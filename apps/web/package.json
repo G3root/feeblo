@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "astro build",
+    "build": "dotenvx run -f ../../.env -- astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "dev": "astro dev",
-    "dev:bare": "astro dev"
+    "dev": "dotenvx run -f ../../.env -- astro dev",
+    "dev:bare": "dotenvx run -f ../../.env -- astro dev"
   },
   "dependencies": {
     "@astrojs/node": "^9.5.2",

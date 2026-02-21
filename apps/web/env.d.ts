@@ -1,0 +1,8 @@
+/** biome-ignore-all lint/style/noNamespace: <explanation> */
+
+declare namespace App {
+  interface Locals {
+    session: import("@feeblo/auth").Session["session"] | null;
+    user: import("@feeblo/auth").Session["user"] | null;
+  }
+}

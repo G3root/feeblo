@@ -6,4 +6,4 @@ const authRuntime = ManagedRuntime.make(
   DBLive.pipe(Layer.provide(PgClientLive))
 );
 
-export const auth = authRuntime.runSync(initAuthHandler());
+export const getAuth = () => authRuntime.runPromise(initAuthHandler());
