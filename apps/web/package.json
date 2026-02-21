@@ -7,15 +7,24 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "dev": "astro dev",
     "dev:bare": "astro dev"
   },
   "dependencies": {
     "@astrojs/node": "^9.5.2",
+    "@astrojs/react": "^4.4.2",
     "@feeblo/auth": "workspace:*",
     "@feeblo/env": "workspace:*",
+    "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-router": "^1.161.3",
+    "@tanstack/react-router-devtools": "^1.161.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "astro": "^5.16.11",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -23,6 +32,10 @@
     "@cloudflare/workers-types": "catalog:",
     "@feeblo/config": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-devtools": "^0.9.6",
+    "@tanstack/react-form-devtools": "^0.2.16",
+    "@tanstack/react-query-devtools": "^5.91.3",
+    "@tanstack/router-plugin": "^1.161.3",
     "alchemy": "catalog:",
     "tailwindcss": "^4.1.18",
     "typescript": "catalog:"

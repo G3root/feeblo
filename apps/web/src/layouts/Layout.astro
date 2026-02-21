@@ -1,6 +1,5 @@
 ---
 import "../styles/global.css";
-import Header from "../components/Header.astro";
 
 interface Props {
   title?: string;
@@ -18,8 +17,7 @@ const { title = "feeblo" } = Astro.props;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
-  <body class="min-h-screen bg-neutral-950 text-white">
-    <Header />
+  <body>
     <slot />
   </body>
 </html>

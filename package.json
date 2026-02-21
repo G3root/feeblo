@@ -34,7 +34,8 @@
     "db:down": "turbo -F @feeblo/db db:down",
     "deploy": "turbo -F @feeblo/infra deploy",
     "destroy": "turbo -F @feeblo/infra destroy",
-    "check": "biome check --write ."
+    "check": "ultracite check",
+    "fix": "ultracite fix"
   },
   "dependencies": {
     "@feeblo/env": "workspace:*",
@@ -42,12 +43,13 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.0",
+    "@biomejs/biome": "2.4.0",
     "@cloudflare/workers-types": "catalog:",
     "@feeblo/config": "workspace:*",
     "@types/bun": "catalog:",
     "turbo": "^2.6.3",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "ultracite": "7.2.3"
   },
   "packageManager": "bun@1.2.15"
 }

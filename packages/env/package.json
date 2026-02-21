@@ -13,7 +13,6 @@
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
-    "@feeblo/infra": "workspace:*",
     "@types/bun": "catalog:",
     "typescript": "catalog:"
   }

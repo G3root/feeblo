@@ -1,0 +1,11 @@
+---
+import { Dashboard as ReactDashboard } from "../../dashboard/main.tsx";
+import Layout from "../../layouts/Layout.astro";
+export const prerender = false;
+---
+
+<Layout title="Dashboard">
+  <main>
+    <ReactDashboard client:only="react" />
+  </main>
+</Layout>
