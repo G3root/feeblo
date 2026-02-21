@@ -1,7 +1,8 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { DB } from "@feeblo/db";
-import * as schema from "@feeblo/db/schema/auth";
+import * as schema from "@feeblo/db/schema/index";
 import { generateId } from "@feeblo/utils/id";
+import { slugify } from "@feeblo/utils/url";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import {
   admin,
@@ -85,6 +86,8 @@ export const initAuthHandler = () =>
               await Effect.runPromise(
                 db.transaction((tx) =>
                   Effect.gen(function* () {
+                    const boards = ["🐞 Bugs", "💡 Features"];
+
                     const [newOrg] = yield* tx
                       .insert(schema.organization)
                       .values({
@@ -109,6 +112,17 @@ export const initAuthHandler = () =>
                       createdAt: new Date(),
                       userId: user.id,
                     });
+
+                    for (const board of boards) {
+                      yield* tx.insert(schema.board).values({
+                        id: generateId("board"),
+                        name: board,
+                        createdAt: new Date(),
+                        organizationId: newOrg.id,
+                        slug: slugify(board),
+                        visibility: "PUBLIC",
+                      });
+                    }
                   })
                 )
               );

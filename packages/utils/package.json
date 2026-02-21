@@ -4,10 +4,12 @@
   "version": "0.0.1",
   "private": true,
   "exports": {
-    "./id": "./src/id.ts"
+    "./id": "./src/id.ts",
+    "./url": "./src/url.ts"
   },
   "dependencies": {
     "legid": "^0.1.4",
-    "nanoid": "^5.1.6"
+    "nanoid": "^5.1.6",
+    "@sindresorhus/slugify": "^2.2.1"
   }
 }
