@@ -24,7 +24,8 @@
     "dotenv": "catalog:",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@astrojs/cloudflare": "^12.6.12",
