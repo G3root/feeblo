@@ -14,6 +14,7 @@
     "db:generate": "dotenvx run -f ../../.env -- drizzle-kit generate",
     "db:studio": "dotenvx run -f ../../.env -- drizzle-kit studio",
     "db:migrate": "dotenvx run -f ../../.env -- drizzle-kit migrate",
+    "db:seed": "dotenvx run -f ../../.env -- bun run seed.ts",
     "db:start": "docker compose up -d",
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
@@ -28,6 +29,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.3.0",
+    "@feeblo/auth": "workspace:*",
     "@feeblo/config": "workspace:*",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "^1.0.0-beta.15-859cf75",
