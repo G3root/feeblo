@@ -1,4 +1,4 @@
-import { defineRelations } from "drizzle-orm/relations";
+import { relations } from "drizzle-orm/relations";
 import {
   account,
   board,
@@ -14,223 +14,157 @@ import {
   twoFactor,
   upvote,
   user,
-  verification,
 } from "./schema";
 
-export const relations = defineRelations(
-  {
-    user,
-    session,
-    account,
-    verification,
-    twoFactor,
-    organization,
-    member,
-    invitation,
-    board,
-    post,
-    upvote,
-    reaction,
-    commentEntity: comment,
-    commentLikeEntity: commentLike,
-    site,
-  },
-  (r) => ({
-    user: {
-      sessions: r.many.session({
-        from: r.user.id,
-        to: r.session.userId,
-      }),
-      accounts: r.many.account({
-        from: r.user.id,
-        to: r.account.userId,
-      }),
-      twoFactors: r.many.twoFactor({
-        from: r.user.id,
-        to: r.twoFactor.userId,
-      }),
-      members: r.many.member({
-        from: r.user.id,
-        to: r.member.userId,
-      }),
-      invitations: r.many.invitation({
-        from: r.user.id,
-        to: r.invitation.inviterId,
-      }),
-      upvotes: r.many.upvote({
-        from: r.user.id,
-        to: r.upvote.userId,
-      }),
-      reactions: r.many.reaction({
-        from: r.user.id,
-        to: r.reaction.userId,
-      }),
-      comments: r.many.commentEntity({
-        from: r.user.id,
-        to: r.commentEntity.userId,
-      }),
-      commentLikes: r.many.commentLikeEntity({
-        from: r.user.id,
-        to: r.commentLikeEntity.userId,
-      }),
-    },
-    session: {
-      user: r.one.user({
-        from: r.session.userId,
-        to: r.user.id,
-      }),
-    },
-    account: {
-      user: r.one.user({
-        from: r.account.userId,
-        to: r.user.id,
-      }),
-    },
-    twoFactor: {
-      user: r.one.user({
-        from: r.twoFactor.userId,
-        to: r.user.id,
-      }),
-    },
-    organization: {
-      members: r.many.member({
-        from: r.organization.id,
-        to: r.member.organizationId,
-      }),
-      invitations: r.many.invitation({
-        from: r.organization.id,
-        to: r.invitation.organizationId,
-      }),
-      boards: r.many.board({
-        from: r.organization.id,
-        to: r.board.organizationId,
-      }),
-      posts: r.many.post({
-        from: r.organization.id,
-        to: r.post.organizationId,
-      }),
-      comments: r.many.commentEntity({
-        from: r.organization.id,
-        to: r.commentEntity.organizationId,
-      }),
-      site: r.one.site({
-        from: r.organization.id,
-        to: r.site.organizationId,
-      }),
-    },
-    member: {
-      organization: r.one.organization({
-        from: r.member.organizationId,
-        to: r.organization.id,
-      }),
-      user: r.one.user({
-        from: r.member.userId,
-        to: r.user.id,
-      }),
-    },
-    invitation: {
-      organization: r.one.organization({
-        from: r.invitation.organizationId,
-        to: r.organization.id,
-      }),
-      user: r.one.user({
-        from: r.invitation.inviterId,
-        to: r.user.id,
-      }),
-    },
-    board: {
-      organization: r.one.organization({
-        from: r.board.organizationId,
-        to: r.organization.id,
-      }),
-      posts: r.many.post({
-        from: r.board.id,
-        to: r.post.boardId,
-      }),
-    },
-    post: {
-      board: r.one.board({
-        from: r.post.boardId,
-        to: r.board.id,
-      }),
-      organization: r.one.organization({
-        from: r.post.organizationId,
-        to: r.organization.id,
-      }),
-      upvotes: r.many.upvote({
-        from: r.post.id,
-        to: r.upvote.postId,
-      }),
-      reactions: r.many.reaction({
-        from: r.post.id,
-        to: r.reaction.postId,
-      }),
-      comments: r.many.commentEntity({
-        from: r.post.id,
-        to: r.commentEntity.postId,
-      }),
-    },
-    upvote: {
-      user: r.one.user({
-        from: r.upvote.userId,
-        to: r.user.id,
-      }),
-      post: r.one.post({
-        from: r.upvote.postId,
-        to: r.post.id,
-      }),
-    },
-    reaction: {
-      user: r.one.user({
-        from: r.reaction.userId,
-        to: r.user.id,
-      }),
-      post: r.one.post({
-        from: r.reaction.postId,
-        to: r.post.id,
-      }),
-    },
-    commentEntity: {
-      organization: r.one.organization({
-        from: r.commentEntity.organizationId,
-        to: r.organization.id,
-      }),
-      post: r.one.post({
-        from: r.commentEntity.postId,
-        to: r.post.id,
-      }),
-      user: r.one.user({
-        from: r.commentEntity.userId,
-        to: r.user.id,
-      }),
-      parentComment: r.one.commentEntity({
-        from: r.commentEntity.parentCommentId,
-        to: r.commentEntity.id,
-      }),
-      replies: r.many.commentEntity({
-        from: r.commentEntity.id,
-        to: r.commentEntity.parentCommentId,
-      }),
-      commentLikes: r.many.commentLikeEntity({
-        from: r.commentEntity.id,
-        to: r.commentLikeEntity.commentId,
-      }),
-    },
-    commentLikeEntity: {
-      user: r.one.user({
-        from: r.commentLikeEntity.userId,
-        to: r.user.id,
-      }),
-      comment: r.one.commentEntity({
-        from: r.commentLikeEntity.commentId,
-        to: r.commentEntity.id,
-      }),
-    },
-    site: {
-      organization: r.one.organization({
-        from: r.site.organizationId,
-        to: r.organization.id,
-      }),
-    },
-  })
-);
+export const userRelations = relations(user, ({ many }) => ({
+  sessions: many(session),
+  accounts: many(account),
+  twoFactors: many(twoFactor),
+  members: many(member),
+  invitations: many(invitation),
+  upvotes: many(upvote),
+  reactions: many(reaction),
+  comments: many(comment),
+  commentLikes: many(commentLike),
+}));
+
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+  }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
+  user: one(user, {
+    fields: [twoFactor.userId],
+    references: [user.id],
+  }),
+}));
+
+export const organizationRelations = relations(organization, ({ many, one }) => ({
+  members: many(member),
+  invitations: many(invitation),
+  boards: many(board),
+  posts: many(post),
+  comments: many(comment),
+  site: one(site, {
+    fields: [organization.id],
+    references: [site.organizationId],
+  }),
+}));
+
+export const memberRelations = relations(member, ({ one }) => ({
+  organization: one(organization, {
+    fields: [member.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [member.userId],
+    references: [user.id],
+  }),
+}));
+
+export const invitationRelations = relations(invitation, ({ one }) => ({
+  organization: one(organization, {
+    fields: [invitation.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [invitation.inviterId],
+    references: [user.id],
+  }),
+}));
+
+export const boardRelations = relations(board, ({ many, one }) => ({
+  organization: one(organization, {
+    fields: [board.organizationId],
+    references: [organization.id],
+  }),
+  posts: many(post),
+}));
+
+export const postRelations = relations(post, ({ many, one }) => ({
+  board: one(board, {
+    fields: [post.boardId],
+    references: [board.id],
+  }),
+  organization: one(organization, {
+    fields: [post.organizationId],
+    references: [organization.id],
+  }),
+  upvotes: many(upvote),
+  reactions: many(reaction),
+  comments: many(comment),
+}));
+
+export const upvoteRelations = relations(upvote, ({ one }) => ({
+  user: one(user, {
+    fields: [upvote.userId],
+    references: [user.id],
+  }),
+  post: one(post, {
+    fields: [upvote.postId],
+    references: [post.id],
+  }),
+}));
+
+export const reactionRelations = relations(reaction, ({ one }) => ({
+  user: one(user, {
+    fields: [reaction.userId],
+    references: [user.id],
+  }),
+  post: one(post, {
+    fields: [reaction.postId],
+    references: [post.id],
+  }),
+}));
+
+export const commentRelations = relations(comment, ({ many, one }) => ({
+  organization: one(organization, {
+    fields: [comment.organizationId],
+    references: [organization.id],
+  }),
+  post: one(post, {
+    fields: [comment.postId],
+    references: [post.id],
+  }),
+  user: one(user, {
+    fields: [comment.userId],
+    references: [user.id],
+  }),
+  parentComment: one(comment, {
+    fields: [comment.parentCommentId],
+    references: [comment.id],
+    relationName: "commentReplies",
+  }),
+  replies: many(comment, {
+    relationName: "commentReplies",
+  }),
+  commentLikes: many(commentLike),
+}));
+
+export const commentLikeRelations = relations(commentLike, ({ one }) => ({
+  user: one(user, {
+    fields: [commentLike.userId],
+    references: [user.id],
+  }),
+  comment: one(comment, {
+    fields: [commentLike.commentId],
+    references: [comment.id],
+  }),
+}));
+
+export const siteRelations = relations(site, ({ one }) => ({
+  organization: one(organization, {
+    fields: [site.organizationId],
+    references: [organization.id],
+  }),
+}));

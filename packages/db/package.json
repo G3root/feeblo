@@ -21,9 +21,10 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
+    "@effect/sql-drizzle": "^0.48.1",
     "@effect/sql-pg": "catalog:",
     "dotenv": "catalog:",
-    "drizzle-orm": "^1.0.0-beta.15-859cf75",
+    "drizzle-orm": "^0.45.1",
     "effect": "catalog:",
     "pg": "^8.17.1",
     "zod": "catalog:"
@@ -33,7 +34,8 @@
     "@feeblo/auth": "workspace:*",
     "@feeblo/config": "workspace:*",
     "@types/pg": "^8.16.0",
-    "drizzle-kit": "^1.0.0-beta.15-859cf75",
+    "drizzle-kit": "^0.31.9",
+    "drizzle-seed": "^0.3.1",
     "typescript": "catalog:"
   }
 }

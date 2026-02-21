@@ -2,8 +2,11 @@
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth";
 import { and, eq } from "drizzle-orm";
-import { Effect, Layer } from "effect";
-import { DB, DBLive, PgClientLive } from "./src";
+import { reset } from "drizzle-seed";
+import { Effect } from "effect";
+import { DB } from "./src";
+import * as relationalSchema from "./src/relations";
+import * as schema from "./src/schema";
 import {
   board,
   comment,
@@ -67,8 +70,18 @@ const ensureUser = ({
     const db = yield* DB;
     const auth = yield* initAuthHandler();
 
+    yield* Effect.tryPromise(() =>
+      reset(db, {
+        schema: { ...schema, ...relationalSchema },
+      })
+    );
+
     let [existingUser] = yield* db
-      .select({ id: user.id, email: user.email, emailVerified: user.emailVerified })
+      .select({
+        id: user.id,
+        email: user.email,
+        emailVerified: user.emailVerified,
+      })
       .from(user)
       .where(eq(user.email, email))
       .limit(1);
@@ -84,19 +97,30 @@ const ensureUser = ({
         })
       );
 
-      if (!result || typeof result !== "object" || !("user" in result) || !result.user) {
+      if (
+        !result ||
+        typeof result !== "object" ||
+        !("user" in result) ||
+        !result.user
+      ) {
         return yield* Effect.fail(new Error(`Failed to create user ${email}`));
       }
 
       [existingUser] = yield* db
-        .select({ id: user.id, email: user.email, emailVerified: user.emailVerified })
+        .select({
+          id: user.id,
+          email: user.email,
+          emailVerified: user.emailVerified,
+        })
         .from(user)
         .where(eq(user.email, email))
         .limit(1);
     }
 
     if (!existingUser) {
-      return yield* Effect.fail(new Error(`User ${email} not found after creation`));
+      return yield* Effect.fail(
+        new Error(`User ${email} not found after creation`)
+      );
     }
 
     if (!existingUser.emailVerified) {
@@ -114,7 +138,11 @@ const ensureOrganization = (userId: string) =>
     const db = yield* DB;
 
     let [org] = yield* db
-      .select({ id: organization.id, name: organization.name, slug: organization.slug })
+      .select({
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+      })
       .from(organization)
       .where(eq(organization.id, userId))
       .limit(1);
@@ -136,7 +164,9 @@ const ensureOrganization = (userId: string) =>
     }
 
     if (!org) {
-      return yield* Effect.fail(new Error(`Failed to ensure organization for ${userId}`));
+      return yield* Effect.fail(
+        new Error(`Failed to ensure organization for ${userId}`)
+      );
     }
 
     return org;
@@ -157,7 +187,12 @@ const ensureMember = ({
     let [existing] = yield* db
       .select({ id: member.id, role: member.role })
       .from(member)
-      .where(and(eq(member.organizationId, organizationId), eq(member.userId, userId)))
+      .where(
+        and(
+          eq(member.organizationId, organizationId),
+          eq(member.userId, userId)
+        )
+      )
       .limit(1);
 
     if (!existing) {
@@ -286,7 +321,9 @@ const seedEngagement = ({
       .limit(1);
 
     if (existingComment) {
-      console.log("   Engagement already exists, skipping comments/likes/reactions");
+      console.log(
+        "   Engagement already exists, skipping comments/likes/reactions"
+      );
       return;
     }
 
@@ -294,7 +331,10 @@ const seedEngagement = ({
     const createdComments: Array<{ id: string; userId: string }> = [];
 
     for (const [index, postItem] of targetPosts.entries()) {
-      const commentCount = faker.number.int({ min: 1, max: Math.min(3, actorIds.length) });
+      const commentCount = faker.number.int({
+        min: 1,
+        max: Math.min(3, actorIds.length),
+      });
 
       for (let i = 0; i < commentCount; i++) {
         const actorId = actorIds[(index + i) % actorIds.length];
@@ -327,7 +367,9 @@ const seedEngagement = ({
         const [existing] = yield* db
           .select({ id: upvote.id })
           .from(upvote)
-          .where(and(eq(upvote.userId, upvoterId), eq(upvote.postId, postItem.id)))
+          .where(
+            and(eq(upvote.userId, upvoterId), eq(upvote.postId, postItem.id))
+          )
           .limit(1);
 
         if (!existing) {
@@ -371,7 +413,10 @@ const seedEngagement = ({
     }
 
     for (const item of createdComments.slice(0, 20)) {
-      const likeCount = faker.number.int({ min: 1, max: Math.min(3, actorIds.length) });
+      const likeCount = faker.number.int({
+        min: 1,
+        max: Math.min(3, actorIds.length),
+      });
       const likers = faker.helpers.arrayElements(actorIds, likeCount);
 
       for (const likerId of likers) {
@@ -382,7 +427,12 @@ const seedEngagement = ({
         const [existing] = yield* db
           .select({ id: commentLike.id })
           .from(commentLike)
-          .where(and(eq(commentLike.userId, likerId), eq(commentLike.commentId, item.id)))
+          .where(
+            and(
+              eq(commentLike.userId, likerId),
+              eq(commentLike.commentId, item.id)
+            )
+          )
           .limit(1);
 
         if (!existing) {
@@ -427,7 +477,8 @@ const seed = Effect.gen(function* () {
 
   console.log("2) Creating additional users");
 
-  const extraUsers: Array<{ id: string; email: string; joinMainOrg: boolean }> = [];
+  const extraUsers: Array<{ id: string; email: string; joinMainOrg: boolean }> =
+    [];
 
   for (const candidate of TEAM_USERS) {
     const userRecord = yield* ensureUser({
@@ -475,7 +526,9 @@ const seed = Effect.gen(function* () {
       count: EXTERNAL_POST_COUNT,
     });
 
-    console.log(`   External org: ${externalOrg.name} (${externalPosts.length} posts)`);
+    console.log(
+      `   External org: ${externalOrg.name} (${externalPosts.length} posts)`
+    );
   }
 
   console.log("4) Seeding comments, likes, and reactions in main org");
@@ -496,7 +549,7 @@ const seed = Effect.gen(function* () {
   console.log(`Primary user password: ${TEST_USER.password}`);
 });
 
-const SeedLayer = DBLive.pipe(Layer.provide(PgClientLive));
+const SeedLayer = DB.Client;
 
 seed.pipe(Effect.provide(SeedLayer), Effect.runPromise).catch((error) => {
   console.error("Seed failed:", error);

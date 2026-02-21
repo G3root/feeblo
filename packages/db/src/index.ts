@@ -1,39 +1,26 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import { PgClient } from "@effect/sql-pg";
-import * as PgDrizzle from "drizzle-orm/effect-postgres";
-import { Context, Effect, Layer, Redacted } from "effect";
-import { types } from "pg";
-import { relations } from "./relations";
+import * as Pg from "@effect/sql-drizzle/Pg";
+import { Config, Effect, Layer } from "effect";
+import * as relationalSchema from "./relations";
 import * as schema from "./schema";
 
-// Configure the PgClient layer with type parsers
-export const PgClientLive = PgClient.layer({
-  url: Redacted.make(process.env.DATABASE_URL!),
-  types: {
-    getTypeParser: (typeId, format) => {
-      if (
-        [1184, 1114, 1082, 1186, 1231, 1115, 1185, 1187, 1182].includes(typeId)
-      ) {
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        return (val: any) => val;
-      }
-      return types.getTypeParser(typeId, format);
-    },
-  },
-});
-
-const dbEffect = PgDrizzle.make({ relations, schema }).pipe(
-  Effect.provide(PgDrizzle.DefaultServices)
+export const PgClientLive = Layer.unwrapEffect(
+  Config.redacted("DATABASE_URL").pipe(
+    Effect.map((url) =>
+      PgClient.layer({
+        url,
+      })
+    )
+  )
 );
 
-export class DB extends Context.Tag("DB")<
-  DB,
-  Effect.Effect.Success<typeof dbEffect>
->() {}
+export class DB extends Effect.Service<DB>()("DB", {
+  effect: Pg.make({
+    schema: { ...schema, ...relationalSchema },
+  }),
+}) {
+  static Client = this.Default.pipe(Layer.provideMerge(PgClientLive));
+}
 
-export const DBLive = Layer.effect(
-  DB,
-  Effect.gen(function* () {
-    return yield* dbEffect;
-  })
-);
+export const DBLive = DB.Default;

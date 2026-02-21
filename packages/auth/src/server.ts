@@ -1,15 +1,16 @@
-import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { DB } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema/index";
 import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
   admin,
   emailOTP,
   lastLoginMethod,
   organization,
 } from "better-auth/plugins";
+import { SqlClient } from "@effect/sql";
 import { and, eq } from "drizzle-orm";
 import { Config, Effect } from "effect";
 
@@ -19,6 +20,7 @@ export const initAuthHandler = () =>
     const apiUrl = yield* Config.string("VITE_API_URL");
     const secret = yield* Config.string("AUTH_ENCRYPTION_KEY");
     const db = yield* DB;
+    const sql = yield* SqlClient.SqlClient;
 
     const config = {
       database: drizzleAdapter(db, {
@@ -84,11 +86,11 @@ export const initAuthHandler = () =>
           create: {
             after: async (user) => {
               await Effect.runPromise(
-                db.transaction((tx) =>
+                sql.withTransaction(
                   Effect.gen(function* () {
                     const boards = ["🐞 Bugs", "💡 Features"];
 
-                    const [newOrg] = yield* tx
+                    const [newOrg] = yield* db
                       .insert(schema.organization)
                       .values({
                         id: user.id,
@@ -105,7 +107,7 @@ export const initAuthHandler = () =>
                       );
                     }
 
-                    yield* tx.insert(schema.member).values({
+                    yield* db.insert(schema.member).values({
                       id: generateId("member"),
                       organizationId: newOrg.id,
                       role: "owner",
@@ -114,7 +116,7 @@ export const initAuthHandler = () =>
                     });
 
                     for (const board of boards) {
-                      yield* tx.insert(schema.board).values({
+                      yield* db.insert(schema.board).values({
                         id: generateId("board"),
                         name: board,
                         createdAt: new Date(),
