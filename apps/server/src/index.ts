@@ -8,9 +8,11 @@ import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { initAuthHandler } from "@feeblo/auth";
 import { DBLive, PgClientLive } from "@feeblo/db";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
+import { Auth } from "@feeblo/domain/session-middleware";
 import { Config, Effect, Layer } from "effect";
 
 const ServiceLayers = DBLive.pipe(Layer.provide(PgClientLive));
+const AuthLayer = Layer.effect(Auth, initAuthHandler());
 
 const BetterAuthApp = Effect.flatMap(initAuthHandler(), (auth) =>
   HttpApp.fromWebHandler(auth.handler)
@@ -56,6 +58,7 @@ HttpLayerRouter.serve(AllRoutes, {
     maxParamLength: 500,
   },
 }).pipe(
+  Layer.provide(AuthLayer),
   Layer.provide(ServiceLayers),
   Layer.provide(
     BunHttpServer.layerConfig(

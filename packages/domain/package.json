@@ -7,6 +7,9 @@
     "./rpc-router": {
       "default": "./src/rpc-router.ts"
     },
+    "./session-middleware": {
+      "default": "./src/session-middleware.ts"
+    },
     "./user/schema": {
       "default": "./src/user/schema.ts"
     },
@@ -23,7 +26,10 @@
   "dependencies": {
     "@effect/platform": "catalog:",
     "@effect/rpc": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@feeblo/auth": "workspace:*",
+    "@feeblo/db": "workspace:*",
+    "@feeblo/utils": "workspace:*"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
