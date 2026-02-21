@@ -1,0 +1,30 @@
+{
+  "name": "web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "dev:bare": "astro dev"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.5.2",
+    "@feeblo/auth": "workspace:*",
+    "@feeblo/env": "workspace:*",
+    "astro": "^5.16.11",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@astrojs/cloudflare": "^12.6.12",
+    "@cloudflare/workers-types": "catalog:",
+    "@feeblo/config": "workspace:*",
+    "@tailwindcss/vite": "^4.1.18",
+    "alchemy": "catalog:",
+    "tailwindcss": "^4.1.18",
+    "typescript": "catalog:"
+  }
+}

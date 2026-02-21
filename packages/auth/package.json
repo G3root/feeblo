@@ -1,0 +1,24 @@
+{
+  "name": "@feeblo/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@feeblo/db": "workspace:*",
+    "@feeblo/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
