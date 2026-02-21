@@ -1,0 +1,184 @@
+import {
+  type AnyPgColumn,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import { organization, user } from "./auth";
+
+export const boardVisibilityEnum = pgEnum("board_visibility", [
+  "PUBLIC",
+  "PRIVATE",
+]);
+
+export const postStatusEnum = pgEnum("post_status", [
+  "PAUSED",
+  "REVIEW",
+  "PLANNED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "CLOSED",
+]);
+
+export const postIconTypeEnum = pgEnum("post_icon_type", ["EMOJI"]);
+
+export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
+  "PUBLIC",
+  "INTERNAL",
+]);
+
+export const board = pgTable(
+  "board",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    visibility: boardVisibilityEnum("visibility").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .$onUpdate(() => /* @__PURE__ */ new Date()),
+  },
+  (table) => [
+    uniqueIndex("board_organizationId_slug_uidx").on(
+      table.organizationId,
+      table.slug
+    ),
+  ]
+);
+
+export const post = pgTable("post", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  publicId: text("public_id").notNull().unique(),
+  slug: text("slug").notNull(),
+  content: text("content").notNull(),
+  boardId: text("board_id")
+    .notNull()
+    .references(() => board.id, { onDelete: "cascade" }),
+  status: postStatusEnum("status").notNull(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .$onUpdate(() => /* @__PURE__ */ new Date()),
+});
+
+export const upvote = pgTable(
+  "upvote",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId)]
+);
+
+export const reaction = pgTable(
+  "reaction",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("reaction_userId_postId_emoji_uidx").on(
+      table.userId,
+      table.postId,
+      table.emoji
+    ),
+  ]
+);
+
+export const comment = pgTable("comment", {
+  id: text("id").primaryKey(),
+  content: text("content").notNull(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  postId: text("post_id")
+    .notNull()
+    .references(() => post.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  visibility: postCommentVisibilityEnum("visibility")
+    .default("PUBLIC")
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+  parentCommentId: text("parent_comment_id").references(
+    (): AnyPgColumn => comment.id,
+    {
+      onDelete: "cascade",
+    }
+  ),
+});
+
+export const commentLike = pgTable(
+  "commentLike",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    commentId: text("comment_id")
+      .notNull()
+      .references(() => comment.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("commentLike_userId_commentId_uidx").on(
+      table.userId,
+      table.commentId
+    ),
+  ]
+);
+
+export const site = pgTable(
+  "site",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    subdomain: text("subdomain").notNull(),
+    customDomain: text("custom_domain"),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .$onUpdate(() => /* @__PURE__ */ new Date()),
+  },
+  (table) => [uniqueIndex("site_organizationId_uidx").on(table.organizationId)]
+);
