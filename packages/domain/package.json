@@ -1,0 +1,32 @@
+{
+  "name": "@feeblo/domain",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./rpc-router": {
+      "default": "./src/rpc-router.ts"
+    },
+    "./user/schema": {
+      "default": "./src/user/schema.ts"
+    },
+    "./user/rpcs": {
+      "default": "./src/user/rpcs.ts"
+    },
+    "./user/repository": {
+      "default": "./src/user/repository.ts"
+    },
+    "./user/handlers": {
+      "default": "./src/user/handlers.ts"
+    }
+  },
+  "dependencies": {
+    "@effect/platform": "catalog:",
+    "@effect/rpc": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

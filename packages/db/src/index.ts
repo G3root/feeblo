@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import { PgClient } from "@effect/sql-pg";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
-import { Context, Effect, Redacted } from "effect";
+import { Context, Effect, Layer, Redacted } from "effect";
 import { types } from "pg";
 import { relations } from "./relations";
 import * as schema from "./schema";
@@ -30,3 +30,10 @@ export class DB extends Context.Tag("DB")<
   DB,
   Effect.Effect.Success<typeof dbEffect>
 >() {}
+
+export const DBLive = Layer.effect(
+  DB,
+  Effect.gen(function* () {
+    return yield* dbEffect;
+  })
+);
