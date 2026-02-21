@@ -1,5 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { getContext } from "./integrations/tanstack-query/root-provider";
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
@@ -21,7 +22,7 @@ export function createRouter() {
     Wrap({ children }: { children: React.ReactNode }) {
       return (
         <QueryClientProvider client={queryClient}>
-          {children}
+          <TooltipProvider>{children}</TooltipProvider>
         </QueryClientProvider>
       );
     },

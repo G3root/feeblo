@@ -9,11 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
+import { Route as SignUpRouteImport } from "./routes/sign-up"
+import { Route as SignInRouteImport } from "./routes/sign-in"
 import { Route as DashboardLayoutRouteImport } from "./routes/_dashboard-layout"
 import { Route as DashboardLayoutIndexRouteImport } from "./routes/_dashboard-layout/index"
 import { Route as DashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/_dashboard-layout/board/$boardSlug/index"
 import { Route as DashboardLayoutBoardBoardSlugPostSlugRouteImport } from "./routes/_dashboard-layout/board/$boardSlug/$postSlug"
 
+const SignUpRoute = SignUpRouteImport.update({
+  id: "/sign-up",
+  path: "/sign-up",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: "/sign-in",
+  path: "/sign-in",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardLayoutRoute = DashboardLayoutRouteImport.update({
   id: "/_dashboard-layout",
   getParentRoute: () => rootRouteImport,
@@ -38,10 +50,14 @@ const DashboardLayoutBoardBoardSlugPostSlugRoute =
 
 export interface FileRoutesByFullPath {
   "/": typeof DashboardLayoutIndexRoute
+  "/sign-in": typeof SignInRoute
+  "/sign-up": typeof SignUpRoute
   "/board/$boardSlug/$postSlug": typeof DashboardLayoutBoardBoardSlugPostSlugRoute
   "/board/$boardSlug/": typeof DashboardLayoutBoardBoardSlugIndexRoute
 }
 export interface FileRoutesByTo {
+  "/sign-in": typeof SignInRoute
+  "/sign-up": typeof SignUpRoute
   "/": typeof DashboardLayoutIndexRoute
   "/board/$boardSlug/$postSlug": typeof DashboardLayoutBoardBoardSlugPostSlugRoute
   "/board/$boardSlug": typeof DashboardLayoutBoardBoardSlugIndexRoute
@@ -49,18 +65,32 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/_dashboard-layout": typeof DashboardLayoutRouteWithChildren
+  "/sign-in": typeof SignInRoute
+  "/sign-up": typeof SignUpRoute
   "/_dashboard-layout/": typeof DashboardLayoutIndexRoute
   "/_dashboard-layout/board/$boardSlug/$postSlug": typeof DashboardLayoutBoardBoardSlugPostSlugRoute
   "/_dashboard-layout/board/$boardSlug/": typeof DashboardLayoutBoardBoardSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: "/" | "/board/$boardSlug/$postSlug" | "/board/$boardSlug/"
+  fullPaths:
+    | "/"
+    | "/sign-in"
+    | "/sign-up"
+    | "/board/$boardSlug/$postSlug"
+    | "/board/$boardSlug/"
   fileRoutesByTo: FileRoutesByTo
-  to: "/" | "/board/$boardSlug/$postSlug" | "/board/$boardSlug"
+  to:
+    | "/sign-in"
+    | "/sign-up"
+    | "/"
+    | "/board/$boardSlug/$postSlug"
+    | "/board/$boardSlug"
   id:
     | "__root__"
     | "/_dashboard-layout"
+    | "/sign-in"
+    | "/sign-up"
     | "/_dashboard-layout/"
     | "/_dashboard-layout/board/$boardSlug/$postSlug"
     | "/_dashboard-layout/board/$boardSlug/"
@@ -68,10 +98,26 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   DashboardLayoutRoute: typeof DashboardLayoutRouteWithChildren
+  SignInRoute: typeof SignInRoute
+  SignUpRoute: typeof SignUpRoute
 }
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+    "/sign-up": {
+      id: "/sign-up"
+      path: "/sign-up"
+      fullPath: "/sign-up"
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/sign-in": {
+      id: "/sign-in"
+      path: "/sign-in"
+      fullPath: "/sign-in"
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/_dashboard-layout": {
       id: "/_dashboard-layout"
       path: ""
@@ -123,6 +169,8 @@ const DashboardLayoutRouteWithChildren = DashboardLayoutRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   DashboardLayoutRoute: DashboardLayoutRouteWithChildren,
+  SignInRoute: SignInRoute,
+  SignUpRoute: SignUpRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
