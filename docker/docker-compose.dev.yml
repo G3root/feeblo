@@ -1,0 +1,23 @@
+name: feeblo
+services:
+  pg:
+    image: postgres:17-alpine
+    container_name: feeblo-database
+    environment:
+      - POSTGRES_USER=feeblo
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=feeblo
+    ports:
+      - 54323:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+  smtp:
+    image: axllent/mailpit
+    container_name: feeblo-smtp
+    ports:
+      - 8025:8025
+      - 1025:1025
+
+volumes:
+  postgres:

@@ -10,10 +10,10 @@
     }
   },
   "scripts": {
-    "db:push": "drizzle-kit push",
-    "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio",
-    "db:migrate": "drizzle-kit migrate",
+    "db:push": "dotenvx run -f ../../.env -- drizzle-kit push",
+    "db:generate": "dotenvx run -f ../../.env -- drizzle-kit generate",
+    "db:studio": "dotenvx run -f ../../.env -- drizzle-kit studio",
+    "db:migrate": "dotenvx run -f ../../.env -- drizzle-kit migrate",
     "db:start": "docker compose up -d",
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
