@@ -3,19 +3,21 @@
   "type": "module",
   "exports": {
     ".": {
-      "default": "./src/index.ts"
+      "types": "./dist/server.d.ts",
+      "default": "./src/server.ts"
     },
-    "./*": {
-      "default": "./src/*.ts"
+    "./client": {
+      "types": "./dist/auth-client.d.ts",
+      "default": "./src/auth-client.ts"
     }
   },
   "scripts": {},
   "dependencies": {
+    "@better-auth/drizzle-adapter": "https://pkg.pr.new/better-auth/better-auth/@better-auth/drizzle-adapter@6913",
     "@feeblo/db": "workspace:*",
-    "@feeblo/env": "workspace:*",
     "better-auth": "catalog:",
-    "dotenv": "catalog:",
-    "zod": "catalog:"
+    "effect": "catalog:",
+    "@feeblo/utils": "workspace:*"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",

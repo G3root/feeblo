@@ -20,16 +20,17 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
-    "@feeblo/env": "workspace:*",
+    "@effect/sql-pg": "catalog:",
     "dotenv": "catalog:",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "^1.0.0-beta.15-859cf75",
+    "effect": "catalog:",
     "pg": "^8.17.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@types/pg": "^8.16.0",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^1.0.0-beta.15-859cf75",
     "typescript": "catalog:"
   }
 }
