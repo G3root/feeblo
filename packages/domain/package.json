@@ -4,6 +4,9 @@
   "version": "0.0.1",
   "private": true,
   "exports": {
+    "./rpc-group": {
+      "default": "./src/rpc-group.ts"
+    },
     "./rpc-router": {
       "default": "./src/rpc-router.ts"
     },

@@ -1,14 +1,14 @@
 import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
 import { AuthMiddleware } from "../session-middleware";
-import { Post } from "./schema";
+import { Board } from "./schema";
 
-export class PostRpcs extends RpcGroup.make(
-  Rpc.make("PostList", {
-    success: Schema.Array(Post),
+export class BoardRpcs extends RpcGroup.make(
+  Rpc.make("BoardList", {
+    success: Schema.Array(Board),
   }),
 
-  Rpc.make("PostDelete", {
+  Rpc.make("BoardDelete", {
     success: Schema.Void,
     payload: {
       id: Schema.String,
