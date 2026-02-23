@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
 import {
@@ -42,38 +43,61 @@ function RouteComponent() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <form
-          className="flex flex-col gap-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            form.handleSubmit();
-          }}
-        >
-          <form.AppField
-            children={(field) => <field.TextField label="Full Name" />}
-            name="name"
-          />
+        <Card>
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-xl">Create account</CardTitle>
+            <p className="text-muted-foreground text-sm">
+              Start your workspace with a new account.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                form.handleSubmit();
+              }}
+            >
+              <form.AppField
+                children={(field) => <field.TextField label="Full Name" />}
+                name="name"
+              />
 
-          <form.AppField
-            children={(field) => <field.TextField label="Email" />}
-            name="email"
-          />
+              <form.AppField
+                children={(field) => (
+                  <field.TextField label="Email" type="email" />
+                )}
+                name="email"
+              />
 
-          <form.AppField
-            children={(field) => <field.TextField label="Password" />}
-            name="password"
-          />
+              <form.AppField
+                children={(field) => (
+                  <field.TextField label="Password" type="password" />
+                )}
+                name="password"
+              />
 
-          <form.AppField
-            children={(field) => <field.TextField label="Confirm Password" />}
-            name="confirmPassword"
-          />
+              <form.AppField
+                children={(field) => (
+                  <field.TextField label="Confirm Password" type="password" />
+                )}
+                name="confirmPassword"
+              />
 
-          <form.AppForm>
-            <form.SubscribeButton label="Signup" />
-          </form.AppForm>
-        </form>
+              <form.AppForm>
+                <form.SubscribeButton className="w-full" label="Sign up" />
+              </form.AppForm>
+
+              <div className="text-center text-sm">
+                Already have an account?{" "}
+                <Link className="underline underline-offset-4" to="/sign-in">
+                  Sign in
+                </Link>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
