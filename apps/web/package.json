@@ -26,6 +26,8 @@
     "@tanstack/react-router-devtools": "^1.161.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@xstate/store": "^3.15.0",
+    "@xstate/store-react": "^1.0.1",
     "astro": "^5.16.11",
     "better-auth": "catalog:",
     "class-variance-authority": "^0.7.1",

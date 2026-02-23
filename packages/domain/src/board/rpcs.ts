@@ -1,7 +1,7 @@
 import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
 import { AuthMiddleware } from "../session-middleware";
-import { Board } from "./schema";
+import { Board, BoardCreate, BoardUpdate } from "./schema";
 
 export class BoardRpcs extends RpcGroup.make(
   Rpc.make("BoardList", {
@@ -13,5 +13,15 @@ export class BoardRpcs extends RpcGroup.make(
     payload: {
       id: Schema.String,
     },
+  }),
+
+  Rpc.make("BoardCreate", {
+    success: Board,
+    payload: BoardCreate,
+  }),
+
+  Rpc.make("BoardUpdate", {
+    success: Board,
+    payload: BoardUpdate,
   })
 ).middleware(AuthMiddleware) {}

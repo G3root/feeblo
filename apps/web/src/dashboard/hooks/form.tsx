@@ -8,12 +8,16 @@ interface SubscribeButtonProps extends React.ComponentProps<typeof Button> {
   label: string;
 }
 
-function SubscribeButton({ label, ...props }: SubscribeButtonProps) {
+function SubscribeButton({
+  label,
+  type = "submit",
+  ...props
+}: SubscribeButtonProps) {
   const form = useFormContext();
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
-        <Button {...props} disabled={isSubmitting}>
+        <Button {...props} disabled={isSubmitting} type={type}>
           {label}
         </Button>
       )}

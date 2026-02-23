@@ -1,14 +1,45 @@
-import { Command } from "@hugeicons/core-free-icons";
+import {
+  Command,
+  Delete02Icon,
+  Edit,
+  Ellipsis,
+  Plus,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useLiveSuspenseQuery } from "@tanstack/react-db";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
+  useSidebar,
 } from "~/components/ui/sidebar";
+import {
+  useCreateBoardDialogContext,
+  useDeleteBoardDialogContext,
+  useRenameBoardDialogContext,
+} from "~/features/board/dialog-stores";
+import { boardCollection } from "~/lib/collections";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -31,6 +62,137 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
+      <SidebarSeparator />
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Overview</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname === "/"}
+                render={(props) => (
+                  <Link {...props} to="/">
+                    <span>Dashboard</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <div className="flex items-center justify-between">
+            <SidebarGroupLabel>Boards</SidebarGroupLabel>
+            <CreateBoardButton />
+          </div>
+          <SidebarMenu>
+            <BoardList />
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
     </Sidebar>
   );
 }
+
+function CreateBoardButton() {
+  const store = useCreateBoardDialogContext();
+
+  return (
+    <div>
+      <SidebarMenuButton onClick={() => store.send({ type: "toggle" })}>
+        <HugeiconsIcon className="size-4" icon={Plus} />
+      </SidebarMenuButton>
+    </div>
+  );
+}
+
+function BoardList() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const { data } = useLiveSuspenseQuery((q) =>
+    q
+      .from({ board: boardCollection })
+      .orderBy((board) => board.board.createdAt, "desc")
+  );
+
+  return data.map((board) => (
+    <SidebarMenuItem key={board.slug}>
+      <SidebarMenuButton
+        isActive={pathname.startsWith(`/board/${board.slug}`)}
+        render={(props) => (
+          <Link
+            {...props}
+            params={{ boardSlug: board.slug }}
+            to="/board/$boardSlug"
+          >
+            <span>{board.name}</span>
+          </Link>
+        )}
+      />
+      <BoardMenu boardPublicId={board.id} />
+    </SidebarMenuItem>
+  ));
+}
+
+interface BoardMenuProps {
+  boardPublicId: string;
+}
+
+function BoardMenu({ boardPublicId }: BoardMenuProps) {
+  const { isMobile } = useSidebar();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={(props) => (
+          <SidebarMenuAction {...props} showOnHover>
+            <HugeiconsIcon icon={Ellipsis} />
+            <span className="sr-only">More</span>
+          </SidebarMenuAction>
+        )}
+      />
+
+      <DropdownMenuContent
+        align={isMobile ? "end" : "start"}
+        className="w-48 rounded-lg"
+        side={isMobile ? "bottom" : "right"}
+      >
+        <RenameBoardButton boardPublicId={boardPublicId} />
+
+        <DropdownMenuSeparator />
+
+        <DeleteBoardButton boardPublicId={boardPublicId} />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const DeleteBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
+  const store = useDeleteBoardDialogContext();
+
+  return (
+    <DropdownMenuItem
+      onClick={() =>
+        store.send({ type: "toggle", data: { boardId: boardPublicId } })
+      }
+    >
+      <HugeiconsIcon className="text-muted-foreground" icon={Delete02Icon} />
+      <span>Delete</span>
+    </DropdownMenuItem>
+  );
+};
+
+const RenameBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
+  const store = useRenameBoardDialogContext();
+  return (
+    <DropdownMenuItem
+      onClick={() =>
+        store.send({ type: "toggle", data: { boardId: boardPublicId } })
+      }
+    >
+      <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
+      <span>Rename</span>
+    </DropdownMenuItem>
+  );
+};

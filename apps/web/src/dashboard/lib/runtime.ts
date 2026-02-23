@@ -1,6 +1,8 @@
 import { type Effect, Exit, Layer, ManagedRuntime } from "effect";
 
 import { FetchWithCredentials, Rpc, withRpc } from "./rpc-client";
+import type { LiveManagedRuntime } from "./runtime/live-layer";
+import { useRuntime } from "./runtime/use-runtime";
 
 export const runtimeLayer = Layer.mergeAll(
   Rpc.Default,
@@ -21,9 +23,9 @@ export type RuntimeRequirements = ManagedRuntime.ManagedRuntime.Context<
  */
 export async function runEffect<A, E, R extends RuntimeRequirements>(
   effect: Effect.Effect<A, E, R>,
-  options?: { signal?: AbortSignal }
+  options?: { signal?: AbortSignal; runtime?: LiveManagedRuntime }
 ): Promise<A> {
-  const result = await runtime.runPromiseExit(effect, {
+  const result = await (options?.runtime ?? runtime).runPromiseExit(effect, {
     signal: options?.signal,
   });
   if (Exit.isFailure(result)) {
@@ -42,5 +44,12 @@ export function fetchRpc<A, E>(
 ): Promise<A> {
   return runEffect(withRpc(cb), options);
 }
+
+export const useFetchRpc = () => {
+  const runtime = useRuntime();
+  return <A, E>(cb: (rpc: Rpc) => Effect.Effect<A, E>) => {
+    return runEffect(withRpc(cb), { runtime });
+  };
+};
 
 export const useRpcClient = () => runtime.runSync(Rpc);

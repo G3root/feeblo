@@ -1,8 +1,23 @@
 import { DB } from "@feeblo/db";
 import { board as boardTable } from "@feeblo/db/schema/feedback";
+import { slugify } from "@feeblo/utils/url";
 import { and, eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { Board } from "./schema";
+
+type TBoardCreate = {
+  name: string;
+  visibility: "PUBLIC" | "PRIVATE";
+  organizationId: string;
+  id: string;
+};
+
+type TBoardUpdate = {
+  id: string;
+  name?: string;
+  visibility?: "PUBLIC" | "PRIVATE";
+  organizationId: string;
+};
 
 export class BoardRepository extends Effect.Service<BoardRepository>()(
   "BoardRepository",
@@ -11,6 +26,26 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
       const db = yield* DB;
 
       return {
+        create: (args: TBoardCreate) =>
+          Effect.gen(function* () {
+            const [newBoard] = yield* db
+              .insert(boardTable)
+              .values({
+                ...args,
+                slug: slugify(args.name),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .returning();
+
+            if (!newBoard) {
+              return yield* Effect.fail(new Error("Failed to create board"));
+            }
+
+            return new Board({
+              ...newBoard,
+            });
+          }),
         findMany: ({ organizationId }: { organizationId: string }) =>
           Effect.gen(function* () {
             const boards = yield* db
@@ -54,6 +89,33 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
                   eq(boardTable.organizationId, organizationId)
                 )
               );
+          }),
+        update: (args: TBoardUpdate) =>
+          Effect.gen(function* () {
+            const { id, organizationId, ...rest } = args;
+
+            const [updatedBoard] = yield* db
+              .update(boardTable)
+              .set({
+                ...rest,
+                ...(rest.name && { slug: slugify(rest.name) }),
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(boardTable.id, id),
+                  eq(boardTable.organizationId, organizationId)
+                )
+              )
+              .returning();
+
+            if (!updatedBoard) {
+              return yield* Effect.fail(new Error("Failed to update board"));
+            }
+
+            return new Board({
+              ...updatedBoard,
+            });
           }),
       };
     }),

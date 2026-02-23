@@ -1,6 +1,7 @@
+import { VITE_API_URL } from "astro:env/client";
 import { FetchHttpClient } from "@effect/platform";
 import { RpcClient, RpcSerialization } from "@effect/rpc";
-import { AllRpcs } from "@feeblo/domain/rpc-router";
+import { AllRpcs } from "@feeblo/domain/rpc-group";
 import { Effect, Layer } from "effect";
 
 /** Fetch client that sends cookies (needed for BetterAuth session) */
@@ -11,7 +12,7 @@ export const FetchWithCredentials = FetchHttpClient.layer.pipe(
 );
 
 const RpcProtocolLive = RpcClient.layerProtocolHttp({
-  url: `${import.meta.env.VITE_API_URL}/rpc`,
+  url: `${VITE_API_URL}/rpc`,
 }).pipe(Layer.provide([FetchHttpClient.layer, RpcSerialization.layerNdjson]));
 
 export type RpcClientType = RpcClient.FromGroup<typeof AllRpcs>;
