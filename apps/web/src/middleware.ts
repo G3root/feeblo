@@ -78,10 +78,7 @@ function dashboardAuthRedirectMiddleware(
 
   if (!(isAuthed || isAuthPath)) {
     const redirectURL = new URL(AUTH_SIGN_IN_PATH, url);
-    redirectURL.searchParams.set(
-      "redirectTo",
-      `${url.pathname}${url.search}`
-    );
+    redirectURL.searchParams.set("redirectTo", `${url.pathname}${url.search}`);
     return context.redirect(redirectURL.toString());
   }
 

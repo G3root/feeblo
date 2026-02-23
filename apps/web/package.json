@@ -7,7 +7,7 @@
     "build": "dotenvx run -f ../../.env -- astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "dev": "dotenvx run -f ../../.env -- astro dev",
+    "dev": "dotenvx run -f ../../.env -- astro dev --port 3001",
     "dev:bare": "dotenvx run -f ../../.env -- astro dev"
   },
   "dependencies": {

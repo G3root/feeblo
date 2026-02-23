@@ -110,7 +110,6 @@
       },
       "devDependencies": {
         "@faker-js/faker": "^10.3.0",
-        "@feeblo/auth": "workspace:*",
         "@feeblo/config": "workspace:*",
         "@types/pg": "^8.16.0",
         "drizzle-kit": "^0.31.9",

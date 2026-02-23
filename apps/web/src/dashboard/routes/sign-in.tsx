@@ -74,7 +74,7 @@ function RouteComponent() {
                 />
 
                 <form.AppForm>
-                  <form.SubscribeButton label="Login" />
+                  <form.SubscribeButton label="Login" type="submit" />
                 </form.AppForm>
               </div>
             </div>

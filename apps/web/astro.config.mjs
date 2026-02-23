@@ -4,7 +4,7 @@ import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 // import alchemy from "alchemy/cloudflare/astro";
-import { defineConfig } from "astro/config";
+import { defineConfig, envField } from "astro/config";
 
 // https://astro.build/config
 export default defineConfig({
@@ -23,6 +23,21 @@ export default defineConfig({
         autoCodeSplitting: true,
       }),
     ],
+  },
+
+  env: {
+    schema: {
+      VITE_API_URL: envField.string({
+        context: "client",
+        access: "public",
+        optional: false,
+      }),
+      VITE_APP_URL: envField.string({
+        context: "client",
+        access: "public",
+        optional: false,
+      }),
+    },
   },
 
   integrations: [react()],

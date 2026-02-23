@@ -8,7 +8,7 @@ import {
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import type { Auth } from "./server";
 
-export const createAuthClient = () => {
+export const createAuthClient = (baseURL: string) => {
   return createAuthClientBase({
     plugins: [
       inferAdditionalFields<Auth>(),
@@ -17,7 +17,7 @@ export const createAuthClient = () => {
       twoFactorClient(),
       adminClient(),
     ],
-    baseURL: import.meta.env.VITE_API_URL,
+    baseURL,
   });
 };
 
