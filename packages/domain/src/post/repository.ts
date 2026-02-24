@@ -33,6 +33,7 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               status: postTable.status,
               createdAt: postTable.createdAt,
               updatedAt: postTable.updatedAt,
+              organizationId: postTable.organizationId,
             })
             .from(postTable)
             .where(
@@ -54,6 +55,7 @@ export class PostRepository extends Effect.Service<PostRepository>()(
                       status: entry.status,
                       createdAt: entry.createdAt,
                       updatedAt: entry.updatedAt,
+                      organizationId: entry.organizationId,
                     })
                 )
               )

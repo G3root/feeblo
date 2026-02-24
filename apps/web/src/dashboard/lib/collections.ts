@@ -19,10 +19,12 @@ export const postCollection = createCollection(
       return cacheKey;
     },
     syncMode: "on-demand",
-    queryFn: (ctx) => {
+    queryFn: async (ctx) => {
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+
       const filters: {
         boardId?: string;
+        organizationId?: string;
       } = {};
       for (const { field, operator, value } of parsed.filters) {
         if (operator === "eq") {
@@ -31,18 +33,28 @@ export const postCollection = createCollection(
           if (fieldName === "boardId") {
             filters.boardId = value as string;
           }
+          if (fieldName === "organizationId") {
+            filters.organizationId = value as string;
+          }
         }
       }
 
-      const boardId = filters.boardId;
-
+      const boardId = filters?.boardId;
+      const organizationId = filters?.organizationId;
       if (!boardId) {
         throw new Error("boardId is required");
       }
+      if (!organizationId) {
+        throw new Error("organizationId is required");
+      }
 
-      return fetchRpc((rpc) => rpc.PostList({ boardId }), {
-        signal: ctx.signal,
-      }).then((data) => [...data]);
+      const data = await fetchRpc(
+        (rpc) => rpc.PostList({ boardId, organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+      return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,
     getKey: (item) => item.id,
@@ -51,37 +63,88 @@ export const postCollection = createCollection(
 
 export const boardCollection = createCollection(
   queryCollectionOptions({
-    queryKey: ["board"],
-    queryFn: async (args) =>
-      fetchRpc((rpc) => rpc.BoardList(), { signal: args.signal }).then(
-        (data) => [...data]
-      ),
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["board"];
+      for (const f of parsed.filters) {
+        cacheKey.push(`${f.field.join(".")}-${f.operator}-${f.value}`);
+      }
+
+      if (parsed.limit) {
+        cacheKey.push(`limit-${parsed.limit}`);
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const filters: {
+        organizationId?: string;
+      } = {};
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq") {
+          const fieldName = field.join(".");
+
+          if (fieldName === "organizationId") {
+            filters.organizationId = value as string;
+          }
+        }
+      }
+
+      const organizationId = filters.organizationId;
+
+      if (!organizationId) {
+        throw new Error("organizationId is required");
+      }
+
+      const data = await fetchRpc((rpc) => rpc.BoardList({ organizationId }), {
+        signal: ctx.signal,
+      });
+      return [...data];
+    },
     queryClient: TanstackQuery.getContext().queryClient,
     getKey: (item) => item.id,
     onInsert: async ({ transaction }) => {
-      const { modified: newBoard } = transaction.mutations[0];
+      const mutation = transaction.mutations[0];
+      const { modified: newBoard } = mutation;
+
       await fetchRpc(
         (rpc) =>
           rpc.BoardCreate({
             id: newBoard.id,
             name: newBoard.name,
             visibility: newBoard.visibility,
+            organizationId: newBoard.organizationId,
           }),
         {}
       );
     },
     onDelete: async ({ transaction }) => {
-      const { original: deletedBoard } = transaction.mutations[0];
-      await fetchRpc((rpc) => rpc.BoardDelete({ id: deletedBoard.id }), {});
+      const mutation = transaction.mutations[0];
+
+      const { original: deletedBoard } = mutation;
+
+      await fetchRpc(
+        (rpc) =>
+          rpc.BoardDelete({
+            id: deletedBoard.id,
+            organizationId: deletedBoard.organizationId,
+          }),
+        {}
+      );
     },
     onUpdate: async ({ transaction }) => {
-      const { modified: updatedBoard } = transaction.mutations[0];
+      const mutation = transaction.mutations[0];
+      const { modified: updatedBoard } = mutation;
+
       await fetchRpc(
         (rpc) =>
           rpc.BoardUpdate({
             id: updatedBoard.id,
             name: updatedBoard.name,
             visibility: updatedBoard.visibility,
+            organizationId: updatedBoard.organizationId,
           }),
         {}
       );
