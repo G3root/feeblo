@@ -38,13 +38,7 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
               })
               .returning();
 
-            if (!newBoard) {
-              return yield* Effect.fail(new Error("Failed to create board"));
-            }
-
-            return new Board({
-              ...newBoard,
-            });
+            return newBoard;
           }),
         findMany: ({ organizationId }: { organizationId: string }) =>
           Effect.gen(function* () {
@@ -56,6 +50,7 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
                 visibility: boardTable.visibility,
                 createdAt: boardTable.createdAt,
                 updatedAt: boardTable.updatedAt,
+                organizationId: boardTable.organizationId,
               })
               .from(boardTable)
               .where(eq(boardTable.organizationId, organizationId));
@@ -69,6 +64,7 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
                   visibility: entry.visibility,
                   createdAt: entry.createdAt,
                   updatedAt: entry.updatedAt,
+                  organizationId: entry.organizationId,
                 })
             );
           }),
@@ -109,13 +105,7 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
               )
               .returning();
 
-            if (!updatedBoard) {
-              return yield* Effect.fail(new Error("Failed to update board"));
-            }
-
-            return new Board({
-              ...updatedBoard,
-            });
+            return updatedBoard;
           }),
       };
     }),

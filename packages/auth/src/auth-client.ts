@@ -1,5 +1,6 @@
 import {
   adminClient,
+  customSessionClient,
   emailOTPClient,
   inferAdditionalFields,
   organizationClient,
@@ -11,6 +12,7 @@ import type { Auth } from "./server";
 export const createAuthClient = (baseURL: string) => {
   return createAuthClientBase({
     plugins: [
+      customSessionClient<Auth>(),
       inferAdditionalFields<Auth>(),
       emailOTPClient(),
       organizationClient(),

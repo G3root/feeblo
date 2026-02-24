@@ -15,6 +15,7 @@ export type TPost = Schema.Schema.Type<typeof Post>;
 
 export const PostList = Schema.Struct({
   boardId: Schema.String,
+  organizationId: Schema.String,
 });
 
 export type TPostList = Schema.Schema.Type<typeof PostList>;
@@ -22,6 +23,7 @@ export type TPostList = Schema.Schema.Type<typeof PostList>;
 export const PostDelete = Schema.Struct({
   id: Schema.String,
   boardId: Schema.String,
+  organizationId: Schema.String,
 });
 
 export type TPostDelete = Schema.Schema.Type<typeof PostDelete>;

@@ -5,14 +5,12 @@ import { MembershipRpcHandlers } from "./membership/handlers";
 import { PostRpcHandlers } from "./post/handlers";
 import { AllRpcs } from "./rpc-group";
 import { AuthMiddlewareLive } from "./session-middleware";
-import { UserRpcHandlers } from "./user/handlers";
 
 export const RpcRoute = RpcServer.layerHttpRouter({
   group: AllRpcs,
   path: "/rpc",
   protocol: "http",
 }).pipe(
-  Layer.provide(UserRpcHandlers),
   Layer.provide(PostRpcHandlers),
   Layer.provide(BoardRpcHandlers),
   Layer.provide(MembershipRpcHandlers),

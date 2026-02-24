@@ -1,4 +1,5 @@
 import { Effect, Layer } from "effect";
+import { mapToInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { MembershipRepository } from "./repository";
 import { MembershipRpcs } from "./rpcs";
@@ -15,7 +16,7 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           return yield* repository.findMany({
             userId: session.session.userId,
           });
-        }).pipe(Effect.orDie);
+        }).pipe(Effect.mapError(mapToInternalServerError()));
       },
     };
   })

@@ -1,52 +1,88 @@
 import { Effect, Layer } from "effect";
-import { CurrentSession } from "../session-middleware";
+import { requireOrganizationMembership } from "../authorization";
+import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
+import { BoardNotFoundError, FailedToCreateBoardError } from "./errors";
 import { BoardRepository } from "./repository";
 import { BoardRpcs } from "./rpcs";
-import type { TBoardCreate, TBoardUpdate } from "./schema";
+import {
+  Board,
+  type TBoardCreate,
+  type TBoardDelete,
+  type TBoardList,
+  type TBoardUpdate,
+} from "./schema";
 
 export const BoardRpcHandlers = BoardRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* BoardRepository;
 
     return {
-      BoardList: () => {
+      BoardList: (args: TBoardList) => {
         return Effect.gen(function* () {
-          const session = yield* CurrentSession;
-
+          yield* requireOrganizationMembership(args.organizationId);
           return yield* repository.findMany({
-            organizationId: session.session.activeOrganizationId,
+            organizationId: args.organizationId,
           });
-        }).pipe(Effect.orDie);
+        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
-      BoardDelete: ({ id }: { id: string }) => {
+      BoardDelete: (args: TBoardDelete) => {
         return Effect.gen(function* () {
-          const session = yield* CurrentSession;
-
+          yield* requireOrganizationMembership(args.organizationId);
           return yield* repository.delete({
-            id,
-            organizationId: session.session.activeOrganizationId,
+            id: args.id,
+            organizationId: args.organizationId,
           });
-        }).pipe(Effect.orDie);
+        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
-      BoardCreate: (args: TBoardCreate) => {
+      BoardCreate: ({ organizationId, ...rest }: TBoardCreate) => {
         return Effect.gen(function* () {
-          const session = yield* CurrentSession;
+          yield* requireOrganizationMembership(organizationId);
 
-          return yield* repository.create({
-            ...args,
-            organizationId: session.session.activeOrganizationId,
+          const newBoard = yield* repository.create({
+            ...rest,
+            organizationId,
           });
-        }).pipe(Effect.orDie);
+
+          if (!newBoard) {
+            return yield* FailedToCreateBoardError.make({
+              message: "Failed to create board",
+            });
+          }
+
+          return new Board({
+            ...newBoard,
+          });
+        }).pipe(
+          Effect.mapError(
+            mapToInternalServerError(
+              UnauthorizedError,
+              FailedToCreateBoardError
+            )
+          )
+        );
       },
-      BoardUpdate: (args: TBoardUpdate) => {
+      BoardUpdate: ({ organizationId, ...rest }: TBoardUpdate) => {
         return Effect.gen(function* () {
-          const session = yield* CurrentSession;
-
-          return yield* repository.update({
-            ...args,
-            organizationId: session.session.activeOrganizationId,
+          yield* requireOrganizationMembership(organizationId);
+          const updatedBoard = yield* repository.update({
+            ...rest,
+            organizationId,
           });
-        }).pipe(Effect.orDie);
+
+          if (!updatedBoard) {
+            return yield* BoardNotFoundError.make({
+              message: "Board not found",
+            });
+          }
+
+          return new Board({
+            ...updatedBoard,
+          });
+        }).pipe(
+          Effect.mapError(
+            mapToInternalServerError(UnauthorizedError, BoardNotFoundError)
+          )
+        );
       },
     };
   })

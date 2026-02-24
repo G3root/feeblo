@@ -1,3 +1,4 @@
+import { SqlClient } from "@effect/sql";
 import { DB } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema/index";
 import { generateId } from "@feeblo/utils/id";
@@ -6,12 +7,12 @@ import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
   admin,
+  customSession,
   emailOTP,
   lastLoginMethod,
   organization,
 } from "better-auth/plugins";
-import { SqlClient } from "@effect/sql";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Config, Effect } from "effect";
 
 export const initAuthHandler = () =>
@@ -58,6 +59,17 @@ export const initAuthHandler = () =>
       },
 
       plugins: [
+        customSession(async ({ user, session }) => {
+          const organizations = await db
+            .select({ id: schema.member.organizationId })
+            .from(schema.member)
+            .where(eq(schema.member.userId, session.userId));
+          return {
+            organizations,
+            user,
+            session,
+          };
+        }),
         admin(),
 
         lastLoginMethod({
@@ -131,67 +143,7 @@ export const initAuthHandler = () =>
             },
           },
         },
-        session: {
-          create: {
-            before: async (session) => {
-              const [organization] = await Effect.runPromise(
-                db
-                  .select({ id: schema.organization.id })
-                  .from(schema.organization)
-                  .where(eq(schema.organization.id, session.userId))
-                  .limit(1)
-              );
-
-              if (!organization) {
-                throw new Error("Organization not found for session user");
-              }
-
-              const [member] = await Effect.runPromise(
-                db
-                  .select({ id: schema.member.id })
-                  .from(schema.member)
-                  .where(
-                    and(
-                      eq(schema.member.organizationId, organization.id),
-                      eq(schema.member.userId, session.userId)
-                    )
-                  )
-                  .limit(1)
-              );
-
-              if (!member) {
-                throw new Error("Member not found for session user");
-              }
-
-              return {
-                data: {
-                  ...session,
-                  activeOrganizationId: organization.id,
-                  activeMemberId: member.id,
-                },
-              };
-            },
-          },
-        },
       },
-
-      session: {
-        additionalFields: {
-          activeMemberId: {
-            type: "string",
-          },
-          activeOrganizationId: {
-            type: "string",
-          },
-        },
-      },
-      // user: {
-      //   additionalFields: {
-      //     isOnboarded: {
-      //       type: "boolean",
-      //     },
-      //   },
-      // },
     } satisfies BetterAuthOptions;
     return betterAuth(config);
   });

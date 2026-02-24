@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
-import { CurrentSession } from "../session-middleware";
+import { requireOrganizationMembership } from "../authorization";
+import { UnauthorizedError, mapToInternalServerError } from "../rpc-errors";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
 import type { TPostDelete, TPostList } from "./schema";
@@ -11,24 +12,24 @@ export const PostRpcHandlers = PostRpcs.toLayer(
     return {
       PostList: (args: TPostList) => {
         return Effect.gen(function* () {
-          const session = yield* CurrentSession;
+          yield* requireOrganizationMembership(args.organizationId);
 
           return yield* repository.findMany({
-            organizationId: session.session.activeOrganizationId,
+            organizationId: args.organizationId,
             boardId: args.boardId,
           });
-        }).pipe(Effect.orDie);
+        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
       PostDelete: (args: TPostDelete) => {
         return Effect.gen(function* () {
-          const session = yield* CurrentSession;
+          yield* requireOrganizationMembership(args.organizationId);
 
           return yield* repository.delete({
             id: args.id,
-            organizationId: session.session.activeOrganizationId,
+            organizationId: args.organizationId,
             boardId: args.boardId,
           });
-        }).pipe(Effect.orDie);
+        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
     };
   })

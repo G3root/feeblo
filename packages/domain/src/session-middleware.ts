@@ -10,16 +10,9 @@ export class Auth extends Context.Tag("@cronosend/api/Auth")<
   AuthHandler
 >() {}
 
-export interface ValidatedSession extends Session {
-  session: Session["session"] & {
-    activeOrganizationId: string;
-    activeMemberId: string;
-  };
-}
-
 export class CurrentSession extends Context.Tag(
   "@cronosend/domain/CurrentSession"
-)<CurrentSession, ValidatedSession>() {}
+)<CurrentSession, Session>() {}
 
 export class AuthMiddleware extends RpcMiddleware.Tag<AuthMiddleware>()(
   "@cronosend/api/AuthMiddleware",
@@ -29,27 +22,10 @@ export class AuthMiddleware extends RpcMiddleware.Tag<AuthMiddleware>()(
   }
 ) {}
 
-export const validateSession = (session: Session) =>
-  Effect.gen(function* () {
-    if (!session.session.activeOrganizationId) {
-      return yield* Effect.fail(
-        new UnauthorizedError({ message: "Organization not found" })
-      );
-    }
-
-    if (!session.session.activeMemberId) {
-      return yield* Effect.fail(
-        new UnauthorizedError({ message: "Member not found" })
-      );
-    }
-
-    return session as ValidatedSession;
-  });
-
 function getValidatedSessionFromToken(
   auth: AuthHandler,
   token: string
-): Effect.Effect<ValidatedSession, UnauthorizedError> {
+): Effect.Effect<Session, UnauthorizedError> {
   return Effect.gen(function* () {
     if (!token) {
       return yield* Effect.fail(
@@ -70,7 +46,7 @@ function getValidatedSessionFromToken(
         new UnauthorizedError({ message: "Not authenticated" })
       );
     }
-    return yield* validateSession(session as Session);
+    return session;
   });
 }
 
