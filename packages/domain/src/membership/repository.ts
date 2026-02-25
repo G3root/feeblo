@@ -5,7 +5,6 @@ import {
 } from "@feeblo/db/schema/auth";
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
-import { Membership } from "./schema";
 
 export class MembershipRepository extends Effect.Service<MembershipRepository>()(
   "MembershipRepository",
@@ -36,17 +35,7 @@ export class MembershipRepository extends Effect.Service<MembershipRepository>()
               )
               .where(eq(memberTable.userId, userId));
 
-            return rows.map(
-              (entry) =>
-                new Membership({
-                  id: entry.id,
-                  organizationId: entry.organizationId,
-                  userId: entry.userId,
-                  role: entry.role,
-                  createdAt: entry.createdAt,
-                  organization: entry.organization,
-                })
-            );
+            return rows;
           }),
       };
     }),

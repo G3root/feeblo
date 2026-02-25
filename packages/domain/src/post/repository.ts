@@ -2,7 +2,6 @@ import { DB } from "@feeblo/db";
 import { post as postTable } from "@feeblo/db/schema/feedback";
 import { and, eq } from "drizzle-orm";
 import { Effect } from "effect";
-import { Post } from "./schema";
 
 type TPostFindMany = {
   boardId: string;
@@ -40,24 +39,6 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               and(
                 eq(postTable.boardId, boardId),
                 eq(postTable.organizationId, organizationId)
-              )
-            )
-            .pipe(
-              Effect.map((posts) =>
-                posts.map(
-                  (entry) =>
-                    new Post({
-                      id: entry.id,
-                      title: entry.title,
-                      boardId: entry.boardId,
-                      slug: entry.slug,
-                      content: entry.content,
-                      status: entry.status,
-                      createdAt: entry.createdAt,
-                      updatedAt: entry.updatedAt,
-                      organizationId: entry.organizationId,
-                    })
-                )
               )
             ),
 
