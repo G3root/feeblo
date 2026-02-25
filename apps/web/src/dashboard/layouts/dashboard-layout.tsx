@@ -1,3 +1,4 @@
+import { useMatchRoute } from "@tanstack/react-router";
 import { AppSidebar } from "~/components/common/app-sidebar";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import {
@@ -13,8 +14,14 @@ import {
   DeleteBoardDialogProvider,
   RenameBoardDialogProvider,
 } from "~/features/board/dialog-stores";
+import { PostDetailsWorkspaceShell } from "~/features/post/components/post-details-workspace-shell";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const matchRoute = useMatchRoute();
+  const postRouteParams = matchRoute({
+    to: "/$organizationId/board/$boardSlug/$postSlug",
+  });
+
   return (
     <RenameBoardDialogProvider>
       <DeleteBoardDialogProvider>
@@ -30,15 +37,23 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             <AppSidebar variant="inset" />
             <SidebarInset className="h-full min-h-0 overflow-hidden">
-              <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-                <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-                  <SidebarTrigger className="-ml-1" />
-                </div>
-              </header>
+              {postRouteParams ? (
+                <PostDetailsWorkspaceShell params={postRouteParams}>
+                  {children}
+                </PostDetailsWorkspaceShell>
+              ) : (
+                <>
+                  <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+                    <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+                      <SidebarTrigger className="-ml-1" />
+                    </div>
+                  </header>
 
-              <ScrollArea className="min-h-0 flex-1 overflow-hidden">
-                {children}
-              </ScrollArea>
+                  <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+                    {children}
+                  </ScrollArea>
+                </>
+              )}
             </SidebarInset>
             <CreateBoardDialog />
             <DeleteBoardDialog />
