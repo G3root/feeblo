@@ -11,6 +11,7 @@ import {
 } from "~/components/ui/sheet";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { boardCollection } from "~/lib/collections";
 import { useCreateBoardDialogContext } from "../dialog-stores";
 
@@ -37,6 +38,7 @@ export function CreateBoardDialog() {
 }
 
 function CreateBoardForm() {
+  const organizationId = useOrganizationId();
   const store = useCreateBoardDialogContext();
   const form = useAppForm({
     defaultValues: {
@@ -58,6 +60,7 @@ function CreateBoardForm() {
           name: data.value.name,
           visibility: data.value.visibility,
           slug: slugify(data.value.name),
+          organizationId,
         });
 
         await tx.isPersisted.promise;

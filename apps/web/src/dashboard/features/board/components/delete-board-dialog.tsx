@@ -15,7 +15,6 @@ import { useDeleteBoardDialogContext } from "../dialog-stores";
 
 export function DeleteBoardDialog() {
   const store = useDeleteBoardDialogContext();
-
   const open = useSelector(store, (state) => state.context.open);
 
   return (

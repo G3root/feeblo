@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import { requireOrganizationMembership } from "../authorization";
-import { UnauthorizedError, mapToInternalServerError } from "../rpc-errors";
+import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
 import type { TPostDelete, TPostList } from "./schema";

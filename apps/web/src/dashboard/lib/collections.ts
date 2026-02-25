@@ -1,5 +1,6 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
+import { Duration } from "effect";
 import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
 import { fetchRpc } from "./runtime";
 
@@ -8,12 +9,14 @@ export const postCollection = createCollection(
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
       const cacheKey = ["post"];
-      for (const f of parsed.filters) {
-        cacheKey.push(`${f.field.join(".")}-${f.operator}-${f.value}`);
-      }
-
-      if (parsed.limit) {
-        cacheKey.push(`limit-${parsed.limit}`);
+      for (const { field, value } of parsed.filters) {
+        const fieldName = field.join(".");
+        if (fieldName === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+        if (fieldName === "boardId") {
+          cacheKey.push(`boardId-${value}`);
+        }
       }
 
       return cacheKey;
@@ -54,6 +57,7 @@ export const postCollection = createCollection(
           signal: ctx.signal,
         }
       );
+
       return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,
@@ -66,17 +70,16 @@ export const boardCollection = createCollection(
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
       const cacheKey = ["board"];
-      for (const f of parsed.filters) {
-        cacheKey.push(`${f.field.join(".")}-${f.operator}-${f.value}`);
-      }
-
-      if (parsed.limit) {
-        cacheKey.push(`limit-${parsed.limit}`);
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
       }
 
       return cacheKey;
     },
     syncMode: "on-demand",
+    refetchInterval: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
       const filters: {
@@ -155,6 +158,7 @@ export const boardCollection = createCollection(
 export const membershipCollection = createCollection(
   queryCollectionOptions({
     queryKey: ["membership"],
+    refetchInterval: Duration.toMillis(Duration.minutes(10)),
     queryFn: async (args) =>
       fetchRpc((rpc) => rpc.MembershipList(), { signal: args.signal }).then(
         (data) => [...data]

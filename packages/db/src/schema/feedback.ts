@@ -22,6 +22,8 @@ export const postStatusEnum = pgEnum("post_status", [
   "CLOSED",
 ]);
 
+export type TPostStatus = (typeof postStatusEnum.enumValues)[number];
+
 export const postIconTypeEnum = pgEnum("post_icon_type", ["EMOJI"]);
 
 export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
@@ -87,7 +89,9 @@ export const upvote = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId)]
+  (table) => [
+    uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
+  ]
 );
 
 export const reaction = pgTable(

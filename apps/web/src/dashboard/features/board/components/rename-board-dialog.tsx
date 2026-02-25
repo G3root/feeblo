@@ -1,5 +1,5 @@
 import { slugify } from "@feeblo/utils/url";
-import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
@@ -11,6 +11,7 @@ import {
 } from "~/components/ui/sheet";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { boardCollection } from "~/lib/collections";
 import { useRenameBoardDialogContext } from "../dialog-stores";
 
@@ -35,15 +36,20 @@ export function RenameBoardDialog() {
 }
 
 function RenameBoardForm() {
+  const organizationId = useOrganizationId();
   const store = useRenameBoardDialogContext();
-
   const boardId = useSelector(store, (state) => state.context.data.boardId);
 
   const { data } = useLiveSuspenseQuery(
     (q) =>
       q
         .from({ board: boardCollection })
-        .where((board) => eq(board.board.id, boardId))
+        .where((board) =>
+          and(
+            eq(board.board.id, boardId),
+            eq(board.board.organizationId, organizationId)
+          )
+        )
         .orderBy((board) => board.board.createdAt, "desc")
         .limit(1),
     [boardId]
