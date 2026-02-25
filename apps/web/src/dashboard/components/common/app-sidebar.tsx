@@ -1,6 +1,6 @@
 import { Delete02Icon, Edit, Ellipsis, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useLiveSuspenseQuery } from "@tanstack/react-db";
+import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Sidebar,
@@ -20,6 +20,7 @@ import {
   useDeleteBoardDialogContext,
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { boardCollection } from "~/lib/collections";
 import {
   DropdownMenu,
@@ -31,6 +32,7 @@ import {
 import { OrganizationSwitcher } from "./organization-switcher";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const organizationId = useOrganizationId();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -47,9 +49,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                isActive={pathname === "/"}
+                isActive={pathname === `/${organizationId}`}
                 render={(props) => (
-                  <Link {...props} to="/">
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId"
+                  >
                     <span>Dashboard</span>
                   </Link>
                 )}
@@ -85,24 +91,29 @@ function CreateBoardButton() {
 }
 
 function BoardList() {
+  const organizationId = useOrganizationId();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
-  const { data } = useLiveSuspenseQuery((q) =>
-    q
-      .from({ board: boardCollection })
-      .orderBy((board) => board.board.createdAt, "desc")
+  const { data } = useLiveSuspenseQuery(
+    (q) =>
+      q
+        .from({ board: boardCollection })
+        .where((board) => eq(board.board.organizationId, organizationId))
+
+        .orderBy((board) => board.board.createdAt, "desc"),
+    []
   );
 
   return data.map((board) => (
     <SidebarMenuItem key={board.slug}>
       <SidebarMenuButton
-        isActive={pathname.startsWith(`/board/${board.slug}`)}
+        isActive={pathname.startsWith(`/${organizationId}/board/${board.slug}`)}
         render={(props) => (
           <Link
             {...props}
-            params={{ boardSlug: board.slug }}
-            to="/board/$boardSlug"
+            params={{ organizationId, boardSlug: board.slug }}
+            to="/$organizationId/board/$boardSlug"
           >
             <span>{board.name}</span>
           </Link>

@@ -1,5 +1,5 @@
-import { RouterProvider } from '@tanstack/react-router';
-import { createRouter } from './router';
+import { RouterProvider } from "@tanstack/react-router";
+import { createRouter } from "./router";
 
 const router = createRouter();
 

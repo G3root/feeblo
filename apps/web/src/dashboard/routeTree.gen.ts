@@ -11,10 +11,10 @@
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as SignUpRouteImport } from "./routes/sign-up"
 import { Route as SignInRouteImport } from "./routes/sign-in"
-import { Route as DashboardLayoutRouteImport } from "./routes/_dashboard-layout"
-import { Route as DashboardLayoutIndexRouteImport } from "./routes/_dashboard-layout/index"
-import { Route as DashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/_dashboard-layout/board/$boardSlug/index"
-import { Route as DashboardLayoutBoardBoardSlugPostSlugRouteImport } from "./routes/_dashboard-layout/board/$boardSlug/$postSlug"
+import { Route as OrganizationIdDashboardLayoutRouteImport } from "./routes/$organizationId/_dashboard-layout"
+import { Route as OrganizationIdDashboardLayoutIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/index"
+import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
+import { Route as OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
 
 const SignUpRoute = SignUpRouteImport.update({
   id: "/sign-up",
@@ -26,80 +26,85 @@ const SignInRoute = SignInRouteImport.update({
   path: "/sign-in",
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardLayoutRoute = DashboardLayoutRouteImport.update({
-  id: "/_dashboard-layout",
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardLayoutIndexRoute = DashboardLayoutIndexRouteImport.update({
-  id: "/",
-  path: "/",
-  getParentRoute: () => DashboardLayoutRoute,
-} as any)
-const DashboardLayoutBoardBoardSlugIndexRoute =
-  DashboardLayoutBoardBoardSlugIndexRouteImport.update({
+const OrganizationIdDashboardLayoutRoute =
+  OrganizationIdDashboardLayoutRouteImport.update({
+    id: "/$organizationId/_dashboard-layout",
+    path: "/$organizationId",
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const OrganizationIdDashboardLayoutIndexRoute =
+  OrganizationIdDashboardLayoutIndexRouteImport.update({
+    id: "/",
+    path: "/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute =
+  OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport.update({
     id: "/board/$boardSlug/",
     path: "/board/$boardSlug/",
-    getParentRoute: () => DashboardLayoutRoute,
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
-const DashboardLayoutBoardBoardSlugPostSlugRoute =
-  DashboardLayoutBoardBoardSlugPostSlugRouteImport.update({
+const OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute =
+  OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRouteImport.update({
     id: "/board/$boardSlug/$postSlug",
     path: "/board/$boardSlug/$postSlug",
-    getParentRoute: () => DashboardLayoutRoute,
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof DashboardLayoutIndexRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
-  "/board/$boardSlug/$postSlug": typeof DashboardLayoutBoardBoardSlugPostSlugRoute
-  "/board/$boardSlug/": typeof DashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId": typeof OrganizationIdDashboardLayoutRouteWithChildren
+  "/$organizationId/": typeof OrganizationIdDashboardLayoutIndexRoute
+  "/$organizationId/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
+  "/$organizationId/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
 export interface FileRoutesByTo {
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
-  "/": typeof DashboardLayoutIndexRoute
-  "/board/$boardSlug/$postSlug": typeof DashboardLayoutBoardBoardSlugPostSlugRoute
-  "/board/$boardSlug": typeof DashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId": typeof OrganizationIdDashboardLayoutIndexRoute
+  "/$organizationId/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
+  "/$organizationId/board/$boardSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  "/_dashboard-layout": typeof DashboardLayoutRouteWithChildren
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
-  "/_dashboard-layout/": typeof DashboardLayoutIndexRoute
-  "/_dashboard-layout/board/$boardSlug/$postSlug": typeof DashboardLayoutBoardBoardSlugPostSlugRoute
-  "/_dashboard-layout/board/$boardSlug/": typeof DashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId/_dashboard-layout": typeof OrganizationIdDashboardLayoutRouteWithChildren
+  "/$organizationId/_dashboard-layout/": typeof OrganizationIdDashboardLayoutIndexRoute
+  "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
+  "/$organizationId/_dashboard-layout/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | "/"
     | "/sign-in"
     | "/sign-up"
-    | "/board/$boardSlug/$postSlug"
-    | "/board/$boardSlug/"
+    | "/$organizationId"
+    | "/$organizationId/"
+    | "/$organizationId/board/$boardSlug/$postSlug"
+    | "/$organizationId/board/$boardSlug/"
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/sign-in"
     | "/sign-up"
-    | "/"
-    | "/board/$boardSlug/$postSlug"
-    | "/board/$boardSlug"
+    | "/$organizationId"
+    | "/$organizationId/board/$boardSlug/$postSlug"
+    | "/$organizationId/board/$boardSlug"
   id:
     | "__root__"
-    | "/_dashboard-layout"
     | "/sign-in"
     | "/sign-up"
-    | "/_dashboard-layout/"
-    | "/_dashboard-layout/board/$boardSlug/$postSlug"
-    | "/_dashboard-layout/board/$boardSlug/"
+    | "/$organizationId/_dashboard-layout"
+    | "/$organizationId/_dashboard-layout/"
+    | "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
+    | "/$organizationId/_dashboard-layout/board/$boardSlug/"
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  DashboardLayoutRoute: typeof DashboardLayoutRouteWithChildren
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
+  OrganizationIdDashboardLayoutRoute: typeof OrganizationIdDashboardLayoutRouteWithChildren
 }
 
 declare module "@tanstack/react-router" {
@@ -118,59 +123,63 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
-    "/_dashboard-layout": {
-      id: "/_dashboard-layout"
-      path: ""
-      fullPath: "/"
-      preLoaderRoute: typeof DashboardLayoutRouteImport
+    "/$organizationId/_dashboard-layout": {
+      id: "/$organizationId/_dashboard-layout"
+      path: "/$organizationId"
+      fullPath: "/$organizationId"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    "/_dashboard-layout/": {
-      id: "/_dashboard-layout/"
+    "/$organizationId/_dashboard-layout/": {
+      id: "/$organizationId/_dashboard-layout/"
       path: "/"
-      fullPath: "/"
-      preLoaderRoute: typeof DashboardLayoutIndexRouteImport
-      parentRoute: typeof DashboardLayoutRoute
+      fullPath: "/$organizationId/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
-    "/_dashboard-layout/board/$boardSlug/": {
-      id: "/_dashboard-layout/board/$boardSlug/"
+    "/$organizationId/_dashboard-layout/board/$boardSlug/": {
+      id: "/$organizationId/_dashboard-layout/board/$boardSlug/"
       path: "/board/$boardSlug"
-      fullPath: "/board/$boardSlug/"
-      preLoaderRoute: typeof DashboardLayoutBoardBoardSlugIndexRouteImport
-      parentRoute: typeof DashboardLayoutRoute
+      fullPath: "/$organizationId/board/$boardSlug/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
-    "/_dashboard-layout/board/$boardSlug/$postSlug": {
-      id: "/_dashboard-layout/board/$boardSlug/$postSlug"
+    "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug": {
+      id: "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
       path: "/board/$boardSlug/$postSlug"
-      fullPath: "/board/$boardSlug/$postSlug"
-      preLoaderRoute: typeof DashboardLayoutBoardBoardSlugPostSlugRouteImport
-      parentRoute: typeof DashboardLayoutRoute
+      fullPath: "/$organizationId/board/$boardSlug/$postSlug"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
   }
 }
 
-interface DashboardLayoutRouteChildren {
-  DashboardLayoutIndexRoute: typeof DashboardLayoutIndexRoute
-  DashboardLayoutBoardBoardSlugPostSlugRoute: typeof DashboardLayoutBoardBoardSlugPostSlugRoute
-  DashboardLayoutBoardBoardSlugIndexRoute: typeof DashboardLayoutBoardBoardSlugIndexRoute
+interface OrganizationIdDashboardLayoutRouteChildren {
+  OrganizationIdDashboardLayoutIndexRoute: typeof OrganizationIdDashboardLayoutIndexRoute
+  OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
+  OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
 
-const DashboardLayoutRouteChildren: DashboardLayoutRouteChildren = {
-  DashboardLayoutIndexRoute: DashboardLayoutIndexRoute,
-  DashboardLayoutBoardBoardSlugPostSlugRoute:
-    DashboardLayoutBoardBoardSlugPostSlugRoute,
-  DashboardLayoutBoardBoardSlugIndexRoute:
-    DashboardLayoutBoardBoardSlugIndexRoute,
-}
+const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutRouteChildren =
+  {
+    OrganizationIdDashboardLayoutIndexRoute:
+      OrganizationIdDashboardLayoutIndexRoute,
+    OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute:
+      OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute,
+    OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute:
+      OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute,
+  }
 
-const DashboardLayoutRouteWithChildren = DashboardLayoutRoute._addFileChildren(
-  DashboardLayoutRouteChildren,
-)
+const OrganizationIdDashboardLayoutRouteWithChildren =
+  OrganizationIdDashboardLayoutRoute._addFileChildren(
+    OrganizationIdDashboardLayoutRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
-  DashboardLayoutRoute: DashboardLayoutRouteWithChildren,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
+  OrganizationIdDashboardLayoutRoute:
+    OrganizationIdDashboardLayoutRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
