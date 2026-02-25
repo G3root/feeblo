@@ -43,7 +43,6 @@ export const session = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     impersonatedBy: text("impersonated_by"),
     activeOrganizationId: text("active_organization_id"),
-    activeMemberId: text("active_member_id"),
   },
   (table) => [index("session_userId_idx").on(table.userId)]
 );
@@ -133,6 +132,10 @@ export const member = pgTable(
   (table) => [
     index("member_organizationId_idx").on(table.organizationId),
     index("member_userId_idx").on(table.userId),
+    uniqueIndex("member_organizationId_userId_uidx").on(
+      table.organizationId,
+      table.userId
+    ),
   ]
 );
 

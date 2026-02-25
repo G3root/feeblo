@@ -6,7 +6,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { organization, user } from "./auth";
+import { member, organization, user } from "./auth";
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PUBLIC",
@@ -80,6 +80,9 @@ export const upvote = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
     postId: text("post_id")
       .notNull()
       .references(() => post.id, { onDelete: "cascade" }),
@@ -101,6 +104,9 @@ export const reaction = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
     postId: text("post_id")
       .notNull()
       .references(() => post.id, { onDelete: "cascade" }),
@@ -132,6 +138,9 @@ export const comment = pgTable("comment", {
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  memberId: text("member_id").references(() => member.id, {
+    onDelete: "set null",
+  }),
   visibility: postCommentVisibilityEnum("visibility")
     .default("PUBLIC")
     .notNull(),
@@ -155,6 +164,9 @@ export const commentLike = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
     commentId: text("comment_id")
       .notNull()
       .references(() => comment.id, { onDelete: "cascade" }),
