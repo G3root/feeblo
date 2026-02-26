@@ -1,5 +1,5 @@
 import { generateId } from "@feeblo/utils/id";
-import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -384,12 +384,13 @@ export function PostCommentEditor({
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (
               <Button
-                className="size-8 rounded-full p-0"
+                className="rounded-full"
                 disabled={isSubmitting}
-                size="icon"
+                size="icon-xs"
                 type="submit"
+                variant="outline"
               >
-                <HugeiconsIcon className="size-4" icon={ArrowUp01Icon} />
+                <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />
                 <span className="sr-only">Submit comment</span>
               </Button>
             )}
@@ -399,7 +400,7 @@ export function PostCommentEditor({
         onContentChange={(content) => form.setFieldValue("content", content)}
         placeholder="Leave a comment..."
         placeholderClassName="left-4 top-4"
-        wrapperClassName="rounded-xl border bg-muted/25 p-4"
+        wrapperClassName="rounded-xl border  p-4"
       />
     </form>
   );
