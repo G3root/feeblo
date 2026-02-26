@@ -1,4 +1,4 @@
-import { Trash2 } from "@hugeicons/core-free-icons";
+import { Copy01Icon, Trash2 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
@@ -127,6 +127,7 @@ function PostDetailsWorkspaceShellContent({
 
       <aside className="hidden border-l bg-muted/20 px-6 pt-2 lg:block">
         <div className="flex items-center justify-end gap-2">
+          <CopyPostButton postId={post?.id ?? ""} />
           <Button
             aria-label="Close"
             onClick={() =>
@@ -251,6 +252,14 @@ function PropertyRow({
       <span className="w-14 shrink-0 text-muted-foreground">{label}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
+  );
+}
+
+function CopyPostButton({ postId }: { postId: string }) {
+  return (
+    <Button size="icon-sm" variant="outline">
+      <HugeiconsIcon icon={Copy01Icon} />
+    </Button>
   );
 }
 

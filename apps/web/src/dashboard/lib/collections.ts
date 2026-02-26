@@ -297,3 +297,46 @@ export const commentCollection = createCollection(
     },
   })
 );
+
+export const siteCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["site"];
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (args) => {
+      const parsed = parseLoadSubsetOptions(args.meta?.loadSubsetOptions);
+      const filters: {
+        organizationId?: string;
+      } = {};
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq") {
+          const fieldName = field.join(".");
+          if (fieldName === "organizationId") {
+            filters.organizationId = value as string;
+          }
+        }
+      }
+      const organizationId = filters?.organizationId;
+
+      if (!organizationId) {
+        return [];
+      }
+      const data = await fetchRpc((rpc) => rpc.SiteList({ organizationId }), {
+        signal: args.signal,
+      });
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+    refetchInterval: Duration.toMillis(Duration.minutes(30)),
+  })
+);

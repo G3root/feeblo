@@ -1,4 +1,11 @@
-import { Delete02Icon, Edit, Ellipsis, Plus } from "@hugeicons/core-free-icons";
+import {
+  Delete02Icon,
+  Edit,
+  Ellipsis,
+  Home,
+  Plus,
+  WebDesign01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -21,6 +28,7 @@ import {
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { useSite } from "~/hooks/use-site";
 import { boardCollection } from "~/lib/collections";
 import {
   DropdownMenu,
@@ -56,11 +64,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     params={{ organizationId }}
                     to="/$organizationId"
                   >
+                    <HugeiconsIcon icon={Home} />
                     <span>Dashboard</span>
                   </Link>
                 )}
               />
             </SidebarMenuItem>
+            <MyBoardLink />
           </SidebarMenu>
         </SidebarGroup>
 
@@ -185,3 +195,30 @@ const RenameBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
     </DropdownMenuItem>
   );
 };
+
+const getSiteUrl = (subdomain: string) => {
+  return subdomain
+    ? `${location.protocol}//${subdomain}.${location.host}`
+    : undefined;
+};
+
+function MyBoardLink() {
+  const site = useSite();
+
+  if (!site?.subdomain) {
+    return null;
+  }
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        render={(props) => (
+          <a {...props} href={getSiteUrl(site.subdomain)}>
+            <HugeiconsIcon icon={WebDesign01Icon} />
+            <span>My Board</span>
+          </a>
+        )}
+      />
+    </SidebarMenuItem>
+  );
+}

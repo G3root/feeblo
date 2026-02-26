@@ -15,6 +15,7 @@ import {
   organization,
   post,
   reaction,
+  site,
   upvote,
   user,
 } from "./src/schema";
@@ -170,6 +171,47 @@ const ensureOrganization = (userId: string) =>
     }
 
     return org;
+  });
+
+const ensureSite = ({
+  organizationId,
+  name,
+  subdomain,
+}: {
+  organizationId: string;
+  name: string;
+  subdomain: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* DB;
+
+    let [existing] = yield* db
+      .select({ id: site.id, subdomain: site.subdomain })
+      .from(site)
+      .where(eq(site.organizationId, organizationId))
+      .limit(1);
+
+    if (!existing) {
+      [existing] = yield* db
+        .insert(site)
+        .values({
+          id: makeId("ste"),
+          name,
+          subdomain,
+          organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning({ id: site.id, subdomain: site.subdomain });
+    }
+
+    if (!existing) {
+      return yield* Effect.fail(
+        new Error(`Failed to ensure site for organization ${organizationId}`)
+      );
+    }
+
+    return existing;
   });
 
 const ensureMember = ({
@@ -492,7 +534,14 @@ const seed = Effect.gen(function* () {
     count: MAIN_POST_COUNT,
   });
 
+  const primarySite = yield* ensureSite({
+    organizationId: primaryOrg.id,
+    name: primaryOrg.name,
+    subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
+  });
+
   console.log(`   Main org: ${primaryOrg.name}`);
+  console.log(`   Site subdomain: ${primarySite.subdomain}`);
   console.log(`   Boards: ${mainBoards.map((item) => item.name).join(", ")}`);
   console.log(`   Posts: ${mainPosts.length}`);
 
@@ -521,6 +570,13 @@ const seed = Effect.gen(function* () {
         role: "member",
       });
     }
+
+    const personalOrg = yield* ensureOrganization(userRecord.id);
+    yield* ensureSite({
+      organizationId: personalOrg.id,
+      name: personalOrg.name,
+      subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
+    });
   }
 
   console.log(
@@ -530,12 +586,12 @@ const seed = Effect.gen(function* () {
     `   External users with separate orgs: ${extraUsers.filter((item) => !item.joinMainOrg).length}`
   );
 
-  console.log("3) Seeding a different organization");
+  console.log("3) Seeding additional organizations");
 
-  const firstExternal = extraUsers.find((item) => !item.joinMainOrg);
+  const externalUsers = extraUsers.filter((item) => !item.joinMainOrg);
 
-  if (firstExternal) {
-    const externalOrg = yield* ensureOrganization(firstExternal.id);
+  for (const externalUser of externalUsers) {
+    const externalOrg = yield* ensureOrganization(externalUser.id);
     const externalBoards = yield* ensureBoards({
       organizationId: externalOrg.id,
       names: ["Roadmap", "Requests"],
@@ -547,8 +603,14 @@ const seed = Effect.gen(function* () {
       count: EXTERNAL_POST_COUNT,
     });
 
+    const externalSite = yield* ensureSite({
+      organizationId: externalOrg.id,
+      name: externalOrg.name,
+      subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
+    });
+
     console.log(
-      `   External org: ${externalOrg.name} (${externalPosts.length} posts)`
+      `   Org for ${externalUser.email}: ${externalOrg.name} (${externalPosts.length} posts, subdomain: ${externalSite.subdomain})`
     );
   }
 
