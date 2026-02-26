@@ -216,11 +216,57 @@ export const commentCollection = createCollection(
           { signal: ctx.signal }
         );
         return [...data];
-      } catch (error) {
+      } catch (_error) {
         return [];
       }
     },
     queryClient: TanstackQuery.getContext().queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newComment } = mutation;
+
+      await fetchRpc(
+        (rpc) =>
+          rpc.CommentCreate({
+            organizationId: newComment.organizationId,
+            visibility: newComment.visibility,
+            content: newComment.content,
+            postId: newComment.postId,
+            parentCommentId: newComment.parentCommentId,
+            id: newComment.id,
+          }),
+        {}
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedComment } = mutation;
+
+      await fetchRpc(
+        (rpc) =>
+          rpc.CommentDelete({
+            id: deletedComment.id,
+            organizationId: deletedComment.organizationId,
+            postId: deletedComment.postId,
+          }),
+        {}
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedComment } = mutation;
+
+      await fetchRpc(
+        (rpc) =>
+          rpc.CommentUpdate({
+            id: updatedComment.id,
+            organizationId: updatedComment.organizationId,
+            postId: updatedComment.postId,
+            content: updatedComment.content,
+          }),
+        {}
+      );
+    },
   })
 );
