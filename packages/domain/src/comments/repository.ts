@@ -1,17 +1,25 @@
 import { DB } from "@feeblo/db";
 import { user as userTable } from "@feeblo/db/schema/auth";
-import { comment as commentTable } from "@feeblo/db/schema/feedback";
-import { generateId } from "@feeblo/utils/id";
+import {
+  comment as commentTable,
+  type InsertComment,
+} from "@feeblo/db/schema/feedback";
 import { and, eq } from "drizzle-orm";
 import { Effect } from "effect";
 
-type TCommentCreate = {
+type DeleteComment = {
+  id: string;
+  organizationId: string;
+  postId: string;
+  userId: string;
+};
+
+type UpdateComment = {
+  id: string;
   organizationId: string;
   postId: string;
   content: string;
   userId: string;
-  visibility: "PUBLIC" | "INTERNAL";
-  parentCommentId: string | null;
 };
 
 export class CommentRepository extends Effect.Service<CommentRepository>()(
@@ -56,18 +64,49 @@ export class CommentRepository extends Effect.Service<CommentRepository>()(
 
             return rows;
           }),
-        create: (args: TCommentCreate) =>
+        create: (args: InsertComment) =>
           Effect.gen(function* () {
             const [newComment] = yield* db
               .insert(commentTable)
               .values({
                 ...args,
-                id: generateId("comment"),
                 createdAt: new Date(),
                 updatedAt: new Date(),
               })
               .returning();
             return newComment;
+          }),
+        delete: (args: DeleteComment) =>
+          Effect.gen(function* () {
+            yield* db
+              .delete(commentTable)
+              .where(
+                and(
+                  eq(commentTable.id, args.id),
+                  eq(commentTable.organizationId, args.organizationId),
+                  eq(commentTable.postId, args.postId),
+                  eq(commentTable.userId, args.userId)
+                )
+              );
+          }),
+        update: (args: UpdateComment) =>
+          Effect.gen(function* () {
+            const [updatedComment] = yield* db
+              .update(commentTable)
+              .set({
+                content: args.content,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(commentTable.id, args.id),
+                  eq(commentTable.organizationId, args.organizationId),
+                  eq(commentTable.postId, args.postId),
+                  eq(commentTable.userId, args.userId)
+                )
+              )
+              .returning();
+            return updatedComment;
           }),
       };
     }),

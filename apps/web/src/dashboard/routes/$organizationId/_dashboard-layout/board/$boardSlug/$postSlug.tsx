@@ -1,9 +1,11 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
 import {
   PostDetailsForm,
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
+import { CommentDeleteDialogProvider } from "~/features/post/dialog-stores";
 import {
   boardCollection,
   commentCollection,
@@ -87,15 +89,19 @@ function RouteComponent() {
   }
 
   return (
-    <PostDetailsForm
-      boardName={board.name}
-      boardSlug={board.slug}
-      comments={comments}
-      createdAt={post.createdAt}
-      description={post.content}
-      initialTitle={post.title}
-      organizationId={organizationId}
-    />
+    <CommentDeleteDialogProvider>
+      <PostDetailsForm
+        boardName={board.name}
+        boardSlug={board.slug}
+        comments={comments}
+        createdAt={post.createdAt}
+        description={post.content}
+        initialTitle={post.title}
+        organizationId={organizationId}
+        postId={post.id}
+      />
+      <CommentDeleteDialog />
+    </CommentDeleteDialogProvider>
   );
 }
 

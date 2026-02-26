@@ -1,7 +1,22 @@
+import {
+  Delete02Icon,
+  MoreHorizontalIcon,
+  PencilEdit01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import {
   Item,
+  ItemActions,
   ItemContent,
   ItemDescription,
   ItemGroup,
@@ -11,6 +26,8 @@ import {
 } from "~/components/ui/item";
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
+import { authClient } from "~/lib/auth-client";
+import { useCommentDeleteDialogContext } from "../dialog-stores";
 import {
   PostCommentEditor,
   PostDescriptionEditor,
@@ -23,6 +40,7 @@ type PostComment = {
   user: {
     name: string;
   };
+  userId: string;
 };
 
 type PostDetailsFormProps = {
@@ -33,6 +51,7 @@ type PostDetailsFormProps = {
   description: string;
   initialTitle: string;
   organizationId: string;
+  postId: string;
 };
 
 export function PostDetailsForm({
@@ -43,6 +62,7 @@ export function PostDetailsForm({
   description,
   initialTitle,
   organizationId,
+  postId,
 }: PostDetailsFormProps) {
   const [title, setTitle] = useState(initialTitle);
 
@@ -77,7 +97,7 @@ export function PostDetailsForm({
           <Separator />
         </div>
 
-        <PostCommentEditor />
+        <PostCommentEditor organizationId={organizationId} postId={postId} />
 
         <PostCommentList comments={comments} />
 
@@ -90,6 +110,9 @@ export function PostDetailsForm({
 }
 
 function PostCommentList({ comments }: { comments: PostComment[] }) {
+  const { data: session } = authClient.useSession();
+  const currentUserId = session?.user?.id ?? "unknown";
+  const store = useCommentDeleteDialogContext();
   if (comments.length === 0) {
     return null;
   }
@@ -121,6 +144,42 @@ function PostCommentList({ comments }: { comments: PostComment[] }) {
               {comment.content}
             </ItemDescription>
           </ItemContent>
+          {currentUserId === comment.userId && (
+            <ItemActions>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={(props) => (
+                    <Button {...props} size="icon-sm" variant="ghost">
+                      <HugeiconsIcon icon={MoreHorizontalIcon} />
+                    </Button>
+                  )}
+                />
+
+                <DropdownMenuContent align="end">
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem>
+                      <HugeiconsIcon icon={PencilEdit01Icon} />
+                      Edit
+                    </DropdownMenuItem>
+                    {/* 
+                  <DropdownMenuSeparator /> */}
+
+                    <DropdownMenuItem
+                      onClick={() =>
+                        store.send({
+                          type: "toggle",
+                          data: { commentId: comment.id },
+                        })
+                      }
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ItemActions>
+          )}
         </Item>
       ))}
     </ItemGroup>
@@ -137,9 +196,9 @@ function formatRelativeTime(value: Date | string) {
 
   const diffMs = date.getTime() - Date.now();
   const diffSeconds = Math.round(diffMs / 1000);
-  const diffMinutes = Math.round(diffSeconds / 60);
-  const diffHours = Math.round(diffMinutes / 60);
-  const diffDays = Math.round(diffHours / 24);
+  const diffMinutes = Math.round(diffMs / (1000 * 60));
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
   if (Math.abs(diffSeconds) < 60) {
     return rtf.format(diffSeconds, "second");

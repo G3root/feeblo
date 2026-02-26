@@ -1,10 +1,16 @@
+import { generateId } from "@feeblo/utils/id";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 import { Button } from "~/components/ui/button";
+import { toastManager } from "~/components/ui/toast";
+import { useAppForm } from "~/hooks/form";
+import { authClient } from "~/lib/auth-client";
+import { commentCollection } from "~/lib/collections";
 import { cn } from "~/lib/utils";
 
 type SlashCommand = {
@@ -55,6 +61,7 @@ type EditorFrameProps = {
   content: string;
   editorClassName?: string;
   footer?: React.ReactNode;
+  onContentChange?: (content: string) => void;
   placeholderClassName?: string;
   placeholder: string;
   wrapperClassName?: string;
@@ -64,6 +71,7 @@ function PostRichTextEditor({
   content,
   editorClassName,
   footer,
+  onContentChange,
   placeholderClassName,
   placeholder,
   wrapperClassName,
@@ -188,6 +196,17 @@ function PostRichTextEditor({
     };
   }, [editor]);
 
+  useEffect(() => {
+    if (!(editor && onContentChange)) {
+      return;
+    }
+    const handler = () => onContentChange(editor.getText());
+    editor.on("update", handler);
+    return () => {
+      editor.off("update", handler);
+    };
+  }, [editor, onContentChange]);
+
   if (!editor) {
     return null;
   }
@@ -295,20 +314,93 @@ export function PostDescriptionEditor({ content }: { content: string }) {
   );
 }
 
-export function PostCommentEditor() {
-  return (
-    <PostRichTextEditor
-      content=""
-      editorClassName="min-h-7 [&_.ProseMirror_p]:my-0"
-      footer={
-        <Button className="size-8 rounded-full p-0" size="icon" type="button">
-          <HugeiconsIcon className="size-4" icon={ArrowUp01Icon} />
-          <span className="sr-only">Submit comment</span>
-        </Button>
+type PostCommentEditorProps = {
+  organizationId: string;
+  postId: string;
+};
+
+export function PostCommentEditor({
+  organizationId,
+  postId,
+}: PostCommentEditorProps) {
+  const [editorKey, setEditorKey] = useState(0);
+
+  const { data: session } = authClient.useSession();
+
+  const form = useAppForm({
+    defaultValues: { content: "" },
+    validators: {
+      onChange: z.object({
+        content: z.string().min(1),
+      }),
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        const userId = session?.user?.id;
+        const userName = session?.user?.name;
+
+        if (!(userId && userName)) {
+          throw new Error("User not found");
+        }
+
+        const tx = commentCollection.insert({
+          id: generateId("comment"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          content: value.content,
+          visibility: "PUBLIC",
+          parentCommentId: null,
+          organizationId,
+          memberId: null,
+          postId,
+          userId,
+          user: {
+            name: userName,
+          },
+        });
+        await tx.isPersisted.promise;
+
+        setEditorKey((k) => k + 1);
+        form.reset();
+        toastManager.add({ title: "Comment added", type: "success" });
+      } catch (_error) {
+        toastManager.add({ title: "Failed to add comment", type: "error" });
       }
-      placeholder="Leave a comment..."
-      placeholderClassName="left-4 top-4"
-      wrapperClassName="rounded-xl border bg-muted/25 p-4"
-    />
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+    >
+      <PostRichTextEditor
+        content=""
+        editorClassName="min-h-7 [&_.ProseMirror_p]:my-0"
+        footer={
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
+              <Button
+                className="size-8 rounded-full p-0"
+                disabled={isSubmitting}
+                size="icon"
+                type="submit"
+              >
+                <HugeiconsIcon className="size-4" icon={ArrowUp01Icon} />
+                <span className="sr-only">Submit comment</span>
+              </Button>
+            )}
+          </form.Subscribe>
+        }
+        key={editorKey}
+        onContentChange={(content) => form.setFieldValue("content", content)}
+        placeholder="Leave a comment..."
+        placeholderClassName="left-4 top-4"
+        wrapperClassName="rounded-xl border bg-muted/25 p-4"
+      />
+    </form>
   );
 }

@@ -1,7 +1,7 @@
 // biome-ignore-all lint/suspicious/noConsole: Seed script requires console output
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { reset } from "drizzle-seed";
 import { Effect } from "effect";
 import { DB } from "./src";
@@ -314,6 +314,23 @@ const seedEngagement = ({
       return;
     }
 
+    const membershipRows =
+      actorIds.length > 0
+        ? yield* db
+            .select({ userId: member.userId, memberId: member.id })
+            .from(member)
+            .where(
+              and(
+                eq(member.organizationId, organizationId),
+                inArray(member.userId, actorIds)
+              )
+            )
+        : [];
+
+    const memberIdByUserId = new Map(
+      membershipRows.map((item) => [item.userId, item.memberId])
+    );
+
     const [existingComment] = yield* db
       .select({ id: comment.id })
       .from(comment)
@@ -351,6 +368,7 @@ const seedEngagement = ({
           organizationId,
           postId: postItem.id,
           userId: actorId,
+          memberId: memberIdByUserId.get(actorId) ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -376,6 +394,7 @@ const seedEngagement = ({
           yield* db.insert(upvote).values({
             id: makeId("upv"),
             userId: upvoterId,
+            memberId: memberIdByUserId.get(upvoterId) ?? null,
             postId: postItem.id,
           });
         }
@@ -405,6 +424,7 @@ const seedEngagement = ({
           yield* db.insert(reaction).values({
             id: makeId("rct"),
             userId: reactorId,
+            memberId: memberIdByUserId.get(reactorId) ?? null,
             postId: postItem.id,
             emoji,
           });
@@ -439,6 +459,7 @@ const seedEngagement = ({
           yield* db.insert(commentLike).values({
             id: makeId("clk"),
             userId: likerId,
+            memberId: memberIdByUserId.get(likerId) ?? null,
             commentId: item.id,
           });
         }
@@ -536,6 +557,10 @@ const seed = Effect.gen(function* () {
   const actorIds = [
     primaryUser.id,
     ...extraUsers.filter((item) => item.joinMainOrg).map((item) => item.id),
+    ...extraUsers
+      .filter((item) => !item.joinMainOrg)
+      .slice(0, 2)
+      .map((item) => item.id),
   ];
 
   yield* seedEngagement({

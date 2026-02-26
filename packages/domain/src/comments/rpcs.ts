@@ -2,7 +2,13 @@ import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
 import { AuthMiddleware } from "../session-middleware";
 import { CommentServiceErrors } from "./errors";
-import { Comment, CommentCreate, CommentList } from "./schema";
+import {
+  Comment,
+  CommentCreate,
+  CommentDelete,
+  CommentList,
+  CommentUpdate,
+} from "./schema";
 
 export class CommentRpcs extends RpcGroup.make(
   Rpc.make("CommentList", {
@@ -16,5 +22,19 @@ export class CommentRpcs extends RpcGroup.make(
     }),
     error: CommentServiceErrors,
     payload: CommentCreate,
+  }),
+  Rpc.make("CommentDelete", {
+    success: Schema.Struct({
+      message: Schema.String,
+    }),
+    error: CommentServiceErrors,
+    payload: CommentDelete,
+  }),
+  Rpc.make("CommentUpdate", {
+    success: Schema.Struct({
+      message: Schema.String,
+    }),
+    error: CommentServiceErrors,
+    payload: CommentUpdate,
   })
 ).middleware(AuthMiddleware) {}

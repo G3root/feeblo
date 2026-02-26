@@ -24,6 +24,7 @@ export const CommentList = Schema.Struct({
 export type TCommentList = Schema.Schema.Type<typeof CommentList>;
 
 export const CommentCreate = Schema.Struct({
+  id: Schema.String,
   organizationId: Schema.String,
   postId: Schema.String,
   content: Schema.String,
@@ -32,3 +33,20 @@ export const CommentCreate = Schema.Struct({
 });
 
 export type TCommentCreate = Schema.Schema.Type<typeof CommentCreate>;
+
+export const CommentDelete = Schema.Struct({
+  id: Schema.String,
+  organizationId: Schema.String,
+  postId: Schema.String,
+});
+
+export type TCommentDelete = Schema.Schema.Type<typeof CommentDelete>;
+
+export const CommentUpdate = Schema.Struct({
+  id: Schema.String,
+  organizationId: Schema.String,
+  postId: Schema.String,
+  content: Schema.String,
+});
+
+export type TCommentUpdate = Schema.Schema.Type<typeof CommentUpdate>;

@@ -198,3 +198,5 @@ export const site = pgTable(
   },
   (table) => [uniqueIndex("site_organizationId_uidx").on(table.organizationId)]
 );
+
+export type InsertComment = typeof comment.$inferInsert;
