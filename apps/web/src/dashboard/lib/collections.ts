@@ -45,10 +45,10 @@ export const postCollection = createCollection(
       const boardId = filters?.boardId;
       const organizationId = filters?.organizationId;
       if (!boardId) {
-        throw new Error("boardId is required");
+        return [];
       }
       if (!organizationId) {
-        throw new Error("organizationId is required");
+        return [];
       }
 
       const data = await fetchRpc(
@@ -163,6 +163,63 @@ export const membershipCollection = createCollection(
       fetchRpc((rpc) => rpc.MembershipList(), { signal: args.signal }).then(
         (data) => [...data]
       ),
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const commentCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["comment"];
+      for (const { field, value } of parsed.filters) {
+        const fieldName = field.join(".");
+        if (fieldName === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+        if (fieldName === "postId") {
+          cacheKey.push(`postId-${value}`);
+        }
+      }
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const filters: {
+        organizationId?: string;
+        postId?: string;
+      } = {};
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq") {
+          const fieldName = field.join(".");
+          if (fieldName === "organizationId") {
+            filters.organizationId = value as string;
+          }
+          if (fieldName === "postId") {
+            filters.postId = value as string;
+          }
+        }
+      }
+      const organizationId = filters?.organizationId;
+      const postId = filters?.postId;
+      if (!organizationId) {
+        return [];
+      }
+      if (!postId) {
+        return [];
+      }
+      try {
+        const data = await fetchRpc(
+          (rpc) => rpc.CommentList({ organizationId, postId }),
+          { signal: ctx.signal }
+        );
+        return [...data];
+      } catch (error) {
+        return [];
+      }
+    },
     queryClient: TanstackQuery.getContext().queryClient,
     getKey: (item) => item.id,
   })

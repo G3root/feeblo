@@ -4,7 +4,11 @@ import {
   PostDetailsForm,
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
-import { boardCollection, postCollection } from "~/lib/collections";
+import {
+  boardCollection,
+  commentCollection,
+  postCollection,
+} from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
@@ -47,10 +51,27 @@ function RouteComponent() {
     [postSlug, organizationId, board?.id]
   );
 
+  const { data: comments } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ comment: commentCollection })
+        .where(({ comment }) =>
+          and(
+            eq(comment.organizationId, organizationId),
+            eq(comment.postId, post?.id)
+          )
+        )
+        .orderBy((comment) => comment.comment.createdAt, "desc");
+    },
+    [organizationId, post?.id]
+  );
+
   if (!(board && post)) {
     return (
       <div className="mx-auto w-full max-w-5xl p-6">
-        <h1 className="font-semibold text-2xl tracking-tight">Post not found</h1>
+        <h1 className="font-semibold text-2xl tracking-tight">
+          Post not found
+        </h1>
         <p className="mt-2 text-muted-foreground text-sm">
           We could not find the requested post.
         </p>
@@ -69,6 +90,7 @@ function RouteComponent() {
     <PostDetailsForm
       boardName={board.name}
       boardSlug={board.slug}
+      comments={comments}
       createdAt={post.createdAt}
       description={post.content}
       initialTitle={post.title}
