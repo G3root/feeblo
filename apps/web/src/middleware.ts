@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { VITE_APP_ROOT_DOMAIN } from "astro:env/client";
 import { sequence } from "astro:middleware";
 import { extractSubdomain, RESERVED_SUBDOMAINS } from "@feeblo/utils/url";
@@ -34,22 +35,29 @@ function getTargetPathPrefix(subdomain: string | null) {
   return DASHBOARD_PATH;
 }
 
+function hasPathPrefix(pathname: string, prefix: string) {
+  if (prefix === DASHBOARD_PATH) {
+    return true;
+  }
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function stripLeadingSegment(pathname: string, segment: string) {
+  if (pathname === `/${segment}`) {
+    return "";
+  }
+  return pathname.slice(segment.length + 1);
+}
+
 function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   const subdomain = resolveSubdomain(context);
   context.locals.subdomain = subdomain;
   const targetPathPrefix = getTargetPathPrefix(subdomain);
   const pathname = normalizePathname(context.url.pathname);
 
-  if (targetPathPrefix) {
-    const isAlreadyInPath =
-      pathname === targetPathPrefix || pathname.startsWith(targetPathPrefix);
-
-    if (!isAlreadyInPath) {
-      const suffix = pathname === "/" ? "" : pathname;
-      return context.rewrite(
-        `${targetPathPrefix}${suffix}${context.url.search}`
-      );
-    }
+  if (!hasPathPrefix(pathname, targetPathPrefix)) {
+    const suffix = pathname === "/" ? "" : pathname;
+    return context.rewrite(`${targetPathPrefix}${suffix}${context.url.search}`);
   }
 
   return next();
@@ -116,7 +124,7 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
   const pathname = normalizePathname(url.pathname);
   const targetPathPrefix = getTargetPathPrefix(context.locals.subdomain);
   const organizationIds = getMemberOrganizationIds(context);
-  const defaultOrganizationId = organizationIds[0] ?? null;
+  const defaultOrganizationId = getDefaultOrganizationId(context);
 
   if (targetPathPrefix !== DASHBOARD_PATH || !defaultOrganizationId) {
     return next();
@@ -131,10 +139,12 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
     return next();
   }
 
-  let suffix = pathname === "/" ? "" : pathname;
-  if (pathOrganizationId) {
-    suffix = pathname.slice(pathOrganizationId.length + 1);
-  }
+  const suffix =
+    pathOrganizationId && pathname !== "/"
+      ? stripLeadingSegment(pathname, pathOrganizationId)
+      : pathname === "/"
+        ? ""
+        : pathname;
   return context.redirect(`/${defaultOrganizationId}${suffix}${url.search}`);
 }
 
