@@ -1,14 +1,27 @@
+import { VITE_APP_ROOT_DOMAIN } from "astro:env/client";
 import { sequence } from "astro:middleware";
+import { extractSubdomain } from "@feeblo/utils/url";
 import type { APIContext, MiddlewareNext } from "astro";
 import { authClient } from "~/lib/auth-client";
 
 const AUTH_SIGN_IN_PATH = "/sign-in";
 const AUTH_SIGN_UP_PATH = "/sign-up";
 const APP_HOME_PATH = "/";
+const PUBLIC_BOARD_PATH = "/s";
 const DASHBOARD_AUTH_PATHS = new Set([AUTH_SIGN_IN_PATH, AUTH_SIGN_UP_PATH]);
 
-function resolveSubdomain(_context: APIContext) {
-  return "app";
+function normalizePathname(pathname: string) {
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    return pathname.slice(0, -1);
+  }
+  return pathname;
+}
+
+function resolveSubdomain(context: APIContext) {
+  return extractSubdomain({
+    url: context.request.url,
+    rootDomain: VITE_APP_ROOT_DOMAIN,
+  });
 }
 
 function getTargetPathPrefix(subdomain: string | null) {
@@ -16,7 +29,12 @@ function getTargetPathPrefix(subdomain: string | null) {
     return null;
   }
 
-  return subdomain === "app" ? APP_HOME_PATH : null;
+  return subdomain === "app" ? APP_HOME_PATH : PUBLIC_BOARD_PATH;
+}
+
+function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
+  context.locals.subdomain = resolveSubdomain(context);
+  return next();
 }
 
 async function authMiddleware(context: APIContext, next: MiddlewareNext) {
@@ -63,13 +81,14 @@ function dashboardAuthRedirectMiddleware(
   next: MiddlewareNext
 ) {
   const { url } = context;
-  const targetPathPrefix = getTargetPathPrefix(resolveSubdomain(context));
+  const pathname = normalizePathname(url.pathname);
+  const targetPathPrefix = getTargetPathPrefix(context.locals.subdomain);
   const isAppSubdomain = targetPathPrefix === APP_HOME_PATH;
   if (!isAppSubdomain) {
     return next();
   }
 
-  const isAuthPath = DASHBOARD_AUTH_PATHS.has(url.pathname);
+  const isAuthPath = DASHBOARD_AUTH_PATHS.has(pathname);
   const isAuthed = Boolean(context.locals.session);
 
   if (!(isAuthed || isAuthPath)) {
@@ -80,7 +99,9 @@ function dashboardAuthRedirectMiddleware(
 
   if (isAuthed && isAuthPath) {
     const organizationId = getDefaultOrganizationId(context);
-    return context.redirect(organizationId ? `/${organizationId}` : APP_HOME_PATH);
+    return context.redirect(
+      organizationId ? `/${organizationId}` : APP_HOME_PATH
+    );
   }
 
   return next();
@@ -88,34 +109,49 @@ function dashboardAuthRedirectMiddleware(
 
 function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
   const { url } = context;
-  const targetPathPrefix = getTargetPathPrefix(resolveSubdomain(context));
+  const pathname = normalizePathname(url.pathname);
+  const targetPathPrefix = getTargetPathPrefix(context.locals.subdomain);
   const organizationIds = getMemberOrganizationIds(context);
   const defaultOrganizationId = getDefaultOrganizationId(context);
+
+  if (targetPathPrefix === PUBLIC_BOARD_PATH) {
+    const isAlreadyInBoardPath =
+      pathname === PUBLIC_BOARD_PATH ||
+      pathname.startsWith(`${PUBLIC_BOARD_PATH}/`);
+
+    if (isAlreadyInBoardPath) {
+      return next();
+    }
+
+    const suffix = pathname === "/" ? "" : pathname;
+    return context.rewrite(`${PUBLIC_BOARD_PATH}${suffix}${url.search}`);
+  }
 
   if (targetPathPrefix !== APP_HOME_PATH || !defaultOrganizationId) {
     return next();
   }
 
-  if (DASHBOARD_AUTH_PATHS.has(url.pathname)) {
+  if (DASHBOARD_AUTH_PATHS.has(pathname)) {
     return next();
   }
 
-  const pathOrganizationId = getPathOrganizationId(url.pathname);
+  const pathOrganizationId = getPathOrganizationId(pathname);
   if (pathOrganizationId && organizationIds.includes(pathOrganizationId)) {
     return next();
   }
 
   if (pathOrganizationId) {
-    const pathnameWithoutOrg = url.pathname.slice(pathOrganizationId.length + 1);
+    const pathnameWithoutOrg = pathname.slice(pathOrganizationId.length + 1);
     const suffix = pathnameWithoutOrg ? pathnameWithoutOrg : "";
     return context.redirect(`/${defaultOrganizationId}${suffix}${url.search}`);
   }
 
-  const suffix = url.pathname === "/" ? "" : url.pathname;
+  const suffix = pathname === "/" ? "" : pathname;
   return context.redirect(`/${defaultOrganizationId}${suffix}${url.search}`);
 }
 
 export const onRequest = sequence(
+  subdomainMiddleware,
   authMiddleware,
   dashboardAuthRedirectMiddleware,
   redirectMiddleware
