@@ -2,6 +2,7 @@ import { DB } from "@feeblo/db";
 import { post as postTable } from "@feeblo/db/schema/feedback";
 import { and, eq } from "drizzle-orm";
 import { Effect } from "effect";
+import type { TPostUpdate } from "./schema";
 
 type TPostFindMany = {
   boardId: string;
@@ -41,6 +42,25 @@ export class PostRepository extends Effect.Service<PostRepository>()(
                 eq(postTable.organizationId, organizationId)
               )
             ),
+
+        update: ({
+          id,
+          organizationId,
+          status,
+          boardId,
+          title,
+          content,
+        }: TPostUpdate) =>
+          db
+            .update(postTable)
+            .set({ status, boardId, title, content })
+            .where(
+              and(
+                eq(postTable.id, id),
+                eq(postTable.organizationId, organizationId)
+              )
+            )
+            .pipe(Effect.asVoid),
 
         delete: ({ id, organizationId, boardId }: TPostDelete) =>
           db

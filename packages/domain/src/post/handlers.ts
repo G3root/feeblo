@@ -3,7 +3,7 @@ import { requireOrganizationMembership } from "../authorization";
 import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
-import type { TPostDelete, TPostList } from "./schema";
+import type { TPostDelete, TPostList, TPostUpdate } from "./schema";
 
 export const PostRpcHandlers = PostRpcs.toLayer(
   Effect.gen(function* () {
@@ -29,6 +29,12 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             organizationId: args.organizationId,
             boardId: args.boardId,
           });
+        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+      },
+      PostUpdate: (args: TPostUpdate) => {
+        return Effect.gen(function* () {
+          yield* requireOrganizationMembership(args.organizationId);
+          yield* repository.update(args);
         }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
     };
