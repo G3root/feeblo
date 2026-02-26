@@ -62,6 +62,33 @@ export const postCollection = createCollection(
     },
     queryClient: TanstackQuery.getContext().queryClient,
     getKey: (item) => item.id,
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedPost } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.PostUpdate({
+          id: updatedPost.id,
+          status: updatedPost.status,
+          content: updatedPost.content,
+          title: updatedPost.title,
+          boardId: updatedPost.boardId,
+          organizationId: updatedPost.organizationId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedPost } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.PostDelete({
+          id: deletedPost.id,
+          boardId: deletedPost.boardId,
+          organizationId: deletedPost.organizationId,
+        })
+      );
+    },
   })
 );
 

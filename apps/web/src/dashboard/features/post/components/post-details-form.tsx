@@ -118,7 +118,7 @@ function PostCommentList({ comments }: { comments: PostComment[] }) {
   }
 
   return (
-    <ItemGroup className="gap-2">
+    <ItemGroup>
       {comments.map((comment) => (
         <Item
           className="rounded-xl border-border/80 px-4 py-3"
