@@ -1,14 +1,16 @@
 import { VITE_APP_ROOT_DOMAIN } from "astro:env/client";
 import { sequence } from "astro:middleware";
-import { extractSubdomain } from "@feeblo/utils/url";
+import { extractSubdomain, RESERVED_SUBDOMAINS } from "@feeblo/utils/url";
 import type { APIContext, MiddlewareNext } from "astro";
 import { authClient } from "~/lib/auth-client";
 
 const AUTH_SIGN_IN_PATH = "/sign-in";
 const AUTH_SIGN_UP_PATH = "/sign-up";
-const APP_HOME_PATH = "/";
+const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
 const DASHBOARD_AUTH_PATHS = new Set([AUTH_SIGN_IN_PATH, AUTH_SIGN_UP_PATH]);
+
+const RESERVED_SUBDOMAIN_SET = new Set(RESERVED_SUBDOMAINS);
 
 function normalizePathname(pathname: string) {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -25,42 +27,48 @@ function resolveSubdomain(context: APIContext) {
 }
 
 function getTargetPathPrefix(subdomain: string | null) {
-  if (!subdomain) {
-    return null;
+  if (subdomain && !RESERVED_SUBDOMAIN_SET.has(subdomain)) {
+    return PUBLIC_BOARD_PATH;
   }
 
-  return subdomain === "app" ? APP_HOME_PATH : PUBLIC_BOARD_PATH;
+  return DASHBOARD_PATH;
 }
 
 function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
-  context.locals.subdomain = resolveSubdomain(context);
+  const subdomain = resolveSubdomain(context);
+  context.locals.subdomain = subdomain;
+  const targetPathPrefix = getTargetPathPrefix(subdomain);
+  const pathname = normalizePathname(context.url.pathname);
+
+  if (targetPathPrefix) {
+    const isAlreadyInPath =
+      pathname === targetPathPrefix || pathname.startsWith(targetPathPrefix);
+
+    if (!isAlreadyInPath) {
+      const suffix = pathname === "/" ? "" : pathname;
+      return context.rewrite(
+        `${targetPathPrefix}${suffix}${context.url.search}`
+      );
+    }
+  }
+
   return next();
 }
 
 async function authMiddleware(context: APIContext, next: MiddlewareNext) {
-  const session = await authClient.getSession({
-    fetchOptions: {
-      headers: context.request.headers,
-    },
+  const { data } = await authClient.getSession({
+    fetchOptions: { headers: context.request.headers },
   });
 
-  if (session?.data) {
-    context.locals.user = session.data.user;
-    context.locals.session = session.data.session;
-    context.locals.organizations = session.data.organizations;
-  } else {
-    context.locals.user = null;
-    context.locals.session = null;
-    context.locals.organizations = null;
-  }
+  context.locals.user = data?.user ?? null;
+  context.locals.session = data?.session ?? null;
+  context.locals.organizations = data?.organizations ?? null;
 
   return next();
 }
 
 function getMemberOrganizationIds(context: APIContext) {
-  return (context.locals.organizations ?? [])
-    .map((org) => org.id)
-    .filter(Boolean);
+  return (context.locals.organizations ?? []).map((org) => org.id);
 }
 
 function getPathOrganizationId(pathname: string) {
@@ -69,11 +77,7 @@ function getPathOrganizationId(pathname: string) {
 }
 
 function getDefaultOrganizationId(context: APIContext) {
-  const organizationIds = getMemberOrganizationIds(context);
-  if (organizationIds.length === 0) {
-    return null;
-  }
-  return organizationIds[0] ?? null;
+  return getMemberOrganizationIds(context)[0] ?? null;
 }
 
 function dashboardAuthRedirectMiddleware(
@@ -83,7 +87,7 @@ function dashboardAuthRedirectMiddleware(
   const { url } = context;
   const pathname = normalizePathname(url.pathname);
   const targetPathPrefix = getTargetPathPrefix(context.locals.subdomain);
-  const isAppSubdomain = targetPathPrefix === APP_HOME_PATH;
+  const isAppSubdomain = targetPathPrefix === DASHBOARD_PATH;
   if (!isAppSubdomain) {
     return next();
   }
@@ -100,7 +104,7 @@ function dashboardAuthRedirectMiddleware(
   if (isAuthed && isAuthPath) {
     const organizationId = getDefaultOrganizationId(context);
     return context.redirect(
-      organizationId ? `/${organizationId}` : APP_HOME_PATH
+      organizationId ? `/${organizationId}` : DASHBOARD_PATH
     );
   }
 
@@ -112,22 +116,9 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
   const pathname = normalizePathname(url.pathname);
   const targetPathPrefix = getTargetPathPrefix(context.locals.subdomain);
   const organizationIds = getMemberOrganizationIds(context);
-  const defaultOrganizationId = getDefaultOrganizationId(context);
+  const defaultOrganizationId = organizationIds[0] ?? null;
 
-  if (targetPathPrefix === PUBLIC_BOARD_PATH) {
-    const isAlreadyInBoardPath =
-      pathname === PUBLIC_BOARD_PATH ||
-      pathname.startsWith(`${PUBLIC_BOARD_PATH}/`);
-
-    if (isAlreadyInBoardPath) {
-      return next();
-    }
-
-    const suffix = pathname === "/" ? "" : pathname;
-    return context.rewrite(`${PUBLIC_BOARD_PATH}${suffix}${url.search}`);
-  }
-
-  if (targetPathPrefix !== APP_HOME_PATH || !defaultOrganizationId) {
+  if (targetPathPrefix !== DASHBOARD_PATH || !defaultOrganizationId) {
     return next();
   }
 
@@ -140,19 +131,16 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
     return next();
   }
 
+  let suffix = pathname === "/" ? "" : pathname;
   if (pathOrganizationId) {
-    const pathnameWithoutOrg = pathname.slice(pathOrganizationId.length + 1);
-    const suffix = pathnameWithoutOrg ? pathnameWithoutOrg : "";
-    return context.redirect(`/${defaultOrganizationId}${suffix}${url.search}`);
+    suffix = pathname.slice(pathOrganizationId.length + 1);
   }
-
-  const suffix = pathname === "/" ? "" : pathname;
   return context.redirect(`/${defaultOrganizationId}${suffix}${url.search}`);
 }
 
 export const onRequest = sequence(
-  subdomainMiddleware,
   authMiddleware,
+  subdomainMiddleware,
   dashboardAuthRedirectMiddleware,
   redirectMiddleware
 );

@@ -37,6 +37,11 @@ export default defineConfig({
         access: "public",
         optional: false,
       }),
+      VITE_APP_ROOT_DOMAIN: envField.string({
+        context: "client",
+        access: "public",
+        optional: false,
+      }),
     },
   },
 
