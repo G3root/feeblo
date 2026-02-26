@@ -1,5 +1,6 @@
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
@@ -39,6 +40,7 @@ function RenameBoardForm() {
   const organizationId = useOrganizationId();
   const store = useRenameBoardDialogContext();
   const boardId = useSelector(store, (state) => state.context.data.boardId);
+  const navigate = useNavigate();
 
   const { data } = useLiveSuspenseQuery(
     (q) =>
@@ -70,10 +72,11 @@ function RenameBoardForm() {
     },
     onSubmit: async (data) => {
       try {
+        const boardSlug = slugify(data.value.name);
         const tx = boardCollection.update(boardId, (draft) => {
           draft.name = data.value.name;
           draft.visibility = data.value.visibility;
-          draft.slug = slugify(data.value.name);
+          draft.slug = boardSlug;
         });
         await tx.isPersisted.promise;
         toastManager.add({
@@ -81,6 +84,14 @@ function RenameBoardForm() {
           type: "success",
         });
         store.send({ type: "toggle" });
+
+        navigate({
+          to: "/$organizationId/board/$boardSlug",
+          params: {
+            organizationId,
+            boardSlug,
+          },
+        });
       } catch (_error) {
         toastManager.add({
           title: "Failed to rename board",
