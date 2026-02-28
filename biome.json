@@ -4,7 +4,8 @@
     "ultracite/biome/core",
     "ultracite/biome/react",
     "ultracite/biome/remix",
-    "ultracite/biome/astro"
+    "ultracite/biome/astro",
+    "ultracite/biome/svelte"
   ],
   "overrides": [
     {
@@ -15,8 +16,16 @@
       "linter": {
         "enabled": false
       }
+    },
+    {
+      "includes": ["**/*.svelte"],
+
+      "linter": {
+        "enabled": false
+      }
     }
   ],
+
   "linter": {
     "rules": {
       "performance": {

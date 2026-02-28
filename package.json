@@ -20,7 +20,6 @@
       "@effect/platform-bun": "^0.87.1",
       "@effect/platform": "^0.94.5",
       "@dotenvx/dotenvx": "^1.51.0",
-      "solid-js": "^1.9.11",
       "tailwindcss": "^4.1.18",
       "@tailwindcss/cli": "^4.1.18",
       "tailwind-merge": "^3.5.0",
@@ -30,7 +29,8 @@
       "clsx": "^2.1.1",
       "@tanstack/query-db-collection": "^1.0.27",
       "@tanstack/react-db": "^0.1.74",
-      "@tanstack/solid-db": "^0.2.10"
+      "@tanstack/svelte-db": "^0.1.73",
+      "svelte": "^5.53.6"
     }
   },
   "type": "module",

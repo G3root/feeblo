@@ -1,7 +1,7 @@
 // @ts-check
 
 import react from "@astrojs/react";
-import solidJs from "@astrojs/solid-js";
+import svelte from "@astrojs/svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 // import alchemy from "alchemy/cloudflare/astro";
@@ -22,6 +22,9 @@ export default defineConfig({
   },
 
   vite: {
+    ssr: {
+      noExternal: [/^@feeblo\//],
+    },
     plugins: [
       tailwindcss(),
       tanstackRouter({
@@ -59,7 +62,7 @@ export default defineConfig({
     react({
       include: ["**/dashboard/**"],
     }),
-    solidJs({
+    svelte({
       include: [
         "**/node_modules/@feeblo/public-board/**",
         "**/packages/public-board/**",

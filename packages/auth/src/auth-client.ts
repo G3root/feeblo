@@ -6,7 +6,7 @@ import {
   twoFactorClient,
 } from "better-auth/client/plugins";
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
-import { createAuthClient as createSolidAuthClientBase } from "better-auth/solid";
+import { createAuthClient as createSvelteAuthClientBase } from "better-auth/svelte";
 import type { Auth } from "./server";
 
 const plugins = [
@@ -26,8 +26,8 @@ export const createAuthClient = (baseURL: string) => {
 
 export type TAuthClient = ReturnType<typeof createAuthClient>;
 
-export const createSolidAuthClient = (baseURL: string) => {
-  return createSolidAuthClientBase({
+export const createSvelteAuthClient = (baseURL: string) => {
+  return createSvelteAuthClientBase({
     plugins,
     baseURL,
   });

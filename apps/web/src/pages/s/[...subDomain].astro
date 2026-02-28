@@ -27,6 +27,6 @@ const site = siteData[0];
 
 <PublicBoardLayout title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}>
   <main>
-    <PublicBoardApp client:only="solid-js" site={site} />
+    <PublicBoardApp client:only="svelte" site={site} />
   </main>
 </PublicBoardLayout>
