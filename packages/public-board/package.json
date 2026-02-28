@@ -1,0 +1,55 @@
+{
+  "name": "@feeblo/public-board",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build:js": "rolldown -c",
+    "build:css": "tailwindcss -i src/styles/index.css -o dist/styles.css --minify",
+    "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "bun run clean && bun run build:js && bun run build:css && bun run build:types",
+    "dev:js": "rolldown --config rolldown.config.mjs --watch",
+    "dev:css": "tailwindcss -i src/styles/index.css -o dist/styles.css --watch",
+    "dev:types": "tsc -p tsconfig.json --emitDeclarationOnly --watch",
+    "dev": "bun run clean && (bun run dev:js & bun run dev:css & bun run dev:types & wait)"
+  },
+  "dependencies": {
+    "@feeblo/auth": "workspace:*",
+    "@feeblo/rpc-client": "workspace:*",
+    "@kobalte/core": "^0.13.11",
+    "@tanstack/query-db-collection": "catalog:",
+    "@tanstack/solid-db": "catalog:",
+    "@solidjs/router": "^0.15.3",
+    "@tanstack/solid-query": "^5.90.23",
+    "effect": "catalog:",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/preset-typescript": "^7.27.1",
+    "@fontsource-variable/manrope": "catalog:",
+    "@rollup/plugin-babel": "^6.1.0",
+    "@tailwindcss/cli": "catalog:",
+    "babel-preset-solid": "^1.9.10",
+    "lucide-solid": "^0.575.0",
+    "rolldown": "^1.0.0-beta.39",
+    "shadcn": "catalog:",
+    "tailwind-merge": "catalog:",
+    "tailwindcss": "catalog:",
+    "tw-animate-css": "catalog:",
+    "typescript": "catalog:"
+  }
+}
