@@ -28,7 +28,7 @@ import {
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useSite } from "~/hooks/use-site";
+import { getPublicSiteUrl } from "~/hooks/use-site";
 import { boardCollection } from "~/lib/collections";
 import {
   DropdownMenu,
@@ -196,16 +196,10 @@ const RenameBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
   );
 };
 
-const getSiteUrl = (subdomain: string) => {
-  return subdomain
-    ? `${location.protocol}//${subdomain}.${location.host}`
-    : undefined;
-};
-
 function MyBoardLink() {
-  const site = useSite();
+  const publicSiteUrl = getPublicSiteUrl();
 
-  if (!site?.subdomain) {
+  if (!publicSiteUrl) {
     return null;
   }
 
@@ -213,7 +207,7 @@ function MyBoardLink() {
     <SidebarMenuItem>
       <SidebarMenuButton
         render={(props) => (
-          <a {...props} href={getSiteUrl(site.subdomain)}>
+          <a {...props} href={publicSiteUrl}>
             <HugeiconsIcon icon={WebDesign01Icon} />
             <span>My Board</span>
           </a>

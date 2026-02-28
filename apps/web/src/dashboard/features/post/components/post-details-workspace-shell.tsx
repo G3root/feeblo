@@ -1,4 +1,8 @@
-import { Copy01Icon, Trash2 } from "@hugeicons/core-free-icons";
+import {
+  Copy01Icon,
+  LinkSquare02Icon,
+  Trash2,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
@@ -16,6 +20,7 @@ import { SidebarTrigger } from "~/components/ui/sidebar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { BOARD_LANES, type BoardPostStatus } from "~/features/board/constants";
+import { getPublicSiteUrl } from "~/hooks/use-site";
 import { boardCollection, postCollection } from "~/lib/collections";
 import { usePostDeleteDialogContext } from "../dialog-stores";
 
@@ -127,7 +132,8 @@ function PostDetailsWorkspaceShellContent({
 
       <aside className="hidden border-l bg-muted/20 px-6 pt-2 lg:block">
         <div className="flex items-center justify-end gap-2">
-          <CopyPostButton postId={post?.id ?? ""} />
+          <RedirectToPostUrlButton postSlug={post?.slug ?? ""} />
+          <CopyPostButton postSlug={post?.slug ?? ""} />
           <Button
             aria-label="Close"
             onClick={() =>
@@ -240,6 +246,30 @@ function PostDetailsWorkspaceShellContent({
   );
 }
 
+const RedirectToPostUrlButton = ({ postSlug }: { postSlug: string }) => {
+  const publicSiteUrl = getPublicSiteUrl();
+  if (!publicSiteUrl) {
+    return null;
+  }
+  return (
+    <Button
+      nativeButton={false}
+      render={(props) => (
+        <a
+          {...props}
+          href={`${publicSiteUrl}/p/${postSlug}`}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <HugeiconsIcon icon={LinkSquare02Icon} />
+        </a>
+      )}
+      size="icon-sm"
+      variant="outline"
+    />
+  );
+};
+
 function PropertyRow({
   label,
   children,
@@ -255,9 +285,30 @@ function PropertyRow({
   );
 }
 
-function CopyPostButton({ postId }: { postId: string }) {
+function CopyPostButton({ postSlug }: { postSlug: string }) {
+  const publicSiteUrl = getPublicSiteUrl();
+  if (!publicSiteUrl) {
+    return null;
+  }
   return (
-    <Button size="icon-sm" variant="outline">
+    <Button
+      onClick={() => {
+        try {
+          navigator.clipboard.writeText(`${publicSiteUrl}/p/${postSlug}`);
+          toastManager.add({
+            title: "Post URL copied to clipboard",
+            type: "success",
+          });
+        } catch (_error) {
+          toastManager.add({
+            title: "Failed to copy post URL to clipboard",
+            type: "error",
+          });
+        }
+      }}
+      size="icon-sm"
+      variant="outline"
+    >
       <HugeiconsIcon icon={Copy01Icon} />
     </Button>
   );

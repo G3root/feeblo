@@ -16,3 +16,17 @@ export const useSite = () => {
 
   return site;
 };
+
+const getSiteUrl = (subdomain: string) => {
+  return subdomain
+    ? `${location.protocol}//${subdomain}.${location.host}`
+    : undefined;
+};
+
+export const getPublicSiteUrl = () => {
+  const site = useSite();
+  if (!site?.subdomain) {
+    return undefined;
+  }
+  return getSiteUrl(site.subdomain);
+};
