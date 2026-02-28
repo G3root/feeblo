@@ -33,13 +33,31 @@ const CorsLayer = Layer.unwrapEffect(
     appUrl: Config.string("VITE_APP_URL"),
     apiUrl: Config.string("VITE_API_URL"),
   }).pipe(
-    Effect.map(({ appUrl, apiUrl }) =>
-      HttpLayerRouter.cors({
-        allowedOrigins: [appUrl, apiUrl],
+    Effect.map(({ appUrl, apiUrl }) => {
+      const appParsed = new URL(appUrl);
+      const apiParsed = new URL(apiUrl);
+      const appOrigin = appParsed.origin;
+      const apiOrigin = apiParsed.origin;
+
+      const isAllowedOrigin = (origin: string) => {
+        if (origin === appOrigin || origin === apiOrigin) { return true; }
+        try {
+          const { hostname, port } = new URL(origin);
+          return (
+            hostname.endsWith(`.${appParsed.hostname}`) &&
+            port === appParsed.port
+          );
+        } catch {
+          return false;
+        }
+      };
+
+      return HttpLayerRouter.cors({
+        allowedOrigins: isAllowedOrigin,
         allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         credentials: true,
-      })
-    )
+      });
+    })
   )
 );
 

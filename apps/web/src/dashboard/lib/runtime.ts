@@ -1,21 +1,12 @@
-import { type Effect, Exit, Layer, ManagedRuntime } from "effect";
-
-import { FetchWithCredentials, Rpc, withRpc } from "./rpc-client";
+import {
+  Rpc,
+  type RuntimeRequirements,
+  runtime,
+  withRpc,
+} from "@feeblo/rpc-client";
+import { type Effect, Exit } from "effect";
 import type { LiveManagedRuntime } from "./runtime/live-layer";
 import { useRuntime } from "./runtime/use-runtime";
-
-export const runtimeLayer = Layer.mergeAll(
-  Rpc.Default,
-
-  FetchWithCredentials
-);
-
-export const runtime = ManagedRuntime.make(runtimeLayer);
-
-/** Services provided by the default runtime (used for runEffect typing). */
-export type RuntimeRequirements = ManagedRuntime.ManagedRuntime.Context<
-  typeof runtime
->;
 
 /**
  * Runs an Effect with the default runtime and optional AbortSignal.

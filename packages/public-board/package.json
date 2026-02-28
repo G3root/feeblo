@@ -40,7 +40,6 @@
   "devDependencies": {
     "@babel/core": "^7.28.4",
     "@babel/preset-typescript": "^7.27.1",
-    "@fontsource-variable/manrope": "catalog:",
     "@rollup/plugin-babel": "^6.1.0",
     "@tailwindcss/cli": "catalog:",
     "babel-preset-solid": "^1.9.10",

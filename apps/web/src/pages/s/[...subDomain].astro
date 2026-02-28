@@ -1,7 +1,32 @@
 ---
-import Layout from "../../layouts/Layout.astro";
+import { PublicBoardApp } from "@feeblo/public-board";
+import { fetchRpc } from "~/lib/runtime";
+import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
+
+export const prerender = false;
+
+const { subdomain } = Astro.locals;
+
+if (!subdomain) {
+  throw new Error("Subdomain is required");
+}
+
+const siteData = await fetchRpc(
+  (rpc) => rpc.SiteListBySubdomain({ subdomain }),
+  {
+    signal: AbortSignal.timeout(10000),
+  },
+);
+
+if (siteData.length === 0) {
+  throw new Error("Site not found");
+}
+
+const site = siteData[0];
 ---
 
-<Layout title="Dashboard">
-  <main>hello</main>
-</Layout>
+<PublicBoardLayout title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}>
+  <main>
+    <PublicBoardApp client:only="solid-js" site={site} />
+  </main>
+</PublicBoardLayout>

@@ -1,15 +1,25 @@
 // @ts-check
 
 import react from "@astrojs/react";
+import solidJs from "@astrojs/solid-js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 // import alchemy from "alchemy/cloudflare/astro";
-import { defineConfig, envField } from "astro/config";
+import { defineConfig, envField, fontProviders } from "astro/config";
 
 // https://astro.build/config
 export default defineConfig({
   output: "server",
   // adapter: alchemy(),
+  experimental: {
+    fonts: [
+      {
+        provider: fontProviders.google(),
+        name: "Manrope",
+        cssVariable: "--font-manrope",
+      },
+    ],
+  },
 
   vite: {
     plugins: [
@@ -45,5 +55,15 @@ export default defineConfig({
     },
   },
 
-  integrations: [react()],
+  integrations: [
+    react({
+      include: ["**/dashboard/**"],
+    }),
+    solidJs({
+      include: [
+        "**/node_modules/@feeblo/public-board/**",
+        "**/packages/public-board/**",
+      ],
+    }),
+  ],
 });
