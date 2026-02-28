@@ -1,14 +1,15 @@
 {
   "extends": "@feeblo/config/tsconfig.base",
   "compilerOptions": {
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-    "baseUrl": ".",
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist"]

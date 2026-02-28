@@ -1,15 +1,27 @@
-import { type Rpc, runtime, withRpc } from "@feeblo/rpc-client";
+import type { Rpc } from "@feeblo/rpc-client";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import { createCollection, parseLoadSubsetOptions } from "@tanstack/solid-db";
-import { QueryClient } from "@tanstack/solid-query";
+import { createCollection, parseLoadSubsetOptions } from "@tanstack/svelte-db";
+import { QueryClient } from "@tanstack/svelte-query";
 import { Duration, type Effect, Exit } from "effect";
 
 const queryClient = new QueryClient();
+let rpcRuntimePromise: Promise<typeof import("@feeblo/rpc-client")> | null =
+  null;
+
+function getRpcRuntime() {
+  if (!rpcRuntimePromise) {
+    rpcRuntimePromise = import("@feeblo/rpc-client");
+  }
+
+  return rpcRuntimePromise;
+}
 
 async function fetchRpc<A, E>(
   cb: (rpc: Rpc) => Effect.Effect<A, E>,
   options?: { signal?: AbortSignal }
 ): Promise<A> {
+  const { runtime, withRpc } = await getRpcRuntime();
+
   const result = await runtime.runPromiseExit(withRpc(cb), {
     signal: options?.signal,
   });

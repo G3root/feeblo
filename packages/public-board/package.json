@@ -4,49 +4,49 @@
   "private": true,
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
     },
-    "./styles.css": "./dist/styles.css"
+    "./styles.css": "./src/styles/index.css"
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build:js": "rolldown -c",
+    "build:js": "mkdir -p dist && printf 'import PublicBoardApp from \"../src/app/public-board-app.svelte\";\\n\\nexport { PublicBoardApp };\\n' > dist/index.js",
     "build:css": "tailwindcss -i src/styles/index.css -o dist/styles.css --minify",
     "build:types": "tsc -p tsconfig.json --emitDeclarationOnly",
     "build": "bun run clean && bun run build:js && bun run build:css && bun run build:types",
-    "dev:js": "rolldown --config rolldown.config.mjs --watch",
     "dev:css": "tailwindcss -i src/styles/index.css -o dist/styles.css --watch",
     "dev:types": "tsc -p tsconfig.json --emitDeclarationOnly --watch",
-    "dev": "bun run clean && (bun run dev:js & bun run dev:css & bun run dev:types & wait)"
+    "dev": "bun run clean && (bun run dev:css & bun run dev:types & wait)"
   },
   "dependencies": {
     "@feeblo/auth": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
-    "@kobalte/core": "^0.13.11",
+    "@lucide/svelte": "^0.561.0",
     "@tanstack/query-db-collection": "catalog:",
-    "@tanstack/solid-db": "catalog:",
-    "@solidjs/router": "^0.15.3",
-    "@tanstack/solid-query": "^5.90.23",
+    "@tanstack/svelte-db": "catalog:",
+    "@tanstack/svelte-query": "^6.0.18",
+    "bits-ui": "^2.14.4",
+    "clsx": "catalog:",
     "effect": "catalog:",
-    "solid-js": "catalog:"
+    "formsnap": "^2.0.1",
+    "sv-router": "^0.14.0",
+    "svelte": "catalog:"
   },
   "devDependencies": {
-    "@babel/core": "^7.28.4",
-    "@babel/preset-typescript": "^7.27.1",
-    "@rollup/plugin-babel": "^6.1.0",
+    "@internationalized/date": "^3.10.0",
     "@tailwindcss/cli": "catalog:",
-    "babel-preset-solid": "^1.9.10",
-    "lucide-solid": "^0.575.0",
-    "rolldown": "^1.0.0-beta.39",
     "shadcn": "catalog:",
+    "sveltekit-superforms": "^2.28.1",
     "tailwind-merge": "catalog:",
+    "tailwind-variants": "^3.2.2",
     "tailwindcss": "catalog:",
     "tw-animate-css": "catalog:",
     "typescript": "catalog:"
