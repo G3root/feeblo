@@ -8,18 +8,12 @@ interface Props {
 const { title = "feeblo" } = Astro.props;
 
 import { Font } from "astro:assets";
+import CommonHead from "./CommonHead.astro";
 ---
 
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="generator" content={Astro.generator} />
-    <title>{title}</title>
-    <Font cssVariable="--font-manrope" preload />
-  </head>
+  <CommonHead title={title} />
   <body>
     <slot />
   </body>
