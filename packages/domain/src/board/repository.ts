@@ -1,7 +1,7 @@
 import { DB } from "@feeblo/db";
 import { board as boardTable } from "@feeblo/db/schema/feedback";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
 import { Board } from "./schema";
 
@@ -40,8 +40,23 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
 
             return newBoard;
           }),
-        findMany: ({ organizationId }: { organizationId: string }) =>
+        findMany: ({
+          organizationId,
+          visibility,
+        }: {
+          organizationId: string;
+          visibility?: "PUBLIC" | "PRIVATE";
+        }) =>
           Effect.gen(function* () {
+            const where: SQL[] = [];
+            if (visibility) {
+              where.push(eq(boardTable.visibility, visibility));
+            }
+
+            where.push(eq(boardTable.organizationId, organizationId));
+
+            const whereClause = where.length > 1 ? and(...where) : where[0];
+
             const boards = yield* db
               .select({
                 id: boardTable.id,
@@ -53,7 +68,7 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
                 organizationId: boardTable.organizationId,
               })
               .from(boardTable)
-              .where(eq(boardTable.organizationId, organizationId));
+              .where(whereClause);
 
             return boards.map(
               (entry) =>

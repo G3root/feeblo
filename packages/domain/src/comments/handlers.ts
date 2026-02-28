@@ -33,6 +33,15 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           });
         }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
+      CommentListPublic: (args: TCommentList) => {
+        return Effect.gen(function* () {
+          return yield* repository.findMany({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            visibility: "PUBLIC",
+          });
+        }).pipe(Effect.mapError(mapToInternalServerError()));
+      },
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
           yield* requireOrganizationMembership(args.organizationId);

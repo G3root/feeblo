@@ -20,6 +20,14 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           });
         }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
+      PostListPublic: (args: TPostList) => {
+        return Effect.gen(function* () {
+          return yield* repository.findMany({
+            organizationId: args.organizationId,
+            boardId: args.boardId,
+          });
+        }).pipe(Effect.mapError(mapToInternalServerError()));
+      },
       PostDelete: (args: TPostDelete) => {
         return Effect.gen(function* () {
           yield* requireOrganizationMembership(args.organizationId);

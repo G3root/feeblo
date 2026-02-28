@@ -9,16 +9,23 @@ export class PostRpcs extends RpcGroup.make(
     payload: PostList,
     success: Schema.Array(Post),
     error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostListPublic", {
+    payload: PostList,
+    success: Schema.Array(Post),
+    error: PostServiceErrors,
   }),
 
   Rpc.make("PostDelete", {
     success: Schema.Void,
     payload: PostDelete,
     error: PostServiceErrors,
-  }),
+  }).middleware(AuthMiddleware),
+
   Rpc.make("PostUpdate", {
     success: Schema.Void,
     payload: PostUpdate,
     error: PostServiceErrors,
-  })
-).middleware(AuthMiddleware) {}
+  }).middleware(AuthMiddleware)
+) {}

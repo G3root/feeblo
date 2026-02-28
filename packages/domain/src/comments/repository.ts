@@ -4,7 +4,7 @@ import {
   comment as commentTable,
   type InsertComment,
 } from "@feeblo/db/schema/feedback";
-import { and, eq } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
 
 type DeleteComment = {
@@ -32,11 +32,21 @@ export class CommentRepository extends Effect.Service<CommentRepository>()(
         findMany: ({
           organizationId,
           postId,
+          visibility,
         }: {
           organizationId: string;
           postId: string;
+          visibility?: "PUBLIC" | "INTERNAL";
         }) =>
           Effect.gen(function* () {
+            const where: SQL[] = [];
+            if (visibility) {
+              where.push(eq(commentTable.visibility, visibility));
+            }
+
+            where.push(eq(commentTable.organizationId, organizationId));
+            where.push(eq(commentTable.postId, postId));
+
             const rows = yield* db
               .select({
                 id: commentTable.id,
@@ -55,12 +65,7 @@ export class CommentRepository extends Effect.Service<CommentRepository>()(
               })
               .from(commentTable)
               .innerJoin(userTable, eq(commentTable.userId, userTable.id))
-              .where(
-                and(
-                  eq(commentTable.organizationId, organizationId),
-                  eq(commentTable.postId, postId)
-                )
-              );
+              .where(and(...where));
 
             return rows;
           }),

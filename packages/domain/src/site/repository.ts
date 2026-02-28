@@ -1,6 +1,6 @@
 import { DB } from "@feeblo/db";
 import { site as siteTable } from "@feeblo/db/schema/feedback";
-import { eq } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
 import { Site } from "./schema";
 
@@ -11,8 +11,26 @@ export class SiteRepository extends Effect.Service<SiteRepository>()(
       const db = yield* DB;
 
       return {
-        findMany: ({ organizationId }: { organizationId: string }) =>
+        findMany: ({
+          organizationId,
+          subdomain,
+          limit,
+        }: {
+          organizationId?: string;
+          subdomain?: string;
+          limit: number;
+        }) =>
           Effect.gen(function* () {
+            const where: SQL[] = [];
+            if (organizationId) {
+              where.push(eq(siteTable.organizationId, organizationId));
+            }
+            if (subdomain) {
+              where.push(eq(siteTable.subdomain, subdomain));
+            }
+
+            const whereClause = where.length > 1 ? and(...where) : where[0];
+
             const sites = yield* db
               .select({
                 id: siteTable.id,
@@ -24,7 +42,8 @@ export class SiteRepository extends Effect.Service<SiteRepository>()(
                 organizationId: siteTable.organizationId,
               })
               .from(siteTable)
-              .where(eq(siteTable.organizationId, organizationId));
+              .where(whereClause)
+              .limit(limit);
 
             return sites.map((entry) => new Site(entry));
           }),

@@ -15,3 +15,11 @@ export const SiteList = Schema.Struct({
 });
 
 export type TSiteList = Schema.Schema.Type<typeof SiteList>;
+
+export const SiteListBySubdomain = Schema.Struct({
+  subdomain: Schema.String,
+});
+
+export type TSiteListBySubdomain = Schema.Schema.Type<
+  typeof SiteListBySubdomain
+>;

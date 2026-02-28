@@ -25,6 +25,14 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           });
         }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },
+      BoardListPublic: (args: TBoardList) => {
+        return Effect.gen(function* () {
+          return yield* repository.findMany({
+            organizationId: args.organizationId,
+            visibility: "PUBLIC",
+          });
+        }).pipe(Effect.mapError(mapToInternalServerError()));
+      },
       BoardDelete: (args: TBoardDelete) => {
         return Effect.gen(function* () {
           yield* requireOrganizationMembership(args.organizationId);

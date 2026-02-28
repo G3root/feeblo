@@ -3,7 +3,7 @@ import { requireOrganizationMembership } from "../authorization";
 import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
 import { SiteRepository } from "./repository";
 import { SiteRpcs } from "./rpcs";
-import type { TSiteList } from "./schema";
+import type { TSiteList, TSiteListBySubdomain } from "./schema";
 
 export const SiteRpcHandlers = SiteRpcs.toLayer(
   Effect.gen(function* () {
@@ -15,6 +15,15 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
           yield* requireOrganizationMembership(args.organizationId);
           return yield* repository.findMany({
             organizationId: args.organizationId,
+            limit: 1,
+          });
+        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+      },
+      SiteListBySubdomain: (args: TSiteListBySubdomain) => {
+        return Effect.gen(function* () {
+          return yield* repository.findMany({
+            subdomain: args.subdomain,
+            limit: 1,
           });
         }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
       },

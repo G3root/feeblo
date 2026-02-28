@@ -15,23 +15,28 @@ export class BoardRpcs extends RpcGroup.make(
     success: Schema.Array(Board),
     payload: BoardList,
     error: BoardServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("BoardListPublic", {
+    success: Schema.Array(Board),
+    payload: BoardList,
+    error: BoardServiceErrors,
   }),
 
   Rpc.make("BoardDelete", {
     success: Schema.Void,
     payload: BoardDelete,
     error: BoardServiceErrors,
-  }),
+  }).middleware(AuthMiddleware),
 
   Rpc.make("BoardCreate", {
     success: Board,
     payload: BoardCreate,
     error: BoardServiceErrors,
-  }),
+  }).middleware(AuthMiddleware),
 
   Rpc.make("BoardUpdate", {
     success: Board,
     payload: BoardUpdate,
     error: BoardServiceErrors,
-  })
-).middleware(AuthMiddleware) {}
+  }).middleware(AuthMiddleware)
+) {}

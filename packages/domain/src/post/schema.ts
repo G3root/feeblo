@@ -24,7 +24,7 @@ export class Post extends Schema.Class<Post>("Post")({
 export type TPost = Schema.Schema.Type<typeof Post>;
 
 export const PostList = Schema.Struct({
-  boardId: Schema.String,
+  boardId: Schema.Union(Schema.String, Schema.Null, Schema.Undefined),
   organizationId: Schema.String,
 });
 
