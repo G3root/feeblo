@@ -4,7 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { toastManager } from "~/components/ui/toast";
@@ -17,6 +17,12 @@ type SlashCommand = {
   id: string;
   label: string;
   run: (editor: Editor) => void;
+};
+
+type SelectionMenuState = {
+  visible: boolean;
+  x: number;
+  y: number;
 };
 
 const slashCommands: SlashCommand[] = [
@@ -57,6 +63,112 @@ const slashCommands: SlashCommand[] = [
   },
 ];
 
+const EDITOR_BASE_CLASS =
+  "text-sm leading-7 text-foreground outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:mt-6 [&_.ProseMirror_h1]:text-2xl [&_.ProseMirror_h1]:font-semibold [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:mt-5 [&_.ProseMirror_h2]:text-xl [&_.ProseMirror_h2]:font-medium [&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:mt-4 [&_.ProseMirror_h3]:text-lg [&_.ProseMirror_h3]:font-medium [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-3 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_ol]:my-3 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-6 [&_.ProseMirror_li]:my-1 [&_.ProseMirror_blockquote]:my-4 [&_.ProseMirror_blockquote]:border-l [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:text-muted-foreground [&_.ProseMirror_code]:rounded [&_.ProseMirror_code]:bg-muted [&_.ProseMirror_code]:px-1.5 [&_.ProseMirror_code]:py-0.5 [&_.ProseMirror_pre]:my-4 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-md [&_.ProseMirror_pre]:bg-muted [&_.ProseMirror_pre]:p-4";
+
+function createEditorContent(content: string) {
+  if (content.length === 0) {
+    return {
+      type: "doc",
+      content: [{ type: "paragraph" }],
+    };
+  }
+
+  return {
+    type: "doc",
+    content: content
+      .split(/\n+/)
+      .filter((line) => line.trim().length > 0)
+      .map((line) => ({
+        type: "paragraph",
+        content: [{ type: "text", text: line }],
+      })),
+  };
+}
+
+function SelectionFormattingMenu({
+  editor,
+  selectionMenu,
+}: {
+  editor: Editor;
+  selectionMenu: SelectionMenuState;
+}) {
+  if (!selectionMenu.visible) {
+    return null;
+  }
+
+  return (
+    <div
+      className="absolute z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-md border bg-card p-1 shadow-sm"
+      style={{ left: selectionMenu.x, top: selectionMenu.y }}
+    >
+      <Button
+        className="h-8 px-2 text-xs"
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        size="sm"
+        type="button"
+        variant={editor.isActive("bold") ? "secondary" : "ghost"}
+      >
+        B
+      </Button>
+      <Button
+        className="h-8 px-2 text-xs italic"
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        size="sm"
+        type="button"
+        variant={editor.isActive("italic") ? "secondary" : "ghost"}
+      >
+        I
+      </Button>
+      <Button
+        className="h-8 px-2 text-xs"
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+        size="sm"
+        type="button"
+        variant={editor.isActive("strike") ? "secondary" : "ghost"}
+      >
+        S
+      </Button>
+      <Button
+        className="h-8 px-2 text-xs"
+        onClick={() => editor.chain().focus().toggleCode().run()}
+        size="sm"
+        type="button"
+        variant={editor.isActive("code") ? "secondary" : "ghost"}
+      >
+        Code
+      </Button>
+    </div>
+  );
+}
+
+function SlashCommandsMenu({
+  commands,
+  onSelect,
+}: {
+  commands: SlashCommand[];
+  onSelect: (command: SlashCommand) => void;
+}) {
+  if (commands.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 w-full max-w-xs rounded-md border bg-card p-1 shadow-sm">
+      {commands.map((command) => (
+        <button
+          className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+          key={command.id}
+          onClick={() => onSelect(command)}
+          type="button"
+        >
+          {command.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 type EditorFrameProps = {
   content: string;
   editorClassName?: string;
@@ -81,12 +193,13 @@ function PostRichTextEditor({
     from: number;
     to: number;
   } | null>(null);
-  const [selectionMenu, setSelectionMenu] = useState<{
-    visible: boolean;
-    x: number;
-    y: number;
-  }>({ visible: false, x: 0, y: 0 });
+  const [selectionMenu, setSelectionMenu] = useState<SelectionMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const initialContent = useMemo(() => createEditorContent(content), [content]);
 
   const filteredSlashCommands = useMemo(() => {
     const normalizedQuery = slashQuery.trim().toLowerCase();
@@ -100,10 +213,10 @@ function PostRichTextEditor({
     );
   }, [slashQuery]);
 
-  const hideSlashMenu = () => {
+  const hideSlashMenu = useCallback(() => {
     setSlashRange(null);
     setSlashQuery("");
-  };
+  }, []);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -114,25 +227,10 @@ function PostRichTextEditor({
         },
       }),
     ],
-    content:
-      content.length > 0
-        ? {
-            type: "doc",
-            content: content
-              .split(/\n+/)
-              .filter((line) => line.trim().length > 0)
-              .map((line) => ({
-                type: "paragraph",
-                content: [{ type: "text", text: line }],
-              })),
-          }
-        : {
-            type: "doc",
-            content: [{ type: "paragraph" }],
-          },
+    content: initialContent,
     editorProps: {
       attributes: {
-        class: `text-sm leading-7 text-foreground outline-none [&_.ProseMirror]:outline-none [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:mt-6 [&_.ProseMirror_h1]:text-2xl [&_.ProseMirror_h1]:font-semibold [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:mt-5 [&_.ProseMirror_h2]:text-xl [&_.ProseMirror_h2]:font-medium [&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:mt-4 [&_.ProseMirror_h3]:text-lg [&_.ProseMirror_h3]:font-medium [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-3 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_ol]:my-3 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-6 [&_.ProseMirror_li]:my-1 [&_.ProseMirror_blockquote]:my-4 [&_.ProseMirror_blockquote]:border-l [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:text-muted-foreground [&_.ProseMirror_code]:rounded [&_.ProseMirror_code]:bg-muted [&_.ProseMirror_code]:px-1.5 [&_.ProseMirror_code]:py-0.5 [&_.ProseMirror_pre]:my-4 [&_.ProseMirror_pre]:overflow-x-auto [&_.ProseMirror_pre]:rounded-md [&_.ProseMirror_pre]:bg-muted [&_.ProseMirror_pre]:p-4 ${editorClassName ?? ""}`,
+        class: `${EDITOR_BASE_CLASS} ${editorClassName ?? ""}`,
       },
     },
   });
@@ -194,7 +292,7 @@ function PostRichTextEditor({
       editor.off("selectionUpdate", updateEditorOverlays);
       editor.off("blur", hideSlashMenu);
     };
-  }, [editor]);
+  }, [editor, hideSlashMenu]);
 
   useEffect(() => {
     if (!(editor && onContentChange)) {
@@ -211,53 +309,21 @@ function PostRichTextEditor({
     return null;
   }
 
-  const showSlashMenu = slashRange && filteredSlashCommands.length > 0;
+  const showSlashMenu = Boolean(slashRange) && filteredSlashCommands.length > 0;
+
+  const applySlashCommand = (command: SlashCommand) => {
+    if (!slashRange) {
+      return;
+    }
+
+    editor.chain().focus().deleteRange(slashRange).run();
+    command.run(editor);
+    hideSlashMenu();
+  };
 
   return (
     <div className={cn("relative", wrapperClassName)} ref={wrapperRef}>
-      {selectionMenu.visible ? (
-        <div
-          className="absolute z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-md border bg-card p-1 shadow-sm"
-          style={{ left: selectionMenu.x, top: selectionMenu.y }}
-        >
-          <Button
-            className="h-8 px-2 text-xs"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            size="sm"
-            type="button"
-            variant={editor.isActive("bold") ? "secondary" : "ghost"}
-          >
-            B
-          </Button>
-          <Button
-            className="h-8 px-2 text-xs italic"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            size="sm"
-            type="button"
-            variant={editor.isActive("italic") ? "secondary" : "ghost"}
-          >
-            I
-          </Button>
-          <Button
-            className="h-8 px-2 text-xs"
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            size="sm"
-            type="button"
-            variant={editor.isActive("strike") ? "secondary" : "ghost"}
-          >
-            S
-          </Button>
-          <Button
-            className="h-8 px-2 text-xs"
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            size="sm"
-            type="button"
-            variant={editor.isActive("code") ? "secondary" : "ghost"}
-          >
-            Code
-          </Button>
-        </div>
-      ) : null}
+      <SelectionFormattingMenu editor={editor} selectionMenu={selectionMenu} />
 
       <EditorContent editor={editor} />
 
@@ -274,26 +340,10 @@ function PostRichTextEditor({
       ) : null}
 
       {showSlashMenu ? (
-        <div className="mt-3 w-full max-w-xs rounded-md border bg-card p-1 shadow-sm">
-          {filteredSlashCommands.map((command) => (
-            <button
-              className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
-              key={command.id}
-              onClick={() => {
-                if (!slashRange) {
-                  return;
-                }
-
-                editor.chain().focus().deleteRange(slashRange).run();
-                command.run(editor);
-                hideSlashMenu();
-              }}
-              type="button"
-            >
-              {command.label}
-            </button>
-          ))}
-        </div>
+        <SlashCommandsMenu
+          commands={filteredSlashCommands}
+          onSelect={applySlashCommand}
+        />
       ) : null}
 
       {footer ? (
@@ -307,7 +357,7 @@ export function PostDescriptionEditor({ content }: { content: string }) {
   return (
     <PostRichTextEditor
       content={content}
-      editorClassName="min-h-28"
+      editorClassName="min-h-24"
       placeholder="Add description..."
       placeholderClassName="left-1 top-0"
     />
@@ -379,7 +429,7 @@ export function PostCommentEditor({
     >
       <PostRichTextEditor
         content=""
-        editorClassName="min-h-7 [&_.ProseMirror_p]:my-0"
+        editorClassName="min-h-8 [&_.ProseMirror_p]:my-0"
         footer={
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (
@@ -400,7 +450,7 @@ export function PostCommentEditor({
         onContentChange={(content) => form.setFieldValue("content", content)}
         placeholder="Leave a comment..."
         placeholderClassName="left-4 top-4"
-        wrapperClassName="rounded-xl border  p-4"
+        wrapperClassName="rounded-xl border p-4"
       />
     </form>
   );

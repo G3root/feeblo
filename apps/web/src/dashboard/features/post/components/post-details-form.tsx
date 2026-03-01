@@ -1,4 +1,6 @@
+import { generateId } from "@feeblo/utils/id";
 import {
+  ArrowUp02Icon,
   Delete02Icon,
   MoreHorizontalIcon,
   PencilEdit01Icon,
@@ -26,7 +28,9 @@ import {
 } from "~/components/ui/item";
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
+import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
+import { upvoteCollection } from "~/lib/collections";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
 import {
   PostCommentEditor,
@@ -43,6 +47,13 @@ type PostComment = {
   userId: string;
 };
 
+type PostUpvote = {
+  id: string;
+  organizationId: string;
+  postId: string;
+  userId: string;
+};
+
 type PostDetailsFormProps = {
   boardName: string;
   boardSlug: string;
@@ -52,6 +63,7 @@ type PostDetailsFormProps = {
   initialTitle: string;
   organizationId: string;
   postId: string;
+  upvotes: PostUpvote[];
 };
 
 export function PostDetailsForm({
@@ -63,6 +75,7 @@ export function PostDetailsForm({
   initialTitle,
   organizationId,
   postId,
+  upvotes,
 }: PostDetailsFormProps) {
   const [title, setTitle] = useState(initialTitle);
 
@@ -71,23 +84,21 @@ export function PostDetailsForm({
   }, [initialTitle]);
 
   return (
-    <div className="mx-auto w-full max-w-[980px] px-4 py-6 md:px-6 md:py-8">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
       <section className="space-y-6">
-        <div className="space-y-3">
-          <Link
-            className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
-            params={{ organizationId, boardSlug }}
-            to="/$organizationId/board/$boardSlug"
-          >
-            Back to {boardName}
-          </Link>
+        <PostDetailsHeader
+          boardName={boardName}
+          boardSlug={boardSlug}
+          onTitleChange={setTitle}
+          organizationId={organizationId}
+          title={title}
+        />
 
-          <input
-            className="w-full border-0 bg-transparent p-0 font-semibold text-3xl tracking-tight outline-none placeholder:text-muted-foreground/70 md:text-4xl"
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Untitled"
-            type="text"
-            value={title}
+        <div className="flex items-center justify-end">
+          <PostUpvoteButton
+            organizationId={organizationId}
+            postId={postId}
+            upvotes={upvotes}
           />
         </div>
 
@@ -106,6 +117,101 @@ export function PostDetailsForm({
         </p>
       </section>
     </div>
+  );
+}
+
+function PostDetailsHeader({
+  boardName,
+  boardSlug,
+  onTitleChange,
+  organizationId,
+  title,
+}: {
+  boardName: string;
+  boardSlug: string;
+  onTitleChange: (title: string) => void;
+  organizationId: string;
+  title: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <Link
+        className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
+        params={{ organizationId, boardSlug }}
+        to="/$organizationId/board/$boardSlug"
+      >
+        Back to {boardName}
+      </Link>
+
+      <input
+        className="w-full border-0 bg-transparent p-0 font-semibold text-3xl tracking-tight outline-none placeholder:text-muted-foreground/70 md:text-4xl"
+        onChange={(event) => onTitleChange(event.target.value)}
+        placeholder="Untitled"
+        type="text"
+        value={title}
+      />
+    </div>
+  );
+}
+
+function PostUpvoteButton({
+  organizationId,
+  postId,
+  upvotes,
+}: {
+  organizationId: string;
+  postId: string;
+  upvotes: PostUpvote[];
+}) {
+  const { data: session } = authClient.useSession();
+  const [isToggling, setIsToggling] = useState(false);
+  const currentUserId = session?.user?.id;
+  const currentUpvote = upvotes.find(
+    (upvote) => upvote.userId === currentUserId
+  );
+  const upvoteCount = upvotes.length;
+
+  const handleToggleUpvote = async () => {
+    if (!currentUserId) {
+      toastManager.add({ title: "Sign in to upvote", type: "error" });
+      return;
+    }
+
+    try {
+      setIsToggling(true);
+      if (currentUpvote) {
+        const tx = upvoteCollection.delete(currentUpvote.id);
+        await tx.isPersisted.promise;
+      } else {
+        const tx = upvoteCollection.insert({
+          id: generateId("upvote"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          organizationId,
+          postId,
+          userId: currentUserId,
+          memberId: null,
+        });
+        await tx.isPersisted.promise;
+      }
+    } catch (_error) {
+      toastManager.add({ title: "Failed to update upvote", type: "error" });
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  return (
+    <Button
+      className="gap-2 rounded-full"
+      disabled={isToggling}
+      onClick={handleToggleUpvote}
+      type="button"
+      variant={currentUpvote ? "default" : "outline"}
+    >
+      <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />
+      <span>Upvote {upvoteCount}</span>
+    </Button>
   );
 }
 
@@ -214,11 +320,15 @@ function formatRelativeTime(value: Date | string) {
 
 export function PostDetailsFormSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[980px] px-4 py-6 md:px-6 md:py-8">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
       <section className="space-y-6">
         <div className="space-y-3">
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-10 w-3/5" />
+        </div>
+
+        <div className="flex justify-end">
+          <Skeleton className="h-9 w-24 rounded-full" />
         </div>
 
         <Skeleton className="h-28 w-full" />

@@ -10,6 +10,7 @@ import {
   boardCollection,
   commentCollection,
   postCollection,
+  upvoteCollection,
 } from "~/lib/collections";
 
 export const Route = createFileRoute(
@@ -68,6 +69,20 @@ function RouteComponent() {
     [organizationId, post?.id]
   );
 
+  const { data: upvotes } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) =>
+          and(
+            eq(upvote.organizationId, organizationId),
+            eq(upvote.postId, post?.id)
+          )
+        );
+    },
+    [organizationId, post?.id]
+  );
+
   if (!(board && post)) {
     return (
       <div className="mx-auto w-full max-w-5xl p-6">
@@ -99,6 +114,7 @@ function RouteComponent() {
         initialTitle={post.title}
         organizationId={organizationId}
         postId={post.id}
+        upvotes={upvotes}
       />
       <CommentDeleteDialog />
     </CommentDeleteDialogProvider>
