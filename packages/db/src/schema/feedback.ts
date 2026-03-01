@@ -1,5 +1,6 @@
 import {
   type AnyPgColumn,
+  index,
   pgEnum,
   pgTable,
   text,
@@ -93,6 +94,7 @@ export const upvote = pgTable(
       .notNull(),
   },
   (table) => [
+    index("upvote_postId_idx").on(table.postId),
     uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
   ]
 );

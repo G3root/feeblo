@@ -15,6 +15,7 @@ export class Post extends Schema.Class<Post>("Post")({
   title: Schema.String,
   slug: Schema.String,
   content: Schema.String,
+  upVotes: Schema.Number,
   status: postStatus,
   createdAt: Schema.Date,
   updatedAt: Schema.Date,

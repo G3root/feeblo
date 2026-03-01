@@ -1,6 +1,9 @@
 import { DB } from "@feeblo/db";
-import { post as postTable } from "@feeblo/db/schema/feedback";
-import { and, eq, type SQL } from "drizzle-orm";
+import {
+  post as postTable,
+  upvote as upvoteTable,
+} from "@feeblo/db/schema/feedback";
+import { and, eq, type SQL, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { TPostUpdate } from "./schema";
 
@@ -31,6 +34,14 @@ export class PostRepository extends Effect.Service<PostRepository>()(
           where.push(eq(postTable.organizationId, organizationId));
 
           const whereClause = where.length > 1 ? and(...where) : where[0];
+          const upvoteCounts = db
+            .select({
+              postId: upvoteTable.postId,
+              upVotes: sql<number>`count(*)::int`.as("upVotes"),
+            })
+            .from(upvoteTable)
+            .groupBy(upvoteTable.postId)
+            .as("upvote_counts");
 
           return db
             .select({
@@ -39,12 +50,14 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               boardId: postTable.boardId,
               slug: postTable.slug,
               content: postTable.content,
+              upVotes: sql<number>`coalesce(${upvoteCounts.upVotes}, 0)`,
               status: postTable.status,
               createdAt: postTable.createdAt,
               updatedAt: postTable.updatedAt,
               organizationId: postTable.organizationId,
             })
             .from(postTable)
+            .leftJoin(upvoteCounts, eq(upvoteCounts.postId, postTable.id))
             .where(whereClause);
         },
 
