@@ -5,9 +5,11 @@
   "private": true,
   "exports": {
     "./id": "./src/id.ts",
-    "./url": "./src/url.ts"
+    "./url": "./src/url.ts",
+    "./crypto": "./src/crypto.ts"
   },
   "dependencies": {
+    "@noble/ciphers": "^2.0.1",
     "legid": "^0.1.4",
     "nanoid": "^5.1.6",
     "@sindresorhus/slugify": "^2.2.1"

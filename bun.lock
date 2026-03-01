@@ -190,6 +190,7 @@
       "name": "@feeblo/utils",
       "version": "0.0.1",
       "dependencies": {
+        "@noble/ciphers": "^2.0.1",
         "@sindresorhus/slugify": "^2.2.1",
         "legid": "^0.1.4",
         "nanoid": "^5.1.6",
