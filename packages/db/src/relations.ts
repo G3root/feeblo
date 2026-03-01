@@ -26,6 +26,7 @@ export const userRelations = relations(user, ({ many }) => ({
   reactions: many(reaction),
   comments: many(comment),
   commentLikes: many(commentLike),
+  createdPosts: many(post),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -99,6 +100,14 @@ export const postRelations = relations(post, ({ many, one }) => ({
   organization: one(organization, {
     fields: [post.organizationId],
     references: [organization.id],
+  }),
+  creator: one(user, {
+    fields: [post.creatorId],
+    references: [user.id],
+  }),
+  creatorMember: one(member, {
+    fields: [post.creatorMemberId],
+    references: [member.id],
   }),
   upvotes: many(upvote),
   reactions: many(reaction),

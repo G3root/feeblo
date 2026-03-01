@@ -68,6 +68,12 @@ export const post = pgTable("post", {
   organizationId: text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),
+  creatorId: text("creator_id").references(() => user.id, {
+    onDelete: "set null",
+  }),
+  creatorMemberId: text("creator_member_id").references(() => member.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()

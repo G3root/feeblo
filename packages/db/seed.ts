@@ -294,10 +294,14 @@ const ensurePosts = ({
   organizationId,
   boardIds,
   count,
+  creatorId,
+  creatorMemberId,
 }: {
   organizationId: string;
   boardIds: string[];
   count: number;
+  creatorId?: string;
+  creatorMemberId?: string;
 }) =>
   Effect.gen(function* () {
     const db = yield* DB;
@@ -328,6 +332,8 @@ const ensurePosts = ({
           boardId,
           status: faker.helpers.arrayElement(STATUSES) ?? "PLANNED",
           organizationId,
+          creatorId: creatorId ?? null,
+          creatorMemberId: creatorMemberId ?? null,
           createdAt: faker.date.recent({ days: 120, refDate: now }),
           updatedAt: now,
         });
@@ -517,7 +523,7 @@ const seed = Effect.gen(function* () {
   console.log("1) Creating test user and organization");
   const primaryUser = yield* ensureUser(TEST_USER);
   const primaryOrg = yield* ensureOrganization(primaryUser.id);
-  yield* ensureMember({
+  const primaryMember = yield* ensureMember({
     organizationId: primaryOrg.id,
     userId: primaryUser.id,
     role: "owner",
@@ -532,6 +538,8 @@ const seed = Effect.gen(function* () {
     organizationId: primaryOrg.id,
     boardIds: mainBoards.map((item) => item.id),
     count: MAIN_POST_COUNT,
+    creatorId: primaryUser.id,
+    creatorMemberId: primaryMember?.id,
   });
 
   const primarySite = yield* ensureSite({
@@ -592,6 +600,11 @@ const seed = Effect.gen(function* () {
 
   for (const externalUser of externalUsers) {
     const externalOrg = yield* ensureOrganization(externalUser.id);
+    const externalMember = yield* ensureMember({
+      organizationId: externalOrg.id,
+      userId: externalUser.id,
+      role: "owner",
+    });
     const externalBoards = yield* ensureBoards({
       organizationId: externalOrg.id,
       names: ["Roadmap", "Requests"],
@@ -601,6 +614,8 @@ const seed = Effect.gen(function* () {
       organizationId: externalOrg.id,
       boardIds: externalBoards.map((item) => item.id),
       count: EXTERNAL_POST_COUNT,
+      creatorId: externalUser.id,
+      creatorMemberId: externalMember?.id,
     });
 
     const externalSite = yield* ensureSite({
