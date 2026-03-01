@@ -1,4 +1,5 @@
 import { DB } from "@feeblo/db";
+import { user as userTable } from "@feeblo/db/schema/auth";
 import {
   post as postTable,
   upvote as upvoteTable,
@@ -55,9 +56,15 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               createdAt: postTable.createdAt,
               updatedAt: postTable.updatedAt,
               organizationId: postTable.organizationId,
+              user: {
+                name: sql<string | null>`${userTable.name}`,
+              },
+              creatorMemberId: postTable.creatorMemberId,
+              creatorId: postTable.creatorId,
             })
             .from(postTable)
             .leftJoin(upvoteCounts, eq(upvoteCounts.postId, postTable.id))
+            .leftJoin(userTable, eq(userTable.id, postTable.creatorId))
             .where(whereClause);
         },
 

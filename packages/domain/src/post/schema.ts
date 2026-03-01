@@ -20,6 +20,11 @@ export class Post extends Schema.Class<Post>("Post")({
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   organizationId: Schema.String,
+  creatorMemberId: Schema.NullOr(Schema.String),
+  creatorId: Schema.NullOr(Schema.String),
+  user: Schema.Struct({
+    name: Schema.NullOr(Schema.String),
+  }),
 }) {}
 
 export type TPost = Schema.Schema.Type<typeof Post>;

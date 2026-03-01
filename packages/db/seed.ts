@@ -1,12 +1,9 @@
 // biome-ignore-all lint/suspicious/noConsole: Seed script requires console output
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth";
-import { and, eq, inArray } from "drizzle-orm";
-import { reset } from "drizzle-seed";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import { DB } from "./src";
-import * as relationalSchema from "./src/relations";
-import * as schema from "./src/schema";
 import {
   board,
   comment,
@@ -70,12 +67,6 @@ const ensureUser = ({
   Effect.gen(function* () {
     const db = yield* DB;
     const auth = yield* initAuthHandler();
-
-    yield* Effect.tryPromise(() =>
-      reset(db, {
-        schema: { ...schema, ...relationalSchema },
-      })
-    );
 
     let [existingUser] = yield* db
       .select({
@@ -519,6 +510,28 @@ const seedEngagement = ({
 
 const seed = Effect.gen(function* () {
   console.log("Starting database seed...\n");
+
+  const db = yield* DB;
+  yield* db.execute(
+    sql`truncate table
+      "commentLike",
+      "comment",
+      "reaction",
+      "upvote",
+      "post",
+      "board",
+      "site",
+      "invitation",
+      "member",
+      "organization",
+      "two_factor",
+      "verification",
+      "account",
+      "session",
+      "user"
+    cascade`
+  );
+  console.log("Database reset complete.\n");
 
   console.log("1) Creating test user and organization");
   const primaryUser = yield* ensureUser(TEST_USER);

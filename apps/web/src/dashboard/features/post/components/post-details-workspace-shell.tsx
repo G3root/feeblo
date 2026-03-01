@@ -16,9 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { Separator } from "~/components/ui/separator";
 import { SidebarTrigger } from "~/components/ui/sidebar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
+import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { BOARD_LANES, type BoardPostStatus } from "~/features/board/constants";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { boardCollection, postCollection } from "~/lib/collections";
@@ -239,6 +241,19 @@ function PostDetailsWorkspaceShellContent({
                 }
               }}
             />
+          </PropertyRow>
+
+          <Separator />
+
+          <PropertyRow label="Date">
+            <p className="text-muted-foreground text-sm">
+              {formatPostDate(post?.createdAt ?? new Date())}
+            </p>
+          </PropertyRow>
+          <PropertyRow label="Author">
+            <p className="text-muted-foreground text-sm">
+              {post?.user?.name ?? "Unknown author"}
+            </p>
           </PropertyRow>
         </div>
       </aside>
