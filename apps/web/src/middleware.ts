@@ -8,6 +8,7 @@ import { authClient } from "~/lib/auth-client";
 const AUTH_SIGN_IN_PATH = "/sign-in";
 const AUTH_SIGN_UP_PATH = "/sign-up";
 const AUTH_EMAIL_VERIFY_PATH = "/email-verify";
+const ONBOARDING_PATH = "/onboarding";
 const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
 const DASHBOARD_AUTH_PATHS = new Set([
@@ -15,6 +16,7 @@ const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_SIGN_UP_PATH,
   AUTH_EMAIL_VERIFY_PATH,
 ]);
+const DASHBOARD_NON_ORG_PATHS = new Set([...DASHBOARD_AUTH_PATHS, ONBOARDING_PATH]);
 
 const RESERVED_SUBDOMAIN_SET = new Set(RESERVED_SUBDOMAINS);
 
@@ -107,6 +109,8 @@ function dashboardAuthRedirectMiddleware(
 
   const isAuthPath = DASHBOARD_AUTH_PATHS.has(pathname);
   const isAuthed = Boolean(context.locals.session);
+  const isOnboardingPath = pathname === ONBOARDING_PATH;
+  const isOnboarded = Boolean(context.locals.user?.onboardedOn);
 
   if (!(isAuthed || isAuthPath)) {
     const redirectURL = new URL(AUTH_SIGN_IN_PATH, url);
@@ -114,7 +118,24 @@ function dashboardAuthRedirectMiddleware(
     return context.redirect(redirectURL.toString());
   }
 
+  if (isAuthed && !isOnboarded && !(isAuthPath || isOnboardingPath)) {
+    const redirectURL = new URL(ONBOARDING_PATH, url);
+    redirectURL.searchParams.set("redirectTo", `${url.pathname}${url.search}`);
+    return context.redirect(redirectURL.toString());
+  }
+
   if (isAuthed && isAuthPath) {
+    if (!isOnboarded) {
+      return context.redirect(ONBOARDING_PATH);
+    }
+
+    const organizationId = getDefaultOrganizationId(context);
+    return context.redirect(
+      organizationId ? `/${organizationId}` : DASHBOARD_PATH
+    );
+  }
+
+  if (isAuthed && isOnboardingPath && isOnboarded) {
     const organizationId = getDefaultOrganizationId(context);
     return context.redirect(
       organizationId ? `/${organizationId}` : DASHBOARD_PATH
@@ -135,7 +156,7 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
     return next();
   }
 
-  if (DASHBOARD_AUTH_PATHS.has(pathname)) {
+  if (DASHBOARD_NON_ORG_PATHS.has(pathname)) {
     return next();
   }
 

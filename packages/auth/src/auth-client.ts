@@ -2,6 +2,7 @@ import {
   adminClient,
   customSessionClient,
   emailOTPClient,
+  inferAdditionalFields,
   organizationClient,
   twoFactorClient,
 } from "better-auth/client/plugins";
@@ -11,6 +12,7 @@ import type { Auth } from "./server";
 
 const plugins = [
   customSessionClient<Auth>(),
+  inferAdditionalFields<Auth>(),
   emailOTPClient(),
   organizationClient(),
   twoFactorClient(),

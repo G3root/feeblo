@@ -57,6 +57,14 @@ export const initAuthHandler = () =>
         requireEmailVerification: true,
         autoSignIn: false,
       },
+      user: {
+        additionalFields: {
+          onboardedOn: {
+            type: "date",
+            required: false,
+          },
+        },
+      },
 
       plugins: [
         customSession(async ({ user, session }) => {
@@ -64,9 +72,16 @@ export const initAuthHandler = () =>
             .select({ id: schema.member.organizationId })
             .from(schema.member)
             .where(eq(schema.member.userId, session.userId));
+          const userWithOnboarding = user as typeof user & {
+            onboardedOn?: Date | null;
+          };
+
           return {
             organizations,
-            user,
+            user: {
+              ...user,
+              onboardedOn: userWithOnboarding.onboardedOn ?? null,
+            },
             session,
           };
         }),
