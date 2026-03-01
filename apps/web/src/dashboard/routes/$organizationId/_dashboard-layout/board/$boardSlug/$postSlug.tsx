@@ -9,6 +9,8 @@ import { CommentDeleteDialogProvider } from "~/features/post/dialog-stores";
 import {
   boardCollection,
   commentCollection,
+  commentReactionCollection,
+  postReactionCollection,
   postCollection,
   upvoteCollection,
 } from "~/lib/collections";
@@ -69,6 +71,23 @@ function RouteComponent() {
     [organizationId, post?.id]
   );
 
+  const { data: commentReactions } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ commentReaction: commentReactionCollection })
+        .where(({ commentReaction }) =>
+          and(
+            eq(commentReaction.organizationId, organizationId),
+            eq(commentReaction.postId, post?.id)
+          )
+        )
+        .orderBy((commentReaction) => commentReaction.commentReaction.commentId, "asc")
+        .orderBy((commentReaction) => commentReaction.commentReaction.emoji, "asc")
+        .orderBy((commentReaction) => commentReaction.commentReaction.createdAt, "asc");
+    },
+    [organizationId, post?.id]
+  );
+
   const { data: upvotes } = useLiveSuspenseQuery(
     (q) => {
       return q
@@ -79,6 +98,22 @@ function RouteComponent() {
             eq(upvote.postId, post?.id)
           )
         );
+    },
+    [organizationId, post?.id]
+  );
+
+  const { data: postReactions } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ postReaction: postReactionCollection })
+        .where(({ postReaction }) =>
+          and(
+            eq(postReaction.organizationId, organizationId),
+            eq(postReaction.postId, post?.id)
+          )
+        )
+        .orderBy((postReaction) => postReaction.postReaction.emoji, "asc")
+        .orderBy((postReaction) => postReaction.postReaction.createdAt, "asc");
     },
     [organizationId, post?.id]
   );
@@ -109,11 +144,13 @@ function RouteComponent() {
         boardName={board.name}
         boardSlug={board.slug}
         comments={comments}
+        commentReactions={commentReactions}
         createdAt={post.createdAt}
         description={post.content}
         initialTitle={post.title}
         organizationId={organizationId}
         postId={post.id}
+        postReactions={postReactions}
         upvotes={upvotes}
       />
       <CommentDeleteDialog />

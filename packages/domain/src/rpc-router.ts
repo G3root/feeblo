@@ -1,9 +1,11 @@
 import { RpcSerialization, RpcServer } from "@effect/rpc";
 import { Layer } from "effect";
 import { BoardRpcHandlers } from "./board/handlers";
+import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { PostRpcHandlers } from "./post/handlers";
+import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { AllRpcs } from "./rpc-group";
 import { AuthMiddlewareLive } from "./session-middleware";
 import { SiteRpcHandlers } from "./site/handlers";
@@ -17,9 +19,11 @@ export const RpcRoute = RpcServer.layerHttpRouter({
   Layer.provide(PostRpcHandlers),
   Layer.provide(BoardRpcHandlers),
   Layer.provide(MembershipRpcHandlers),
+  Layer.provide(CommentReactionRpcHandlers),
   Layer.provide(CommentRpcHandlers),
   Layer.provide(SiteRpcHandlers),
   Layer.provide(UpvoteRpcHandlers),
+  Layer.provide(PostReactionRpcHandlers),
   Layer.provide(RpcSerialization.layerNdjson),
   Layer.provide(AuthMiddlewareLive)
 );

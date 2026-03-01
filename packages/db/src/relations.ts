@@ -3,12 +3,12 @@ import {
   account,
   board,
   comment,
-  commentLike,
+  commentReaction,
   invitation,
   member,
   organization,
   post,
-  reaction,
+  postReaction,
   session,
   site,
   twoFactor,
@@ -23,9 +23,9 @@ export const userRelations = relations(user, ({ many }) => ({
   members: many(member),
   invitations: many(invitation),
   upvotes: many(upvote),
-  reactions: many(reaction),
+  postReactions: many(postReaction),
   comments: many(comment),
-  commentLikes: many(commentLike),
+  commentReactions: many(commentReaction),
   createdPosts: many(post),
 }));
 
@@ -110,7 +110,7 @@ export const postRelations = relations(post, ({ many, one }) => ({
     references: [member.id],
   }),
   upvotes: many(upvote),
-  reactions: many(reaction),
+  postReactions: many(postReaction),
   comments: many(comment),
 }));
 
@@ -125,13 +125,13 @@ export const upvoteRelations = relations(upvote, ({ one }) => ({
   }),
 }));
 
-export const reactionRelations = relations(reaction, ({ one }) => ({
+export const postReactionRelations = relations(postReaction, ({ one }) => ({
   user: one(user, {
-    fields: [reaction.userId],
+    fields: [postReaction.userId],
     references: [user.id],
   }),
   post: one(post, {
-    fields: [reaction.postId],
+    fields: [postReaction.postId],
     references: [post.id],
   }),
 }));
@@ -157,16 +157,16 @@ export const commentRelations = relations(comment, ({ many, one }) => ({
   replies: many(comment, {
     relationName: "commentReplies",
   }),
-  commentLikes: many(commentLike),
+  commentReactions: many(commentReaction),
 }));
 
-export const commentLikeRelations = relations(commentLike, ({ one }) => ({
+export const commentReactionRelations = relations(commentReaction, ({ one }) => ({
   user: one(user, {
-    fields: [commentLike.userId],
+    fields: [commentReaction.userId],
     references: [user.id],
   }),
   comment: one(comment, {
-    fields: [commentLike.commentId],
+    fields: [commentReaction.commentId],
     references: [comment.id],
   }),
 }));

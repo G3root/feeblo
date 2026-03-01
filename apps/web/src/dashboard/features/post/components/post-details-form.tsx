@@ -1,6 +1,6 @@
 import { generateId } from "@feeblo/utils/id";
 import {
-  ArrowUp02Icon,
+  ArrowUp01Icon,
   Delete02Icon,
   MoreHorizontalIcon,
   PencilEdit01Icon,
@@ -33,6 +33,14 @@ import { authClient } from "~/lib/auth-client";
 import { upvoteCollection } from "~/lib/collections";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
 import {
+  CommentReactionSection,
+  type CommentReaction,
+} from "./comment-reaction-section";
+import {
+  PostReactionSection,
+  type PostReaction,
+} from "./post-reaction-section";
+import {
   PostCommentEditor,
   PostDescriptionEditor,
 } from "./post-wysiwyg-editor";
@@ -58,11 +66,13 @@ type PostDetailsFormProps = {
   boardName: string;
   boardSlug: string;
   comments: PostComment[];
+  commentReactions: CommentReaction[];
   createdAt: Date;
   description: string;
   initialTitle: string;
   organizationId: string;
   postId: string;
+  postReactions: PostReaction[];
   upvotes: PostUpvote[];
 };
 
@@ -70,11 +80,13 @@ export function PostDetailsForm({
   boardName,
   boardSlug,
   comments,
+  commentReactions,
   createdAt,
   description,
   initialTitle,
   organizationId,
   postId,
+  postReactions,
   upvotes,
 }: PostDetailsFormProps) {
   const [title, setTitle] = useState(initialTitle);
@@ -94,23 +106,31 @@ export function PostDetailsForm({
           title={title}
         />
 
-        <div className="flex items-center justify-end">
-          <PostUpvoteButton
-            organizationId={organizationId}
-            postId={postId}
-            upvotes={upvotes}
-          />
-        </div>
-
         <PostDescriptionEditor content={description} />
 
-        <div className="py-1">
-          <Separator />
+        <div className="flex items-center justify-between py-1">
+          <PostReactionSection
+            organizationId={organizationId}
+            postId={postId}
+            postReactions={postReactions}
+          />
+          <div>
+            <PostUpvoteButton
+              organizationId={organizationId}
+              postId={postId}
+              upvotes={upvotes}
+            />
+          </div>
         </div>
 
         <PostCommentEditor organizationId={organizationId} postId={postId} />
 
-        <PostCommentList comments={comments} />
+        <PostCommentList
+          commentReactions={commentReactions}
+          comments={comments}
+          organizationId={organizationId}
+          postId={postId}
+        />
 
         <p className="text-muted-foreground text-xs">
           Created {createdAt.toLocaleDateString()}
@@ -203,19 +223,30 @@ function PostUpvoteButton({
 
   return (
     <Button
-      className="gap-2 rounded-full"
+      className="rounded-full"
       disabled={isToggling}
       onClick={handleToggleUpvote}
+      size="sm"
       type="button"
       variant={currentUpvote ? "default" : "outline"}
     >
-      <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />
-      <span>Upvote {upvoteCount}</span>
+      <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} />
+      <span>{upvoteCount}</span>
     </Button>
   );
 }
 
-function PostCommentList({ comments }: { comments: PostComment[] }) {
+function PostCommentList({
+  commentReactions,
+  comments,
+  organizationId,
+  postId,
+}: {
+  commentReactions: CommentReaction[];
+  comments: PostComment[];
+  organizationId: string;
+  postId: string;
+}) {
   const { data: session } = authClient.useSession();
   const currentUserId = session?.user?.id ?? "unknown";
   const store = useCommentDeleteDialogContext();
@@ -249,6 +280,12 @@ function PostCommentList({ comments }: { comments: PostComment[] }) {
             <ItemDescription className="line-clamp-none text-foreground">
               {comment.content}
             </ItemDescription>
+            <CommentReactionSection
+              commentId={comment.id}
+              commentReactions={commentReactions}
+              organizationId={organizationId}
+              postId={postId}
+            />
           </ItemContent>
           {currentUserId === comment.userId && (
             <ItemActions>

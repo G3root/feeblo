@@ -105,8 +105,8 @@ export const upvote = pgTable(
   ]
 );
 
-export const reaction = pgTable(
-  "reaction",
+export const postReaction = pgTable(
+  "postReaction",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
@@ -126,7 +126,7 @@ export const reaction = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("reaction_userId_postId_emoji_uidx").on(
+    uniqueIndex("postReaction_userId_postId_emoji_uidx").on(
       table.userId,
       table.postId,
       table.emoji
@@ -165,8 +165,8 @@ export const comment = pgTable("comment", {
   ),
 });
 
-export const commentLike = pgTable(
-  "commentLike",
+export const commentReaction = pgTable(
+  "commentReaction",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
@@ -178,13 +178,18 @@ export const commentLike = pgTable(
     commentId: text("comment_id")
       .notNull()
       .references(() => comment.id, { onDelete: "cascade" }),
+    emoji: text("emoji").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
   },
   (table) => [
-    uniqueIndex("commentLike_userId_commentId_uidx").on(
+    uniqueIndex("commentReaction_userId_commentId_emoji_uidx").on(
       table.userId,
-      table.commentId
+      table.commentId,
+      table.emoji
     ),
   ]
 );

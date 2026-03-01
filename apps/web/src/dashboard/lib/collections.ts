@@ -408,6 +408,89 @@ export const commentCollection = createCollection(
   })
 );
 
+export const commentReactionCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["commentReaction"];
+      for (const { field, value } of parsed.filters) {
+        const fieldName = field.join(".");
+        if (fieldName === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+        if (fieldName === "postId") {
+          cacheKey.push(`postId-${value}`);
+        }
+      }
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const filters: {
+        organizationId?: string;
+        postId?: string;
+      } = {};
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq") {
+          const fieldName = field.join(".");
+          if (fieldName === "organizationId") {
+            filters.organizationId = value as string;
+          }
+          if (fieldName === "postId") {
+            filters.postId = value as string;
+          }
+        }
+      }
+
+      const organizationId = filters.organizationId;
+      const postId = filters.postId;
+      if (!organizationId) {
+        return [];
+      }
+      if (!postId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.CommentReactionList({ organizationId, postId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newCommentReaction } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CommentReactionToggle({
+          organizationId: newCommentReaction.organizationId,
+          postId: newCommentReaction.postId,
+          commentId: newCommentReaction.commentId,
+          emoji: newCommentReaction.emoji,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedCommentReaction } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CommentReactionToggle({
+          organizationId: deletedCommentReaction.organizationId,
+          postId: deletedCommentReaction.postId,
+          commentId: deletedCommentReaction.commentId,
+          emoji: deletedCommentReaction.emoji,
+        })
+      );
+    },
+  })
+);
+
 export const upvoteCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
@@ -480,6 +563,89 @@ export const upvoteCollection = createCollection(
         rpc.UpvoteToggle({
           organizationId: deletedUpvote.organizationId,
           postId: deletedUpvote.postId,
+        })
+      );
+    },
+  })
+);
+
+export const postReactionCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["postReaction"];
+      for (const { field, value } of parsed.filters) {
+        const fieldName = field.join(".");
+        if (fieldName === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+        if (fieldName === "postId") {
+          cacheKey.push(`postId-${value}`);
+        }
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const filters: {
+        organizationId?: string;
+        postId?: string;
+      } = {};
+
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq") {
+          const fieldName = field.join(".");
+          if (fieldName === "organizationId") {
+            filters.organizationId = value as string;
+          }
+          if (fieldName === "postId") {
+            filters.postId = value as string;
+          }
+        }
+      }
+
+      const organizationId = filters.organizationId;
+      const postId = filters.postId;
+      if (!organizationId) {
+        return [];
+      }
+      if (!postId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.PostReactionList({ organizationId, postId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newPostReaction } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.PostReactionToggle({
+          organizationId: newPostReaction.organizationId,
+          postId: newPostReaction.postId,
+          emoji: newPostReaction.emoji,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedPostReaction } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.PostReactionToggle({
+          organizationId: deletedPostReaction.organizationId,
+          postId: deletedPostReaction.postId,
+          emoji: deletedPostReaction.emoji,
         })
       );
     },

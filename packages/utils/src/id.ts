@@ -10,9 +10,10 @@ const prefixes = {
   board: "brd",
   post: "pst",
   upvote: "upv",
+  commentReaction: "crt",
   comment: "cmt",
   reply: "rpl",
-  reaction: "rct",
+  postReaction: "rct",
   site: "sit",
 } as const;
 

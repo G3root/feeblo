@@ -7,11 +7,11 @@ import { DB } from "./src";
 import {
   board,
   comment,
-  commentLike,
+  commentReaction,
   member,
   organization,
   post,
-  reaction,
+  postReaction,
   site,
   upvote,
   user,
@@ -43,7 +43,7 @@ const STATUSES: NonNullable<typeof post.$inferInsert.status>[] = [
   "PAUSED",
 ];
 
-const REACTIONS = ["like", "fire", "heart", "clap", "target", "rocket"];
+const REACTIONS = ["👍", "❤️", "🔥", "😂", "🎯"];
 
 const makeId = (prefix: string) => `${prefix}-${faker.string.alphanumeric(12)}`;
 const makePublicId = () => faker.string.alphanumeric(12).toLowerCase();
@@ -445,22 +445,22 @@ const seedEngagement = ({
       );
 
       for (const reactorId of reactors) {
-        const emoji = faker.helpers.arrayElement(REACTIONS) ?? "like";
+        const emoji = faker.helpers.arrayElement(REACTIONS) ?? "👍";
 
         const [existing] = yield* db
-          .select({ id: reaction.id })
-          .from(reaction)
+          .select({ id: postReaction.id })
+          .from(postReaction)
           .where(
             and(
-              eq(reaction.userId, reactorId),
-              eq(reaction.postId, postItem.id),
-              eq(reaction.emoji, emoji)
+              eq(postReaction.userId, reactorId),
+              eq(postReaction.postId, postItem.id),
+              eq(postReaction.emoji, emoji)
             )
           )
           .limit(1);
 
         if (!existing) {
-          yield* db.insert(reaction).values({
+          yield* db.insert(postReaction).values({
             id: makeId("rct"),
             userId: reactorId,
             memberId: memberIdByUserId.get(reactorId) ?? null,
@@ -472,34 +472,38 @@ const seedEngagement = ({
     }
 
     for (const item of createdComments.slice(0, 20)) {
-      const likeCount = faker.number.int({
+      const reactionCount = faker.number.int({
         min: 1,
         max: Math.min(3, actorIds.length),
       });
-      const likers = faker.helpers.arrayElements(actorIds, likeCount);
+      const reactors = faker.helpers.arrayElements(actorIds, reactionCount);
 
-      for (const likerId of likers) {
-        if (likerId === item.userId) {
+      for (const reactorId of reactors) {
+        if (reactorId === item.userId) {
           continue;
         }
 
+        const emoji = faker.helpers.arrayElement(REACTIONS) ?? "👍";
+
         const [existing] = yield* db
-          .select({ id: commentLike.id })
-          .from(commentLike)
+          .select({ id: commentReaction.id })
+          .from(commentReaction)
           .where(
             and(
-              eq(commentLike.userId, likerId),
-              eq(commentLike.commentId, item.id)
+              eq(commentReaction.userId, reactorId),
+              eq(commentReaction.commentId, item.id),
+              eq(commentReaction.emoji, emoji)
             )
           )
           .limit(1);
 
         if (!existing) {
-          yield* db.insert(commentLike).values({
-            id: makeId("clk"),
-            userId: likerId,
-            memberId: memberIdByUserId.get(likerId) ?? null,
+          yield* db.insert(commentReaction).values({
+            id: makeId("crt"),
+            userId: reactorId,
+            memberId: memberIdByUserId.get(reactorId) ?? null,
             commentId: item.id,
+            emoji,
           });
         }
       }
@@ -514,9 +518,9 @@ const seed = Effect.gen(function* () {
   const db = yield* DB;
   yield* db.execute(
     sql`truncate table
-      "commentLike",
+      "commentReaction",
       "comment",
-      "reaction",
+      "postReaction",
       "upvote",
       "post",
       "board",
