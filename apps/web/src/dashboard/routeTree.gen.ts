@@ -11,8 +11,16 @@
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as SignUpRouteImport } from "./routes/sign-up"
 import { Route as SignInRouteImport } from "./routes/sign-in"
+import { Route as OrganizationIdSettingsRouteImport } from "./routes/$organizationId/settings"
 import { Route as OrganizationIdDashboardLayoutRouteImport } from "./routes/$organizationId/_dashboard-layout"
+import { Route as OrganizationIdSettingsIndexRouteImport } from "./routes/$organizationId/settings/index"
 import { Route as OrganizationIdDashboardLayoutIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/index"
+import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$organizationId/settings/workspace"
+import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
+import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
+import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
+import { Route as OrganizationIdSettingsAppearenceRouteImport } from "./routes/$organizationId/settings/appearence"
+import { Route as OrganizationIdDashboardLayoutSettingsRouteImport } from "./routes/$organizationId/_dashboard-layout/settings"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
 
@@ -26,16 +34,63 @@ const SignInRoute = SignInRouteImport.update({
   path: "/sign-in",
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrganizationIdSettingsRoute = OrganizationIdSettingsRouteImport.update({
+  id: "/$organizationId/settings",
+  path: "/$organizationId/settings",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrganizationIdDashboardLayoutRoute =
   OrganizationIdDashboardLayoutRouteImport.update({
     id: "/$organizationId/_dashboard-layout",
     path: "/$organizationId",
     getParentRoute: () => rootRouteImport,
   } as any)
+const OrganizationIdSettingsIndexRoute =
+  OrganizationIdSettingsIndexRouteImport.update({
+    id: "/",
+    path: "/",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
 const OrganizationIdDashboardLayoutIndexRoute =
   OrganizationIdDashboardLayoutIndexRouteImport.update({
     id: "/",
     path: "/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdSettingsWorkspaceRoute =
+  OrganizationIdSettingsWorkspaceRouteImport.update({
+    id: "/workspace",
+    path: "/workspace",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsProfileRoute =
+  OrganizationIdSettingsProfileRouteImport.update({
+    id: "/profile",
+    path: "/profile",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsMembersRoute =
+  OrganizationIdSettingsMembersRouteImport.update({
+    id: "/members",
+    path: "/members",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsBillingRoute =
+  OrganizationIdSettingsBillingRouteImport.update({
+    id: "/billing",
+    path: "/billing",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsAppearenceRoute =
+  OrganizationIdSettingsAppearenceRouteImport.update({
+    id: "/appearence",
+    path: "/appearence",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdDashboardLayoutSettingsRoute =
+  OrganizationIdDashboardLayoutSettingsRouteImport.update({
+    id: "/settings",
+    path: "/settings",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
 const OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute =
@@ -55,13 +110,26 @@ export interface FileRoutesByFullPath {
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId": typeof OrganizationIdDashboardLayoutRouteWithChildren
+  "/$organizationId/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
+  "/$organizationId/settings/appearence": typeof OrganizationIdSettingsAppearenceRoute
+  "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
+  "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
+  "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/": typeof OrganizationIdDashboardLayoutIndexRoute
+  "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
   "/$organizationId/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
 export interface FileRoutesByTo {
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
+  "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
+  "/$organizationId/settings/appearence": typeof OrganizationIdSettingsAppearenceRoute
+  "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
+  "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
+  "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
@@ -71,7 +139,15 @@ export interface FileRoutesById {
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/_dashboard-layout": typeof OrganizationIdDashboardLayoutRouteWithChildren
+  "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
+  "/$organizationId/_dashboard-layout/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
+  "/$organizationId/settings/appearence": typeof OrganizationIdSettingsAppearenceRoute
+  "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
+  "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
+  "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/_dashboard-layout/": typeof OrganizationIdDashboardLayoutIndexRoute
+  "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -81,13 +157,26 @@ export interface FileRouteTypes {
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId"
+    | "/$organizationId/settings"
+    | "/$organizationId/settings/appearence"
+    | "/$organizationId/settings/billing"
+    | "/$organizationId/settings/members"
+    | "/$organizationId/settings/profile"
+    | "/$organizationId/settings/workspace"
     | "/$organizationId/"
+    | "/$organizationId/settings/"
     | "/$organizationId/board/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug/"
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/sign-in"
     | "/sign-up"
+    | "/$organizationId/settings"
+    | "/$organizationId/settings/appearence"
+    | "/$organizationId/settings/billing"
+    | "/$organizationId/settings/members"
+    | "/$organizationId/settings/profile"
+    | "/$organizationId/settings/workspace"
     | "/$organizationId"
     | "/$organizationId/board/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug"
@@ -96,7 +185,15 @@ export interface FileRouteTypes {
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/_dashboard-layout"
+    | "/$organizationId/settings"
+    | "/$organizationId/_dashboard-layout/settings"
+    | "/$organizationId/settings/appearence"
+    | "/$organizationId/settings/billing"
+    | "/$organizationId/settings/members"
+    | "/$organizationId/settings/profile"
+    | "/$organizationId/settings/workspace"
     | "/$organizationId/_dashboard-layout/"
+    | "/$organizationId/settings/"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/"
   fileRoutesById: FileRoutesById
@@ -105,6 +202,7 @@ export interface RootRouteChildren {
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   OrganizationIdDashboardLayoutRoute: typeof OrganizationIdDashboardLayoutRouteWithChildren
+  OrganizationIdSettingsRoute: typeof OrganizationIdSettingsRouteWithChildren
 }
 
 declare module "@tanstack/react-router" {
@@ -123,6 +221,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/$organizationId/settings": {
+      id: "/$organizationId/settings"
+      path: "/$organizationId/settings"
+      fullPath: "/$organizationId/settings"
+      preLoaderRoute: typeof OrganizationIdSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/$organizationId/_dashboard-layout": {
       id: "/$organizationId/_dashboard-layout"
       path: "/$organizationId"
@@ -130,11 +235,60 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/$organizationId/settings/": {
+      id: "/$organizationId/settings/"
+      path: "/"
+      fullPath: "/$organizationId/settings/"
+      preLoaderRoute: typeof OrganizationIdSettingsIndexRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
     "/$organizationId/_dashboard-layout/": {
       id: "/$organizationId/_dashboard-layout/"
       path: "/"
       fullPath: "/$organizationId/"
       preLoaderRoute: typeof OrganizationIdDashboardLayoutIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/settings/workspace": {
+      id: "/$organizationId/settings/workspace"
+      path: "/workspace"
+      fullPath: "/$organizationId/settings/workspace"
+      preLoaderRoute: typeof OrganizationIdSettingsWorkspaceRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/profile": {
+      id: "/$organizationId/settings/profile"
+      path: "/profile"
+      fullPath: "/$organizationId/settings/profile"
+      preLoaderRoute: typeof OrganizationIdSettingsProfileRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/members": {
+      id: "/$organizationId/settings/members"
+      path: "/members"
+      fullPath: "/$organizationId/settings/members"
+      preLoaderRoute: typeof OrganizationIdSettingsMembersRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/billing": {
+      id: "/$organizationId/settings/billing"
+      path: "/billing"
+      fullPath: "/$organizationId/settings/billing"
+      preLoaderRoute: typeof OrganizationIdSettingsBillingRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/appearence": {
+      id: "/$organizationId/settings/appearence"
+      path: "/appearence"
+      fullPath: "/$organizationId/settings/appearence"
+      preLoaderRoute: typeof OrganizationIdSettingsAppearenceRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/_dashboard-layout/settings": {
+      id: "/$organizationId/_dashboard-layout/settings"
+      path: "/settings"
+      fullPath: "/$organizationId/settings"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutSettingsRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
     "/$organizationId/_dashboard-layout/board/$boardSlug/": {
@@ -155,6 +309,7 @@ declare module "@tanstack/react-router" {
 }
 
 interface OrganizationIdDashboardLayoutRouteChildren {
+  OrganizationIdDashboardLayoutSettingsRoute: typeof OrganizationIdDashboardLayoutSettingsRoute
   OrganizationIdDashboardLayoutIndexRoute: typeof OrganizationIdDashboardLayoutIndexRoute
   OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
@@ -162,6 +317,8 @@ interface OrganizationIdDashboardLayoutRouteChildren {
 
 const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutRouteChildren =
   {
+    OrganizationIdDashboardLayoutSettingsRoute:
+      OrganizationIdDashboardLayoutSettingsRoute,
     OrganizationIdDashboardLayoutIndexRoute:
       OrganizationIdDashboardLayoutIndexRoute,
     OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute:
@@ -175,11 +332,37 @@ const OrganizationIdDashboardLayoutRouteWithChildren =
     OrganizationIdDashboardLayoutRouteChildren,
   )
 
+interface OrganizationIdSettingsRouteChildren {
+  OrganizationIdSettingsAppearenceRoute: typeof OrganizationIdSettingsAppearenceRoute
+  OrganizationIdSettingsBillingRoute: typeof OrganizationIdSettingsBillingRoute
+  OrganizationIdSettingsMembersRoute: typeof OrganizationIdSettingsMembersRoute
+  OrganizationIdSettingsProfileRoute: typeof OrganizationIdSettingsProfileRoute
+  OrganizationIdSettingsWorkspaceRoute: typeof OrganizationIdSettingsWorkspaceRoute
+  OrganizationIdSettingsIndexRoute: typeof OrganizationIdSettingsIndexRoute
+}
+
+const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
+  {
+    OrganizationIdSettingsAppearenceRoute:
+      OrganizationIdSettingsAppearenceRoute,
+    OrganizationIdSettingsBillingRoute: OrganizationIdSettingsBillingRoute,
+    OrganizationIdSettingsMembersRoute: OrganizationIdSettingsMembersRoute,
+    OrganizationIdSettingsProfileRoute: OrganizationIdSettingsProfileRoute,
+    OrganizationIdSettingsWorkspaceRoute: OrganizationIdSettingsWorkspaceRoute,
+    OrganizationIdSettingsIndexRoute: OrganizationIdSettingsIndexRoute,
+  }
+
+const OrganizationIdSettingsRouteWithChildren =
+  OrganizationIdSettingsRoute._addFileChildren(
+    OrganizationIdSettingsRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   OrganizationIdDashboardLayoutRoute:
     OrganizationIdDashboardLayoutRouteWithChildren,
+  OrganizationIdSettingsRoute: OrganizationIdSettingsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

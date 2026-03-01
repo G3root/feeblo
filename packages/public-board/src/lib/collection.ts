@@ -259,3 +259,109 @@ export const commentCollection = createCollection(
     },
   })
 );
+
+export const membersCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["members"];
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+      }
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq" && field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+      }
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc((rpc) =>
+        rpc.OrganizationMembersList({ organizationId })
+      );
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedMember } = mutation;
+      await fetchRpc((rpc) =>
+        rpc.OrganizationRemoveMember({
+          memberId: deletedMember.id,
+          organizationId: deletedMember.organizationId,
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedMember } = mutation;
+      const primaryRole = (
+        updatedMember.role?.split(",")[0] ?? "member"
+      ) as "owner" | "admin" | "member";
+      await fetchRpc((rpc) =>
+        rpc.OrganizationUpdateMemberRole({
+          memberId: updatedMember.id,
+          organizationId: updatedMember.organizationId,
+          role: primaryRole === "owner" ? "admin" : primaryRole,
+        })
+      );
+    },
+  })
+);
+
+export const invitationsCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["invitations"];
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+      }
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq" && field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+      }
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc((rpc) =>
+        rpc.OrganizationInvitationsList({ organizationId })
+      );
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedInvitation } = mutation;
+      await fetchRpc((rpc) =>
+        rpc.OrganizationCancelInvitation({
+          invitationId: deletedInvitation.id,
+          organizationId: deletedInvitation.organizationId,
+        })
+      );
+    },
+  })
+);

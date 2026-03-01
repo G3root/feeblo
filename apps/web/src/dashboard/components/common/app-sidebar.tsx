@@ -4,6 +4,7 @@ import {
   Ellipsis,
   Home,
   Plus,
+  PreferenceVerticalIcon,
   WebDesign01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -66,6 +67,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   >
                     <HugeiconsIcon icon={Home} />
                     <span>Dashboard</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/settings`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/settings/profile"
+                  >
+                    <HugeiconsIcon icon={PreferenceVerticalIcon} />
+                    <span>Settings</span>
                   </Link>
                 )}
               />
