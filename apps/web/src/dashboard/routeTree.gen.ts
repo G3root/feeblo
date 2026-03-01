@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as SignUpRouteImport } from "./routes/sign-up"
 import { Route as SignInRouteImport } from "./routes/sign-in"
+import { Route as EmailVerifyRouteImport } from "./routes/email-verify"
 import { Route as OrganizationIdSettingsRouteImport } from "./routes/$organizationId/settings"
 import { Route as OrganizationIdDashboardLayoutRouteImport } from "./routes/$organizationId/_dashboard-layout"
 import { Route as OrganizationIdSettingsIndexRouteImport } from "./routes/$organizationId/settings/index"
@@ -32,6 +33,11 @@ const SignUpRoute = SignUpRouteImport.update({
 const SignInRoute = SignInRouteImport.update({
   id: "/sign-in",
   path: "/sign-in",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailVerifyRoute = EmailVerifyRouteImport.update({
+  id: "/email-verify",
+  path: "/email-verify",
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizationIdSettingsRoute = OrganizationIdSettingsRouteImport.update({
@@ -107,6 +113,7 @@ const OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  "/email-verify": typeof EmailVerifyRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId": typeof OrganizationIdDashboardLayoutRouteWithChildren
@@ -122,6 +129,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
 export interface FileRoutesByTo {
+  "/email-verify": typeof EmailVerifyRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
@@ -136,6 +144,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  "/email-verify": typeof EmailVerifyRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/_dashboard-layout": typeof OrganizationIdDashboardLayoutRouteWithChildren
@@ -154,6 +163,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | "/email-verify"
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId"
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | "/$organizationId/board/$boardSlug/"
   fileRoutesByTo: FileRoutesByTo
   to:
+    | "/email-verify"
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/settings"
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | "/$organizationId/board/$boardSlug"
   id:
     | "__root__"
+    | "/email-verify"
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/_dashboard-layout"
@@ -199,6 +211,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  EmailVerifyRoute: typeof EmailVerifyRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   OrganizationIdDashboardLayoutRoute: typeof OrganizationIdDashboardLayoutRouteWithChildren
@@ -219,6 +232,13 @@ declare module "@tanstack/react-router" {
       path: "/sign-in"
       fullPath: "/sign-in"
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/email-verify": {
+      id: "/email-verify"
+      path: "/email-verify"
+      fullPath: "/email-verify"
+      preLoaderRoute: typeof EmailVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/$organizationId/settings": {
@@ -358,6 +378,7 @@ const OrganizationIdSettingsRouteWithChildren =
   )
 
 const rootRouteChildren: RootRouteChildren = {
+  EmailVerifyRoute: EmailVerifyRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   OrganizationIdDashboardLayoutRoute:

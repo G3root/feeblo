@@ -13,6 +13,12 @@
     "./rpc-router": {
       "default": "./src/rpc-router.ts"
     },
+    "./http/api": {
+      "default": "./src/http/api.ts"
+    },
+    "./http/router": {
+      "default": "./src/http/router.ts"
+    },
     "./session-middleware": {
       "default": "./src/session-middleware.ts"
     },
@@ -30,6 +36,21 @@
     },
     "./site/schema": {
       "default": "./src/site/schema.ts"
+    },
+    "./auth/verification-otp/schema": {
+      "default": "./src/auth/verification-otp/schema.ts"
+    },
+    "./auth/verification-otp/api": {
+      "default": "./src/auth/verification-otp/api.ts"
+    },
+    "./auth/verification-otp/live": {
+      "default": "./src/auth/verification-otp/live.ts"
+    },
+    "./auth/verification-otp/utils": {
+      "default": "./src/auth/verification-otp/utils.ts"
+    },
+    "./auth/verification-otp": {
+      "default": "./src/auth/verification-otp/index.ts"
     },
     "./board/schema": {
       "default": "./src/board/schema.ts"

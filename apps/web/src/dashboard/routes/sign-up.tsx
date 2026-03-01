@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
-import { authClient } from "~/lib/auth-client";
+import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
 import {
   EmailSchema,
   NameSchema,
@@ -10,6 +11,12 @@ import {
 } from "~/utils/user-validation";
 
 export const Route = createFileRoute("/sign-up")({
+  validateSearch: (search) =>
+    z
+      .object({
+        redirectTo: z.string().optional(),
+      })
+      .parse(search),
   component: RouteComponent,
 });
 
@@ -21,6 +28,9 @@ const FormSchema = z
   .and(PasswordAndConfirmPasswordSchema);
 
 function RouteComponent() {
+  const navigate = useNavigate({ from: "/sign-up" });
+  const search = Route.useSearch();
+
   const form = useAppForm({
     defaultValues: {
       name: "",
@@ -32,11 +42,48 @@ function RouteComponent() {
       onChange: FormSchema,
     },
     onSubmit: async ({ value }) => {
-      await authClient.signUp.email({
+      const response = await authClient.signUp.email({
         email: value.email,
         name: value.name,
         password: value.password,
         callbackURL: "/",
+      });
+
+      if (response.error) {
+        toastManager.add({
+          title: response.error.message,
+          type: "error",
+        });
+        return;
+      }
+
+      const email = response.data?.user?.email ?? value.email;
+
+      const otpStateResponse = await fetch(verificationOtpEndpoint, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          type: "email-verification",
+        }),
+      });
+
+      if (!otpStateResponse.ok) {
+        toastManager.add({
+          title: "Failed to initialize verification",
+          type: "error",
+        });
+        return;
+      }
+
+      navigate({
+        to: "/email-verify",
+        search: {
+          redirectTo: search.redirectTo,
+        },
       });
     },
   });

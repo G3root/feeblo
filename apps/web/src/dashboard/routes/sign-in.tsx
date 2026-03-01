@@ -1,11 +1,18 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
-import { authClient } from "~/lib/auth-client";
+import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
 import { EmailSchema, PasswordSchema } from "~/utils/user-validation";
 
 export const Route = createFileRoute("/sign-in")({
+  validateSearch: (search) =>
+    z
+      .object({
+        redirectTo: z.string().optional(),
+      })
+      .parse(search),
   component: RouteComponent,
 });
 
@@ -15,6 +22,9 @@ const FormSchema = z.object({
 });
 
 function RouteComponent() {
+  const navigate = useNavigate({ from: "/sign-in" });
+  const search = Route.useSearch();
+
   const form = useAppForm({
     defaultValues: {
       email: "",
@@ -24,10 +34,49 @@ function RouteComponent() {
       onChange: FormSchema,
     },
     onSubmit: async ({ value }) => {
-      await authClient.signIn.email({
+      const response = await authClient.signIn.email({
         email: value.email,
         password: value.password,
         callbackURL: "/",
+      });
+
+      if (!response.error) {
+        return;
+      }
+
+      if (response.error.code === "EMAIL_NOT_VERIFIED") {
+        const otpStateResponse = await fetch(verificationOtpEndpoint, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            email: value.email,
+            type: "email-verification",
+          }),
+        });
+
+        if (!otpStateResponse.ok) {
+          toastManager.add({
+            title: "Failed to initialize verification",
+            type: "error",
+          });
+          return;
+        }
+
+        navigate({
+          to: "/email-verify",
+          search: {
+            redirectTo: search.redirectTo,
+          },
+        });
+        return;
+      }
+
+      toastManager.add({
+        title: response.error.message,
+        type: "error",
       });
     },
   });

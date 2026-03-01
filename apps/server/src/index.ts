@@ -1,4 +1,5 @@
 import {
+  HttpApiScalar,
   HttpApp,
   HttpLayerRouter,
   HttpServerRequest,
@@ -7,6 +8,8 @@ import {
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { initAuthHandler } from "@feeblo/auth";
 import { DB } from "@feeblo/db";
+import { Api } from "@feeblo/domain/http/api";
+import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { Config, Effect, Layer } from "effect";
@@ -28,6 +31,11 @@ const BetterAuthRouterLive = HttpLayerRouter.use((router) =>
   )
 );
 
+const DocsRoute = HttpApiScalar.layerHttpLayerRouter({
+  api: Api,
+  path: "/docs",
+});
+
 const CorsLayer = Layer.unwrapEffect(
   Config.all({
     appUrl: Config.string("VITE_APP_URL"),
@@ -40,7 +48,9 @@ const CorsLayer = Layer.unwrapEffect(
       const apiOrigin = apiParsed.origin;
 
       const isAllowedOrigin = (origin: string) => {
-        if (origin === appOrigin || origin === apiOrigin) { return true; }
+        if (origin === appOrigin || origin === apiOrigin) {
+          return true;
+        }
         try {
           const { hostname, port } = new URL(origin);
           return (
@@ -68,7 +78,9 @@ const HealthRouter = HttpLayerRouter.use((router) =>
 const AllRoutes = Layer.mergeAll(
   HealthRouter,
   RpcRoute,
-  BetterAuthRouterLive
+  HttpRoute,
+  BetterAuthRouterLive,
+  DocsRoute
 ).pipe(Layer.provide(CorsLayer));
 
 HttpLayerRouter.serve(AllRoutes, {
