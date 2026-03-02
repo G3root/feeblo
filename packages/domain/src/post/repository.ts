@@ -5,7 +5,6 @@ import {
   type TPostStatus,
   upvote as upvoteTable,
 } from "@feeblo/db/schema/feedback";
-import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL, sql } from "drizzle-orm";
 import { Effect } from "effect";
@@ -135,7 +134,6 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               createdAt: new Date(),
               slug: slugify(title),
               updatedAt: new Date(),
-              publicId: generateId("post"),
             })
             .pipe(Effect.asVoid),
       };

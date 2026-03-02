@@ -46,7 +46,6 @@ const STATUSES: NonNullable<typeof post.$inferInsert.status>[] = [
 const REACTIONS = ["👍", "❤️", "🔥", "😂", "🎯"];
 
 const makeId = (prefix: string) => `${prefix}-${faker.string.alphanumeric(12)}`;
-const makePublicId = () => faker.string.alphanumeric(12).toLowerCase();
 
 const slugify = (value: string) =>
   value
@@ -317,7 +316,6 @@ const ensurePosts = ({
         yield* db.insert(post).values({
           id: makeId("pst"),
           title,
-          publicId: makePublicId(),
           slug: slugify(`${title}-${i + 1}`),
           content: faker.lorem.paragraphs({ min: 2, max: 4 }),
           boardId,

@@ -55,30 +55,39 @@ export const board = pgTable(
   ]
 );
 
-export const post = pgTable("post", {
-  id: text("id").primaryKey(),
-  title: text("title").notNull(),
-  publicId: text("public_id").notNull().unique(),
-  slug: text("slug").notNull(),
-  content: text("content").notNull(),
-  boardId: text("board_id")
-    .notNull()
-    .references(() => board.id, { onDelete: "cascade" }),
-  status: postStatusEnum("status").notNull(),
-  organizationId: text("organization_id")
-    .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  creatorId: text("creator_id").references(() => user.id, {
-    onDelete: "set null",
-  }),
-  creatorMemberId: text("creator_member_id").references(() => member.id, {
-    onDelete: "set null",
-  }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .$onUpdate(() => /* @__PURE__ */ new Date()),
-});
+export const post = pgTable(
+  "post",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    content: text("content").notNull(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    status: postStatusEnum("status").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    creatorId: text("creator_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    creatorMemberId: text("creator_member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .$onUpdate(() => /* @__PURE__ */ new Date()),
+  },
+  (table) => [
+    uniqueIndex("post_organizationId_boardId_slug_uidx").on(
+      table.organizationId,
+      table.boardId,
+      table.slug
+    ),
+  ]
+);
 
 export const upvote = pgTable(
   "upvote",
@@ -93,7 +102,9 @@ export const upvote = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => post.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -119,7 +130,9 @@ export const postReaction = pgTable(
       .notNull()
       .references(() => post.id, { onDelete: "cascade" }),
     emoji: text("emoji").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -152,7 +165,9 @@ export const comment = pgTable("comment", {
   visibility: postCommentVisibilityEnum("visibility")
     .default("PUBLIC")
     .notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -179,7 +194,9 @@ export const commentReaction = pgTable(
       .notNull()
       .references(() => comment.id, { onDelete: "cascade" }),
     emoji: text("emoji").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
