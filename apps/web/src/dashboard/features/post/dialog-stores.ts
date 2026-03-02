@@ -1,3 +1,4 @@
+import type { TPostStatus } from "@feeblo/db/schema/feedback";
 import type { NavigateOptions } from "@tanstack/react-router";
 import { createModalStoreContext } from "~/utils/model-context";
 
@@ -16,4 +17,14 @@ export const [PostDeleteDialogProvider, usePostDeleteDialogContext] =
     name: "PostDeleteDialogContext",
     hookName: "usePostDeleteDialogContext",
     providerName: "PostDeleteDialogProvider",
+  });
+
+export const [PostCreateDialogProvider, usePostCreateDialogContext] =
+  createModalStoreContext<{
+    boardId: string;
+    status: TPostStatus;
+  }>({
+    name: "PostCreateDialogContext",
+    hookName: "usePostCreateDialogContext",
+    providerName: "PostCreateDialogProvider",
   });

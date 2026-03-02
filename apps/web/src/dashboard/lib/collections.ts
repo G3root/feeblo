@@ -89,6 +89,21 @@ export const postCollection = createCollection(
         })
       );
     },
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newPost } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.PostCreate({
+          id: newPost.id,
+          boardId: newPost.boardId,
+          organizationId: newPost.organizationId,
+          title: newPost.title,
+          content: newPost.content,
+          status: newPost.status,
+        })
+      );
+    },
   })
 );
 
@@ -197,6 +212,7 @@ export const membershipCollection = createCollection(
 
 export const membersCollection = createCollection(
   queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(20)),
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
       const cacheKey = ["members"];
@@ -205,6 +221,7 @@ export const membersCollection = createCollection(
           cacheKey.push(`organizationId-${value}`);
         }
       }
+
       return cacheKey;
     },
     syncMode: "on-demand",
@@ -243,9 +260,10 @@ export const membersCollection = createCollection(
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: updatedMember } = mutation;
-      const primaryRole = (
-        updatedMember.role?.split(",")[0] ?? "member"
-      ) as "owner" | "admin" | "member";
+      const primaryRole = (updatedMember.role?.split(",")[0] ?? "member") as
+        | "owner"
+        | "admin"
+        | "member";
 
       await fetchRpc((rpc) =>
         rpc.OrganizationUpdateMemberRole({
@@ -537,9 +555,12 @@ export const upvoteCollection = createCollection(
         return [];
       }
 
-      const data = await fetchRpc((rpc) => rpc.UpvoteList({ organizationId, postId }), {
-        signal: ctx.signal,
-      });
+      const data = await fetchRpc(
+        (rpc) => rpc.UpvoteList({ organizationId, postId }),
+        {
+          signal: ctx.signal,
+        }
+      );
       return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,

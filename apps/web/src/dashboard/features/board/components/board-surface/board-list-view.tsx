@@ -1,4 +1,8 @@
-import { ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Accordion,
@@ -6,6 +10,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import { Button } from "~/components/ui/button";
+import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
 import type { BoardLane } from "./types";
@@ -14,10 +20,12 @@ export function BoardListView({
   lanes,
   boardSlug,
   organizationId,
+  boardId,
 }: {
   lanes: BoardLane[];
   boardSlug: string;
   organizationId: string;
+  boardId: string;
 }) {
   return (
     <section>
@@ -53,23 +61,13 @@ export function BoardListView({
                 </div>
               </AccordionTrigger>
 
-              <button
-                aria-label={`Add post to ${lane.label}`}
-                className="absolute top-1/2 right-2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }}
-                type="button"
-              >
-                +
-              </button>
+              <AddPostButton boardId={boardId} lane={lane} />
             </div>
             <AccordionContent className="h-auto pb-0">
               {lane.posts.map((post) => (
                 <BoardPostRowItem
                   boardSlug={boardSlug}
-                  key={post.slug}
+                  key={post.id}
                   organizationId={organizationId}
                   post={post}
                 />
@@ -79,5 +77,32 @@ export function BoardListView({
         ))}
       </Accordion>
     </section>
+  );
+}
+
+function AddPostButton({
+  boardId,
+  lane,
+}: {
+  boardId: string;
+  lane: BoardLane;
+}) {
+  const store = usePostCreateDialogContext();
+  return (
+    <Button
+      aria-label={`Add post to ${lane.label}`}
+      // className="absolute top-1/2 right-2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
+      className="absolute top-1/2 right-6 -translate-y-1/2"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        store.send({ type: "toggle", data: { boardId, status: lane.status } });
+      }}
+      size="icon-sm"
+      type="button"
+      variant="ghost"
+    >
+      <HugeiconsIcon icon={Add01Icon} />
+    </Button>
   );
 }

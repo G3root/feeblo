@@ -33,13 +33,14 @@ import { authClient } from "~/lib/auth-client";
 import { upvoteCollection } from "~/lib/collections";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
 import {
-  CommentReactionSection,
   type CommentReaction,
+  CommentReactionSection,
 } from "./comment-reaction-section";
 import {
-  PostReactionSection,
   type PostReaction,
+  PostReactionSection,
 } from "./post-reaction-section";
+import { PostTitleInput } from "./post-title-input";
 import {
   PostCommentEditor,
   PostDescriptionEditor,
@@ -163,12 +164,9 @@ function PostDetailsHeader({
         Back to {boardName}
       </Link>
 
-      <input
-        className="w-full border-0 bg-transparent p-0 font-semibold text-3xl tracking-tight outline-none placeholder:text-muted-foreground/70 md:text-4xl"
-        onChange={(event) => onTitleChange(event.target.value)}
-        placeholder="Untitled"
-        type="text"
-        value={title}
+      <PostTitleInput
+        onChange={(e) => onTitleChange(e.target.value)}
+        title={title}
       />
     </div>
   );

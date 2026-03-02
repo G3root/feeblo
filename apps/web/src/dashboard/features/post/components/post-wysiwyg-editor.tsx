@@ -353,11 +353,18 @@ function PostRichTextEditor({
   );
 }
 
-export function PostDescriptionEditor({ content }: { content: string }) {
+export function PostDescriptionEditor({
+  content,
+  onContentChange,
+}: {
+  content: string;
+  onContentChange?: (content: string) => void;
+}) {
   return (
     <PostRichTextEditor
       content={content}
       editorClassName="min-h-24"
+      onContentChange={onContentChange}
       placeholder="Add description..."
       placeholderClassName="left-1 top-0"
     />

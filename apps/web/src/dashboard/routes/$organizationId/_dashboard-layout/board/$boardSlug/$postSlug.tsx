@@ -10,8 +10,8 @@ import {
   boardCollection,
   commentCollection,
   commentReactionCollection,
-  postReactionCollection,
   postCollection,
+  postReactionCollection,
   upvoteCollection,
 } from "~/lib/collections";
 
@@ -81,9 +81,18 @@ function RouteComponent() {
             eq(commentReaction.postId, post?.id)
           )
         )
-        .orderBy((commentReaction) => commentReaction.commentReaction.commentId, "asc")
-        .orderBy((commentReaction) => commentReaction.commentReaction.emoji, "asc")
-        .orderBy((commentReaction) => commentReaction.commentReaction.createdAt, "asc");
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.commentId,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.emoji,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.createdAt,
+          "asc"
+        );
     },
     [organizationId, post?.id]
   );
@@ -143,8 +152,8 @@ function RouteComponent() {
       <PostDetailsForm
         boardName={board.name}
         boardSlug={board.slug}
-        comments={comments}
         commentReactions={commentReactions}
+        comments={comments}
         createdAt={post.createdAt}
         description={post.content}
         initialTitle={post.title}

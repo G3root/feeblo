@@ -2,8 +2,11 @@ import { DB } from "@feeblo/db";
 import { user as userTable } from "@feeblo/db/schema/auth";
 import {
   post as postTable,
+  type TPostStatus,
   upvote as upvoteTable,
 } from "@feeblo/db/schema/feedback";
+import { generateId } from "@feeblo/utils/id";
+import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { TPostUpdate } from "./schema";
@@ -19,6 +22,16 @@ type TPostDelete = {
   boardId: string;
 };
 
+type TPostCreate = {
+  id: string;
+  boardId: string;
+  organizationId: string;
+  title: string;
+  content: string;
+  status: TPostStatus;
+  creatorId: string;
+  creatorMemberId?: string;
+};
 export class PostRepository extends Effect.Service<PostRepository>()(
   "PostRepository",
   {
@@ -97,6 +110,33 @@ export class PostRepository extends Effect.Service<PostRepository>()(
                 eq(postTable.boardId, boardId)
               )
             )
+            .pipe(Effect.asVoid),
+        create: ({
+          id,
+          boardId,
+          organizationId,
+          title,
+          content,
+          status,
+          creatorId,
+          creatorMemberId,
+        }: TPostCreate) =>
+          db
+            .insert(postTable)
+            .values({
+              id,
+              boardId,
+              organizationId,
+              title,
+              content,
+              status,
+              creatorId,
+              creatorMemberId,
+              createdAt: new Date(),
+              slug: slugify(title),
+              updatedAt: new Date(),
+              publicId: generateId("post"),
+            })
             .pipe(Effect.asVoid),
       };
     }),

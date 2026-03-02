@@ -29,7 +29,9 @@ function RouteComponent() {
   );
 
   if (!board) {
-    return <BoardNotFound boardSlug={boardSlug} organizationId={organizationId} />;
+    return (
+      <BoardNotFound boardSlug={boardSlug} organizationId={organizationId} />
+    );
   }
 
   return (

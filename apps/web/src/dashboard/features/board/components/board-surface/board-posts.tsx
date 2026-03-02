@@ -1,11 +1,11 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { postCollection } from "~/lib/collections";
-import { BOARD_LANES, type BoardPostStatus } from "../../constants";
+import { BOARD_LANES } from "../../constants";
 import { useBoardViewMode } from "../../state/view-mode-context";
 import { BoardGridView } from "./board-grid-view";
 import { BoardListView } from "./board-list-view";
 import { BoardPostsEmpty } from "./board-posts-empty";
-import type { BoardLane, BoardPostRow } from "./types";
+import type { BoardLane } from "./types";
 
 export function BoardPosts({
   boardId,
@@ -22,6 +22,14 @@ export function BoardPosts({
     (q) => {
       return q
         .from({ post: postCollection })
+        .select(({ post }) => ({
+          id: post.id,
+          slug: post.slug,
+          status: post.status,
+          title: post.title,
+          summary: post.content,
+          updatedAt: post.updatedAt,
+        }))
         .where(({ post }) =>
           and(
             eq(post.boardId, boardId),
@@ -33,23 +41,15 @@ export function BoardPosts({
     [boardId, organizationId]
   );
 
-  const postRows: BoardPostRow[] = posts.map((post) => ({
-    slug: post.slug,
-    status: post.status as BoardPostStatus,
-    title: post.title,
-    summary: post.content,
-    updatedAt: post.updatedAt,
-  }));
-
   const lanes: BoardLane[] = BOARD_LANES.map((lane) => ({
     key: lane.key,
     label: lane.label,
     status: lane.statuses[0],
     toneVar: lane.toneVar,
-    posts: postRows.filter((post) => lane.statuses.includes(post.status)),
+    posts: posts.filter((post) => lane.statuses.includes(post.status)),
   })).filter((lane) => lane.posts.length > 0);
 
-  if (postRows.length === 0) {
+  if (posts.length === 0) {
     return <BoardPostsEmpty />;
   }
 
@@ -65,6 +65,7 @@ export function BoardPosts({
 
   return (
     <BoardListView
+      boardId={boardId}
       boardSlug={boardSlug}
       lanes={lanes}
       organizationId={organizationId}

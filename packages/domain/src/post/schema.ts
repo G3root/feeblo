@@ -54,3 +54,14 @@ export const PostUpdate = Schema.Struct({
 });
 
 export type TPostUpdate = Schema.Schema.Type<typeof PostUpdate>;
+
+export const PostCreate = Schema.Struct({
+  id: Schema.String,
+  boardId: Schema.String,
+  title: Schema.String,
+  content: Schema.String,
+  status: postStatus,
+  organizationId: Schema.String,
+});
+
+export type TPostCreate = Schema.Schema.Type<typeof PostCreate>;
