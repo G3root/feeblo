@@ -390,7 +390,7 @@ function InviteMemberForm() {
       role: "member" as "member" | "admin",
     },
     validators: {
-      onChange: InviteMemberFormSchema,
+      onSubmit: InviteMemberFormSchema,
     },
     onSubmit: async ({ value, formApi }) => {
       try {

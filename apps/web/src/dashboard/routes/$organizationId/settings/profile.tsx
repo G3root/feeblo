@@ -65,7 +65,7 @@ function ProfileForm({
       image,
     },
     validators: {
-      onChange: ProfileFormSchema,
+      onSubmit: ProfileFormSchema,
     },
     onSubmit: async ({ value }) => {
       const response = await authClient.updateUser({
