@@ -185,7 +185,7 @@ export const boardCollection = createCollection(
 export const membershipCollection = createCollection(
   queryCollectionOptions({
     queryKey: ["membership"],
-    refetchInterval: Duration.toMillis(Duration.minutes(10)),
+    staleTime: Duration.toMillis(Duration.minutes(10)),
     queryFn: async (args) =>
       fetchRpc((rpc) => rpc.MembershipList(), { signal: args.signal }).then(
         (data) => [...data]
@@ -243,9 +243,10 @@ export const membersCollection = createCollection(
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: updatedMember } = mutation;
-      const primaryRole = (
-        updatedMember.role?.split(",")[0] ?? "member"
-      ) as "owner" | "admin" | "member";
+      const primaryRole = (updatedMember.role?.split(",")[0] ?? "member") as
+        | "owner"
+        | "admin"
+        | "member";
 
       await fetchRpc((rpc) =>
         rpc.OrganizationUpdateMemberRole({
@@ -537,9 +538,12 @@ export const upvoteCollection = createCollection(
         return [];
       }
 
-      const data = await fetchRpc((rpc) => rpc.UpvoteList({ organizationId, postId }), {
-        signal: ctx.signal,
-      });
+      const data = await fetchRpc(
+        (rpc) => rpc.UpvoteList({ organizationId, postId }),
+        {
+          signal: ctx.signal,
+        }
+      );
       return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,

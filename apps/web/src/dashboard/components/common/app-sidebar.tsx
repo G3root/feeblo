@@ -38,7 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { OrganizationSwitcher } from "./organization-switcher";
+import { WorkspaceSwitcher } from "./workspace-switcher";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const organizationId = useOrganizationId();
@@ -49,7 +49,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
-        <OrganizationSwitcher />
+        <WorkspaceSwitcher />
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent>
