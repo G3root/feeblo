@@ -161,6 +161,22 @@ const ensureOrganization = (userId: string) =>
       );
     }
 
+    const [existingOwnerMembership] = yield* db
+      .select({ id: member.id })
+      .from(member)
+      .where(and(eq(member.organizationId, org.id), eq(member.userId, userId)))
+      .limit(1);
+
+    if (!existingOwnerMembership) {
+      yield* db.insert(member).values({
+        id: makeId("mem"),
+        organizationId: org.id,
+        userId,
+        role: "owner",
+        createdAt: new Date(),
+      });
+    }
+
     return org;
   });
 
