@@ -200,7 +200,7 @@ export const boardCollection = createCollection(
 export const membershipCollection = createCollection(
   queryCollectionOptions({
     queryKey: ["membership"],
-    refetchInterval: Duration.toMillis(Duration.minutes(10)),
+    staleTime: Duration.toMillis(Duration.minutes(10)),
     queryFn: async (args) =>
       fetchRpc((rpc) => rpc.MembershipList(), { signal: args.signal }).then(
         (data) => [...data]

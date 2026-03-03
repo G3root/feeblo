@@ -387,7 +387,7 @@ export function PostCommentEditor({
   const form = useAppForm({
     defaultValues: { content: "" },
     validators: {
-      onChange: z.object({
+      onSubmit: z.object({
         content: z.string().min(1),
       }),
     },

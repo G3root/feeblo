@@ -46,7 +46,7 @@ function CreateBoardForm() {
       visibility: "PUBLIC" as "PUBLIC" | "PRIVATE",
     },
     validators: {
-      onChange: z.object({
+      onSubmit: z.object({
         name: z.string(),
         visibility: z.enum(["PUBLIC", "PRIVATE"]),
       }),

@@ -65,7 +65,7 @@ function RenameBoardForm() {
       visibility: board.visibility,
     },
     validators: {
-      onChange: z.object({
+      onSubmit: z.object({
         name: z.string(),
         visibility: z.enum(["PUBLIC", "PRIVATE"]),
       }),

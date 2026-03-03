@@ -39,7 +39,7 @@ function RouteComponent() {
       confirmPassword: "",
     },
     validators: {
-      onChange: FormSchema,
+      onSubmit: FormSchema,
     },
     onSubmit: async ({ value }) => {
       const response = await authClient.signUp.email({

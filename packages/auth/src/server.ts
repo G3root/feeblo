@@ -1,8 +1,5 @@
-import { SqlClient } from "@effect/sql";
 import { DB } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema/index";
-import { generateId } from "@feeblo/utils/id";
-import { slugify } from "@feeblo/utils/url";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
@@ -21,8 +18,6 @@ export const initAuthHandler = () =>
     const apiUrl = yield* Config.string("VITE_API_URL");
     const secret = yield* Config.string("AUTH_ENCRYPTION_KEY");
     const db = yield* DB;
-    const sql = yield* SqlClient.SqlClient;
-
     const config = {
       database: drizzleAdapter(db, {
         provider: "pg",
@@ -108,57 +103,6 @@ export const initAuthHandler = () =>
           },
         }),
       ],
-      databaseHooks: {
-        user: {
-          create: {
-            after: async (user) => {
-              await Effect.runPromise(
-                sql.withTransaction(
-                  Effect.gen(function* () {
-                    const boards = ["🐞 Bugs", "💡 Features"];
-
-                    const [newOrg] = yield* db
-                      .insert(schema.organization)
-                      .values({
-                        id: user.id,
-                        name: "Personal",
-                        slug: user.id,
-                        logo: null,
-                        createdAt: new Date(),
-                      })
-                      .returning({ id: schema.organization.id });
-
-                    if (!newOrg) {
-                      return yield* Effect.fail(
-                        new Error("Failed to create organization")
-                      );
-                    }
-
-                    yield* db.insert(schema.member).values({
-                      id: generateId("member"),
-                      organizationId: newOrg.id,
-                      role: "owner",
-                      createdAt: new Date(),
-                      userId: user.id,
-                    });
-
-                    for (const board of boards) {
-                      yield* db.insert(schema.board).values({
-                        id: generateId("board"),
-                        name: board,
-                        createdAt: new Date(),
-                        organizationId: newOrg.id,
-                        slug: slugify(board),
-                        visibility: "PUBLIC",
-                      });
-                    }
-                  })
-                )
-              );
-            },
-          },
-        },
-      },
     } satisfies BetterAuthOptions;
     return betterAuth(config);
   });
