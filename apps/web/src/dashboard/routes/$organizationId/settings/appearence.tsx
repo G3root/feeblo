@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingsSection } from "./-settings-section";
+import { SettingsLayout } from "~/features/settings/components/settings-layout";
 
 export const Route = createFileRoute("/$organizationId/settings/appearence")({
   component: AppearenceSettingsPage,
@@ -7,9 +7,18 @@ export const Route = createFileRoute("/$organizationId/settings/appearence")({
 
 function AppearenceSettingsPage() {
   return (
-    <SettingsSection
-      description="Customize visual preferences for your workspace and board views."
-      title="Appearence"
-    />
+    <SettingsLayout.Root>
+      <SettingsLayout.Header>
+        <SettingsLayout.HeaderTitle>Appearence</SettingsLayout.HeaderTitle>
+        <SettingsLayout.HeaderDescription>
+          Customize visual preferences for your workspace and board views.
+        </SettingsLayout.HeaderDescription>
+      </SettingsLayout.Header>
+      <SettingsLayout.Content>
+        <div>
+          <h2 className="font-medium text-sm">Theme</h2>
+        </div>
+      </SettingsLayout.Content>
+    </SettingsLayout.Root>
   );
 }

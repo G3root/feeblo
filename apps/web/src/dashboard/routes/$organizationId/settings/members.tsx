@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { toastManager } from "~/components/ui/toast";
+import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -63,13 +64,18 @@ interface OrganizationInvitationRow {
 
 function MembersSettingsPage() {
   return (
-    <MembersSettingsLayout.Root
-      description="Invite teammates, adjust roles, and maintain access controls."
-      title="members"
-    >
-      <MembersSection />
-      <InvitationsSection />
-    </MembersSettingsLayout.Root>
+    <SettingsLayout.Root>
+      <SettingsLayout.Header>
+        <SettingsLayout.HeaderTitle>Members</SettingsLayout.HeaderTitle>
+        <SettingsLayout.HeaderDescription>
+          Invite teammates, adjust roles, and maintain access controls.
+        </SettingsLayout.HeaderDescription>
+      </SettingsLayout.Header>
+      <SettingsLayout.Content>
+        <MembersSection />
+        <InvitationsSection />
+      </SettingsLayout.Content>
+    </SettingsLayout.Root>
   );
 }
 

@@ -1,3 +1,5 @@
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Sidebar,
@@ -60,6 +62,7 @@ export function SettingsSidebar({
                   params={{ organizationId }}
                   to="/$organizationId"
                 >
+                  <HugeiconsIcon icon={ArrowLeft01Icon} />
                   <span>Back to App</span>
                 </Link>
               )}

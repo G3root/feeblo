@@ -1,15 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { toastManager } from "~/components/ui/toast";
+import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { authClient } from "~/lib/auth-client";
@@ -24,24 +18,22 @@ function ProfileSettingsPage() {
   const formKey = `${session?.user?.id ?? "anonymous"}-${session?.user?.name ?? ""}-${session?.user?.image ?? ""}`;
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-4 md:p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>
-            Update your account details with Better Auth.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ProfileForm
-            email={session?.user?.email ?? ""}
-            image={session?.user?.image ?? ""}
-            key={formKey}
-            name={session?.user?.name ?? ""}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <SettingsLayout.Root>
+      <SettingsLayout.Header>
+        <SettingsLayout.HeaderTitle>Profile</SettingsLayout.HeaderTitle>
+        <SettingsLayout.HeaderDescription>
+          Update your account details.
+        </SettingsLayout.HeaderDescription>
+      </SettingsLayout.Header>
+      <SettingsLayout.Content>
+        <ProfileForm
+          email={session?.user?.email ?? ""}
+          image={session?.user?.image ?? ""}
+          key={formKey}
+          name={session?.user?.name ?? ""}
+        />
+      </SettingsLayout.Content>
+    </SettingsLayout.Root>
   );
 }
 
