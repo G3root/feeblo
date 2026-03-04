@@ -19,5 +19,36 @@ services:
       - 8025:8025
       - 1025:1025
 
+  minio:
+    image: minio/minio
+    container_name: feeblo-minio
+    ports:
+      - 9002:9002
+      - 9001:9001
+    volumes:
+      - minio:/data
+    environment:
+      - MINIO_ROOT_USER=feeblo
+      - MINIO_ROOT_PASSWORD=password
+
+    entrypoint: sh
+    command: -c 'minio server /data --console-address ":9001" --address ":9002"'
+
+  mc:
+    image: minio/mc
+    container_name: feeblo-mc
+    depends_on:
+      - minio
+    entrypoint: sh
+    command: |
+      -c "
+        sleep 10;
+        mc alias set myminio http://minio:9002 feeblo password;
+        mc mb myminio/feeblo-media-public;
+        mc anonymous set download myminio/feeblo-media-public;
+        exit 0;
+      "
+
 volumes:
   postgres:
+  minio:

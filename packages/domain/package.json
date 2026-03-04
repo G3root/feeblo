@@ -60,12 +60,14 @@
     }
   },
   "dependencies": {
+    "@effect-aws/client-s3": "^1.10.9",
+    "@effect-aws/s3": "^0.2.6",
     "@effect/platform": "catalog:",
     "@effect/rpc": "catalog:",
-    "effect": "catalog:",
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
-    "@feeblo/utils": "workspace:*"
+    "@feeblo/utils": "workspace:*",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
