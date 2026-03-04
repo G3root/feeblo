@@ -15,8 +15,8 @@ export default defineConfig({
     fonts: [
       {
         provider: fontProviders.google(),
-        name: "Manrope",
-        cssVariable: "--font-manrope",
+        name: "Inter",
+        cssVariable: "--font-inter",
       },
     ],
   },
