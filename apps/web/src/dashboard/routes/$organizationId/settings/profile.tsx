@@ -14,21 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemTitle,
-} from "~/components/ui/item";
-import { Separator } from "~/components/ui/separator";
 import { toastManager } from "~/components/ui/toast";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
@@ -48,24 +34,26 @@ function ProfileSettingsPage() {
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
-        <Item variant="outline">
-          <ItemContent>
-            <FieldGroup>
-              <Field orientation="responsive">
-                <FieldContent>
-                  <FieldLabel>Profile picture</FieldLabel>
-                </FieldContent>
+        <SettingsItem.Item>
+          <SettingsItem.ItemContent>
+            <SettingsItem.FieldGroup>
+              <SettingsItem.Field>
+                <SettingsItem.FieldContent>
+                  <SettingsItem.FieldLabel>
+                    Profile picture
+                  </SettingsItem.FieldLabel>
+                </SettingsItem.FieldContent>
                 <ProfileButton />
-              </Field>
-            </FieldGroup>
-          </ItemContent>
-          <Separator />
-          <ItemContent>
-            <FieldGroup>
+              </SettingsItem.Field>
+            </SettingsItem.FieldGroup>
+          </SettingsItem.ItemContent>
+          <SettingsItem.Separator />
+          <SettingsItem.ItemContent>
+            <SettingsItem.FieldGroup>
               <FullNameField />
-            </FieldGroup>
-          </ItemContent>
-        </Item>
+            </SettingsItem.FieldGroup>
+          </SettingsItem.ItemContent>
+        </SettingsItem.Item>
 
         <SettingsItem.Root>
           <SettingsItem.Header>
@@ -123,10 +111,12 @@ function FullNameField() {
   }
 
   return (
-    <Field orientation="responsive">
-      <FieldContent>
-        <FieldLabel htmlFor={id}>Full name</FieldLabel>
-      </FieldContent>
+    <SettingsItem.Field>
+      <SettingsItem.FieldContent>
+        <SettingsItem.FieldLabel htmlFor={id}>
+          Full name
+        </SettingsItem.FieldLabel>
+      </SettingsItem.FieldContent>
       <Input
         defaultValue={data.user.name}
         id={id}
@@ -134,32 +124,32 @@ function FullNameField() {
         placeholder="Full name"
         ref={inputRef}
       />
-    </Field>
+    </SettingsItem.Field>
   );
 }
 
 function DangerZone() {
   return (
-    <Item variant="outline">
-      <ItemContent>
-        <FieldGroup>
-          <Field orientation="responsive">
-            <FieldContent>
-              <ItemTitle>Delete account</ItemTitle>
-              <FieldDescription>
+    <SettingsItem.Item>
+      <SettingsItem.ItemContent>
+        <SettingsItem.FieldGroup>
+          <SettingsItem.Field>
+            <SettingsItem.FieldContent>
+              <SettingsItem.ItemTitle>Delete account</SettingsItem.ItemTitle>
+              <SettingsItem.FieldDescription>
                 Delete your account and all associated data. This action is
                 irreversible.
-              </FieldDescription>
-            </FieldContent>
-            <ItemActions>
+              </SettingsItem.FieldDescription>
+            </SettingsItem.FieldContent>
+            <SettingsItem.ItemActions>
               <Button size="sm" variant="destructive">
                 <HugeiconsIcon icon={Delete02Icon} /> Delete account
               </Button>
-            </ItemActions>
-          </Field>
-        </FieldGroup>
-      </ItemContent>
-    </Item>
+            </SettingsItem.ItemActions>
+          </SettingsItem.Field>
+        </SettingsItem.FieldGroup>
+      </SettingsItem.ItemContent>
+    </SettingsItem.Item>
   );
 }
 
