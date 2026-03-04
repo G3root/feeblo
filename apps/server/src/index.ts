@@ -11,7 +11,10 @@ import { DB } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
-import { Auth } from "@feeblo/domain/session-middleware";
+import {
+  Auth,
+  HttpApiAuthMiddlewareLive,
+} from "@feeblo/domain/session-middleware";
 import { Config, Effect, Layer } from "effect";
 
 const ServiceLayers = DB.Client;
@@ -88,6 +91,7 @@ HttpLayerRouter.serve(AllRoutes, {
     maxParamLength: 500,
   },
 }).pipe(
+  Layer.provide(HttpApiAuthMiddlewareLive),
   Layer.provide(AuthLayer),
   Layer.provide(ServiceLayers),
   Layer.provide(

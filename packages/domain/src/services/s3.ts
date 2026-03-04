@@ -1,12 +1,7 @@
-import {
-  makeS3Service,
-  S3ClientInstance as S3ClientInstanceNS,
-  S3Service,
-  S3ServiceConfig,
-} from "@effect-aws/client-s3";
-import { make as makeS3ClientInstance } from "@effect-aws/client-s3/S3ClientInstance";
+import { FileSystem } from "@effect/platform";
+import { S3 } from "@effect-aws/client-s3";
+import { S3FileSystem } from "@effect-aws/s3";
 import { Config, Effect, Layer } from "effect";
-import type { ConfigError } from "effect/ConfigError";
 
 /**
  * Configuration for S3 service
@@ -18,12 +13,14 @@ const S3ConfigSchema = Effect.all({
   secretAccessKey: Config.string("MEDIA_UPLOAD_SECRET_ACCESS_KEY").pipe(
     Config.option
   ),
+  publicBucketName: Config.string("MEDIA_PUBLIC_BUCKET_NAME"),
+  publicBaseUrl: Config.string("MEDIA_PUBLIC_BASE_URL").pipe(Config.option),
 });
 
 /**
- * Custom S3ServiceConfig layer with configuration from environment
+ * Layer that provides S3Service with custom configuration
  */
-const S3ServiceConfigLayer = Layer.unwrapEffect(
+export const S3Layer = Layer.unwrapEffect(
   Effect.gen(function* () {
     const config = yield* S3ConfigSchema;
 
@@ -36,7 +33,7 @@ const S3ServiceConfigLayer = Layer.unwrapEffect(
           }
         : undefined;
 
-    return S3ServiceConfig.setS3ServiceConfig({
+    return S3.layer({
       region: config.region,
       endpoint: config.endpoint,
       credentials,
@@ -44,18 +41,58 @@ const S3ServiceConfigLayer = Layer.unwrapEffect(
   })
 );
 
-/**
- * Custom S3ClientInstance layer using makeS3ClientInstance
- */
-const S3ClientInstanceLayer = Layer.scoped(
-  S3ClientInstanceNS.S3ClientInstance,
-  makeS3ClientInstance
-).pipe(Layer.provide(S3ServiceConfigLayer));
+const PROFILE_IMAGE_PREFIX = "profile-images";
 
-/**
- * Layer that provides S3Service with custom configuration
- */
-export const S3Layer: Layer.Layer<S3Service, ConfigError, never> = Layer.effect(
-  S3Service,
-  makeS3Service
-).pipe(Layer.provide(S3ClientInstanceLayer));
+export class S3UploadService extends Effect.Service<S3UploadService>()(
+  "S3UploadService",
+  {
+    effect: Effect.gen(function* () {
+      const config = yield* S3ConfigSchema;
+      const bucket = config.publicBucketName;
+      const fileSystem = yield* FileSystem.FileSystem;
+
+      return {
+        uploadProfileImage: ({
+          bytes,
+          extension,
+          userId,
+        }: {
+          bytes: Uint8Array;
+          extension: string;
+          userId: string;
+        }) =>
+          Effect.gen(function* () {
+            const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+            yield* fileSystem.writeFile(fileKey, bytes);
+
+            const encodedKey = fileKey
+              .split("/")
+              .map((segment) => encodeURIComponent(segment))
+              .join("/");
+            const baseUrl =
+              config.publicBaseUrl._tag === "Some"
+                ? config.publicBaseUrl.value.replace(/\/$/, "")
+                : `${config.endpoint.replace(/\/$/, "")}/${bucket}`;
+
+            return {
+              bucket,
+              key: fileKey,
+              url: `${baseUrl}/${encodedKey}`,
+            };
+          }),
+      };
+    }),
+  }
+) {}
+
+export const S3UploadServiceLive = Layer.unwrapEffect(
+  Config.string("MEDIA_PUBLIC_BUCKET_NAME").pipe(
+    Effect.map((bucketName) => {
+      const S3FileSystemLive = S3FileSystem.layer({ bucketName }).pipe(
+        Layer.provide(S3Layer)
+      );
+
+      return S3UploadService.Default.pipe(Layer.provideMerge(S3FileSystemLive));
+    })
+  )
+);

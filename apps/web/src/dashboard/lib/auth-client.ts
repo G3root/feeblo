@@ -4,5 +4,6 @@ import { createAuthClient } from "@feeblo/auth/client";
 const baseUrl = VITE_API_URL?.endsWith("/") ? VITE_API_URL : `${VITE_API_URL}/`;
 
 export const verificationOtpEndpoint = `${baseUrl}api/auth/verification-otp`;
+export const profilePictureUploadEndpoint = `${baseUrl}api/profile/picture`;
 
 export const authClient = createAuthClient(baseUrl);

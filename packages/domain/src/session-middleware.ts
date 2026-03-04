@@ -1,21 +1,22 @@
+import { HttpApiMiddleware, HttpApiSecurity } from "@effect/platform";
 import { RpcMiddleware } from "@effect/rpc";
 import type { Auth as AuthHandler, Session } from "@feeblo/auth";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Redacted } from "effect";
 import { UnauthorizedError } from "./rpc-errors";
 
 const SESSION_COOKIE_KEY = "better-auth.session_token";
 
-export class Auth extends Context.Tag("@cronosend/api/Auth")<
+export class Auth extends Context.Tag("@feeblo/api/Auth")<
   Auth,
   AuthHandler
 >() {}
 
 export class CurrentSession extends Context.Tag(
-  "@cronosend/domain/CurrentSession"
+  "@feeblo/domain/CurrentSession"
 )<CurrentSession, Session>() {}
 
 export class AuthMiddleware extends RpcMiddleware.Tag<AuthMiddleware>()(
-  "@cronosend/api/AuthMiddleware",
+  "@feeblo/api/AuthMiddleware",
   {
     provides: CurrentSession,
     failure: UnauthorizedError,
@@ -76,6 +77,31 @@ export const AuthMiddlewareLive = Layer.effect(
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
       return getValidatedSessionFromToken(auth, token ?? "");
+    };
+  })
+);
+
+export class HttpApiAuthMiddleware extends HttpApiMiddleware.Tag<HttpApiAuthMiddleware>()(
+  "@feeblo/domain/HttpApiAuthMiddleware",
+  {
+    provides: CurrentSession,
+    failure: UnauthorizedError,
+    security: {
+      cookie: HttpApiSecurity.apiKey({
+        in: "cookie",
+        key: SESSION_COOKIE_KEY,
+      }),
+    },
+  }
+) {}
+
+export const HttpApiAuthMiddlewareLive = Layer.effect(
+  HttpApiAuthMiddleware,
+  Effect.gen(function* () {
+    const auth = yield* Auth;
+    return {
+      cookie: (token: Redacted.Redacted<string>) =>
+        getValidatedSessionFromToken(auth, Redacted.value(token)),
     };
   })
 );

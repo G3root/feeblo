@@ -39,9 +39,7 @@ export const mapToInternalServerError =
   <const TKnown extends readonly ErrorConstructor<object>[]>(
     ...knownErrors: TKnown
   ) =>
-  (
-    error: unknown
-  ): InstanceType<TKnown[number]> | InternalServerError => {
+  (error: unknown): InstanceType<TKnown[number]> | InternalServerError => {
     for (const KnownError of knownErrors) {
       if (error instanceof KnownError) {
         return error as InstanceType<TKnown[number]>;
