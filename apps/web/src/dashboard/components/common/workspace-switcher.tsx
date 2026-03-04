@@ -47,7 +47,7 @@ export function WorkspaceSwitcher() {
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="font-medium">Workspace</span>
-                  <span className="max-w-[11rem] truncate text-muted-foreground text-xs">
+                  <span className="max-w-44 truncate text-muted-foreground text-xs">
                     {selectedMembership?.organization.name ??
                       "Select workspace"}
                   </span>

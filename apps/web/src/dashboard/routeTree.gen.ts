@@ -21,7 +21,7 @@ import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$o
 import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
 import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
 import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
-import { Route as OrganizationIdSettingsAppearenceRouteImport } from "./routes/$organizationId/settings/appearence"
+import { Route as OrganizationIdSettingsAppearanceRouteImport } from "./routes/$organizationId/settings/appearance"
 import { Route as OrganizationIdDashboardLayoutSettingsRouteImport } from "./routes/$organizationId/_dashboard-layout/settings"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
@@ -93,10 +93,10 @@ const OrganizationIdSettingsBillingRoute =
     path: "/billing",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdSettingsAppearenceRoute =
-  OrganizationIdSettingsAppearenceRouteImport.update({
-    id: "/appearence",
-    path: "/appearence",
+const OrganizationIdSettingsAppearanceRoute =
+  OrganizationIdSettingsAppearanceRouteImport.update({
+    id: "/appearance",
+    path: "/appearance",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdDashboardLayoutSettingsRoute =
@@ -125,7 +125,7 @@ export interface FileRoutesByFullPath {
   "/sign-up": typeof SignUpRoute
   "/$organizationId": typeof OrganizationIdDashboardLayoutRouteWithChildren
   "/$organizationId/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
-  "/$organizationId/settings/appearence": typeof OrganizationIdSettingsAppearenceRoute
+  "/$organizationId/settings/appearance": typeof OrganizationIdSettingsAppearanceRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
@@ -141,7 +141,7 @@ export interface FileRoutesByTo {
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
-  "/$organizationId/settings/appearence": typeof OrganizationIdSettingsAppearenceRoute
+  "/$organizationId/settings/appearance": typeof OrganizationIdSettingsAppearanceRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
@@ -159,7 +159,7 @@ export interface FileRoutesById {
   "/$organizationId/_dashboard-layout": typeof OrganizationIdDashboardLayoutRouteWithChildren
   "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
   "/$organizationId/_dashboard-layout/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
-  "/$organizationId/settings/appearence": typeof OrganizationIdSettingsAppearenceRoute
+  "/$organizationId/settings/appearance": typeof OrganizationIdSettingsAppearanceRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
@@ -178,7 +178,7 @@ export interface FileRouteTypes {
     | "/sign-up"
     | "/$organizationId"
     | "/$organizationId/settings"
-    | "/$organizationId/settings/appearence"
+    | "/$organizationId/settings/appearance"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/profile"
@@ -194,7 +194,7 @@ export interface FileRouteTypes {
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/settings"
-    | "/$organizationId/settings/appearence"
+    | "/$organizationId/settings/appearance"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/profile"
@@ -211,7 +211,7 @@ export interface FileRouteTypes {
     | "/$organizationId/_dashboard-layout"
     | "/$organizationId/settings"
     | "/$organizationId/_dashboard-layout/settings"
-    | "/$organizationId/settings/appearence"
+    | "/$organizationId/settings/appearance"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/profile"
@@ -317,11 +317,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsBillingRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
-    "/$organizationId/settings/appearence": {
-      id: "/$organizationId/settings/appearence"
-      path: "/appearence"
-      fullPath: "/$organizationId/settings/appearence"
-      preLoaderRoute: typeof OrganizationIdSettingsAppearenceRouteImport
+    "/$organizationId/settings/appearance": {
+      id: "/$organizationId/settings/appearance"
+      path: "/appearance"
+      fullPath: "/$organizationId/settings/appearance"
+      preLoaderRoute: typeof OrganizationIdSettingsAppearanceRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/_dashboard-layout/settings": {
@@ -373,7 +373,7 @@ const OrganizationIdDashboardLayoutRouteWithChildren =
   )
 
 interface OrganizationIdSettingsRouteChildren {
-  OrganizationIdSettingsAppearenceRoute: typeof OrganizationIdSettingsAppearenceRoute
+  OrganizationIdSettingsAppearanceRoute: typeof OrganizationIdSettingsAppearanceRoute
   OrganizationIdSettingsBillingRoute: typeof OrganizationIdSettingsBillingRoute
   OrganizationIdSettingsMembersRoute: typeof OrganizationIdSettingsMembersRoute
   OrganizationIdSettingsProfileRoute: typeof OrganizationIdSettingsProfileRoute
@@ -383,8 +383,8 @@ interface OrganizationIdSettingsRouteChildren {
 
 const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
   {
-    OrganizationIdSettingsAppearenceRoute:
-      OrganizationIdSettingsAppearenceRoute,
+    OrganizationIdSettingsAppearanceRoute:
+      OrganizationIdSettingsAppearanceRoute,
     OrganizationIdSettingsBillingRoute: OrganizationIdSettingsBillingRoute,
     OrganizationIdSettingsMembersRoute: OrganizationIdSettingsMembersRoute,
     OrganizationIdSettingsProfileRoute: OrganizationIdSettingsProfileRoute,

@@ -1,8 +1,18 @@
+import { Delete02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "~/components/ui/item";
 import { toastManager } from "~/components/ui/toast";
+import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -15,7 +25,6 @@ export const Route = createFileRoute("/$organizationId/settings/profile")({
 function ProfileSettingsPage() {
   useOrganizationId();
   const { data: session } = authClient.useSession();
-  const formKey = `${session?.user?.id ?? "anonymous"}-${session?.user?.name ?? ""}-${session?.user?.image ?? ""}`;
 
   return (
     <SettingsLayout.Root>
@@ -26,12 +35,15 @@ function ProfileSettingsPage() {
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
-        <ProfileForm
-          email={session?.user?.email ?? ""}
-          image={session?.user?.image ?? ""}
-          key={formKey}
-          name={session?.user?.name ?? ""}
-        />
+        <ProfileForm name={session?.user?.name ?? ""} />
+        <SettingsItem.Root>
+          <SettingsItem.Header>
+            <SettingsItem.Title>Danger Zone</SettingsItem.Title>
+          </SettingsItem.Header>
+          <SettingsItem.Content>
+            <DangerZone />
+          </SettingsItem.Content>
+        </SettingsItem.Root>
       </SettingsLayout.Content>
     </SettingsLayout.Root>
   );
@@ -39,22 +51,12 @@ function ProfileSettingsPage() {
 
 const ProfileFormSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
-  image: z.string(),
 });
 
-function ProfileForm({
-  name,
-  image,
-  email,
-}: {
-  name: string;
-  image: string;
-  email: string;
-}) {
+function ProfileForm({ name }: { name: string }) {
   const form = useAppForm({
     defaultValues: {
       name,
-      image,
     },
     validators: {
       onSubmit: ProfileFormSchema,
@@ -62,7 +64,6 @@ function ProfileForm({
     onSubmit: async ({ value }) => {
       const response = await authClient.updateUser({
         name: value.name.trim(),
-        image: value.image.trim() || undefined,
       });
 
       if (response?.error) {
@@ -81,46 +82,53 @@ function ProfileForm({
   });
 
   return (
-    <form
-      className="grid gap-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        form.handleSubmit();
-      }}
-    >
-      <div className="grid gap-2">
-        <Label htmlFor="settings-email">Email</Label>
-        <Input disabled id="settings-email" type="email" value={email} />
-      </div>
-
-      <form.AppField
-        children={(field) => (
-          <field.TextField
-            id="settings-name"
-            label="Name"
-            placeholder="Your name"
+    <Card>
+      <CardContent>
+        <form
+          className="grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            form.handleSubmit();
+          }}
+        >
+          <form.AppField
+            children={(field) => (
+              <field.TextField
+                id="settings-name"
+                label="Name"
+                placeholder="Your name"
+              />
+            )}
+            name="name"
           />
-        )}
-        name="name"
-      />
 
-      <form.AppField
-        children={(field) => (
-          <field.TextField
-            id="settings-image"
-            label="Image URL"
-            placeholder="https://..."
-          />
-        )}
-        name="image"
-      />
+          <div className="pt-2">
+            <form.AppForm>
+              <form.SubscribeButton label="Save profile" type="submit" />
+            </form.AppForm>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
 
-      <div className="pt-2">
-        <form.AppForm>
-          <form.SubscribeButton label="Save profile" type="submit" />
-        </form.AppForm>
-      </div>
-    </form>
+function DangerZone() {
+  return (
+    <Item variant="outline">
+      <ItemContent>
+        <ItemTitle>Delete account</ItemTitle>
+        <ItemDescription>
+          Delete your account and all associated data. This action is
+          irreversible.
+        </ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <Button size="sm" variant="destructive">
+          <HugeiconsIcon icon={Delete02Icon} /> Delete account
+        </Button>
+      </ItemActions>
+    </Item>
   );
 }

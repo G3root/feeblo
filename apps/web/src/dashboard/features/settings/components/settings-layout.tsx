@@ -40,7 +40,7 @@ function HeaderTitle({ children, className, ...props }: HeaderTitleProps) {
   return (
     <h1
       className={cn(
-        "font-semibold text-xl leading-tight tracking-tight",
+        "font-semibold text-2xl leading-tight tracking-tight",
         className
       )}
       {...props}
@@ -72,7 +72,7 @@ interface ContentProps extends React.ComponentProps<"div"> {
 
 function Content({ children, className, ...props }: ContentProps) {
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
+    <div className={cn("flex flex-col gap-12", className)} {...props}>
       {children}
     </div>
   );

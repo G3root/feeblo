@@ -21,22 +21,22 @@ const settingsItems = [
     to: "/$organizationId/settings/profile" as const,
   },
   {
-    label: "Appearence",
-    slug: "appearence",
-    to: "/$organizationId/settings/appearence" as const,
+    label: "Appearance",
+    slug: "appearance",
+    to: "/$organizationId/settings/appearance" as const,
   },
   {
-    label: "workspace",
+    label: "Workspace",
     slug: "workspace",
     to: "/$organizationId/settings/workspace" as const,
   },
   {
-    label: "members",
+    label: "Members",
     slug: "members",
     to: "/$organizationId/settings/members" as const,
   },
   {
-    label: "billing",
+    label: "Billing",
     slug: "billing",
     to: "/$organizationId/settings/billing" as const,
   },
