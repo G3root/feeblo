@@ -5,7 +5,12 @@ import {
   HttpServerRequest,
   HttpServerResponse,
 } from "@effect/platform";
-import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
+import {
+  BunFileSystem,
+  BunHttpServer,
+  BunPath,
+  BunRuntime,
+} from "@effect/platform-bun";
 import { initAuthHandler } from "@feeblo/auth";
 import { DB } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
@@ -94,6 +99,8 @@ HttpLayerRouter.serve(AllRoutes, {
   Layer.provide(HttpApiAuthMiddlewareLive),
   Layer.provide(AuthLayer),
   Layer.provide(ServiceLayers),
+  Layer.provide(BunFileSystem.layer),
+  Layer.provide(BunPath.layer),
   Layer.provide(
     BunHttpServer.layerConfig(
       Config.all({

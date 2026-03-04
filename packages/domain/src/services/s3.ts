@@ -92,7 +92,7 @@ export const S3UploadServiceLive = Layer.unwrapEffect(
         Layer.provide(S3Layer)
       );
 
-      return S3UploadService.Default.pipe(Layer.provideMerge(S3FileSystemLive));
+      return S3UploadService.Default.pipe(Layer.provide(S3FileSystemLive));
     })
   )
 );

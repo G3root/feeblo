@@ -1,4 +1,4 @@
-import { HttpApiBuilder, HttpServerRequest } from "@effect/platform";
+import { FileSystem, HttpApiBuilder } from "@effect/platform";
 import { DB } from "@feeblo/db";
 import { user as userTable } from "@feeblo/db/schema/auth";
 import { eq } from "drizzle-orm";
@@ -23,51 +23,11 @@ export const ProfileApiLive = HttpApiBuilder.group(
   Api,
   "ProfileApiGroup",
   (handlers) =>
-    handlers.handle("uploadProfilePicture", () => {
+    handlers.handle("uploadProfilePicture", ({ payload: { file } }) => {
       return Effect.gen(function* () {
-        const request = yield* HttpServerRequest.HttpServerRequest;
         const session = yield* CurrentSession;
 
-        const source = request.source as
-          | { formData?: () => Promise<{ get: (name: string) => unknown }> }
-          | undefined;
-
-        if (!source || typeof source.formData !== "function") {
-          return yield* Effect.fail(
-            new BadRequestError({ message: "Invalid upload payload" })
-          );
-        }
-
-        const formData = yield* Effect.tryPromise({
-          try: () =>
-            source.formData() as Promise<{ get: (name: string) => unknown }>,
-          catch: () =>
-            new BadRequestError({ message: "Invalid upload payload" }),
-        });
-
-        const file = formData.get("file") as {
-          size?: number;
-          type?: string;
-          arrayBuffer?: () => Promise<ArrayBuffer>;
-        } | null;
-
-        if (!file || typeof file.arrayBuffer !== "function") {
-          return yield* Effect.fail(
-            new BadRequestError({ message: "Missing profile image file" })
-          );
-        }
-
-        const fileSize = typeof file.size === "number" ? file.size : 0;
-        if (fileSize <= 0 || fileSize > MAX_PROFILE_IMAGE_BYTES) {
-          return yield* Effect.fail(
-            new BadRequestError({
-              message: "Profile image must be between 1B and 5MB",
-            })
-          );
-        }
-
-        const fileType = typeof file.type === "string" ? file.type : "";
-        if (!ALLOWED_CONTENT_TYPES.has(fileType)) {
+        if (!ALLOWED_CONTENT_TYPES.has(file.contentType)) {
           return yield* Effect.fail(
             new BadRequestError({
               message: "Unsupported file type. Use JPEG, PNG, or WEBP",
@@ -75,7 +35,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
           );
         }
 
-        const extension = getFileExtension(fileType);
+        const extension = getFileExtension(file.contentType);
         if (!extension) {
           return yield* Effect.fail(
             new BadRequestError({
@@ -84,27 +44,42 @@ export const ProfileApiLive = HttpApiBuilder.group(
           );
         }
 
-        const bytes = yield* Effect.tryPromise({
-          try: async () =>
-            new Uint8Array((await file.arrayBuffer?.()) ?? new ArrayBuffer(0)),
-          catch: () =>
-            new InternalServerError({ message: "Failed to read file" }),
-        });
+        const fs = yield* FileSystem.FileSystem;
+        const bytes = yield* fs
+          .readFile(file.path)
+          .pipe(
+            Effect.mapError(
+              () => new InternalServerError({ message: "Failed to read file" })
+            )
+          );
+
+        if (bytes.length === 0 || bytes.length > MAX_PROFILE_IMAGE_BYTES) {
+          return yield* Effect.fail(
+            new BadRequestError({
+              message: "Profile image must be between 1B and 5MB",
+            })
+          );
+        }
 
         const s3Service = yield* S3UploadService;
-        const uploaded = yield* s3Service.uploadProfileImage({
-          bytes,
-          extension,
-          userId: session.user.id,
-        });
+        const uploaded = yield* s3Service
+          .uploadProfileImage({
+            bytes,
+            extension,
+            userId: session.user.id,
+          })
+          .pipe(
+            Effect.mapError(
+              () =>
+                new InternalServerError({ message: "Failed to upload image" })
+            )
+          );
 
         const db = yield* DB;
 
         yield* db
           .update(userTable)
-          .set({
-            image: uploaded.url,
-          })
+          .set({ image: uploaded.url })
           .where(eq(userTable.id, session.user.id))
           .pipe(
             Effect.mapError(

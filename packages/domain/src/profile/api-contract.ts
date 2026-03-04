@@ -1,4 +1,10 @@
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
+import {
+  HttpApiEndpoint,
+  HttpApiGroup,
+  HttpApiSchema,
+  Multipart,
+  OpenApi,
+} from "@effect/platform";
 import { Schema } from "effect";
 import {
   BadRequestError,
@@ -20,6 +26,13 @@ export class ProfileApiGroup extends HttpApiGroup.make("ProfileApiGroup")
       .addError(BadRequestError)
       .addError(UnauthorizedError)
       .addError(InternalServerError)
+      .setPayload(
+        HttpApiSchema.Multipart(
+          Schema.Struct({
+            file: Multipart.SingleFileSchema,
+          })
+        )
+      )
       .annotateContext(
         OpenApi.annotations({
           title: "Upload Profile Picture",
