@@ -92,7 +92,6 @@ function AddPostButton({
   return (
     <Button
       aria-label={`Add post to ${lane.label}`}
-      // className="absolute top-1/2 right-2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
       className="absolute top-1/2 right-6 -translate-y-1/2"
       onClick={(event) => {
         event.preventDefault();
