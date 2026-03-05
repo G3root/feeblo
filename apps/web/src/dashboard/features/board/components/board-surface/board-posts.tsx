@@ -1,7 +1,10 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { useEffect } from "react";
+import { usePostSelectionStore } from "~/features/board/state/post-selection-context";
 import { postCollection } from "~/lib/collections";
 import { BOARD_LANES } from "../../constants";
 import { useBoardViewMode } from "../../state/view-mode-context";
+import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardGridView } from "./board-grid-view";
 import { BoardListView } from "./board-list-view";
 import { BoardPostsEmpty } from "./board-posts-empty";
@@ -17,6 +20,7 @@ export function BoardPosts({
   organizationId: string;
 }) {
   const mode = useBoardViewMode();
+  const selectionStore = usePostSelectionStore();
 
   const { data: posts } = useLiveSuspenseQuery(
     (q) => {
@@ -41,6 +45,13 @@ export function BoardPosts({
     [boardId, organizationId]
   );
 
+  useEffect(() => {
+    selectionStore.send({
+      type: "syncAvailablePostIds",
+      postIds: posts.map((post) => post.id),
+    });
+  }, [posts, selectionStore]);
+
   const lanes: BoardLane[] = BOARD_LANES.map((lane) => ({
     key: lane.key,
     label: lane.label,
@@ -53,22 +64,23 @@ export function BoardPosts({
     return <BoardPostsEmpty />;
   }
 
-  if (mode === "grid") {
-    return (
-      <BoardGridView
-        boardSlug={boardSlug}
-        lanes={lanes}
-        organizationId={organizationId}
-      />
-    );
-  }
-
   return (
-    <BoardListView
-      boardId={boardId}
-      boardSlug={boardSlug}
-      lanes={lanes}
-      organizationId={organizationId}
-    />
+    <>
+      {mode === "grid" ? (
+        <BoardGridView
+          boardSlug={boardSlug}
+          lanes={lanes}
+          organizationId={organizationId}
+        />
+      ) : (
+        <BoardListView
+          boardId={boardId}
+          boardSlug={boardSlug}
+          lanes={lanes}
+          organizationId={organizationId}
+        />
+      )}
+      <BoardPostBulkActions />
+    </>
   );
 }

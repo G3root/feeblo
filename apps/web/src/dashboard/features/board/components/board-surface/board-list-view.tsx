@@ -66,6 +66,7 @@ export function BoardListView({
             <AccordionContent className="h-auto pb-0">
               {lane.posts.map((post) => (
                 <BoardPostRowItem
+                  boardId={boardId}
                   boardSlug={boardSlug}
                   key={post.id}
                   organizationId={organizationId}

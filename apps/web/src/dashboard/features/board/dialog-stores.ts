@@ -1,4 +1,4 @@
-import { createModalStoreContext } from "~/utils/model-context";
+import { createModalStoreContext } from "~/lib/xstate";
 
 export const [CreateBoardDialogProvider, useCreateBoardDialogContext] =
   createModalStoreContext({

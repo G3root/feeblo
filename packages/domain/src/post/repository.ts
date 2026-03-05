@@ -6,7 +6,7 @@ import {
   upvote as upvoteTable,
 } from "@feeblo/db/schema/feedback";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq, type SQL, sql } from "drizzle-orm";
+import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { Effect } from "effect";
 import type { TPostUpdate } from "./schema";
 
@@ -16,7 +16,7 @@ type TPostFindMany = {
 };
 
 type TPostDelete = {
-  id: string;
+  id: string | readonly string[];
   organizationId: string;
   boardId: string;
 };
@@ -99,17 +99,26 @@ export class PostRepository extends Effect.Service<PostRepository>()(
             )
             .pipe(Effect.asVoid),
 
-        delete: ({ id, organizationId, boardId }: TPostDelete) =>
-          db
+        delete: ({ id, organizationId, boardId }: TPostDelete) => {
+          const where: SQL[] = [];
+
+          if (typeof id === "string") {
+            where.push(eq(postTable.id, id));
+          } else {
+            where.push(inArray(postTable.id, id));
+          }
+
+          return db
             .delete(postTable)
             .where(
               and(
-                eq(postTable.id, id),
+                ...where,
                 eq(postTable.organizationId, organizationId),
                 eq(postTable.boardId, boardId)
               )
             )
-            .pipe(Effect.asVoid),
+            .pipe(Effect.asVoid);
+        },
         create: ({
           id,
           boardId,
