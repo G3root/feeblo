@@ -37,7 +37,7 @@ export const PostList = Schema.Struct({
 export type TPostList = Schema.Schema.Type<typeof PostList>;
 
 export const PostDelete = Schema.Struct({
-  id: Schema.String,
+  id: Schema.Union(Schema.String, Schema.Array(Schema.String)),
   boardId: Schema.String,
   organizationId: Schema.String,
 });

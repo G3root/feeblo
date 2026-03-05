@@ -1,6 +1,6 @@
 import type { TPostStatus } from "@feeblo/db/schema/feedback";
 import type { NavigateOptions } from "@tanstack/react-router";
-import { createModalStoreContext } from "~/utils/model-context";
+import { createModalStoreContext } from "~/lib/xstate";
 
 export const [CommentDeleteDialogProvider, useCommentDeleteDialogContext] =
   createModalStoreContext<{ commentId: string }>({

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { PostSelectionProvider } from "../../state/post-selection-context";
 import { BoardViewModeProvider } from "../../state/view-mode-context";
 import { BoardHeader } from "./board-header";
 import { BoardPosts } from "./board-posts";
@@ -19,18 +20,20 @@ export function BoardSurface({
 }) {
   return (
     <BoardViewModeProvider>
-      <div className="mx-auto w-full">
-        <section className="overflow-hidden text-card-foreground">
-          <BoardHeader boardName={boardName} visibility={visibility} />
-          <Suspense fallback={<BoardPostsLoading />} key={boardId}>
-            <BoardPosts
-              boardId={boardId}
-              boardSlug={boardSlug}
-              organizationId={organizationId}
-            />
-          </Suspense>
-        </section>
-      </div>
+      <PostSelectionProvider key={boardId}>
+        <div className="mx-auto w-full">
+          <section className="overflow-hidden text-card-foreground">
+            <BoardHeader boardName={boardName} visibility={visibility} />
+            <Suspense fallback={<BoardPostsLoading />} key={boardId}>
+              <BoardPosts
+                boardId={boardId}
+                boardSlug={boardSlug}
+                organizationId={organizationId}
+              />
+            </Suspense>
+          </section>
+        </div>
+      </PostSelectionProvider>
     </BoardViewModeProvider>
   );
 }
