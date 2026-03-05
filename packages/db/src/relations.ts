@@ -9,8 +9,10 @@ import {
   organization,
   post,
   postReaction,
+  product,
   session,
   site,
+  subscription,
   twoFactor,
   upvote,
   user,
@@ -50,17 +52,21 @@ export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
   }),
 }));
 
-export const organizationRelations = relations(organization, ({ many, one }) => ({
-  members: many(member),
-  invitations: many(invitation),
-  boards: many(board),
-  posts: many(post),
-  comments: many(comment),
-  site: one(site, {
-    fields: [organization.id],
-    references: [site.organizationId],
-  }),
-}));
+export const organizationRelations = relations(
+  organization,
+  ({ many, one }) => ({
+    members: many(member),
+    invitations: many(invitation),
+    boards: many(board),
+    posts: many(post),
+    comments: many(comment),
+    site: one(site, {
+      fields: [organization.id],
+      references: [site.organizationId],
+    }),
+    subscriptions: many(subscription),
+  })
+);
 
 export const memberRelations = relations(member, ({ one }) => ({
   organization: one(organization, {
@@ -160,20 +166,38 @@ export const commentRelations = relations(comment, ({ many, one }) => ({
   commentReactions: many(commentReaction),
 }));
 
-export const commentReactionRelations = relations(commentReaction, ({ one }) => ({
-  user: one(user, {
-    fields: [commentReaction.userId],
-    references: [user.id],
-  }),
-  comment: one(comment, {
-    fields: [commentReaction.commentId],
-    references: [comment.id],
-  }),
-}));
+export const commentReactionRelations = relations(
+  commentReaction,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [commentReaction.userId],
+      references: [user.id],
+    }),
+    comment: one(comment, {
+      fields: [commentReaction.commentId],
+      references: [comment.id],
+    }),
+  })
+);
 
 export const siteRelations = relations(site, ({ one }) => ({
   organization: one(organization, {
     fields: [site.organizationId],
     references: [organization.id],
   }),
+}));
+
+export const subscriptionRelations = relations(subscription, ({ one }) => ({
+  organization: one(organization, {
+    fields: [subscription.organizationId],
+    references: [organization.id],
+  }),
+  product: one(product, {
+    fields: [subscription.productId],
+    references: [product.id],
+  }),
+}));
+
+export const productRelations = relations(product, ({ many }) => ({
+  subscriptions: many(subscription),
 }));

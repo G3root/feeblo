@@ -1,7 +1,10 @@
 import {
   boolean,
   index,
+  integer,
+  jsonb,
   pgTable,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -13,7 +16,9 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -33,7 +38,9 @@ export const session = pgTable(
     id: text("id").primaryKey(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
@@ -60,11 +67,17 @@ export const account = pgTable(
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true,
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true,
+    }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
@@ -79,7 +92,9 @@ export const verification = pgTable(
     identifier: text("identifier").notNull(),
     value: text("value").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
@@ -151,7 +166,9 @@ export const invitation = pgTable(
     role: text("role"),
     status: text("status").default("pending").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     inviterId: text("inviter_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -161,3 +178,86 @@ export const invitation = pgTable(
     index("invitation_email_idx").on(table.email),
   ]
 );
+
+export const subscription = pgTable("subscription", {
+  id: text("id").primaryKey(),
+  externalId: text("external_id").notNull(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  amount: real("amount").notNull(),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull(),
+  currency: text("currency").notNull(),
+  recurringInterval: text("recurring_interval").notNull(),
+  recurringIntervalCount: integer("recurring_interval_count").notNull(),
+  status: text("status").notNull(),
+
+  currentPeriodStart: timestamp("current_period_start", {
+    withTimezone: true,
+  }).notNull(),
+
+  currentPeriodEnd: timestamp("current_period_end", {
+    withTimezone: true,
+  }),
+
+  trialStart: timestamp("trial_start", {
+    withTimezone: true,
+  }),
+
+  trialEnd: timestamp("trial_end", {
+    withTimezone: true,
+  }),
+
+  canceledAt: timestamp("canceled_at", {
+    withTimezone: true,
+  }),
+
+  startedAt: timestamp("started_at", {
+    withTimezone: true,
+  }),
+
+  endsAt: timestamp("ends_at", {
+    withTimezone: true,
+  }),
+
+  endedAt: timestamp("ended_at", {
+    withTimezone: true,
+  }),
+
+  customerId: text("customer_id").notNull(),
+  productId: text("product_id")
+    .notNull()
+    .references(() => product.id, { onDelete: "cascade" }),
+  discountId: text("discount_id"),
+  checkoutId: text("checkout_id"),
+  seats: integer("seats"),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const product = pgTable("product", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  trialInterval: text("trial_interval"),
+  trialIntervalCount: integer("trial_interval_count"),
+  recurringInterval: text("recurring_interval"),
+  recurringIntervalCount: integer("recurring_interval_count"),
+  isRecurring: boolean("is_recurring").notNull(),
+  isArchived: boolean("is_archived").notNull(),
+  externalOrganizationId: text("external_organization_id").notNull(),
+  visibility: text("visibility").notNull(),
+  prices: jsonb("prices"),
+  metadata: jsonb("metadata").$type<{ plan: "starter" | "professional" }>(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});

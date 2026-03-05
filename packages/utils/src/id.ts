@@ -15,6 +15,7 @@ const prefixes = {
   reply: "rpl",
   postReaction: "rct",
   site: "sit",
+  subscription: "sub",
 } as const;
 
 export const generateId = <TPrefix extends keyof typeof prefixes>(

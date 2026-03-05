@@ -546,6 +546,7 @@ const seed = Effect.gen(function* () {
       "verification",
       "account",
       "session",
+      "subscription",
       "user"
     cascade`
   );
