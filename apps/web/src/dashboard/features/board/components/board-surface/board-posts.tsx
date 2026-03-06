@@ -4,9 +4,9 @@ import { usePostSelectionStore } from "~/features/board/state/post-selection-con
 import { postCollection } from "~/lib/collections";
 import { BOARD_LANES } from "../../constants";
 import { useBoardViewMode } from "../../state/view-mode-context";
-import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardGridView } from "./board-grid-view";
 import { BoardListView } from "./board-list-view";
+import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardPostsEmpty } from "./board-posts-empty";
 import type { BoardLane } from "./types";
 
@@ -61,7 +61,7 @@ export function BoardPosts({
   })).filter((lane) => lane.posts.length > 0);
 
   if (posts.length === 0) {
-    return <BoardPostsEmpty />;
+    return <BoardPostsEmpty boardId={boardId} />;
   }
 
   return (

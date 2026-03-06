@@ -1,5 +1,5 @@
 import { HttpApiSchema } from "@effect/platform";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 export class BadRequestError extends Schema.TaggedError<BadRequestError>()(
   "BadRequestError",
@@ -48,3 +48,6 @@ export const mapToInternalServerError =
 
     return new InternalServerError({ message: "Internal server error" });
   };
+
+export const onInternalServerError = (_error: unknown) =>
+  Effect.fail(new InternalServerError({ message: "Internal server error" }));

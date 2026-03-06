@@ -21,6 +21,11 @@ export function createRouter() {
         <div>Loading...</div>
       </div>
     ),
+    defaultErrorComponent: () => (
+      <div className="flex h-full min-h-screen w-full items-center justify-center">
+        <div>Error</div>
+      </div>
+    ),
     Wrap({ children }: { children: React.ReactNode }) {
       return (
         <ToastProvider>

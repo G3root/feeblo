@@ -45,18 +45,6 @@ export const initAuthHandler = () =>
       "POLAR_WEBHOOK_SECRET"
     ).pipe(Config.option);
 
-    console.log({
-      polarAccessToken:
-        polarAccessToken._tag === "Some"
-          ? Redacted.value(polarAccessToken.value)
-          : undefined,
-      polarMode,
-      polarWebhookSecret:
-        polarWebhookSecret._tag === "Some"
-          ? Redacted.value(polarWebhookSecret.value)
-          : undefined,
-    });
-
     const db = yield* DB;
 
     const config = {
@@ -112,6 +100,7 @@ export const initAuthHandler = () =>
                   server: polarMode,
                 }),
                 createCustomerOnSignUp: true,
+
                 use: [
                   // checkout({
                   //   products: [
@@ -185,16 +174,26 @@ export const initAuthHandler = () =>
           : []),
 
         customSession(async ({ user, session }) => {
-          const organizations = await db
-            .select({ id: schema.member.organizationId })
+          const memberships = await db
+            .select({
+              userId: schema.member.userId,
+              organizationId: schema.member.organizationId,
+              role: schema.member.role,
+              membershipId: schema.member.id,
+            })
             .from(schema.member)
             .where(eq(schema.member.userId, session.userId));
+
+          const organizations = memberships.map((membership) => ({
+            id: membership.organizationId,
+          }));
           const userWithOnboarding = user as typeof user & {
             onboardedOn?: Date | null;
           };
 
           return {
             organizations,
+            memberships,
             user: {
               ...user,
               onboardedOn: userWithOnboarding.onboardedOn ?? null,

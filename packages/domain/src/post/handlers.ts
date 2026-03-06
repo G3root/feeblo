@@ -1,10 +1,8 @@
 import { Effect, Layer } from "effect";
-import {
-  isMemberOfOrganization,
-  requireOrganizationMembership,
-} from "../authorization";
-import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
+import * as Policy from "../policy";
+import { onInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
 import type {
@@ -17,54 +15,80 @@ import type {
 export const PostRpcHandlers = PostRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* PostRepository;
-
+    const postPolicy = yield* PostPolicy;
     return {
       PostList: (args: TPostList) => {
-        return Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
-
-          return yield* repository.findMany({
+        return repository
+          .findMany({
             organizationId: args.organizationId,
             boardId: args.boardId,
-          });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+          })
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            Effect.catchAll(onInternalServerError)
+          );
       },
       PostListPublic: (args: TPostList) => {
-        return Effect.gen(function* () {
-          return yield* repository.findMany({
+        return repository
+          .findMany({
             organizationId: args.organizationId,
             boardId: args.boardId,
-          });
-        }).pipe(Effect.mapError(mapToInternalServerError()));
+          })
+          .pipe(Effect.catchAll(onInternalServerError));
       },
       PostDelete: (args: TPostDelete) => {
-        return Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
-
-          return yield* repository.delete({
+        return repository
+          .delete({
             id: args.id,
             organizationId: args.organizationId,
             boardId: args.boardId,
-          });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+          })
+          .pipe(
+            Policy.withPolicy(
+              Policy.all(
+                Policy.hasMembership(args.organizationId),
+                postPolicy.isOwner({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  boardId: args.boardId,
+                })
+              )
+            ),
+            Effect.catchAll(onInternalServerError)
+          );
       },
       PostUpdate: (args: TPostUpdate) => {
-        return Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
-          yield* repository.update(args);
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+        return repository.update(args).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
+            )
+          ),
+          Effect.catchAll(onInternalServerError)
+        );
       },
       PostCreate: (args: TPostCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
-          const isMember = yield* isMemberOfOrganization(args.organizationId);
+          const isMember = session.memberships.find(
+            (membership) => membership.organizationId === args.organizationId
+          );
+
           yield* repository.create({
             ...args,
             creatorId: session.session.userId,
-            ...(isMember ? { creatorMemberId: isMember.id } : {}),
+            ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+        }).pipe(Effect.catchAll(onInternalServerError));
       },
     };
   })
-).pipe(Layer.provide(PostRepository.Default));
+).pipe(
+  Layer.provide(PostPolicy.Default),
+  Layer.provide(PostRepository.Default)
+);

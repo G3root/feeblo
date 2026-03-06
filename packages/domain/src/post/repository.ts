@@ -7,7 +7,7 @@ import {
 } from "@feeblo/db/schema/feedback";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, Array as EffectArray } from "effect";
 import type { TPostUpdate } from "./schema";
 
 type TPostFindMany = {
@@ -31,6 +31,21 @@ type TPostCreate = {
   creatorId: string;
   creatorMemberId?: string;
 };
+
+type TPostFindByCreatorId = {
+  id: string;
+  organizationId: string;
+  memberId: string;
+  boardId: string;
+};
+
+type TPostFindByCreatorIds = {
+  ids: readonly string[];
+  organizationId: string;
+  memberId: string;
+  boardId: string;
+};
+
 export class PostRepository extends Effect.Service<PostRepository>()(
   "PostRepository",
   {
@@ -38,6 +53,43 @@ export class PostRepository extends Effect.Service<PostRepository>()(
       const db = yield* DB;
 
       return {
+        findByCreatorId: ({
+          id,
+          organizationId,
+          memberId,
+          boardId,
+        }: TPostFindByCreatorId) => {
+          return db
+            .select({ id: postTable.id })
+            .from(postTable)
+            .where(
+              and(
+                eq(postTable.id, id),
+                eq(postTable.organizationId, organizationId),
+                eq(postTable.creatorMemberId, memberId),
+                eq(postTable.boardId, boardId)
+              )
+            )
+            .pipe(Effect.map(EffectArray.get(0)));
+        },
+        findByCreatorIds: ({
+          ids,
+          organizationId,
+          memberId,
+          boardId,
+        }: TPostFindByCreatorIds) => {
+          return db
+            .select({ id: postTable.id })
+            .from(postTable)
+            .where(
+              and(
+                inArray(postTable.id, ids),
+                eq(postTable.organizationId, organizationId),
+                eq(postTable.creatorMemberId, memberId),
+                eq(postTable.boardId, boardId)
+              )
+            );
+        },
         findMany: ({ boardId, organizationId }: TPostFindMany) => {
           const where: SQL[] = [];
           if (boardId) {
