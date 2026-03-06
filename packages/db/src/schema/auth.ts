@@ -193,7 +193,17 @@ export const subscription = pgTable("subscription", {
   currency: text("currency").notNull(),
   recurringInterval: text("recurring_interval").notNull(),
   recurringIntervalCount: integer("recurring_interval_count").notNull(),
-  status: text("status").notNull(),
+  status: text("status")
+    .$type<
+      | "incomplete"
+      | "incomplete_expired"
+      | "trialing"
+      | "active"
+      | "past_due"
+      | "canceled"
+      | "unpaid"
+    >()
+    .notNull(),
 
   currentPeriodStart: timestamp("current_period_start", {
     withTimezone: true,
@@ -249,14 +259,17 @@ export const product = pgTable("product", {
   description: text("description"),
   trialInterval: text("trial_interval"),
   trialIntervalCount: integer("trial_interval_count"),
-  recurringInterval: text("recurring_interval"),
+  recurringInterval: text("recurring_interval").$type<"month" | "year">(),
   recurringIntervalCount: integer("recurring_interval_count"),
   isRecurring: boolean("is_recurring").notNull(),
   isArchived: boolean("is_archived").notNull(),
   externalOrganizationId: text("external_organization_id").notNull(),
   visibility: text("visibility").notNull(),
   prices: jsonb("prices"),
-  metadata: jsonb("metadata").$type<{ plan: "starter" | "professional" }>(),
+  metadata: jsonb("metadata").$type<{
+    plan: "starter" | "professional";
+    variant: "monthly" | "yearly";
+  }>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

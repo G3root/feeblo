@@ -5,6 +5,7 @@ import {
   Home,
   Plus,
   PreferenceVerticalIcon,
+  SparklesIcon,
   WebDesign01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -15,6 +16,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
+  SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
@@ -23,6 +25,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "~/components/ui/sidebar";
+import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
+import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import {
   useCreateBoardDialogContext,
   useDeleteBoardDialogContext,
@@ -99,6 +103,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <BoardList />
           </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <UpgradePlanButton />
+            </SidebarMenu>
+          </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
@@ -234,5 +245,20 @@ function MyBoardLink() {
         )}
       />
     </SidebarMenuItem>
+  );
+}
+
+function UpgradePlanButton() {
+  const store = useUpgradePlanDialogContext();
+  return (
+    <>
+      <SidebarMenuItem>
+        <SidebarMenuButton onClick={() => store.send({ type: "toggle" })}>
+          <HugeiconsIcon icon={SparklesIcon} />
+          <span>Upgrade Plan</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <UpgradePlanDialog />
+    </>
   );
 }

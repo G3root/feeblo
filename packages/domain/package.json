@@ -19,6 +19,12 @@
     "./http/router": {
       "default": "./src/http/router.ts"
     },
+    "./billing/service": {
+      "default": "./src/billing/service.ts"
+    },
+    "./billing/repository": {
+      "default": "./src/billing/repository.ts"
+    },
     "./session-middleware": {
       "default": "./src/session-middleware.ts"
     },

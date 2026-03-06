@@ -1,10 +1,8 @@
 import { DB } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema/index";
-import { generateId } from "@feeblo/utils/id";
+import { BillingRepository } from "@feeblo/domain/billing/repository";
+import { PolarService } from "@feeblo/domain/billing/service";
 import { polar, webhooks } from "@polar-sh/better-auth";
-import { Polar } from "@polar-sh/sdk";
-import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
-import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import {
@@ -15,35 +13,15 @@ import {
   organization,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
-import { Config, Effect, Redacted, Schema } from "effect";
+import { Config, Effect, Layer, Redacted } from "effect";
 
-interface PolarClient {
-  accessToken: string;
-  server: "sandbox" | "production";
-}
-
-const getPolarClient = (client: PolarClient) => new Polar(client);
-
-type SubscriptionPayload = WebhookSubscriptionCreatedPayload["data"];
-
-type ProductPayload = WebhookProductCreatedPayload["data"];
 export const initAuthHandler = () =>
   Effect.gen(function* () {
     const appUrl = yield* Config.string("VITE_APP_URL");
     const apiUrl = yield* Config.string("VITE_API_URL");
     const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
-
-    //Polar Configuration
-    const polarAccessToken = yield* Config.redacted("POLAR_ACCESS_TOKEN").pipe(
-      Config.option
-    );
-    const polarMode = yield* Schema.Config(
-      "POLAR_MODE",
-      Schema.Literal("sandbox", "production")
-    ).pipe(Config.withDefault("sandbox"));
-    const polarWebhookSecret = yield* Config.redacted(
-      "POLAR_WEBHOOK_SECRET"
-    ).pipe(Config.option);
+    const billingRepository = yield* BillingRepository;
+    const polarService = yield* PolarService;
 
     const db = yield* DB;
 
@@ -91,82 +69,53 @@ export const initAuthHandler = () =>
       },
 
       plugins: [
-        ...(polarAccessToken._tag === "Some" &&
-        polarWebhookSecret._tag === "Some"
+        ...(polarService.client && polarService.webhookSecret._tag === "Some"
           ? [
               polar({
-                client: getPolarClient({
-                  accessToken: polarAccessToken.value.pipe(Redacted.value),
-                  server: polarMode,
-                }),
+                client: polarService.client,
                 createCustomerOnSignUp: true,
 
                 use: [
-                  // checkout({
-                  //   products: [
-                  //     {
-                  //       productId: "123-456-789", // ID of Product from Polar Dashboard
-                  //       slug: "pro", // Custom slug for easy reference in Checkout URL, e.g. /checkout/pro
-                  //     },
-                  //   ],
-                  //   successUrl: "/success?checkout_id={CHECKOUT_ID}",
-                  //   authenticatedUsersOnly: true,
-                  // }),
-                  // portal(),
-
                   webhooks({
-                    secret: polarWebhookSecret.value.pipe(Redacted.value),
-                    onProductCreated(payload) {
-                      return Effect.runPromise(
-                        createProduct(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      );
-                    },
-                    onProductUpdated(payload) {
-                      return Effect.runPromise(
-                        updateProduct(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      );
-                    },
+                    secret: polarService.webhookSecret.value.pipe(
+                      Redacted.value
+                    ),
 
-                    onSubscriptionCreated: (payload) =>
-                      Effect.runPromise(
-                        createSubscription(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      ),
-                    onSubscriptionUpdated: (payload) =>
-                      Effect.runPromise(
-                        updateSubscription(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      ),
-                    onSubscriptionCanceled: (payload) =>
-                      Effect.runPromise(
-                        deleteSubscription(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      ),
-                    onSubscriptionRevoked: (payload) =>
-                      Effect.runPromise(
-                        deleteSubscription(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      ),
-                    onSubscriptionUncanceled: (payload) =>
-                      Effect.runPromise(
-                        updateSubscription(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      ),
-                    onSubscriptionActive: (payload) =>
-                      Effect.runPromise(
-                        updateSubscription(payload.data).pipe(
-                          Effect.provideService(DB, db)
-                        )
-                      ),
+                    onPayload: async (payload) => {
+                      switch (payload.type) {
+                        case "product.created": {
+                          await Effect.runPromise(
+                            billingRepository.createProduct(payload.data)
+                          ).then(() => undefined);
+                          break;
+                        }
+                        case "product.updated": {
+                          await Effect.runPromise(
+                            billingRepository.updateProduct(payload.data)
+                          ).then(() => undefined);
+                          break;
+                        }
+                        case "subscription.created": {
+                          await Effect.runPromise(
+                            billingRepository.createSubscription(payload.data)
+                          ).then(() => undefined);
+                          break;
+                        }
+                        case "subscription.updated":
+                        case "subscription.canceled":
+                        case "subscription.revoked":
+                        case "subscription.uncanceled":
+                        case "subscription.active": {
+                          await Effect.runPromise(
+                            billingRepository.updateSubscription(payload.data)
+                          ).then(() => undefined);
+                          break;
+                        }
+                        default: {
+                          return;
+                        }
+                      }
+                    },
                   }),
                 ],
               }),
@@ -226,154 +175,13 @@ export const initAuthHandler = () =>
       ],
     } satisfies BetterAuthOptions;
     return betterAuth(config);
-  });
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(PolarService.Default, BillingRepository.Default)
+    )
+  );
 
 export type Auth = Effect.Effect.Success<ReturnType<typeof initAuthHandler>>;
 export type Session = Auth["$Infer"]["Session"];
 
 export const auth = initAuthHandler();
-
-const createSubscription = (payload: SubscriptionPayload) => {
-  return Effect.gen(function* () {
-    const db = yield* DB;
-
-    yield* db.insert(schema.subscription).values({
-      id: generateId("subscription"),
-      externalId: payload.id,
-      organizationId: payload.metadata.org as string,
-      amount: payload.amount,
-      cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
-      currency: payload.currency,
-      recurringInterval: payload.recurringInterval,
-      recurringIntervalCount: payload.recurringIntervalCount,
-      status: payload.status,
-      currentPeriodStart: payload.currentPeriodStart,
-      currentPeriodEnd: payload.currentPeriodEnd,
-      trialStart: payload.trialStart,
-      trialEnd: payload.trialEnd,
-      canceledAt: payload.canceledAt,
-      startedAt: payload.startedAt,
-      endsAt: payload.endsAt,
-      endedAt: payload.endedAt,
-      customerId: payload.customerId,
-      productId: payload.productId,
-      discountId: payload.discountId,
-      checkoutId: payload.checkoutId,
-      seats: payload.seats,
-    });
-  });
-};
-
-const updateSubscription = (payload: SubscriptionPayload) => {
-  return Effect.gen(function* () {
-    const db = yield* DB;
-
-    const existingSubscription = yield* db
-      .select({ id: schema.subscription.id })
-      .from(schema.subscription)
-      .where(eq(schema.subscription.externalId, payload.id));
-
-    if (existingSubscription.length === 1) {
-      yield* db
-        .update(schema.subscription)
-        .set({
-          id: payload.id,
-          amount: payload.amount,
-          cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
-          currency: payload.currency,
-          recurringInterval: payload.recurringInterval,
-          recurringIntervalCount: payload.recurringIntervalCount,
-          status: payload.status,
-          currentPeriodStart: payload.currentPeriodStart,
-          currentPeriodEnd: payload.currentPeriodEnd,
-          trialStart: payload.trialStart,
-          trialEnd: payload.trialEnd,
-          canceledAt: payload.canceledAt,
-          startedAt: payload.startedAt,
-          endsAt: payload.endsAt,
-          endedAt: payload.endedAt,
-          customerId: payload.customerId,
-          productId: payload.productId,
-          discountId: payload.discountId,
-          checkoutId: payload.checkoutId,
-          seats: payload.seats,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.subscription.externalId, payload.id));
-    } else {
-      yield* createSubscription(payload);
-    }
-  });
-};
-
-const deleteSubscription = (payload: SubscriptionPayload) => {
-  return Effect.gen(function* () {
-    const db = yield* DB;
-    yield* db
-      .delete(schema.subscription)
-      .where(eq(schema.subscription.externalId, payload.id));
-  });
-};
-
-const createProduct = (payload: ProductPayload) => {
-  return Effect.gen(function* () {
-    const db = yield* DB;
-    yield* db.insert(schema.product).values({
-      id: payload.id,
-      name: payload.name,
-      description: payload.description,
-      trialInterval: payload.trialInterval,
-      trialIntervalCount: payload.trialIntervalCount,
-      recurringInterval: payload.recurringInterval,
-      recurringIntervalCount: payload.recurringIntervalCount,
-      isRecurring: payload.isRecurring,
-      isArchived: payload.isArchived,
-      externalOrganizationId: payload.organizationId,
-      visibility: payload.visibility,
-      createdAt: payload.createdAt,
-      updatedAt: payload.modifiedAt ?? undefined,
-      metadata: payload.metadata,
-      prices: payload.prices,
-    });
-  });
-};
-
-const updateProduct = (payload: ProductPayload) => {
-  return Effect.gen(function* () {
-    const db = yield* DB;
-
-    const existingProduct = yield* db
-      .select({ id: schema.product.id })
-      .from(schema.product)
-      .where(eq(schema.product.id, payload.id));
-
-    if (existingProduct.length === 1) {
-      yield* db
-        .update(schema.product)
-        .set({
-          id: payload.id,
-          name: payload.name,
-          description: payload.description,
-          trialInterval: payload.trialInterval,
-          trialIntervalCount: payload.trialIntervalCount,
-          recurringInterval: payload.recurringInterval,
-          recurringIntervalCount: payload.recurringIntervalCount,
-          isRecurring: payload.isRecurring,
-          isArchived: payload.isArchived,
-          externalOrganizationId: payload.organizationId,
-          visibility: payload.visibility,
-          createdAt: payload.createdAt,
-          updatedAt: payload.modifiedAt ?? new Date(),
-          metadata: payload.metadata,
-          prices: payload.prices,
-        })
-        .where(eq(schema.product.id, payload.id));
-    } else {
-      yield* createProduct(payload);
-    }
-  }).pipe(
-    Effect.tapError((error) =>
-      Effect.sync(() => console.error("[updateProduct] failed", error))
-    )
-  );
-};

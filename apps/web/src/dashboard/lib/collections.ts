@@ -715,3 +715,57 @@ export const siteCollection = createCollection(
     refetchInterval: Duration.toMillis(Duration.minutes(30)),
   })
 );
+
+export const workspaceProductCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: ["workspace-product"],
+
+    queryFn: async (ctx) => {
+      const data = await fetchRpc((rpc) => rpc.WorkspaceProductList(), {
+        signal: ctx.signal,
+      });
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+);
+
+export const workspaceSubscriptionCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["workspace-subscription"];
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+      }
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq" && field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+      }
+      if (!organizationId) {
+        return [];
+      }
+      const data = await fetchRpc(
+        (rpc) => rpc.WorkspaceSubscriptionGet({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+);
