@@ -29,13 +29,13 @@ export class BoardRpcs extends RpcGroup.make(
   }).middleware(AuthMiddleware),
 
   Rpc.make("BoardCreate", {
-    success: Board,
+    success: Schema.Void,
     payload: BoardCreate,
     error: BoardServiceErrors,
   }).middleware(AuthMiddleware),
 
   Rpc.make("BoardUpdate", {
-    success: Board,
+    success: Schema.Void,
     payload: BoardUpdate,
     error: BoardServiceErrors,
   }).middleware(AuthMiddleware)

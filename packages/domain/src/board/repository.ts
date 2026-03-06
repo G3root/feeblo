@@ -2,7 +2,7 @@ import { DB } from "@feeblo/db";
 import { board as boardTable } from "@feeblo/db/schema/feedback";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, Array as EffectArray } from "effect";
 import { Board } from "./schema";
 
 type TBoardCreate = {
@@ -10,6 +10,8 @@ type TBoardCreate = {
   visibility: "PUBLIC" | "PRIVATE";
   organizationId: string;
   id: string;
+  creatorId: string;
+  creatorMemberId: string;
 };
 
 type TBoardUpdate = {
@@ -19,6 +21,12 @@ type TBoardUpdate = {
   organizationId: string;
 };
 
+type TBoardFindById = {
+  id: string;
+  organizationId: string;
+  memberId: string;
+};
+
 export class BoardRepository extends Effect.Service<BoardRepository>()(
   "BoardRepository",
   {
@@ -26,20 +34,28 @@ export class BoardRepository extends Effect.Service<BoardRepository>()(
       const db = yield* DB;
 
       return {
+        findById: ({ id, organizationId, memberId }: TBoardFindById) =>
+          db
+            .select({ id: boardTable.id })
+            .from(boardTable)
+            .where(
+              and(
+                eq(boardTable.id, id),
+                eq(boardTable.organizationId, organizationId),
+                eq(boardTable.creatorMemberId, memberId)
+              )
+            )
+            .pipe(Effect.map(EffectArray.get(0))),
         create: (args: TBoardCreate) =>
-          Effect.gen(function* () {
-            const [newBoard] = yield* db
-              .insert(boardTable)
-              .values({
-                ...args,
-                slug: slugify(args.name),
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              })
-              .returning();
-
-            return newBoard;
-          }),
+          db
+            .insert(boardTable)
+            .values({
+              ...args,
+              slug: slugify(args.name),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .returning(),
         findMany: ({
           organizationId,
           visibility,
