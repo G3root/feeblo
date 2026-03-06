@@ -1,27 +1,27 @@
 import { Schema } from "effect";
 
-export class Membership extends Schema.Class<Membership>("Membership")({
+const ROLE_LITERAL = Schema.Literal("owner", "admin", "member");
+
+export const Membership = Schema.Struct({
   id: Schema.String,
   organizationId: Schema.String,
   userId: Schema.String,
-  role: Schema.String,
+  role: ROLE_LITERAL,
   createdAt: Schema.Date,
   organization: Schema.Struct({
     id: Schema.String,
     name: Schema.String,
     slug: Schema.String,
   }),
-}) {}
+});
 
 export type TMembership = Schema.Schema.Type<typeof Membership>;
 
-export class OrganizationMember extends Schema.Class<OrganizationMember>(
-  "OrganizationMember"
-)({
+export const OrganizationMember = Schema.Struct({
   id: Schema.String,
   organizationId: Schema.String,
   userId: Schema.String,
-  role: Schema.String,
+  role: ROLE_LITERAL,
   createdAt: Schema.Date,
   user: Schema.Struct({
     id: Schema.String,
@@ -29,11 +29,9 @@ export class OrganizationMember extends Schema.Class<OrganizationMember>(
     email: Schema.String,
     image: Schema.NullOr(Schema.String),
   }),
-}) {}
+});
 
-export class OrganizationInvitation extends Schema.Class<OrganizationInvitation>(
-  "OrganizationInvitation"
-)({
+export const OrganizationInvitation = Schema.Struct({
   id: Schema.String,
   organizationId: Schema.String,
   email: Schema.String,
@@ -42,40 +40,30 @@ export class OrganizationInvitation extends Schema.Class<OrganizationInvitation>
   expiresAt: Schema.Date,
   inviterId: Schema.String,
   createdAt: Schema.Date,
-}) {}
+});
 
-export class OrganizationIdInput extends Schema.Class<OrganizationIdInput>(
-  "OrganizationIdInput"
-)({
+export const OrganizationId = Schema.Struct({
   organizationId: Schema.String,
-}) {}
+});
 
-export class InviteMemberInput extends Schema.Class<InviteMemberInput>(
-  "InviteMemberInput"
-)({
+export const InviteMember = Schema.Struct({
   organizationId: Schema.String,
   email: Schema.String,
-  role: Schema.String,
-}) {}
+  role: ROLE_LITERAL,
+});
 
-export class UpdateMemberRoleInput extends Schema.Class<UpdateMemberRoleInput>(
-  "UpdateMemberRoleInput"
-)({
+export const UpdateMemberRole = Schema.Struct({
   organizationId: Schema.String,
   memberId: Schema.String,
-  role: Schema.String,
-}) {}
+  role: ROLE_LITERAL,
+});
 
-export class RemoveMemberInput extends Schema.Class<RemoveMemberInput>(
-  "RemoveMemberInput"
-)({
+export const RemoveMember = Schema.Struct({
   organizationId: Schema.String,
   memberId: Schema.String,
-}) {}
+});
 
-export class CancelInvitationInput extends Schema.Class<CancelInvitationInput>(
-  "CancelInvitationInput"
-)({
+export const CancelInvitation = Schema.Struct({
   organizationId: Schema.String,
   invitationId: Schema.String,
-}) {}
+});

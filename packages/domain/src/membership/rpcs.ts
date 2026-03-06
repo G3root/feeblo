@@ -3,14 +3,14 @@ import { Schema } from "effect";
 import { AuthMiddleware } from "../session-middleware";
 import { MembershipServiceErrors } from "./errors";
 import {
-  CancelInvitationInput,
-  InviteMemberInput,
+  CancelInvitation,
+  InviteMember,
   Membership,
-  OrganizationIdInput,
+  OrganizationId,
   OrganizationInvitation,
   OrganizationMember,
-  RemoveMemberInput,
-  UpdateMemberRoleInput,
+  RemoveMember,
+  UpdateMemberRole,
 } from "./schema";
 
 export class MembershipRpcs extends RpcGroup.make(
@@ -19,32 +19,32 @@ export class MembershipRpcs extends RpcGroup.make(
     error: MembershipServiceErrors,
   }),
   Rpc.make("OrganizationMembersList", {
-    payload: OrganizationIdInput,
+    payload: OrganizationId,
     success: Schema.Array(OrganizationMember),
     error: MembershipServiceErrors,
   }),
   Rpc.make("OrganizationInvitationsList", {
-    payload: OrganizationIdInput,
+    payload: OrganizationId,
     success: Schema.Array(OrganizationInvitation),
     error: MembershipServiceErrors,
   }),
   Rpc.make("OrganizationInviteMember", {
-    payload: InviteMemberInput,
-    success: OrganizationInvitation,
+    payload: InviteMember,
+    success: Schema.Void,
     error: MembershipServiceErrors,
   }),
   Rpc.make("OrganizationUpdateMemberRole", {
-    payload: UpdateMemberRoleInput,
-    success: OrganizationMember,
+    payload: UpdateMemberRole,
+    success: Schema.Void,
     error: MembershipServiceErrors,
   }),
   Rpc.make("OrganizationRemoveMember", {
-    payload: RemoveMemberInput,
+    payload: RemoveMember,
     success: Schema.Void,
     error: MembershipServiceErrors,
   }),
   Rpc.make("OrganizationCancelInvitation", {
-    payload: CancelInvitationInput,
+    payload: CancelInvitation,
     success: Schema.Void,
     error: MembershipServiceErrors,
   })

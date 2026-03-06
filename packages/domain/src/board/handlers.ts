@@ -1,8 +1,13 @@
 import { Effect, Layer } from "effect";
 import { requireOrganizationMembership } from "../authorization";
 import * as Policy from "../policy";
-import { onInternalServerError, UnauthorizedError } from "../rpc-errors";
+import { onInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import {
+  FailedToCreateBoardError,
+  FailedToDeleteBoardError,
+  FailedToUpdateBoardError,
+} from "./errors";
 import { BoardPolicy } from "./policies";
 import { BoardRepository } from "./repository";
 import { BoardRpcs } from "./rpcs";
@@ -53,6 +58,9 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
               })
             )
           ),
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToDeleteBoardError()),
+          }),
           Effect.catchAll(onInternalServerError)
         );
       },
@@ -65,8 +73,8 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
 
           if (!isMember) {
             return yield* Effect.fail(
-              new UnauthorizedError({
-                message: "You are not a member of this organization",
+              new Policy.PolicyDeniedError({
+                reason: "You are not a member of this organization",
               })
             );
           }
@@ -77,6 +85,9 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToCreateBoardError()),
+          }),
           Effect.catchAll(onInternalServerError)
         );
       },
@@ -93,6 +104,9 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
               })
             )
           ),
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToUpdateBoardError()),
+          }),
           Effect.catchAll(onInternalServerError)
         );
       },
