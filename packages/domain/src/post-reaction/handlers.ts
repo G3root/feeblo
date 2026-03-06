@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect";
-import { requireOrganizationMembership } from "../authorization";
-import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
+import { onInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
@@ -13,16 +12,13 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
     return {
       PostReactionList: (args: TPostReactionList) =>
         Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
-
           return yield* repository.list({
             postId: args.postId,
             organizationId: args.organizationId,
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError))),
+        }).pipe(Effect.catchAll(onInternalServerError)),
       PostReactionToggle: (args: TPostReactionToggle) =>
         Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           const session = yield* CurrentSession;
 
           return yield* repository.toggle({
@@ -31,7 +27,7 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             userId: session.session.userId,
             emoji: args.emoji,
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError))),
+        }).pipe(Effect.catchAll(onInternalServerError)),
     };
   })
 ).pipe(Layer.provide(PostReactionRepository.Default));

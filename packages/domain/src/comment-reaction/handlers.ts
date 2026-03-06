@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect";
-import { requireOrganizationMembership } from "../authorization";
-import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
+import { onInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
@@ -13,15 +12,13 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
     return {
       CommentReactionList: (args: TCommentReactionList) =>
         Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           return yield* repository.list({
             organizationId: args.organizationId,
             postId: args.postId,
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError))),
+        }).pipe(Effect.catchAll(onInternalServerError)),
       CommentReactionToggle: (args: TCommentReactionToggle) =>
         Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           const session = yield* CurrentSession;
           return yield* repository.toggle({
             organizationId: args.organizationId,
@@ -30,7 +27,7 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             userId: session.session.userId,
             emoji: args.emoji,
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError))),
+        }).pipe(Effect.catchAll(onInternalServerError)),
     };
   })
 ).pipe(Layer.provide(CommentReactionRepository.Default));

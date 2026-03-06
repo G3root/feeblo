@@ -5,7 +5,7 @@ import {
   type InsertComment,
 } from "@feeblo/db/schema/feedback";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, Array as EffectArray } from "effect";
 
 type DeleteComment = {
   id: string;
@@ -22,6 +22,11 @@ type UpdateComment = {
   userId: string;
 };
 
+type FindByIdComment = {
+  id: string;
+  organizationId: string;
+  postId: string;
+};
 export class CommentRepository extends Effect.Service<CommentRepository>()(
   "CommentRepository",
   {
@@ -113,6 +118,20 @@ export class CommentRepository extends Effect.Service<CommentRepository>()(
               .returning();
             return updatedComment;
           }),
+        findById: (args: FindByIdComment) =>
+          db
+            .select({
+              id: commentTable.id,
+            })
+            .from(commentTable)
+            .where(
+              and(
+                eq(commentTable.id, args.id),
+                eq(commentTable.organizationId, args.organizationId),
+                eq(commentTable.postId, args.postId)
+              )
+            )
+            .pipe(Effect.map(EffectArray.get(0))),
       };
     }),
   }

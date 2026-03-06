@@ -1,14 +1,13 @@
 import { Effect, Layer } from "effect";
-import {
-  isMemberOfOrganization,
-  requireOrganizationMembership,
-} from "../authorization";
-import {
-  InternalServerError,
-  mapToInternalServerError,
-  UnauthorizedError,
-} from "../rpc-errors";
+import * as Policy from "../policy";
+import { onInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import {
+  FailedToCreateCommentError,
+  FailedToDeleteCommentError,
+  FailedToUpdateCommentError,
+} from "./errors";
+import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 import { CommentRpcs } from "./rpcs";
 import type {
@@ -21,17 +20,16 @@ import type {
 export const CommentRpcHandlers = CommentRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* CommentRepository;
+    const commentPolicy = yield* CommentPolicy;
 
     return {
       CommentList: (args: TCommentList) => {
         return Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
-
           return yield* repository.findMany({
             organizationId: args.organizationId,
             postId: args.postId,
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+        }).pipe(Effect.catchAll(onInternalServerError));
       },
       CommentListPublic: (args: TCommentList) => {
         return Effect.gen(function* () {
@@ -40,36 +38,40 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             postId: args.postId,
             visibility: "PUBLIC",
           });
-        }).pipe(Effect.mapError(mapToInternalServerError()));
+        }).pipe(Effect.catchAll(onInternalServerError));
       },
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           const session = yield* CurrentSession;
 
-          const isMember = yield* isMemberOfOrganization(args.organizationId);
+          const isMember = session.memberships.find(
+            (membership) => membership.organizationId === args.organizationId
+          );
 
-          const createdComment = yield* repository.create({
+          yield* repository.create({
             ...args,
             userId: session.session.userId,
-            ...(isMember ? { memberId: isMember.id } : {}),
+            ...(isMember ? { memberId: isMember.membershipId } : {}),
           });
-
-          if (!createdComment) {
-            return yield* Effect.fail(
-              new InternalServerError({ message: "Failed to create comment" })
-            );
-          }
 
           return {
             message: "Comment created successfully",
           };
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new FailedToCreateCommentError({
+                  message: "Failed to create comment",
+                })
+              ),
+          }),
+          Effect.catchAll(onInternalServerError)
+        );
       },
       CommentDelete: (args: TCommentDelete) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
-          yield* requireOrganizationMembership(args.organizationId);
 
           yield* repository.delete({
             id: args.id,
@@ -80,11 +82,27 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           return {
             message: "Comment deleted successfully",
           };
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+        }).pipe(
+          Policy.withPolicy(
+            commentPolicy.isOwner({
+              organizationId: args.organizationId,
+              commentId: args.id,
+              postId: args.postId,
+            })
+          ),
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new FailedToDeleteCommentError({
+                  message: "Failed to delete comment",
+                })
+              ),
+          }),
+          Effect.catchAll(onInternalServerError)
+        );
       },
       CommentUpdate: (args: TCommentUpdate) => {
         return Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           const session = yield* CurrentSession;
           yield* repository.update({
             id: args.id,
@@ -96,7 +114,24 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           return {
             message: "Comment updated successfully",
           };
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError)));
+        }).pipe(
+          Policy.withPolicy(
+            commentPolicy.isOwner({
+              organizationId: args.organizationId,
+              commentId: args.id,
+              postId: args.postId,
+            })
+          ),
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new FailedToUpdateCommentError({
+                  message: "Failed to update comment",
+                })
+              ),
+          }),
+          Effect.catchAll(onInternalServerError)
+        );
       },
     };
   })
