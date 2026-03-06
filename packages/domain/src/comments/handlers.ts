@@ -135,4 +135,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
       },
     };
   })
-).pipe(Layer.provide(CommentRepository.Default));
+).pipe(
+  Layer.provide(CommentPolicy.Default),
+  Layer.provide(CommentRepository.Default)
+);

@@ -6,7 +6,7 @@ import {
 } from "@feeblo/db/schema/feedback";
 import { generateId } from "@feeblo/utils/id";
 import { and, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, Array as EffectArray, Option } from "effect";
 
 type TUpvoteList = {
   postId: string;
@@ -29,7 +29,7 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
       return {
         list: ({ postId, userId, organizationId }: TUpvoteList) =>
           Effect.gen(function* () {
-            const [post] = yield* db
+            const post = yield* db
               .select({ id: postTable.id })
               .from(postTable)
               .where(
@@ -38,9 +38,10 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
                   eq(postTable.organizationId, organizationId)
                 )
               )
-              .limit(1);
+              .limit(1)
+              .pipe(Effect.map(EffectArray.get(0)));
 
-            if (!post) {
+            if (Option.isNone(post)) {
               return [];
             }
 
@@ -67,7 +68,7 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
 
         toggle: ({ organizationId, postId, userId }: TUpvoteToggle) =>
           Effect.gen(function* () {
-            const [post] = yield* db
+            const post = yield* db
               .select({ id: postTable.id })
               .from(postTable)
               .where(
@@ -76,13 +77,14 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
                   eq(postTable.organizationId, organizationId)
                 )
               )
-              .limit(1);
+              .limit(1)
+              .pipe(Effect.map(EffectArray.get(0)));
 
-            if (!post) {
+            if (Option.isNone(post)) {
               return { upvoted: false };
             }
 
-            const [existingUpvote] = yield* db
+            const existingUpvote = yield* db
               .select({ id: upvoteTable.id })
               .from(upvoteTable)
               .where(
@@ -91,17 +93,18 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
                   eq(upvoteTable.userId, userId)
                 )
               )
-              .limit(1);
+              .limit(1)
+              .pipe(Effect.map(EffectArray.get(0)));
 
-            if (existingUpvote) {
+            if (Option.isSome(existingUpvote)) {
               yield* db
                 .delete(upvoteTable)
-                .where(eq(upvoteTable.id, existingUpvote.id));
+                .where(eq(upvoteTable.id, existingUpvote.value.id));
 
               return { upvoted: false };
             }
 
-            const [member] = yield* db
+            const member = yield* db
               .select({ id: memberTable.id })
               .from(memberTable)
               .where(
@@ -110,13 +113,14 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
                   eq(memberTable.userId, userId)
                 )
               )
-              .limit(1);
+              .limit(1)
+              .pipe(Effect.map(EffectArray.get(0)));
 
             yield* db.insert(upvoteTable).values({
               id: generateId("upvote"),
               postId,
               userId,
-              memberId: member?.id ?? null,
+              memberId: Option.getOrNull(member)?.id,
             });
 
             return { upvoted: true };

@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect";
-import { requireOrganizationMembership } from "../authorization";
-import { mapToInternalServerError, UnauthorizedError } from "../rpc-errors";
+import { onInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { UpvoteRepository } from "./repository";
 import { UpvoteRpcs } from "./rpcs";
@@ -13,7 +12,6 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
     return {
       UpvoteList: (args: TUpvoteList) =>
         Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           const session = yield* CurrentSession;
 
           return yield* repository.list({
@@ -21,10 +19,9 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             userId: session.session.userId,
             organizationId: args.organizationId,
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError))),
+        }).pipe(Effect.catchAll(onInternalServerError)),
       UpvoteToggle: (args: TUpvoteToggle) =>
         Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           const session = yield* CurrentSession;
 
           return yield* repository.toggle({
@@ -32,7 +29,7 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             postId: args.postId,
             userId: session.session.userId,
           });
-        }).pipe(Effect.mapError(mapToInternalServerError(UnauthorizedError))),
+        }).pipe(Effect.catchAll(onInternalServerError)),
     };
   })
 ).pipe(Layer.provide(UpvoteRepository.Default));
