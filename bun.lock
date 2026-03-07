@@ -95,6 +95,7 @@
       "name": "@feeblo/auth",
       "dependencies": {
         "@feeblo/db": "workspace:*",
+        "@feeblo/domain": "workspace:*",
         "@feeblo/utils": "workspace:*",
         "@polar-sh/better-auth": "^1.8.2",
         "@polar-sh/sdk": "^0.46.1",
@@ -138,7 +139,6 @@
         "@effect-aws/s3": "^0.2.6",
         "@effect/platform": "catalog:",
         "@effect/rpc": "catalog:",
-        "@feeblo/auth": "workspace:*",
         "@feeblo/db": "workspace:*",
         "@feeblo/utils": "workspace:*",
         "effect": "catalog:",

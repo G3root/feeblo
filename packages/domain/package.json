@@ -70,7 +70,6 @@
     "@effect-aws/s3": "^0.2.6",
     "@effect/platform": "catalog:",
     "@effect/rpc": "catalog:",
-    "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "effect": "catalog:"
