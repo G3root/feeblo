@@ -8,8 +8,9 @@ import {
   PencilEdit01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -35,7 +36,12 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
-import { commentCollection, upvoteCollection } from "~/lib/collections";
+import {
+  commentCollection,
+  postCollection,
+  upvoteCollection,
+} from "~/lib/collections";
+import { fetchRpc } from "~/lib/runtime";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
 import {
   type CommentReaction,
@@ -99,14 +105,9 @@ export function PostDetailsForm({
   postReactions,
   upvotes,
 }: PostDetailsFormProps) {
-  const [title, setTitle] = useState(initialTitle);
   const postEditorRef = useRef<EditorHandle | null>(null);
   const postImageInputRef = useRef<HTMLInputElement | null>(null);
   const commentEditorRef = useRef<EditorHandle | null>(null);
-
-  useEffect(() => {
-    setTitle(initialTitle);
-  }, [initialTitle]);
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
@@ -114,9 +115,9 @@ export function PostDetailsForm({
         <PostDetailsHeader
           boardName={boardName}
           boardSlug={boardSlug}
-          onTitleChange={setTitle}
           organizationId={organizationId}
-          title={title}
+          postId={postId}
+          title={initialTitle}
         />
 
         <div className="space-y-3">
@@ -136,7 +137,6 @@ export function PostDetailsForm({
             type="file"
           />
           <Editor
-            className="rounded-xl border"
             editorClassName="min-h-24"
             enableImagePasteDrop
             onUploadImage={uploadPostEditorImage}
@@ -294,16 +294,51 @@ function PostCommentComposer({
 function PostDetailsHeader({
   boardName,
   boardSlug,
-  onTitleChange,
   organizationId,
   title,
+  postId,
 }: {
   boardName: string;
   boardSlug: string;
-  onTitleChange: (title: string) => void;
   organizationId: string;
   title: string;
+  postId: string;
 }) {
+  const mutate = usePacedMutations<{ value: string }>({
+    onMutate: ({ value }) => {
+      // Apply optimistic update immediately
+      postCollection.update(postId, (draft) => {
+        draft.title = value;
+      });
+    },
+    mutationFn: async ({ transaction }) => {
+      // Persist the final merged state to the backend
+      const mutation = transaction.mutations[0];
+      const { modified: updatedPost } = mutation;
+      await fetchRpc((rpc) =>
+        rpc.PostUpdate({
+          id: updatedPost.id,
+          status: updatedPost.status,
+          content: updatedPost.content,
+          title: updatedPost.title,
+          boardId: updatedPost.boardId,
+          organizationId: updatedPost.organizationId,
+        })
+      );
+    },
+    // Wait 500ms after the last change before persisting
+    strategy: debounceStrategy({ wait: 500 }),
+  });
+
+  const handleChange = (value: string) => {
+    // Multiple rapid changes merge into a single transaction
+
+    if (value.trim() === "") {
+      toastManager.add({ title: "Title is required", type: "error" });
+      return;
+    }
+    mutate({ value });
+  };
   return (
     <div className="space-y-3">
       <Link
@@ -315,8 +350,8 @@ function PostDetailsHeader({
       </Link>
 
       <PostTitleInput
-        onChange={(e) => onTitleChange(e.target.value)}
-        title={title}
+        defaultValue={title}
+        onChange={(e) => handleChange(e.target.value)}
       />
     </div>
   );
