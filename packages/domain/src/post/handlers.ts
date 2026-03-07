@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { onInternalServerError } from "../rpc-errors";
+import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -58,7 +59,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           );
       },
       PostUpdate: (args: TPostUpdate) => {
-        return repository.update(args).pipe(
+        return repository.update({ ...args, content: sanitizeRichText(args.content) }).pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
@@ -81,6 +82,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
 
           yield* repository.create({
             ...args,
+            content: sanitizeRichText(args.content),
             creatorId: session.session.userId,
             ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
           });

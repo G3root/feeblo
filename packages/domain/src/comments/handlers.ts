@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { onInternalServerError } from "../rpc-errors";
+import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
 import {
   FailedToCreateCommentError,
@@ -50,6 +51,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
 
           yield* repository.create({
             ...args,
+            content: sanitizeRichText(args.content),
             userId: session.session.userId,
             ...(isMember ? { memberId: isMember.membershipId } : {}),
           });
@@ -108,7 +110,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             id: args.id,
             organizationId: args.organizationId,
             postId: args.postId,
-            content: args.content,
+            content: sanitizeRichText(args.content),
             userId: session.session.userId,
           });
           return {
