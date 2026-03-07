@@ -1,18 +1,9 @@
 import { generateId } from "@feeblo/utils/id";
-import { SmileIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
-import { Button } from "~/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { postReactionCollection } from "~/lib/collections";
-
-const REACTION_EMOJIS = ["👍", "❤️", "🔥", "😂", "🎯"] as const;
+import { ReactionButton, ReactionList } from "./reaction-button";
 
 export type PostReaction = {
   id: string;
@@ -108,116 +99,8 @@ export function PostReactionSection({
         isToggling={isToggling}
         onToggleReaction={handleToggleReaction}
         reactionCounts={reactionCounts}
+        showCount={false}
       />
     </div>
-  );
-}
-
-function ReactionButton({
-  isSelected,
-  isToggling,
-  onToggleReaction,
-  reactionCounts,
-}: {
-  isSelected: (emoji: string) => boolean;
-  isToggling: boolean;
-  onToggleReaction: (emoji: string) => Promise<void>;
-  reactionCounts: Record<string, number>;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover onOpenChange={setOpen} open={open}>
-      <PopoverTrigger
-        render={
-          <Button
-            className="rounded-full"
-            disabled={isToggling}
-            size="icon-sm"
-            type="button"
-            variant="ghost"
-          >
-            <HugeiconsIcon icon={SmileIcon} />
-          </Button>
-        }
-      />
-      <PopoverContent className="w-auto p-2">
-        <div className="grid grid-cols-3 gap-2">
-          {REACTION_EMOJIS.map((emoji) => {
-            return (
-              <ReactionPill
-                count={reactionCounts[emoji] ?? 0}
-                disabled={isToggling}
-                emoji={emoji}
-                key={emoji}
-                onClick={() => {
-                  setOpen(false);
-                  onToggleReaction(emoji);
-                }}
-                selected={isSelected(emoji)}
-              />
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function ReactionList({
-  isSelected,
-  isToggling,
-  onToggleReaction,
-  reactionCounts,
-}: {
-  isSelected: (emoji: string) => boolean;
-  isToggling: boolean;
-  onToggleReaction: (emoji: string) => Promise<void>;
-  reactionCounts: Record<string, number>;
-}) {
-  const reactedEmojis = REACTION_EMOJIS.filter(
-    (emoji) => (reactionCounts[emoji] ?? 0) > 0
-  );
-
-  if (reactedEmojis.length === 0) {
-    return null;
-  }
-
-  return reactedEmojis.map((emoji) => (
-    <ReactionPill
-      count={reactionCounts[emoji] ?? 0}
-      disabled={isToggling}
-      emoji={emoji}
-      key={emoji}
-      onClick={() => onToggleReaction(emoji)}
-      selected={isSelected(emoji)}
-    />
-  ));
-}
-
-function ReactionPill({
-  count,
-  disabled,
-  emoji,
-  onClick,
-  selected,
-}: {
-  count: number;
-  disabled?: boolean;
-  emoji: string;
-  onClick?: () => void;
-  selected: boolean;
-}) {
-  return (
-    <Button
-      className="rounded-full"
-      disabled={disabled}
-      onClick={onClick}
-      size="sm"
-      type="button"
-      variant={selected ? "secondary" : "ghost"}
-    >
-      <span>{emoji}</span>
-      <span>{count}</span>
-    </Button>
   );
 }

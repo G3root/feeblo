@@ -4,6 +4,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useState } from "react";
 import { z } from "zod";
+import { Editor } from "~/components/ui/rich-text-editor";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -23,7 +24,10 @@ import { authClient } from "~/lib/auth-client";
 import { membersCollection, postCollection } from "~/lib/collections";
 import { usePostCreateDialogContext } from "../dialog-stores";
 import { PostTitleInput } from "./post-title-input";
-import { PostDescriptionEditor } from "./post-wysiwyg-editor";
+import {
+  isRichTextContentEmpty,
+  uploadPostEditorImage,
+} from "./post-editor-utils";
 
 export function PostCreateDialog() {
   const store = usePostCreateDialogContext();
@@ -97,7 +101,9 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
     },
     validators: {
       onChange: z.object({
-        content: z.string().min(1, "Content is required"),
+        content: z
+          .string()
+          .refine((value) => !isRichTextContentEmpty(value), "Content is required"),
         title: z.string().trim().min(1, "Title is required"),
       }),
     },
@@ -173,9 +179,13 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
 
         <form.Field name="content">
           {(field) => (
-            <PostDescriptionEditor
-              content={field.state.value}
-              onContentChange={field.handleChange}
+            <Editor
+              className="rounded-xl border"
+              enableImagePasteDrop
+              onChange={field.handleChange}
+              onUploadImage={uploadPostEditorImage}
+              placeholder="Add description..."
+              value={field.state.value}
             />
           )}
         </form.Field>

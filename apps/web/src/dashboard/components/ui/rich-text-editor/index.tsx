@@ -29,7 +29,14 @@ import {
   Underline as UnderlineIcon,
   X,
 } from "lucide-react";
-import { type HTMLAttributes, useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  type HTMLAttributes,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { cn } from "~/lib/utils";
 import SlashCommands from "./slash-command/commands";
 import type { ImagePickerHandler } from "./slash-command/suggestion";
@@ -38,7 +45,7 @@ export type EditorFormat = "html" | "markdown";
 export type ImageFallbackMode = "data-url" | "prompt-url" | "none";
 export type ImageUploadContext = {
   editor: TiptapEditor;
-  source: "paste" | "drop" | "slash";
+  source: "paste" | "drop" | "slash" | "button";
 };
 export type ImageUploadResult = {
   src: string;
@@ -88,6 +95,7 @@ export type EditorProps = {
   onChange?: (value: string) => void;
   disabled?: boolean;
   format?: EditorFormat;
+  placeholder?: string;
   enableImages?: boolean;
   enableImagePasteDrop?: boolean;
   onUploadImage?: ImageUploadHandler;
@@ -98,6 +106,11 @@ export type EditorProps = {
   className?: string;
   editorClassName?: string;
 } & Omit<HTMLAttributes<HTMLDivElement>, "onChange" | "className">;
+
+export type EditorHandle = {
+  focus: () => void;
+  insertImageFiles: (files: File[]) => void;
+};
 
 type ToggleAction = {
   label: string;
@@ -184,22 +197,26 @@ const blockOptions: Array<{ value: BlockType; label: string }> = [
   { value: "codeBlock", label: "Code block" },
 ];
 
-export function Editor({
-  value = "",
-  onChange = () => undefined,
-  disabled = false,
-  format = "html",
-  enableImages = true,
-  enableImagePasteDrop = false,
-  onUploadImage,
-  imageFallback = "prompt-url",
-  maxImageBytes = DEFAULT_MAX_IMAGE_BYTES,
-  onRequestImage,
-  onPendingUploadsChange,
-  className,
-  editorClassName,
-  ...props
-}: EditorProps) {
+export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
+  {
+    value = "",
+    onChange = () => undefined,
+    disabled = false,
+    format = "html",
+    placeholder = "Press '/' for commands",
+    enableImages = true,
+    enableImagePasteDrop = false,
+    onUploadImage,
+    imageFallback = "prompt-url",
+    maxImageBytes = DEFAULT_MAX_IMAGE_BYTES,
+    onRequestImage,
+    onPendingUploadsChange,
+    className,
+    editorClassName,
+    ...props
+  }: EditorProps,
+  ref
+) {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [showTableActions, setShowTableActions] = useState(false);
   const [showAltInput, setShowAltInput] = useState(false);
@@ -240,7 +257,7 @@ export function Editor({
       TableCell,
       Placeholder.configure({
         placeholder: ({ node }: { node: ProseMirrorNode }): string =>
-          node.type.name === "paragraph" ? "Press '/' for commands" : "",
+          node.type.name === "paragraph" ? placeholder : "",
         showOnlyCurrent: true,
         includeChildren: true,
       }),
@@ -522,10 +539,6 @@ export function Editor({
     };
   }, [onPendingUploadsChange]);
 
-  if (!editor) {
-    return null;
-  }
-
   const updatePendingUploads = (delta: number): void => {
     pendingUploadsRef.current = Math.max(0, pendingUploadsRef.current + delta);
     onPendingUploadsChange?.(pendingUploadsRef.current);
@@ -595,7 +608,7 @@ export function Editor({
     uploadId: string
   ): { pos: number; attrs: UploadableImageAttrs } | null => {
     let match: { pos: number; attrs: UploadableImageAttrs } | null = null;
-    editor.state.doc.descendants((node, pos) => {
+    editor!.state.doc.descendants((node, pos) => {
       if (node.type.name !== "image") {
         return true;
       }
@@ -623,8 +636,8 @@ export function Editor({
       return false;
     }
 
-    editor.view.dispatch(
-      editor.state.tr.setNodeMarkup(match.pos, undefined, nextAttrs)
+    editor!.view.dispatch(
+      editor!.state.tr.setNodeMarkup(match.pos, undefined, nextAttrs)
     );
     return true;
   };
@@ -647,7 +660,7 @@ export function Editor({
 
   const insertLocalImageFile = async (
     file: File,
-    source: "paste" | "drop" | "slash",
+    source: "paste" | "drop" | "slash" | "button",
     initialAttrs?: { alt?: string; title?: string }
   ): Promise<void> => {
     if (!file.type.startsWith("image/")) {
@@ -661,7 +674,7 @@ export function Editor({
     expectedBlobByUploadIdRef.current.set(uploadId, blobUrl);
     updatePendingUploads(1);
 
-    editor
+    editor!
       .chain()
       .focus()
       .insertContent({
@@ -680,7 +693,7 @@ export function Editor({
     try {
       let resolved: ImageUploadResult | null = null;
       if (onUploadImage) {
-        resolved = await onUploadImage(file, { editor, source });
+        resolved = await onUploadImage(file, { editor: editor!, source });
       } else if (imageFallback === "data-url" && file.size <= maxImageBytes) {
         resolved = { src: await fileToDataUrl(file), alt: fallbackAlt };
       }
@@ -741,12 +754,32 @@ export function Editor({
 
   const insertImagesFromFiles = async (
     files: File[],
-    source: "paste" | "drop"
+    source: "paste" | "drop" | "button"
   ): Promise<void> => {
     for (const file of files) {
       await insertLocalImageFile(file, source);
     }
   };
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        editor?.chain().focus().run();
+      },
+      insertImageFiles: (files) => {
+        if (!files.length) {
+          return;
+        }
+        insertImagesFromFiles(files, "button");
+      },
+    }),
+    [editor]
+  );
+
+  if (!editor) {
+    return null;
+  }
 
   const setBlockType = (next: BlockType): void => {
     const chain = editor.chain().focus();
@@ -1146,4 +1179,4 @@ export function Editor({
       <EditorContent editor={editor} />
     </div>
   );
-}
+});

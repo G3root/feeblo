@@ -238,6 +238,7 @@ const createSuggestion = (
 
         const el = component.element;
         el.style.width = "max-content";
+        el.style.zIndex = "90";
         document.body.appendChild(el);
 
         const clientRect = () =>

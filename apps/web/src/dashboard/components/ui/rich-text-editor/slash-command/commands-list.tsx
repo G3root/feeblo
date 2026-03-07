@@ -64,7 +64,7 @@ const CommandsList = forwardRef<CommandsListHandle, CommandsListProps>(
     }));
 
     return (
-      <div className="z-50 min-w-44 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
+      <div className="z-90 min-w-44 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md">
         {items.length ? (
           items.map((item, index) => (
             <button

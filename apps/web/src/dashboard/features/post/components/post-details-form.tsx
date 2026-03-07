@@ -1,13 +1,16 @@
 import { generateId } from "@feeblo/utils/id";
 import {
   ArrowUp01Icon,
+  ArrowUp02Icon,
   Delete02Icon,
+  Image01Icon,
   MoreHorizontalIcon,
   PencilEdit01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
+import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -26,25 +29,31 @@ import {
   ItemMedia,
   ItemTitle,
 } from "~/components/ui/item";
+import { Editor, type EditorHandle } from "~/components/ui/rich-text-editor";
 import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
+import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
-import { upvoteCollection } from "~/lib/collections";
+import { commentCollection, upvoteCollection } from "~/lib/collections";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
 import {
   type CommentReaction,
   CommentReactionSection,
 } from "./comment-reaction-section";
 import {
+  isRichTextContentEmpty,
+  toRenderableRichTextHtml,
+  uploadPostEditorImage,
+} from "./post-editor-utils";
+import {
   type PostReaction,
   PostReactionSection,
 } from "./post-reaction-section";
 import { PostTitleInput } from "./post-title-input";
-import {
-  PostCommentEditor,
-  PostDescriptionEditor,
-} from "./post-wysiwyg-editor";
+
+const READONLY_RICH_TEXT_CLASS =
+  "prose prose-sm max-w-none text-foreground prose-headings:mb-2 prose-headings:mt-4 prose-headings:text-foreground prose-p:my-2 prose-p:text-foreground prose-strong:text-foreground prose-a:text-foreground prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-img:my-3 prose-img:max-h-80 prose-img:rounded-lg prose-img:border prose-img:border-border/60";
 
 type PostComment = {
   id: string;
@@ -91,6 +100,9 @@ export function PostDetailsForm({
   upvotes,
 }: PostDetailsFormProps) {
   const [title, setTitle] = useState(initialTitle);
+  const postEditorRef = useRef<EditorHandle | null>(null);
+  const postImageInputRef = useRef<HTMLInputElement | null>(null);
+  const commentEditorRef = useRef<EditorHandle | null>(null);
 
   useEffect(() => {
     setTitle(initialTitle);
@@ -107,7 +119,44 @@ export function PostDetailsForm({
           title={title}
         />
 
-        <PostDescriptionEditor content={description} />
+        <div className="space-y-3">
+          <input
+            accept="image/gif,image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = "";
+              if (!files.length) {
+                return;
+              }
+              postEditorRef.current?.focus();
+              postEditorRef.current?.insertImageFiles(files);
+            }}
+            ref={postImageInputRef}
+            type="file"
+          />
+          <Editor
+            className="rounded-xl border"
+            editorClassName="min-h-24"
+            enableImagePasteDrop
+            onUploadImage={uploadPostEditorImage}
+            placeholder="Add description..."
+            ref={postEditorRef}
+            value={description}
+          />
+          <div className="flex justify-end">
+            <Button
+              className="rounded-full"
+              onClick={() => postImageInputRef.current?.click()}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={Image01Icon} strokeWidth={2} />
+              <span>Add image</span>
+            </Button>
+          </div>
+        </div>
 
         <div className="flex items-center justify-between py-1">
           <PostReactionSection
@@ -115,16 +164,18 @@ export function PostDetailsForm({
             postId={postId}
             postReactions={postReactions}
           />
-          <div>
-            <PostUpvoteButton
-              organizationId={organizationId}
-              postId={postId}
-              upvotes={upvotes}
-            />
-          </div>
+          <PostUpvoteButton
+            organizationId={organizationId}
+            postId={postId}
+            upvotes={upvotes}
+          />
         </div>
 
-        <PostCommentEditor organizationId={organizationId} postId={postId} />
+        <PostCommentComposer
+          editorRef={commentEditorRef}
+          organizationId={organizationId}
+          postId={postId}
+        />
 
         <PostCommentList
           commentReactions={commentReactions}
@@ -138,6 +189,105 @@ export function PostDetailsForm({
         </p>
       </section>
     </div>
+  );
+}
+
+function PostCommentComposer({
+  editorRef,
+  organizationId,
+  postId,
+}: {
+  editorRef: RefObject<EditorHandle | null>;
+  organizationId: string;
+  postId: string;
+}) {
+  const [editorKey, setEditorKey] = useState(0);
+  const { data: session } = authClient.useSession();
+
+  const form = useAppForm({
+    defaultValues: { content: "" },
+    validators: {
+      onSubmit: z.object({
+        content: z
+          .string()
+          .refine(
+            (value) => !isRichTextContentEmpty(value),
+            "Comment is required"
+          ),
+      }),
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        const userId = session?.user?.id;
+        const userName = session?.user?.name;
+
+        if (!(userId && userName)) {
+          throw new Error("User not found");
+        }
+
+        const tx = commentCollection.insert({
+          id: generateId("comment"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          content: value.content,
+          visibility: "PUBLIC",
+          parentCommentId: null,
+          organizationId,
+          memberId: null,
+          postId,
+          userId,
+          user: {
+            name: userName,
+          },
+        });
+
+        await tx.isPersisted.promise;
+        setEditorKey((current) => current + 1);
+        form.reset();
+        toastManager.add({ title: "Comment added", type: "success" });
+      } catch (_error) {
+        toastManager.add({ title: "Failed to add comment", type: "error" });
+      }
+    },
+  });
+
+  return (
+    <form
+      className="mt-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        form.handleSubmit();
+      }}
+    >
+      <div className="flex items-end gap-8 rounded-md border px-2 py-2">
+        <Editor
+          className="min-w-0 flex-1 border-0"
+          editorClassName="min-h-10 px-1 py-1 [&_p]:my-0 mb-7"
+          enableImagePasteDrop
+          key={editorKey}
+          onChange={(content) => form.setFieldValue("content", content)}
+          onUploadImage={uploadPostEditorImage}
+          placeholder="Leave a comment..."
+          ref={editorRef}
+          value=""
+        />
+        <form.Subscribe selector={(state) => state.isSubmitting}>
+          {(isSubmitting) => (
+            <Button
+              className="rounded-full"
+              disabled={isSubmitting}
+              size="icon-xs"
+              type="submit"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />
+              <span className="sr-only">Submit comment</span>
+            </Button>
+          )}
+        </form.Subscribe>
+      </div>
+    </form>
   );
 }
 
@@ -276,7 +426,12 @@ function PostCommentList({
               </span>
             </ItemHeader>
             <ItemDescription className="line-clamp-none text-foreground">
-              {comment.content}
+              <div
+                className={READONLY_RICH_TEXT_CLASS}
+                dangerouslySetInnerHTML={{
+                  __html: toRenderableRichTextHtml(comment.content),
+                }}
+              />
             </ItemDescription>
             <CommentReactionSection
               commentId={comment.id}
@@ -286,7 +441,7 @@ function PostCommentList({
             />
           </ItemContent>
           {currentUserId === comment.userId && (
-            <ItemActions>
+            <ItemActions className="self-start">
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={(props) => (
