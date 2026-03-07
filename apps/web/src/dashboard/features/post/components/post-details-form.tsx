@@ -10,7 +10,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
-import { type RefObject, useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -88,6 +88,7 @@ type PostDetailsFormProps = {
   initialTitle: string;
   organizationId: string;
   postId: string;
+  postCreatorId: string | null;
   postReactions: PostReaction[];
   upvotes: PostUpvote[];
 };
@@ -102,105 +103,176 @@ export function PostDetailsForm({
   initialTitle,
   organizationId,
   postId,
+  postCreatorId,
   postReactions,
   upvotes,
 }: PostDetailsFormProps) {
-  const postEditorRef = useRef<EditorHandle | null>(null);
-  const postImageInputRef = useRef<HTMLInputElement | null>(null);
-  const commentEditorRef = useRef<EditorHandle | null>(null);
+  return (
+    <PostDetailsLayout>
+      <PostDetailsHeader
+        boardName={boardName}
+        boardSlug={boardSlug}
+        organizationId={organizationId}
+        postCreatorId={postCreatorId}
+        postId={postId}
+        title={initialTitle}
+      />
 
+      <PostDescriptionEditor
+        description={description}
+        postCreatorId={postCreatorId}
+        postId={postId}
+      />
+
+      <PostDetailsActions
+        organizationId={organizationId}
+        postId={postId}
+        postReactions={postReactions}
+        upvotes={upvotes}
+      />
+
+      <PostCommentComposer organizationId={organizationId} postId={postId} />
+
+      <PostCommentList
+        commentReactions={commentReactions}
+        comments={comments}
+        organizationId={organizationId}
+        postId={postId}
+      />
+
+      <p className="text-muted-foreground text-xs">
+        Created {createdAt.toLocaleDateString()}
+      </p>
+    </PostDetailsLayout>
+  );
+}
+
+function PostDetailsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
-      <section className="space-y-6">
-        <PostDetailsHeader
-          boardName={boardName}
-          boardSlug={boardSlug}
-          organizationId={organizationId}
-          postId={postId}
-          title={initialTitle}
-        />
+      <section className="space-y-6">{children}</section>
+    </div>
+  );
+}
 
-        <div className="space-y-3">
-          <input
-            accept="image/gif,image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              if (!files.length) {
-                return;
-              }
-              postEditorRef.current?.focus();
-              postEditorRef.current?.insertImageFiles(files);
-            }}
-            ref={postImageInputRef}
-            type="file"
-          />
-          <Editor
-            editorClassName="min-h-24"
-            enableImagePasteDrop
-            onUploadImage={uploadPostEditorImage}
-            placeholder="Add description..."
-            ref={postEditorRef}
-            value={description}
-          />
-          <div className="flex justify-end">
-            <Button
-              className="rounded-full"
-              onClick={() => postImageInputRef.current?.click()}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <HugeiconsIcon icon={Image01Icon} strokeWidth={2} />
-              <span>Add image</span>
-            </Button>
-          </div>
+function PostDescriptionEditor({
+  postId,
+  description,
+  postCreatorId,
+}: {
+  postId: string;
+  description: string;
+  postCreatorId: string | null;
+}) {
+  const { data: session } = authClient.useSession();
+  const isOwner = !!session?.user?.id && session.user.id === postCreatorId;
+  const postEditorRef = useRef<EditorHandle | null>(null);
+  const postImageInputRef = useRef<HTMLInputElement | null>(null);
+  const initialDescription = useRef(description);
+
+  const mutate = usePacedMutations<{ value: string }>({
+    onMutate: ({ value }) => {
+      postCollection.update(postId, (draft) => {
+        draft.content = value;
+      });
+    },
+    mutationFn: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedPost } = mutation;
+      await fetchRpc((rpc) =>
+        rpc.PostUpdate({
+          id: updatedPost.id,
+          status: updatedPost.status,
+          content: updatedPost.content,
+          title: updatedPost.title,
+          boardId: updatedPost.boardId,
+          organizationId: updatedPost.organizationId,
+        })
+      );
+    },
+    strategy: debounceStrategy({ wait: 500 }),
+  });
+
+  return (
+    <div className="space-y-3">
+      <input
+        accept="image/gif,image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = "";
+          if (!files.length) {
+            return;
+          }
+          postEditorRef.current?.focus();
+          postEditorRef.current?.insertImageFiles(files);
+        }}
+        ref={postImageInputRef}
+        type="file"
+      />
+      <Editor
+        disabled={!isOwner}
+        editorClassName="min-h-24"
+        enableImagePasteDrop={isOwner}
+        onChange={(value) => mutate({ value })}
+        onUploadImage={uploadPostEditorImage}
+        placeholder="Add description..."
+        ref={postEditorRef}
+        value={initialDescription.current}
+      />
+      {isOwner ? (
+        <div className="flex justify-end">
+          <Button
+            className="rounded-full"
+            onClick={() => postImageInputRef.current?.click()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Image01Icon} strokeWidth={2} />
+            <span>Add image</span>
+          </Button>
         </div>
+      ) : null}
+    </div>
+  );
+}
 
-        <div className="flex items-center justify-between py-1">
-          <PostReactionSection
-            organizationId={organizationId}
-            postId={postId}
-            postReactions={postReactions}
-          />
-          <PostUpvoteButton
-            organizationId={organizationId}
-            postId={postId}
-            upvotes={upvotes}
-          />
-        </div>
-
-        <PostCommentComposer
-          editorRef={commentEditorRef}
-          organizationId={organizationId}
-          postId={postId}
-        />
-
-        <PostCommentList
-          commentReactions={commentReactions}
-          comments={comments}
-          organizationId={organizationId}
-          postId={postId}
-        />
-
-        <p className="text-muted-foreground text-xs">
-          Created {createdAt.toLocaleDateString()}
-        </p>
-      </section>
+function PostDetailsActions({
+  organizationId,
+  postId,
+  postReactions,
+  upvotes,
+}: {
+  organizationId: string;
+  postId: string;
+  postReactions: PostReaction[];
+  upvotes: PostUpvote[];
+}) {
+  return (
+    <div className="flex items-center justify-between py-1">
+      <PostReactionSection
+        organizationId={organizationId}
+        postId={postId}
+        postReactions={postReactions}
+      />
+      <PostUpvoteButton
+        organizationId={organizationId}
+        postId={postId}
+        upvotes={upvotes}
+      />
     </div>
   );
 }
 
 function PostCommentComposer({
-  editorRef,
   organizationId,
   postId,
 }: {
-  editorRef: RefObject<EditorHandle | null>;
   organizationId: string;
   postId: string;
 }) {
+  const editorRef = useRef<EditorHandle | null>(null);
   const [editorKey, setEditorKey] = useState(0);
   const { data: session } = authClient.useSession();
 
@@ -297,13 +369,17 @@ function PostDetailsHeader({
   organizationId,
   title,
   postId,
+  postCreatorId,
 }: {
   boardName: string;
   boardSlug: string;
   organizationId: string;
   title: string;
   postId: string;
+  postCreatorId: string | null;
 }) {
+  const { data: session } = authClient.useSession();
+  const isOwner = !!session?.user?.id && session.user.id === postCreatorId;
   const mutate = usePacedMutations<{ value: string }>({
     onMutate: ({ value }) => {
       // Apply optimistic update immediately
@@ -351,7 +427,8 @@ function PostDetailsHeader({
 
       <PostTitleInput
         defaultValue={title}
-        onChange={(e) => handleChange(e.target.value)}
+        onChange={isOwner ? (e) => handleChange(e.target.value) : undefined}
+        readOnly={!isOwner}
       />
     </div>
   );
@@ -542,6 +619,15 @@ function formatRelativeTime(value: Date | string) {
   }
   return rtf.format(diffDays, "day");
 }
+
+export const PostDetails = {
+  Layout: PostDetailsLayout,
+  Header: PostDetailsHeader,
+  Description: PostDescriptionEditor,
+  Actions: PostDetailsActions,
+  CommentComposer: PostCommentComposer,
+  CommentList: PostCommentList,
+};
 
 export function PostDetailsFormSkeleton() {
   return (

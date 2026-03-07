@@ -2,7 +2,7 @@ import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
 import {
-  PostDetailsForm,
+  PostDetails,
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
 import { CommentDeleteDialogProvider } from "~/features/post/dialog-stores";
@@ -149,19 +149,40 @@ function RouteComponent() {
 
   return (
     <CommentDeleteDialogProvider>
-      <PostDetailsForm
-        boardName={board.name}
-        boardSlug={board.slug}
-        commentReactions={commentReactions}
-        comments={comments}
-        createdAt={post.createdAt}
-        description={post.content}
-        initialTitle={post.title}
-        organizationId={organizationId}
-        postId={post.id}
-        postReactions={postReactions}
-        upvotes={upvotes}
-      />
+      <PostDetails.Layout>
+        <PostDetails.Header
+          boardName={board.name}
+          boardSlug={board.slug}
+          organizationId={organizationId}
+          postCreatorId={post.creatorId}
+          postId={post.id}
+          title={post.title}
+        />
+        <PostDetails.Description
+          description={post.content}
+          postCreatorId={post.creatorId}
+          postId={post.id}
+        />
+        <PostDetails.Actions
+          organizationId={organizationId}
+          postId={post.id}
+          postReactions={postReactions}
+          upvotes={upvotes}
+        />
+        <PostDetails.CommentComposer
+          organizationId={organizationId}
+          postId={post.id}
+        />
+        <PostDetails.CommentList
+          commentReactions={commentReactions}
+          comments={comments}
+          organizationId={organizationId}
+          postId={post.id}
+        />
+        <p className="text-muted-foreground text-xs">
+          Created {post.createdAt.toLocaleDateString()}
+        </p>
+      </PostDetails.Layout>
       <CommentDeleteDialog />
     </CommentDeleteDialogProvider>
   );

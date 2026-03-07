@@ -42,6 +42,7 @@ export const S3Layer = Layer.unwrapEffect(
 );
 
 const PROFILE_IMAGE_PREFIX = "profile-images";
+const EDITOR_MEDIA_PREFIX = "editor-media";
 
 export class S3UploadService extends Effect.Service<S3UploadService>()(
   "S3UploadService",
@@ -50,6 +51,22 @@ export class S3UploadService extends Effect.Service<S3UploadService>()(
       const config = yield* S3ConfigSchema;
       const bucket = config.publicBucketName;
       const fileSystem = yield* FileSystem.FileSystem;
+      const resolvePublicUrl = (fileKey: string) => {
+        const encodedKey = fileKey
+          .split("/")
+          .map((segment) => encodeURIComponent(segment))
+          .join("/");
+        const baseUrl =
+          config.publicBaseUrl._tag === "Some"
+            ? config.publicBaseUrl.value.replace(/\/$/, "")
+            : `${config.endpoint.replace(/\/$/, "")}/${bucket}`;
+
+        return {
+          bucket,
+          key: fileKey,
+          url: `${baseUrl}/${encodedKey}`,
+        };
+      };
 
       return {
         uploadProfileImage: ({
@@ -64,21 +81,23 @@ export class S3UploadService extends Effect.Service<S3UploadService>()(
           Effect.gen(function* () {
             const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
             yield* fileSystem.writeFile(fileKey, bytes);
-
-            const encodedKey = fileKey
-              .split("/")
-              .map((segment) => encodeURIComponent(segment))
-              .join("/");
-            const baseUrl =
-              config.publicBaseUrl._tag === "Some"
-                ? config.publicBaseUrl.value.replace(/\/$/, "")
-                : `${config.endpoint.replace(/\/$/, "")}/${bucket}`;
-
-            return {
-              bucket,
-              key: fileKey,
-              url: `${baseUrl}/${encodedKey}`,
-            };
+            return resolvePublicUrl(fileKey);
+          }),
+        uploadEditorMedia: ({
+          bytes,
+          extension,
+          kind,
+          userId,
+        }: {
+          bytes: Uint8Array;
+          extension: string;
+          kind: "image" | "video";
+          userId: string;
+        }) =>
+          Effect.gen(function* () {
+            const fileKey = `${EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+            yield* fileSystem.writeFile(fileKey, bytes);
+            return resolvePublicUrl(fileKey);
           }),
       };
     }),
