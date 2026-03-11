@@ -1,6 +1,6 @@
 ---
-import { PublicBoardApp } from "@feeblo/public-board";
 import { fetchRpc } from "~/lib/runtime";
+import { PublicBoardApp } from "../../feature-board";
 import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
 
 export const prerender = false;
@@ -27,6 +27,6 @@ const site = siteData[0];
 
 <PublicBoardLayout title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}>
   <main>
-    <PublicBoardApp client:only="svelte" site={site} />
+    <PublicBoardApp client:only="react" site={site} />
   </main>
 </PublicBoardLayout>

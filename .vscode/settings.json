@@ -28,9 +28,6 @@
   "[vue]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "[svelte]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
   "[css]": {
     "editor.defaultFormatter": "biomejs.biome"
   },

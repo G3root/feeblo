@@ -61,6 +61,9 @@
     "./board/schema": {
       "default": "./src/board/schema.ts"
     },
+    "./post/schema": {
+      "default": "./src/post/schema.ts"
+    },
     "./comments/schema": {
       "default": "./src/comments/schema.ts"
     }
