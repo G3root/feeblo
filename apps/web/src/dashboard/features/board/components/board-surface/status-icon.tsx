@@ -1,4 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "~/lib/utils";
 import { type BoardPostStatus, IconMap } from "../../constants";
 
 export function StatusIcon({
@@ -11,11 +12,8 @@ export function StatusIcon({
   const Icon = IconMap[status];
 
   return (
-    <span
-      className="inline-flex items-center justify-center"
-      style={{ color: toneVar }}
-    >
-      <HugeiconsIcon className="size-4" icon={Icon} strokeWidth={2} />
+    <span className={cn("inline-flex items-center justify-center", toneVar)}>
+      <HugeiconsIcon className="size-4" icon={Icon} strokeWidth={2.5} />
     </span>
   );
 }
