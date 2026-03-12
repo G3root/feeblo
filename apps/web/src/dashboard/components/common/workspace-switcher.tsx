@@ -1,7 +1,7 @@
-import { Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useLiveSuspenseQuery } from "@tanstack/react-db";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { membershipCollection } from "~/lib/collections";
@@ -9,11 +9,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 
 export function WorkspaceSwitcher() {
+  const navigate = useNavigate();
   const organizationId = useOrganizationId();
   const { data } = useLiveSuspenseQuery((q) =>
     q
@@ -63,6 +65,19 @@ export function WorkspaceSwitcher() {
                 selectedMembership?.organizationId ?? null
               }
             />
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              className="justify-center"
+              onClick={() =>
+                navigate({
+                  to: "/register",
+                })
+              }
+            >
+              <HugeiconsIcon className="text-muted-foreground" icon={Plus} />
+              <span>Create workspace</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
