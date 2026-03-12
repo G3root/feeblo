@@ -1,4 +1,10 @@
-import { startTransition } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { cn } from "../../lib/utils";
 
 export type BoardOption = {
@@ -18,27 +24,25 @@ export function BoardSelect({
   value: string;
 }) {
   return (
-    <label className={cn("flex flex-col gap-1.5", className)}>
-      <span className="font-medium text-muted-foreground text-xs uppercase tracking-[0.16em]">
+    <div className={cn("flex flex-col gap-1.5", className)}>
+      <span className="text-muted-foreground text-xs uppercase tracking-wider">
         Board
       </span>
-      <select
-        className="h-9 min-w-52 rounded-lg border border-input bg-background px-3 text-sm shadow-xs outline-none transition focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        onChange={(event) => {
-          const nextValue = event.currentTarget.value;
-
-          startTransition(() => {
-            onChange(nextValue);
-          });
-        }}
+      <Select
+        onValueChange={(v) => v !== null && onChange(v)}
         value={value}
       >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        <SelectTrigger className="min-w-52">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

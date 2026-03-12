@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { buttonVariants } from "~/components/ui/button";
 import {
   Empty,
@@ -16,9 +17,9 @@ export function NotFoundPage() {
             The public board route you requested does not exist.
           </EmptyDescription>
         </EmptyHeader>
-        <a className={buttonVariants({ variant: "outline" })} href="/">
+        <Link className={buttonVariants({ variant: "outline" })} href="/">
           Back to feedback
-        </a>
+        </Link>
       </Empty>
     </div>
   );

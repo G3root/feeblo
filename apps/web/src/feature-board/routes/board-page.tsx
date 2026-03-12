@@ -1,14 +1,10 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "~/components/ui/empty";
 import { BoardListCard } from "../components/feedback/board-list-card";
-import { FeedbackCard } from "../components/feedback/feedback-card";
+import {
+  FeedbackCard,
+  FeedbackCardSkeleton,
+} from "../components/feedback/feedback-card";
 import {
   FeedbackBrowseLayout,
   FeedbackBrowseLayoutContent,
@@ -28,6 +24,19 @@ function MainContent({ children }: { children: ReactNode }) {
         </FeedbackBrowseLayoutSidebar>
       </FeedbackBrowseLayoutContent>
     </FeedbackBrowseLayout>
+  );
+}
+
+function ListHeader({ count, title }: { count?: number; title: string }) {
+  return (
+    <div className="flex items-baseline justify-between px-1 pb-3">
+      <h2 className="font-semibold text-base tracking-tight">{title}</h2>
+      {count !== undefined && (
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {count} {count === 1 ? "post" : "posts"}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -83,7 +92,14 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
   if (boardLoading || (board && postsLoading)) {
     return (
       <MainContent>
-        <p className="text-muted-foreground text-sm">Loading posts...</p>
+        <div className="min-w-0">
+          <ListHeader title="Loading..." />
+          <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
+            {["a", "b", "c", "d", "e"].map((key) => (
+              <FeedbackCardSkeleton key={key} />
+            ))}
+          </div>
+        </div>
       </MainContent>
     );
   }
@@ -91,14 +107,12 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
   if (boardError || postsError) {
     return (
       <MainContent>
-        <Card className="ring-1 ring-border/60">
-          <CardHeader>
-            <CardTitle>Posts unavailable</CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground text-sm">
+        <div className="min-w-0 rounded-lg border border-border/60 p-12 text-center">
+          <p className="font-medium text-sm">Posts unavailable</p>
+          <p className="mt-1 text-muted-foreground text-xs">
             There was a problem loading this board.
-          </CardContent>
-        </Card>
+          </p>
+        </div>
       </MainContent>
     );
   }
@@ -106,38 +120,43 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
   if (!board) {
     return (
       <MainContent>
-        <Card className="ring-1 ring-border/60">
-          <CardHeader>
-            <CardTitle>Board not found</CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground text-sm">
+        <div className="min-w-0 rounded-lg border border-border/60 p-12 text-center">
+          <p className="font-medium text-sm">Board not found</p>
+          <p className="mt-1 text-muted-foreground text-xs">
             This public board does not exist anymore.
-          </CardContent>
-        </Card>
+          </p>
+        </div>
       </MainContent>
     );
   }
 
   if (posts.length === 0) {
     return (
-      <Empty className="border border-border/70 border-dashed bg-muted/20">
-        <EmptyHeader>
-          <EmptyTitle>No posts yet</EmptyTitle>
-          <EmptyDescription>
-            New updates and requests for this board will appear here once they
-            are shared publicly.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <MainContent>
+        <div className="min-w-0">
+          <ListHeader count={0} title={board.name} />
+          <div className="w-full rounded-lg border border-border/70 border-dashed p-12 text-center">
+            <p className="font-medium text-foreground/80 text-sm">
+              No posts yet
+            </p>
+            <p className="mt-1 text-muted-foreground text-xs">
+              New updates and requests for this board will appear here.
+            </p>
+          </div>
+        </div>
+      </MainContent>
     );
   }
 
   return (
     <MainContent>
-      <div className="grid gap-4">
-        {posts.map((post) => (
-          <FeedbackCard board={board} key={post.id} post={post} />
-        ))}
+      <div className="min-w-0">
+        <ListHeader count={posts.length} title={board.name} />
+        <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
+          {posts.map((post) => (
+            <FeedbackCard board={board} key={post.id} post={post} />
+          ))}
+        </div>
       </div>
     </MainContent>
   );

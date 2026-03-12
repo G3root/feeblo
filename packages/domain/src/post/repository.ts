@@ -13,6 +13,7 @@ import type { TPostUpdate } from "./schema";
 type TPostFindMany = {
   boardId?: string | null | undefined;
   organizationId: string;
+  userId?: string | null | undefined;
 };
 
 type TPostDelete = {
@@ -90,7 +91,7 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               )
             );
         },
-        findMany: ({ boardId, organizationId }: TPostFindMany) => {
+        findMany: ({ boardId, organizationId, userId }: TPostFindMany) => {
           const where: SQL[] = [];
           if (boardId) {
             where.push(eq(postTable.boardId, boardId));
@@ -99,6 +100,9 @@ export class PostRepository extends Effect.Service<PostRepository>()(
           where.push(eq(postTable.organizationId, organizationId));
 
           const whereClause = where.length > 1 ? and(...where) : where[0];
+          const hasUserUpVotedExpr = userId
+            ? sql<boolean>`exists(select 1 from ${upvoteTable} where ${upvoteTable.postId} = ${postTable.id} and ${upvoteTable.userId} = ${userId})`
+            : sql<boolean>`false`;
           const upvoteCounts = db
             .select({
               postId: upvoteTable.postId,
@@ -122,7 +126,9 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               organizationId: postTable.organizationId,
               user: {
                 name: sql<string | null>`${userTable.name}`,
+                image: sql<string | null>`${userTable.image}`,
               },
+              hasUserUpVoted: hasUserUpVotedExpr,
               creatorMemberId: postTable.creatorMemberId,
               creatorId: postTable.creatorId,
             })

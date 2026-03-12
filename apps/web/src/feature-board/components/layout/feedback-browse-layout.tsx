@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export function FeedbackBrowseLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-5xl overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
       {children}
     </div>
   );
@@ -14,7 +14,7 @@ export function FeedbackBrowseLayoutContent({
   children: ReactNode;
 }) {
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_220px]">
       {children}
     </div>
   );
@@ -25,7 +25,7 @@ export function FeedbackBrowseLayoutMain({
 }: {
   children: ReactNode;
 }) {
-  return <section className="space-y-6">{children}</section>;
+  return <section className="min-w-0">{children}</section>;
 }
 
 export function FeedbackBrowseLayoutSidebar({
@@ -33,5 +33,5 @@ export function FeedbackBrowseLayoutSidebar({
 }: {
   children?: ReactNode;
 }) {
-  return <aside className="space-y-4">{children}</aside>;
+  return <aside className="hidden lg:block">{children}</aside>;
 }

@@ -6,6 +6,7 @@ import { fetchRpc } from "~/lib/runtime";
 
 export const postCollection = createCollection(
   queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
       const cacheKey = ["post"];
@@ -17,9 +18,9 @@ export const postCollection = createCollection(
           cacheKey.push(`organizationId-${value}`);
         }
 
-        if (fieldName === "boardId") {
-          cacheKey.push(`boardId-${value}`);
-        }
+        // if (fieldName === "boardId") {
+        //   cacheKey.push(`boardId-${value}`);
+        // }
       }
 
       return cacheKey;
@@ -39,16 +40,16 @@ export const postCollection = createCollection(
 
         const fieldName = field.join(".");
 
-        if (fieldName === "boardId") {
-          filters.boardId = value as string;
-        }
+        // if (fieldName === "boardId") {
+        //   filters.boardId = value as string;
+        // }
 
         if (fieldName === "organizationId") {
           filters.organizationId = value as string;
         }
       }
 
-      const boardId = filters.boardId;
+      // const boardId = filters.boardId;
       const organizationId = filters.organizationId;
 
       if (!organizationId) {
@@ -58,8 +59,9 @@ export const postCollection = createCollection(
       const data = await fetchRpc(
         (rpc) =>
           rpc.PostListPublic({
-            boardId,
+            // boardId,
             organizationId,
+            boardId: null,
           }),
         { signal: ctx.signal }
       );
@@ -86,11 +88,12 @@ export const postCollection = createCollection(
   })
 );
 
-export const boardCollection = createCollection(
+export const publicBoardCollection = createCollection(
   queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["board"];
+      const cacheKey = ["public-board"];
 
       for (const { field, value } of parsed.filters) {
         if (field.join(".") === "organizationId") {
