@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import { authClient } from "~/lib/auth-client";
 
 type SessionData = NonNullable<
@@ -49,3 +49,39 @@ export const allPolicy = (
 export const anyPolicy = (
   ...policies: [ClientPolicy, ...ClientPolicy[]]
 ): ClientPolicy => policy((session) => policies.some((p) => p(session)));
+
+/**
+ * Client policy: current user is organization owner or admin.
+ * Mirrors server Policy.any(hasRole("owner"), hasRole("admin")) used in
+ * membership (invite, update role, remove, cancel invitation) and board/post isOwner.
+ */
+export const hasOwnerOrAdminRole = (): ClientPolicy =>
+  anyPolicy(hasRole("owner"), hasRole("admin"));
+
+/**
+ * Conditionally renders children based on a policy evaluation.
+ * Frontend mirror of `withPolicy` from `packages/domain/src/policy.ts`.
+ */
+export function PolicyGuard({
+  policy,
+  fallback = null,
+  pending = null,
+  children,
+}: {
+  policy: ClientPolicy;
+  fallback?: ReactNode;
+  pending?: ReactNode;
+  children: ReactNode;
+}): ReactNode {
+  const { allowed, isPending } = usePolicy(policy);
+
+  if (isPending) {
+    return pending;
+  }
+
+  if (!allowed) {
+    return fallback;
+  }
+
+  return children;
+}

@@ -6,9 +6,16 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
+import { PolicyGuard, hasMembership } from "~/hooks/use-policy";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 
-export function BoardPostsEmpty({ boardId }: { boardId: string }) {
+export function BoardPostsEmpty({
+  boardId,
+  organizationId,
+}: {
+  boardId: string;
+  organizationId: string;
+}) {
   const store = usePostCreateDialogContext();
   return (
     <Empty>
@@ -19,13 +26,15 @@ export function BoardPostsEmpty({ boardId }: { boardId: string }) {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button
-          onClick={() =>
-            store.send({ type: "toggle", data: { boardId, status: "PLANNED" } })
-          }
-        >
-          Create post
-        </Button>
+        <PolicyGuard policy={hasMembership(organizationId)}>
+          <Button
+            onClick={() =>
+              store.send({ type: "toggle", data: { boardId, status: "PLANNED" } })
+            }
+          >
+            Create post
+          </Button>
+        </PolicyGuard>
       </EmptyContent>
     </Empty>
   );

@@ -43,7 +43,9 @@ import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import {
   allPolicy,
+  anyPolicy,
   hasMembership,
+  hasOwnerOrAdminRole,
   isUser,
   usePolicy,
 } from "~/hooks/use-policy";
@@ -164,7 +166,10 @@ function PostDescriptionEditor({
   organizationId: string;
 }) {
   const { allowed: isOwner } = usePolicy(
-    allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
+    anyPolicy(
+      hasOwnerOrAdminRole(),
+      allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
+    )
   );
   const postEditorRef = useRef<EditorHandle | null>(null);
   const postImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -397,7 +402,10 @@ function PostDetailsHeader({
   postCreatorId: string | null;
 }) {
   const { allowed: isOwner } = usePolicy(
-    allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
+    anyPolicy(
+      hasOwnerOrAdminRole(),
+      allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
+    )
   );
 
   const mutate = usePacedMutations<{ value: string }>({

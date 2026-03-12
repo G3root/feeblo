@@ -30,6 +30,7 @@ import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { PolicyGuard, hasOwnerOrAdminRole } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
@@ -112,7 +113,9 @@ function MembersSection() {
   return (
     <MembersSettingsLayout.Section title="Members">
       <MembersSettingsLayout.Controls>
-        <InviteMemberForm />
+        <PolicyGuard policy={hasOwnerOrAdminRole()}>
+          <InviteMemberForm />
+        </PolicyGuard>
         {isEmpty ? null : (
           <InputGroup>
             <InputGroupInput
@@ -185,64 +188,66 @@ function MembersSection() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Select
-                    onValueChange={async (value) => {
-                      const tx = membersCollection.update(
-                        member.id,
-                        (draft) => {
-                          draft.role = value as "owner" | "admin" | "member";
+                  <PolicyGuard policy={hasOwnerOrAdminRole()}>
+                    <Select
+                      onValueChange={async (value) => {
+                        const tx = membersCollection.update(
+                          member.id,
+                          (draft) => {
+                            draft.role = value as "owner" | "admin" | "member";
+                          }
+                        );
+                        try {
+                          await tx.isPersisted.promise;
+                          toastManager.add({
+                            title: "Member role updated",
+                            type: "success",
+                          });
+                        } catch (_error) {
+                          toastManager.add({
+                            title: "Failed to update role",
+                            type: "error",
+                          });
                         }
-                      );
-                      try {
-                        await tx.isPersisted.promise;
-                        toastManager.add({
-                          title: "Member role updated",
-                          type: "success",
-                        });
-                      } catch (_error) {
-                        toastManager.add({
-                          title: "Failed to update role",
-                          type: "error",
-                        });
-                      }
-                    }}
-                    value={role}
-                  >
-                    <SelectTrigger className="w-28" disabled={isOwner}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isOwner ? (
-                        <SelectItem value="owner">Owner</SelectItem>
-                      ) : null}
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
+                      }}
+                      value={role}
+                    >
+                      <SelectTrigger className="w-28" disabled={isOwner}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isOwner ? (
+                          <SelectItem value="owner">Owner</SelectItem>
+                        ) : null}
+                        <SelectItem value="member">Member</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                  <Button
-                    disabled={isOwner}
-                    onClick={async () => {
-                      const tx = membersCollection.delete(member.id);
-                      try {
-                        await tx.isPersisted.promise;
-                        toastManager.add({
-                          title: "Member removed",
-                          type: "success",
-                        });
-                      } catch (_error) {
-                        toastManager.add({
-                          title: "Failed to remove member",
-                          type: "error",
-                        });
-                      }
-                    }}
-                    size="icon-sm"
-                    type="button"
-                    variant="destructive"
-                  >
-                    <HugeiconsIcon icon={Delete02Icon} />
-                  </Button>
+                    <Button
+                      disabled={isOwner}
+                      onClick={async () => {
+                        const tx = membersCollection.delete(member.id);
+                        try {
+                          await tx.isPersisted.promise;
+                          toastManager.add({
+                            title: "Member removed",
+                            type: "success",
+                          });
+                        } catch (_error) {
+                          toastManager.add({
+                            title: "Failed to remove member",
+                            type: "error",
+                          });
+                        }
+                      }}
+                      size="icon-sm"
+                      type="button"
+                      variant="destructive"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} />
+                    </Button>
+                  </PolicyGuard>
                 </div>
               </div>
             );
@@ -353,28 +358,30 @@ function InvitationsSection() {
                 </p>
               </div>
 
-              <Button
-                onClick={async () => {
-                  const tx = invitationsCollection.delete(invitation.id);
-                  try {
-                    await tx.isPersisted.promise;
-                    toastManager.add({
-                      title: "Invitation revoked",
-                      type: "success",
-                    });
-                  } catch (_error) {
-                    toastManager.add({
-                      title: "Failed to revoke invitation",
-                      type: "error",
-                    });
-                  }
-                }}
-                size="icon-sm"
-                type="button"
-                variant="destructive"
-              >
-                <HugeiconsIcon icon={Delete02Icon} />
-              </Button>
+              <PolicyGuard policy={hasOwnerOrAdminRole()}>
+                <Button
+                  onClick={async () => {
+                    const tx = invitationsCollection.delete(invitation.id);
+                    try {
+                      await tx.isPersisted.promise;
+                      toastManager.add({
+                        title: "Invitation revoked",
+                        type: "success",
+                      });
+                    } catch (_error) {
+                      toastManager.add({
+                        title: "Failed to revoke invitation",
+                        type: "error",
+                      });
+                    }
+                  }}
+                  size="icon-sm"
+                  type="button"
+                  variant="destructive"
+                >
+                  <HugeiconsIcon icon={Delete02Icon} />
+                </Button>
+              </PolicyGuard>
             </div>
           ))}
         </MembersSettingsLayout.List>

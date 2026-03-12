@@ -33,6 +33,7 @@ import {
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { boardCollection } from "~/lib/collections";
 import {
@@ -160,13 +161,21 @@ function BoardList() {
           </Link>
         )}
       />
-      <BoardMenu boardPublicId={board.id} />
+      <BoardMenuWithPolicy boardPublicId={board.id} />
     </SidebarMenuItem>
   ));
 }
 
 interface BoardMenuProps {
   boardPublicId: string;
+}
+
+function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
+  const { allowed: canManageBoard } = usePolicy(hasOwnerOrAdminRole());
+  if (!canManageBoard) {
+    return null;
+  }
+  return <BoardMenu boardPublicId={boardPublicId} />;
 }
 
 function BoardMenu({ boardPublicId }: BoardMenuProps) {

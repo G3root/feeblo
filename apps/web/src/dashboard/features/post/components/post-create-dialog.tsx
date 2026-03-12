@@ -20,6 +20,7 @@ import { Switch } from "~/components/ui/switch";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { hasMembership, usePolicy } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
 import { membersCollection, postCollection } from "~/lib/collections";
 import { usePostCreateDialogContext } from "../dialog-stores";
@@ -75,6 +76,7 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
 
   const organizationId = useOrganizationId();
   const { data: session } = authClient.useSession();
+  const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
 
   const { data: member } = useLiveQuery(
     (q) => {
@@ -108,6 +110,9 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
       }),
     },
     onSubmit: async ({ value }) => {
+      if (!canCreate) {
+        return;
+      }
       const boardId = store.get().context.data.boardId;
       const status = store.get().context.data.status;
 
@@ -153,6 +158,14 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
       }
     },
   });
+
+  if (!canCreate) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        You must be a member of this organization to create posts.
+      </p>
+    );
+  }
 
   return (
     <form

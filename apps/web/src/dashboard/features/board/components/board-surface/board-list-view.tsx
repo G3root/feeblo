@@ -11,6 +11,7 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { Button } from "~/components/ui/button";
+import { PolicyGuard, hasMembership } from "~/hooks/use-policy";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
@@ -61,7 +62,9 @@ export function BoardListView({
                 </div>
               </AccordionTrigger>
 
-              <AddPostButton boardId={boardId} lane={lane} />
+              <PolicyGuard policy={hasMembership(organizationId)}>
+                <AddPostButton boardId={boardId} lane={lane} />
+              </PolicyGuard>
             </div>
             <AccordionContent className="h-auto pb-0">
               {lane.posts.map((post) => (

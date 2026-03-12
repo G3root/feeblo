@@ -61,7 +61,9 @@ export function BoardPosts({
   })).filter((lane) => lane.posts.length > 0);
 
   if (posts.length === 0) {
-    return <BoardPostsEmpty boardId={boardId} />;
+    return (
+      <BoardPostsEmpty boardId={boardId} organizationId={organizationId} />
+    );
   }
 
   return (
