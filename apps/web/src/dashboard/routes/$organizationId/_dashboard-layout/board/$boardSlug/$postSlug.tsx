@@ -1,6 +1,14 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Suspense } from "react";
+import { Button } from "~/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
 import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
 import {
   PostDetails,
@@ -52,21 +60,29 @@ function RouteComponent() {
 
   if (!(board && post)) {
     return (
-      <div className="mx-auto w-full max-w-5xl p-6">
-        <h1 className="font-semibold text-2xl tracking-tight">
-          Post not found
-        </h1>
-        <p className="mt-2 text-muted-foreground text-sm">
-          We could not find the requested post.
-        </p>
-        <Link
-          className="mt-4 inline-block text-primary text-sm underline underline-offset-4"
-          params={{ organizationId }}
-          to="/$organizationId"
-        >
-          Go back to dashboard
-        </Link>
-      </div>
+      <Empty>
+        <EmptyHeader>
+          <EmptyTitle>Post not found</EmptyTitle>
+          <EmptyDescription>
+            We could not find the requested post.
+          </EmptyDescription>
+          <EmptyContent>
+            <Button
+              nativeButton={false}
+              render={(props) => (
+                <Link
+                  {...props}
+                  params={{ organizationId }}
+                  to="/$organizationId"
+                >
+                  Go back to dashboard
+                </Link>
+              )}
+              variant="link"
+            />
+          </EmptyContent>
+        </EmptyHeader>
+      </Empty>
     );
   }
 

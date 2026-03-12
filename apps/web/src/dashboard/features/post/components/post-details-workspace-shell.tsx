@@ -118,6 +118,8 @@ function PostDetailsWorkspaceShellContent({
   const navigate = useNavigate();
   const postDialogStore = usePostDeleteDialogContext();
 
+  const isPostAvailable = !!board && !!post;
+
   return (
     <div className="grid h-full min-h-0 lg:grid-cols-[minmax(0,1fr)_280px]">
       <div className="flex min-h-0 flex-col overflow-hidden">
@@ -132,131 +134,133 @@ function PostDetailsWorkspaceShellContent({
         </ScrollArea>
       </div>
 
-      <aside className="hidden border-l bg-muted/20 px-6 pt-2 lg:block">
-        <div className="flex items-center justify-end gap-2">
-          <RedirectToPostUrlButton postSlug={post?.slug ?? ""} />
-          <CopyPostButton postSlug={post?.slug ?? ""} />
-          <Button
-            aria-label="Close"
-            onClick={() =>
-              postDialogStore.send({
-                type: "toggle",
-                data: {
-                  postId: post?.id ?? "",
-                  redirectOptions: {
-                    to: "/$organizationId/board/$boardSlug",
-                    params: {
-                      organizationId: params.organizationId,
-                      boardSlug: params.boardSlug,
+      {isPostAvailable ? (
+        <aside className="hidden border-l bg-muted/20 px-6 pt-2 lg:block">
+          <div className="flex items-center justify-end gap-2">
+            <RedirectToPostUrlButton postSlug={post?.slug ?? ""} />
+            <CopyPostButton postSlug={post?.slug ?? ""} />
+            <Button
+              aria-label="Close"
+              onClick={() =>
+                postDialogStore.send({
+                  type: "toggle",
+                  data: {
+                    postId: post?.id ?? "",
+                    redirectOptions: {
+                      to: "/$organizationId/board/$boardSlug",
+                      params: {
+                        organizationId: params.organizationId,
+                        boardSlug: params.boardSlug,
+                      },
                     },
                   },
-                },
-              })
-            }
-            size="icon-sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={Trash2} />
-          </Button>
-        </div>
-        <div className="mt-4 text-sm">
-          <PropertyRow label="Status">
-            <StatusSelect
-              currentStatus={currentStatus}
-              onValueChange={async (status) => {
-                if (!post) {
-                  return;
-                }
-                if (!status) {
-                  return;
-                }
-                try {
-                  const tx = postCollection.update(post.id, (draft) => {
-                    draft.status = status;
-                  });
-                  await tx.isPersisted.promise;
-
-                  toastManager.add({
-                    title: "Status updated",
-                    type: "success",
-                  });
-                } catch (_error) {
-                  toastManager.add({
-                    title: "Failed to update status",
-                    type: "error",
-                  });
-                }
-              }}
-            />
-          </PropertyRow>
-
-          <PropertyRow label="Board">
-            <BoardSelect
-              boards={allBoards}
-              currentBoardId={currentBoardId}
-              onValueChange={async (boardId) => {
-                if (!post) {
-                  return;
-                }
-                if (!boardId) {
-                  return;
-                }
-                try {
-                  const board = allBoards.find((b) => b.id === boardId);
-                  const boardSlug = board?.slug;
-                  const tx = postCollection.update(
-                    post.id,
-                    {
-                      optimistic: false,
-                    },
-                    (draft) => {
-                      draft.boardId = boardId;
-                    }
-                  );
-                  await tx.isPersisted.promise;
-
-                  toastManager.add({
-                    title: "Board updated",
-                    type: "success",
-                  });
-
-                  if (!boardSlug) {
+                })
+              }
+              size="icon-sm"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={Trash2} />
+            </Button>
+          </div>
+          <div className="mt-4 text-sm">
+            <PropertyRow label="Status">
+              <StatusSelect
+                currentStatus={currentStatus}
+                onValueChange={async (status) => {
+                  if (!post) {
                     return;
                   }
+                  if (!status) {
+                    return;
+                  }
+                  try {
+                    const tx = postCollection.update(post.id, (draft) => {
+                      draft.status = status;
+                    });
+                    await tx.isPersisted.promise;
 
-                  navigate({
-                    to: "/$organizationId/board/$boardSlug/$postSlug",
-                    params: {
-                      organizationId: params.organizationId,
-                      boardSlug,
-                      postSlug: params.postSlug,
-                    },
-                    replace: true,
-                  });
-                } catch (_error) {
-                  toastManager.add({
-                    title: "Failed to update board",
-                    type: "error",
-                  });
-                }
-              }}
-            />
-          </PropertyRow>
+                    toastManager.add({
+                      title: "Status updated",
+                      type: "success",
+                    });
+                  } catch (_error) {
+                    toastManager.add({
+                      title: "Failed to update status",
+                      type: "error",
+                    });
+                  }
+                }}
+              />
+            </PropertyRow>
 
-          <Separator />
+            <PropertyRow label="Board">
+              <BoardSelect
+                boards={allBoards}
+                currentBoardId={currentBoardId}
+                onValueChange={async (boardId) => {
+                  if (!post) {
+                    return;
+                  }
+                  if (!boardId) {
+                    return;
+                  }
+                  try {
+                    const board = allBoards.find((b) => b.id === boardId);
+                    const boardSlug = board?.slug;
+                    const tx = postCollection.update(
+                      post.id,
+                      {
+                        optimistic: false,
+                      },
+                      (draft) => {
+                        draft.boardId = boardId;
+                      }
+                    );
+                    await tx.isPersisted.promise;
 
-          <PropertyRow label="Date">
-            <p className="text-muted-foreground text-sm">
-              {formatPostDate(post?.createdAt ?? new Date())}
-            </p>
-          </PropertyRow>
-          <PropertyRow label="Author">
-            <p className="text-muted-foreground text-sm">
-              {post?.user?.name ?? "Unknown author"}
-            </p>
-          </PropertyRow>
-        </div>
-      </aside>
+                    toastManager.add({
+                      title: "Board updated",
+                      type: "success",
+                    });
+
+                    if (!boardSlug) {
+                      return;
+                    }
+
+                    navigate({
+                      to: "/$organizationId/board/$boardSlug/$postSlug",
+                      params: {
+                        organizationId: params.organizationId,
+                        boardSlug,
+                        postSlug: params.postSlug,
+                      },
+                      replace: true,
+                    });
+                  } catch (_error) {
+                    toastManager.add({
+                      title: "Failed to update board",
+                      type: "error",
+                    });
+                  }
+                }}
+              />
+            </PropertyRow>
+
+            <Separator />
+
+            <PropertyRow label="Date">
+              <p className="text-muted-foreground text-sm">
+                {formatPostDate(post?.createdAt ?? new Date())}
+              </p>
+            </PropertyRow>
+            <PropertyRow label="Author">
+              <p className="text-muted-foreground text-sm">
+                {post?.user?.name ?? "Unknown author"}
+              </p>
+            </PropertyRow>
+          </div>
+        </aside>
+      ) : null}
     </div>
   );
 }
