@@ -24,7 +24,9 @@ export class Post extends Schema.Class<Post>("Post")({
   creatorId: Schema.NullOr(Schema.String),
   user: Schema.Struct({
     name: Schema.NullOr(Schema.String),
+    image: Schema.NullOr(Schema.String),
   }),
+  hasUserUpVoted: Schema.Boolean,
 }) {}
 
 export type TPost = Schema.Schema.Type<typeof Post>;
