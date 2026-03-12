@@ -143,7 +143,7 @@ function BoardList() {
         .where((board) => eq(board.board.organizationId, organizationId))
 
         .orderBy((board) => board.board.createdAt, "desc"),
-    []
+    [organizationId]
   );
 
   return data.map((board) => (

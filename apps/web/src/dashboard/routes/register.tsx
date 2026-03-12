@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
@@ -10,32 +9,32 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { toastManager } from "~/components/ui/toast";
-import { OnboardingShell } from "~/features/onboarding/components/onboarding-shell";
-import { OnboardingWorkspaceStep } from "~/features/onboarding/components/onboarding-workspace-step";
+import { RegisterShell } from "~/features/register/components/register-shell";
+import { RegisterWorkspaceStep } from "~/features/register/components/register-workspace-step";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
 import { fetchRpc } from "~/lib/runtime";
-import { onboardingFormOpts } from "../features/onboarding/shared-form";
+import { registerFormOpts } from "../features/register/shared-form";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
 });
 
-export const Route = createFileRoute("/onboarding")({
+export const Route = createFileRoute("/register")({
   validateSearch: (search) => SearchSchema.parse(search),
-  component: OnboardingRoute,
+  component: RegisterRoute,
 });
 
-function OnboardingRoute() {
+function RegisterRoute() {
   const navigate = Route.useNavigate();
   const { refetch } = authClient.useSession();
 
   const form = useAppForm({
-    ...onboardingFormOpts,
+    ...registerFormOpts,
     onSubmit: async ({ value }) => {
       try {
         const result = await fetchRpc((rpc) =>
-          rpc.OnboardingComplete({
+          rpc.WorkspaceCreate({
             workspaceName: value.workspaceName,
           })
         );
@@ -54,7 +53,7 @@ function OnboardingRoute() {
         }
       } catch (_error) {
         toastManager.add({
-          title: "Failed to complete onboarding",
+          title: "Failed to create workspace",
           type: "error",
         });
         return;
@@ -63,7 +62,7 @@ function OnboardingRoute() {
   });
 
   return (
-    <OnboardingShell>
+    <RegisterShell>
       <Card>
         <CardHeader>
           <CardTitle>Create a new Workspace</CardTitle>
@@ -75,16 +74,16 @@ function OnboardingRoute() {
         <CardContent>
           <form
             className="flex flex-col gap-5"
-            id="onboarding-form"
+            id="register-form"
             onSubmit={(e) => {
               e.preventDefault();
               e.stopPropagation();
               form.handleSubmit();
             }}
           >
-            <OnboardingShell.Body>
-              <OnboardingWorkspaceStep form={form} />
-            </OnboardingShell.Body>
+            <RegisterShell.Body>
+              <RegisterWorkspaceStep form={form} />
+            </RegisterShell.Body>
           </form>
         </CardContent>
       </Card>
@@ -96,7 +95,7 @@ function OnboardingRoute() {
           <Button
             className="w-full"
             disabled={isDisabled}
-            form="onboarding-form"
+            form="register-form"
             size="lg"
             type="submit"
           >
@@ -104,6 +103,6 @@ function OnboardingRoute() {
           </Button>
         )}
       </form.Subscribe>
-    </OnboardingShell>
+    </RegisterShell>
   );
 }

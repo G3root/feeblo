@@ -14,7 +14,7 @@ import {
 } from "~/components/ui/input-group";
 import { withForm } from "~/hooks/form";
 import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
-import { onboardingFormOpts } from "../shared-form";
+import { registerFormOpts } from "../shared-form";
 import { toWorkspaceSlug } from "../utils";
 
 const slugStatusMessages: Partial<
@@ -30,8 +30,8 @@ const slugStatusMessages: Partial<
   error: <FieldError>Could not check availability. Try again.</FieldError>,
 };
 
-export const OnboardingWorkspaceStep = withForm({
-  ...onboardingFormOpts,
+export const RegisterWorkspaceStep = withForm({
+  ...registerFormOpts,
   render: ({ form }) => {
     const workspaceName = useStore(
       form.store,

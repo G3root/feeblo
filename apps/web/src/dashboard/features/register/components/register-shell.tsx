@@ -48,7 +48,7 @@ function Actions({ children, className }: SectionProps) {
   return <div className={cn("flex flex-col", className)}>{children}</div>;
 }
 
-export const OnboardingShell = Object.assign(Root, {
+export const RegisterShell = Object.assign(Root, {
   Heading,
   Body,
   Actions,

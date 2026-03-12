@@ -8,7 +8,7 @@ import { authClient } from "~/lib/auth-client";
 const AUTH_SIGN_IN_PATH = "/sign-in";
 const AUTH_SIGN_UP_PATH = "/sign-up";
 const AUTH_EMAIL_VERIFY_PATH = "/email-verify";
-const ONBOARDING_PATH = "/onboarding";
+const REGISTER_PATH = "/register";
 const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
 const DASHBOARD_AUTH_PATHS = new Set([
@@ -16,7 +16,7 @@ const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_SIGN_UP_PATH,
   AUTH_EMAIL_VERIFY_PATH,
 ]);
-const DASHBOARD_NON_ORG_PATHS = new Set([...DASHBOARD_AUTH_PATHS, ONBOARDING_PATH]);
+const DASHBOARD_NON_ORG_PATHS = new Set([...DASHBOARD_AUTH_PATHS, REGISTER_PATH]);
 
 const RESERVED_SUBDOMAIN_SET = new Set(RESERVED_SUBDOMAINS);
 
@@ -95,6 +95,10 @@ function getDefaultOrganizationId(context: APIContext) {
   return getMemberOrganizationIds(context)[0] ?? null;
 }
 
+function hasOrganizations(context: APIContext) {
+  return getMemberOrganizationIds(context).length > 0;
+}
+
 function dashboardAuthRedirectMiddleware(
   context: APIContext,
   next: MiddlewareNext
@@ -109,8 +113,8 @@ function dashboardAuthRedirectMiddleware(
 
   const isAuthPath = DASHBOARD_AUTH_PATHS.has(pathname);
   const isAuthed = Boolean(context.locals.session);
-  const isOnboardingPath = pathname === ONBOARDING_PATH;
-  const isOnboarded = Boolean(context.locals.user?.onboardedOn);
+  const isRegisterPath = pathname === REGISTER_PATH;
+  const hasOrgs = hasOrganizations(context);
 
   if (!(isAuthed || isAuthPath)) {
     const redirectURL = new URL(AUTH_SIGN_IN_PATH, url);
@@ -118,24 +122,17 @@ function dashboardAuthRedirectMiddleware(
     return context.redirect(redirectURL.toString());
   }
 
-  if (isAuthed && !isOnboarded && !(isAuthPath || isOnboardingPath)) {
-    const redirectURL = new URL(ONBOARDING_PATH, url);
+  if (isAuthed && !hasOrgs && !(isAuthPath || isRegisterPath)) {
+    const redirectURL = new URL(REGISTER_PATH, url);
     redirectURL.searchParams.set("redirectTo", `${url.pathname}${url.search}`);
     return context.redirect(redirectURL.toString());
   }
 
   if (isAuthed && isAuthPath) {
-    if (!isOnboarded) {
-      return context.redirect(ONBOARDING_PATH);
+    if (!hasOrgs) {
+      return context.redirect(REGISTER_PATH);
     }
 
-    const organizationId = getDefaultOrganizationId(context);
-    return context.redirect(
-      organizationId ? `/${organizationId}` : DASHBOARD_PATH
-    );
-  }
-
-  if (isAuthed && isOnboardingPath && isOnboarded) {
     const organizationId = getDefaultOrganizationId(context);
     return context.redirect(
       organizationId ? `/${organizationId}` : DASHBOARD_PATH

@@ -5,7 +5,6 @@ import { BoardRpcHandlers } from "./board/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
-import { OnboardingRpcHandlers } from "./onboarding/handlers";
 import { PostRpcHandlers } from "./post/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { AllRpcs } from "./rpc-group";
@@ -22,7 +21,6 @@ export const RpcRoute = RpcServer.layerHttpRouter({
   Layer.provide(PostRpcHandlers),
   Layer.provide(BillingRpcHandlers),
   Layer.provide(BoardRpcHandlers),
-  Layer.provide(OnboardingRpcHandlers),
   Layer.provide(MembershipRpcHandlers),
   Layer.provide(CommentReactionRpcHandlers),
   Layer.provide(CommentRpcHandlers),

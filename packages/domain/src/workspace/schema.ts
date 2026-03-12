@@ -4,6 +4,22 @@ export const WorkspaceInput = Schema.Struct({
   organizationId: Schema.String,
 });
 
+export class CreateWorkspaceInput extends Schema.Class<CreateWorkspaceInput>(
+  "CreateWorkspaceInput"
+)({
+  workspaceName: Schema.String.pipe(Schema.minLength(3)),
+}) {}
+
+export class CreateWorkspaceOutput extends Schema.Class<CreateWorkspaceOutput>(
+  "CreateWorkspaceOutput"
+)({
+  organizationId: Schema.String,
+}) {}
+
+export type TCreateWorkspaceInput = Schema.Schema.Type<
+  typeof CreateWorkspaceInput
+>;
+
 export type TWorkspaceInput = Schema.Schema.Type<typeof WorkspaceInput>;
 
 export const WorkspacePreferences = Schema.Struct({

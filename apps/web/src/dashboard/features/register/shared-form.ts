@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-export const onboardingFormSchema = z.object({
+export const registerFormSchema = z.object({
   workspaceName: z.string().trim().min(2, "Workspace name is required"),
 });
 
-export const onboardingFormOpts = {
+export const registerFormOpts = {
   defaultValues: {
     workspaceName: "",
   },
   validators: {
-    onChange: onboardingFormSchema,
+    onChange: registerFormSchema,
   },
 };

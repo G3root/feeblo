@@ -1,10 +1,15 @@
 import { DB } from "@feeblo/db";
 import {
+  member as memberTable,
+  organization as organizationTable,
   product as productTable,
   subscription as subscriptionTable,
 } from "@feeblo/db/schema/auth";
+import { board as boardTable } from "@feeblo/db/schema/feedback";
+import { generateId } from "@feeblo/utils/id";
+import { slugify } from "@feeblo/utils/url";
 import { and, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, Array as EffectArray, Option } from "effect";
 
 export class WorkspaceRepository extends Effect.Service<WorkspaceRepository>()(
   "WorkspaceRepository",
@@ -13,6 +18,68 @@ export class WorkspaceRepository extends Effect.Service<WorkspaceRepository>()(
       const db = yield* DB;
 
       return {
+        isOrganizationSlugTaken: ({ slug }: { slug: string }) =>
+          Effect.gen(function* () {
+            const [row] = yield* db
+              .select({ id: organizationTable.id })
+              .from(organizationTable)
+              .where(eq(organizationTable.slug, slug))
+              .limit(1);
+
+            return Boolean(row);
+          }),
+        createWorkspace: ({
+          userId,
+          workspaceName,
+          slug,
+        }: {
+          userId: string;
+          workspaceName: string;
+          slug: string;
+        }) =>
+          Effect.gen(function* () {
+            const organization = yield* db
+              .insert(organizationTable)
+              .values({
+                id: generateId("organization"),
+                name: workspaceName,
+                slug,
+                createdAt: new Date(),
+              })
+              .returning()
+              .pipe(Effect.map(EffectArray.get(0)));
+
+            if (Option.isNone(organization)) {
+              return yield* Effect.fail(
+                new Error("Failed to create organization")
+              );
+            }
+            const organizationId = organization.value.id;
+
+            yield* db.insert(memberTable).values({
+              id: generateId("member"),
+              organizationId,
+              role: "owner",
+              createdAt: new Date(),
+              userId,
+            });
+
+            const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
+
+            for (const boardName of defaultBoards) {
+              yield* db.insert(boardTable).values({
+                id: generateId("board"),
+                name: boardName,
+                slug: slugify(boardName),
+                visibility: "PUBLIC",
+                organizationId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+            }
+
+            return organizationId;
+          }),
         findProducts: () =>
           db
             .select({

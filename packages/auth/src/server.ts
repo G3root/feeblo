@@ -59,15 +59,6 @@ export const initAuthHandler = () =>
         requireEmailVerification: true,
         autoSignIn: false,
       },
-      user: {
-        additionalFields: {
-          onboardedOn: {
-            type: "date",
-            required: false,
-          },
-        },
-      },
-
       plugins: [
         ...(polarService.client && polarService.webhookSecret._tag === "Some"
           ? [
@@ -136,17 +127,11 @@ export const initAuthHandler = () =>
           const organizations = memberships.map((membership) => ({
             id: membership.organizationId,
           }));
-          const userWithOnboarding = user as typeof user & {
-            onboardedOn?: Date | null;
-          };
 
           return {
             organizations,
             memberships,
-            user: {
-              ...user,
-              onboardedOn: userWithOnboarding.onboardedOn ?? null,
-            },
+            user,
             session,
           };
         }),
