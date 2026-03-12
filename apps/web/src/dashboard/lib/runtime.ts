@@ -4,7 +4,7 @@ import {
   runtime,
   withRpc,
 } from "@feeblo/rpc-client";
-import { type Effect, Exit } from "effect";
+import { Cause, type Effect, Exit } from "effect";
 import type { LiveManagedRuntime } from "./runtime/live-layer";
 import { useRuntime } from "./runtime/use-runtime";
 
@@ -20,7 +20,9 @@ export async function runEffect<A, E, R extends RuntimeRequirements>(
     signal: options?.signal,
   });
   if (Exit.isFailure(result)) {
-    throw result.cause;
+    const cause = result.cause;
+
+    throw new Error(Cause.pretty(cause));
   }
   return result.value;
 }

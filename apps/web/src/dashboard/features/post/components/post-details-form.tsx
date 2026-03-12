@@ -8,7 +8,13 @@ import {
   PencilEdit01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
+import {
+  and,
+  debounceStrategy,
+  eq,
+  useLiveSuspenseQuery,
+  usePacedMutations,
+} from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useRef, useState } from "react";
 import { z } from "zod";
@@ -35,41 +41,33 @@ import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
+import {
+  allPolicy,
+  hasMembership,
+  isUser,
+  usePolicy,
+} from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
 import {
   commentCollection,
+  commentReactionCollection,
   postCollection,
+  postReactionCollection,
   upvoteCollection,
 } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
-import {
-  type CommentReaction,
-  CommentReactionSection,
-} from "./comment-reaction-section";
+import { CommentReactionSection } from "./comment-reaction-section";
 import {
   isRichTextContentEmpty,
   toRenderableRichTextHtml,
   uploadPostEditorImage,
 } from "./post-editor-utils";
-import {
-  type PostReaction,
-  PostReactionSection,
-} from "./post-reaction-section";
+import { PostReactionSection } from "./post-reaction-section";
 import { PostTitleInput } from "./post-title-input";
 
 const READONLY_RICH_TEXT_CLASS =
   "prose prose-sm max-w-none text-foreground prose-headings:mb-2 prose-headings:mt-4 prose-headings:text-foreground prose-p:my-2 prose-p:text-foreground prose-strong:text-foreground prose-a:text-foreground prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-img:my-3 prose-img:max-h-80 prose-img:rounded-lg prose-img:border prose-img:border-border/60";
-
-type PostComment = {
-  id: string;
-  content: string;
-  createdAt: Date | string;
-  user: {
-    name: string;
-  };
-  userId: string;
-};
 
 type PostUpvote = {
   id: string;
@@ -81,31 +79,23 @@ type PostUpvote = {
 type PostDetailsFormProps = {
   boardName: string;
   boardSlug: string;
-  comments: PostComment[];
-  commentReactions: CommentReaction[];
   createdAt: Date;
   description: string;
   initialTitle: string;
   organizationId: string;
   postId: string;
   postCreatorId: string | null;
-  postReactions: PostReaction[];
-  upvotes: PostUpvote[];
 };
 
 export function PostDetailsForm({
   boardName,
   boardSlug,
-  comments,
-  commentReactions,
   createdAt,
   description,
   initialTitle,
   organizationId,
   postId,
   postCreatorId,
-  postReactions,
-  upvotes,
 }: PostDetailsFormProps) {
   return (
     <PostDetailsLayout>
@@ -120,25 +110,16 @@ export function PostDetailsForm({
 
       <PostDescriptionEditor
         description={description}
+        organizationId={organizationId}
         postCreatorId={postCreatorId}
         postId={postId}
       />
 
-      <PostDetailsActions
-        organizationId={organizationId}
-        postId={postId}
-        postReactions={postReactions}
-        upvotes={upvotes}
-      />
+      <PostDetailsActions organizationId={organizationId} postId={postId} />
 
       <PostCommentComposer organizationId={organizationId} postId={postId} />
 
-      <PostCommentList
-        commentReactions={commentReactions}
-        comments={comments}
-        organizationId={organizationId}
-        postId={postId}
-      />
+      <PostCommentList organizationId={organizationId} postId={postId} />
 
       <p className="text-muted-foreground text-xs">
         Created {createdAt.toLocaleDateString()}
@@ -155,17 +136,36 @@ function PostDetailsLayout({ children }: { children: ReactNode }) {
   );
 }
 
+const UpdatedPostSchema = z.object({
+  id: z.string(),
+  status: z.enum([
+    "PAUSED",
+    "REVIEW",
+    "PLANNED",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "CLOSED",
+  ]),
+  content: z.string(),
+  title: z.string(),
+  boardId: z.string(),
+  organizationId: z.string(),
+});
+
 function PostDescriptionEditor({
   postId,
   description,
   postCreatorId,
+  organizationId,
 }: {
   postId: string;
   description: string;
   postCreatorId: string | null;
+  organizationId: string;
 }) {
-  const { data: session } = authClient.useSession();
-  const isOwner = !!session?.user?.id && session.user.id === postCreatorId;
+  const { allowed: isOwner } = usePolicy(
+    allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
+  );
   const postEditorRef = useRef<EditorHandle | null>(null);
   const postImageInputRef = useRef<HTMLInputElement | null>(null);
   const initialDescription = useRef(description);
@@ -179,16 +179,8 @@ function PostDescriptionEditor({
     mutationFn: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: updatedPost } = mutation;
-      await fetchRpc((rpc) =>
-        rpc.PostUpdate({
-          id: updatedPost.id,
-          status: updatedPost.status,
-          content: updatedPost.content,
-          title: updatedPost.title,
-          boardId: updatedPost.boardId,
-          organizationId: updatedPost.organizationId,
-        })
-      );
+      const validatedPost = UpdatedPostSchema.parse(updatedPost);
+      await fetchRpc((rpc) => rpc.PostUpdate(validatedPost));
     },
     strategy: debounceStrategy({ wait: 500 }),
   });
@@ -241,14 +233,40 @@ function PostDescriptionEditor({
 function PostDetailsActions({
   organizationId,
   postId,
-  postReactions,
-  upvotes,
 }: {
   organizationId: string;
   postId: string;
-  postReactions: PostReaction[];
-  upvotes: PostUpvote[];
 }) {
+  const { data: upvotes } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) =>
+          and(
+            eq(upvote.organizationId, organizationId),
+            eq(upvote.postId, postId)
+          )
+        );
+    },
+    [organizationId, postId]
+  );
+
+  const { data: postReactions } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ postReaction: postReactionCollection })
+        .where(({ postReaction }) =>
+          and(
+            eq(postReaction.organizationId, organizationId),
+            eq(postReaction.postId, postId)
+          )
+        )
+        .orderBy((postReaction) => postReaction.postReaction.emoji, "asc")
+        .orderBy((postReaction) => postReaction.postReaction.createdAt, "asc");
+    },
+    [organizationId, postId]
+  );
+
   return (
     <div className="flex items-center justify-between py-1">
       <PostReactionSection
@@ -378,8 +396,10 @@ function PostDetailsHeader({
   postId: string;
   postCreatorId: string | null;
 }) {
-  const { data: session } = authClient.useSession();
-  const isOwner = !!session?.user?.id && session.user.id === postCreatorId;
+  const { allowed: isOwner } = usePolicy(
+    allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
+  );
+
   const mutate = usePacedMutations<{ value: string }>({
     onMutate: ({ value }) => {
       // Apply optimistic update immediately
@@ -391,16 +411,8 @@ function PostDetailsHeader({
       // Persist the final merged state to the backend
       const mutation = transaction.mutations[0];
       const { modified: updatedPost } = mutation;
-      await fetchRpc((rpc) =>
-        rpc.PostUpdate({
-          id: updatedPost.id,
-          status: updatedPost.status,
-          content: updatedPost.content,
-          title: updatedPost.title,
-          boardId: updatedPost.boardId,
-          organizationId: updatedPost.organizationId,
-        })
-      );
+      const validatedPost = UpdatedPostSchema.parse(updatedPost);
+      await fetchRpc((rpc) => rpc.PostUpdate(validatedPost));
     },
     // Wait 500ms after the last change before persisting
     strategy: debounceStrategy({ wait: 500 }),
@@ -497,19 +509,57 @@ function PostUpvoteButton({
 }
 
 function PostCommentList({
-  commentReactions,
-  comments,
   organizationId,
   postId,
 }: {
-  commentReactions: CommentReaction[];
-  comments: PostComment[];
   organizationId: string;
   postId: string;
 }) {
   const { data: session } = authClient.useSession();
   const currentUserId = session?.user?.id ?? "unknown";
   const store = useCommentDeleteDialogContext();
+
+  const { data: comments } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ comment: commentCollection })
+        .where(({ comment }) =>
+          and(
+            eq(comment.organizationId, organizationId),
+            eq(comment.postId, postId)
+          )
+        )
+        .orderBy((comment) => comment.comment.createdAt, "desc");
+    },
+    [organizationId, postId]
+  );
+
+  const { data: commentReactions } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ commentReaction: commentReactionCollection })
+        .where(({ commentReaction }) =>
+          and(
+            eq(commentReaction.organizationId, organizationId),
+            eq(commentReaction.postId, postId)
+          )
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.commentId,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.emoji,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.createdAt,
+          "asc"
+        );
+    },
+    [organizationId, postId]
+  );
+
   if (comments.length === 0) {
     return null;
   }
@@ -620,13 +670,33 @@ function formatRelativeTime(value: Date | string) {
   return rtf.format(diffDays, "day");
 }
 
+function PostDetailsActionsSkeleton() {
+  return (
+    <div className="flex items-center justify-between py-1">
+      <Skeleton className="h-8 w-20 rounded-full" />
+      <Skeleton className="h-8 w-16 rounded-full" />
+    </div>
+  );
+}
+
+function PostCommentListSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-20 w-full rounded-xl" />
+      <Skeleton className="h-20 w-full rounded-xl" />
+    </div>
+  );
+}
+
 export const PostDetails = {
   Layout: PostDetailsLayout,
   Header: PostDetailsHeader,
   Description: PostDescriptionEditor,
   Actions: PostDetailsActions,
+  ActionsSkeleton: PostDetailsActionsSkeleton,
   CommentComposer: PostCommentComposer,
   CommentList: PostCommentList,
+  CommentListSkeleton: PostCommentListSkeleton,
 };
 
 export function PostDetailsFormSkeleton() {

@@ -1,19 +1,13 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Suspense } from "react";
 import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
 import {
   PostDetails,
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
 import { CommentDeleteDialogProvider } from "~/features/post/dialog-stores";
-import {
-  boardCollection,
-  commentCollection,
-  commentReactionCollection,
-  postCollection,
-  postReactionCollection,
-  upvoteCollection,
-} from "~/lib/collections";
+import { boardCollection, postCollection } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
@@ -56,77 +50,6 @@ function RouteComponent() {
     [postSlug, organizationId, board?.id]
   );
 
-  const { data: comments } = useLiveSuspenseQuery(
-    (q) => {
-      return q
-        .from({ comment: commentCollection })
-        .where(({ comment }) =>
-          and(
-            eq(comment.organizationId, organizationId),
-            eq(comment.postId, post?.id)
-          )
-        )
-        .orderBy((comment) => comment.comment.createdAt, "desc");
-    },
-    [organizationId, post?.id]
-  );
-
-  const { data: commentReactions } = useLiveSuspenseQuery(
-    (q) => {
-      return q
-        .from({ commentReaction: commentReactionCollection })
-        .where(({ commentReaction }) =>
-          and(
-            eq(commentReaction.organizationId, organizationId),
-            eq(commentReaction.postId, post?.id)
-          )
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.commentId,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.emoji,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.createdAt,
-          "asc"
-        );
-    },
-    [organizationId, post?.id]
-  );
-
-  const { data: upvotes } = useLiveSuspenseQuery(
-    (q) => {
-      return q
-        .from({ upvote: upvoteCollection })
-        .where(({ upvote }) =>
-          and(
-            eq(upvote.organizationId, organizationId),
-            eq(upvote.postId, post?.id)
-          )
-        );
-    },
-    [organizationId, post?.id]
-  );
-
-  const { data: postReactions } = useLiveSuspenseQuery(
-    (q) => {
-      return q
-        .from({ postReaction: postReactionCollection })
-        .where(({ postReaction }) =>
-          and(
-            eq(postReaction.organizationId, organizationId),
-            eq(postReaction.postId, post?.id)
-          )
-        )
-        .orderBy((postReaction) => postReaction.postReaction.emoji, "asc")
-        .orderBy((postReaction) => postReaction.postReaction.createdAt, "asc");
-    },
-    [organizationId, post?.id]
-  );
-
   if (!(board && post)) {
     return (
       <div className="mx-auto w-full max-w-5xl p-6">
@@ -160,25 +83,26 @@ function RouteComponent() {
         />
         <PostDetails.Description
           description={post.content}
+          organizationId={organizationId}
           postCreatorId={post.creatorId}
           postId={post.id}
         />
-        <PostDetails.Actions
-          organizationId={organizationId}
-          postId={post.id}
-          postReactions={postReactions}
-          upvotes={upvotes}
-        />
+        <Suspense fallback={<PostDetails.ActionsSkeleton />}>
+          <PostDetails.Actions
+            organizationId={organizationId}
+            postId={post.id}
+          />
+        </Suspense>
         <PostDetails.CommentComposer
           organizationId={organizationId}
           postId={post.id}
         />
-        <PostDetails.CommentList
-          commentReactions={commentReactions}
-          comments={comments}
-          organizationId={organizationId}
-          postId={post.id}
-        />
+        <Suspense fallback={<PostDetails.CommentListSkeleton />}>
+          <PostDetails.CommentList
+            organizationId={organizationId}
+            postId={post.id}
+          />
+        </Suspense>
         <p className="text-muted-foreground text-xs">
           Created {post.createdAt.toLocaleDateString()}
         </p>
