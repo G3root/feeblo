@@ -12,11 +12,8 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
     return {
       UpvoteList: (args: TUpvoteList) =>
         Effect.gen(function* () {
-          const session = yield* CurrentSession;
-
           return yield* repository.list({
             postId: args.postId,
-            userId: session.session.userId,
             organizationId: args.organizationId,
           });
         }).pipe(Effect.catchAll(onInternalServerError)),

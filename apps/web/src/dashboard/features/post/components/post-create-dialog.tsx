@@ -132,8 +132,10 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
           organizationId,
           creatorId: session?.user?.id ?? null,
           creatorMemberId: member?.id ?? null,
+          hasUserUpVoted: false,
           user: {
             name: session?.user?.name ?? null,
+            image: session?.user?.image ?? null,
           },
         });
 

@@ -36,7 +36,7 @@ export const initAuthHandler = () =>
       telemetry: {
         enabled: false,
       },
-      trustedOrigins: [appUrl, apiUrl],
+      trustedOrigins: [appUrl, apiUrl, "*.localhost:3001"],
 
       advanced: {
         defaultCookieAttributes: {

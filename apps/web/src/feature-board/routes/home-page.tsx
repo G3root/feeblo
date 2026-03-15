@@ -11,7 +11,10 @@ import {
   FeedbackBrowseLayoutMain,
   FeedbackBrowseLayoutSidebar,
 } from "../components/layout/feedback-browse-layout";
-import { postCollection, publicBoardCollection } from "../lib/collections";
+import {
+  publicBoardCollection,
+  publicPostCollection,
+} from "../lib/collections";
 import { useSite } from "../providers/site-provider";
 
 function MainContent({ children }: { children: ReactNode }) {
@@ -37,7 +40,7 @@ export function HomePage() {
   } = useLiveQuery(
     (q) =>
       q
-        .from({ post: postCollection })
+        .from({ post: publicPostCollection })
         .join(
           { board: publicBoardCollection },
           ({ post, board }) => eq(post.boardId, board.id),

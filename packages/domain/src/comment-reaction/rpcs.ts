@@ -13,7 +13,7 @@ export class CommentReactionRpcs extends RpcGroup.make(
     payload: CommentReactionList,
     success: Schema.Array(CommentReaction),
     error: CommentReactionServiceErrors,
-  }).middleware(AuthMiddleware),
+  }),
   Rpc.make("CommentReactionToggle", {
     payload: CommentReactionToggle,
     success: Schema.Struct({

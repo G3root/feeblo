@@ -66,6 +66,9 @@
     },
     "./comments/schema": {
       "default": "./src/comments/schema.ts"
+    },
+    "./upvote/schema": {
+      "default": "./src/upvote/schema.ts"
     }
   },
   "dependencies": {

@@ -1,5 +1,8 @@
 import { DB } from "@feeblo/db";
-import { member as memberTable } from "@feeblo/db/schema/auth";
+import {
+  member as memberTable,
+  user as userTable,
+} from "@feeblo/db/schema/auth";
 import {
   post as postTable,
   upvote as upvoteTable,
@@ -10,7 +13,6 @@ import { Effect, Array as EffectArray, Option } from "effect";
 
 type TUpvoteList = {
   postId: string;
-  userId: string;
   organizationId: string;
 };
 
@@ -27,7 +29,7 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
       const db = yield* DB;
 
       return {
-        list: ({ postId, userId, organizationId }: TUpvoteList) =>
+        list: ({ postId, organizationId }: TUpvoteList) =>
           Effect.gen(function* () {
             const post = yield* db
               .select({ id: postTable.id })
@@ -51,17 +53,21 @@ export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
                 postId: upvoteTable.postId,
                 organizationId: postTable.organizationId,
                 userId: upvoteTable.userId,
+                user: {
+                  name: userTable.name,
+                  image: userTable.image,
+                },
                 memberId: upvoteTable.memberId,
                 createdAt: upvoteTable.createdAt,
                 updatedAt: upvoteTable.updatedAt,
               })
               .from(upvoteTable)
               .innerJoin(postTable, eq(postTable.id, upvoteTable.postId))
+              .innerJoin(userTable, eq(userTable.id, upvoteTable.userId))
               .where(
                 and(
                   eq(postTable.organizationId, organizationId),
-                  eq(upvoteTable.postId, postId),
-                  eq(upvoteTable.userId, userId)
+                  eq(upvoteTable.postId, postId)
                 )
               );
           }),

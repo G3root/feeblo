@@ -34,7 +34,15 @@ export function BoardListCard() {
   );
 }
 
-function BoardNavLink({ href, label }: { href: string; label: string }) {
+export function BoardNavLink({
+  href,
+  label,
+  showActiveIndicator = false,
+}: {
+  href: string;
+  label: string;
+  showActiveIndicator?: boolean;
+}) {
   const [location] = useLocation();
   const isActive = location === href;
 
@@ -51,7 +59,8 @@ function BoardNavLink({ href, label }: { href: string; label: string }) {
       <span
         className={cn(
           "size-1.5 shrink-0 rounded-full",
-          isActive ? "bg-primary" : "bg-muted-foreground/40"
+          isActive ? "bg-primary" : "bg-muted-foreground/40",
+          showActiveIndicator ? "bg-primary" : ""
         )}
       />
       <span className="truncate">{label}</span>

@@ -8,7 +8,10 @@ import { MembershipRpcHandlers } from "./membership/handlers";
 import { PostRpcHandlers } from "./post/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { AllRpcs } from "./rpc-group";
-import { AuthMiddlewareLive } from "./session-middleware";
+import {
+  AuthMiddlewareLive,
+  OptionalAuthMiddlewareLive,
+} from "./session-middleware";
 import { SiteRpcHandlers } from "./site/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
@@ -29,5 +32,6 @@ export const RpcRoute = RpcServer.layerHttpRouter({
   Layer.provide(PostReactionRpcHandlers),
   Layer.provide(WorkspaceRpcHandlers),
   Layer.provide(RpcSerialization.layerNdjson),
-  Layer.provide(AuthMiddlewareLive)
+  Layer.provide(AuthMiddlewareLive),
+  Layer.provide(OptionalAuthMiddlewareLive)
 );

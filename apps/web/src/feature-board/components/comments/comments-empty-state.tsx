@@ -1,3 +1,5 @@
+import { Comment01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Empty,
   EmptyDescription,
@@ -8,9 +10,11 @@ import {
 
 export function CommentsEmptyState() {
   return (
-    <Empty className="border border-border/70 border-dashed bg-muted/20">
+    <Empty className="border border-dashed">
       <EmptyHeader>
-        <EmptyMedia variant="icon">0</EmptyMedia>
+        <EmptyMedia variant="icon">
+          <HugeiconsIcon icon={Comment01Icon} />
+        </EmptyMedia>
         <EmptyTitle>No comments yet</EmptyTitle>
         <EmptyDescription>
           Start the discussion when you are ready.

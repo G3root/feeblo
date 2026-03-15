@@ -2,7 +2,7 @@ import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { onInternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
-import { CurrentSession } from "../session-middleware";
+import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -19,23 +19,31 @@ export const PostRpcHandlers = PostRpcs.toLayer(
     const postPolicy = yield* PostPolicy;
     return {
       PostList: (args: TPostList) => {
-        return repository
-          .findMany({
+        return Effect.gen(function* () {
+          const session = yield* CurrentSession;
+          return yield* repository.findMany({
             organizationId: args.organizationId,
             boardId: args.boardId,
-          })
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            Effect.catchAll(onInternalServerError)
-          );
+            userId: session.session.userId,
+          });
+        }).pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Effect.catchAll(onInternalServerError)
+        );
       },
       PostListPublic: (args: TPostList) => {
-        return repository
-          .findMany({
+        return Effect.gen(function* () {
+          const sessionOption = yield* OptionalCurrentSession;
+          const userId =
+            sessionOption._tag === "Some"
+              ? sessionOption.value.session.userId
+              : undefined;
+          return yield* repository.findMany({
             organizationId: args.organizationId,
             boardId: args.boardId,
-          })
-          .pipe(Effect.catchAll(onInternalServerError));
+            userId,
+          });
+        }).pipe(Effect.catchAll(onInternalServerError));
       },
       PostDelete: (args: TPostDelete) => {
         return repository
@@ -59,19 +67,21 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           );
       },
       PostUpdate: (args: TPostUpdate) => {
-        return repository.update({ ...args, content: sanitizeRichText(args.content) }).pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(args.organizationId),
-              postPolicy.isOwner({
-                organizationId: args.organizationId,
-                postId: args.id,
-                boardId: args.boardId,
-              })
-            )
-          ),
-          Effect.catchAll(onInternalServerError)
-        );
+        return repository
+          .update({ ...args, content: sanitizeRichText(args.content) })
+          .pipe(
+            Policy.withPolicy(
+              Policy.all(
+                Policy.hasMembership(args.organizationId),
+                postPolicy.isOwner({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  boardId: args.boardId,
+                })
+              )
+            ),
+            Effect.catchAll(onInternalServerError)
+          );
       },
       PostCreate: (args: TPostCreate) => {
         return Effect.gen(function* () {

@@ -1,8 +1,6 @@
-import { generateId } from "@feeblo/utils/id";
 import { useMemo, useState } from "react";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
-import { postReactionCollection } from "~/lib/collections";
 import { ReactionButton, ReactionList } from "./reaction-button";
 
 export type PostReaction = {
@@ -14,12 +12,13 @@ export type PostReaction = {
 };
 
 export function PostReactionSection({
-  organizationId,
-  postId,
+  handleToggleReaction: handleToggleReaction_,
   postReactions,
 }: {
-  organizationId: string;
-  postId: string;
+  handleToggleReaction: (
+    emoji: string,
+    existingUserEmojiReaction: PostReaction | undefined
+  ) => Promise<void>;
   postReactions: PostReaction[];
 }) {
   const { data: session } = authClient.useSession();
@@ -62,23 +61,7 @@ export function PostReactionSection({
           reaction.userId === currentUserId && reaction.emoji === emoji
       );
 
-      if (existingUserEmojiReaction) {
-        const tx = postReactionCollection.delete(existingUserEmojiReaction.id);
-        await tx.isPersisted.promise;
-        return;
-      }
-
-      const tx = postReactionCollection.insert({
-        id: generateId("postReaction"),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        organizationId,
-        postId,
-        userId: currentUserId,
-        memberId: null,
-        emoji,
-      });
-      await tx.isPersisted.promise;
+      await handleToggleReaction_(emoji, existingUserEmojiReaction);
     } catch (_error) {
       toastManager.add({ title: "Failed to update reaction", type: "error" });
     } finally {
