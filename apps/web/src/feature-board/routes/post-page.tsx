@@ -1,7 +1,6 @@
 import { generateId } from "@feeblo/utils/id";
 import {
   and,
-  createOptimisticAction,
   debounceStrategy,
   eq,
   useLiveQuery,
@@ -41,6 +40,7 @@ import { fetchRpc } from "~/lib/runtime";
 import { cn } from "~/lib/utils";
 import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
+import { useUpvote } from "../hooks/use-upvote";
 import {
   publicBoardCollection,
   publicPostCollection,
@@ -248,7 +248,11 @@ export function PostPage({ slug }: { slug: string }) {
 
           <div className="flex items-start gap-4 sm:gap-6">
             <div className="shrink-0 pt-1">
-              <UpvoteButton postId={post.id} />
+              <UpvoteButton
+                hasUserUpVoted={post.hasUserUpVoted}
+                postId={post.id}
+                upvoteCount={post.upVotes}
+              />
             </div>
 
             <div className="min-w-0 flex-1 space-y-6">
@@ -373,7 +377,8 @@ function UpvoteList({ postId }: { postId: string }) {
             eq(upvote.postId, postId),
             eq(upvote.organizationId, organizationId)
           )
-        ),
+        )
+        .orderBy(({ upvote }) => upvote.createdAt, "asc"),
     [organizationId, postId]
   );
 
@@ -395,7 +400,15 @@ function UpvoteList({ postId }: { postId: string }) {
   );
 }
 
-function UpvoteButton({ postId }: { postId: string }) {
+function UpvoteButton({
+  hasUserUpVoted,
+  postId,
+  upvoteCount,
+}: {
+  hasUserUpVoted: boolean;
+  postId: string;
+  upvoteCount: number;
+}) {
   const site = useSite();
   const organizationId = site.organizationId;
   const { data: session } = authClient.useSession();
@@ -413,99 +426,25 @@ function UpvoteButton({ postId }: { postId: string }) {
     [organizationId, postId]
   );
 
-  const upvoteCount = upvotes.length;
-
-  const hasUserUpVoted_ = upvotes.some(
-    (upvote) => upvote.userId === session?.user?.id
-  );
-
-  // const handleToggleUpvote = async () => {
-  //   const currentUserId = session?.user?.id;
-  //   if (!currentUserId) {
-  //     toastManager.add({ title: "Sign in to upvote", type: "error" });
-  //     return;
-  //   }
-  //   const tx = publicUpvoteCollection.insert({
-  //     id: generateId("upvote"),
-  //     createdAt: new Date(),
-  //     updatedAt: new Date(),
-  //     organizationId,
-  //     postId,
-  //     userId: currentUserId,
-  //     memberId: null,
-  //     user: {
-  //       name: session?.user?.name ?? null,
-  //       image: session?.user?.image ?? null,
-  //     },
-  //   });
-  //   await tx.isPersisted.promise;
-  // };
-
-  const handleToggleUpvote = createOptimisticAction<{
-    postId: string;
-    organizationId: string;
-  }>({
-    onMutate: ({ postId }) => {
-      const currentUserId = session?.user?.id;
-      if (!currentUserId) {
-        toastManager.add({ title: "Sign in to upvote", type: "error" });
-        return;
-      }
-
-      const isMember = session?.memberships?.find(
-        (membership) =>
-          membership.userId === currentUserId &&
-          membership.organizationId === organizationId
-      );
-
-      const existingUpvote = upvotes.find(
-        (upvote) => upvote.userId === currentUserId
-      );
-
-      if (existingUpvote) {
-        publicUpvoteCollection.delete(existingUpvote.id);
-        publicPostCollection.update(postId, (draft) => {
-          draft.hasUserUpVoted = !draft.hasUserUpVoted;
-        });
-      } else {
-        publicUpvoteCollection.insert({
-          id: generateId("upvote"),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          organizationId,
-          postId,
-          userId: currentUserId,
-          memberId: isMember ? isMember.membershipId : null,
-          user: {
-            name: session?.user?.name ?? null,
-            image: session?.user?.image ?? null,
-          },
-        });
-
-        publicPostCollection.update(postId, (draft) => {
-          draft.hasUserUpVoted = !draft.hasUserUpVoted;
-        });
-      }
-    },
-    mutationFn: async ({ postId, organizationId }, _params) => {
-      await fetchRpc((rpc) =>
-        rpc.UpvoteToggle({
-          organizationId,
-          postId,
-        })
-      );
-
-      await publicUpvoteCollection.utils.refetch();
-      // await publicPostCollection.utils.refetch();
-    },
-  });
+  const { handleToggleUpvote } = useUpvote();
 
   return (
     <PostUpvoteButton
       handleToggleUpvote={async () => {
-        await handleToggleUpvote({ postId, organizationId });
+        const existingUpvoteId = upvotes.find(
+          (upvote) => upvote.userId === session?.user?.id
+        )?.id;
+        await handleToggleUpvote({
+          postId,
+          organizationId,
+          existingUpvote: hasUserUpVoted,
+          revalidateExistingUpvote: existingUpvoteId
+            ? { id: existingUpvoteId }
+            : undefined,
+          insertNewUpvote: true,
+        });
       }}
-      isUpvoted={hasUserUpVoted_}
+      isUpvoted={hasUserUpVoted}
       upvoteCount={upvoteCount}
       variant="compact"
     />

@@ -2,6 +2,8 @@ import type { Board } from "@feeblo/domain/board/schema";
 import type { Post } from "@feeblo/domain/post/schema";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useUpvote } from "src/feature-board/hooks/use-upvote";
+import { publicUpvoteCollection } from "src/feature-board/lib/collections";
 import {
   formatPostStatus,
   getInitials,
@@ -11,6 +13,7 @@ import {
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Skeleton } from "~/components/ui/skeleton";
+import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 
 const statusColors: Record<string, string> = {
@@ -56,6 +59,10 @@ function UserAvatar({
 }
 
 export function FeedbackCard({ board, post }: { board: Board; post: Post }) {
+  const { handleToggleUpvote } = useUpvote();
+  const { data: session } = authClient.useSession();
+  const existingUpvote = post.hasUserUpVoted;
+  const upvoteCount = post.upVotes;
   const description =
     truncate(stripHtml(post.content), 100) || "No details yet.";
 
@@ -67,16 +74,35 @@ export function FeedbackCard({ board, post }: { board: Board; post: Post }) {
       <button
         className={cn(
           "flex h-9 w-10 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors",
-          post.hasUserUpVoted
+          existingUpvote
             ? "bg-primary/10 text-primary"
             : "bg-muted/70 text-muted-foreground hover:bg-muted"
         )}
-        onClick={(e) => e.preventDefault()}
+        onClick={(e) => {
+          e.preventDefault();
+          const existingUpvoteId = Array.from(
+            publicUpvoteCollection.values()
+          ).filter(
+            (upvote) =>
+              upvote.postId === post.id && upvote.userId === session?.user?.id
+          )?.[0]?.id;
+          handleToggleUpvote({
+            postId: post.id,
+            organizationId: board.organizationId,
+            existingUpvote,
+            revalidateExistingUpvote: existingUpvoteId
+              ? {
+                  id: existingUpvoteId,
+                }
+              : undefined,
+            insertNewUpvote: !existingUpvoteId,
+          });
+        }}
         type="button"
       >
         <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
         <span className="font-medium text-xs tabular-nums leading-none">
-          {post.upVotes}
+          {upvoteCount}
         </span>
       </button>
 
