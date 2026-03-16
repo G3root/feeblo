@@ -1,0 +1,38 @@
+{
+  "name": "@feeblo/transactional",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./templates/*": {
+      "default": "./src/templates/*.tsx"
+    }
+  },
+  "scripts": {
+    "build": "email build",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "email:dev": "email dev --dir ./src/templates --port 3005",
+    "email:export": "email export",
+    "email:start": "email start"
+  },
+  "dependencies": {
+    "@react-email/components": "^1.0.9",
+    "@react-email/render": "^2.0.4",
+    "effect": "catalog:",
+    "nodemailer": "^8.0.2",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@react-email/preview-server": "^5.2.9",
+    "@types/nodemailer": "^7.0.11",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react-email": "^5.2.9",
+    "typescript": "catalog:"
+  }
+}

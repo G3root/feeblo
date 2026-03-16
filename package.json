@@ -28,7 +28,11 @@
       "class-variance-authority": "^0.7.1",
       "clsx": "^2.1.1",
       "@tanstack/query-db-collection": "^1.0.27",
-      "@tanstack/react-db": "^0.1.74"
+      "@tanstack/react-db": "^0.1.74",
+      "react": "^19.2.4",
+      "react-dom": "^19.2.4",
+      "@types/react": "^19.2.14",
+      "@types/react-dom": "^19.2.3"
     }
   },
   "type": "module",

@@ -1,7 +1,14 @@
+/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { DB } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema/index";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
+import {
+  createOrganizationInvitationEmail,
+  createPasswordResetEmail,
+  createVerificationOtpEmail,
+  Mailer,
+} from "@feeblo/transactional";
 import { polar, webhooks } from "@polar-sh/better-auth";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -22,6 +29,7 @@ export const initAuthHandler = () =>
     const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
     const billingRepository = yield* BillingRepository;
     const polarService = yield* PolarService;
+    const mailer = yield* Mailer;
 
     const db = yield* DB;
 
@@ -51,9 +59,17 @@ export const initAuthHandler = () =>
       },
       emailAndPassword: {
         enabled: true,
-        // biome-ignore lint/suspicious/useAwait: callback signature requires async
+
         async sendResetPassword(data) {
-          console.log({ data });
+          await Effect.runPromise(
+            mailer.send({
+              to: data.user.email,
+              ...createPasswordResetEmail({
+                resetUrl: data.url,
+                recipientName: data.user.name,
+              }),
+            })
+          );
         },
 
         requireEmailVerification: true,
@@ -142,19 +158,43 @@ export const initAuthHandler = () =>
         }),
         organization({
           allowUserToCreateOrganization: false,
-          // biome-ignore lint/suspicious/useAwait: callback signature requires async
           async sendInvitationEmail(data) {
             const inviteLink = `${appUrl}/invitation/${data.id}`;
-            console.log({ inviteLink });
+            await Effect.runPromise(
+              mailer.send({
+                to: data.email,
+                ...createOrganizationInvitationEmail({
+                  inviteUrl: inviteLink,
+                  organizationName: data.organization.name,
+                  inviterName: data.inviter.user.name,
+                  role: data.role,
+                }),
+              })
+            );
           },
         }),
         emailOTP({
           disableSignUp: true,
           expiresIn: 8 * 60, // 8 minutes
           overrideDefaultEmailVerification: true,
-          // biome-ignore lint/suspicious/useAwait: callback signature requires async
-          async sendVerificationOTP({ email, otp }) {
-            console.log({ email, otp });
+
+          async sendVerificationOTP({ email, otp, type }) {
+            const flowLabel =
+              type === "forget-password"
+                ? "password reset"
+                : type === "sign-in"
+                  ? "sign-in"
+                  : "email verification";
+
+            await Effect.runPromise(
+              mailer.send({
+                to: email,
+                ...createVerificationOtpEmail({
+                  otp,
+                  flowLabel,
+                }),
+              })
+            );
           },
         }),
       ],
@@ -162,7 +202,11 @@ export const initAuthHandler = () =>
     return betterAuth(config);
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(PolarService.Default, BillingRepository.Default)
+      Layer.mergeAll(
+        PolarService.Default,
+        BillingRepository.Default,
+        Mailer.Default
+      )
     )
   );
 
