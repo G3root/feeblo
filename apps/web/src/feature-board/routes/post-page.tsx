@@ -411,37 +411,16 @@ function UpvoteButton({
 }) {
   const site = useSite();
   const organizationId = site.organizationId;
-  const { data: session } = authClient.useSession();
-
-  const { data: upvotes } = useLiveSuspenseQuery(
-    (q) =>
-      q
-        .from({ upvote: publicUpvoteCollection })
-        .where(({ upvote }) =>
-          and(
-            eq(upvote.postId, postId),
-            eq(upvote.organizationId, organizationId)
-          )
-        ),
-    [organizationId, postId]
-  );
 
   const { handleToggleUpvote } = useUpvote();
 
   return (
     <PostUpvoteButton
       handleToggleUpvote={async () => {
-        const existingUpvoteId = upvotes.find(
-          (upvote) => upvote.userId === session?.user?.id
-        )?.id;
         await handleToggleUpvote({
           postId,
           organizationId,
           existingUpvote: hasUserUpVoted,
-          revalidateExistingUpvote: existingUpvoteId
-            ? { id: existingUpvoteId }
-            : undefined,
-          insertNewUpvote: true,
         });
       }}
       isUpvoted={hasUserUpVoted}

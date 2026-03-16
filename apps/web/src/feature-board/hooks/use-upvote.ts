@@ -15,16 +15,8 @@ export function useUpvote() {
     postId: string;
     organizationId: string;
     existingUpvote: boolean;
-    revalidateExistingUpvote: { id: string } | undefined;
-    insertNewUpvote: boolean;
   }>({
-    onMutate: ({
-      postId,
-      organizationId,
-      existingUpvote,
-      revalidateExistingUpvote,
-      insertNewUpvote,
-    }) => {
+    onMutate: ({ postId, organizationId, existingUpvote }) => {
       const currentUserId = session?.user?.id;
 
       if (!currentUserId) {
@@ -38,38 +30,47 @@ export function useUpvote() {
           membership.organizationId === organizationId
       );
 
-      if (existingUpvote) {
-        if (revalidateExistingUpvote) {
-          publicUpvoteCollection.delete(revalidateExistingUpvote.id);
+      const existingUpvoteRecord = Array.from(
+        publicUpvoteCollection.values()
+      ).find(
+        (upvote) =>
+          upvote.postId === postId &&
+          upvote.userId === currentUserId &&
+          upvote.organizationId === organizationId
+      );
+
+      if (existingUpvoteRecord || existingUpvote) {
+        if (existingUpvoteRecord) {
+          publicUpvoteCollection.delete(existingUpvoteRecord.id);
         }
         publicPostCollection.update(postId, (draft) => {
           draft.hasUserUpVoted = false;
           draft.upVotes -= 1;
         });
-      } else {
-        if (insertNewUpvote) {
-          publicUpvoteCollection.insert({
-            id: generateId("upvote"),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            organizationId,
-            postId,
-            userId: currentUserId,
-            memberId: isMember ? isMember.membershipId : null,
-            user: {
-              name: session?.user?.name ?? null,
-              image: session?.user?.image ?? null,
-            },
-          });
-        }
-        publicPostCollection.update(postId, (draft) => {
-          draft.hasUserUpVoted = true;
-          draft.upVotes += 1;
-        });
+        return;
       }
+
+      publicUpvoteCollection.insert({
+        id: generateId("upvote"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organizationId,
+        postId,
+        userId: currentUserId,
+        memberId: isMember ? isMember.membershipId : null,
+        user: {
+          name: session?.user?.name ?? null,
+          image: session?.user?.image ?? null,
+        },
+      });
+
+      publicPostCollection.update(postId, (draft) => {
+        draft.hasUserUpVoted = true;
+        draft.upVotes += 1;
+      });
     },
     mutationFn: async (
-      { postId, organizationId, revalidateExistingUpvote, insertNewUpvote },
+      { postId, organizationId },
       _params
     ) => {
       await fetchRpc((rpc) =>
@@ -79,14 +80,10 @@ export function useUpvote() {
         })
       );
 
-      const promises: Promise<unknown>[] = [];
-
-      if (revalidateExistingUpvote || insertNewUpvote) {
-        promises.push(publicUpvoteCollection.utils.refetch());
-      }
-      promises.push(publicPostCollection.utils.refetch());
-
-      await Promise.all(promises);
+      await Promise.all([
+        publicUpvoteCollection.utils.refetch(),
+        publicPostCollection.utils.refetch(),
+      ]);
     },
   });
 

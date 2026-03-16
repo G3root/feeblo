@@ -3,7 +3,6 @@ import type { Post } from "@feeblo/domain/post/schema";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useUpvote } from "src/feature-board/hooks/use-upvote";
-import { publicUpvoteCollection } from "src/feature-board/lib/collections";
 import {
   formatPostStatus,
   getInitials,
@@ -13,7 +12,6 @@ import {
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Skeleton } from "~/components/ui/skeleton";
-import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 
 const statusColors: Record<string, string> = {
@@ -60,7 +58,6 @@ function UserAvatar({
 
 export function FeedbackCard({ board, post }: { board: Board; post: Post }) {
   const { handleToggleUpvote } = useUpvote();
-  const { data: session } = authClient.useSession();
   const existingUpvote = post.hasUserUpVoted;
   const upvoteCount = post.upVotes;
   const description =
@@ -80,22 +77,10 @@ export function FeedbackCard({ board, post }: { board: Board; post: Post }) {
         )}
         onClick={(e) => {
           e.preventDefault();
-          const existingUpvoteId = Array.from(
-            publicUpvoteCollection.values()
-          ).filter(
-            (upvote) =>
-              upvote.postId === post.id && upvote.userId === session?.user?.id
-          )?.[0]?.id;
           handleToggleUpvote({
             postId: post.id,
             organizationId: board.organizationId,
             existingUpvote,
-            revalidateExistingUpvote: existingUpvoteId
-              ? {
-                  id: existingUpvoteId,
-                }
-              : undefined,
-            insertNewUpvote: !existingUpvoteId,
           });
         }}
         type="button"
