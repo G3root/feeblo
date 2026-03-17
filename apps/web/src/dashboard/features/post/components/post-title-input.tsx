@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { Input } from "~/components/ui/input";
 import { cn } from "~/lib/utils";
 
 interface PostTitleInputProps
@@ -18,11 +19,9 @@ export function PostTitleInput({
       <label className="sr-only" htmlFor={id}>
         Post Title
       </label>
-      <input
+      <Input
         className={cn(
-          "w-full border-0 bg-transparent p-0 font-semibold tracking-tight outline-none placeholder:text-muted-foreground/70",
-          size === "sm" && "text-base md:text-lg",
-          size === "default" && "text-3xl md:text-4xl",
+          "rounded-md border-none bg-transparent font-medium tracking-tight hover:bg-input/30 focus:bg-input/30 md:text-2xl",
           className
         )}
         {...props}

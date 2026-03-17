@@ -4,19 +4,15 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useState } from "react";
 import { z } from "zod";
-import { Editor } from "~/components/ui/rich-text-editor";
-import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogPanel,
   DialogPopup,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
+import { Editor } from "~/components/ui/rich-text-editor";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -24,11 +20,11 @@ import { hasMembership, usePolicy } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
 import { membersCollection, postCollection } from "~/lib/collections";
 import { usePostCreateDialogContext } from "../dialog-stores";
-import { PostTitleInput } from "./post-title-input";
 import {
   isRichTextContentEmpty,
   uploadPostEditorImage,
 } from "./post-editor-utils";
+import { PostTitleInput } from "./post-title-input";
 
 export function PostCreateDialog() {
   const store = usePostCreateDialogContext();
@@ -37,7 +33,7 @@ export function PostCreateDialog() {
 
   return (
     <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <DialogPopup>
+      <DialogPopup className="md:max-w-6xl" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="sr-only">Create Post</DialogTitle>
           <DialogDescription className="sr-only">
@@ -47,7 +43,7 @@ export function PostCreateDialog() {
         <DialogPanel>
           <PostCreateForm createMore={createMore} />
         </DialogPanel>
-        <DialogFooter>
+        {/* <DialogFooter>
           <div className="flex w-full justify-between">
             <div className="flex items-center space-x-2">
               <Switch
@@ -65,7 +61,7 @@ export function PostCreateDialog() {
               Create Post
             </Button>
           </div>
-        </DialogFooter>
+        </DialogFooter> */}
       </DialogPopup>
     </Dialog>
   );
@@ -105,7 +101,10 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
       onChange: z.object({
         content: z
           .string()
-          .refine((value) => !isRichTextContentEmpty(value), "Content is required"),
+          .refine(
+            (value) => !isRichTextContentEmpty(value),
+            "Content is required"
+          ),
         title: z.string().trim().min(1, "Title is required"),
       }),
     },
@@ -178,14 +177,14 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
         form.handleSubmit();
       }}
     >
-      <div className="space-y-5">
+      <div className="flex flex-col gap-1">
         <form.Field name="title">
           {(field) => (
             <PostTitleInput
               name={field.name}
               onBlur={field.handleBlur}
               onChange={(e) => field.handleChange(e.target.value)}
-              placeholder="Untitled"
+              placeholder="Enter post title..."
               size="sm"
               value={field.state.value}
             />
@@ -195,11 +194,10 @@ function PostCreateForm({ createMore }: { createMore: boolean }) {
         <form.Field name="content">
           {(field) => (
             <Editor
-              className="rounded-xl border"
               enableImagePasteDrop
               onChange={field.handleChange}
               onUploadImage={uploadPostEditorImage}
-              placeholder="Add description..."
+              placeholder="Type '/' for commands or start typing a description..."
               value={field.state.value}
             />
           )}
