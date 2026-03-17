@@ -16,7 +16,8 @@ export function TextField({
   id: idProp,
   ...props
 }: TextFieldProps) {
-  const id = idProp ?? useId();
+  const generateId = useId();
+  const id = idProp ?? generateId;
   const field = useFieldContext<string>();
 
   const errors = useStore(field.store, (state) => state.meta.errors);

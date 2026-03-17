@@ -1,12 +1,12 @@
-import { useStore } from '@tanstack/react-store';
-import { useId } from 'react';
-import { useFieldContext } from '~/hooks/form-context';
-import { Label } from './label';
-import { Textarea } from './textarea';
+import { useStore } from "@tanstack/react-store";
+import { useId } from "react";
+import { useFieldContext } from "~/hooks/form-context";
+import { Label } from "./label";
+import { Textarea } from "./textarea";
 
-interface TextareaFieldProps extends React.ComponentProps<'textarea'> {
-  label: string;
+interface TextareaFieldProps extends React.ComponentProps<"textarea"> {
   hideLabel?: boolean;
+  label: string;
 }
 
 export function TextareaField({
@@ -15,7 +15,8 @@ export function TextareaField({
   hideLabel,
   ...props
 }: TextareaFieldProps) {
-  const id = idProp ?? useId();
+  const generateId = useId();
+  const id = idProp ?? generateId;
   const field = useFieldContext<string>();
 
   const errors = useStore(field.store, (state) => state.meta.errors);
@@ -23,22 +24,22 @@ export function TextareaField({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor={id} className={hideLabel ? 'sr-only' : ''}>
+      <Label className={hideLabel ? "sr-only" : ""} htmlFor={id}>
         {label}
       </Label>
       <Textarea
         {...props}
-        onChange={(e) => field.handleChange(e.target.value)}
         id={id}
         name={field.name}
-        value={field.state.value}
         onBlur={field.handleBlur}
+        onChange={(e) => field.handleChange(e.target.value)}
+        value={field.state.value}
       />
 
       {isTouched && errors.length > 0 ? (
         <div className="flex flex-col gap-1">
           {errors.map((error: { message: string }) => (
-            <p key={error.message} className="text-destructive text-sm">
+            <p className="text-destructive text-sm" key={error.message}>
               {error.message}
             </p>
           ))}
