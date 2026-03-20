@@ -11,8 +11,8 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { Button } from "~/components/ui/button";
-import { PolicyGuard, hasMembership } from "~/hooks/use-policy";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
+import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
 import type { BoardLane } from "./types";
@@ -31,7 +31,7 @@ export function BoardListView({
   return (
     <section>
       <Accordion
-        className="w-full"
+        className="w-full rounded-none"
         defaultValue={lanes.map((lane) => lane.key)}
         multiple
       >
@@ -42,7 +42,7 @@ export function BoardListView({
             value={lane.key}
           >
             <div className="relative">
-              <AccordionTrigger className="rounded-none border-0 bg-linear-to-r from-muted/70 via-muted/30 to-transparent px-4 py-2.5 pr-14 hover:no-underline [&_[data-slot=accordion-trigger-icon]]:hidden">
+              <AccordionTrigger className="rounded-none border-0 bg-linear-to-r from-muted/70 via-muted/30 to-transparent px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden">
                 <div className="flex items-center gap-2">
                   <HugeiconsIcon
                     className="size-4 text-muted-foreground group-aria-expanded/accordion-trigger:hidden"
@@ -66,7 +66,7 @@ export function BoardListView({
                 <AddPostButton boardId={boardId} lane={lane} />
               </PolicyGuard>
             </div>
-            <AccordionContent className="h-auto pb-0">
+            <AccordionContent className="h-auto pb-0" panelClassName="px-0">
               {lane.posts.map((post) => (
                 <BoardPostRowItem
                   boardId={boardId}
