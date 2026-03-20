@@ -25,6 +25,7 @@ import { BOARD_LANES, type BoardPostStatus } from "~/features/board/constants";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { boardCollection, postCollection } from "~/lib/collections";
 import { usePostDeleteDialogContext } from "../dialog-stores";
+import { PostBoardSelect } from "./post-board-select";
 
 const STATUS_DOT_COLORS: Record<BoardPostStatus, string> = {
   IN_PROGRESS: "#3b82f6",
@@ -194,7 +195,7 @@ function PostDetailsWorkspaceShellContent({
             </PropertyRow>
 
             <PropertyRow label="Board">
-              <BoardSelect
+              <PostBoardSelect
                 boards={allBoards}
                 currentBoardId={currentBoardId}
                 onValueChange={async (boardId) => {
@@ -289,7 +290,7 @@ const RedirectToPostUrlButton = ({ postSlug }: { postSlug: string }) => {
   );
 };
 
-function PropertyRow({
+export function PropertyRow({
   label,
   children,
 }: {
@@ -298,7 +299,9 @@ function PropertyRow({
 }) {
   return (
     <div className="flex items-center gap-3 py-3">
-      <span className="w-14 shrink-0 text-muted-foreground">{label}</span>
+      <span className="w-14 shrink-0 text-muted-foreground text-sm">
+        {label}
+      </span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
@@ -333,7 +336,7 @@ function CopyPostButton({ postSlug }: { postSlug: string }) {
   );
 }
 
-function StatusSelect({
+export function StatusSelect({
   currentStatus,
   onValueChange,
 }: {
@@ -363,35 +366,6 @@ function StatusSelect({
             </SelectItem>
           ))
         )}
-      </SelectContent>
-    </Select>
-  );
-}
-
-function BoardSelect({
-  boards,
-  currentBoardId,
-  onValueChange,
-}: {
-  boards: { id: string; name: string }[];
-  currentBoardId: string;
-  onValueChange: (boardId: string | null) => void;
-}) {
-  const currentBoard = boards.find((b) => b.id === currentBoardId);
-
-  return (
-    <Select onValueChange={onValueChange} value={currentBoardId}>
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select board">
-          {currentBoard?.name ?? "Select board"}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {boards.map((b) => (
-          <SelectItem key={b.id} value={b.id}>
-            {b.name}
-          </SelectItem>
-        ))}
       </SelectContent>
     </Select>
   );
