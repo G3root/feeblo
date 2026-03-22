@@ -2,6 +2,7 @@ import { RpcSerialization, RpcServer } from "@effect/rpc";
 import { Layer } from "effect";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
+import { ChangelogRpcHandlers } from "./changelog/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
@@ -24,6 +25,7 @@ export const RpcRoute = RpcServer.layerHttpRouter({
   Layer.provide(PostRpcHandlers),
   Layer.provide(BillingRpcHandlers),
   Layer.provide(BoardRpcHandlers),
+  Layer.provide(ChangelogRpcHandlers),
   Layer.provide(MembershipRpcHandlers),
   Layer.provide(CommentReactionRpcHandlers),
   Layer.provide(CommentRpcHandlers),

@@ -1,5 +1,6 @@
 import { BillingRpcs } from "./billing/rpcs";
 import { BoardRpcs } from "./board/rpcs";
+import { ChangelogRpcs } from "./changelog/rpcs";
 import { CommentReactionRpcs } from "./comment-reaction/rpcs";
 import { CommentRpcs } from "./comments/rpcs";
 import { MembershipRpcs } from "./membership/rpcs";
@@ -12,6 +13,7 @@ import { WorkspaceRpcs } from "./workspace/rpcs";
 export const AllRpcs = PostRpcs.merge(
   BillingRpcs,
   BoardRpcs,
+  ChangelogRpcs,
   MembershipRpcs,
   CommentReactionRpcs,
   CommentRpcs,
