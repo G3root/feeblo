@@ -235,4 +235,31 @@ export const site = pgTable(
   (table) => [uniqueIndex("site_organizationId_uidx").on(table.organizationId)]
 );
 
+export const changelog = pgTable(
+  "changelog",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    slug: text("slug").notNull(),
+    content: text("content").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    creatorId: text("creator_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    creatorMemberId: text("creator_member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [uniqueIndex("changelog_organizationId_slug_uidx").on(table.organizationId, table.slug)]
+);
+
 export type InsertComment = typeof comment.$inferInsert;

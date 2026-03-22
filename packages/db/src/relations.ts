@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm/relations";
 import {
   account,
   board,
+  changelog,
   comment,
   commentReaction,
   invitation,
@@ -29,6 +30,7 @@ export const userRelations = relations(user, ({ many }) => ({
   comments: many(comment),
   commentReactions: many(commentReaction),
   createdPosts: many(post),
+  createdChangelogs: many(changelog),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -60,6 +62,7 @@ export const organizationRelations = relations(
     boards: many(board),
     posts: many(post),
     comments: many(comment),
+    changelogs: many(changelog),
     site: one(site, {
       fields: [organization.id],
       references: [site.organizationId],
@@ -184,6 +187,21 @@ export const siteRelations = relations(site, ({ one }) => ({
   organization: one(organization, {
     fields: [site.organizationId],
     references: [organization.id],
+  }),
+}));
+
+export const changelogRelations = relations(changelog, ({ one }) => ({
+  organization: one(organization, {
+    fields: [changelog.organizationId],
+    references: [organization.id],
+  }),
+  creator: one(user, {
+    fields: [changelog.creatorId],
+    references: [user.id],
+  }),
+  creatorMember: one(member, {
+    fields: [changelog.creatorMemberId],
+    references: [member.id],
   }),
 }));
 

@@ -69,6 +69,9 @@
     },
     "./upvote/schema": {
       "default": "./src/upvote/schema.ts"
+    },
+    "./changelog/schema": {
+      "default": "./src/changelog/schema.ts"
     }
   },
   "dependencies": {
