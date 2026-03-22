@@ -2,6 +2,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
+import { Suspense } from "react";
 import { z } from "zod";
 import {
   Sheet,
@@ -10,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/ui/sheet";
+import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -29,10 +31,26 @@ export function RenameBoardDialog() {
           <SheetDescription>Rename the board to a new name.</SheetDescription>
         </SheetHeader>
         <div className="p-4">
-          <RenameBoardForm />
+          {open ? (
+            <Suspense fallback={<RenameBoardFormSkeleton />}>
+              <RenameBoardForm />
+            </Suspense>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function RenameBoardFormSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-12" />
+        <Skeleton className="h-10 w-full rounded-md" />
+      </div>
+      <Skeleton className="h-10 w-full rounded-md" />
+    </div>
   );
 }
 

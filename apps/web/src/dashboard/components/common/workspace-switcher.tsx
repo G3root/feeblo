@@ -108,6 +108,7 @@ const WorkspaceList = ({
     return (
       <DropdownMenuItem
         key={membership.id}
+        nativeButton={false}
         render={(props) => (
           <Link
             {...props}

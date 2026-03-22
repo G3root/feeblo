@@ -11,6 +11,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { Suspense } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -23,8 +24,10 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   useSidebar,
 } from "~/components/ui/sidebar";
+import { Skeleton } from "~/components/ui/skeleton";
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import {
@@ -55,7 +58,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
-        <WorkspaceSwitcher />
+        <Suspense fallback={<WorkspaceSwitcherSkeleton />}>
+          <WorkspaceSwitcher />
+        </Suspense>
       </SidebarHeader>
 
       <SidebarContent>
@@ -102,7 +107,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <CreateBoardButton />
           </div>
           <SidebarMenu>
-            <BoardList />
+            <Suspense fallback={<BoardListSkeleton />}>
+              <BoardList />
+            </Suspense>
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup className="mt-auto">
@@ -164,6 +171,32 @@ function BoardList() {
       <BoardMenuWithPolicy boardPublicId={board.id} />
     </SidebarMenuItem>
   ));
+}
+
+function WorkspaceSwitcherSkeleton() {
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <div className="flex h-12 items-center gap-3 rounded-lg px-2">
+          <Skeleton className="size-8 rounded-lg" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        </div>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
+function BoardListSkeleton() {
+  return (
+    <>
+      <SidebarMenuSkeleton showIcon />
+      <SidebarMenuSkeleton showIcon />
+      <SidebarMenuSkeleton showIcon />
+    </>
+  );
 }
 
 interface BoardMenuProps {

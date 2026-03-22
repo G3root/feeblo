@@ -8,6 +8,7 @@ import {
   usePacedMutations,
 } from "@tanstack/react-db";
 import { ArrowLeft } from "lucide-react";
+import { Suspense } from "react";
 import { Link } from "wouter";
 import { z } from "zod";
 import {
@@ -17,6 +18,7 @@ import {
   AvatarImage,
 } from "~/components/ui/avatar";
 import { buttonVariants } from "~/components/ui/button";
+import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { PostCommentComposer } from "~/features/post/components/post-comment-composer";
 import { PostCommentList } from "~/features/post/components/post-comment-list";
@@ -284,10 +286,12 @@ export function PostPage({ slug }: { slug: string }) {
                 value={post.content}
               />
 
-              <PostReactionBar
-                organizationId={site.organizationId}
-                postId={post.id}
-              />
+              <Suspense fallback={<PostReactionBarSkeleton />}>
+                <PostReactionBar
+                  organizationId={site.organizationId}
+                  postId={post.id}
+                />
+              </Suspense>
 
               <div className="space-y-4">
                 <PostCommentComposer
@@ -492,5 +496,15 @@ function PostReactionBar({
       handleToggleReaction={handleToggleReaction}
       postReactions={postReactions}
     />
+  );
+}
+
+function PostReactionBarSkeleton() {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Skeleton className="h-8 w-16 rounded-full" />
+      <Skeleton className="h-8 w-20 rounded-full" />
+      <Skeleton className="h-8 w-24 rounded-full" />
+    </div>
   );
 }

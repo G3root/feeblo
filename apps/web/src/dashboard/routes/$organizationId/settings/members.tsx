@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
+import { Suspense } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -25,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
@@ -73,8 +75,12 @@ function MembersSettingsPage() {
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
-        <MembersSection />
-        <InvitationsSection />
+        <Suspense fallback={<MembersSectionSkeleton title="Members" />}>
+          <MembersSection />
+        </Suspense>
+        <Suspense fallback={<MembersSectionSkeleton title="Invitations" />}>
+          <InvitationsSection />
+        </Suspense>
       </SettingsLayout.Content>
     </SettingsLayout.Root>
   );
@@ -386,6 +392,21 @@ function InvitationsSection() {
           ))}
         </MembersSettingsLayout.List>
       )}
+    </MembersSettingsLayout.Section>
+  );
+}
+
+function MembersSectionSkeleton({ title }: { title: string }) {
+  return (
+    <MembersSettingsLayout.Section title={title}>
+      <MembersSettingsLayout.Controls>
+        <Skeleton className="h-9 w-full rounded-md" />
+        <Skeleton className="h-9 w-full rounded-md" />
+      </MembersSettingsLayout.Controls>
+      <MembersSettingsLayout.List>
+        <Skeleton className="h-20 w-full rounded-lg" />
+        <Skeleton className="h-20 w-full rounded-lg" />
+      </MembersSettingsLayout.List>
     </MembersSettingsLayout.Section>
   );
 }
