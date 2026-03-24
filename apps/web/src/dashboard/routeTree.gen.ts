@@ -23,6 +23,8 @@ import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$org
 import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
 import { Route as OrganizationIdSettingsAppearanceRouteImport } from "./routes/$organizationId/settings/appearance"
 import { Route as OrganizationIdDashboardLayoutSettingsRouteImport } from "./routes/$organizationId/_dashboard-layout/settings"
+import { Route as OrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/index"
+import { Route as OrganizationIdDashboardLayoutChangelogChangelogSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/$changelogSlug"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
 
@@ -105,6 +107,18 @@ const OrganizationIdDashboardLayoutSettingsRoute =
     path: "/settings",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
+const OrganizationIdDashboardLayoutChangelogIndexRoute =
+  OrganizationIdDashboardLayoutChangelogIndexRouteImport.update({
+    id: "/changelog/",
+    path: "/changelog/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutChangelogChangelogSlugRoute =
+  OrganizationIdDashboardLayoutChangelogChangelogSlugRouteImport.update({
+    id: "/changelog/$changelogSlug",
+    path: "/changelog/$changelogSlug",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
 const OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute =
   OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport.update({
     id: "/board/$boardSlug/",
@@ -132,6 +146,8 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
+  "/$organizationId/changelog/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
+  "/$organizationId/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -147,6 +163,8 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId": typeof OrganizationIdDashboardLayoutIndexRoute
+  "/$organizationId/changelog/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
+  "/$organizationId/changelog": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -166,6 +184,8 @@ export interface FileRoutesById {
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/_dashboard-layout/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
+  "/$organizationId/_dashboard-layout/changelog/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
+  "/$organizationId/_dashboard-layout/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -185,6 +205,8 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/workspace"
     | "/$organizationId/"
     | "/$organizationId/settings/"
+    | "/$organizationId/changelog/$changelogSlug"
+    | "/$organizationId/changelog/"
     | "/$organizationId/board/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug/"
   fileRoutesByTo: FileRoutesByTo
@@ -200,6 +222,8 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/workspace"
     | "/$organizationId"
+    | "/$organizationId/changelog/$changelogSlug"
+    | "/$organizationId/changelog"
     | "/$organizationId/board/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug"
   id:
@@ -218,6 +242,8 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/workspace"
     | "/$organizationId/_dashboard-layout/"
     | "/$organizationId/settings/"
+    | "/$organizationId/_dashboard-layout/changelog/$changelogSlug"
+    | "/$organizationId/_dashboard-layout/changelog/"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/"
   fileRoutesById: FileRoutesById
@@ -331,6 +357,20 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutSettingsRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
+    "/$organizationId/_dashboard-layout/changelog/": {
+      id: "/$organizationId/_dashboard-layout/changelog/"
+      path: "/changelog"
+      fullPath: "/$organizationId/changelog/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/changelog/$changelogSlug": {
+      id: "/$organizationId/_dashboard-layout/changelog/$changelogSlug"
+      path: "/changelog/$changelogSlug"
+      fullPath: "/$organizationId/changelog/$changelogSlug"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
     "/$organizationId/_dashboard-layout/board/$boardSlug/": {
       id: "/$organizationId/_dashboard-layout/board/$boardSlug/"
       path: "/board/$boardSlug"
@@ -351,6 +391,8 @@ declare module "@tanstack/react-router" {
 interface OrganizationIdDashboardLayoutRouteChildren {
   OrganizationIdDashboardLayoutSettingsRoute: typeof OrganizationIdDashboardLayoutSettingsRoute
   OrganizationIdDashboardLayoutIndexRoute: typeof OrganizationIdDashboardLayoutIndexRoute
+  OrganizationIdDashboardLayoutChangelogChangelogSlugRoute: typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
+  OrganizationIdDashboardLayoutChangelogIndexRoute: typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute
   OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -361,6 +403,10 @@ const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutR
       OrganizationIdDashboardLayoutSettingsRoute,
     OrganizationIdDashboardLayoutIndexRoute:
       OrganizationIdDashboardLayoutIndexRoute,
+    OrganizationIdDashboardLayoutChangelogChangelogSlugRoute:
+      OrganizationIdDashboardLayoutChangelogChangelogSlugRoute,
+    OrganizationIdDashboardLayoutChangelogIndexRoute:
+      OrganizationIdDashboardLayoutChangelogIndexRoute,
     OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute:
       OrganizationIdDashboardLayoutBoardBoardSlugPostSlugRoute,
     OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute:
