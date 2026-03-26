@@ -107,6 +107,94 @@ export const postCollection = createCollection(
   })
 );
 
+export const changelogCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["changelog"];
+
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq" && field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+      }
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogList({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedChangelog } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogUpdate({
+          id: updatedChangelog.id,
+          title: updatedChangelog.title,
+          slug: updatedChangelog.slug,
+          content: updatedChangelog.content,
+          status: updatedChangelog.status,
+          scheduledAt: updatedChangelog.scheduledAt,
+          publishedAt: updatedChangelog.publishedAt,
+          organizationId: updatedChangelog.organizationId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedChangelog } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogDelete({
+          id: deletedChangelog.id,
+          organizationId: deletedChangelog.organizationId,
+        })
+      );
+    },
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newChangelog } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCreate({
+          id: newChangelog.id,
+          title: newChangelog.title,
+          slug: newChangelog.slug,
+          content: newChangelog.content,
+          status: newChangelog.status,
+          scheduledAt: newChangelog.scheduledAt,
+          publishedAt: newChangelog.publishedAt,
+          organizationId: newChangelog.organizationId,
+        })
+      );
+    },
+  })
+);
+
 export const boardCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {

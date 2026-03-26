@@ -1,6 +1,4 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { useEffect } from "react";
-import { usePostSelectionStore } from "~/features/board/state/post-selection-context";
 import { postCollection } from "~/lib/collections";
 import { BOARD_LANES } from "../../constants";
 import { useBoardViewMode } from "../../state/view-mode-context";
@@ -20,7 +18,6 @@ export function BoardPosts({
   organizationId: string;
 }) {
   const mode = useBoardViewMode();
-  const selectionStore = usePostSelectionStore();
 
   const { data: posts } = useLiveSuspenseQuery(
     (q) => {
@@ -44,13 +41,6 @@ export function BoardPosts({
     },
     [boardId, organizationId]
   );
-
-  useEffect(() => {
-    selectionStore.send({
-      type: "syncAvailablePostIds",
-      postIds: posts.map((post) => post.id),
-    });
-  }, [posts, selectionStore]);
 
   const lanes: BoardLane[] = BOARD_LANES.map((lane) => ({
     key: lane.key,

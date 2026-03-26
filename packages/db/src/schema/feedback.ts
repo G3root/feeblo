@@ -25,6 +25,12 @@ export const postStatusEnum = pgEnum("post_status", [
 
 export type TPostStatus = (typeof postStatusEnum.enumValues)[number];
 
+export const changelogStatusEnum = pgEnum("changelog_status", [
+  "draft",
+  "scheduled",
+  "published",
+]);
+
 export const postIconTypeEnum = pgEnum("post_icon_type", ["EMOJI"]);
 
 export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
@@ -242,6 +248,9 @@ export const changelog = pgTable(
     title: text("title").notNull(),
     slug: text("slug").notNull(),
     content: text("content").notNull(),
+    status: changelogStatusEnum("status").notNull().default("draft"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),

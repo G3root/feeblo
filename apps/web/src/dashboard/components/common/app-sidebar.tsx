@@ -3,6 +3,7 @@ import {
   Edit,
   Ellipsis,
   Home,
+  Megaphone03Icon,
   Plus,
   PreferenceVerticalIcon,
   SparklesIcon,
@@ -82,6 +83,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 )}
               />
             </SidebarMenuItem>
+            <MyBoardLink />
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/changelog`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/changelog"
+                  >
+                    <HugeiconsIcon icon={Megaphone03Icon} />
+                    <span>Changelogs</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={pathname.startsWith(`/${organizationId}/settings`)}
@@ -97,7 +115,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 )}
               />
             </SidebarMenuItem>
-            <MyBoardLink />
           </SidebarMenu>
         </SidebarGroup>
 

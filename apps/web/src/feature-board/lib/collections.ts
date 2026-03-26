@@ -88,6 +88,48 @@ export const publicPostCollection = createCollection(
   })
 );
 
+export const publicChangelogCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["public-changelog"];
+
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq" && field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+      }
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogListPublic({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const publicBoardCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),

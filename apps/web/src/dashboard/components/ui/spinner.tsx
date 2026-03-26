@@ -5,12 +5,12 @@ import { cn } from "~/lib/utils";
 function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
   return (
     <HugeiconsIcon
+      {...props}
       aria-label="Loading"
       className={cn("size-4 animate-spin", className)}
       icon={Loading03Icon}
       role="status"
       strokeWidth={2}
-      {...props}
     />
   );
 }

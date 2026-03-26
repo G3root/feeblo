@@ -1,6 +1,6 @@
 import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
-import { AuthMiddleware } from "../session-middleware";
+import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { ChangelogServiceErrors } from "./errors";
 import {
   Changelog,
@@ -16,6 +16,12 @@ export class ChangelogRpcs extends RpcGroup.make(
     success: Schema.Array(Changelog),
     error: ChangelogServiceErrors,
   }).middleware(AuthMiddleware),
+
+  Rpc.make("ChangelogListPublic", {
+    payload: ChangelogList,
+    success: Schema.Array(Changelog),
+    error: ChangelogServiceErrors,
+  }).middleware(OptionalAuthMiddleware),
 
   Rpc.make("ChangelogCreate", {
     success: Schema.Void,

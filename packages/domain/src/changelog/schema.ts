@@ -1,10 +1,21 @@
 import { Schema } from "effect";
 
+export const ChangelogStatus = Schema.Literal(
+  "draft",
+  "scheduled",
+  "published"
+);
+
+export type TChangelogStatus = Schema.Schema.Type<typeof ChangelogStatus>;
+
 export const Changelog = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   slug: Schema.String,
   content: Schema.String,
+  status: ChangelogStatus,
+  scheduledAt: Schema.NullOr(Schema.Date),
+  publishedAt: Schema.NullOr(Schema.Date),
   organizationId: Schema.String,
   creatorMemberId: Schema.NullOr(Schema.String),
   creatorId: Schema.NullOr(Schema.String),
@@ -29,6 +40,9 @@ export const ChangelogCreate = Schema.Struct({
   title: Schema.String,
   slug: Schema.String,
   content: Schema.String,
+  status: ChangelogStatus,
+  scheduledAt: Schema.NullOr(Schema.Date),
+  publishedAt: Schema.NullOr(Schema.Date),
   organizationId: Schema.String,
 });
 
@@ -39,6 +53,9 @@ export const ChangelogUpdate = Schema.Struct({
   title: Schema.String,
   slug: Schema.String,
   content: Schema.String,
+  status: ChangelogStatus,
+  scheduledAt: Schema.NullOr(Schema.Date),
+  publishedAt: Schema.NullOr(Schema.Date),
   organizationId: Schema.String,
 });
 

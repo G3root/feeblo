@@ -25,6 +25,11 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
           Effect.catchAll(onInternalServerError)
         ),
 
+      ChangelogListPublic: (args: TChangelogList) =>
+        repository.findManyPublished(args).pipe(
+          Effect.catchAll(onInternalServerError)
+        ),
+
       ChangelogCreate: (args: TChangelogCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;

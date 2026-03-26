@@ -49,6 +49,9 @@ export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
               title: changelogTable.title,
               slug: changelogTable.slug,
               content: changelogTable.content,
+              status: changelogTable.status,
+              scheduledAt: changelogTable.scheduledAt,
+              publishedAt: changelogTable.publishedAt,
               organizationId: changelogTable.organizationId,
               creatorMemberId: changelogTable.creatorMemberId,
               creatorId: changelogTable.creatorId,
@@ -63,11 +66,43 @@ export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
             .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
             .where(eq(changelogTable.organizationId, organizationId)),
 
+        findManyPublished: ({ organizationId }: TChangelogList) =>
+          db
+            .select({
+              id: changelogTable.id,
+              title: changelogTable.title,
+              slug: changelogTable.slug,
+              content: changelogTable.content,
+              status: changelogTable.status,
+              scheduledAt: changelogTable.scheduledAt,
+              publishedAt: changelogTable.publishedAt,
+              organizationId: changelogTable.organizationId,
+              creatorMemberId: changelogTable.creatorMemberId,
+              creatorId: changelogTable.creatorId,
+              createdAt: changelogTable.createdAt,
+              updatedAt: changelogTable.updatedAt,
+              user: {
+                name: sql<string | null>`${userTable.name}`,
+                image: sql<string | null>`${userTable.image}`,
+              },
+            })
+            .from(changelogTable)
+            .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
+            .where(
+              and(
+                eq(changelogTable.organizationId, organizationId),
+                eq(changelogTable.status, "published")
+              )
+            ),
+
         create: ({
           id,
           title,
           slug,
           content,
+          status,
+          scheduledAt,
+          publishedAt,
           organizationId,
           creatorId,
           creatorMemberId,
@@ -79,6 +114,9 @@ export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
               title,
               slug: slug || slugify(title),
               content,
+              status,
+              scheduledAt,
+              publishedAt,
               organizationId,
               creatorId,
               creatorMemberId,
@@ -87,13 +125,25 @@ export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
             })
             .pipe(Effect.asVoid),
 
-        update: ({ id, title, slug, content, organizationId }: TChangelogUpdate) =>
+        update: ({
+          id,
+          title,
+          slug,
+          content,
+          status,
+          scheduledAt,
+          publishedAt,
+          organizationId,
+        }: TChangelogUpdate) =>
           db
             .update(changelogTable)
             .set({
               title,
               slug: slug || slugify(title),
               content,
+              status,
+              scheduledAt,
+              publishedAt,
               updatedAt: new Date(),
             })
             .where(
