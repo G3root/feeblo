@@ -60,9 +60,10 @@ export function BoardPosts({
     <>
       {mode === "grid" ? (
         <BoardGridView
+          boardId={boardId}
           boardSlug={boardSlug}
-          lanes={lanes}
           organizationId={organizationId}
+          posts={posts}
         />
       ) : (
         <BoardListView

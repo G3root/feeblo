@@ -42,7 +42,6 @@ function RouteComponent() {
       boardName={board.name}
       boardSlug={boardSlug}
       organizationId={organizationId}
-      visibility={board.visibility}
     />
   );
 }

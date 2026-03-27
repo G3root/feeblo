@@ -1,62 +1,76 @@
-import { useDraggable } from "@dnd-kit/react";
-import { Link } from "@tanstack/react-router";
+import { Feedback } from "@dnd-kit/dom";
+import { useSortable } from "@dnd-kit/react/sortable";
+import { useNavigate } from "@tanstack/react-router";
+import { memo } from "react";
 import { cn } from "~/lib/utils";
+import type { BoardPostStatus } from "../../constants";
 import { StatusIcon } from "./status-icon";
-import type { BoardLane, BoardPostRow } from "./types";
+import type { BoardPostRow } from "./types";
 import { formatPostDate } from "./utils";
 
-export function BoardGridPostCard({
-  post,
-  lane,
-  boardSlug,
-  organizationId,
-  laneMap,
-}: {
-  post: BoardPostRow;
-  lane: BoardLane;
+interface BoardGridPostCardProps {
   boardSlug: string;
+  column: string;
+  id: string;
+  index: number;
   organizationId: string;
-  laneMap: Map<string, BoardLane>;
-}) {
-  const { ref, isDragging } = useDraggable({
-    id: `post:${post.slug}`,
-    data: {
-      laneKey: lane.key,
-      status: post.status,
-    },
+  post: BoardPostRow;
+}
+
+export const BoardGridPostCard = memo(function BoardGridPostCard({
+  id,
+  index,
+  column,
+  organizationId,
+  boardSlug,
+  post,
+}: BoardGridPostCardProps) {
+  const navigate = useNavigate();
+  const group = column;
+  const { isDragging, ref } = useSortable({
+    id,
+    group,
+    accept: "item",
+    type: "item",
+    plugins: [Feedback],
+    index,
+    data: { group },
+    feedback: "clone",
   });
 
-  const laneTone = laneMap.get(lane.key)?.toneVar ?? lane.toneVar;
-
   return (
-    <Link
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: <explanation>
+    // biome-ignore lint/a11y/noStaticElementInteractions: <explanation>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: <explanation>
+    <div
       className={cn(
-        "block rounded-md border border-border bg-background p-3 transition-all hover:border-muted-foreground/40 hover:bg-muted/20",
+        "block rounded-md bg-background p-3 transition-all hover:border-muted-foreground/40 hover:bg-muted/20",
         isDragging && "opacity-60"
       )}
-      params={{
-        organizationId,
-        boardSlug,
-        postSlug: post.slug,
-      }}
-      ref={ref as (element: HTMLAnchorElement | null) => void}
-      to="/$organizationId/board/$boardSlug/$postSlug"
+      onClick={() =>
+        navigate({
+          to: "/$organizationId/board/$boardSlug/$postSlug",
+          params: {
+            organizationId,
+            boardSlug,
+            postSlug: post.slug,
+          },
+        })
+      }
+      ref={ref}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-muted-foreground text-xs uppercase tracking-wide">
-          {post.slug}
+      <div className="flex justify-between gap-2">
+        <span className="text-muted-foreground text-xs uppercase tracking-wide">
+          {post.title}
         </span>
-        <StatusIcon status={post.status} toneVar={laneTone} />
+        <div className="flex items-start">
+          <StatusIcon status={group as BoardPostStatus} />
+        </div>
       </div>
-      <p className="mt-2 line-clamp-2 font-semibold text-sm leading-6">
-        {post.title}
-      </p>
-      <p className="mt-2 line-clamp-2 text-muted-foreground text-xs">
-        {post.summary}
-      </p>
+
       <div className="mt-3 text-muted-foreground text-xs">
         {formatPostDate(post.updatedAt)}
       </div>
-    </Link>
+    </div>
   );
-}
+});

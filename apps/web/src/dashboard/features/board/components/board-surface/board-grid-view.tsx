@@ -1,80 +1,102 @@
-import { DragDropProvider } from "@dnd-kit/react";
-import { useEffect, useMemo, useState } from "react";
+import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
+import { move } from "@dnd-kit/helpers";
+import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
+import { useCallback, useRef, useState } from "react";
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
-import type { BoardLane } from "./types";
-import { findLaneKeyByPost, movePostToLane } from "./utils";
+import { BoardGridPostCard } from "./board-grid-post-card";
+import type { BoardPostRow } from "./types";
+import { groupPostByStatusMap } from "./utils";
+
+const sensors = [
+  PointerSensor.configure({
+    activatorElements(source) {
+      return [source.element, source.handle];
+    },
+  }),
+  KeyboardSensor,
+];
 
 export function BoardGridView({
-  lanes,
   boardSlug,
   organizationId,
+  posts,
+  boardId,
 }: {
-  lanes: BoardLane[];
   boardSlug: string;
   organizationId: string;
+  posts: BoardPostRow[];
+  boardId: string;
 }) {
-  const [dndLanes, setDndLanes] = useState<BoardLane[]>(lanes);
+  const [items, setItems] = useState(groupPostByStatusMap(posts));
 
-  useEffect(() => {
-    setDndLanes(lanes);
-  }, [lanes]);
+  const [columns] = useState(Object.keys(items));
 
-  const laneMap = useMemo(() => {
-    return new Map(dndLanes.map((lane) => [lane.key, lane]));
-  }, [dndLanes]);
+  const snapshot = useRef(structuredClone(items));
+
+  const handleDragStart = useCallback<
+    DragDropEventHandlers["onDragStart"]
+  >(() => {
+    snapshot.current = structuredClone(items);
+  }, [items]);
+
+  const handleDragOver = useCallback<DragDropEventHandlers["onDragOver"]>(
+    (event) => {
+      const { source } = event.operation;
+
+      if (source?.type === "column") {
+        // We can rely on optimistic sorting for columns
+        return;
+      }
+
+      setItems((items) => move(items, event));
+    },
+    []
+  );
+
+  const handleDragEnd = useCallback<DragDropEventHandlers["onDragEnd"]>(
+    (event) => {
+      if (event.canceled) {
+        setItems(snapshot.current);
+        return;
+      }
+    },
+    []
+  );
 
   return (
     <DragDropProvider
-      onDragEnd={(event) => {
-        if (
-          event.canceled ||
-          !event.operation.source ||
-          !event.operation.target
-        ) {
-          return;
-        }
-
-        const sourceId = String(event.operation.source.id);
-        const targetId = String(event.operation.target.id);
-
-        if (!sourceId.startsWith("post:")) {
-          return;
-        }
-
-        const postSlug = sourceId.replace("post:", "");
-        const sourceLaneKey = findLaneKeyByPost(dndLanes, postSlug);
-        if (!sourceLaneKey) {
-          return;
-        }
-
-        const targetLaneKey = targetId.startsWith("lane:")
-          ? targetId.replace("lane:", "")
-          : findLaneKeyByPost(dndLanes, targetId.replace("post:", ""));
-
-        if (!targetLaneKey) {
-          return;
-        }
-
-        if (sourceLaneKey === targetLaneKey) {
-          return;
-        }
-
-        setDndLanes((previousLanes) =>
-          movePostToLane(previousLanes, postSlug, sourceLaneKey, targetLaneKey)
-        );
-      }}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDragStart={handleDragStart}
+      sensors={sensors}
     >
       <section className="overflow-x-auto pb-3">
         <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 p-3">
-          {dndLanes.map((lane) => (
-            <BoardGridLaneColumn
-              boardSlug={boardSlug}
-              key={lane.key}
-              lane={lane}
-              laneMap={laneMap}
-              organizationId={organizationId}
-            />
-          ))}
+          {columns.map((column, columnIndex) => {
+            const rows = items[column as keyof typeof items];
+            return (
+              <BoardGridLaneColumn
+                boardId={boardId}
+                id={column}
+                index={columnIndex}
+                key={column}
+                status={column as keyof typeof items}
+                totalPosts={rows.length}
+              >
+                {rows.map((post, postIndex) => (
+                  <BoardGridPostCard
+                    boardSlug={boardSlug}
+                    column={column}
+                    id={post.id}
+                    index={postIndex}
+                    key={post.slug}
+                    organizationId={organizationId}
+                    post={post}
+                  />
+                ))}
+              </BoardGridLaneColumn>
+            );
+          })}
         </div>
       </section>
     </DragDropProvider>

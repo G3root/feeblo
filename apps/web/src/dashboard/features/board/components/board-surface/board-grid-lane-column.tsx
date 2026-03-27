@@ -1,50 +1,65 @@
-import { useDroppable } from "@dnd-kit/react";
+import { CollisionPriority } from "@dnd-kit/abstract";
+import { useSortable } from "@dnd-kit/react/sortable";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { memo } from "react";
+import { Button } from "~/components/ui/button";
+import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { cn } from "~/lib/utils";
-import { BoardGridPostCard } from "./board-grid-post-card";
+import { BOARD_LANE_COLUMN_MAP, type BoardPostStatus } from "../../constants";
 import { StatusIcon } from "./status-icon";
-import type { BoardLane } from "./types";
 
-export function BoardGridLaneColumn({
-  lane,
-  boardSlug,
-  organizationId,
-  laneMap,
-}: {
-  lane: BoardLane;
-  boardSlug: string;
-  organizationId: string;
-  laneMap: Map<string, BoardLane>;
-}) {
-  const { ref, isDropTarget } = useDroppable({
-    id: `lane:${lane.key}`,
-    data: {
-      laneKey: lane.key,
-    },
+interface BoardGridLaneColumnProps {
+  boardId: string;
+  children?: React.ReactNode;
+  id: string;
+  index: number;
+  status: BoardPostStatus;
+  totalPosts: number;
+}
+
+const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
+  id,
+  index,
+  children,
+  totalPosts,
+  status,
+  boardId,
+}: BoardGridLaneColumnProps) {
+  const store = usePostCreateDialogContext();
+  const { ref, isDropTarget } = useSortable({
+    id,
+    accept: "item",
+    collisionPriority: CollisionPriority.Low,
+    type: "column",
+    index,
   });
 
+  const readableStatus = BOARD_LANE_COLUMN_MAP[status];
+
   return (
-    <div className="flex h-96 w-80 flex-col overflow-hidden rounded-lg border border-border bg-muted/30">
-      <div
-        className="border-border border-b bg-linear-to-r px-3 py-2"
-        style={{
-          backgroundImage: `linear-gradient(to right, color-mix(in oklab, ${lane.toneVar} 18%, transparent), transparent)`,
-        }}
-      >
+    <div className="flex h-96 w-80 flex-col overflow-hidden rounded-lg bg-muted/30">
+      <div className="px-3 py-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <StatusIcon status={lane.status} toneVar={lane.toneVar} />
-            <h3 className="font-medium text-sm">{lane.label}</h3>
-            <span className="text-muted-foreground text-xs">
-              {lane.posts.length}
-            </span>
+            <StatusIcon status={status} />
+            <h3 className="font-medium text-sm">{readableStatus}</h3>
+            <span className="text-muted-foreground text-xs">{totalPosts}</span>
           </div>
-          <button
-            aria-label={`Add post to ${lane.label}`}
-            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
-            type="button"
+
+          <Button
+            aria-label={`Add post to ${readableStatus}`}
+            onClick={() => {
+              store.send({
+                type: "toggle",
+                data: { boardId, status },
+              });
+            }}
+            size="icon-xs"
+            variant="ghost"
           >
-            +
-          </button>
+            <HugeiconsIcon icon={PlusSignIcon} />
+          </Button>
         </div>
       </div>
 
@@ -55,17 +70,10 @@ export function BoardGridLaneColumn({
         )}
         ref={ref}
       >
-        {lane.posts.map((post) => (
-          <BoardGridPostCard
-            boardSlug={boardSlug}
-            key={post.slug}
-            lane={lane}
-            laneMap={laneMap}
-            organizationId={organizationId}
-            post={post}
-          />
-        ))}
+        {children}
       </div>
     </div>
   );
-}
+});
+
+export { BoardGridLaneColumn };

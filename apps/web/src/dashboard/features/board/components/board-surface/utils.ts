@@ -1,55 +1,9 @@
 import { BOARD_LANES, type BoardPostStatus } from "../../constants";
-import type { BoardLane } from "./types";
+import type { BoardPostRow } from "./types";
 
 export function getToneForStatus(status: BoardPostStatus) {
   const lane = BOARD_LANES.find((entry) => entry.statuses.includes(status));
   return lane?.toneVar ?? "var(--muted-foreground)";
-}
-
-export function findLaneKeyByPost(lanes: BoardLane[], postSlug: string) {
-  const lane = lanes.find((entry) =>
-    entry.posts.some((post) => post.slug === postSlug)
-  );
-
-  return lane?.key;
-}
-
-export function movePostToLane(
-  lanes: BoardLane[],
-  postSlug: string,
-  sourceLaneKey: string,
-  targetLaneKey: string
-) {
-  const sourceLane = lanes.find((lane) => lane.key === sourceLaneKey);
-  const targetLane = lanes.find((lane) => lane.key === targetLaneKey);
-
-  if (!(sourceLane && targetLane)) {
-    return lanes;
-  }
-
-  const post = sourceLane.posts.find((entry) => entry.slug === postSlug);
-
-  if (!post) {
-    return lanes;
-  }
-
-  return lanes.map((lane) => {
-    if (lane.key === sourceLaneKey) {
-      return {
-        ...lane,
-        posts: lane.posts.filter((entry) => entry.slug !== postSlug),
-      };
-    }
-
-    if (lane.key === targetLaneKey) {
-      return {
-        ...lane,
-        posts: [...lane.posts, post],
-      };
-    }
-
-    return lane;
-  });
 }
 
 export function formatPostDate(value: Date | string) {
@@ -64,3 +18,20 @@ export function formatPostDate(value: Date | string) {
     month: "short",
   });
 }
+
+export const groupPostByStatusMap = (posts: BoardPostRow[]) => {
+  const map: Record<BoardPostStatus, BoardPostRow[]> = {
+    PLANNED: [],
+    IN_PROGRESS: [],
+    REVIEW: [],
+    COMPLETED: [],
+    PAUSED: [],
+    CLOSED: [],
+  };
+
+  for (const post of posts) {
+    map[post.status].push(post);
+  }
+
+  return map;
+};

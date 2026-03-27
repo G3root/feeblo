@@ -64,3 +64,23 @@ export const BOARD_LANES: BoardLaneConfig[] = [
     toneVar: "text-destructive",
   },
 ];
+
+export const BOARD_LANE_COLUMN_MAP: Record<BoardPostStatus, string> = {
+  PAUSED: "paused",
+  REVIEW: "review",
+  PLANNED: "todo",
+  IN_PROGRESS: "in-progress",
+  COMPLETED: "completed",
+  CLOSED: "canceled",
+};
+
+export const BOARD_LANE_COLOR_MAP: Record<BoardPostStatus, string> = {
+  PAUSED: "text-primary-blue",
+  REVIEW: "text-muted-foreground",
+  PLANNED: "text-muted-foreground",
+  IN_PROGRESS: "text-primary-yellow",
+  COMPLETED: "text-chart-2",
+  CLOSED: "text-destructive",
+};
+
+export const BOARD_LANE_COLUMNS = Object.keys(BOARD_LANE_COLUMN_MAP);
