@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { commentReactionCollection } from "~/lib/collections";
+import { getCommentReactionCollectionKey } from "~/lib/reaction-keys";
 import { ReactionButton, ReactionList } from "./reaction-button";
 
 export type CommentReaction = {
@@ -73,7 +74,7 @@ export function CommentReactionSection({
 
       if (existingUserEmojiReaction) {
         const tx = commentReactionCollection.delete(
-          existingUserEmojiReaction.id
+          getCommentReactionCollectionKey(existingUserEmojiReaction)
         );
         await tx.isPersisted.promise;
         return;

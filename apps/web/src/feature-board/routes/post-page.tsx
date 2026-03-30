@@ -11,6 +11,7 @@ import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 import { Link } from "wouter";
 import { z } from "zod";
+import { getPostReactionCollectionKey } from "../../dashboard/lib/reaction-keys";
 import {
   Avatar,
   AvatarFallback,
@@ -473,7 +474,7 @@ function PostReactionBar({
 
     if (existingUserEmojiReaction) {
       const tx = publicPostReactionCollection.delete(
-        existingUserEmojiReaction.id
+        getPostReactionCollectionKey(existingUserEmojiReaction)
       );
       await tx.isPersisted.promise;
       return;

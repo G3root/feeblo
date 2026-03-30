@@ -2,6 +2,10 @@ import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
 import { Duration } from "effect";
 import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
+import {
+  getCommentReactionCollectionKey,
+  getPostReactionCollectionKey,
+} from "~/lib/reaction-keys";
 import { fetchRpc } from "./runtime";
 
 export const postCollection = createCollection(
@@ -757,7 +761,7 @@ export const commentReactionCollection = createCollection(
       return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
+    getKey: getCommentReactionCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newCommentReaction } = mutation;
@@ -923,7 +927,7 @@ export const postReactionCollection = createCollection(
       return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
+    getKey: getPostReactionCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newPostReaction } = mutation;

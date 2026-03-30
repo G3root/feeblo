@@ -3,6 +3,7 @@ import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
 import { Duration } from "effect";
 import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
 import { fetchRpc } from "~/lib/runtime";
+import { getPostReactionCollectionKey } from "../../dashboard/lib/reaction-keys";
 
 export const publicPostCollection = createCollection(
   queryCollectionOptions({
@@ -566,7 +567,7 @@ export const publicPostReactionCollection = createCollection(
       return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
+    getKey: getPostReactionCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newPostReaction } = mutation;

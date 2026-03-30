@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { postReactionCollection, upvoteCollection } from "~/lib/collections";
+import { getPostReactionCollectionKey } from "~/lib/reaction-keys";
 import { cn } from "~/lib/utils";
 import {
   type PostReaction,
@@ -107,7 +108,9 @@ export function PostDetailsEngagementBar({
     );
 
     if (existingUserEmojiReaction) {
-      const tx = postReactionCollection.delete(existingUserEmojiReaction.id);
+      const tx = postReactionCollection.delete(
+        getPostReactionCollectionKey(existingUserEmojiReaction)
+      );
       await tx.isPersisted.promise;
       return;
     }
