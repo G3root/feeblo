@@ -13,33 +13,34 @@ import {
 import { Button } from "~/components/ui/button";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
+import { BOARD_LANE_COLUMN_MAP, type BoardPostStatus } from "../../constants";
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
-import type { BoardLane } from "./types";
+import type { BoardPostRow } from "./types";
 
 export function BoardListView({
-  lanes,
   boardSlug,
   organizationId,
   boardId,
+  groupedPosts,
 }: {
-  lanes: BoardLane[];
   boardSlug: string;
   organizationId: string;
   boardId: string;
+  groupedPosts: Record<BoardPostStatus, BoardPostRow[]>;
 }) {
   return (
     <section>
       <Accordion
         className="w-full rounded-none"
-        defaultValue={lanes.map((lane) => lane.key)}
+        defaultValue={Object.keys(groupedPosts)}
         multiple
       >
-        {lanes.map((lane) => (
+        {Object.keys(groupedPosts).map((lane) => (
           <AccordionItem
             className="border-border border-b last:border-b-0"
-            key={lane.key}
-            value={lane.key}
+            key={lane}
+            value={lane}
           >
             <div className="relative">
               <AccordionTrigger className="rounded-none border-0 bg-linear-to-r from-muted/70 via-muted/30 to-transparent px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden">
@@ -54,20 +55,25 @@ export function BoardListView({
                     icon={ArrowUp01Icon}
                     strokeWidth={2}
                   />
-                  <StatusIcon status={lane.status} toneVar={lane.toneVar} />
-                  <h3 className="font-medium text-sm">{lane.label}</h3>
+                  <StatusIcon status={lane as BoardPostStatus} />
+                  <h3 className="font-medium text-sm">
+                    {BOARD_LANE_COLUMN_MAP[lane as BoardPostStatus]}
+                  </h3>
                   <span className="text-muted-foreground text-xs">
-                    {lane.posts.length}
+                    {groupedPosts[lane as BoardPostStatus].length}
                   </span>
                 </div>
               </AccordionTrigger>
 
               <PolicyGuard policy={hasMembership(organizationId)}>
-                <AddPostButton boardId={boardId} lane={lane} />
+                <AddPostButton
+                  boardId={boardId}
+                  status={lane as BoardPostStatus}
+                />
               </PolicyGuard>
             </div>
             <AccordionContent className="h-auto pb-0" panelClassName="px-0">
-              {lane.posts.map((post) => (
+              {groupedPosts[lane as BoardPostStatus].map((post) => (
                 <BoardPostRowItem
                   boardId={boardId}
                   boardSlug={boardSlug}
@@ -86,20 +92,20 @@ export function BoardListView({
 
 function AddPostButton({
   boardId,
-  lane,
+  status,
 }: {
   boardId: string;
-  lane: BoardLane;
+  status: BoardPostStatus;
 }) {
   const store = usePostCreateDialogContext();
   return (
     <Button
-      aria-label={`Add post to ${lane.label}`}
+      aria-label={`Add post to ${BOARD_LANE_COLUMN_MAP[status]}`}
       className="absolute top-1/2 right-6 -translate-y-1/2"
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        store.send({ type: "toggle", data: { boardId, status: lane.status } });
+        store.send({ type: "toggle", data: { boardId, status } });
       }}
       size="icon-sm"
       type="button"

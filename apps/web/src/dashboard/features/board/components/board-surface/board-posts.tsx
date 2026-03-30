@@ -1,12 +1,11 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { postCollection } from "~/lib/collections";
-import { BOARD_LANES } from "../../constants";
 import { useBoardViewMode } from "../../state/view-mode-context";
 import { BoardGridView } from "./board-grid-view";
 import { BoardListView } from "./board-list-view";
 import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardPostsEmpty } from "./board-posts-empty";
-import type { BoardLane } from "./types";
+import { groupPostByStatusMap } from "./utils";
 
 export function BoardPosts({
   boardId,
@@ -42,13 +41,7 @@ export function BoardPosts({
     [boardId, organizationId]
   );
 
-  const lanes: BoardLane[] = BOARD_LANES.map((lane) => ({
-    key: lane.key,
-    label: lane.label,
-    status: lane.statuses[0],
-    toneVar: lane.toneVar,
-    posts: posts.filter((post) => lane.statuses.includes(post.status)),
-  })).filter((lane) => lane.posts.length > 0);
+  const groupedPosts = groupPostByStatusMap(posts);
 
   if (posts.length === 0) {
     return (
@@ -62,14 +55,14 @@ export function BoardPosts({
         <BoardGridView
           boardId={boardId}
           boardSlug={boardSlug}
+          groupedPosts={groupedPosts}
           organizationId={organizationId}
-          posts={posts}
         />
       ) : (
         <BoardListView
           boardId={boardId}
           boardSlug={boardSlug}
-          lanes={lanes}
+          groupedPosts={groupedPosts}
           organizationId={organizationId}
         />
       )}

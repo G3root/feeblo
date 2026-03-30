@@ -21,7 +21,7 @@ import { SidebarTrigger } from "~/components/ui/sidebar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
-import { BOARD_LANES, type BoardPostStatus } from "~/features/board/constants";
+import type { BoardPostStatus } from "~/features/board/constants";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { boardCollection, postCollection } from "~/lib/collections";
 import { usePostDeleteDialogContext } from "../dialog-stores";
@@ -355,17 +355,17 @@ export function StatusSelect({
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {BOARD_LANES.map((lane) =>
-          lane.statuses.map((status) => (
-            <SelectItem key={status} value={status}>
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: STATUS_DOT_COLORS[status] }}
-              />
-              {STATUS_LABELS[status]}
-            </SelectItem>
-          ))
-        )}
+        {Object.keys(STATUS_LABELS).map((status) => (
+          <SelectItem key={status} value={status}>
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{
+                backgroundColor: STATUS_DOT_COLORS[status as BoardPostStatus],
+              }}
+            />
+            {STATUS_LABELS[status as BoardPostStatus]}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );

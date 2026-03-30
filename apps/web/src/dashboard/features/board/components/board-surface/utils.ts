@@ -1,10 +1,5 @@
-import { BOARD_LANES, type BoardPostStatus } from "../../constants";
+import type { BoardPostStatus } from "../../constants";
 import type { BoardPostRow } from "./types";
-
-export function getToneForStatus(status: BoardPostStatus) {
-  const lane = BOARD_LANES.find((entry) => entry.statuses.includes(status));
-  return lane?.toneVar ?? "var(--muted-foreground)";
-}
 
 export function formatPostDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);

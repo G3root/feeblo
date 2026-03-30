@@ -4,7 +4,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { usePostSelectionStore } from "~/features/board/state/post-selection-context";
 import { StatusIcon } from "./status-icon";
 import type { BoardPostRow } from "./types";
-import { formatPostDate, getToneForStatus } from "./utils";
+import { formatPostDate } from "./utils";
 
 export function BoardPostRowItem({
   post,
@@ -17,7 +17,6 @@ export function BoardPostRowItem({
   organizationId: string;
   boardId: string;
 }) {
-  const toneVar = getToneForStatus(post.status);
   const store = usePostSelectionStore();
   const checked = useSelector(store, (state) =>
     state.context.selectedPostIds.includes(post.id)
@@ -54,7 +53,7 @@ export function BoardPostRowItem({
         to="/$organizationId/board/$boardSlug/$postSlug"
       >
         <div className="flex min-w-0 items-center gap-2">
-          <StatusIcon status={post.status} toneVar={toneVar} />
+          <StatusIcon status={post.status} />
           <p className="truncate font-medium text-sm">{post.title}</p>
         </div>
         <span className="shrink-0 text-muted-foreground text-xs">

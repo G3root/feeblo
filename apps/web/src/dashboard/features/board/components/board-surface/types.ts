@@ -8,11 +8,3 @@ export type BoardPostRow = {
   summary: string;
   updatedAt: Date | string;
 };
-
-export type BoardLane = {
-  key: string;
-  label: string;
-  status: BoardPostStatus;
-  toneVar: string;
-  posts: BoardPostRow[];
-};

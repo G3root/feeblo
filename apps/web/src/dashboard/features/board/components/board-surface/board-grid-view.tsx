@@ -2,10 +2,10 @@ import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { move } from "@dnd-kit/helpers";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { useCallback, useRef, useState } from "react";
+import type { BoardPostStatus } from "../../constants";
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
 import { BoardGridPostCard } from "./board-grid-post-card";
 import type { BoardPostRow } from "./types";
-import { groupPostByStatusMap } from "./utils";
 
 const sensors = [
   PointerSensor.configure({
@@ -19,15 +19,15 @@ const sensors = [
 export function BoardGridView({
   boardSlug,
   organizationId,
-  posts,
   boardId,
+  groupedPosts,
 }: {
   boardSlug: string;
   organizationId: string;
-  posts: BoardPostRow[];
   boardId: string;
+  groupedPosts: Record<BoardPostStatus, BoardPostRow[]>;
 }) {
-  const [items, setItems] = useState(groupPostByStatusMap(posts));
+  const [items, setItems] = useState(groupedPosts);
 
   const [columns] = useState(Object.keys(items));
 
