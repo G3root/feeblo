@@ -542,16 +542,12 @@ export const membersCollection = createCollection(
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: updatedMember } = mutation;
-      const primaryRole = (updatedMember.role?.split(",")[0] ?? "member") as
-        | "owner"
-        | "admin"
-        | "member";
 
       await fetchRpc((rpc) =>
         rpc.OrganizationUpdateMemberRole({
           memberId: updatedMember.id,
           organizationId: updatedMember.organizationId,
-          role: primaryRole === "owner" ? "admin" : primaryRole,
+          role: updatedMember.role,
         })
       );
     },

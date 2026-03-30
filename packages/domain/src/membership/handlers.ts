@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { MembershipPolicy } from "./policies";
 import { MembershipRepository } from "./repository";
@@ -19,14 +19,30 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           return yield* repository.findMembershipsByUserId({
             userId: session.session.userId,
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list members",
+                })
+              ),
+          })
+        );
       },
       OrganizationMembersList: ({ organizationId }) =>
         Effect.gen(function* () {
           return yield* repository.findOrganizationMembers({ organizationId });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list members",
+                })
+              ),
+          })
         ),
       OrganizationInvitationsList: ({ organizationId }) =>
         Effect.gen(function* () {
@@ -35,7 +51,14 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list invitations",
+                })
+              ),
+          })
         ),
       OrganizationInviteMember: ({ organizationId, email, role }) =>
         Effect.gen(function* () {
@@ -53,12 +76,18 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.hasRole("owner"),
-              Policy.hasRole("admin"),
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin")),
               membershipPolicy.isNotMember({ organizationId, email })
             )
           ),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to invite member",
+                })
+              ),
+          })
         ),
       OrganizationUpdateMemberRole: ({ organizationId, memberId, role }) =>
         Effect.gen(function* () {
@@ -71,12 +100,18 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.hasRole("owner"),
-              Policy.hasRole("admin"),
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin")),
               membershipPolicy.hasOtherOwners({ organizationId, memberId })
             )
           ),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to update member role",
+                })
+              ),
+          })
         ),
       OrganizationRemoveMember: ({ organizationId, memberId }) =>
         Effect.gen(function* () {
@@ -88,12 +123,18 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.hasRole("owner"),
-              Policy.hasRole("admin"),
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin")),
               membershipPolicy.hasOtherOwners({ organizationId, memberId })
             )
           ),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to remove member",
+                })
+              ),
+          })
         ),
       OrganizationCancelInvitation: ({ organizationId, invitationId }) =>
         Effect.gen(function* () {
@@ -102,11 +143,17 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.hasRole("owner"),
-              Policy.hasRole("admin")
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
             )
           ),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to cancel invitation",
+                })
+              ),
+          })
         ),
     };
   })
