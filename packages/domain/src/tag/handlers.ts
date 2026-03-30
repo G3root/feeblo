@@ -11,8 +11,10 @@ import {
 import { TagRepository } from "./repository";
 import { TagRpcs } from "./rpcs";
 import type {
-  TBoardTagSet,
+  TChangelogTagList,
   TChangelogTagSet,
+  TPostTagList,
+  TPostTagSet,
   TTag,
   TTagCreate,
   TTagDelete,
@@ -48,21 +50,21 @@ const validateTagIds = ({
     }
   });
 
-const validateBoard = ({
-  boardId,
+const validatePost = ({
+  postId,
   organizationId,
 }: {
-  boardId: string;
+  postId: string;
   organizationId: string;
 }) =>
   Effect.gen(function* () {
     const repository = yield* TagRepository;
-    const exists = yield* repository.hasBoard({ boardId, organizationId });
+    const exists = yield* repository.hasPost({ postId, organizationId });
 
     if (!exists) {
       return yield* Effect.fail(
         new Policy.PolicyDeniedError({
-          reason: "Board does not belong to this organization",
+          reason: "Post does not belong to this organization",
         })
       );
     }
@@ -102,6 +104,31 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           Effect.catchAll(onInternalServerError)
         ),
 
+      TagListPublic: (args: TTagList) =>
+        repository.findMany(args).pipe(Effect.catchAll(onInternalServerError)),
+
+      PostTagList: (args: TPostTagList) =>
+        repository.findPostTags(args).pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Effect.catchAll(onInternalServerError)
+        ),
+
+      PostTagListPublic: (args: TPostTagList) =>
+        repository
+          .findPostTags(args)
+          .pipe(Effect.catchAll(onInternalServerError)),
+
+      ChangelogTagList: (args: TChangelogTagList) =>
+        repository.findChangelogTags(args).pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Effect.catchAll(onInternalServerError)
+        ),
+
+      ChangelogTagListPublic: (args: TChangelogTagList) =>
+        repository
+          .findChangelogTags(args)
+          .pipe(Effect.catchAll(onInternalServerError)),
+
       TagCreate: (args: TTagCreate) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -140,11 +167,11 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           Effect.catchAll(onInternalServerError)
         ),
 
-      BoardTagSet: (args: TBoardTagSet) =>
+      PostTagSet: (args: TPostTagSet) =>
         Effect.gen(function* () {
           const tagIds = normalizeTagIds(args.tagIds);
-          yield* validateBoard({
-            boardId: args.boardId,
+          yield* validatePost({
+            postId: args.postId,
             organizationId: args.organizationId,
           });
           yield* validateTagIds({
@@ -153,7 +180,7 @@ export const TagRpcHandlers = TagRpcs.toLayer(
             type: "FEEDBACK",
           });
 
-          yield* repository.setBoardTags({ ...args, tagIds });
+          yield* repository.setPostTags({ ...args, tagIds });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({

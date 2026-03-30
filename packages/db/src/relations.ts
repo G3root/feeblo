@@ -2,7 +2,6 @@ import { relations } from "drizzle-orm/relations";
 import {
   account,
   board,
-  boardTag,
   changelog,
   changelogTag,
   comment,
@@ -11,6 +10,7 @@ import {
   member,
   organization,
   post,
+  postTag,
   postReaction,
   product,
   session,
@@ -65,8 +65,8 @@ export const organizationRelations = relations(
     invitations: many(invitation),
     boards: many(board),
     tags: many(tag),
-    boardTags: many(boardTag),
     posts: many(post),
+    postTags: many(postTag),
     comments: many(comment),
     changelogs: many(changelog),
     changelogTags: many(changelogTag),
@@ -106,7 +106,6 @@ export const boardRelations = relations(board, ({ many, one }) => ({
     references: [organization.id],
   }),
   posts: many(post),
-  boardTags: many(boardTag),
 }));
 
 export const tagRelations = relations(tag, ({ many, one }) => ({
@@ -122,21 +121,21 @@ export const tagRelations = relations(tag, ({ many, one }) => ({
     fields: [tag.creatorMemberId],
     references: [member.id],
   }),
-  boardTags: many(boardTag),
+  postTags: many(postTag),
   changelogTags: many(changelogTag),
 }));
 
-export const boardTagRelations = relations(boardTag, ({ one }) => ({
-  board: one(board, {
-    fields: [boardTag.boardId],
-    references: [board.id],
+export const postTagRelations = relations(postTag, ({ one }) => ({
+  post: one(post, {
+    fields: [postTag.postId],
+    references: [post.id],
   }),
   tag: one(tag, {
-    fields: [boardTag.tagId],
+    fields: [postTag.tagId],
     references: [tag.id],
   }),
   organization: one(organization, {
-    fields: [boardTag.organizationId],
+    fields: [postTag.organizationId],
     references: [organization.id],
   }),
 }));
@@ -161,6 +160,7 @@ export const postRelations = relations(post, ({ many, one }) => ({
   upvotes: many(upvote),
   postReactions: many(postReaction),
   comments: many(comment),
+  postTags: many(postTag),
 }));
 
 export const upvoteRelations = relations(upvote, ({ one }) => ({

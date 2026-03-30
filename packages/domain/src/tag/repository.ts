@@ -1,18 +1,22 @@
 import { DB } from "@feeblo/db";
 import {
-  board as boardTable,
-  boardTag as boardTagTable,
   changelog as changelogTable,
   changelogTag as changelogTagTable,
+  post as postTable,
+  postTag as postTagTable,
   tag as tagTable,
 } from "@feeblo/db/schema/feedback";
 import { generatePublicId } from "@feeblo/utils/id";
 import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 import {
+  ChangelogTagAssignment,
+  PostTagAssignment,
   Tag,
-  type TBoardTagSet,
+  type TChangelogTagList,
   type TChangelogTagSet,
+  type TPostTagList,
+  type TPostTagSet,
   type TTag,
 } from "./schema";
 
@@ -107,14 +111,50 @@ export class TagRepository extends Effect.Service<TagRepository>()(
             )
             .pipe(Effect.asVoid),
 
-        setBoardTags: ({ boardId, organizationId, tagIds }: TBoardTagSet) =>
+        findPostTags: ({ organizationId }: TPostTagList) =>
+          db
+            .select({
+              id: postTagTable.id,
+              postId: postTagTable.postId,
+              tagId: postTagTable.tagId,
+              organizationId: postTagTable.organizationId,
+              createdAt: postTagTable.createdAt,
+              updatedAt: postTagTable.updatedAt,
+            })
+            .from(postTagTable)
+            .where(eq(postTagTable.organizationId, organizationId))
+            .pipe(
+              Effect.map((entries) =>
+                entries.map((entry) => new PostTagAssignment(entry))
+              )
+            ),
+
+        findChangelogTags: ({ organizationId }: TChangelogTagList) =>
+          db
+            .select({
+              id: changelogTagTable.id,
+              changelogId: changelogTagTable.changelogId,
+              tagId: changelogTagTable.tagId,
+              organizationId: changelogTagTable.organizationId,
+              createdAt: changelogTagTable.createdAt,
+              updatedAt: changelogTagTable.updatedAt,
+            })
+            .from(changelogTagTable)
+            .where(eq(changelogTagTable.organizationId, organizationId))
+            .pipe(
+              Effect.map((entries) =>
+                entries.map((entry) => new ChangelogTagAssignment(entry))
+              )
+            ),
+
+        setPostTags: ({ postId, organizationId, tagIds }: TPostTagSet) =>
           Effect.gen(function* () {
             yield* db
-              .delete(boardTagTable)
+              .delete(postTagTable)
               .where(
                 and(
-                  eq(boardTagTable.boardId, boardId),
-                  eq(boardTagTable.organizationId, organizationId)
+                  eq(postTagTable.postId, postId),
+                  eq(postTagTable.organizationId, organizationId)
                 )
               );
 
@@ -126,7 +166,7 @@ export class TagRepository extends Effect.Service<TagRepository>()(
               Effect.promise(() => generatePublicId()).pipe(
                 Effect.map((id) => ({
                   id,
-                  boardId,
+                  postId,
                   tagId,
                   organizationId,
                   createdAt: new Date(),
@@ -135,7 +175,7 @@ export class TagRepository extends Effect.Service<TagRepository>()(
               )
             );
 
-            yield* db.insert(boardTagTable).values(rows);
+            yield* db.insert(postTagTable).values(rows);
           }).pipe(Effect.asVoid),
 
         setChangelogTags: ({
@@ -196,20 +236,20 @@ export class TagRepository extends Effect.Service<TagRepository>()(
                 )
                 .pipe(Effect.map((rows) => rows.length)),
 
-        hasBoard: ({
-          boardId,
+        hasPost: ({
+          postId,
           organizationId,
         }: {
-          boardId: string;
+          postId: string;
           organizationId: string;
         }) =>
           db
-            .select({ id: boardTable.id })
-            .from(boardTable)
+            .select({ id: postTable.id })
+            .from(postTable)
             .where(
               and(
-                eq(boardTable.id, boardId),
-                eq(boardTable.organizationId, organizationId)
+                eq(postTable.id, postId),
+                eq(postTable.organizationId, organizationId)
               )
             )
             .pipe(Effect.map((rows) => rows.length > 0)),

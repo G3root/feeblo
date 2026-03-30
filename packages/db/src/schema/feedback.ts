@@ -101,13 +101,13 @@ export const tag = pgTable(
   ]
 );
 
-export const boardTag = pgTable(
-  "board_tag",
+export const postTag = pgTable(
+  "post_tag",
   {
     id: text("id").primaryKey(),
-    boardId: text("board_id")
+    postId: text("post_id")
       .notNull()
-      .references(() => board.id, { onDelete: "cascade" }),
+      .references(() => post.id, { onDelete: "cascade" }),
     tagId: text("tag_id")
       .notNull()
       .references(() => tag.id, { onDelete: "cascade" }),
@@ -123,9 +123,9 @@ export const boardTag = pgTable(
       .notNull(),
   },
   (table) => [
-    index("board_tag_boardId_idx").on(table.boardId),
-    index("board_tag_tagId_idx").on(table.tagId),
-    uniqueIndex("board_tag_boardId_tagId_uidx").on(table.boardId, table.tagId),
+    index("post_tag_postId_idx").on(table.postId),
+    index("post_tag_tagId_idx").on(table.tagId),
+    uniqueIndex("post_tag_postId_tagId_uidx").on(table.postId, table.tagId),
   ]
 );
 

@@ -173,6 +173,164 @@ export const publicBoardCollection = createCollection(
   })
 );
 
+export const publicTagCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["public-tag"];
+
+      for (const { field, value } of parsed.filters) {
+        if (field.join(".") === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator === "eq" && field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+      }
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.TagListPublic({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const publicPostTagCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["public-post-tag"];
+
+      for (const { field, value } of parsed.filters) {
+        const fieldName = field.join(".");
+        if (fieldName === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+        if (fieldName === "postId") {
+          cacheKey.push(`postId-${value}`);
+        }
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+      let postId: string | undefined;
+
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator !== "eq") {
+          continue;
+        }
+
+        if (field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+        if (field.join(".") === "postId") {
+          postId = value as string;
+        }
+      }
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.PostTagListPublic({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return postId
+        ? data.filter((entry) => entry.postId === postId)
+        : [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const publicChangelogTagCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const cacheKey = ["public-changelog-tag"];
+
+      for (const { field, value } of parsed.filters) {
+        const fieldName = field.join(".");
+        if (fieldName === "organizationId") {
+          cacheKey.push(`organizationId-${value}`);
+        }
+        if (fieldName === "changelogId") {
+          cacheKey.push(`changelogId-${value}`);
+        }
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      let organizationId: string | undefined;
+      let changelogId: string | undefined;
+
+      for (const { field, operator, value } of parsed.filters) {
+        if (operator !== "eq") {
+          continue;
+        }
+
+        if (field.join(".") === "organizationId") {
+          organizationId = value as string;
+        }
+        if (field.join(".") === "changelogId") {
+          changelogId = value as string;
+        }
+      }
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogTagListPublic({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return changelogId
+        ? data.filter((entry) => entry.changelogId === changelogId)
+        : [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const publicCommentCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
