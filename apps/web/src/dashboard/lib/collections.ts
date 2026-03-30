@@ -5,6 +5,7 @@ import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
+  getUpvoteCollectionKey,
 } from "~/lib/reaction-keys";
 import { fetchRpc } from "./runtime";
 
@@ -846,7 +847,7 @@ export const upvoteCollection = createCollection(
       return [...data];
     },
     queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
+    getKey: getUpvoteCollectionKey,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newUpvote } = mutation;

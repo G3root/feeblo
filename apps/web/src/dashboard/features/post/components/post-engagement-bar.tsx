@@ -7,7 +7,10 @@ import { Button } from "~/components/ui/button";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { postReactionCollection, upvoteCollection } from "~/lib/collections";
-import { getPostReactionCollectionKey } from "~/lib/reaction-keys";
+import {
+  getPostReactionCollectionKey,
+  getUpvoteCollectionKey,
+} from "~/lib/reaction-keys";
 import { cn } from "~/lib/utils";
 import {
   type PostReaction,
@@ -17,11 +20,9 @@ import {
 export function PostDetailsEngagementBar({
   organizationId,
   postId,
-  hasUserUpVoted,
 }: {
   organizationId: string;
   postId: string;
-  hasUserUpVoted: boolean;
 }) {
   const { data: session } = authClient.useSession();
   const { data: upvotes } = useLiveSuspenseQuery(
@@ -52,6 +53,11 @@ export function PostDetailsEngagementBar({
     [organizationId, postId]
   );
 
+  const hasCurrentUserUpvoted =
+    session?.user?.id != null
+      ? upvotes.some((upvote) => upvote.userId === session.user.id)
+      : false;
+
   const handleToggleUpvote = async () => {
     const currentUserId = session?.user?.id;
     if (!currentUserId) {
@@ -71,7 +77,9 @@ export function PostDetailsEngagementBar({
     );
 
     if (existingUpvote) {
-      const tx = upvoteCollection.delete(existingUpvote.id);
+      const tx = upvoteCollection.delete(
+        getUpvoteCollectionKey(existingUpvote)
+      );
       await tx.isPersisted.promise;
       return;
     }
@@ -136,7 +144,7 @@ export function PostDetailsEngagementBar({
 
       <PostUpvoteButton
         handleToggleUpvote={handleToggleUpvote}
-        isUpvoted={hasUserUpVoted}
+        isUpvoted={hasCurrentUserUpvoted}
         upvoteCount={upvotes.length}
         variant="default"
       />

@@ -106,7 +106,6 @@ function RouteComponent() {
         <Suspense fallback={<PostDetails.ActionsSkeleton />}>
           <div className="flex items-center justify-between py-1">
             <PostDetails.EngagementBar
-              hasUserUpVoted={post.hasUserUpVoted}
               organizationId={organizationId}
               postId={post.id}
             />

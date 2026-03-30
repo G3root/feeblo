@@ -13,3 +13,10 @@ export function getCommentReactionCollectionKey(reaction: {
 }) {
   return `${reaction.commentId}:${reaction.userId}:${reaction.emoji}`;
 }
+
+export function getUpvoteCollectionKey(upvote: {
+  postId: string;
+  userId: string;
+}) {
+  return `${upvote.postId}:${upvote.userId}`;
+}

@@ -2,6 +2,7 @@ import { generateId } from "@feeblo/utils/id";
 import { createOptimisticAction } from "@tanstack/react-db";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
+import { getUpvoteCollectionKey } from "~/lib/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";
 import {
   publicPostCollection,
@@ -41,7 +42,9 @@ export function useUpvote() {
 
       if (existingUpvoteRecord || existingUpvote) {
         if (existingUpvoteRecord) {
-          publicUpvoteCollection.delete(existingUpvoteRecord.id);
+          publicUpvoteCollection.delete(
+            getUpvoteCollectionKey(existingUpvoteRecord)
+          );
         }
         publicPostCollection.update(postId, (draft) => {
           draft.hasUserUpVoted = false;
