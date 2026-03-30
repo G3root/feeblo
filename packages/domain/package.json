@@ -72,6 +72,9 @@
     },
     "./changelog/schema": {
       "default": "./src/changelog/schema.ts"
+    },
+    "./tag/schema": {
+      "default": "./src/tag/schema.ts"
     }
   },
   "dependencies": {

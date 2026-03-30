@@ -14,6 +14,7 @@ import {
   OptionalAuthMiddlewareLive,
 } from "./session-middleware";
 import { SiteRpcHandlers } from "./site/handlers";
+import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
@@ -30,6 +31,7 @@ export const RpcRoute = RpcServer.layerHttpRouter({
   Layer.provide(CommentReactionRpcHandlers),
   Layer.provide(CommentRpcHandlers),
   Layer.provide(SiteRpcHandlers),
+  Layer.provide(TagRpcHandlers),
   Layer.provide(UpvoteRpcHandlers),
   Layer.provide(PostReactionRpcHandlers),
   Layer.provide(WorkspaceRpcHandlers),

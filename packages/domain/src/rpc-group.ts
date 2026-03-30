@@ -7,6 +7,7 @@ import { MembershipRpcs } from "./membership/rpcs";
 import { PostRpcs } from "./post/rpcs";
 import { PostReactionRpcs } from "./post-reaction/rpcs";
 import { SiteRpcs } from "./site/rpcs";
+import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
@@ -18,6 +19,7 @@ export const AllRpcs = PostRpcs.merge(
   CommentReactionRpcs,
   CommentRpcs,
   SiteRpcs,
+  TagRpcs,
   UpvoteRpcs,
   PostReactionRpcs,
   WorkspaceRpcs

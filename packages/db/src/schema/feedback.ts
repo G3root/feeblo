@@ -38,6 +38,8 @@ export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
   "INTERNAL",
 ]);
 
+export const tagTypeEnum = pgEnum("tag_type", ["FEEDBACK", "CHANGELOG"]);
+
 export const board = pgTable(
   "board",
   {
@@ -63,6 +65,97 @@ export const board = pgTable(
     uniqueIndex("board_organizationId_slug_uidx").on(
       table.organizationId,
       table.slug
+    ),
+  ]
+);
+
+export const tag = pgTable(
+  "tag",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    type: tagTypeEnum("type").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    creatorId: text("creator_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    creatorMemberId: text("creator_member_id").references(() => member.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("tag_organizationId_type_name_uidx").on(
+      table.organizationId,
+      table.type,
+      table.name
+    ),
+  ]
+);
+
+export const boardTag = pgTable(
+  "board_tag",
+  {
+    id: text("id").primaryKey(),
+    boardId: text("board_id")
+      .notNull()
+      .references(() => board.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tag.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("board_tag_boardId_idx").on(table.boardId),
+    index("board_tag_tagId_idx").on(table.tagId),
+    uniqueIndex("board_tag_boardId_tagId_uidx").on(table.boardId, table.tagId),
+  ]
+);
+
+export const changelogTag = pgTable(
+  "changelog_tag",
+  {
+    id: text("id").primaryKey(),
+    changelogId: text("changelog_id")
+      .notNull()
+      .references(() => changelog.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tag.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("changelog_tag_changelogId_idx").on(table.changelogId),
+    index("changelog_tag_tagId_idx").on(table.tagId),
+    uniqueIndex("changelog_tag_changelogId_tagId_uidx").on(
+      table.changelogId,
+      table.tagId
     ),
   ]
 );

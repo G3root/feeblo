@@ -2,7 +2,9 @@ import { relations } from "drizzle-orm/relations";
 import {
   account,
   board,
+  boardTag,
   changelog,
+  changelogTag,
   comment,
   commentReaction,
   invitation,
@@ -14,6 +16,7 @@ import {
   session,
   site,
   subscription,
+  tag,
   twoFactor,
   upvote,
   user,
@@ -31,6 +34,7 @@ export const userRelations = relations(user, ({ many }) => ({
   commentReactions: many(commentReaction),
   createdPosts: many(post),
   createdChangelogs: many(changelog),
+  createdTags: many(tag),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -60,9 +64,12 @@ export const organizationRelations = relations(
     members: many(member),
     invitations: many(invitation),
     boards: many(board),
+    tags: many(tag),
+    boardTags: many(boardTag),
     posts: many(post),
     comments: many(comment),
     changelogs: many(changelog),
+    changelogTags: many(changelogTag),
     site: one(site, {
       fields: [organization.id],
       references: [site.organizationId],
@@ -99,6 +106,39 @@ export const boardRelations = relations(board, ({ many, one }) => ({
     references: [organization.id],
   }),
   posts: many(post),
+  boardTags: many(boardTag),
+}));
+
+export const tagRelations = relations(tag, ({ many, one }) => ({
+  organization: one(organization, {
+    fields: [tag.organizationId],
+    references: [organization.id],
+  }),
+  creator: one(user, {
+    fields: [tag.creatorId],
+    references: [user.id],
+  }),
+  creatorMember: one(member, {
+    fields: [tag.creatorMemberId],
+    references: [member.id],
+  }),
+  boardTags: many(boardTag),
+  changelogTags: many(changelogTag),
+}));
+
+export const boardTagRelations = relations(boardTag, ({ one }) => ({
+  board: one(board, {
+    fields: [boardTag.boardId],
+    references: [board.id],
+  }),
+  tag: one(tag, {
+    fields: [boardTag.tagId],
+    references: [tag.id],
+  }),
+  organization: one(organization, {
+    fields: [boardTag.organizationId],
+    references: [organization.id],
+  }),
 }));
 
 export const postRelations = relations(post, ({ many, one }) => ({
@@ -190,7 +230,7 @@ export const siteRelations = relations(site, ({ one }) => ({
   }),
 }));
 
-export const changelogRelations = relations(changelog, ({ one }) => ({
+export const changelogRelations = relations(changelog, ({ many, one }) => ({
   organization: one(organization, {
     fields: [changelog.organizationId],
     references: [organization.id],
@@ -202,6 +242,22 @@ export const changelogRelations = relations(changelog, ({ one }) => ({
   creatorMember: one(member, {
     fields: [changelog.creatorMemberId],
     references: [member.id],
+  }),
+  changelogTags: many(changelogTag),
+}));
+
+export const changelogTagRelations = relations(changelogTag, ({ one }) => ({
+  changelog: one(changelog, {
+    fields: [changelogTag.changelogId],
+    references: [changelog.id],
+  }),
+  tag: one(tag, {
+    fields: [changelogTag.tagId],
+    references: [tag.id],
+  }),
+  organization: one(organization, {
+    fields: [changelogTag.organizationId],
+    references: [organization.id],
   }),
 }));
 
