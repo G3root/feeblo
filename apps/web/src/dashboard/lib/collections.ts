@@ -314,7 +314,7 @@ export const tagCollection = createCollection(
       }
 
       if (!organizationId) {
-        return [];
+        throw new Error("organizationId is required");
       }
 
       const data = await fetchRpc((rpc) => rpc.TagList({ organizationId }), {
