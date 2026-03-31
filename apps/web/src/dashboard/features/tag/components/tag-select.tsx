@@ -46,13 +46,19 @@ export const TagSelect = ({
 }: TagSelectProps) => {
   const [open, setOpen] = useState(false);
   const selectedTagIds = new Set(selectedTags.map((tag) => tag.tagId));
-
+  const hasSelectedTags = selectedTags.length > 0;
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger
         render={
-          <Button size="icon-xs" variant="outline">
-            <HugeiconsIcon icon={PlusSignIcon} />
+          <Button size={hasSelectedTags ? "icon-xs" : "xs"} variant="ghost">
+            {hasSelectedTags ? (
+              <HugeiconsIcon icon={PlusSignIcon} />
+            ) : (
+              <>
+                <HugeiconsIcon icon={Tag01Icon} /> Add Tag
+              </>
+            )}
           </Button>
         }
       />

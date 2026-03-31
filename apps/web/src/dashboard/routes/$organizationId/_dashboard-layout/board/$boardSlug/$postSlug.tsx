@@ -347,7 +347,7 @@ function RouteComponent() {
             </SidebarCard>
 
             <SidebarCard title="Tags">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <TagList selectedTags={postTags} tags={tags} />
                 <TagSelect
                   onTagSelect={handleTagSelect}
