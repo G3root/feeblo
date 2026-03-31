@@ -22,8 +22,21 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import type { BoardPostStatus } from "~/features/board/constants";
+import {
+  TagList,
+  TagSelect,
+  TagSelectContent,
+  type TagSelectOption,
+  TagSelectTrigger,
+} from "~/features/tag/components/tag-select";
 import { getPublicSiteUrl } from "~/hooks/use-site";
-import { boardCollection, postCollection } from "~/lib/collections";
+import {
+  boardCollection,
+  postCollection,
+  postTagCollection,
+  tagCollection,
+} from "~/lib/collections";
+import { fetchRpc } from "~/lib/runtime";
 import { usePostDeleteDialogContext } from "../dialog-stores";
 import { PostBoardSelect } from "./post-board-select";
 
@@ -113,6 +126,84 @@ function PostDetailsWorkspaceShellContent({
     },
     [params.postSlug, params.organizationId, board?.id]
   );
+
+  const { data: tags } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ tags: tagCollection })
+        .where(({ tags }) =>
+          and(
+            eq(tags.organizationId, params.organizationId),
+            eq(tags.type, "FEEDBACK")
+          )
+        )
+        .select(({ tags }) => ({
+          id: tags.id,
+          name: tags.name,
+          type: tags.type,
+        }));
+    },
+    [params.organizationId]
+  );
+
+  const { data: postTags } = useLiveSuspenseQuery(
+    (q) => {
+      return q
+        .from({ tags: postTagCollection })
+        .where(({ tags }) =>
+          and(
+            eq(tags.postId, post?.id ?? ""),
+            eq(tags.organizationId, params.organizationId)
+          )
+        )
+        .select(({ tags }) => ({
+          id: tags.id,
+          tagId: tags.tagId,
+          typeId: tags.postId,
+        }));
+    },
+    [board?.id, params.organizationId]
+  );
+
+  const handleTagSelect = async (
+    option: TagSelectOption,
+    isSelected: boolean
+  ) => {
+    try {
+      if (!post) {
+        return;
+      }
+
+      // Get current tag IDs
+      const currentTagIds = postTags.map((tag) => tag.tagId);
+
+      // Calculate new tag IDs based on selection
+      const newTagIds = isSelected
+        ? currentTagIds.filter((id) => id !== option.id) // Remove tag
+        : [...currentTagIds, option.id]; // Add tag
+
+      // Call the PostTagSet RPC to update tags
+      await fetchRpc((rpc) =>
+        rpc.PostTagSet({
+          postId: post.id,
+          organizationId: params.organizationId,
+          tagIds: newTagIds,
+        })
+      );
+
+      await postTagCollection.utils.refetch();
+
+      toastManager.add({
+        title: "Tags updated",
+        type: "success",
+      });
+    } catch (_error) {
+      toastManager.add({
+        title: "Failed to update tags",
+        type: "error",
+      });
+    }
+  };
 
   const currentStatus = (post?.status as BoardPostStatus) ?? "PLANNED";
   const currentBoardId = board?.id ?? "";
@@ -245,6 +336,18 @@ function PostDetailsWorkspaceShellContent({
                   }
                 }}
               />
+            </PropertyRow>
+
+            <PropertyRow label="Tags">
+              <TagList selectedTags={postTags} tags={tags} />
+              <TagSelect>
+                <TagSelectTrigger />
+                <TagSelectContent
+                  onTagSelect={handleTagSelect}
+                  selectedTags={postTags}
+                  tags={tags}
+                />
+              </TagSelect>
             </PropertyRow>
 
             <Separator />
