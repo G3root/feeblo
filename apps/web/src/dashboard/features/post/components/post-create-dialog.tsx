@@ -28,7 +28,7 @@ import {
 } from "~/lib/collections";
 import { usePostCreateDialogContext } from "../dialog-stores";
 import { PostBoardSelect } from "./post-board-select";
-import { PropertyRow, StatusSelect } from "./post-details-workspace-shell";
+import { PropertyRow, StatusSelect } from "./post-properties";
 import {
   isRichTextContentEmpty,
   uploadPostEditorImage,
