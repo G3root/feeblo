@@ -10,7 +10,7 @@ import {
 
 export type BoardPostStatus = TPostStatus;
 
-export const IconMap: Record<BoardPostStatus, typeof CancelCircleIcon> = {
+export const BoardIconMap: Record<BoardPostStatus, typeof CancelCircleIcon> = {
   CLOSED: CancelCircleIcon,
   PAUSED: PauseCircleIcon,
   COMPLETED: CheckmarkCircle02Icon,
@@ -20,12 +20,12 @@ export const IconMap: Record<BoardPostStatus, typeof CancelCircleIcon> = {
 };
 
 export const BOARD_LANE_COLUMN_MAP: Record<BoardPostStatus, string> = {
-  PAUSED: "paused",
-  REVIEW: "review",
-  PLANNED: "todo",
-  IN_PROGRESS: "in-progress",
-  COMPLETED: "completed",
-  CLOSED: "canceled",
+  PAUSED: "Paused",
+  REVIEW: "Review",
+  PLANNED: "Planned",
+  IN_PROGRESS: "In Progress",
+  COMPLETED: "Completed",
+  CLOSED: "Closed",
 };
 
 export const BOARD_LANE_COLOR_MAP: Record<BoardPostStatus, string> = {

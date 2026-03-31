@@ -2,12 +2,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "~/lib/utils";
 import {
   BOARD_LANE_COLOR_MAP,
+  BoardIconMap,
   type BoardPostStatus,
-  IconMap,
 } from "../../constants";
 
 export function StatusIcon({ status }: { status: BoardPostStatus }) {
-  const Icon = IconMap[status];
+  const Icon = BoardIconMap[status];
   const color = BOARD_LANE_COLOR_MAP[status];
 
   return (

@@ -1,29 +1,22 @@
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "~/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import type { BoardPostStatus } from "~/features/board/constants";
-
-const STATUS_DOT_COLORS: Record<BoardPostStatus, string> = {
-  IN_PROGRESS: "#3b82f6",
-  REVIEW: "#f59e0b",
-  PLANNED: "#6b7280",
-  COMPLETED: "#22c55e",
-  PAUSED: "#eab308",
-  CLOSED: "#ef4444",
-};
-
-const STATUS_LABELS: Record<BoardPostStatus, string> = {
-  IN_PROGRESS: "In Progress",
-  REVIEW: "In Review",
-  PLANNED: "Planned",
-  COMPLETED: "Completed",
-  PAUSED: "Paused",
-  CLOSED: "Closed",
-};
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "~/components/ui/combobox";
+import {
+  BOARD_LANE_COLOR_MAP,
+  BOARD_LANE_COLUMN_MAP,
+  BoardIconMap,
+  type BoardPostStatus,
+} from "~/features/board/constants";
+import { cn } from "~/lib/utils";
 
 export function PropertyRow({
   label,
@@ -42,6 +35,11 @@ export function PropertyRow({
   );
 }
 
+const items = Object.keys(BOARD_LANE_COLUMN_MAP).map((status) => ({
+  value: status,
+  label: BOARD_LANE_COLUMN_MAP[status as BoardPostStatus],
+}));
+
 export function StatusSelect({
   currentStatus,
   onValueChange,
@@ -49,30 +47,61 @@ export function StatusSelect({
   currentStatus: BoardPostStatus;
   onValueChange: (status: BoardPostStatus | null) => void;
 }) {
+  const defaultValue = {
+    value: currentStatus,
+    label: BOARD_LANE_COLUMN_MAP[currentStatus],
+  };
+
   return (
-    <Select onValueChange={onValueChange} value={currentStatus}>
-      <SelectTrigger className="w-full">
-        <SelectValue>
-          <span
-            className="size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: STATUS_DOT_COLORS[currentStatus] }}
-          />
-          {STATUS_LABELS[currentStatus]}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {Object.keys(STATUS_LABELS).map((status) => (
-          <SelectItem key={status} value={status}>
-            <span
-              className="size-2 shrink-0 rounded-full"
-              style={{
-                backgroundColor: STATUS_DOT_COLORS[status as BoardPostStatus],
-              }}
-            />
-            {STATUS_LABELS[status as BoardPostStatus]}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Combobox
+      defaultValue={defaultValue}
+      items={items}
+      onValueChange={(value) => onValueChange(value?.value ?? null)}
+    >
+      <ComboboxTrigger
+        render={
+          <Button size="sm" variant="ghost">
+            <ComboboxValue>
+              {(value) => (
+                <span className="flex items-center gap-2">
+                  {value ? (
+                    <>
+                      <HugeiconsIcon
+                        className={cn(
+                          "size-4",
+                          BOARD_LANE_COLOR_MAP[value.value as BoardPostStatus]
+                        )}
+                        icon={BoardIconMap[value.value as BoardPostStatus]}
+                        strokeWidth={2}
+                      />
+                      {value.label}
+                    </>
+                  ) : null}
+                </span>
+              )}
+            </ComboboxValue>
+          </Button>
+        }
+      />
+      <ComboboxContent className="w-full">
+        <ComboboxInput placeholder="Search" showTrigger={false} />
+        <ComboboxEmpty>No items; found.</ComboboxEmpty>
+        <ComboboxList>
+          {(item) => (
+            <ComboboxItem key={item.value} value={item}>
+              <HugeiconsIcon
+                className={cn(
+                  "size-4",
+                  BOARD_LANE_COLOR_MAP[item.value as BoardPostStatus]
+                )}
+                icon={BoardIconMap[item.value as BoardPostStatus]}
+                strokeWidth={2}
+              />{" "}
+              {item.label}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }

@@ -8,6 +8,7 @@ import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
   Empty,
   EmptyContent,
@@ -15,20 +16,16 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
-import { Separator } from "~/components/ui/separator";
 import { toastManager } from "~/components/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import type { BoardPostStatus } from "~/features/board/constants";
 import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
+import { PostBoardSelect } from "~/features/post/components/post-board-select";
 import {
   PostDetails,
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
-import { PostBoardSelect } from "~/features/post/components/post-board-select";
-import {
-  PropertyRow,
-  StatusSelect,
-} from "~/features/post/components/post-properties";
+import { StatusSelect } from "~/features/post/components/post-properties";
 import {
   CommentDeleteDialogProvider,
   usePostDeleteDialogContext,
@@ -36,9 +33,7 @@ import {
 import {
   TagList,
   TagSelect,
-  TagSelectContent,
   type TagSelectOption,
-  TagSelectTrigger,
 } from "~/features/tag/components/tag-select";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import {
@@ -106,7 +101,10 @@ function RouteComponent() {
       return q
         .from({ tags: tagCollection })
         .where(({ tags }) =>
-          and(eq(tags.organizationId, organizationId), eq(tags.type, "FEEDBACK"))
+          and(
+            eq(tags.organizationId, organizationId),
+            eq(tags.type, "FEEDBACK")
+          )
         )
         .select(({ tags }) => ({
           id: tags.id,
@@ -122,7 +120,10 @@ function RouteComponent() {
       return q
         .from({ tags: postTagCollection })
         .where(({ tags }) =>
-          and(eq(tags.postId, post?.id ?? ""), eq(tags.organizationId, organizationId))
+          and(
+            eq(tags.postId, post?.id ?? ""),
+            eq(tags.organizationId, organizationId)
+          )
         )
         .select(({ tags }) => ({
           id: tags.id,
@@ -236,13 +237,14 @@ function RouteComponent() {
           </p>
         </PostDetails.Layout>
 
-        <aside className="hidden border-l bg-muted/20 px-6 pt-2 lg:block">
-          <div className="sticky top-0 py-6">
+        <aside className="hidden px-6 py-6 lg:block">
+          <div className="sticky top-0 space-y-4">
             <div className="flex items-center justify-end gap-2">
               <RedirectToPostUrlButton postSlug={post.slug} />
               <CopyPostButton postSlug={post.slug} />
               <Button
                 aria-label="Close"
+                className="rounded-full"
                 onClick={() =>
                   postDialogStore.send({
                     type: "toggle",
@@ -265,8 +267,8 @@ function RouteComponent() {
               </Button>
             </div>
 
-            <div className="mt-4 text-sm">
-              <PropertyRow label="Status">
+            <SidebarCard title="Properties">
+              <div>
                 <StatusSelect
                   currentStatus={currentStatus}
                   onValueChange={async (status) => {
@@ -291,83 +293,79 @@ function RouteComponent() {
                     }
                   }}
                 />
-              </PropertyRow>
+              </div>
 
-              <PropertyRow label="Board">
-                <PostBoardSelect
-                  boards={allBoards}
-                  currentBoardId={board.id}
-                  onValueChange={async (boardId) => {
-                    if (!boardId) {
+              <PostBoardSelect
+                boards={allBoards}
+                currentBoardId={board.id}
+                onValueChange={async (boardId) => {
+                  if (!boardId) {
+                    return;
+                  }
+                  try {
+                    const nextBoard = allBoards.find(
+                      (item) => item.id === boardId
+                    );
+                    const nextBoardSlug = nextBoard?.slug;
+                    const tx = postCollection.update(
+                      post.id,
+                      {
+                        optimistic: false,
+                      },
+                      (draft) => {
+                        draft.boardId = boardId;
+                      }
+                    );
+                    await tx.isPersisted.promise;
+
+                    toastManager.add({
+                      title: "Board updated",
+                      type: "success",
+                    });
+
+                    if (!nextBoardSlug) {
                       return;
                     }
-                    try {
-                      const nextBoard = allBoards.find((item) => item.id === boardId);
-                      const nextBoardSlug = nextBoard?.slug;
-                      const tx = postCollection.update(
-                        post.id,
-                        {
-                          optimistic: false,
-                        },
-                        (draft) => {
-                          draft.boardId = boardId;
-                        }
-                      );
-                      await tx.isPersisted.promise;
 
-                      toastManager.add({
-                        title: "Board updated",
-                        type: "success",
-                      });
+                    navigate({
+                      to: "/$organizationId/board/$boardSlug/$postSlug",
+                      params: {
+                        organizationId,
+                        boardSlug: nextBoardSlug,
+                        postSlug,
+                      },
+                      replace: true,
+                    });
+                  } catch (_error) {
+                    toastManager.add({
+                      title: "Failed to update board",
+                      type: "error",
+                    });
+                  }
+                }}
+              />
+            </SidebarCard>
 
-                      if (!nextBoardSlug) {
-                        return;
-                      }
-
-                      navigate({
-                        to: "/$organizationId/board/$boardSlug/$postSlug",
-                        params: {
-                          organizationId,
-                          boardSlug: nextBoardSlug,
-                          postSlug,
-                        },
-                        replace: true,
-                      });
-                    } catch (_error) {
-                      toastManager.add({
-                        title: "Failed to update board",
-                        type: "error",
-                      });
-                    }
-                  }}
-                />
-              </PropertyRow>
-
-              <PropertyRow label="Tags">
+            <SidebarCard title="Tags">
+              <div className="flex flex-wrap gap-2">
                 <TagList selectedTags={postTags} tags={tags} />
-                <TagSelect>
-                  <TagSelectTrigger />
-                  <TagSelectContent
-                    onTagSelect={handleTagSelect}
-                    selectedTags={postTags}
-                    tags={tags}
-                  />
-                </TagSelect>
-              </PropertyRow>
+                <TagSelect
+                  onTagSelect={handleTagSelect}
+                  selectedTags={postTags}
+                  tags={tags}
+                />
+              </div>
+            </SidebarCard>
 
-              <Separator />
+            <SidebarCard title="Details">
+              <p className="text-muted-foreground text-sm">
+                {formatPostDate(post.createdAt)}
+              </p>
 
-              <PropertyRow label="Date">
-                <p className="text-muted-foreground text-sm">
-                  {formatPostDate(post.createdAt)}
-                </p>
-              </PropertyRow>
-              <PropertyRow label="Author">
-                <p className="text-muted-foreground text-sm">
-                  {post.user?.name ?? "Unknown author"}
-                </p>
-              </PropertyRow>
-            </div>
+              <p className="text-muted-foreground text-sm">
+                {post.user?.name ?? "Unknown author"}
+              </p>
+            </SidebarCard>
           </div>
         </aside>
       </div>
@@ -389,6 +387,7 @@ function RedirectToPostUrlButton({ postSlug }: { postSlug: string }) {
 
   return (
     <Button
+      className="rounded-full"
       nativeButton={false}
       render={(props) => (
         <a
@@ -415,6 +414,7 @@ function CopyPostButton({ postSlug }: { postSlug: string }) {
 
   return (
     <Button
+      className="rounded-full"
       onClick={() => {
         try {
           navigator.clipboard.writeText(`${publicSiteUrl}/p/${postSlug}`);
@@ -434,5 +434,22 @@ function CopyPostButton({ postSlug }: { postSlug: string }) {
     >
       <HugeiconsIcon icon={Copy01Icon} />
     </Button>
+  );
+}
+
+function SidebarCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">{children}</CardContent>
+    </Card>
   );
 }
