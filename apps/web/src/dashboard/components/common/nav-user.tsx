@@ -1,6 +1,8 @@
 import {
   CreditCardIcon,
   LogoutSquare01Icon,
+  Moon02Icon,
+  Sun01Icon,
   UnfoldMoreIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -10,9 +12,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { useTheme } from "~/components/ui/theme-provider";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { authClient } from "~/lib/auth-client";
 import {
@@ -70,6 +78,7 @@ export function NavUser() {
                 </Link>
               )}
             />
+            <ThemeMenu />
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
@@ -90,5 +99,29 @@ export function NavUser() {
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
+  );
+}
+
+function ThemeMenu() {
+  const { themeMode, setTheme } = useTheme();
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <HugeiconsIcon icon={themeMode === "dark" ? Moon02Icon : Sun01Icon} />
+        Theme
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        <DropdownMenuRadioGroup
+          onValueChange={(value) =>
+            setTheme(value as "light" | "dark" | "auto")
+          }
+          value={themeMode}
+        >
+          <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="auto">System</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   );
 }

@@ -16,3 +16,25 @@ import { Font } from "astro:assets";
   <title>{title}</title>
   <Font cssVariable="--font-inter" preload />
 </head>
+
+<script is:inline>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme") || "auto";
+      var v = ["light", "dark", "auto"].includes(t) ? t : "auto";
+      if (v === "auto") {
+        var a = matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+        document.documentElement.classList.add(a, "auto");
+      } else {
+        document.documentElement.classList.add(v);
+      }
+    } catch (e) {
+      var a = matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+      document.documentElement.classList.add(a, "auto");
+    }
+  })();
+</script>

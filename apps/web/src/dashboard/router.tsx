@@ -1,5 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { ThemeProvider } from "./components/ui/theme-provider";
 import { AnchoredToastProvider, ToastProvider } from "./components/ui/toast";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { getContext } from "./integrations/tanstack-query/root-provider";
@@ -28,15 +29,17 @@ export function createRouter() {
     ),
     Wrap({ children }: { children: React.ReactNode }) {
       return (
-        <ToastProvider>
-          <AnchoredToastProvider>
-            <RuntimeProvider>
-              <QueryClientProvider client={queryClient}>
-                <TooltipProvider>{children}</TooltipProvider>
-              </QueryClientProvider>
-            </RuntimeProvider>
-          </AnchoredToastProvider>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <AnchoredToastProvider>
+              <RuntimeProvider>
+                <QueryClientProvider client={queryClient}>
+                  <TooltipProvider>{children}</TooltipProvider>
+                </QueryClientProvider>
+              </RuntimeProvider>
+            </AnchoredToastProvider>
+          </ToastProvider>
+        </ThemeProvider>
       );
     },
   });
