@@ -6,8 +6,11 @@ import { HomePage } from "../routes/home-page";
 import { NotFoundPage } from "../routes/not-found-page";
 import { PostPage } from "../routes/post-page";
 import { RoadmapPage } from "../routes/roadmap-page";
+import { useSite } from "../providers/site-provider";
 
 export function PublicBoardRoutes() {
+  const site = useSite();
+
   return (
     <Switch>
       <Route path="/">
@@ -22,14 +25,18 @@ export function PublicBoardRoutes() {
       <Route path="/p/:slug">
         {(params) => <PostPage slug={params.slug} />}
       </Route>
-      <Route path="/changelog">
-        <ChangelogPage />
-      </Route>
-      <Route path="/changelog/:changelogSlug">
-        {(params) => (
-          <ChangeLogDetailPage changelogSlug={params.changelogSlug} />
-        )}
-      </Route>
+      {site.changelogVisibility === "PUBLIC" ? (
+        <Route path="/changelog">
+          <ChangelogPage />
+        </Route>
+      ) : null}
+      {site.changelogVisibility === "PUBLIC" ? (
+        <Route path="/changelog/:changelogSlug">
+          {(params) => (
+            <ChangeLogDetailPage changelogSlug={params.changelogSlug} />
+          )}
+        </Route>
+      ) : null}
       <Route>
         <NotFoundPage />
       </Route>

@@ -3,7 +3,7 @@ import * as Policy from "../policy";
 import { onInternalServerError } from "../rpc-errors";
 import { SiteRepository } from "./repository";
 import { SiteRpcs } from "./rpcs";
-import type { TSiteList, TSiteListBySubdomain } from "./schema";
+import type { TSiteList, TSiteListBySubdomain, TSiteUpdate } from "./schema";
 
 export const SiteRpcHandlers = SiteRpcs.toLayer(
   Effect.gen(function* () {
@@ -28,6 +28,19 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
             limit: 1,
           });
         }).pipe(Effect.catchAll(onInternalServerError));
+      },
+      SiteUpdate: (args: TSiteUpdate) => {
+        return Effect.gen(function* () {
+          yield* repository.update(args);
+        }).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
+            )
+          ),
+          Effect.catchAll(onInternalServerError)
+        );
       },
     };
   })

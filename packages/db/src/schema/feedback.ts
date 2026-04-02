@@ -31,6 +31,11 @@ export const changelogStatusEnum = pgEnum("changelog_status", [
   "published",
 ]);
 
+export const changelogVisibilityEnum = pgEnum("changelog_visibility", [
+  "PUBLIC",
+  "HIDDEN",
+]);
+
 export const postIconTypeEnum = pgEnum("post_icon_type", ["EMOJI"]);
 
 export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
@@ -323,6 +328,9 @@ export const site = pgTable(
     name: text("name").notNull(),
     subdomain: text("subdomain").notNull(),
     customDomain: text("custom_domain"),
+    changelogVisibility: changelogVisibilityEnum("changelog_visibility")
+      .default("PUBLIC")
+      .notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),

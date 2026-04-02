@@ -22,7 +22,9 @@ export function Navbar() {
             <nav className="hidden items-center gap-4 text-muted-foreground text-sm sm:flex">
               <NavTab href="/" label="Feedback" />
               <NavTab href="/roadmap" label="Roadmap" />
-              <NavTab href="/changelog" label="Changelog" />
+              {site.changelogVisibility === "PUBLIC" ? (
+                <NavTab href="/changelog" label="Changelog" />
+              ) : null}
             </nav>
           </div>
 
@@ -34,7 +36,9 @@ export function Navbar() {
         <nav className="flex items-center gap-4 pb-2 text-muted-foreground text-sm sm:hidden">
           <NavTab href="/" label="Feedback" />
           <NavTab href="/roadmap" label="Roadmap" />
-          <NavTab href="/changelog" label="Changelog" />
+          {site.changelogVisibility === "PUBLIC" ? (
+            <NavTab href="/changelog" label="Changelog" />
+          ) : null}
         </nav>
       </div>
     </header>

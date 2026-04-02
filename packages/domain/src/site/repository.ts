@@ -37,6 +37,7 @@ export class SiteRepository extends Effect.Service<SiteRepository>()(
                 name: siteTable.name,
                 subdomain: siteTable.subdomain,
                 customDomain: siteTable.customDomain,
+                changelogVisibility: siteTable.changelogVisibility,
                 createdAt: siteTable.createdAt,
                 updatedAt: siteTable.updatedAt,
                 organizationId: siteTable.organizationId,
@@ -46,6 +47,29 @@ export class SiteRepository extends Effect.Service<SiteRepository>()(
               .limit(limit);
 
             return sites.map((entry) => new Site(entry));
+          }),
+        update: ({
+          id,
+          organizationId,
+          changelogVisibility,
+        }: {
+          id: string;
+          organizationId: string;
+          changelogVisibility: "PUBLIC" | "HIDDEN";
+        }) =>
+          Effect.gen(function* () {
+            yield* db
+              .update(siteTable)
+              .set({
+                changelogVisibility,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(siteTable.id, id),
+                  eq(siteTable.organizationId, organizationId)
+                )
+              );
           }),
       };
     }),

@@ -996,6 +996,18 @@ export const siteCollection = createCollection(
     queryClient: TanstackQuery.getContext().queryClient,
     getKey: (item) => item.id,
     refetchInterval: Duration.toMillis(Duration.minutes(30)),
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedSite } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.SiteUpdate({
+          id: updatedSite.id,
+          organizationId: updatedSite.organizationId,
+          changelogVisibility: updatedSite.changelogVisibility,
+        })
+      );
+    },
   })
 );
 

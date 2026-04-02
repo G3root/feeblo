@@ -21,27 +21,27 @@ const settingsItems = [
     subItems: [
       {
         label: "Profile",
-        slug: "profile",
+
         to: "/$organizationId/settings/profile" as const,
       },
       {
         label: "Appearance",
-        slug: "appearance",
+
         to: "/$organizationId/settings/appearance" as const,
       },
       {
         label: "Workspace",
-        slug: "workspace",
+
         to: "/$organizationId/settings/workspace" as const,
       },
       {
         label: "Members",
-        slug: "members",
+
         to: "/$organizationId/settings/members" as const,
       },
       {
         label: "Billing",
-        slug: "billing",
+
         to: "/$organizationId/settings/billing" as const,
       },
     ],
@@ -51,7 +51,7 @@ const settingsItems = [
     subItems: [
       {
         label: "Tags",
-        slug: "tags",
+
         to: "/$organizationId/settings/feedback-tags" as const,
       },
     ],
@@ -60,8 +60,13 @@ const settingsItems = [
     group: "Changelog",
     subItems: [
       {
+        label: "Privacy",
+
+        to: "/$organizationId/settings/changelog-privacy" as const,
+      },
+      {
         label: "Tags",
-        slug: "tags",
+
         to: "/$organizationId/settings/changelog-tags" as const,
       },
     ],
@@ -104,10 +109,11 @@ export function SettingsSidebar({
               <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
               <SidebarMenu>
                 {group.subItems.map((item) => (
-                  <SidebarMenuItem key={item.slug}>
+                  <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       isActive={
-                        pathname === `/${organizationId}/settings/${item.slug}`
+                        pathname ===
+                        `/${organizationId}/settings/${item.to.split("/").slice(3)}`
                       }
                       render={(renderProps) => (
                         <Link
