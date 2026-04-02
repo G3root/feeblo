@@ -47,11 +47,14 @@ const settingsItems = [
     ],
   },
   {
-    group: "Feedback",
+    group: "Feedback & Roadmap",
     subItems: [
       {
+        label: "Roadmap",
+        to: "/$organizationId/settings/roadmap" as const,
+      },
+      {
         label: "Tags",
-
         to: "/$organizationId/settings/feedback-tags" as const,
       },
     ],

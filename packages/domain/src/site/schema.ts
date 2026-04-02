@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 export const changelogVisibilitySchema = Schema.Literal("PUBLIC", "HIDDEN");
+export const roadmapVisibilitySchema = Schema.Literal("PUBLIC", "HIDDEN");
 
 export class Site extends Schema.Class<Site>("Site")({
   id: Schema.String,
@@ -8,6 +9,7 @@ export class Site extends Schema.Class<Site>("Site")({
   subdomain: Schema.String,
   customDomain: Schema.Union(Schema.String, Schema.Null),
   changelogVisibility: changelogVisibilitySchema,
+  roadmapVisibility: roadmapVisibilitySchema,
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   organizationId: Schema.String,
@@ -23,6 +25,7 @@ export const SiteUpdate = Schema.Struct({
   id: Schema.String,
   organizationId: Schema.String,
   changelogVisibility: changelogVisibilitySchema,
+  roadmapVisibility: roadmapVisibilitySchema,
 });
 
 export type TSiteUpdate = Schema.Schema.Type<typeof SiteUpdate>;

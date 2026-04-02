@@ -1005,6 +1005,7 @@ export const siteCollection = createCollection(
           id: updatedSite.id,
           organizationId: updatedSite.organizationId,
           changelogVisibility: updatedSite.changelogVisibility,
+          roadmapVisibility: updatedSite.roadmapVisibility,
         })
       );
     },

@@ -36,6 +36,11 @@ export const changelogVisibilityEnum = pgEnum("changelog_visibility", [
   "HIDDEN",
 ]);
 
+export const roadmapVisibilityEnum = pgEnum("roadmap_visibility", [
+  "PUBLIC",
+  "HIDDEN",
+]);
+
 export const postIconTypeEnum = pgEnum("post_icon_type", ["EMOJI"]);
 
 export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
@@ -331,6 +336,9 @@ export const site = pgTable(
     changelogVisibility: changelogVisibilityEnum("changelog_visibility")
       .default("PUBLIC")
       .notNull(),
+    roadmapVisibility: roadmapVisibilityEnum("roadmap_visibility")
+      .default("PUBLIC")
+      .notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
@@ -369,7 +377,12 @@ export const changelog = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [uniqueIndex("changelog_organizationId_slug_uidx").on(table.organizationId, table.slug)]
+  (table) => [
+    uniqueIndex("changelog_organizationId_slug_uidx").on(
+      table.organizationId,
+      table.slug
+    ),
+  ]
 );
 
 export type InsertComment = typeof comment.$inferInsert;

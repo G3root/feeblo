@@ -18,6 +18,7 @@ import { Route as OrganizationIdDashboardLayoutRouteImport } from "./routes/$org
 import { Route as OrganizationIdSettingsIndexRouteImport } from "./routes/$organizationId/settings/index"
 import { Route as OrganizationIdDashboardLayoutIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/index"
 import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$organizationId/settings/workspace"
+import { Route as OrganizationIdSettingsRoadmapRouteImport } from "./routes/$organizationId/settings/roadmap"
 import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
 import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
 import { Route as OrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/$organizationId/settings/feedback-tags"
@@ -78,6 +79,12 @@ const OrganizationIdSettingsWorkspaceRoute =
   OrganizationIdSettingsWorkspaceRouteImport.update({
     id: "/workspace",
     path: "/workspace",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsRoadmapRoute =
+  OrganizationIdSettingsRoadmapRouteImport.update({
+    id: "/roadmap",
+    path: "/roadmap",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdSettingsProfileRoute =
@@ -167,6 +174,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
+  "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
@@ -188,6 +196,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
+  "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/changelog/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
@@ -211,6 +220,7 @@ export interface FileRoutesById {
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
+  "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/_dashboard-layout/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/profile"
+    | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/"
     | "/$organizationId/settings/"
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/profile"
+    | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/workspace"
     | "/$organizationId"
     | "/$organizationId/changelog/$changelogSlug"
@@ -278,6 +290,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/profile"
+    | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/_dashboard-layout/"
     | "/$organizationId/settings/"
@@ -359,6 +372,13 @@ declare module "@tanstack/react-router" {
       path: "/workspace"
       fullPath: "/$organizationId/settings/workspace"
       preLoaderRoute: typeof OrganizationIdSettingsWorkspaceRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/roadmap": {
+      id: "/$organizationId/settings/roadmap"
+      path: "/roadmap"
+      fullPath: "/$organizationId/settings/roadmap"
+      preLoaderRoute: typeof OrganizationIdSettingsRoadmapRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/settings/profile": {
@@ -486,6 +506,7 @@ interface OrganizationIdSettingsRouteChildren {
   OrganizationIdSettingsFeedbackTagsRoute: typeof OrganizationIdSettingsFeedbackTagsRoute
   OrganizationIdSettingsMembersRoute: typeof OrganizationIdSettingsMembersRoute
   OrganizationIdSettingsProfileRoute: typeof OrganizationIdSettingsProfileRoute
+  OrganizationIdSettingsRoadmapRoute: typeof OrganizationIdSettingsRoadmapRoute
   OrganizationIdSettingsWorkspaceRoute: typeof OrganizationIdSettingsWorkspaceRoute
   OrganizationIdSettingsIndexRoute: typeof OrganizationIdSettingsIndexRoute
 }
@@ -503,6 +524,7 @@ const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
       OrganizationIdSettingsFeedbackTagsRoute,
     OrganizationIdSettingsMembersRoute: OrganizationIdSettingsMembersRoute,
     OrganizationIdSettingsProfileRoute: OrganizationIdSettingsProfileRoute,
+    OrganizationIdSettingsRoadmapRoute: OrganizationIdSettingsRoadmapRoute,
     OrganizationIdSettingsWorkspaceRoute: OrganizationIdSettingsWorkspaceRoute,
     OrganizationIdSettingsIndexRoute: OrganizationIdSettingsIndexRoute,
   }

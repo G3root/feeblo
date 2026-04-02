@@ -1,4 +1,5 @@
 import { Route, Switch } from "wouter";
+import { useSite } from "../providers/site-provider";
 import { BoardPage } from "../routes/board-page";
 import { ChangeLogDetailPage } from "../routes/change-log-detail-page";
 import { ChangelogPage } from "../routes/change-log-page";
@@ -6,7 +7,6 @@ import { HomePage } from "../routes/home-page";
 import { NotFoundPage } from "../routes/not-found-page";
 import { PostPage } from "../routes/post-page";
 import { RoadmapPage } from "../routes/roadmap-page";
-import { useSite } from "../providers/site-provider";
 
 export function PublicBoardRoutes() {
   const site = useSite();
@@ -16,9 +16,11 @@ export function PublicBoardRoutes() {
       <Route path="/">
         <HomePage />
       </Route>
-      <Route path="/roadmap">
-        <RoadmapPage />
-      </Route>
+      {site.changelogVisibility === "PUBLIC" ? (
+        <Route path="/roadmap">
+          <RoadmapPage />
+        </Route>
+      ) : null}
       <Route path="/b/:boardSlug">
         {(params) => <BoardPage boardSlug={params.boardSlug} />}
       </Route>

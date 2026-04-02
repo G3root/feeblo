@@ -21,7 +21,9 @@ export function Navbar() {
 
             <nav className="hidden items-center gap-4 text-muted-foreground text-sm sm:flex">
               <NavTab href="/" label="Feedback" />
-              <NavTab href="/roadmap" label="Roadmap" />
+              {site.roadmapVisibility === "PUBLIC" ? (
+                <NavTab href="/roadmap" label="Roadmap" />
+              ) : null}
               {site.changelogVisibility === "PUBLIC" ? (
                 <NavTab href="/changelog" label="Changelog" />
               ) : null}
@@ -35,7 +37,9 @@ export function Navbar() {
 
         <nav className="flex items-center gap-4 pb-2 text-muted-foreground text-sm sm:hidden">
           <NavTab href="/" label="Feedback" />
-          <NavTab href="/roadmap" label="Roadmap" />
+          {site.roadmapVisibility === "PUBLIC" ? (
+            <NavTab href="/roadmap" label="Roadmap" />
+          ) : null}
           {site.changelogVisibility === "PUBLIC" ? (
             <NavTab href="/changelog" label="Changelog" />
           ) : null}
