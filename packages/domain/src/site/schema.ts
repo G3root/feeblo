@@ -10,6 +10,7 @@ export class Site extends Schema.Class<Site>("Site")({
   customDomain: Schema.Union(Schema.String, Schema.Null),
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
+  hidePoweredBy: Schema.Boolean,
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   organizationId: Schema.String,

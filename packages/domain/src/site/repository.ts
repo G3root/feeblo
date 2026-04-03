@@ -42,6 +42,7 @@ export class SiteRepository extends Effect.Service<SiteRepository>()(
                 createdAt: siteTable.createdAt,
                 updatedAt: siteTable.updatedAt,
                 organizationId: siteTable.organizationId,
+                hidePoweredBy: siteTable.hidePoweredBy,
               })
               .from(siteTable)
               .where(whereClause)

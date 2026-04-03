@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { SiteRepository } from "./repository";
 import { SiteRpcs } from "./rpcs";
 import type { TSiteList, TSiteListBySubdomain, TSiteUpdate } from "./schema";
@@ -18,7 +18,14 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list Sites",
+                })
+              ),
+          })
         );
       },
       SiteListBySubdomain: (args: TSiteListBySubdomain) => {
@@ -27,7 +34,16 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
             subdomain: args.subdomain,
             limit: 1,
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list Sites by subdomain",
+                })
+              ),
+          })
+        );
       },
       SiteUpdate: (args: TSiteUpdate) => {
         return Effect.gen(function* () {
@@ -39,7 +55,14 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
               Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
             )
           ),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to update Site",
+                })
+              ),
+          })
         );
       },
     };

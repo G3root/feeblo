@@ -1,5 +1,6 @@
 import {
   type AnyPgColumn,
+  boolean,
   index,
   pgEnum,
   pgTable,
@@ -339,6 +340,7 @@ export const site = pgTable(
     roadmapVisibility: roadmapVisibilityEnum("roadmap_visibility")
       .default("PUBLIC")
       .notNull(),
+    hidePoweredBy: boolean("hide_powered_by").default(false).notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
