@@ -1,5 +1,4 @@
 import {
-  FilterMailIcon,
   GridViewIcon,
   ListViewIcon,
   SlidersHorizontalIcon,
@@ -16,6 +15,7 @@ import {
 import { toggleVariants } from "~/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 import { useBoardStore } from "../../state/board-store-context";
+import { BoardFilter } from "./board-filter";
 
 export function BoardToolbar({
   boardSlug,
@@ -25,51 +25,54 @@ export function BoardToolbar({
   organizationId: string;
 }) {
   return (
-    <div className="flex items-center justify-between p-3">
-      <div className="flex gap-2">
-        <Link
-          activeOptions={{
-            exact: true,
-          }}
-          activeProps={{
-            "data-active": "true",
-          }}
-          className={toggleVariants({
-            variant: "outline",
-            size: "sm",
-            class: "data-active:bg-muted",
-          })}
-          params={{ boardSlug, organizationId }}
-          to="/$organizationId/board/$boardSlug"
-        >
-          All feedbacks
-        </Link>
+    <BoardFilter.Root organizationId={organizationId}>
+      <div className="flex flex-col gap-3 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              activeOptions={{
+                exact: true,
+              }}
+              activeProps={{
+                "data-active": "true",
+              }}
+              className={toggleVariants({
+                variant: "outline",
+                size: "sm",
+                class: "data-active:bg-muted",
+              })}
+              params={{ boardSlug, organizationId }}
+              to="/$organizationId/board/$boardSlug"
+            >
+              All feedbacks
+            </Link>
 
-        <Link
-          activeOptions={{
-            exact: true,
-          }}
-          activeProps={{
-            "data-active": "true",
-          }}
-          className={toggleVariants({
-            variant: "outline",
-            size: "sm",
-            class: "data-active:bg-muted",
-          })}
-          params={{ boardSlug, organizationId }}
-          to="/$organizationId/board/$boardSlug/active"
-        >
-          Active
-        </Link>
+            <Link
+              activeOptions={{
+                exact: true,
+              }}
+              activeProps={{
+                "data-active": "true",
+              }}
+              className={toggleVariants({
+                variant: "outline",
+                size: "sm",
+                class: "data-active:bg-muted",
+              })}
+              params={{ boardSlug, organizationId }}
+              to="/$organizationId/board/$boardSlug/active"
+            >
+              Active
+            </Link>
+          </div>
+          <div className="flex gap-2">
+            <BoardFilter.Trigger />
+            <DisplayPopOver />
+          </div>
+        </div>
+        <BoardFilter.ActiveRow />
       </div>
-      <div className="flex gap-2">
-        <Button className="rounded-full" size="icon-sm" variant="outline">
-          <HugeiconsIcon icon={FilterMailIcon} />
-        </Button>
-        <DisplayPopOver />
-      </div>
-    </div>
+    </BoardFilter.Root>
   );
 }
 

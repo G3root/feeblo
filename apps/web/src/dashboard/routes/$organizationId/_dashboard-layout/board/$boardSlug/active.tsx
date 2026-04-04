@@ -45,6 +45,10 @@ function RouteComponent() {
         name: "Active",
         filters: {
           postStatus: "active",
+          statusOperator: "isAnyOf",
+          statuses: [],
+          tagOperator: "includeAllOf",
+          tagIds: [],
         },
       }}
       organizationId={organizationId}

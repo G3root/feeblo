@@ -1,5 +1,13 @@
-import { and, eq, or, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { postCollection } from "~/lib/collections";
+import {
+  and,
+  count,
+  eq,
+  inArray,
+  not,
+  or,
+  useLiveSuspenseQuery,
+} from "@tanstack/react-db";
+import { postCollection, postTagCollection } from "~/lib/collections";
 import {
   useActiveBoardView,
   useBoardDisplayMode,
@@ -21,7 +29,50 @@ export function BoardPosts({
 }) {
   const mode = useBoardDisplayMode();
   const activeView = useActiveBoardView();
-  const postStatus = activeView.filters.postStatus;
+  const {
+    postStatus,
+    statusOperator,
+    statuses,
+    tagIds,
+    tagOperator,
+  } = activeView.filters;
+  const statusesKey = statuses.join(",");
+  const tagIdsKey = tagIds.join(",");
+
+  const { data: matchingTagPosts } = useLiveSuspenseQuery(
+    (q) => {
+      const baseQuery = q.from({ postTag: postTagCollection }).where(({ postTag }) => {
+        const conditions = [
+          eq(postTag.organizationId, organizationId),
+          tagIds.length > 0
+            ? inArray(postTag.tagId, tagIds)
+            : eq(postTag.postId, "__no_matching_post__"),
+        ];
+
+        return and(conditions[0], conditions[1], ...conditions.slice(2));
+      });
+
+      if (tagOperator === "includeAllOf" || tagOperator === "excludeIfAllOf") {
+        return baseQuery
+          .groupBy(({ postTag }) => postTag.postId)
+          .select(({ postTag }) => ({
+            matchedCount: count(postTag.postId),
+            postId: postTag.postId,
+          }))
+          .having(({ $selected }) => eq($selected.matchedCount, tagIds.length));
+      }
+
+      return baseQuery
+        .select(({ postTag }) => ({
+          postId: postTag.postId,
+        }))
+        .distinct();
+    },
+    [organizationId, tagIdsKey, tagOperator]
+  );
+
+  const matchingTagPostIds = matchingTagPosts.map((entry) => entry.postId);
+  const matchingTagPostIdsKey = matchingTagPostIds.join(",");
 
   const { data: posts } = useLiveSuspenseQuery(
     (q) => {
@@ -41,12 +92,36 @@ export function BoardPosts({
             eq(post.organizationId, organizationId),
             ...(postStatus === "active"
               ? [or(eq(post.status, "PLANNED"), eq(post.status, "IN_PROGRESS"))]
+              : []),
+            ...(statuses.length > 0
+              ? [
+                  statusOperator === "isNot"
+                    ? not(inArray(post.status, statuses))
+                    : inArray(post.status, statuses),
+                ]
+              : []),
+            ...(tagIds.length > 0
+              ? [
+                  tagOperator === "excludeIfAnyOf" ||
+                  tagOperator === "excludeIfAllOf"
+                    ? not(inArray(post.id, matchingTagPostIds))
+                    : inArray(post.id, matchingTagPostIds),
+                ]
               : [])
           )
         )
         .orderBy((post) => post.post.createdAt, "desc");
     },
-    [boardId, organizationId, postStatus]
+    [
+      boardId,
+      organizationId,
+      postStatus,
+      statusesKey,
+      statusOperator,
+      tagIdsKey,
+      tagOperator,
+      matchingTagPostIdsKey,
+    ]
   );
 
   const groupedPosts = groupPostByStatusMap(posts);

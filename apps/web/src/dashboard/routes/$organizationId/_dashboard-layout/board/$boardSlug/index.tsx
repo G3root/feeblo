@@ -45,6 +45,10 @@ function RouteComponent() {
         name: "All feedbacks",
         filters: {
           postStatus: "all",
+          statusOperator: "isAnyOf",
+          statuses: [],
+          tagOperator: "includeAllOf",
+          tagIds: [],
         },
       }}
       organizationId={organizationId}
