@@ -27,7 +27,7 @@ const BoardViewModeContext = createContext<BoardViewStore | null>(null);
 
 export function BoardViewModeProvider({
   children,
-  defaultMode = "grid",
+  defaultMode = "list",
 }: {
   children: React.ReactNode;
   defaultMode?: BoardViewMode;

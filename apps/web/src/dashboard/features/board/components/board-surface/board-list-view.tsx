@@ -1,3 +1,4 @@
+import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
 import {
   Add01Icon,
   ArrowDown01Icon,
@@ -7,7 +8,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Accordion,
   AccordionContent,
-  AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { Button } from "~/components/ui/button";
@@ -32,18 +32,14 @@ export function BoardListView({
   return (
     <section>
       <Accordion
-        className="w-full rounded-none"
+        className="w-full gap-2 rounded-none border-none p-3"
         defaultValue={Object.keys(groupedPosts)}
         multiple
       >
         {Object.keys(groupedPosts).map((lane) => (
-          <AccordionItem
-            className="border-border border-b last:border-b-0"
-            key={lane}
-            value={lane}
-          >
+          <AccordionPrimitive.Item key={lane} value={lane}>
             <div className="relative">
-              <AccordionTrigger className="rounded-none border-0 bg-linear-to-r from-muted/70 via-muted/30 to-transparent px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden">
+              <AccordionTrigger className="rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden">
                 <div className="flex items-center gap-2">
                   <HugeiconsIcon
                     className="size-4 text-muted-foreground group-aria-expanded/accordion-trigger:hidden"
@@ -83,7 +79,7 @@ export function BoardListView({
                 />
               ))}
             </AccordionContent>
-          </AccordionItem>
+          </AccordionPrimitive.Item>
         ))}
       </Accordion>
     </section>

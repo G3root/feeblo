@@ -23,7 +23,7 @@ export function BoardPostRowItem({
   );
 
   return (
-    <div className="group flex items-center gap-2 border-border/70 border-t px-4 py-3 transition-colors hover:bg-muted/50">
+    <div className="group flex items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/50">
       <Checkbox
         aria-label={`Select ${post.title}`}
         checked={checked}
@@ -54,7 +54,7 @@ export function BoardPostRowItem({
       >
         <div className="flex min-w-0 items-center gap-2">
           <StatusIcon status={post.status} />
-          <p className="truncate font-medium text-sm">{post.title}</p>
+          <p className="no-underline! font-medium text-sm">{post.title}</p>
         </div>
         <span className="shrink-0 text-muted-foreground text-xs">
           {formatPostDate(post.updatedAt)}
