@@ -49,7 +49,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
       )}
       onClick={() =>
         navigate({
-          to: "/$organizationId/board/$boardSlug/$postSlug",
+          to: "/$organizationId/post/$boardSlug/$postSlug",
           params: {
             organizationId,
             boardSlug,

@@ -41,7 +41,7 @@ export function BoardPostRowItem({
           boardSlug,
           postSlug: post.slug,
         }}
-        to="/$organizationId/board/$boardSlug/$postSlug"
+        to="/$organizationId/post/$boardSlug/$postSlug"
       >
         <div className="flex min-w-0 items-center gap-2">
           <StatusIcon status={post.status} />

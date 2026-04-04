@@ -45,7 +45,7 @@ import {
 import { fetchRpc } from "~/lib/runtime";
 
 export const Route = createFileRoute(
-  "/$organizationId/_dashboard-layout/board/$boardSlug/$postSlug"
+  "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 )({
   component: RouteComponent,
   pendingComponent: PostDetailsRoutePending,
@@ -328,7 +328,7 @@ function RouteComponent() {
                     }
 
                     navigate({
-                      to: "/$organizationId/board/$boardSlug/$postSlug",
+                      to: "/$organizationId/post/$boardSlug/$postSlug",
                       params: {
                         organizationId,
                         boardSlug: nextBoardSlug,
