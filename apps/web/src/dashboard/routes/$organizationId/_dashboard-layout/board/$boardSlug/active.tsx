@@ -6,7 +6,7 @@ import { BoardSurface } from "~/features/board/components/board-surface";
 import { boardCollection } from "~/lib/collections";
 
 export const Route = createFileRoute(
-  "/$organizationId/_dashboard-layout/board/$boardSlug/"
+  "/$organizationId/_dashboard-layout/board/$boardSlug/active"
 )({
   component: RouteComponent,
   pendingComponent: BoardRoutePending,
@@ -41,10 +41,10 @@ function RouteComponent() {
       boardId={board.id}
       boardSlug={boardSlug}
       initialView={{
-        id: "all-feedback",
-        name: "All feedbacks",
+        id: "active-feedback",
+        name: "Active",
         filters: {
-          postStatus: "all",
+          postStatus: "active",
         },
       }}
       organizationId={organizationId}

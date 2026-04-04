@@ -71,7 +71,6 @@ export function BoardListView({
             <AccordionContent className="h-auto pb-0" panelClassName="px-0">
               {groupedPosts[lane as BoardPostStatus].map((post) => (
                 <BoardPostRowItem
-                  boardId={boardId}
                   boardSlug={boardSlug}
                   key={post.id}
                   organizationId={organizationId}

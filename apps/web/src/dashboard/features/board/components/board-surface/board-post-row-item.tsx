@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { Checkbox } from "~/components/ui/checkbox";
-import { usePostSelectionStore } from "~/features/board/state/post-selection-context";
+import { useBoardStore } from "~/features/board/state/board-store-context";
 import { StatusIcon } from "./status-icon";
 import type { BoardPostRow } from "./types";
 import { formatPostDate } from "./utils";
@@ -10,14 +10,12 @@ export function BoardPostRowItem({
   post,
   boardSlug,
   organizationId,
-  boardId,
 }: {
   post: BoardPostRow;
   boardSlug: string;
   organizationId: string;
-  boardId: string;
 }) {
-  const store = usePostSelectionStore();
+  const store = useBoardStore();
   const checked = useSelector(store, (state) =>
     state.context.selectedPostIds.includes(post.id)
   );
@@ -34,13 +32,6 @@ export function BoardPostRowItem({
             checked: nextChecked === true,
             postId: post.id,
           });
-          const previousBoardId = store.get().context.boardId;
-          if (previousBoardId !== boardId) {
-            store.send({
-              type: "setBoardId",
-              boardId,
-            });
-          }
         }}
       />
       <Link

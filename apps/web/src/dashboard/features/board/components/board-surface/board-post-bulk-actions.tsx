@@ -12,9 +12,9 @@ import {
 import { Button } from "~/components/ui/button";
 import { toastManager } from "~/components/ui/toast";
 import {
-  usePostSelectionStore,
+  useBoardStore,
   useSelectedPostIds,
-} from "~/features/board/state/post-selection-context";
+} from "~/features/board/state/board-store-context";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { postCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
@@ -22,7 +22,7 @@ import { cn } from "~/lib/utils";
 
 export function BoardPostBulkActions() {
   const selectedPostIds = useSelectedPostIds();
-  const store = usePostSelectionStore();
+  const store = useBoardStore();
   const selectedCount = selectedPostIds.length;
 
   return (
@@ -59,7 +59,7 @@ export function BoardPostBulkActions() {
 }
 
 function BulkDeleteAlert() {
-  const store = usePostSelectionStore();
+  const store = useBoardStore();
   const selectedPostIds = useSelectedPostIds();
   const open = useSelector(store, (state) => state.context.bulkDeleteOpen);
 

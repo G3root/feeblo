@@ -1,6 +1,9 @@
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { and, eq, or, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { postCollection } from "~/lib/collections";
-import { useBoardViewMode } from "../../state/view-mode-context";
+import {
+  useActiveBoardView,
+  useBoardDisplayMode,
+} from "../../state/board-store-context";
 import { BoardGridView } from "./board-grid-view";
 import { BoardListView } from "./board-list-view";
 import { BoardPostBulkActions } from "./board-post-bulk-actions";
@@ -16,7 +19,9 @@ export function BoardPosts({
   boardSlug: string;
   organizationId: string;
 }) {
-  const mode = useBoardViewMode();
+  const mode = useBoardDisplayMode();
+  const activeView = useActiveBoardView();
+  const postStatus = activeView.filters.postStatus;
 
   const { data: posts } = useLiveSuspenseQuery(
     (q) => {
@@ -33,12 +38,15 @@ export function BoardPosts({
         .where(({ post }) =>
           and(
             eq(post.boardId, boardId),
-            eq(post.organizationId, organizationId)
+            eq(post.organizationId, organizationId),
+            ...(postStatus === "active"
+              ? [or(eq(post.status, "PLANNED"), eq(post.status, "IN_PROGRESS"))]
+              : [])
           )
         )
         .orderBy((post) => post.post.createdAt, "desc");
     },
-    [boardId, organizationId]
+    [boardId, organizationId, postStatus]
   );
 
   const groupedPosts = groupPostByStatusMap(posts);

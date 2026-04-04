@@ -1,5 +1,9 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
+import {
+  createCollection,
+  parseLoadSubsetOptions,
+  parseWhereExpression,
+} from "@tanstack/react-db";
 import { Duration } from "effect";
 import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
 import {
@@ -12,15 +16,25 @@ import { fetchRpc } from "./runtime";
 export const postCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
+      const parsed = parseWhereExpression(opts.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          lt: (field, value) => ({ [`${field.join(".")}_lt`]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
+
       const cacheKey = ["post"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
+
+      if (parsed) {
+        if (parsed?.organizationId) {
+          cacheKey.push(`organizationId-${parsed.organizationId}`);
         }
-        if (fieldName === "boardId") {
-          cacheKey.push(`boardId-${value}`);
+        if (parsed?.boardId) {
+          cacheKey.push(`boardId-${parsed.boardId}`);
         }
       }
 
@@ -28,27 +42,29 @@ export const postCollection = createCollection(
     },
     syncMode: "on-demand",
     queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          lt: (field, value) => ({ [`${field.join(".")}_lt`]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
 
-      const filters: {
-        boardId?: string;
-        organizationId?: string;
-      } = {};
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
-          const fieldName = field.join(".");
+      let boardId: string | null = null;
+      let organizationId: string | null = null;
 
-          if (fieldName === "boardId") {
-            filters.boardId = value as string;
-          }
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
-          }
+      if (parsed) {
+        if (parsed.boardId) {
+          boardId = parsed.boardId;
+        }
+        if (parsed.organizationId) {
+          organizationId = parsed.organizationId;
         }
       }
 
-      const boardId = filters?.boardId;
-      const organizationId = filters?.organizationId;
       if (!boardId) {
         return [];
       }
