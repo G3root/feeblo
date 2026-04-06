@@ -29,11 +29,13 @@ import {
   CommentDeleteDialogProvider,
   usePostDeleteDialogContext,
 } from "~/features/post/dialog-stores";
+import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
   TagList,
   TagSelect,
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
+import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import {
   boardCollection,
@@ -204,181 +206,185 @@ function RouteComponent() {
   };
 
   return (
-    <CommentDeleteDialogProvider>
-      <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
-        <PostDetails.Layout>
-          <PostDetails.Header
-            boardName={board.name}
-            boardSlug={board.slug}
-            organizationId={organizationId}
-            postCreatorId={post.creatorId}
-            postId={post.id}
-            title={post.title}
-          />
-          <PostDetails.Description
-            description={post.content}
-            organizationId={organizationId}
-            postCreatorId={post.creatorId}
-            postId={post.id}
-          />
-          <Suspense fallback={<PostDetails.ActionsSkeleton />}>
-            <div className="flex items-center justify-between py-1">
-              <PostDetails.EngagementBar
-                organizationId={organizationId}
-                postId={post.id}
-              />
-            </div>
-          </Suspense>
-          <PostDetails.CommentComposer
-            organizationId={organizationId}
-            postId={post.id}
-          />
-          <Suspense fallback={<PostDetails.CommentListSkeleton />}>
-            <PostDetails.CommentList
+    <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
+      <CommentDeleteDialogProvider>
+        <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
+          <PostDetails.Layout>
+            <PostDetails.Header
+              boardName={board.name}
+              boardSlug={board.slug}
+              organizationId={organizationId}
+              postCreatorId={post.creatorId}
+              postId={post.id}
+              title={post.title}
+            />
+            <PostDetails.Description
+              description={post.content}
+              organizationId={organizationId}
+              postCreatorId={post.creatorId}
+              postId={post.id}
+            />
+            <Suspense fallback={<PostDetails.ActionsSkeleton />}>
+              <div className="flex items-center justify-between py-1">
+                <PostDetails.EngagementBar
+                  organizationId={organizationId}
+                  postId={post.id}
+                />
+              </div>
+            </Suspense>
+            <PostDetails.CommentComposer
               organizationId={organizationId}
               postId={post.id}
             />
-          </Suspense>
-          <p className="text-muted-foreground text-xs">
-            Created {post.createdAt.toLocaleDateString()}
-          </p>
-        </PostDetails.Layout>
+            <Suspense fallback={<PostDetails.CommentListSkeleton />}>
+              <PostDetails.CommentList
+                organizationId={organizationId}
+                postId={post.id}
+              />
+            </Suspense>
+            <p className="text-muted-foreground text-xs">
+              Created {post.createdAt.toLocaleDateString()}
+            </p>
+          </PostDetails.Layout>
 
-        <aside className="hidden px-6 py-6 lg:block">
-          <div className="sticky top-0 space-y-4">
-            <div className="flex items-center justify-end gap-2">
-              <RedirectToPostUrlButton postSlug={post.slug} />
-              <CopyPostButton postSlug={post.slug} />
-              <Button
-                aria-label="Close"
-                className="rounded-full"
-                onClick={() =>
-                  postDialogStore.send({
-                    type: "toggle",
-                    data: {
-                      postId: post.id,
-                      redirectOptions: {
-                        to: "/$organizationId/board/$boardSlug",
-                        params: {
-                          organizationId,
-                          boardSlug,
+          <aside className="hidden px-6 py-6 lg:block">
+            <div className="sticky top-0 space-y-4">
+              <div className="flex items-center justify-end gap-2">
+                <RedirectToPostUrlButton postSlug={post.slug} />
+                <CopyPostButton postSlug={post.slug} />
+                <Button
+                  aria-label="Close"
+                  className="rounded-full"
+                  onClick={() =>
+                    postDialogStore.send({
+                      type: "toggle",
+                      data: {
+                        postId: post.id,
+                        redirectOptions: {
+                          to: "/$organizationId/board/$boardSlug",
+                          params: {
+                            organizationId,
+                            boardSlug,
+                          },
                         },
                       },
-                    },
-                  })
-                }
-                size="icon-sm"
-                variant="outline"
-              >
-                <HugeiconsIcon icon={Trash2} />
-              </Button>
-            </div>
+                    })
+                  }
+                  size="icon-sm"
+                  variant="outline"
+                >
+                  <HugeiconsIcon icon={Trash2} />
+                </Button>
+              </div>
 
-            <SidebarCard title="Properties">
-              <div>
-                <StatusSelect
-                  currentStatusId={post.statusId}
-                  onValueChange={async (nextPostStatus) => {
-                    if (!nextPostStatus) {
+              <SidebarCard title="Properties">
+                <div>
+                  <StatusSelect
+                    currentStatusId={post.statusId}
+                    onValueChange={async (nextPostStatus) => {
+                      if (!nextPostStatus) {
+                        return;
+                      }
+                      try {
+                        const tx = postCollection.update(post.id, (draft) => {
+                          draft.statusId = nextPostStatus.id;
+                        });
+                        await tx.isPersisted.promise;
+
+                        toastManager.add({
+                          title: "Status updated",
+                          type: "success",
+                        });
+                      } catch (_error) {
+                        toastManager.add({
+                          title: "Failed to update status",
+                          type: "error",
+                        });
+                      }
+                    }}
+                    statuses={postStatuses}
+                  />
+                </div>
+
+                <PostBoardSelect
+                  boards={allBoards}
+                  currentBoardId={board.id}
+                  onValueChange={async (boardId) => {
+                    if (!boardId) {
                       return;
                     }
                     try {
-                      const tx = postCollection.update(post.id, (draft) => {
-                        draft.statusId = nextPostStatus.id;
-                      });
+                      const nextBoard = allBoards.find(
+                        (item) => item.id === boardId
+                      );
+                      const nextBoardSlug = nextBoard?.slug;
+                      const tx = postCollection.update(
+                        post.id,
+                        {
+                          optimistic: false,
+                        },
+                        (draft) => {
+                          draft.boardId = boardId;
+                        }
+                      );
                       await tx.isPersisted.promise;
 
                       toastManager.add({
-                        title: "Status updated",
+                        title: "Board updated",
                         type: "success",
+                      });
+
+                      if (!nextBoardSlug) {
+                        return;
+                      }
+
+                      navigate({
+                        to: "/$organizationId/post/$boardSlug/$postSlug",
+                        params: {
+                          organizationId,
+                          boardSlug: nextBoardSlug,
+                          postSlug,
+                        },
+                        replace: true,
                       });
                     } catch (_error) {
                       toastManager.add({
-                        title: "Failed to update status",
+                        title: "Failed to update board",
                         type: "error",
                       });
                     }
                   }}
-                  statuses={postStatuses}
                 />
-              </div>
+              </SidebarCard>
 
-              <PostBoardSelect
-                boards={allBoards}
-                currentBoardId={board.id}
-                onValueChange={async (boardId) => {
-                  if (!boardId) {
-                    return;
-                  }
-                  try {
-                    const nextBoard = allBoards.find(
-                      (item) => item.id === boardId
-                    );
-                    const nextBoardSlug = nextBoard?.slug;
-                    const tx = postCollection.update(
-                      post.id,
-                      {
-                        optimistic: false,
-                      },
-                      (draft) => {
-                        draft.boardId = boardId;
-                      }
-                    );
-                    await tx.isPersisted.promise;
+              <SidebarCard title="Tags">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <TagList selectedTags={postTags} tags={tags} />
+                  <TagSelect
+                    onTagSelect={handleTagSelect}
+                    selectedTags={postTags}
+                    tags={tags}
+                    type="FEEDBACK"
+                  />
+                </div>
+              </SidebarCard>
 
-                    toastManager.add({
-                      title: "Board updated",
-                      type: "success",
-                    });
+              <SidebarCard title="Details">
+                <p className="text-muted-foreground text-sm">
+                  {formatPostDate(post.createdAt)}
+                </p>
 
-                    if (!nextBoardSlug) {
-                      return;
-                    }
-
-                    navigate({
-                      to: "/$organizationId/post/$boardSlug/$postSlug",
-                      params: {
-                        organizationId,
-                        boardSlug: nextBoardSlug,
-                        postSlug,
-                      },
-                      replace: true,
-                    });
-                  } catch (_error) {
-                    toastManager.add({
-                      title: "Failed to update board",
-                      type: "error",
-                    });
-                  }
-                }}
-              />
-            </SidebarCard>
-
-            <SidebarCard title="Tags">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <TagList selectedTags={postTags} tags={tags} />
-                <TagSelect
-                  onTagSelect={handleTagSelect}
-                  selectedTags={postTags}
-                  tags={tags}
-                />
-              </div>
-            </SidebarCard>
-
-            <SidebarCard title="Details">
-              <p className="text-muted-foreground text-sm">
-                {formatPostDate(post.createdAt)}
-              </p>
-
-              <p className="text-muted-foreground text-sm">
-                {post.user?.name ?? "Unknown author"}
-              </p>
-            </SidebarCard>
-          </div>
-        </aside>
-      </div>
-      <CommentDeleteDialog />
-    </CommentDeleteDialogProvider>
+                <p className="text-muted-foreground text-sm">
+                  {post.user?.name ?? "Unknown author"}
+                </p>
+              </SidebarCard>
+            </div>
+          </aside>
+        </div>
+        <CommentDeleteDialog />
+        <TagCreateDialog />
+      </CommentDeleteDialogProvider>
+    </TagCreateDialogProvider>
   );
 }
 

@@ -11,12 +11,14 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "~/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { useTagCreateDialogContext } from "../dialog-stores";
 
 export interface TagSelectOption {
   id: string;
@@ -37,14 +39,17 @@ interface TagSelectProps {
   ) => void | Promise<void>;
   selectedTags: SelectedTag[];
   tags: TagSelectOption[];
+  type: TagSelectOption["type"];
 }
 
 export const TagSelect = ({
   tags,
   selectedTags,
   onTagSelect,
+  type,
 }: TagSelectProps) => {
   const [open, setOpen] = useState(false);
+  const createDialogStore = useTagCreateDialogContext();
   const selectedTagIds = new Set(selectedTags.map((tag) => tag.tagId));
   const hasSelectedTags = selectedTags.length > 0;
   return (
@@ -85,6 +90,19 @@ export const TagSelect = ({
                   </CommandItem>
                 );
               })}
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandGroup>
+              <CommandItem
+                onSelect={() => {
+                  setOpen(false);
+                  createDialogStore.send({ type: "toggle", data: { type } });
+                }}
+                value="create tag"
+              >
+                <HugeiconsIcon icon={PlusSignIcon} />
+                Create tag
+              </CommandItem>
             </CommandGroup>
           </CommandList>
         </Command>
