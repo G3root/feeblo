@@ -1,4 +1,5 @@
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
+
 import type { ReactNode } from "react";
 import { BoardListCard } from "../components/feedback/board-list-card";
 import {
@@ -34,29 +35,81 @@ function MainContent({ children }: { children: ReactNode }) {
 export function HomePage() {
   const site = useSite();
 
+  ///used here for prefecthing cache for when user visits a board page, which also needs post statuses
+  const { isError: statusError, isLoading: statusLoading } = useLiveQuery(
+    (q) =>
+      q
+        .from({ status: publicPostStatusCollection })
+        .where(({ status }) => eq(status.organizationId, site.organizationId)),
+    [site.organizationId]
+  );
+
+  // used here for prefetching cache for when user visits a board page, which also needs boards
+
+  const { isError: boardError, isLoading: boardLoading } = useLiveQuery(
+    (q) =>
+      q
+        .from({ board: publicBoardCollection })
+        .where(({ board }) => eq(board.organizationId, site.organizationId)),
+    [site.organizationId]
+  );
+
   const {
     data: postsWithBoards = [],
     isError: postsError,
     isLoading: postsLoading,
   } = useLiveQuery(
-    (q) =>
-      q
+    (q) => {
+      if (
+        !site.organizationId ||
+        statusLoading ||
+        boardLoading ||
+        statusError ||
+        boardError
+      ) {
+        return undefined;
+      }
+
+      return q
         .from({ post: publicPostCollection })
-        .join(
-          { board: publicBoardCollection },
-          ({ post, board }) => eq(post.boardId, board.id),
-          "inner"
-        )
-        .join(
-          { postStatus: publicPostStatusCollection },
-          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "inner"
-        )
-        .where(({ post }) => eq(post.organizationId, site.organizationId)),
-    [site.organizationId]
+        .where(({ post }) => eq(post.organizationId, site.organizationId))
+
+        .select(({ post }) => ({
+          id: post.id,
+          slug: post.slug,
+          title: post.title,
+          content: post.content,
+          upVotes: post.upVotes,
+          hasUserUpVoted: post.hasUserUpVoted,
+          creatorId: post.creatorId,
+          user: post.user,
+
+          board: toArray(
+            q
+              .from({ board: publicBoardCollection })
+              .where(({ board }) =>
+                and(
+                  eq(board.id, post.boardId),
+                  eq(board.organizationId, post.organizationId)
+                )
+              )
+          ),
+          status: toArray(
+            q
+              .from({ status: publicPostStatusCollection })
+              .where(({ status }) =>
+                and(
+                  eq(status.id, post.statusId),
+                  eq(status.organizationId, post.organizationId)
+                )
+              )
+          ),
+        }));
+    },
+    [site.organizationId, statusLoading, boardLoading, statusError, boardError]
   );
 
-  if (postsLoading) {
+  if (statusLoading || boardLoading || postsLoading) {
     return (
       <MainContent>
         <div className="min-w-0">
@@ -75,7 +128,7 @@ export function HomePage() {
     );
   }
 
-  if (postsError) {
+  if (statusError || boardError || postsError) {
     return (
       <MainContent>
         <div className="min-w-0 rounded-lg border border-border/60 p-12 text-center">
@@ -113,14 +166,23 @@ export function HomePage() {
           </div>
         ) : (
           <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
-            {postsWithBoards.map(({ post, board, postStatus }) => (
-              <FeedbackCard
-                board={board}
-                key={post.id}
-                post={post}
-                status={postStatus.type}
-              />
-            ))}
+            {postsWithBoards.map((post) => {
+              const board = post.board[0];
+              const status = post.status[0];
+
+              if (!(board && status)) {
+                return null;
+              }
+
+              return (
+                <FeedbackCard
+                  board={board}
+                  key={post.id}
+                  post={post}
+                  status={status.type}
+                />
+              );
+            })}
           </div>
         )}
       </div>

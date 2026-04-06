@@ -116,22 +116,14 @@ const UpdatedPostSchema = z.object({
 export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
   const {
-    data: postEntry,
-    isError: postError,
-    isLoading: postLoading,
+    data: statuses = [],
+    isError: statusError,
+    isLoading: statusLoading,
   } = useLiveQuery(
     (q) =>
       q
-        .from({ post: publicPostCollection })
-        .join(
-          { postStatus: publicPostStatusCollection },
-          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "inner"
-        )
-        .where(({ post }) =>
-          and(eq(post.slug, slug), eq(post.organizationId, site.organizationId))
-        )
-        .findOne(),
+        .from({ status: publicPostStatusCollection })
+        .where(({ status }) => eq(status.organizationId, site.organizationId)),
     [site.organizationId, slug]
   );
   const {
@@ -145,8 +137,32 @@ export function PostPage({ slug }: { slug: string }) {
         .where(({ board }) => eq(board.organizationId, site.organizationId)),
     [site.organizationId]
   );
-  const post = postEntry?.post;
-  const postStatus = postEntry?.postStatus;
+  const {
+    data: post,
+    isError: postError,
+    isLoading: postLoading,
+  } = useLiveQuery(
+    (q) => {
+      if (
+        !site.organizationId ||
+        statusLoading ||
+        boardsLoading ||
+        statusError ||
+        boardsError
+      ) {
+        return undefined;
+      }
+
+      return q
+        .from({ post: publicPostCollection })
+        .where(({ post }) =>
+          and(eq(post.slug, slug), eq(post.organizationId, site.organizationId))
+        )
+        .findOne();
+    },
+    [site.organizationId, slug, statusLoading, boardsLoading, statusError, boardsError]
+  );
+  const postStatus = statuses.find((status) => status.id === post?.statusId);
   const postId = post?.id ?? "";
   const { allowed: canEdit } = usePolicy(
     anyPolicy(
@@ -195,7 +211,7 @@ export function PostPage({ slug }: { slug: string }) {
     strategy: debounceStrategy({ wait: 500 }),
   });
 
-  if (postLoading || boardsLoading) {
+  if (statusLoading || boardsLoading || postLoading) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
         Loading post...
@@ -203,7 +219,7 @@ export function PostPage({ slug }: { slug: string }) {
     );
   }
 
-  if (postError || boardsError) {
+  if (statusError || boardsError || postError) {
     return (
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="rounded-lg border border-border/60 p-10 text-center">
