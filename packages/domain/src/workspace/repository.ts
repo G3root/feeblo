@@ -5,7 +5,11 @@ import {
   product as productTable,
   subscription as subscriptionTable,
 } from "@feeblo/db/schema/auth";
-import { board as boardTable } from "@feeblo/db/schema/feedback";
+import {
+  board as boardTable,
+  DEFAULT_POST_STATUSES,
+  postStatus as postStatusTable,
+} from "@feeblo/db/schema/feedback";
 import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq } from "drizzle-orm";
@@ -63,6 +67,17 @@ export class WorkspaceRepository extends Effect.Service<WorkspaceRepository>()(
               createdAt: new Date(),
               userId,
             });
+
+            for (const postStatus of DEFAULT_POST_STATUSES) {
+              yield* db.insert(postStatusTable).values({
+                id: generateId("postStatus"),
+                organizationId,
+                type: postStatus.type,
+                orderIndex: postStatus.orderIndex,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+            }
 
             const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
 

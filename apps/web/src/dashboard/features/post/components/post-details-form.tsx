@@ -31,14 +31,7 @@ function PostDetailsLayout({ children }: { children: ReactNode }) {
 
 const UpdatedPostSchema = z.object({
   id: z.string(),
-  status: z.enum([
-    "PAUSED",
-    "REVIEW",
-    "PLANNED",
-    "IN_PROGRESS",
-    "COMPLETED",
-    "CLOSED",
-  ]),
+  statusId: z.string(),
   content: z.string(),
   title: z.string(),
   boardId: z.string(),

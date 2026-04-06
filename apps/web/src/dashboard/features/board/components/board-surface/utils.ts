@@ -1,5 +1,5 @@
 import type { BoardPostStatus } from "../../constants";
-import type { BoardPostRow } from "./types";
+import type { BoardPostLane, BoardPostRow } from "./types";
 
 export function formatPostDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
@@ -14,19 +14,29 @@ export function formatPostDate(value: Date | string) {
   });
 }
 
-export const groupPostByStatusMap = (posts: BoardPostRow[]) => {
-  const map: Record<BoardPostStatus, BoardPostRow[]> = {
-    PLANNED: [],
-    IN_PROGRESS: [],
-    REVIEW: [],
-    COMPLETED: [],
-    PAUSED: [],
-    CLOSED: [],
-  };
+export const groupPostsByStatus = (
+  posts: BoardPostRow[],
+  orderedStatuses: readonly BoardPostStatus[]
+) => {
+  const map = new Map<BoardPostStatus, BoardPostRow[]>(
+    orderedStatuses.map((status) => [status, []])
+  );
 
   for (const post of posts) {
-    map[post.status].push(post);
+    const existing = map.get(post.status);
+
+    if (existing) {
+      existing.push(post);
+      continue;
+    }
+
+    map.set(post.status, [post]);
   }
 
-  return map;
+  return [...map.entries()].map(
+    ([status, groupedPosts]): BoardPostLane => ({
+      status,
+      posts: groupedPosts,
+    })
+  );
 };

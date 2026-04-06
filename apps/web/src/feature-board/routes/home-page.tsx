@@ -14,6 +14,7 @@ import {
 import {
   publicBoardCollection,
   publicPostCollection,
+  publicPostStatusCollection,
 } from "../lib/collections";
 import { useSite } from "../providers/site-provider";
 
@@ -44,6 +45,11 @@ export function HomePage() {
         .join(
           { board: publicBoardCollection },
           ({ post, board }) => eq(post.boardId, board.id),
+          "inner"
+        )
+        .join(
+          { postStatus: publicPostStatusCollection },
+          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
           "inner"
         )
         .where(({ post }) => eq(post.organizationId, site.organizationId)),
@@ -107,8 +113,13 @@ export function HomePage() {
           </div>
         ) : (
           <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
-            {postsWithBoards.map(({ post, board }) => (
-              <FeedbackCard board={board} key={post.id} post={post} />
+            {postsWithBoards.map(({ post, board, postStatus }) => (
+              <FeedbackCard
+                board={board}
+                key={post.id}
+                post={post}
+                status={postStatus.type}
+              />
             ))}
           </div>
         )}

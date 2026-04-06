@@ -7,6 +7,7 @@ import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { PostRpcHandlers } from "./post/handlers";
+import { PostStatusRpcHandlers } from "./post-status/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { AllRpcs } from "./rpc-group";
 import {
@@ -34,6 +35,7 @@ export const RpcRoute = RpcServer.layerHttpRouter({
   Layer.provide(TagRpcHandlers),
   Layer.provide(UpvoteRpcHandlers),
   Layer.provide(PostReactionRpcHandlers),
+  Layer.provide(PostStatusRpcHandlers),
   Layer.provide(WorkspaceRpcHandlers),
   Layer.provide(RpcSerialization.layerNdjson),
   Layer.provide(AuthMiddlewareLive),

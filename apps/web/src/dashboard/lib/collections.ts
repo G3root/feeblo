@@ -90,7 +90,7 @@ export const postCollection = createCollection(
       await fetchRpc((rpc) =>
         rpc.PostUpdate({
           id: updatedPost.id,
-          status: updatedPost.status,
+          statusId: updatedPost.statusId,
           content: updatedPost.content,
           title: updatedPost.title,
           boardId: updatedPost.boardId,
@@ -121,10 +121,67 @@ export const postCollection = createCollection(
           organizationId: newPost.organizationId,
           title: newPost.title,
           content: newPost.content,
-          status: newPost.status,
+          statusId: newPost.statusId,
         })
       );
     },
+  })
+);
+
+export const postStatusCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseWhereExpression(opts.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+          or: (...filters) => Object.assign({}, ...filters),
+          not: () => ({}),
+          inArray: () => ({}),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
+      const cacheKey = ["post-status"];
+
+      if (parsed?.organizationId) {
+        cacheKey.push(`organizationId-${parsed.organizationId}`);
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+          or: (...filters) => Object.assign({}, ...filters),
+          not: () => ({}),
+          inArray: () => ({}),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
+      const organizationId = parsed?.organizationId;
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.PostStatusList({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
   })
 );
 

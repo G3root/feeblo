@@ -1,5 +1,4 @@
 import type { Board } from "@feeblo/domain/board/schema";
-import type { Post } from "@feeblo/domain/post/schema";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useUpvote } from "src/feature-board/hooks/use-upvote";
@@ -14,8 +13,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
 
+type FeedbackPost = {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  upVotes: number;
+  hasUserUpVoted: boolean;
+  creatorId: string | null;
+  user: {
+    image: string | null;
+    name: string | null;
+  };
+};
+
 const statusColors: Record<string, string> = {
-  PAUSED: "bg-muted-foreground/50",
+  PENDING: "bg-muted-foreground/50",
   REVIEW: "bg-amber-500",
   PLANNED: "bg-blue-500",
   IN_PROGRESS: "bg-orange-500",
@@ -56,7 +69,15 @@ function UserAvatar({
   );
 }
 
-export function FeedbackCard({ board, post }: { board: Board; post: Post }) {
+export function FeedbackCard({
+  board,
+  post,
+  status,
+}: {
+  board: Board;
+  post: FeedbackPost;
+  status: string;
+}) {
   const { handleToggleUpvote } = useUpvote();
   const existingUpvote = post.hasUserUpVoted;
   const upvoteCount = post.upVotes;
@@ -107,7 +128,7 @@ export function FeedbackCard({ board, post }: { board: Board; post: Post }) {
       </div>
 
       <div className="hidden shrink-0 items-center gap-3 sm:flex">
-        <StatusIndicator status={post.status} />
+        <StatusIndicator status={status} />
         <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-muted-foreground text-xs">
           {board.name}
         </span>

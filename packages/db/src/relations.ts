@@ -10,6 +10,7 @@ import {
   member,
   organization,
   post,
+  postStatus,
   postTag,
   postReaction,
   product,
@@ -65,6 +66,7 @@ export const organizationRelations = relations(
     invitations: many(invitation),
     boards: many(board),
     tags: many(tag),
+    postStatuses: many(postStatus),
     posts: many(post),
     postTags: many(postTag),
     comments: many(comment),
@@ -140,6 +142,17 @@ export const postTagRelations = relations(postTag, ({ one }) => ({
   }),
 }));
 
+export const postStatusRelations = relations(
+  postStatus,
+  ({ many, one }) => ({
+    organization: one(organization, {
+      fields: [postStatus.organizationId],
+      references: [organization.id],
+    }),
+    posts: many(post),
+  })
+);
+
 export const postRelations = relations(post, ({ many, one }) => ({
   board: one(board, {
     fields: [post.boardId],
@@ -148,6 +161,10 @@ export const postRelations = relations(post, ({ many, one }) => ({
   organization: one(organization, {
     fields: [post.organizationId],
     references: [organization.id],
+  }),
+  postStatus: one(postStatus, {
+    fields: [post.statusId],
+    references: [postStatus.id],
   }),
   creator: one(user, {
     fields: [post.creatorId],

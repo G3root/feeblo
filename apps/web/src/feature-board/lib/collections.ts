@@ -1,5 +1,9 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
+import {
+  createCollection,
+  parseLoadSubsetOptions,
+  parseWhereExpression,
+} from "@tanstack/react-db";
 import { Duration } from "effect";
 import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
 import { fetchRpc } from "~/lib/runtime";
@@ -81,7 +85,7 @@ export const publicPostCollection = createCollection(
       await fetchRpc((rpc) =>
         rpc.PostUpdate({
           id: updatedPost.id,
-          status: updatedPost.status,
+          statusId: updatedPost.statusId,
           content: updatedPost.content,
           title: updatedPost.title,
           boardId: updatedPost.boardId,
@@ -89,6 +93,62 @@ export const publicPostCollection = createCollection(
         })
       );
     },
+  })
+);
+
+export const publicPostStatusCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: (opts) => {
+      const parsed = parseWhereExpression(opts.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+          or: (...filters) => Object.assign({}, ...filters),
+          not: () => ({}),
+          inArray: () => ({}),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
+      const cacheKey = ["public-post-status"];
+
+      if (parsed?.organizationId) {
+        cacheKey.push(`organizationId-${parsed.organizationId}`);
+      }
+
+      return cacheKey;
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+          or: (...filters) => Object.assign({}, ...filters),
+          not: () => ({}),
+          inArray: () => ({}),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
+      const organizationId = parsed?.organizationId;
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.PostStatusListPublic({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
   })
 );
 

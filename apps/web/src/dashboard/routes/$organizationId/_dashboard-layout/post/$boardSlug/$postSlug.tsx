@@ -18,7 +18,6 @@ import {
 } from "~/components/ui/empty";
 import { toastManager } from "~/components/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
-import type { BoardPostStatus } from "~/features/board/constants";
 import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";
 import {
@@ -39,6 +38,7 @@ import { getPublicSiteUrl } from "~/hooks/use-site";
 import {
   boardCollection,
   postCollection,
+  postStatusCollection,
   postTagCollection,
   tagCollection,
 } from "~/lib/collections";
@@ -93,6 +93,15 @@ function RouteComponent() {
         .from({ board: boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId));
     },
+    [organizationId]
+  );
+  const { data: postStatuses } = useLiveSuspenseQuery(
+    (q) =>
+      q
+        .from({ postStatus: postStatusCollection })
+        .where(({ postStatus }) =>
+          eq(postStatus.organizationId, organizationId)
+        ),
     [organizationId]
   );
 
@@ -161,8 +170,6 @@ function RouteComponent() {
       </Empty>
     );
   }
-
-  const currentStatus = (post.status as BoardPostStatus) ?? "PLANNED";
 
   const handleTagSelect = async (
     option: TagSelectOption,
@@ -270,14 +277,14 @@ function RouteComponent() {
             <SidebarCard title="Properties">
               <div>
                 <StatusSelect
-                  currentStatus={currentStatus}
-                  onValueChange={async (status) => {
-                    if (!status) {
+                  currentStatusId={post.statusId}
+                  onValueChange={async (nextPostStatus) => {
+                    if (!nextPostStatus) {
                       return;
                     }
                     try {
                       const tx = postCollection.update(post.id, (draft) => {
-                        draft.status = status;
+                        draft.statusId = nextPostStatus.id;
                       });
                       await tx.isPersisted.promise;
 
@@ -292,6 +299,7 @@ function RouteComponent() {
                       });
                     }
                   }}
+                  statuses={postStatuses}
                 />
               </div>
 

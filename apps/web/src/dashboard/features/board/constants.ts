@@ -12,7 +12,7 @@ export type BoardPostStatus = TPostStatus;
 
 export const BoardIconMap: Record<BoardPostStatus, typeof CancelCircleIcon> = {
   CLOSED: CancelCircleIcon,
-  PAUSED: PauseCircleIcon,
+  PENDING: PauseCircleIcon,
   COMPLETED: CheckmarkCircle02Icon,
   REVIEW: DashedLineCircleIcon,
   PLANNED: Clock01Icon,
@@ -20,7 +20,7 @@ export const BoardIconMap: Record<BoardPostStatus, typeof CancelCircleIcon> = {
 };
 
 export const BOARD_LANE_COLUMN_MAP: Record<BoardPostStatus, string> = {
-  PAUSED: "Paused",
+  PENDING: "Pending",
   REVIEW: "Review",
   PLANNED: "Planned",
   IN_PROGRESS: "In Progress",
@@ -29,7 +29,7 @@ export const BOARD_LANE_COLUMN_MAP: Record<BoardPostStatus, string> = {
 };
 
 export const BOARD_LANE_COLOR_MAP: Record<BoardPostStatus, string> = {
-  PAUSED: "text-primary-blue",
+  PENDING: "text-primary-blue",
   REVIEW: "text-muted-foreground",
   PLANNED: "text-muted-foreground",
   IN_PROGRESS: "text-primary-yellow",
@@ -37,4 +37,6 @@ export const BOARD_LANE_COLOR_MAP: Record<BoardPostStatus, string> = {
   CLOSED: "text-destructive",
 };
 
-export const BOARD_LANE_COLUMNS = Object.keys(BOARD_LANE_COLUMN_MAP);
+export function getBoardStatusLabel(status: BoardPostStatus) {
+  return BOARD_LANE_COLUMN_MAP[status];
+}

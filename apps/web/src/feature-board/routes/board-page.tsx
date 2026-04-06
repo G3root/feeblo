@@ -14,6 +14,7 @@ import {
 import {
   publicBoardCollection,
   publicPostCollection,
+  publicPostStatusCollection,
 } from "../lib/collections";
 import { useSite } from "../providers/site-provider";
 
@@ -82,6 +83,11 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
 
       return q
         .from({ post: publicPostCollection })
+        .join(
+          { postStatus: publicPostStatusCollection },
+          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
+          "inner"
+        )
         .where(({ post }) =>
           and(
             eq(post.boardId, board?.id),
@@ -156,8 +162,13 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
       <div className="min-w-0">
         <ListHeader count={posts.length} title={board.name} />
         <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
-          {posts.map((post) => (
-            <FeedbackCard board={board} key={post.id} post={post} />
+          {posts.map(({ post, postStatus }) => (
+            <FeedbackCard
+              board={board}
+              key={post.id}
+              post={post}
+              status={postStatus.type}
+            />
           ))}
         </div>
       </div>

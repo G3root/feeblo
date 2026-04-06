@@ -22,12 +22,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { tagCollection } from "~/lib/collections";
+import { postStatusCollection, tagCollection } from "~/lib/collections";
 import { cn } from "~/lib/utils";
 import {
-  BOARD_LANE_COLUMN_MAP,
-  BOARD_LANE_COLUMNS,
   type BoardPostStatus,
+  getBoardStatusLabel,
 } from "../../constants";
 import {
   type BoardStatusOperator,
@@ -48,6 +47,7 @@ type BoardFilterContextValue = {
   organizationId: string;
   setStatusOperator: (operator: BoardStatusOperator) => void;
   setTagOperator: (operator: BoardTagOperator) => void;
+  postStatuses: Array<{ id: string; type: BoardPostStatus }>;
   tags: FilterTag[];
   toggleStatus: (status: BoardPostStatus) => void;
   toggleTag: (tagId: string) => void;
@@ -99,6 +99,19 @@ function BoardFilterRoot({
 }) {
   const store = useBoardStore();
   const filters = useBoardFilterState();
+  const { data: postStatuses } = useLiveSuspenseQuery(
+    (q) =>
+      q
+        .from({ postStatus: postStatusCollection })
+        .where(({ postStatus }) =>
+          eq(postStatus.organizationId, organizationId)
+        )
+        .select(({ postStatus }) => ({
+          id: postStatus.id,
+          type: postStatus.type,
+        })),
+    [organizationId]
+  );
   const { data: tags } = useLiveSuspenseQuery(
     (q) => {
       return q
@@ -145,6 +158,7 @@ function BoardFilterRoot({
     setTagOperator: (operator) => {
       store.send({ type: "setTagOperator", operator });
     },
+    postStatuses,
     tags,
     toggleStatus: (status) => {
       store.send({ type: "toggleStatusFilter", status });
@@ -162,7 +176,8 @@ function BoardFilterRoot({
 }
 
 function BoardFilterTrigger() {
-  const { filters, tags, toggleStatus, toggleTag } = useBoardFilterContext();
+  const { filters, postStatuses, tags, toggleStatus, toggleTag } =
+    useBoardFilterContext();
   const selectedStatuses = new Set(filters.statuses);
   const selectedTagIds = new Set(filters.tagIds);
 
@@ -184,15 +199,15 @@ function BoardFilterTrigger() {
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
-                {BOARD_LANE_COLUMNS.map((status) => (
+                {postStatuses.map((postStatus) => (
                   <DropdownMenuCheckboxItem
-                    checked={selectedStatuses.has(status as BoardPostStatus)}
-                    key={status}
+                    checked={selectedStatuses.has(postStatus.type)}
+                    key={postStatus.id}
                     onCheckedChange={() => {
-                      toggleStatus(status as BoardPostStatus);
+                      toggleStatus(postStatus.type);
                     }}
                   >
-                    {BOARD_LANE_COLUMN_MAP[status as BoardPostStatus]}
+                    {getBoardStatusLabel(postStatus.type)}
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -252,8 +267,13 @@ function BoardFilterActiveRow() {
 }
 
 function BoardFilterStatusGroup() {
-  const { clearStatusFilter, filters, setStatusOperator, toggleStatus } =
-    useBoardFilterContext();
+  const {
+    clearStatusFilter,
+    filters,
+    setStatusOperator,
+    postStatuses,
+    toggleStatus,
+  } = useBoardFilterContext();
 
   return (
     <BoardFilterActiveGroup>
@@ -266,10 +286,10 @@ function BoardFilterStatusGroup() {
         value={filters.statusOperator}
       />
       <BoardFilterValueMenu
-        items={BOARD_LANE_COLUMNS.map((status) => ({
-          checked: filters.statuses.includes(status as BoardPostStatus),
-          key: status,
-          label: BOARD_LANE_COLUMN_MAP[status as BoardPostStatus],
+        items={postStatuses.map((postStatus) => ({
+          checked: filters.statuses.includes(postStatus.type),
+          key: postStatus.type,
+          label: getBoardStatusLabel(postStatus.type),
         }))}
         label={getStatusSummary(filters.statuses)}
         onToggle={(status) => {
@@ -460,7 +480,7 @@ function BoardFilterClearButton({
 
 function getStatusSummary(statuses: BoardPostStatus[]) {
   if (statuses.length === 1) {
-    return BOARD_LANE_COLUMN_MAP[statuses[0]];
+    return getBoardStatusLabel(statuses[0]);
   }
 
   return `${statuses.length} statuses`;

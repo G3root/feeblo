@@ -47,6 +47,7 @@ import { useUpvote } from "../hooks/use-upvote";
 import {
   publicBoardCollection,
   publicPostCollection,
+  publicPostStatusCollection,
   publicPostReactionCollection,
   publicUpvoteCollection,
 } from "../lib/collections";
@@ -54,7 +55,7 @@ import { formatPostStatus, getInitials } from "../lib/utils";
 import { useSite } from "../providers/site-provider";
 
 const statusColors: Record<string, string> = {
-  PAUSED: "bg-muted-foreground/50",
+  PENDING: "bg-muted-foreground/50",
   REVIEW: "bg-amber-500",
   PLANNED: "bg-blue-500",
   IN_PROGRESS: "bg-orange-500",
@@ -105,14 +106,7 @@ function SidebarSection({
 
 const UpdatedPostSchema = z.object({
   id: z.string(),
-  status: z.enum([
-    "PAUSED",
-    "REVIEW",
-    "PLANNED",
-    "IN_PROGRESS",
-    "COMPLETED",
-    "CLOSED",
-  ]),
+  statusId: z.string(),
   content: z.string(),
   title: z.string(),
   boardId: z.string(),
@@ -122,13 +116,18 @@ const UpdatedPostSchema = z.object({
 export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
   const {
-    data: post,
+    data: postEntry,
     isError: postError,
     isLoading: postLoading,
   } = useLiveQuery(
     (q) =>
       q
         .from({ post: publicPostCollection })
+        .join(
+          { postStatus: publicPostStatusCollection },
+          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
+          "inner"
+        )
         .where(({ post }) =>
           and(eq(post.slug, slug), eq(post.organizationId, site.organizationId))
         )
@@ -146,6 +145,8 @@ export function PostPage({ slug }: { slug: string }) {
         .where(({ board }) => eq(board.organizationId, site.organizationId)),
     [site.organizationId]
   );
+  const post = postEntry?.post;
+  const postStatus = postEntry?.postStatus;
   const postId = post?.id ?? "";
   const { allowed: canEdit } = usePolicy(
     anyPolicy(
@@ -327,7 +328,7 @@ export function PostPage({ slug }: { slug: string }) {
             </SidebarSection>
 
             <SidebarSection title="Status">
-              <StatusPill status={post.status} />
+              <StatusPill status={postStatus?.type ?? "PLANNED"} />
             </SidebarSection>
 
             {/* <SidebarSection title="Tags">

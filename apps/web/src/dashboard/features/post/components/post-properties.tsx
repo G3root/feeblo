@@ -1,3 +1,4 @@
+import type { PostStatus } from "@feeblo/domain/post-status/schema";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "~/components/ui/button";
 import {
@@ -12,9 +13,9 @@ import {
 } from "~/components/ui/combobox";
 import {
   BOARD_LANE_COLOR_MAP,
-  BOARD_LANE_COLUMN_MAP,
   BoardIconMap,
   type BoardPostStatus,
+  getBoardStatusLabel,
 } from "~/features/board/constants";
 import { cn } from "~/lib/utils";
 
@@ -35,28 +36,48 @@ export function PropertyRow({
   );
 }
 
-const items = Object.keys(BOARD_LANE_COLUMN_MAP).map((status) => ({
-  value: status,
-  label: BOARD_LANE_COLUMN_MAP[status as BoardPostStatus],
-}));
-
 export function StatusSelect({
-  currentStatus,
+  currentStatusId,
+  statuses,
   onValueChange,
 }: {
-  currentStatus: BoardPostStatus;
-  onValueChange: (status: BoardPostStatus | null) => void;
+  currentStatusId: string;
+  statuses: Array<Pick<PostStatus, "id" | "type">>;
+  onValueChange: (
+    status:
+      | Pick<PostStatus, "id" | "type">
+      | null
+  ) => void;
 }) {
+  const items = statuses.map((postStatus) => ({
+    label: getBoardStatusLabel(postStatus.type),
+    type: postStatus.type,
+    value: postStatus.id,
+  }));
+  const currentStatus = statuses.find(
+    (postStatus) => postStatus.id === currentStatusId
+  );
   const defaultValue = {
-    value: currentStatus,
-    label: BOARD_LANE_COLUMN_MAP[currentStatus],
+    value: currentStatusId,
+    label: currentStatus ? getBoardStatusLabel(currentStatus.type) : "",
+    type: currentStatus?.type ?? "PLANNED",
   };
 
   return (
     <Combobox
       defaultValue={defaultValue}
       items={items}
-      onValueChange={(value) => onValueChange(value?.value ?? null)}
+      key={currentStatusId}
+      onValueChange={(value) =>
+        onValueChange(
+          value
+            ? {
+                id: value.value,
+                type: value.type as BoardPostStatus,
+              }
+            : null
+        )
+      }
     >
       <ComboboxTrigger
         render={
@@ -69,9 +90,9 @@ export function StatusSelect({
                       <HugeiconsIcon
                         className={cn(
                           "size-4",
-                          BOARD_LANE_COLOR_MAP[value.value as BoardPostStatus]
+                          BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
                         )}
-                        icon={BoardIconMap[value.value as BoardPostStatus]}
+                        icon={BoardIconMap[value.type as BoardPostStatus]}
                         strokeWidth={2}
                       />
                       {value.label}
@@ -92,9 +113,9 @@ export function StatusSelect({
               <HugeiconsIcon
                 className={cn(
                   "size-4",
-                  BOARD_LANE_COLOR_MAP[item.value as BoardPostStatus]
+                  BOARD_LANE_COLOR_MAP[item.type as BoardPostStatus]
                 )}
-                icon={BoardIconMap[item.value as BoardPostStatus]}
+                icon={BoardIconMap[item.type as BoardPostStatus]}
                 strokeWidth={2}
               />{" "}
               {item.label}

@@ -2,6 +2,7 @@ import {
   type AnyPgColumn,
   boolean,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -15,8 +16,8 @@ export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PRIVATE",
 ]);
 
-export const postStatusEnum = pgEnum("post_status", [
-  "PAUSED",
+export const postStatusEnum = pgEnum("post_status_types", [
+  "PENDING",
   "REVIEW",
   "PLANNED",
   "IN_PROGRESS",
@@ -25,6 +26,20 @@ export const postStatusEnum = pgEnum("post_status", [
 ]);
 
 export type TPostStatus = (typeof postStatusEnum.enumValues)[number];
+
+export const POST_STATUS_TYPES = postStatusEnum.enumValues;
+
+export const DEFAULT_POST_STATUSES = [
+  { orderIndex: 0, type: "PENDING" },
+  { orderIndex: 1, type: "REVIEW" },
+  { orderIndex: 2, type: "PLANNED" },
+  { orderIndex: 3, type: "IN_PROGRESS" },
+  { orderIndex: 4, type: "COMPLETED" },
+  { orderIndex: 5, type: "CLOSED" },
+] as const satisfies ReadonlyArray<{
+  orderIndex: number;
+  type: TPostStatus;
+}>;
 
 export const changelogStatusEnum = pgEnum("changelog_status", [
   "draft",
@@ -112,6 +127,36 @@ export const tag = pgTable(
   ]
 );
 
+export const postStatus = pgTable(
+  "post_status",
+  {
+    id: text("id").primaryKey(),
+    type: postStatusEnum("type").notNull(),
+    orderIndex: integer("order_index").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("post_status_organizationId_idx").on(table.organizationId),
+    uniqueIndex("post_status_organizationId_type_uidx").on(
+      table.organizationId,
+      table.type
+    ),
+    uniqueIndex("post_status_organizationId_orderIndex_uidx").on(
+      table.organizationId,
+      table.orderIndex
+    ),
+  ]
+);
+
 export const postTag = pgTable(
   "post_tag",
   {
@@ -181,7 +226,9 @@ export const post = pgTable(
     boardId: text("board_id")
       .notNull()
       .references(() => board.id, { onDelete: "cascade" }),
-    status: postStatusEnum("status").notNull(),
+    statusId: text("status_schema_id")
+      .notNull()
+      .references(() => postStatus.id, { onDelete: "restrict" }),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
@@ -197,6 +244,7 @@ export const post = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date()),
   },
   (table) => [
+    index("post_statusId_idx").on(table.statusId),
     uniqueIndex("post_organizationId_boardId_slug_uidx").on(
       table.organizationId,
       table.boardId,

@@ -34,7 +34,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
     type: "item",
     plugins: [Feedback],
     index,
-    data: { group },
+    data: { column },
     feedback: "clone",
   });
 

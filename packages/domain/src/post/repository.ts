@@ -1,10 +1,6 @@
 import { DB } from "@feeblo/db";
 import { user as userTable } from "@feeblo/db/schema/auth";
-import {
-  post as postTable,
-  type TPostStatus,
-  upvote as upvoteTable,
-} from "@feeblo/db/schema/feedback";
+import { post as postTable, upvote as upvoteTable } from "@feeblo/db/schema/feedback";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { Effect, Array as EffectArray } from "effect";
@@ -28,7 +24,7 @@ type TPostCreate = {
   organizationId: string;
   title: string;
   content: string;
-  status: TPostStatus;
+  statusId: string;
   creatorId: string;
   creatorMemberId?: string;
 };
@@ -120,7 +116,7 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               slug: postTable.slug,
               content: postTable.content,
               upVotes: sql<number>`coalesce(${upvoteCounts.upVotes}, 0)`,
-              status: postTable.status,
+              statusId: postTable.statusId,
               createdAt: postTable.createdAt,
               updatedAt: postTable.updatedAt,
               organizationId: postTable.organizationId,
@@ -141,14 +137,14 @@ export class PostRepository extends Effect.Service<PostRepository>()(
         update: ({
           id,
           organizationId,
-          status,
+          statusId,
           boardId,
           title,
           content,
         }: TPostUpdate) =>
           db
             .update(postTable)
-            .set({ status, boardId, title, content })
+            .set({ statusId, boardId, title, content })
             .where(
               and(
                 eq(postTable.id, id),
@@ -183,7 +179,7 @@ export class PostRepository extends Effect.Service<PostRepository>()(
           organizationId,
           title,
           content,
-          status,
+          statusId,
           creatorId,
           creatorMemberId,
         }: TPostCreate) =>
@@ -195,7 +191,7 @@ export class PostRepository extends Effect.Service<PostRepository>()(
               organizationId,
               title,
               content,
-              status,
+              statusId,
               creatorId,
               creatorMemberId,
               createdAt: new Date(),

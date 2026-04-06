@@ -8,3 +8,8 @@ export type BoardPostRow = {
   summary: string;
   updatedAt: Date | string;
 };
+
+export type BoardPostLane = {
+  posts: BoardPostRow[];
+  status: BoardPostStatus;
+};

@@ -64,6 +64,9 @@
     "./post/schema": {
       "default": "./src/post/schema.ts"
     },
+    "./post-status/schema": {
+      "default": "./src/post-status/schema.ts"
+    },
     "./comments/schema": {
       "default": "./src/comments/schema.ts"
     },

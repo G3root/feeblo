@@ -8,6 +8,7 @@ const prefixes = {
   project: "prj",
   member: "mem",
   board: "brd",
+  postStatus: "pss",
   post: "pst",
   upvote: "upv",
   commentReaction: "crt",

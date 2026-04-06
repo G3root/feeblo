@@ -8,10 +8,12 @@ import {
   board,
   comment,
   commentReaction,
+  DEFAULT_POST_STATUSES,
   member,
   organization,
   post,
   postReaction,
+  postStatus,
   site,
   upvote,
   user,
@@ -33,15 +35,6 @@ const TEAM_USERS = [
 
 const MAIN_POST_COUNT = 40;
 const EXTERNAL_POST_COUNT = 12;
-
-const STATUSES: NonNullable<typeof post.$inferInsert.status>[] = [
-  "REVIEW",
-  "PLANNED",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "CLOSED",
-  "PAUSED",
-];
 
 const REACTIONS = ["👍", "❤️", "🔥", "😂", "🎯"];
 
@@ -174,6 +167,25 @@ const ensureOrganization = (userId: string) =>
         role: "owner",
         createdAt: new Date(),
       });
+    }
+
+    const existingPostStatuses = yield* db
+      .select({ id: postStatus.id })
+      .from(postStatus)
+      .where(eq(postStatus.organizationId, org.id))
+      .limit(1);
+
+    if (existingPostStatuses.length === 0) {
+      for (const postStatusDefinition of DEFAULT_POST_STATUSES) {
+        yield* db.insert(postStatus).values({
+          id: makeId("pss"),
+          organizationId: org.id,
+          type: postStatusDefinition.type,
+          orderIndex: postStatusDefinition.orderIndex,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
     }
 
     return org;
@@ -312,6 +324,10 @@ const ensurePosts = ({
   Effect.gen(function* () {
     const db = yield* DB;
     const now = new Date();
+    const postStatuses = yield* db
+      .select({ id: postStatus.id, type: postStatus.type })
+      .from(postStatus)
+      .where(eq(postStatus.organizationId, organizationId));
 
     const [existing] = yield* db
       .select({ id: post.id })
@@ -327,6 +343,16 @@ const ensurePosts = ({
           return yield* Effect.fail(new Error("No board found to seed posts"));
         }
 
+        const randomPostStatus =
+          faker.helpers.arrayElement(postStatuses) ??
+          postStatuses.find((status) => status.type === "PLANNED");
+
+        if (!randomPostStatus) {
+          return yield* Effect.fail(
+            new Error("No post status found to seed posts")
+          );
+        }
+
         const title = faker.company.catchPhrase();
 
         yield* db.insert(post).values({
@@ -335,7 +361,7 @@ const ensurePosts = ({
           slug: slugify(`${title}-${i + 1}`),
           content: faker.lorem.paragraphs({ min: 2, max: 4 }),
           boardId,
-          status: faker.helpers.arrayElement(STATUSES) ?? "PLANNED",
+          statusId: randomPostStatus.id,
           organizationId,
           creatorId: creatorId ?? null,
           creatorMemberId: creatorMemberId ?? null,

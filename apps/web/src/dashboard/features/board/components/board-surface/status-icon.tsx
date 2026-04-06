@@ -7,7 +7,7 @@ import {
 } from "../../constants";
 
 export function StatusIcon({ status }: { status: BoardPostStatus }) {
-  const Icon = BoardIconMap[status];
+  const Icon = BoardIconMap[status] ?? BoardIconMap.PLANNED;
   const color = BOARD_LANE_COLOR_MAP[status];
 
   return (

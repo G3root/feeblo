@@ -25,14 +25,15 @@ import {
   boardCollection,
   membersCollection,
   postCollection,
+  postStatusCollection,
 } from "~/lib/collections";
 import { usePostCreateDialogContext } from "../dialog-stores";
 import { PostBoardSelect } from "./post-board-select";
-import { PropertyRow, StatusSelect } from "./post-properties";
 import {
   isRichTextContentEmpty,
   uploadPostEditorImage,
 } from "./post-editor-utils";
+import { PropertyRow, StatusSelect } from "./post-properties";
 import { PostTitleInput } from "./post-title-input";
 
 export function PostCreateDialog() {
@@ -93,10 +94,27 @@ function PostCreateForm() {
     },
     [organizationId]
   );
+  const { data: postStatuses = [] } = useLiveQuery(
+    (q) => {
+      if (!organizationId) {
+        return undefined;
+      }
+
+      return q
+        .from({ postStatus: postStatusCollection })
+        .where(({ postStatus }) =>
+          eq(postStatus.organizationId, organizationId)
+        );
+    },
+    [organizationId]
+  );
 
   const initialStatus =
     (store.get().context.data.status as BoardPostStatus | undefined) ??
     "PLANNED";
+  const initialPostStatus =
+    postStatuses.find((postStatus) => postStatus.type === initialStatus) ??
+    postStatuses[0];
 
   const initialBoardId = store.get().context.data.boardId as string;
 
@@ -105,7 +123,7 @@ function PostCreateForm() {
       boardId: initialBoardId,
       content: "",
       createMore: false,
-      status: initialStatus,
+      statusId: initialPostStatus?.id ?? "",
       title: "",
     },
     validators: {
@@ -118,14 +136,7 @@ function PostCreateForm() {
             "Content is required"
           ),
         createMore: z.boolean(),
-        status: z.enum([
-          "PAUSED",
-          "REVIEW",
-          "PLANNED",
-          "IN_PROGRESS",
-          "COMPLETED",
-          "CLOSED",
-        ]),
+        statusId: z.string().trim().min(1, "Status is required"),
         title: z.string().trim().min(1, "Title is required"),
       }),
     },
@@ -137,6 +148,13 @@ function PostCreateForm() {
       try {
         const postId = generateId("post");
         const title = value.title.trim();
+        const selectedPostStatus = postStatuses.find(
+          (postStatus) => postStatus.id === value.statusId
+        );
+
+        if (!selectedPostStatus) {
+          throw new Error("Post status not found");
+        }
         const tx = postCollection.insert({
           id: postId,
           boardId: value.boardId,
@@ -144,7 +162,7 @@ function PostCreateForm() {
           slug: slugify(title) || "untitled",
           content: value.content,
           upVotes: 0,
-          status: value.status,
+          statusId: selectedPostStatus.id,
           createdAt: new Date(),
           updatedAt: new Date(),
           organizationId,
@@ -180,6 +198,10 @@ function PostCreateForm() {
       }
     },
   });
+
+  if (postStatuses.length === 0) {
+    return null;
+  }
 
   if (!canCreate) {
     return (
@@ -247,52 +269,37 @@ function PostCreateForm() {
             </PropertyRow>
 
             <PropertyRow label="Status">
-              <form.Field name="status">
+              <form.Field name="statusId">
                 {(field) => (
                   <StatusSelect
-                    currentStatus={field.state.value}
-                    onValueChange={(nextStatus) => {
-                      if (!nextStatus) {
+                    currentStatusId={field.state.value}
+                    onValueChange={(nextPostStatus) => {
+                      if (!nextPostStatus) {
                         return;
                       }
-                      field.handleChange(nextStatus);
+                      field.handleChange(nextPostStatus.id);
                     }}
+                    statuses={postStatuses}
                   />
                 )}
               </form.Field>
             </PropertyRow>
-
-            {/* <button
-              className="mt-1 font-medium text-muted-foreground text-xs hover:text-foreground"
-              type="button"
-            >
-              + Add property
-            </button> */}
           </div>
-
-          <div className="mt-auto flex justify-between pt-1">
-            <div className="flex items-center space-x-2">
-              <form.Field name="createMore">
-                {(field) => (
-                  <>
-                    <Switch
-                      checked={field.state.value}
-                      id="create-more"
-                      onCheckedChange={field.handleChange}
-                      size="sm"
-                    />
-                    <Label className="text-xs" htmlFor="create-more">
-                      Create More
-                    </Label>
-                  </>
-                )}
-              </form.Field>
-            </div>
-
-            <Button form="post-create-form" size="sm" type="submit">
-              Create Post
-            </Button>
-          </div>
+        </div>
+        <div className="mt-auto flex items-center justify-between pt-4">
+          <form.Field name="createMore">
+            {(field) => (
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={field.state.value}
+                  id="create-more"
+                  onCheckedChange={field.handleChange}
+                />
+                <Label htmlFor="create-more">Create more</Label>
+              </div>
+            )}
+          </form.Field>
+          <Button type="submit">Create Post</Button>
         </div>
       </aside>
     </form>

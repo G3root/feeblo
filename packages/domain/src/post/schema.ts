@@ -1,14 +1,5 @@
 import { Schema } from "effect";
 
-const postStatus = Schema.Literal(
-  "PAUSED",
-  "REVIEW",
-  "PLANNED",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "CLOSED"
-);
-
 export class Post extends Schema.Class<Post>("Post")({
   id: Schema.String,
   boardId: Schema.String,
@@ -16,7 +7,7 @@ export class Post extends Schema.Class<Post>("Post")({
   slug: Schema.String,
   content: Schema.String,
   upVotes: Schema.Number,
-  status: postStatus,
+  statusId: Schema.String,
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   organizationId: Schema.String,
@@ -52,7 +43,7 @@ export const PostUpdate = Schema.Struct({
   id: Schema.String,
   title: Schema.String,
   content: Schema.String,
-  status: postStatus,
+  statusId: Schema.String,
   boardId: Schema.String,
   organizationId: Schema.String,
 });
@@ -64,7 +55,7 @@ export const PostCreate = Schema.Struct({
   boardId: Schema.String,
   title: Schema.String,
   content: Schema.String,
-  status: postStatus,
+  statusId: Schema.String,
   organizationId: Schema.String,
 });
 

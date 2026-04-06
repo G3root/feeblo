@@ -6,7 +6,7 @@ import { memo } from "react";
 import { Button } from "~/components/ui/button";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { cn } from "~/lib/utils";
-import { BOARD_LANE_COLUMN_MAP, type BoardPostStatus } from "../../constants";
+import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
 import { StatusIcon } from "./status-icon";
 
 interface BoardGridLaneColumnProps {
@@ -35,7 +35,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
     index,
   });
 
-  const readableStatus = BOARD_LANE_COLUMN_MAP[status];
+  const readableStatus = getBoardStatusLabel(status);
 
   return (
     <div className="flex h-96 w-80 flex-col overflow-hidden rounded-lg bg-muted/30">
