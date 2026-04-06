@@ -1,4 +1,3 @@
-import { Feedback } from "@dnd-kit/dom";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useNavigate } from "@tanstack/react-router";
 import { memo } from "react";
@@ -15,6 +14,7 @@ interface BoardGridPostCardProps {
   index: number;
   organizationId: string;
   post: BoardPostRow;
+  statusId: string;
 }
 
 export const BoardGridPostCard = memo(function BoardGridPostCard({
@@ -24,6 +24,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
   organizationId,
   boardSlug,
   post,
+  statusId,
 }: BoardGridPostCardProps) {
   const navigate = useNavigate();
   const group = column;
@@ -32,10 +33,8 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
     group,
     accept: "item",
     type: "item",
-    plugins: [Feedback],
     index,
-    data: { column },
-    feedback: "clone",
+    data: { column, statusId },
   });
 
   return (

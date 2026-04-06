@@ -33,11 +33,11 @@ export function BoardListView({
     <section>
       <Accordion
         className="w-full gap-2 rounded-none border-none p-3"
-        defaultValue={groupedPosts.map((lane) => lane.status)}
+        defaultValue={groupedPosts.map((lane) => lane.statusId)}
         multiple
       >
         {groupedPosts.map((lane) => (
-          <AccordionPrimitive.Item key={lane.status} value={lane.status}>
+          <AccordionPrimitive.Item key={lane.statusId} value={lane.statusId}>
             <div className="relative">
               <AccordionTrigger className="rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden">
                 <div className="flex items-center gap-2">
@@ -65,6 +65,7 @@ export function BoardListView({
                 <AddPostButton
                   boardId={boardId}
                   status={lane.status}
+                  statusId={lane.statusId}
                 />
               </PolicyGuard>
             </div>
@@ -88,9 +89,11 @@ export function BoardListView({
 function AddPostButton({
   boardId,
   status,
+  statusId,
 }: {
   boardId: string;
   status: BoardPostStatus;
+  statusId: string;
 }) {
   const store = usePostCreateDialogContext();
   return (
@@ -100,7 +103,7 @@ function AddPostButton({
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        store.send({ type: "toggle", data: { boardId, status } });
+        store.send({ type: "toggle", data: { boardId, status, statusId } });
       }}
       size="icon-sm"
       type="button"

@@ -15,6 +15,7 @@ interface BoardGridLaneColumnProps {
   id: string;
   index: number;
   status: BoardPostStatus;
+  statusId: string;
   totalPosts: number;
 }
 
@@ -24,6 +25,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
   children,
   totalPosts,
   status,
+  statusId,
   boardId,
 }: BoardGridLaneColumnProps) {
   const store = usePostCreateDialogContext();
@@ -33,6 +35,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
     collisionPriority: CollisionPriority.Low,
     type: "column",
     index,
+    data: { column: status, statusId },
   });
 
   const readableStatus = getBoardStatusLabel(status);
@@ -52,7 +55,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
             onClick={() => {
               store.send({
                 type: "toggle",
-                data: { boardId, status },
+                data: { boardId, status, statusId },
               });
             }}
             size="icon-xs"

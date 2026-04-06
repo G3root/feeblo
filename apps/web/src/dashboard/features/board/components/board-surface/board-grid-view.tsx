@@ -1,6 +1,8 @@
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { useCallback, useRef, useState } from "react";
+import { toastManager } from "~/components/ui/toast";
+import { postCollection } from "~/lib/collections";
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
 import { BoardGridPostCard } from "./board-grid-post-card";
 import type { BoardPostLane } from "./types";
@@ -26,7 +28,8 @@ export function BoardGridView({
   groupedPosts: BoardPostLane[];
 }) {
   const [items, setItems] = useState(groupedPosts);
-  const [previousGroupedPosts, setPreviousGroupedPosts] = useState(groupedPosts);
+  const [previousGroupedPosts, setPreviousGroupedPosts] =
+    useState(groupedPosts);
 
   if (groupedPosts !== previousGroupedPosts) {
     setPreviousGroupedPosts(groupedPosts);
@@ -34,25 +37,43 @@ export function BoardGridView({
   }
 
   const snapshot = useRef(structuredClone(items));
+  const activeDrag = useRef<{
+    sourceId: string;
+    sourceStatusId: string;
+    targetStatusId: string | null;
+  } | null>(null);
 
-  const handleDragStart = useCallback<
-    DragDropEventHandlers["onDragStart"]
-  >(() => {
-    snapshot.current = structuredClone(items);
-  }, [items]);
+  const handleDragStart = useCallback<DragDropEventHandlers["onDragStart"]>(
+    (event) => {
+      snapshot.current = structuredClone(items);
+      const { source } = event.operation;
 
-  const movePost = (
+      if (source?.type !== "item") {
+        activeDrag.current = null;
+        return;
+      }
+
+      activeDrag.current = {
+        sourceId: source.id as string,
+        sourceStatusId: source.data?.statusId as string,
+        targetStatusId: null,
+      };
+    },
+    [items]
+  );
+
+  const movePostToColumn = (
     lanes: BoardPostLane[],
-    sourceColumn: string,
-    targetColumn: string,
     sourceId: string,
-    targetId?: string
+    targetStatusId: string
   ) => {
     const nextItems = structuredClone(lanes);
-    const fromLane = nextItems.find((lane) => lane.status === sourceColumn);
-    const toLane = nextItems.find((lane) => lane.status === targetColumn);
+    const fromLane = nextItems.find((lane) =>
+      lane.posts.some((post) => post.id === sourceId)
+    );
+    const toLane = nextItems.find((lane) => lane.statusId === targetStatusId);
 
-    if (!(fromLane && toLane)) {
+    if (!(fromLane && toLane) || fromLane.statusId === toLane.statusId) {
       return lanes;
     }
 
@@ -69,21 +90,8 @@ export function BoardGridView({
     }
 
     movedPost.status = toLane.status;
-
-    const targetIndex =
-      targetId == null
-        ? toLane.posts.length
-        : toLane.posts.findIndex((post) => post.id === targetId);
-
-    if (sourceColumn === targetColumn) {
-      const insertIndex =
-        targetIndex === -1 ? toLane.posts.length : Math.min(targetIndex, toLane.posts.length);
-      toLane.posts.splice(insertIndex, 0, movedPost);
-      return nextItems;
-    }
-
-    const insertIndex = targetIndex === -1 ? 0 : targetIndex;
-    toLane.posts.splice(insertIndex, 0, movedPost);
+    movedPost.statusId = toLane.statusId;
+    toLane.posts.push(movedPost);
 
     return nextItems;
   };
@@ -92,28 +100,22 @@ export function BoardGridView({
     (event) => {
       const { source, target } = event.operation;
 
-      if (source?.type === "column" || source?.type !== "item") {
+      if (source?.type !== "item") {
         return;
       }
 
-      const sourceColumn = source.data?.column as string | undefined;
-      const targetColumn =
-        target?.type === "column"
-          ? (target.id as string | undefined)
-          : (target?.data?.column as string | undefined);
+      const targetStatusId = target?.data?.statusId as string | undefined;
 
-      if (!(sourceColumn && targetColumn)) {
+      if (!targetStatusId) {
         return;
+      }
+
+      if (activeDrag.current) {
+        activeDrag.current.targetStatusId = targetStatusId;
       }
 
       setItems((currentItems) =>
-        movePost(
-          currentItems,
-          sourceColumn,
-          targetColumn,
-          source.id as string,
-          target?.type === "item" ? (target.id as string | undefined) : undefined
-        )
+        movePostToColumn(currentItems, source.id as string, targetStatusId)
       );
     },
     []
@@ -121,9 +123,44 @@ export function BoardGridView({
 
   const handleDragEnd = useCallback<DragDropEventHandlers["onDragEnd"]>(
     (event) => {
+      const { source, target } = event.operation;
+      const dragState = activeDrag.current;
+      activeDrag.current = null;
+
       if (event.canceled) {
         setItems(snapshot.current);
+        return;
       }
+
+      if (source?.type !== "item") {
+        setItems(snapshot.current);
+        return;
+      }
+
+      const sourceStatusId =
+        dragState?.sourceStatusId ?? (source.data?.statusId as string | undefined);
+      const targetStatusId =
+        dragState?.targetStatusId ?? (target?.data?.statusId as string | undefined);
+
+      if (!(sourceStatusId && targetStatusId) || sourceStatusId === targetStatusId) {
+        setItems(snapshot.current);
+        return;
+      }
+
+      const tx = postCollection.update(
+        dragState?.sourceId ?? (source.id as string),
+        (draft) => {
+          draft.statusId = targetStatusId;
+        }
+      );
+
+      void tx.isPersisted.promise.catch(() => {
+        setItems(snapshot.current);
+        toastManager.add({
+          title: "Failed to update status",
+          type: "error",
+        });
+      });
     },
     []
   );
@@ -140,13 +177,15 @@ export function BoardGridView({
           {items.map((lane, columnIndex) => {
             const column = lane.status;
             const rows = lane.posts;
+            const laneId = `${boardId}:${columnIndex}`;
             return (
               <BoardGridLaneColumn
                 boardId={boardId}
-                id={column}
+                id={laneId}
                 index={columnIndex}
-                key={column}
+                key={lane.statusId}
                 status={column}
+                statusId={lane.statusId}
                 totalPosts={rows.length}
               >
                 {rows.map((post, postIndex) => (
@@ -158,6 +197,7 @@ export function BoardGridView({
                     key={post.slug}
                     organizationId={organizationId}
                     post={post}
+                    statusId={post.statusId}
                   />
                 ))}
               </BoardGridLaneColumn>

@@ -23,6 +23,7 @@ export const [PostCreateDialogProvider, usePostCreateDialogContext] =
   createModalStoreContext<{
     boardId: string;
     status: TPostStatus;
+    statusId?: string;
   }>({
     name: "PostCreateDialogContext",
     hookName: "usePostCreateDialogContext",

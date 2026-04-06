@@ -99,6 +99,7 @@ export function BoardPosts({
         .select(({ post, postStatus }) => ({
           id: post.id,
           slug: post.slug,
+          statusId: post.statusId,
           status: postStatus.type,
           title: post.title,
           summary: post.content,
@@ -149,7 +150,10 @@ export function BoardPosts({
 
   const groupedPosts = groupPostsByStatus(
     posts,
-    postStatuses.map((postStatus) => postStatus.type)
+    postStatuses.map((postStatus) => ({
+      id: postStatus.id,
+      type: postStatus.type,
+    }))
   );
 
   if (posts.length === 0) {

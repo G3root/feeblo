@@ -16,27 +16,49 @@ export function formatPostDate(value: Date | string) {
 
 export const groupPostsByStatus = (
   posts: BoardPostRow[],
-  orderedStatuses: readonly BoardPostStatus[]
+  orderedStatuses: ReadonlyArray<{
+    id: string;
+    type: BoardPostStatus;
+  }>
 ) => {
-  const map = new Map<BoardPostStatus, BoardPostRow[]>(
-    orderedStatuses.map((status) => [status, []])
+  const map = new Map<
+    string,
+    {
+      posts: BoardPostRow[];
+      status: BoardPostStatus;
+      statusId: string;
+    }
+  >(
+    orderedStatuses.map((status) => [
+      status.id,
+      {
+        posts: [],
+        status: status.type,
+        statusId: status.id,
+      },
+    ])
   );
 
   for (const post of posts) {
-    const existing = map.get(post.status);
+    const existing = map.get(post.statusId);
 
     if (existing) {
-      existing.push(post);
+      existing.posts.push(post);
       continue;
     }
 
-    map.set(post.status, [post]);
+    map.set(post.statusId, {
+      posts: [post],
+      status: post.status,
+      statusId: post.statusId,
+    });
   }
 
   return [...map.entries()].map(
-    ([status, groupedPosts]): BoardPostLane => ({
-      status,
-      posts: groupedPosts,
+    ([, lane]): BoardPostLane => ({
+      status: lane.status,
+      statusId: lane.statusId,
+      posts: lane.posts,
     })
   );
 };

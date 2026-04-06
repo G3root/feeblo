@@ -112,7 +112,11 @@ function PostCreateForm() {
   const initialStatus =
     (store.get().context.data.status as BoardPostStatus | undefined) ??
     "PLANNED";
+  const initialStatusId = store.get().context.data.statusId as
+    | string
+    | undefined;
   const initialPostStatus =
+    postStatuses.find((postStatus) => postStatus.id === initialStatusId) ??
     postStatuses.find((postStatus) => postStatus.type === initialStatus) ??
     postStatuses[0];
 
