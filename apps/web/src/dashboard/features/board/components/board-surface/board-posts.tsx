@@ -54,16 +54,18 @@ export function BoardPosts({
 
   const { data: matchingTagPosts } = useLiveSuspenseQuery(
     (q) => {
-      const baseQuery = q.from({ postTag: postTagCollection }).where(({ postTag }) => {
-        const conditions = [
-          eq(postTag.organizationId, organizationId),
-          tagIds.length > 0
-            ? inArray(postTag.tagId, tagIds)
-            : eq(postTag.postId, "__no_matching_post__"),
-        ];
+      const baseQuery = q
+        .from({ postTag: postTagCollection })
+        .where(({ postTag }) => {
+          const conditions = [
+            eq(postTag.organizationId, organizationId),
+            tagIds.length > 0
+              ? inArray(postTag.tagId, tagIds)
+              : eq(postTag.postId, "__no_matching_post__"),
+          ];
 
-        return and(conditions[0], conditions[1], ...conditions.slice(2));
-      });
+          return and(conditions[0], conditions[1], ...conditions.slice(2));
+        });
 
       if (tagOperator === "includeAllOf" || tagOperator === "excludeIfAllOf") {
         return baseQuery
@@ -109,6 +111,14 @@ export function BoardPosts({
           and(
             eq(post.boardId, boardId),
             eq(post.organizationId, organizationId),
+            ...(postStatusFilter === "backlog"
+              ? [
+                  or(
+                    eq(postStatus.type, "PENDING"),
+                    eq(postStatus.type, "REVIEW")
+                  ),
+                ]
+              : []),
             ...(postStatusFilter === "active"
               ? [
                   or(

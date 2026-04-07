@@ -4,7 +4,7 @@ import { createStoreContext } from "~/lib/xstate";
 import type { BoardPostStatus } from "../constants";
 
 export type BoardDisplayMode = "list" | "grid";
-export type BoardPostStatusFilter = "all" | "active";
+export type BoardPostStatusFilter = "all" | "active" | "backlog";
 export type BoardStatusOperator = "isAnyOf" | "isNot";
 export type BoardTagOperator =
   | "includeAllOf"

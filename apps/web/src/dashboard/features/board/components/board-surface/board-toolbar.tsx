@@ -14,8 +14,24 @@ import {
 } from "~/components/ui/popover";
 import { toggleVariants } from "~/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+import { cn } from "~/lib/utils";
 import { useBoardStore } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";
+
+const links = [
+  {
+    name: "All feedbacks",
+    to: "/$organizationId/board/$boardSlug" as const,
+  },
+  {
+    name: "Active",
+    to: "/$organizationId/board/$boardSlug/active" as const,
+  },
+  {
+    name: "Backlog",
+    to: "/$organizationId/board/$boardSlug/backlog" as const,
+  },
+];
 
 export function BoardToolbar({
   boardSlug,
@@ -29,41 +45,28 @@ export function BoardToolbar({
       <div className="flex flex-col gap-3 p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              activeOptions={{
-                exact: true,
-              }}
-              activeProps={{
-                "data-active": "true",
-              }}
-              className={toggleVariants({
-                variant: "outline",
-                size: "sm",
-                class: "data-active:bg-muted",
-              })}
-              params={{ boardSlug, organizationId }}
-              to="/$organizationId/board/$boardSlug"
-            >
-              All feedbacks
-            </Link>
-
-            <Link
-              activeOptions={{
-                exact: true,
-              }}
-              activeProps={{
-                "data-active": "true",
-              }}
-              className={toggleVariants({
-                variant: "outline",
-                size: "sm",
-                class: "data-active:bg-muted",
-              })}
-              params={{ boardSlug, organizationId }}
-              to="/$organizationId/board/$boardSlug/active"
-            >
-              Active
-            </Link>
+            {links.map((link) => (
+              <Link
+                activeOptions={{
+                  exact: true,
+                }}
+                activeProps={{
+                  "data-active": "true",
+                }}
+                className={cn(
+                  toggleVariants({
+                    variant: "outline",
+                    size: "sm",
+                  }),
+                  "h-7 min-w-7 data-active:bg-muted"
+                )}
+                key={link.to}
+                params={{ boardSlug, organizationId }}
+                to={link.to}
+              >
+                {link.name}
+              </Link>
+            ))}
           </div>
           <div className="flex gap-2">
             <BoardFilter.Trigger />

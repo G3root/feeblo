@@ -31,6 +31,7 @@ import { Route as OrganizationIdDashboardLayoutChangelogIndexRouteImport } from 
 import { Route as OrganizationIdDashboardLayoutChangelogChangelogSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/$changelogSlug"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
 import { Route as OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
+import { Route as OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/active"
 
 const SignUpRoute = SignUpRouteImport.update({
@@ -160,6 +161,12 @@ const OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute =
     path: "/post/$boardSlug/$postSlug",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
+const OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute =
+  OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport.update({
+    id: "/board/$boardSlug/backlog",
+    path: "/board/$boardSlug/backlog",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
 const OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute =
   OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport.update({
     id: "/board/$boardSlug/active",
@@ -188,6 +195,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/changelog/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
   "/$organizationId/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
+  "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -210,6 +218,7 @@ export interface FileRoutesByTo {
   "/$organizationId/changelog/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
   "/$organizationId/changelog": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
+  "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -236,6 +245,7 @@ export interface FileRoutesById {
   "/$organizationId/_dashboard-layout/changelog/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
   "/$organizationId/_dashboard-layout/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
+  "/$organizationId/_dashboard-layout/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | "/$organizationId/changelog/$changelogSlug"
     | "/$organizationId/changelog/"
     | "/$organizationId/board/$boardSlug/active"
+    | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug/"
   fileRoutesByTo: FileRoutesByTo
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | "/$organizationId/changelog/$changelogSlug"
     | "/$organizationId/changelog"
     | "/$organizationId/board/$boardSlug/active"
+    | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug"
   id:
@@ -309,6 +321,7 @@ export interface FileRouteTypes {
     | "/$organizationId/_dashboard-layout/changelog/$changelogSlug"
     | "/$organizationId/_dashboard-layout/changelog/"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/active"
+    | "/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
     | "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/"
   fileRoutesById: FileRoutesById
@@ -478,6 +491,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
+    "/$organizationId/_dashboard-layout/board/$boardSlug/backlog": {
+      id: "/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
+      path: "/board/$boardSlug/backlog"
+      fullPath: "/$organizationId/board/$boardSlug/backlog"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
     "/$organizationId/_dashboard-layout/board/$boardSlug/active": {
       id: "/$organizationId/_dashboard-layout/board/$boardSlug/active"
       path: "/board/$boardSlug/active"
@@ -494,6 +514,7 @@ interface OrganizationIdDashboardLayoutRouteChildren {
   OrganizationIdDashboardLayoutChangelogChangelogSlugRoute: typeof OrganizationIdDashboardLayoutChangelogChangelogSlugRoute
   OrganizationIdDashboardLayoutChangelogIndexRoute: typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
+  OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute: typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
 }
@@ -510,6 +531,8 @@ const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutR
       OrganizationIdDashboardLayoutChangelogIndexRoute,
     OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute:
       OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute,
+    OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute:
+      OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute,
     OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute:
       OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute,
     OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute:
