@@ -3,7 +3,9 @@ import {
   Edit,
   Ellipsis,
   Home,
+  LayoutThreeColumnIcon,
   Megaphone03Icon,
+  MessageMultiple01Icon,
   Plus,
   PreferenceVerticalIcon,
   SparklesIcon,
@@ -84,21 +86,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               />
             </SidebarMenuItem>
             <MyBoardLink />
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                isActive={pathname.startsWith(`/${organizationId}/changelog`)}
-                render={(props) => (
-                  <Link
-                    {...props}
-                    params={{ organizationId }}
-                    to="/$organizationId/changelog"
-                  >
-                    <HugeiconsIcon icon={Megaphone03Icon} />
-                    <span>Changelogs</span>
-                  </Link>
-                )}
-              />
-            </SidebarMenuItem>
 
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -111,6 +98,57 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   >
                     <HugeiconsIcon icon={PreferenceVerticalIcon} />
                     <span>Settings</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Modules</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/feedback`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/feedback"
+                  >
+                    <HugeiconsIcon icon={MessageMultiple01Icon} />
+                    <span>Feedback</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/changelog`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/changelog"
+                  >
+                    <HugeiconsIcon icon={Megaphone03Icon} />
+                    <span>Changelog</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/roadmap`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/roadmap"
+                  >
+                    <HugeiconsIcon icon={LayoutThreeColumnIcon} />
+                    <span>Roadmap</span>
                   </Link>
                 )}
               />
