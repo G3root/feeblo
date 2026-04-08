@@ -19,14 +19,12 @@ import { StatusIcon } from "./status-icon";
 import type { BoardPostLane } from "./types";
 
 export function BoardListView({
-  boardSlug,
   organizationId,
   boardId,
   groupedPosts,
 }: {
-  boardSlug: string;
   organizationId: string;
-  boardId: string;
+  boardId?: string;
   groupedPosts: BoardPostLane[];
 }) {
   return (
@@ -72,7 +70,6 @@ export function BoardListView({
             <AccordionContent className="h-auto pb-0" panelClassName="px-0">
               {lane.posts.map((post) => (
                 <BoardPostRowItem
-                  boardSlug={boardSlug}
                   key={post.id}
                   organizationId={organizationId}
                   post={post}
@@ -91,11 +88,12 @@ function AddPostButton({
   status,
   statusId,
 }: {
-  boardId: string;
+  boardId?: string;
   status: BoardPostStatus;
   statusId: string;
 }) {
   const store = usePostCreateDialogContext();
+
   return (
     <Button
       aria-label={`Add post to ${getBoardStatusLabel(status)}`}

@@ -27,17 +27,22 @@ export type BoardView = {
   name: string;
 };
 
+export type SelectedBoardPost = {
+  boardId: string;
+  postId: string;
+};
+
 type BoardStoreContext = {
   activeView: BoardView;
-  boardId: string;
+  boardId?: string;
   bulkDeleteOpen: boolean;
   displayMode: BoardDisplayMode;
-  selectedPostIds: string[];
+  selectedPosts: SelectedBoardPost[];
 };
 
 export type BoardStoreDefaultValue = {
   activeView: BoardView;
-  boardId: string;
+  boardId?: string;
   displayMode?: BoardDisplayMode;
 };
 
@@ -58,17 +63,17 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       boardId: defaultValue?.boardId ?? "",
       bulkDeleteOpen: false,
       displayMode: defaultValue?.displayMode ?? "list",
-      selectedPostIds: [],
+      selectedPosts: [],
     } as BoardStoreContext,
     on: {
       clearSelection: (context) => ({
         ...context,
-        selectedPostIds: [],
+        selectedPosts: [],
       }),
       setActiveView: (context, event: { view: BoardView }) => ({
         ...context,
         activeView: event.view,
-        selectedPostIds: [],
+        selectedPosts: [],
       }),
       setBulkDeleteOpen: (context, event: { open: boolean }) => ({
         ...context,
@@ -158,28 +163,33 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
         const available = new Set(event.postIds);
         return {
           ...context,
-          selectedPostIds: context.selectedPostIds.filter((id) =>
-            available.has(id)
+          selectedPosts: context.selectedPosts.filter(({ postId }) =>
+            available.has(postId)
           ),
         };
       },
       togglePostSelection: (
         context,
-        event: { checked?: boolean; postId: string }
+        event: { boardId: string; checked?: boolean; postId: string }
       ) => {
-        const selected = new Set(context.selectedPostIds);
+        const selected = new Map(
+          context.selectedPosts.map((entry) => [entry.postId, entry])
+        );
         const isSelected = selected.has(event.postId);
         const shouldSelect = event.checked ?? !isSelected;
 
         if (shouldSelect) {
-          selected.add(event.postId);
+          selected.set(event.postId, {
+            boardId: event.boardId,
+            postId: event.postId,
+          });
         } else {
           selected.delete(event.postId);
         }
 
         return {
           ...context,
-          selectedPostIds: [...selected],
+          selectedPosts: [...selected.values()],
         };
       },
     },
@@ -195,9 +205,14 @@ export const [BoardStoreProvider, useBoardStore] = createStoreContext<
   providerName: "BoardStoreProvider",
 });
 
-export function useSelectedPostIds() {
+export function useSelectedPosts() {
   const store = useBoardStore();
-  return useSelector(store, (state) => state.context.selectedPostIds);
+  return useSelector(store, (state) => state.context.selectedPosts);
+}
+
+export function useSelectedPostIds() {
+  const selectedPosts = useSelectedPosts();
+  return selectedPosts.map((post) => post.postId);
 }
 
 export function useBoardDisplayMode() {

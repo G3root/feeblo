@@ -30,12 +30,13 @@ export const postCollection = createCollection(
       const cacheKey = ["post"];
 
       if (parsed) {
+        // biome-ignore lint/style/useCollapsedIf: <explanation>
         if (parsed?.organizationId) {
           cacheKey.push(`organizationId-${parsed.organizationId}`);
         }
-        if (parsed?.boardId) {
-          cacheKey.push(`boardId-${parsed.boardId}`);
-        }
+        // if (parsed?.boardId) {
+        //   cacheKey.push(`boardId-${parsed.boardId}`);
+        // }
       }
 
       return cacheKey;
@@ -53,21 +54,22 @@ export const postCollection = createCollection(
         },
       });
 
-      let boardId: string | null = null;
+      const boardId: string | null = null;
       let organizationId: string | null = null;
 
       if (parsed) {
-        if (parsed.boardId) {
-          boardId = parsed.boardId;
-        }
+        // if (parsed.boardId) {
+        //   boardId = parsed.boardId;
+        // }
+        // biome-ignore lint/style/useCollapsedIf: <explanation>
         if (parsed.organizationId) {
           organizationId = parsed.organizationId;
         }
       }
 
-      if (!boardId) {
-        return [];
-      }
+      // if (!boardId) {
+      //   return [];
+      // }
       if (!organizationId) {
         return [];
       }

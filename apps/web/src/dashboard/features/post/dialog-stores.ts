@@ -21,7 +21,7 @@ export const [PostDeleteDialogProvider, usePostDeleteDialogContext] =
 
 export const [PostCreateDialogProvider, usePostCreateDialogContext] =
   createModalStoreContext<{
-    boardId: string;
+    boardId?: string;
     status: TPostStatus;
     statusId?: string;
   }>({

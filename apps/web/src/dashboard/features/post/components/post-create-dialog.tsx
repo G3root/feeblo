@@ -120,7 +120,7 @@ function PostCreateForm() {
     postStatuses.find((postStatus) => postStatus.type === initialStatus) ??
     postStatuses[0];
 
-  const initialBoardId = store.get().context.data.boardId as string;
+  const initialBoardId = store.get().context.data.boardId ?? "";
 
   const form = useAppForm({
     defaultValues: {

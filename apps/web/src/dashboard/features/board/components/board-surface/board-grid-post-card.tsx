@@ -8,7 +8,6 @@ import type { BoardPostRow } from "./types";
 import { formatPostDate } from "./utils";
 
 interface BoardGridPostCardProps {
-  boardSlug: string;
   column: string;
   id: string;
   index: number;
@@ -22,7 +21,6 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
   index,
   column,
   organizationId,
-  boardSlug,
   post,
   statusId,
 }: BoardGridPostCardProps) {
@@ -51,7 +49,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
           to: "/$organizationId/post/$boardSlug/$postSlug",
           params: {
             organizationId,
-            boardSlug,
+            boardSlug: post.boardSlug,
             postSlug: post.slug,
           },
         })

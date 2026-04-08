@@ -33,40 +33,80 @@ const links = [
   },
 ];
 
+const feedbackLinks = [
+  {
+    name: "All feedbacks",
+    to: "/$organizationId/feedback" as const,
+  },
+  {
+    name: "Active",
+    to: "/$organizationId/feedback/active" as const,
+  },
+  {
+    name: "Backlog",
+    to: "/$organizationId/feedback/backlog" as const,
+  },
+];
+
 export function BoardToolbar({
   boardSlug,
   organizationId,
+  variant = "board",
 }: {
-  boardSlug: string;
+  boardSlug?: string;
   organizationId: string;
+  variant?: "board" | "feedback";
 }) {
   return (
     <BoardFilter.Root organizationId={organizationId}>
       <div className="flex flex-col gap-3 p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            {links.map((link) => (
-              <Link
-                activeOptions={{
-                  exact: true,
-                }}
-                activeProps={{
-                  "data-active": "true",
-                }}
-                className={cn(
-                  toggleVariants({
-                    variant: "outline",
-                    size: "sm",
-                  }),
-                  "h-7 min-w-7 data-active:bg-muted"
-                )}
-                key={link.to}
-                params={{ boardSlug, organizationId }}
-                to={link.to}
-              >
-                {link.name}
-              </Link>
-            ))}
+            {variant === "feedback"
+              ? feedbackLinks.map((link) => (
+                  <Link
+                    activeOptions={{
+                      exact: true,
+                    }}
+                    activeProps={{
+                      "data-active": "true",
+                    }}
+                    className={cn(
+                      toggleVariants({
+                        variant: "outline",
+                        size: "sm",
+                      }),
+                      "h-7 min-w-7 data-active:bg-muted"
+                    )}
+                    key={link.to}
+                    params={{ organizationId }}
+                    to={link.to}
+                  >
+                    {link.name}
+                  </Link>
+                ))
+              : links.map((link) => (
+                  <Link
+                    activeOptions={{
+                      exact: true,
+                    }}
+                    activeProps={{
+                      "data-active": "true",
+                    }}
+                    className={cn(
+                      toggleVariants({
+                        variant: "outline",
+                        size: "sm",
+                      }),
+                      "h-7 min-w-7 data-active:bg-muted"
+                    )}
+                    key={link.to}
+                    params={{ boardSlug: boardSlug ?? "", organizationId }}
+                    to={link.to}
+                  >
+                    {link.name}
+                  </Link>
+                ))}
           </div>
           <div className="flex gap-2">
             <BoardFilter.Trigger />

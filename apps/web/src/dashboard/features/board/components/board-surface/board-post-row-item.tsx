@@ -8,16 +8,14 @@ import { formatPostDate } from "./utils";
 
 export function BoardPostRowItem({
   post,
-  boardSlug,
   organizationId,
 }: {
   post: BoardPostRow;
-  boardSlug: string;
   organizationId: string;
 }) {
   const store = useBoardStore();
   const checked = useSelector(store, (state) =>
-    state.context.selectedPostIds.includes(post.id)
+    state.context.selectedPosts.some((entry) => entry.postId === post.id)
   );
 
   return (
@@ -28,6 +26,7 @@ export function BoardPostRowItem({
         className="pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 data-checked:pointer-events-auto data-checked:opacity-100"
         onCheckedChange={(nextChecked) => {
           store.send({
+            boardId: post.boardId,
             type: "togglePostSelection",
             checked: nextChecked === true,
             postId: post.id,
@@ -38,7 +37,7 @@ export function BoardPostRowItem({
         className="flex min-w-0 flex-1 items-center justify-between gap-3"
         params={{
           organizationId,
-          boardSlug,
+          boardSlug: post.boardSlug,
           postSlug: post.slug,
         }}
         to="/$organizationId/post/$boardSlug/$postSlug"

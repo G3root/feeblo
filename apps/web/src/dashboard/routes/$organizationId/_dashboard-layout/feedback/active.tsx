@@ -1,18 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  ActiveBoardPage,
+  ActiveFeedbackPage,
   BoardFeedbackRoutePending,
 } from "~/features/board/components/board-route-pages";
 
 export const Route = createFileRoute(
-  "/$organizationId/_dashboard-layout/board/$boardSlug/active"
+  "/$organizationId/_dashboard-layout/feedback/active"
 )({
   component: RouteComponent,
   pendingComponent: BoardFeedbackRoutePending,
 });
 
 function RouteComponent() {
-  const { organizationId, boardSlug } = Route.useParams();
+  const { organizationId } = Route.useParams();
 
-  return <ActiveBoardPage boardSlug={boardSlug} organizationId={organizationId} />;
+  return <ActiveFeedbackPage organizationId={organizationId} />;
 }

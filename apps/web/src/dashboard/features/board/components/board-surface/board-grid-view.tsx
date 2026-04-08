@@ -17,14 +17,12 @@ const sensors = [
 ];
 
 export function BoardGridView({
-  boardSlug,
   organizationId,
   boardId,
   groupedPosts,
 }: {
-  boardSlug: string;
   organizationId: string;
-  boardId: string;
+  boardId?: string;
   groupedPosts: BoardPostLane[];
 }) {
   const [items, setItems] = useState(groupedPosts);
@@ -177,7 +175,7 @@ export function BoardGridView({
           {items.map((lane, columnIndex) => {
             const column = lane.status;
             const rows = lane.posts;
-            const laneId = `${boardId}:${columnIndex}`;
+            const laneId = `${boardId ?? organizationId}:${columnIndex}`;
             return (
               <BoardGridLaneColumn
                 boardId={boardId}
@@ -190,7 +188,6 @@ export function BoardGridView({
               >
                 {rows.map((post, postIndex) => (
                   <BoardGridPostCard
-                    boardSlug={boardSlug}
                     column={column}
                     id={post.id}
                     index={postIndex}

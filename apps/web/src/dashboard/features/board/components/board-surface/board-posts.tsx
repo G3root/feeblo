@@ -1,18 +1,4 @@
 import {
-  and,
-  count,
-  eq,
-  inArray,
-  not,
-  or,
-  useLiveSuspenseQuery,
-} from "@tanstack/react-db";
-import {
-  postCollection,
-  postStatusCollection,
-  postTagCollection,
-} from "~/lib/collections";
-import {
   useActiveBoardView,
   useBoardDisplayMode,
 } from "../../state/board-store-context";
@@ -20,15 +6,15 @@ import { BoardGridView } from "./board-grid-view";
 import { BoardListView } from "./board-list-view";
 import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardPostsEmpty } from "./board-posts-empty";
+import { BoardPostsLoading } from "./board-posts-loading";
 import { groupPostsByStatus } from "./utils";
+import { useBoardPostsData } from "./use-board-posts-data";
 
 export function BoardPosts({
   boardId,
-  boardSlug,
   organizationId,
 }: {
-  boardId: string;
-  boardSlug: string;
+  boardId?: string;
   organizationId: string;
 }) {
   const mode = useBoardDisplayMode();
@@ -40,123 +26,23 @@ export function BoardPosts({
     tagIds,
     tagOperator,
   } = activeView.filters;
-  const statusesKey = statuses.join(",");
-  const tagIdsKey = tagIds.join(",");
-  const { data: postStatuses } = useLiveSuspenseQuery(
-    (q) =>
-      q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        ),
-    [organizationId]
-  );
+  const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
+    boardId,
+    organizationId,
+    postStatusFilter,
+    statusOperator,
+    statuses,
+    tagIds,
+    tagOperator,
+  });
 
-  const { data: matchingTagPosts } = useLiveSuspenseQuery(
-    (q) => {
-      const baseQuery = q
-        .from({ postTag: postTagCollection })
-        .where(({ postTag }) => {
-          const conditions = [
-            eq(postTag.organizationId, organizationId),
-            tagIds.length > 0
-              ? inArray(postTag.tagId, tagIds)
-              : eq(postTag.postId, "__no_matching_post__"),
-          ];
+  if (hasError) {
+    throw new Error("Failed to load board posts");
+  }
 
-          return and(conditions[0], conditions[1], ...conditions.slice(2));
-        });
-
-      if (tagOperator === "includeAllOf" || tagOperator === "excludeIfAllOf") {
-        return baseQuery
-          .groupBy(({ postTag }) => postTag.postId)
-          .select(({ postTag }) => ({
-            matchedCount: count(postTag.postId),
-            postId: postTag.postId,
-          }))
-          .having(({ $selected }) => eq($selected.matchedCount, tagIds.length));
-      }
-
-      return baseQuery
-        .select(({ postTag }) => ({
-          postId: postTag.postId,
-        }))
-        .distinct();
-    },
-    [organizationId, tagIdsKey, tagOperator]
-  );
-
-  const matchingTagPostIds = matchingTagPosts.map((entry) => entry.postId);
-  const matchingTagPostIdsKey = matchingTagPostIds.join(",");
-
-  const { data: posts } = useLiveSuspenseQuery(
-    (q) => {
-      return q
-        .from({ post: postCollection })
-        .join(
-          { postStatus: postStatusCollection },
-          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "inner"
-        )
-        .select(({ post, postStatus }) => ({
-          id: post.id,
-          slug: post.slug,
-          statusId: post.statusId,
-          status: postStatus.type,
-          title: post.title,
-          summary: post.content,
-          updatedAt: post.updatedAt,
-        }))
-        .where(({ post, postStatus }) =>
-          and(
-            eq(post.boardId, boardId),
-            eq(post.organizationId, organizationId),
-            ...(postStatusFilter === "backlog"
-              ? [
-                  or(
-                    eq(postStatus.type, "PENDING"),
-                    eq(postStatus.type, "REVIEW")
-                  ),
-                ]
-              : []),
-            ...(postStatusFilter === "active"
-              ? [
-                  or(
-                    eq(postStatus.type, "PLANNED"),
-                    eq(postStatus.type, "IN_PROGRESS")
-                  ),
-                ]
-              : []),
-            ...(statuses.length > 0
-              ? [
-                  statusOperator === "isNot"
-                    ? not(inArray(postStatus.type, statuses))
-                    : inArray(postStatus.type, statuses),
-                ]
-              : []),
-            ...(tagIds.length > 0
-              ? [
-                  tagOperator === "excludeIfAnyOf" ||
-                  tagOperator === "excludeIfAllOf"
-                    ? not(inArray(post.id, matchingTagPostIds))
-                    : inArray(post.id, matchingTagPostIds),
-                ]
-              : [])
-          )
-        )
-        .orderBy((post) => post.post.createdAt, "desc");
-    },
-    [
-      boardId,
-      organizationId,
-      postStatusFilter,
-      statusesKey,
-      statusOperator,
-      tagIdsKey,
-      tagOperator,
-      matchingTagPostIdsKey,
-    ]
-  );
+  if (isLoading) {
+    return <BoardPostsLoading />;
+  }
 
   const groupedPosts = groupPostsByStatus(
     posts,
@@ -177,14 +63,12 @@ export function BoardPosts({
       {mode === "grid" ? (
         <BoardGridView
           boardId={boardId}
-          boardSlug={boardSlug}
           groupedPosts={groupedPosts}
           organizationId={organizationId}
         />
       ) : (
         <BoardListView
           boardId={boardId}
-          boardSlug={boardSlug}
           groupedPosts={groupedPosts}
           organizationId={organizationId}
         />

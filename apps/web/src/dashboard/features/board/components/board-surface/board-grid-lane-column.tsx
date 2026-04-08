@@ -10,7 +10,7 @@ import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
 import { StatusIcon } from "./status-icon";
 
 interface BoardGridLaneColumnProps {
-  boardId: string;
+  boardId?: string;
   children?: React.ReactNode;
   id: string;
   index: number;

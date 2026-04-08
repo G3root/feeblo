@@ -14,6 +14,7 @@ import { toastManager } from "~/components/ui/toast";
 import {
   useBoardStore,
   useSelectedPostIds,
+  useSelectedPosts,
 } from "~/features/board/state/board-store-context";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { postCollection } from "~/lib/collections";
@@ -61,6 +62,7 @@ export function BoardPostBulkActions() {
 function BulkDeleteAlert() {
   const store = useBoardStore();
   const selectedPostIds = useSelectedPostIds();
+  const selectedPosts = useSelectedPosts();
   const open = useSelector(store, (state) => state.context.bulkDeleteOpen);
 
   const organizationId = useOrganizationId();
@@ -91,16 +93,25 @@ function BulkDeleteAlert() {
               }
 
               try {
-                const boardId = store.get().context.boardId;
-                if (!boardId) {
-                  return;
+                const postIdsByBoardId = new Map<string, string[]>();
+
+                for (const selectedPost of selectedPosts) {
+                  const boardPostIds =
+                    postIdsByBoardId.get(selectedPost.boardId) ?? [];
+                  boardPostIds.push(selectedPost.postId);
+                  postIdsByBoardId.set(selectedPost.boardId, boardPostIds);
                 }
-                await fetchRpc((rpc) =>
-                  rpc.PostDelete({
-                    id: selectedPostIds,
-                    boardId,
-                    organizationId,
-                  })
+
+                await Promise.all(
+                  [...postIdsByBoardId.entries()].map(([boardId, postIds]) =>
+                    fetchRpc((rpc) =>
+                      rpc.PostDelete({
+                        id: postIds,
+                        boardId,
+                        organizationId,
+                      })
+                    )
+                  )
                 );
 
                 await postCollection.utils.refetch();

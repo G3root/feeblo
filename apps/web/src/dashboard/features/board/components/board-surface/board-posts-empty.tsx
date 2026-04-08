@@ -13,7 +13,7 @@ export function BoardPostsEmpty({
   boardId,
   organizationId,
 }: {
-  boardId: string;
+  boardId?: string;
   organizationId: string;
 }) {
   const store = usePostCreateDialogContext();
@@ -22,20 +22,27 @@ export function BoardPostsEmpty({
       <EmptyHeader>
         <EmptyTitle>No posts yet</EmptyTitle>
         <EmptyDescription>
-          This board does not have any posts yet. Create one to get started.
+          {boardId
+            ? "This board does not have any posts yet. Create one to get started."
+            : "This workspace does not have any feedback yet."}
         </EmptyDescription>
       </EmptyHeader>
-      <EmptyContent>
-        <PolicyGuard policy={hasMembership(organizationId)}>
-          <Button
-            onClick={() =>
-              store.send({ type: "toggle", data: { boardId, status: "PLANNED" } })
-            }
-          >
-            Create post
-          </Button>
-        </PolicyGuard>
-      </EmptyContent>
+      {boardId ? (
+        <EmptyContent>
+          <PolicyGuard policy={hasMembership(organizationId)}>
+            <Button
+              onClick={() =>
+                store.send({
+                  type: "toggle",
+                  data: { boardId, status: "PLANNED" },
+                })
+              }
+            >
+              Create post
+            </Button>
+          </PolicyGuard>
+        </EmptyContent>
+      ) : null}
     </Empty>
   );
 }
