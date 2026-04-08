@@ -73,6 +73,7 @@ export function useBoardPostsData({
         .where(({ board }) => eq(board.organizationId, organizationId))
         .select(({ board }) => ({
           id: board.id,
+          name: board.name,
           slug: board.slug,
         }));
     },
@@ -199,13 +200,14 @@ export function useBoardPostsData({
     ]
   );
 
-  const boardSlugById = new Map(
-    (boardsQuery.data ?? []).map((board) => [board.id, board.slug])
+  const boardById = new Map(
+    (boardsQuery.data ?? []).map((board) => [board.id, board])
   );
 
   const posts: BoardPostRow[] = (postsQuery.data ?? []).map((post) => ({
     ...post,
-    boardSlug: boardSlugById.get(post.boardId) ?? "",
+    boardName: boardById.get(post.boardId)?.name ?? "",
+    boardSlug: boardById.get(post.boardId)?.slug ?? "",
   }));
 
   return {

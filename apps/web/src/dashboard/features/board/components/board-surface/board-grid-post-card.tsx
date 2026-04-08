@@ -1,11 +1,9 @@
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useNavigate } from "@tanstack/react-router";
 import { memo } from "react";
-import { cn } from "~/lib/utils";
+import { SortableRoadmapIssueCard } from "~/features/roadmap/components";
 import type { BoardPostStatus } from "../../constants";
-import { StatusIcon } from "./status-icon";
 import type { BoardPostRow } from "./types";
-import { formatPostDate } from "./utils";
 
 interface BoardGridPostCardProps {
   column: string;
@@ -36,14 +34,8 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
   });
 
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: <explanation>
-    // biome-ignore lint/a11y/noStaticElementInteractions: <explanation>
-    // biome-ignore lint/a11y/useKeyWithClickEvents: <explanation>
-    <div
-      className={cn(
-        "block rounded-md bg-background p-3 transition-all hover:border-muted-foreground/40 hover:bg-muted/20",
-        isDragging && "opacity-60"
-      )}
+    <SortableRoadmapIssueCard
+      isDragging={isDragging}
       onClick={() =>
         navigate({
           to: "/$organizationId/post/$boardSlug/$postSlug",
@@ -54,20 +46,10 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
           },
         })
       }
-      ref={ref}
-    >
-      <div className="flex justify-between gap-2">
-        <span className="text-muted-foreground text-xs uppercase tracking-wide">
-          {post.title}
-        </span>
-        <div className="flex items-start">
-          <StatusIcon status={group as BoardPostStatus} />
-        </div>
-      </div>
-
-      <div className="mt-3 text-muted-foreground text-xs">
-        {formatPostDate(post.updatedAt)}
-      </div>
-    </div>
+      rootRef={ref}
+      status={group as BoardPostStatus}
+      title={post.title}
+      updatedAt={post.updatedAt}
+    />
   );
 });

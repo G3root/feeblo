@@ -2,6 +2,7 @@ import type { BoardPostStatus } from "../../constants";
 
 export type BoardPostRow = {
   boardId: string;
+  boardName?: string;
   boardSlug: string;
   id: string;
   slug: string;
