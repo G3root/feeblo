@@ -10,15 +10,13 @@ import { defineConfig, envField, fontProviders } from "astro/config";
 export default defineConfig({
   output: "server",
   // adapter: alchemy(),
-  experimental: {
-    fonts: [
-      {
-        provider: fontProviders.google(),
-        name: "Inter",
-        cssVariable: "--font-inter",
-      },
-    ],
-  },
+  fonts: [
+    {
+      provider: fontProviders.google(),
+      name: "Inter",
+      cssVariable: "--font-inter",
+    },
+  ],
 
   vite: {
     ssr: {
@@ -59,10 +57,7 @@ export default defineConfig({
 
   integrations: [
     react({
-      include: [
-        "**/dashboard/**",
-        "**/feature-board/**",
-      ],
+      include: ["**/dashboard/**", "**/feature-board/**"],
     }),
   ],
 });
