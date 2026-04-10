@@ -120,80 +120,84 @@ const toProductValues = (payload: ProductPayload): ProductInsert => ({
   prices: payload.prices,
 });
 
+const makeBillingRepository = Effect.gen(function* () {
+  const db = yield* DB;
+
+  return {
+    createSubscription: (payload: SubscriptionPayload) =>
+      db.insert(subscriptionTable).values(toSubscriptionValues(payload)),
+    upsertSubscription: (payload: SubscriptionPayload) =>
+      Effect.gen(function* () {
+        const existingSubscription = yield* db
+          .select({ id: subscriptionTable.id })
+          .from(subscriptionTable)
+          .where(eq(subscriptionTable.externalId, payload.id))
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        if (Option.isSome(existingSubscription)) {
+          const { id: _id, ...values } = toSubscriptionValues(payload);
+
+          yield* db
+            .update(subscriptionTable)
+            .set({
+              ...values,
+              updatedAt: new Date(),
+            })
+            .where(eq(subscriptionTable.externalId, payload.id));
+          return;
+        }
+
+        yield* db
+          .insert(subscriptionTable)
+          .values(toSubscriptionValues(payload));
+      }),
+    createProduct: (payload: ProductPayload) =>
+      db.insert(productTable).values(toProductValues(payload)),
+    upsertProduct: (payload: ProductPayload) =>
+      Effect.gen(function* () {
+        const existingProduct = yield* db
+          .select({ id: productTable.id })
+          .from(productTable)
+          .where(eq(productTable.id, payload.id))
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        if (Option.isSome(existingProduct)) {
+          yield* db
+            .update(productTable)
+            .set({
+              ...toProductValues(payload),
+              updatedAt: payload.modifiedAt ?? new Date(),
+            })
+            .where(eq(productTable.id, payload.id));
+          return;
+        }
+
+        yield* db.insert(productTable).values(toProductValues(payload));
+      }),
+    findSubscriptionByOrganizationId: ({
+      organizationId,
+    }: {
+      organizationId: string;
+    }) =>
+      db
+        .select({
+          id: subscriptionTable.id,
+          customerId: subscriptionTable.customerId,
+          organizationId: subscriptionTable.organizationId,
+        })
+        .from(subscriptionTable)
+        .where(eq(subscriptionTable.organizationId, organizationId))
+        .pipe(Effect.map(EffectArray.get(0))),
+  };
+});
+
 export class BillingRepository extends Effect.Service<BillingRepository>()(
   "BillingRepository",
   {
-    effect: Effect.gen(function* () {
-      const db = yield* DB;
-
-      return {
-        createSubscription: (payload: SubscriptionPayload) =>
-          db.insert(subscriptionTable).values(toSubscriptionValues(payload)),
-        upsertSubscription: (payload: SubscriptionPayload) =>
-          Effect.gen(function* () {
-            const existingSubscription = yield* db
-              .select({ id: subscriptionTable.id })
-              .from(subscriptionTable)
-              .where(eq(subscriptionTable.externalId, payload.id))
-              .limit(1)
-              .pipe(Effect.map(EffectArray.get(0)));
-
-            if (Option.isSome(existingSubscription)) {
-              const { id: _id, ...values } = toSubscriptionValues(payload);
-
-              yield* db
-                .update(subscriptionTable)
-                .set({
-                  ...values,
-                  updatedAt: new Date(),
-                })
-                .where(eq(subscriptionTable.externalId, payload.id));
-              return;
-            }
-
-            yield* db
-              .insert(subscriptionTable)
-              .values(toSubscriptionValues(payload));
-          }),
-        createProduct: (payload: ProductPayload) =>
-          db.insert(productTable).values(toProductValues(payload)),
-        upsertProduct: (payload: ProductPayload) =>
-          Effect.gen(function* () {
-            const existingProduct = yield* db
-              .select({ id: productTable.id })
-              .from(productTable)
-              .where(eq(productTable.id, payload.id))
-              .limit(1)
-              .pipe(Effect.map(EffectArray.get(0)));
-
-            if (Option.isSome(existingProduct)) {
-              yield* db
-                .update(productTable)
-                .set({
-                  ...toProductValues(payload),
-                  updatedAt: payload.modifiedAt ?? new Date(),
-                })
-                .where(eq(productTable.id, payload.id));
-              return;
-            }
-
-            yield* db.insert(productTable).values(toProductValues(payload));
-          }),
-        findSubscriptionByOrganizationId: ({
-          organizationId,
-        }: {
-          organizationId: string;
-        }) =>
-          db
-            .select({
-              id: subscriptionTable.id,
-              customerId: subscriptionTable.customerId,
-              organizationId: subscriptionTable.organizationId,
-            })
-            .from(subscriptionTable)
-            .where(eq(subscriptionTable.organizationId, organizationId))
-            .pipe(Effect.map(EffectArray.get(0))),
-      };
-    }),
+    effect: makeBillingRepository,
   }
-) {}
+) {
+  static readonly layer = this.Default;
+}

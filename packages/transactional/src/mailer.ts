@@ -74,76 +74,78 @@ const optionalInteger = (name: string) =>
     })
   );
 
+const makeMailer = Effect.gen(function* () {
+  const host = yield* optionalString("SMTP_HOST").pipe(
+    Effect.map((value) => (value._tag === "Some" ? value.value : "127.0.0.1"))
+  );
+  const port = yield* optionalInteger("SMTP_PORT").pipe(
+    Effect.map((value) => value ?? 2500)
+  );
+  const secure = yield* optionalBoolean("SMTP_SECURE").pipe(
+    Effect.map((value) => value ?? false)
+  );
+  const ignoreTLS = yield* optionalBoolean("SMTP_UNSAFE_IGNORE_TLS").pipe(
+    Effect.map((value) => value ?? false)
+  );
+  const service = yield* optionalString("SMTP_SERVICE");
+  const username = yield* optionalString("SMTP_USERNAME");
+  const password = yield* Config.redacted("SMTP_PASSWORD").pipe(Config.option);
+  const defaultFrom = yield* optionalString("MAILER_FROM").pipe(
+    Effect.map((value) =>
+      value._tag === "Some" ? value.value : "Feeblo <noreply@feeblo.com>"
+    )
+  );
+
+  const transport = createTransport({
+    host,
+    port,
+    secure,
+    ignoreTLS,
+    auth:
+      username._tag === "Some"
+        ? {
+            user: username.value,
+            ...(password._tag === "Some"
+              ? { pass: Redacted.value(password.value) }
+              : {}),
+          }
+        : undefined,
+    ...(service._tag === "Some" ? { service: service.value } : {}),
+  });
+
+  return {
+    send: Effect.fn("Mailer.send")(function* ({
+      from,
+      react,
+      replyTo,
+      subject,
+      to,
+    }: MailMessage) {
+      const html = yield* Effect.tryPromise({
+        try: () => render(react),
+        catch: (cause) => new MailTemplateRenderError({ subject, cause }),
+      });
+
+      const text = toPlainText(html);
+
+      yield* Effect.tryPromise({
+        try: () =>
+          transport.sendMail({
+            to,
+            subject,
+            html,
+            text,
+            from: from ?? defaultFrom,
+            ...(replyTo ? { replyTo } : {}),
+          }),
+        catch: (cause) => new MailDeliveryError({ subject, cause }),
+      });
+    }),
+  };
+});
+
 export class Mailer extends Effect.Service<Mailer>()("Mailer", {
-  effect: Effect.gen(function* () {
-    const host = yield* optionalString("SMTP_HOST").pipe(
-      Effect.map((value) => (value._tag === "Some" ? value.value : "127.0.0.1"))
-    );
-    const port = yield* optionalInteger("SMTP_PORT").pipe(
-      Effect.map((value) => value ?? 2500)
-    );
-    const secure = yield* optionalBoolean("SMTP_SECURE").pipe(
-      Effect.map((value) => value ?? false)
-    );
-    const ignoreTLS = yield* optionalBoolean("SMTP_UNSAFE_IGNORE_TLS").pipe(
-      Effect.map((value) => value ?? false)
-    );
-    const service = yield* optionalString("SMTP_SERVICE");
-    const username = yield* optionalString("SMTP_USERNAME");
-    const password = yield* Config.redacted("SMTP_PASSWORD").pipe(
-      Config.option
-    );
-    const defaultFrom = yield* optionalString("MAILER_FROM").pipe(
-      Effect.map((value) =>
-        value._tag === "Some" ? value.value : "Feeblo <noreply@feeblo.com>"
-      )
-    );
-
-    const transport = createTransport({
-      host,
-      port,
-      secure,
-      ignoreTLS,
-      auth:
-        username._tag === "Some"
-          ? {
-              user: username.value,
-              ...(password._tag === "Some"
-                ? { pass: Redacted.value(password.value) }
-                : {}),
-            }
-          : undefined,
-      ...(service._tag === "Some" ? { service: service.value } : {}),
-    });
-
-    return {
-      send: Effect.fn("Mailer.send")(function* ({
-        from,
-        react,
-        replyTo,
-        subject,
-        to,
-      }: MailMessage) {
-        const html = yield* Effect.tryPromise({
-          try: () => render(react),
-          catch: (cause) => new MailTemplateRenderError({ subject, cause }),
-        });
-
-        const text = toPlainText(html);
-
-        yield* Effect.tryPromise({
-          try: () =>
-            transport.sendMail({
-              to,
-              subject,
-              html,
-              text,
-              from: from ?? defaultFrom,
-              ...(replyTo ? { replyTo } : {}),
-            }),
-          catch: (cause) => new MailDeliveryError({ subject, cause }),
-        });
-      }),
-    };
-  }),
-}) {}
+  effect: makeMailer,
+}) {
+  static readonly layer = this.Default;
+}

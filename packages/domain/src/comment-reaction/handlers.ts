@@ -17,15 +17,15 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             postId: args.postId,
           })
           .pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list comment reactions",
-                })
-              ),
-          })
-        ),
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to list comment reactions",
+                  })
+                ),
+            })
+          ),
       CommentReactionToggle: (args: TCommentReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -48,4 +48,4 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(CommentReactionRepository.Default));
+).pipe(Layer.provide(CommentReactionRepository.layer));

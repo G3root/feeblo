@@ -32,9 +32,9 @@ export const initAuthHandler = () =>
     const db = yield* DB;
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
-        PolarService.Default,
-        BillingRepository.Default,
-        Mailer.Default
+        PolarService.layer,
+        BillingRepository.layer,
+        Mailer.layer
       ).pipe(Layer.provide(Layer.succeed(DB, db)))
     );
 
@@ -118,7 +118,9 @@ export const initAuthHandler = () =>
                           await callbackRuntime
                             .runPromise(
                               BillingRepository.use((billingRepository) =>
-                                billingRepository.upsertSubscription(payload.data)
+                                billingRepository.upsertSubscription(
+                                  payload.data
+                                )
                               )
                             )
                             .then(() => undefined);
@@ -169,14 +171,14 @@ export const initAuthHandler = () =>
             await callbackRuntime.runPromise(
               Mailer.use((mailer) =>
                 mailer.send({
-                to: data.email,
-                ...createOrganizationInvitationEmail({
-                  inviteUrl: inviteLink,
-                  organizationName: data.organization.name,
-                  inviterName: data.inviter.user.name,
-                  role: data.role,
-                }),
-              })
+                  to: data.email,
+                  ...createOrganizationInvitationEmail({
+                    inviteUrl: inviteLink,
+                    organizationName: data.organization.name,
+                    inviterName: data.inviter.user.name,
+                    role: data.role,
+                  }),
+                })
               )
             );
           },
@@ -197,12 +199,12 @@ export const initAuthHandler = () =>
             await callbackRuntime.runPromise(
               Mailer.use((mailer) =>
                 mailer.send({
-                to: email,
-                ...createVerificationOtpEmail({
-                  otp,
-                  flowLabel,
-                }),
-              })
+                  to: email,
+                  ...createVerificationOtpEmail({
+                    otp,
+                    flowLabel,
+                  }),
+                })
               )
             );
           },
@@ -212,11 +214,7 @@ export const initAuthHandler = () =>
     return betterAuth(config);
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(
-        PolarService.Default,
-        BillingRepository.Default,
-        Mailer.Default
-      )
+      Layer.mergeAll(PolarService.layer, BillingRepository.layer, Mailer.layer)
     )
   );
 

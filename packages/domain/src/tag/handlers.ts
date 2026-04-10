@@ -237,4 +237,4 @@ export const TagRpcHandlers = TagRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(TagRepository.Default));
+).pipe(Layer.provide(TagRepository.layer));

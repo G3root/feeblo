@@ -25,30 +25,38 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
 
     return {
       CommentList: (args: TCommentList) =>
-        repository.findMany({
-          organizationId: args.organizationId,
-          postId: args.postId,
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list comments" })
-              ),
+        repository
+          .findMany({
+            organizationId: args.organizationId,
+            postId: args.postId,
           })
-        ),
+          .pipe(
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to list comments",
+                  })
+                ),
+            })
+          ),
       CommentListPublic: (args: TCommentList) =>
-        repository.findMany({
-          organizationId: args.organizationId,
-          postId: args.postId,
-          visibility: "PUBLIC",
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list comments" })
-              ),
+        repository
+          .findMany({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            visibility: "PUBLIC",
           })
-        ),
+          .pipe(
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to list comments",
+                  })
+                ),
+            })
+          ),
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -143,6 +151,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
     };
   })
 ).pipe(
-  Layer.provide(CommentPolicy.Default),
-  Layer.provide(CommentRepository.Default)
+  Layer.provide(CommentPolicy.layer),
+  Layer.provide(CommentRepository.layer)
 );

@@ -68,5 +68,5 @@ export const BillingRpcHandlers = BillingRpcs.toLayer(
     };
   })
 ).pipe(
-  Layer.provide(Layer.mergeAll(PolarService.Default, BillingRepository.Default))
+  Layer.provide(Layer.mergeAll(PolarService.layer, BillingRepository.layer))
 );

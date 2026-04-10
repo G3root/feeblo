@@ -11,34 +11,38 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
 
     return {
       SiteList: (args: TSiteList) =>
-        repository.findMany({
-          organizationId: args.organizationId,
-          limit: 1,
-        }).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list Sites",
-                })
-              ),
+        repository
+          .findMany({
+            organizationId: args.organizationId,
+            limit: 1,
           })
-        ),
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to list Sites",
+                  })
+                ),
+            })
+          ),
       SiteListBySubdomain: (args: TSiteListBySubdomain) =>
-        repository.findMany({
-          subdomain: args.subdomain,
-          limit: 1,
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list Sites by subdomain",
-                })
-              ),
+        repository
+          .findMany({
+            subdomain: args.subdomain,
+            limit: 1,
           })
-        ),
+          .pipe(
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to list Sites by subdomain",
+                  })
+                ),
+            })
+          ),
       SiteUpdate: (args: TSiteUpdate) =>
         repository.update(args).pipe(
           Policy.withPolicy(
@@ -58,4 +62,4 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(SiteRepository.Default));
+).pipe(Layer.provide(SiteRepository.layer));

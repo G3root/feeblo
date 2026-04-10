@@ -125,7 +125,4 @@ export const PostRpcHandlers = PostRpcs.toLayer(
       },
     };
   })
-).pipe(
-  Layer.provide(PostPolicy.Default),
-  Layer.provide(PostRepository.Default)
-);
+).pipe(Layer.provide(PostPolicy.layer), Layer.provide(PostRepository.layer));

@@ -22,83 +22,94 @@ type TFindByCreatorId = {
   memberId: string;
 };
 
-export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
-  "ChangelogRepository",
-  {
-    effect: Effect.gen(function* () {
-      const db = yield* DB;
+const makeChangelogRepository = Effect.gen(function* () {
+  const db = yield* DB;
 
-      return {
-        findByCreatorId: ({ id, organizationId, memberId }: TFindByCreatorId) =>
-          db
-            .select({ id: changelogTable.id })
-            .from(changelogTable)
-            .where(
-              and(
-                eq(changelogTable.id, id),
-                eq(changelogTable.organizationId, organizationId),
-                eq(changelogTable.creatorMemberId, memberId)
-              )
-            )
-            .pipe(Effect.map(EffectArray.get(0))),
+  return {
+    findByCreatorId: ({ id, organizationId, memberId }: TFindByCreatorId) =>
+      db
+        .select({ id: changelogTable.id })
+        .from(changelogTable)
+        .where(
+          and(
+            eq(changelogTable.id, id),
+            eq(changelogTable.organizationId, organizationId),
+            eq(changelogTable.creatorMemberId, memberId)
+          )
+        )
+        .pipe(Effect.map(EffectArray.get(0))),
 
-        findMany: ({ organizationId }: TChangelogList) =>
-          db
-            .select({
-              id: changelogTable.id,
-              title: changelogTable.title,
-              slug: changelogTable.slug,
-              content: changelogTable.content,
-              status: changelogTable.status,
-              scheduledAt: changelogTable.scheduledAt,
-              publishedAt: changelogTable.publishedAt,
-              organizationId: changelogTable.organizationId,
-              creatorMemberId: changelogTable.creatorMemberId,
-              creatorId: changelogTable.creatorId,
-              createdAt: changelogTable.createdAt,
-              updatedAt: changelogTable.updatedAt,
-              user: {
-                name: sql<string | null>`${userTable.name}`,
-                image: sql<string | null>`${userTable.image}`,
-              },
-            })
-            .from(changelogTable)
-            .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
-            .where(eq(changelogTable.organizationId, organizationId)),
+    findMany: ({ organizationId }: TChangelogList) =>
+      db
+        .select({
+          id: changelogTable.id,
+          title: changelogTable.title,
+          slug: changelogTable.slug,
+          content: changelogTable.content,
+          status: changelogTable.status,
+          scheduledAt: changelogTable.scheduledAt,
+          publishedAt: changelogTable.publishedAt,
+          organizationId: changelogTable.organizationId,
+          creatorMemberId: changelogTable.creatorMemberId,
+          creatorId: changelogTable.creatorId,
+          createdAt: changelogTable.createdAt,
+          updatedAt: changelogTable.updatedAt,
+          user: {
+            name: sql<string | null>`${userTable.name}`,
+            image: sql<string | null>`${userTable.image}`,
+          },
+        })
+        .from(changelogTable)
+        .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
+        .where(eq(changelogTable.organizationId, organizationId)),
 
-        findManyPublished: ({ organizationId }: TChangelogList) =>
-          db
-            .select({
-              id: changelogTable.id,
-              title: changelogTable.title,
-              slug: changelogTable.slug,
-              content: changelogTable.content,
-              status: changelogTable.status,
-              scheduledAt: changelogTable.scheduledAt,
-              publishedAt: changelogTable.publishedAt,
-              organizationId: changelogTable.organizationId,
-              creatorMemberId: changelogTable.creatorMemberId,
-              creatorId: changelogTable.creatorId,
-              createdAt: changelogTable.createdAt,
-              updatedAt: changelogTable.updatedAt,
-              user: {
-                name: sql<string | null>`${userTable.name}`,
-                image: sql<string | null>`${userTable.image}`,
-              },
-            })
-            .from(changelogTable)
-            .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
-            .where(
-              and(
-                eq(changelogTable.organizationId, organizationId),
-                eq(changelogTable.status, "published")
-              )
-            ),
+    findManyPublished: ({ organizationId }: TChangelogList) =>
+      db
+        .select({
+          id: changelogTable.id,
+          title: changelogTable.title,
+          slug: changelogTable.slug,
+          content: changelogTable.content,
+          status: changelogTable.status,
+          scheduledAt: changelogTable.scheduledAt,
+          publishedAt: changelogTable.publishedAt,
+          organizationId: changelogTable.organizationId,
+          creatorMemberId: changelogTable.creatorMemberId,
+          creatorId: changelogTable.creatorId,
+          createdAt: changelogTable.createdAt,
+          updatedAt: changelogTable.updatedAt,
+          user: {
+            name: sql<string | null>`${userTable.name}`,
+            image: sql<string | null>`${userTable.image}`,
+          },
+        })
+        .from(changelogTable)
+        .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
+        .where(
+          and(
+            eq(changelogTable.organizationId, organizationId),
+            eq(changelogTable.status, "published")
+          )
+        ),
 
-        create: ({
+    create: ({
+      id,
+      title,
+      slug,
+      content,
+      status,
+      scheduledAt,
+      publishedAt,
+      organizationId,
+      creatorId,
+      creatorMemberId,
+    }: TChangelogCreateInternal) =>
+      db
+        .insert(changelogTable)
+        .values({
           id,
           title,
-          slug,
+          slug: slug || slugify(title),
           content,
           status,
           scheduledAt,
@@ -106,65 +117,58 @@ export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
           organizationId,
           creatorId,
           creatorMemberId,
-        }: TChangelogCreateInternal) =>
-          db
-            .insert(changelogTable)
-            .values({
-              id,
-              title,
-              slug: slug || slugify(title),
-              content,
-              status,
-              scheduledAt,
-              publishedAt,
-              organizationId,
-              creatorId,
-              creatorMemberId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .pipe(Effect.asVoid),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .pipe(Effect.asVoid),
 
-        update: ({
-          id,
+    update: ({
+      id,
+      title,
+      slug,
+      content,
+      status,
+      scheduledAt,
+      publishedAt,
+      organizationId,
+    }: TChangelogUpdate) =>
+      db
+        .update(changelogTable)
+        .set({
           title,
-          slug,
+          slug: slug || slugify(title),
           content,
           status,
           scheduledAt,
           publishedAt,
-          organizationId,
-        }: TChangelogUpdate) =>
-          db
-            .update(changelogTable)
-            .set({
-              title,
-              slug: slug || slugify(title),
-              content,
-              status,
-              scheduledAt,
-              publishedAt,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(changelogTable.id, id),
-                eq(changelogTable.organizationId, organizationId)
-              )
-            )
-            .pipe(Effect.asVoid),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(changelogTable.id, id),
+            eq(changelogTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
 
-        delete: ({ id, organizationId }: TChangelogDelete) =>
-          db
-            .delete(changelogTable)
-            .where(
-              and(
-                eq(changelogTable.id, id),
-                eq(changelogTable.organizationId, organizationId)
-              )
-            )
-            .pipe(Effect.asVoid),
-      };
-    }),
+    delete: ({ id, organizationId }: TChangelogDelete) =>
+      db
+        .delete(changelogTable)
+        .where(
+          and(
+            eq(changelogTable.id, id),
+            eq(changelogTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
+  };
+});
+
+export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
+  "ChangelogRepository",
+  {
+    effect: makeChangelogRepository,
   }
-) {}
+) {
+  static readonly layer = this.Default;
+}

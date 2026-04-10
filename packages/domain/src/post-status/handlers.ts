@@ -43,4 +43,4 @@ export const PostStatusRpcHandlers = PostStatusRpcs.toLayer(
           ),
     };
   })
-).pipe(Layer.provide(PostStatusRepository.Default));
+).pipe(Layer.provide(PostStatusRepository.layer));

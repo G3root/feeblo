@@ -44,65 +44,69 @@ export const S3Layer = Layer.unwrapEffect(
 const PROFILE_IMAGE_PREFIX = "profile-images";
 const EDITOR_MEDIA_PREFIX = "editor-media";
 
+const makeS3UploadService = Effect.gen(function* () {
+  const config = yield* S3ConfigSchema;
+  const bucket = config.publicBucketName;
+  const fileSystem = yield* FileSystem.FileSystem;
+  const resolvePublicUrl = (fileKey: string) => {
+    const encodedKey = fileKey
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+    const baseUrl =
+      config.publicBaseUrl._tag === "Some"
+        ? config.publicBaseUrl.value.replace(/\/$/, "")
+        : `${config.endpoint.replace(/\/$/, "")}/${bucket}`;
+
+    return {
+      bucket,
+      key: fileKey,
+      url: `${baseUrl}/${encodedKey}`,
+    };
+  };
+
+  return {
+    uploadProfileImage: ({
+      bytes,
+      extension,
+      userId,
+    }: {
+      bytes: Uint8Array;
+      extension: string;
+      userId: string;
+    }) =>
+      Effect.gen(function* () {
+        const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        yield* fileSystem.writeFile(fileKey, bytes);
+        return resolvePublicUrl(fileKey);
+      }),
+    uploadEditorMedia: ({
+      bytes,
+      extension,
+      kind,
+      userId,
+    }: {
+      bytes: Uint8Array;
+      extension: string;
+      kind: "image" | "video";
+      userId: string;
+    }) =>
+      Effect.gen(function* () {
+        const fileKey = `${EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        yield* fileSystem.writeFile(fileKey, bytes);
+        return resolvePublicUrl(fileKey);
+      }),
+  };
+});
+
 export class S3UploadService extends Effect.Service<S3UploadService>()(
   "S3UploadService",
   {
-    effect: Effect.gen(function* () {
-      const config = yield* S3ConfigSchema;
-      const bucket = config.publicBucketName;
-      const fileSystem = yield* FileSystem.FileSystem;
-      const resolvePublicUrl = (fileKey: string) => {
-        const encodedKey = fileKey
-          .split("/")
-          .map((segment) => encodeURIComponent(segment))
-          .join("/");
-        const baseUrl =
-          config.publicBaseUrl._tag === "Some"
-            ? config.publicBaseUrl.value.replace(/\/$/, "")
-            : `${config.endpoint.replace(/\/$/, "")}/${bucket}`;
-
-        return {
-          bucket,
-          key: fileKey,
-          url: `${baseUrl}/${encodedKey}`,
-        };
-      };
-
-      return {
-        uploadProfileImage: ({
-          bytes,
-          extension,
-          userId,
-        }: {
-          bytes: Uint8Array;
-          extension: string;
-          userId: string;
-        }) =>
-          Effect.gen(function* () {
-            const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
-            yield* fileSystem.writeFile(fileKey, bytes);
-            return resolvePublicUrl(fileKey);
-          }),
-        uploadEditorMedia: ({
-          bytes,
-          extension,
-          kind,
-          userId,
-        }: {
-          bytes: Uint8Array;
-          extension: string;
-          kind: "image" | "video";
-          userId: string;
-        }) =>
-          Effect.gen(function* () {
-            const fileKey = `${EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
-            yield* fileSystem.writeFile(fileKey, bytes);
-            return resolvePublicUrl(fileKey);
-          }),
-      };
-    }),
+    effect: makeS3UploadService,
   }
-) {}
+) {
+  static readonly layer = this.Default;
+}
 
 export const S3UploadServiceLive = Layer.unwrapEffect(
   Config.string("MEDIA_PUBLIC_BUCKET_NAME").pipe(
@@ -111,7 +115,7 @@ export const S3UploadServiceLive = Layer.unwrapEffect(
         Layer.provide(S3Layer)
       );
 
-      return S3UploadService.Default.pipe(Layer.provide(S3FileSystemLive));
+      return S3UploadService.layer.pipe(Layer.provide(S3FileSystemLive));
     })
   )
 );

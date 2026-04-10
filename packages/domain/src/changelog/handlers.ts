@@ -108,6 +108,6 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
     };
   })
 ).pipe(
-  Layer.provide(ChangelogPolicy.Default),
-  Layer.provide(ChangelogRepository.Default)
+  Layer.provide(ChangelogPolicy.layer),
+  Layer.provide(ChangelogRepository.layer)
 );

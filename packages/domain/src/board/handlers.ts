@@ -29,14 +29,14 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             organizationId: args.organizationId,
           })
           .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list boards" })
-              ),
-          })
-        ),
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({ message: "Failed to list boards" })
+                ),
+            })
+          ),
       BoardListPublic: (args: TBoardList) =>
         repository
           .findMany({
@@ -44,13 +44,13 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             visibility: "PUBLIC",
           })
           .pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list boards" })
-              ),
-          })
-        ),
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({ message: "Failed to list boards" })
+                ),
+            })
+          ),
       BoardDelete: (args: TBoardDelete) => {
         return Effect.gen(function* () {
           yield* requireOrganizationMembership(args.organizationId);
@@ -114,7 +114,4 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
         ),
     };
   })
-).pipe(
-  Layer.provide(BoardRepository.Default),
-  Layer.provide(BoardPolicy.Default)
-);
+).pipe(Layer.provide(BoardRepository.layer), Layer.provide(BoardPolicy.layer));

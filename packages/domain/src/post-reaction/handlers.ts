@@ -17,15 +17,15 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             organizationId: args.organizationId,
           })
           .pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list post reactions",
-                })
-              ),
-          })
-        ),
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to list post reactions",
+                  })
+                ),
+            })
+          ),
       PostReactionToggle: (args: TPostReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -48,4 +48,4 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(PostReactionRepository.Default));
+).pipe(Layer.provide(PostReactionRepository.layer));

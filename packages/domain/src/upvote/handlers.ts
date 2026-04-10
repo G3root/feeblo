@@ -17,15 +17,15 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             organizationId: args.organizationId,
           })
           .pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list upvotes",
-                })
-              ),
-          })
-        ),
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to list upvotes",
+                  })
+                ),
+            })
+          ),
       UpvoteToggle: (args: TUpvoteToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -47,4 +47,4 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(UpvoteRepository.Default));
+).pipe(Layer.provide(UpvoteRepository.layer));

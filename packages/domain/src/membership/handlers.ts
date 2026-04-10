@@ -156,6 +156,6 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
     };
   })
 ).pipe(
-  Layer.provide(MembershipRepository.Default),
-  Layer.provide(MembershipPolicy.Default)
+  Layer.provide(MembershipRepository.layer),
+  Layer.provide(MembershipPolicy.layer)
 );

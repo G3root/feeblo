@@ -19,7 +19,9 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
 
           const slug = slugify(workspaceName);
           if (!slug) {
-            return yield* new BadRequestError({ message: "Invalid workspace name" });
+            return yield* new BadRequestError({
+              message: "Invalid workspace name",
+            });
           }
 
           const isSlugTaken = yield* repository.isOrganizationSlugTaken({
@@ -79,4 +81,4 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
           ),
     };
   })
-).pipe(Layer.provide(WorkspaceRepository.Default));
+).pipe(Layer.provide(WorkspaceRepository.layer));
