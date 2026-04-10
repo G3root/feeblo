@@ -1,8 +1,13 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import {
+  FailedToCreatePostError,
+  FailedToDeletePostError,
+  FailedToUpdatePostError,
+} from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -28,7 +33,12 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list posts" })
+              ),
+          })
         );
       },
       PostListPublic: (args: TPostList) => {
@@ -43,7 +53,14 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             boardId: args.boardId,
             userId,
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list posts" })
+              ),
+          })
+        );
       },
       PostDelete: (args: TPostDelete) => {
         return repository
@@ -63,7 +80,9 @@ export const PostRpcHandlers = PostRpcs.toLayer(
                 })
               )
             ),
-            Effect.catchAll(onInternalServerError)
+            Effect.catchTags({
+              SqlError: () => Effect.fail(new FailedToDeletePostError()),
+            })
           );
       },
       PostUpdate: (args: TPostUpdate) => {
@@ -80,7 +99,9 @@ export const PostRpcHandlers = PostRpcs.toLayer(
                 })
               )
             ),
-            Effect.catchAll(onInternalServerError)
+            Effect.catchTags({
+              SqlError: () => Effect.fail(new FailedToUpdatePostError()),
+            })
           );
       },
       PostCreate: (args: TPostCreate) => {
@@ -96,7 +117,11 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             creatorId: session.session.userId,
             ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToCreatePostError()),
+          })
+        );
       },
     };
   })

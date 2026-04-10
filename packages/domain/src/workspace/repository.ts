@@ -14,6 +14,7 @@ import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq } from "drizzle-orm";
 import { Effect, Array as EffectArray, Option } from "effect";
+import { FailedToCreateWorkspaceError } from "./errors";
 
 export class WorkspaceRepository extends Effect.Service<WorkspaceRepository>()(
   "WorkspaceRepository",
@@ -55,7 +56,9 @@ export class WorkspaceRepository extends Effect.Service<WorkspaceRepository>()(
 
             if (Option.isNone(organization)) {
               return yield* Effect.fail(
-                new Error("Failed to create organization")
+                new FailedToCreateWorkspaceError({
+                  message: "Failed to create organization",
+                })
               );
             }
             const organizationId = organization.value.id;

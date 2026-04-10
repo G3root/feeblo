@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { UpvoteRepository } from "./repository";
 import { UpvoteRpcs } from "./rpcs";
@@ -16,7 +16,16 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             postId: args.postId,
             organizationId: args.organizationId,
           });
-        }).pipe(Effect.catchAll(onInternalServerError)),
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list upvotes",
+                })
+              ),
+          })
+        ),
       UpvoteToggle: (args: TUpvoteToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -26,7 +35,16 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             postId: args.postId,
             userId: session.session.userId,
           });
-        }).pipe(Effect.catchAll(onInternalServerError)),
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to toggle upvote",
+                })
+              ),
+          })
+        ),
     };
   })
 ).pipe(Layer.provide(UpvoteRepository.Default));

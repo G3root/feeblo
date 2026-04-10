@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
@@ -16,7 +16,16 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             organizationId: args.organizationId,
             postId: args.postId,
           });
-        }).pipe(Effect.catchAll(onInternalServerError)),
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list comment reactions",
+                })
+              ),
+          })
+        ),
       CommentReactionToggle: (args: TCommentReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -27,7 +36,16 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             userId: session.session.userId,
             emoji: args.emoji,
           });
-        }).pipe(Effect.catchAll(onInternalServerError)),
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to toggle comment reaction",
+                })
+              ),
+          })
+        ),
     };
   })
 ).pipe(Layer.provide(CommentReactionRepository.Default));

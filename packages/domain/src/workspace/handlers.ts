@@ -1,12 +1,7 @@
 import { slugify } from "@feeblo/utils/url";
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import {
-  BadRequestError,
-  mapToInternalServerError,
-  onInternalServerError,
-  UnauthorizedError,
-} from "../rpc-errors";
+import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "./repository";
 import { WorkspaceRpcs } from "./rpcs";
@@ -41,22 +36,35 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
             );
           }
 
-          const organizationId =
-            yield* repository.createWorkspace({
-              userId: session.session.userId,
-              workspaceName,
-              slug,
-            });
+          const organizationId = yield* repository.createWorkspace({
+            userId: session.session.userId,
+            workspaceName,
+            slug,
+          });
 
           return { organizationId };
         }).pipe(
-          Effect.mapError(
-            mapToInternalServerError(UnauthorizedError, BadRequestError)
-          )
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to create workspace",
+                })
+              ),
+          })
         );
       },
       WorkspaceProductList: () =>
-        repository.findProducts().pipe(Effect.catchAll(onInternalServerError)),
+        repository.findProducts().pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list workspace products",
+                })
+              ),
+          })
+        ),
       WorkspaceSubscriptionGet: (args: TWorkspaceInput) =>
         repository
           .findSubscriptionByOrganizationId({
@@ -64,7 +72,14 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
           })
           .pipe(
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            Effect.catchAll(onInternalServerError)
+            Effect.catchTags({
+              SqlError: () =>
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to get workspace subscription",
+                  })
+                ),
+            })
           ),
     };
   })

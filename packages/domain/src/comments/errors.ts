@@ -1,5 +1,6 @@
 import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
+import { PolicyDeniedError } from "../policy";
 import { InternalServerError, UnauthorizedError } from "../rpc-errors";
 
 export class FailedToDeleteCommentError extends Schema.TaggedError<FailedToDeleteCommentError>()(
@@ -38,5 +39,8 @@ export class FailedToCreateCommentError extends Schema.TaggedError<FailedToCreat
 export const CommentServiceErrors = Schema.Union(
   UnauthorizedError,
   InternalServerError,
-  FailedToDeleteCommentError
+  PolicyDeniedError,
+  FailedToDeleteCommentError,
+  FailedToUpdateCommentError,
+  FailedToCreateCommentError
 );

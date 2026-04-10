@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
@@ -16,7 +16,16 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             postId: args.postId,
             organizationId: args.organizationId,
           });
-        }).pipe(Effect.catchAll(onInternalServerError)),
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list post reactions",
+                })
+              ),
+          })
+        ),
       PostReactionToggle: (args: TPostReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -27,7 +36,16 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             userId: session.session.userId,
             emoji: args.emoji,
           });
-        }).pipe(Effect.catchAll(onInternalServerError)),
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to toggle post reaction",
+                })
+              ),
+          })
+        ),
     };
   })
 ).pipe(Layer.provide(PostReactionRepository.Default));

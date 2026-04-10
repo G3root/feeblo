@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import { requireOrganizationMembership } from "../authorization";
 import * as Policy from "../policy";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import {
   FailedToCreateBoardError,
@@ -30,7 +30,12 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list boards" })
+              ),
+          })
         );
       },
       BoardListPublic: (args: TBoardList) => {
@@ -39,7 +44,14 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             organizationId: args.organizationId,
             visibility: "PUBLIC",
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list boards" })
+              ),
+          })
+        );
       },
       BoardDelete: (args: TBoardDelete) => {
         return Effect.gen(function* () {
@@ -60,8 +72,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           ),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToDeleteBoardError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         );
       },
       BoardCreate: (args: TBoardCreate) => {
@@ -87,8 +98,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToCreateBoardError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         );
       },
       BoardUpdate: (args: TBoardUpdate) => {
@@ -106,8 +116,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           ),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToUpdateBoardError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         );
       },
     };

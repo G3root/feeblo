@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { BadRequestError, onInternalServerError } from "../rpc-errors";
+import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { BillingRepository } from "./repository";
 import { BillingRpcs } from "./rpcs";
@@ -58,7 +58,14 @@ export const BillingRpcHandlers = BillingRpcs.toLayer(
               Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
             )
           ),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to create billing portal",
+                })
+              ),
+          })
         ),
     };
   })

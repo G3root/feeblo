@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
 import {
@@ -30,7 +30,14 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             organizationId: args.organizationId,
             postId: args.postId,
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list comments" })
+              ),
+          })
+        );
       },
       CommentListPublic: (args: TCommentList) => {
         return Effect.gen(function* () {
@@ -39,7 +46,14 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             postId: args.postId,
             visibility: "PUBLIC",
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list comments" })
+              ),
+          })
+        );
       },
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
@@ -67,8 +81,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
                   message: "Failed to create comment",
                 })
               ),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         );
       },
       CommentDelete: (args: TCommentDelete) => {
@@ -99,8 +112,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
                   message: "Failed to delete comment",
                 })
               ),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         );
       },
       CommentUpdate: (args: TCommentUpdate) => {
@@ -131,8 +143,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
                   message: "Failed to update comment",
                 })
               ),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         );
       },
     };

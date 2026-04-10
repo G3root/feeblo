@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import {
   FailedToCreateTagError,
@@ -101,33 +101,69 @@ export const TagRpcHandlers = TagRpcs.toLayer(
       TagList: (args: TTagList) =>
         repository.findMany(args).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list tags" })
+              ),
+          })
         ),
 
       TagListPublic: (args: TTagList) =>
-        repository.findMany(args).pipe(Effect.catchAll(onInternalServerError)),
+        repository.findMany(args).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list tags" })
+              ),
+          })
+        ),
 
       PostTagList: (args: TPostTagList) =>
         repository.findPostTags(args).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list post tags" })
+              ),
+          })
         ),
 
       PostTagListPublic: (args: TPostTagList) =>
-        repository
-          .findPostTags(args)
-          .pipe(Effect.catchAll(onInternalServerError)),
+        repository.findPostTags(args).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list post tags" })
+              ),
+          })
+        ),
 
       ChangelogTagList: (args: TChangelogTagList) =>
         repository.findChangelogTags(args).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list changelog tags",
+                })
+              ),
+          })
         ),
 
       ChangelogTagListPublic: (args: TChangelogTagList) =>
-        repository
-          .findChangelogTags(args)
-          .pipe(Effect.catchAll(onInternalServerError)),
+        repository.findChangelogTags(args).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list changelog tags",
+                })
+              ),
+          })
+        ),
 
       TagCreate: (args: TTagCreate) =>
         Effect.gen(function* () {
@@ -145,8 +181,7 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToCreateTagError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         ),
 
       TagUpdate: (args: TTagUpdate) =>
@@ -154,8 +189,7 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToUpdateTagError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         ),
 
       TagDelete: (args: TTagDelete) =>
@@ -163,8 +197,7 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToDeleteTagError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         ),
 
       PostTagSet: (args: TPostTagSet) =>
@@ -185,8 +218,7 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToSetTagAssignmentsError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         ),
 
       ChangelogTagSet: (args: TChangelogTagSet) =>
@@ -207,8 +239,7 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToSetTagAssignmentsError()),
-          }),
-          Effect.catchAll(onInternalServerError)
+          })
         ),
     };
   })

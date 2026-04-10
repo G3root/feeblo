@@ -4,11 +4,7 @@ import { user as userTable } from "@feeblo/db/schema/auth";
 import { eq } from "drizzle-orm";
 import { Effect } from "effect";
 import { Api } from "../http/api";
-import {
-  BadRequestError,
-  InternalServerError,
-  mapToInternalServerError,
-} from "../rpc-errors";
+import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
 import { CurrentSession } from "../session-middleware";
 
@@ -91,11 +87,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
           );
 
         return uploaded;
-      }).pipe(
-        Effect.mapError(
-          mapToInternalServerError(BadRequestError, InternalServerError)
-        )
-      );
+      });
     })
 );
 

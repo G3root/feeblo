@@ -1,5 +1,6 @@
 import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
+import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
   InternalServerError,
@@ -44,6 +45,7 @@ export class FailedToDeleteBoardError extends Schema.TaggedError<FailedToDeleteB
 export const BoardServiceErrors = Schema.Union(
   UnauthorizedError,
   InternalServerError,
+  PolicyDeniedError,
   BoardNotFoundError,
   FailedToCreateBoardError,
   FailedToUpdateBoardError,

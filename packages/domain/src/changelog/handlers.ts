@@ -1,8 +1,13 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { onInternalServerError } from "../rpc-errors";
+import { InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
+import {
+  FailedToCreateChangelogError,
+  FailedToDeleteChangelogError,
+  FailedToUpdateChangelogError,
+} from "./errors";
 import { ChangelogPolicy } from "./policies";
 import { ChangelogRepository } from "./repository";
 import { ChangelogRpcs } from "./rpcs";
@@ -22,12 +27,26 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
       ChangelogList: (args: TChangelogList) =>
         repository.findMany(args).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list changelogs",
+                })
+              ),
+          })
         ),
 
       ChangelogListPublic: (args: TChangelogList) =>
         repository.findManyPublished(args).pipe(
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list changelogs",
+                })
+              ),
+          })
         ),
 
       ChangelogCreate: (args: TChangelogCreate) => {
@@ -43,7 +62,11 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
             creatorId: session.session.userId,
             ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
           });
-        }).pipe(Effect.catchAll(onInternalServerError));
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToCreateChangelogError()),
+          })
+        );
       },
 
       ChangelogDelete: (args: TChangelogDelete) =>
@@ -57,7 +80,9 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
               })
             )
           ),
-          Effect.catchAll(onInternalServerError)
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToDeleteChangelogError()),
+          })
         ),
 
       ChangelogUpdate: (args: TChangelogUpdate) =>
@@ -76,7 +101,9 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
                 })
               )
             ),
-            Effect.catchAll(onInternalServerError)
+            Effect.catchTags({
+              SqlError: () => Effect.fail(new FailedToUpdateChangelogError()),
+            })
           ),
     };
   })
