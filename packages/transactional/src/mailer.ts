@@ -1,5 +1,5 @@
 import { render, toPlainText } from "@react-email/render";
-import { Config, Effect, Redacted } from "effect";
+import { Config, Effect, Redacted, Schema } from "effect";
 import { createTransport } from "nodemailer";
 import type { ReactElement } from "react";
 
@@ -10,6 +10,22 @@ type MailMessage = {
   readonly from?: string;
   readonly replyTo?: string;
 };
+
+class MailTemplateRenderError extends Schema.TaggedError<MailTemplateRenderError>()(
+  "MailTemplateRenderError",
+  {
+    subject: Schema.String,
+    cause: Schema.Defect,
+  }
+) {}
+
+class MailDeliveryError extends Schema.TaggedError<MailDeliveryError>()(
+  "MailDeliveryError",
+  {
+    subject: Schema.String,
+    cause: Schema.Defect,
+  }
+) {}
 
 const optionalString = (name: string) =>
   Config.string(name).pipe(
@@ -101,30 +117,33 @@ export class Mailer extends Effect.Service<Mailer>()("Mailer", {
     });
 
     return {
-      send: ({ from, react, replyTo, subject, to }: MailMessage) =>
-        Effect.gen(function* () {
-          const html = yield* Effect.tryPromise({
-            try: () => render(react),
-            catch: (cause) =>
-              new Error("Failed to render email template", { cause }),
-          });
+      send: Effect.fn("Mailer.send")(function* ({
+        from,
+        react,
+        replyTo,
+        subject,
+        to,
+      }: MailMessage) {
+        const html = yield* Effect.tryPromise({
+          try: () => render(react),
+          catch: (cause) => new MailTemplateRenderError({ subject, cause }),
+        });
 
-          const text = toPlainText(html);
+        const text = toPlainText(html);
 
-          yield* Effect.tryPromise({
-            try: () =>
-              transport.sendMail({
-                to,
-                subject,
-                html,
-                text,
-                from: from ?? defaultFrom,
-                ...(replyTo ? { replyTo } : {}),
-              }),
-            catch: (cause) =>
-              new Error(`Failed to send "${subject}" email`, { cause }),
-          });
-        }).pipe(Effect.withSpan("Mailer.send")),
+        yield* Effect.tryPromise({
+          try: () =>
+            transport.sendMail({
+              to,
+              subject,
+              html,
+              text,
+              from: from ?? defaultFrom,
+              ...(replyTo ? { replyTo } : {}),
+            }),
+          catch: (cause) => new MailDeliveryError({ subject, cause }),
+        });
+      }),
     };
   }),
 }) {}
