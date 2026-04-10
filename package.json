@@ -40,6 +40,8 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
+    "typecheck": "turbo check-types",
+    "prepare": "effect-language-service patch",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
     "dev:server": "turbo -F server dev",
@@ -65,8 +67,10 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.0",
     "@cloudflare/workers-types": "catalog:",
+    "@effect/language-service": "^0.85.1",
     "@feeblo/config": "workspace:*",
     "@types/bun": "catalog:",
+    "effect-solutions": "^0.5.2",
     "turbo": "^2.6.3",
     "typescript": "catalog:",
     "ultracite": "7.2.3"
