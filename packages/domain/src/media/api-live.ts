@@ -25,22 +25,18 @@ export const MediaApiLive = HttpApiBuilder.group(
 
         const kind = getMediaKind(file.contentType);
         if (!kind) {
-          return yield* Effect.fail(
-            new BadRequestError({
-              message:
-                "Unsupported file type. Use PNG/JPEG/WEBP/GIF or MP4/WebM/MOV",
-            })
-          );
+          return yield* new BadRequestError({
+            message:
+              "Unsupported file type. Use PNG/JPEG/WEBP/GIF or MP4/WebM/MOV",
+          });
         }
 
         const extension = getFileExtension(file.contentType);
         if (!extension) {
-          return yield* Effect.fail(
-            new BadRequestError({
-              message:
-                "Unsupported file type. Use PNG/JPEG/WEBP/GIF or MP4/WebM/MOV",
-            })
-          );
+          return yield* new BadRequestError({
+            message:
+              "Unsupported file type. Use PNG/JPEG/WEBP/GIF or MP4/WebM/MOV",
+          });
         }
 
         const fs = yield* FileSystem.FileSystem;
@@ -55,11 +51,9 @@ export const MediaApiLive = HttpApiBuilder.group(
         const maxSize = kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
         if (bytes.length === 0 || bytes.length > maxSize) {
           const maxSizeMb = Math.round(maxSize / (1024 * 1024));
-          return yield* Effect.fail(
-            new BadRequestError({
-              message: `File must be between 1B and ${maxSizeMb}MB`,
-            })
-          );
+          return yield* new BadRequestError({
+            message: `File must be between 1B and ${maxSizeMb}MB`,
+          });
         }
 
         const s3Service = yield* S3UploadService;

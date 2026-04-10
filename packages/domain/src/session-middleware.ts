@@ -11,6 +11,7 @@ export class Auth extends Context.Tag("@feeblo/api/Auth")<
   AuthHandler
 >() {}
 
+/** @effect-leakable-service */
 export class CurrentSession extends Context.Tag(
   "@feeblo/domain/CurrentSession"
 )<CurrentSession, Session>() {}
@@ -43,9 +44,7 @@ function getValidatedSessionFromToken(
 ): Effect.Effect<Session, UnauthorizedError> {
   return Effect.gen(function* () {
     if (!token) {
-      return yield* Effect.fail(
-        new UnauthorizedError({ message: "Not authenticated" })
-      );
+      return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
     const session = yield* Effect.tryPromise({
       try: () =>
@@ -57,9 +56,7 @@ function getValidatedSessionFromToken(
       catch: () => new UnauthorizedError({ message: "Failed to get session" }),
     });
     if (!session) {
-      return yield* Effect.fail(
-        new UnauthorizedError({ message: "Not authenticated" })
-      );
+      return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
     return session;
   });

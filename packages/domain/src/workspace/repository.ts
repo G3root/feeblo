@@ -55,11 +55,9 @@ export class WorkspaceRepository extends Effect.Service<WorkspaceRepository>()(
               .pipe(Effect.map(EffectArray.get(0)));
 
             if (Option.isNone(organization)) {
-              return yield* Effect.fail(
-                new FailedToCreateWorkspaceError({
-                  message: "Failed to create organization",
-                })
-              );
+              return yield* new FailedToCreateWorkspaceError({
+                message: "Failed to create organization",
+              });
             }
             const organizationId = organization.value.id;
 

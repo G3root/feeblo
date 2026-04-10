@@ -10,12 +10,10 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
     const repository = yield* SiteRepository;
 
     return {
-      SiteList: (args: TSiteList) => {
-        return Effect.gen(function* () {
-          return yield* repository.findMany({
-            organizationId: args.organizationId,
-            limit: 1,
-          });
+      SiteList: (args: TSiteList) =>
+        repository.findMany({
+          organizationId: args.organizationId,
+          limit: 1,
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
@@ -26,14 +24,11 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
                 })
               ),
           })
-        );
-      },
-      SiteListBySubdomain: (args: TSiteListBySubdomain) => {
-        return Effect.gen(function* () {
-          return yield* repository.findMany({
-            subdomain: args.subdomain,
-            limit: 1,
-          });
+        ),
+      SiteListBySubdomain: (args: TSiteListBySubdomain) =>
+        repository.findMany({
+          subdomain: args.subdomain,
+          limit: 1,
         }).pipe(
           Effect.catchTags({
             SqlError: () =>
@@ -43,12 +38,9 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
                 })
               ),
           })
-        );
-      },
-      SiteUpdate: (args: TSiteUpdate) => {
-        return Effect.gen(function* () {
-          yield* repository.update(args);
-        }).pipe(
+        ),
+      SiteUpdate: (args: TSiteUpdate) =>
+        repository.update(args).pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
@@ -63,8 +55,7 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
                 })
               ),
           })
-        );
-      },
+        ),
     };
   })
 ).pipe(Layer.provide(SiteRepository.Default));

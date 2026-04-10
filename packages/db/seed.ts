@@ -2,7 +2,7 @@
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { Effect } from "effect";
+import { Data, Effect } from "effect";
 import { DB } from "./src";
 import {
   board,
@@ -37,6 +37,10 @@ const MAIN_POST_COUNT = 40;
 const EXTERNAL_POST_COUNT = 12;
 
 const REACTIONS = ["👍", "❤️", "🔥", "😂", "🎯"];
+
+class SeedDataError extends Data.TaggedError("SeedDataError")<{
+  readonly message: string;
+}> {}
 
 const makeId = (prefix: string) => `${prefix}-${faker.string.alphanumeric(12)}`;
 
@@ -87,7 +91,9 @@ const ensureUser = ({
         !("user" in result) ||
         !result.user
       ) {
-        return yield* Effect.fail(new Error(`Failed to create user ${email}`));
+        return yield* new SeedDataError({
+          message: `Failed to create user ${email}`,
+        });
       }
 
       [existingUser] = yield* db
@@ -102,9 +108,9 @@ const ensureUser = ({
     }
 
     if (!existingUser) {
-      return yield* Effect.fail(
-        new Error(`User ${email} not found after creation`)
-      );
+      return yield* new SeedDataError({
+        message: `User ${email} not found after creation`,
+      });
     }
 
     if (!existingUser.emailVerified) {
@@ -148,9 +154,9 @@ const ensureOrganization = (userId: string) =>
     }
 
     if (!org) {
-      return yield* Effect.fail(
-        new Error(`Failed to ensure organization for ${userId}`)
-      );
+      return yield* new SeedDataError({
+        message: `Failed to ensure organization for ${userId}`,
+      });
     }
 
     const [existingOwnerMembership] = yield* db
@@ -224,9 +230,9 @@ const ensureSite = ({
     }
 
     if (!existing) {
-      return yield* Effect.fail(
-        new Error(`Failed to ensure site for organization ${organizationId}`)
-      );
+      return yield* new SeedDataError({
+        message: `Failed to ensure site for organization ${organizationId}`,
+      });
     }
 
     return existing;
@@ -340,7 +346,9 @@ const ensurePosts = ({
         const boardId = boardIds[i % boardIds.length] ?? boardIds[0];
 
         if (!boardId) {
-          return yield* Effect.fail(new Error("No board found to seed posts"));
+          return yield* new SeedDataError({
+            message: "No board found to seed posts",
+          });
         }
 
         const randomPostStatus =
@@ -348,9 +356,9 @@ const ensurePosts = ({
           postStatuses.find((status) => status.type === "PLANNED");
 
         if (!randomPostStatus) {
-          return yield* Effect.fail(
-            new Error("No post status found to seed posts")
-          );
+          return yield* new SeedDataError({
+            message: "No post status found to seed posts",
+          });
         }
 
         const title = faker.company.catchPhrase();
@@ -597,7 +605,7 @@ const seed = Effect.gen(function* () {
     boardIds: mainBoards.map((item) => item.id),
     count: MAIN_POST_COUNT,
     creatorId: primaryUser.id,
-    creatorMemberId: primaryMember?.id,
+    ...(primaryMember ? { creatorMemberId: primaryMember.id } : {}),
   });
 
   const primarySite = yield* ensureSite({
@@ -673,7 +681,7 @@ const seed = Effect.gen(function* () {
       boardIds: externalBoards.map((item) => item.id),
       count: EXTERNAL_POST_COUNT,
       creatorId: externalUser.id,
-      creatorMemberId: externalMember?.id,
+      ...(externalMember ? { creatorMemberId: externalMember.id } : {}),
     });
 
     const externalSite = yield* ensureSite({

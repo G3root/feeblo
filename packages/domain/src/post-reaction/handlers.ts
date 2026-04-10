@@ -11,12 +11,12 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
 
     return {
       PostReactionList: (args: TPostReactionList) =>
-        Effect.gen(function* () {
-          return yield* repository.list({
+        repository
+          .list({
             postId: args.postId,
             organizationId: args.organizationId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(

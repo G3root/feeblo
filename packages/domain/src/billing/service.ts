@@ -55,11 +55,9 @@ export class PolarService extends Effect.Service<PolarService>()(
         }) =>
           Effect.gen(function* () {
             if (!client) {
-              return yield* Effect.fail(
-                new BadRequestError({
-                  message: "Polar billing is not configured",
-                })
-              );
+              return yield* new BadRequestError({
+                message: "Polar billing is not configured",
+              });
             }
 
             const checkout = yield* Effect.tryPromise({
@@ -92,11 +90,9 @@ export class PolarService extends Effect.Service<PolarService>()(
         }) =>
           Effect.gen(function* () {
             if (!client) {
-              return yield* Effect.fail(
-                new BadRequestError({
-                  message: "Polar billing is not configured",
-                })
-              );
+              return yield* new BadRequestError({
+                message: "Polar billing is not configured",
+              });
             }
 
             const portalSession = yield* Effect.tryPromise({

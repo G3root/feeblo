@@ -11,12 +11,12 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
 
     return {
       CommentReactionList: (args: TCommentReactionList) =>
-        Effect.gen(function* () {
-          return yield* repository.list({
+        repository
+          .list({
             organizationId: args.organizationId,
             postId: args.postId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(

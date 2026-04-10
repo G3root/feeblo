@@ -38,15 +38,13 @@ const validateTagIds = ({
     const count = yield* repository.countExistingTags({
       organizationId,
       tagIds,
-      type,
+      ...(type ? { type } : {}),
     });
 
     if (count !== tagIds.length) {
-      return yield* Effect.fail(
-        new Policy.PolicyDeniedError({
-          reason: "One or more tags do not belong to this organization or type",
-        })
-      );
+      return yield* new Policy.PolicyDeniedError({
+        reason: "One or more tags do not belong to this organization or type",
+      });
     }
   });
 
@@ -62,11 +60,9 @@ const validatePost = ({
     const exists = yield* repository.hasPost({ postId, organizationId });
 
     if (!exists) {
-      return yield* Effect.fail(
-        new Policy.PolicyDeniedError({
-          reason: "Post does not belong to this organization",
-        })
-      );
+      return yield* new Policy.PolicyDeniedError({
+        reason: "Post does not belong to this organization",
+      });
     }
   });
 
@@ -85,11 +81,9 @@ const validateChangelog = ({
     });
 
     if (!exists) {
-      return yield* Effect.fail(
-        new Policy.PolicyDeniedError({
-          reason: "Changelog does not belong to this organization",
-        })
-      );
+      return yield* new Policy.PolicyDeniedError({
+        reason: "Changelog does not belong to this organization",
+      });
     }
   });
 

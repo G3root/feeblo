@@ -41,11 +41,9 @@ export const BillingRpcHandlers = BillingRpcs.toLayer(
             });
 
           if (subscription._tag === "None") {
-            return yield* Effect.fail(
-              new BadRequestError({
-                message: "No active subscription found",
-              })
-            );
+            return yield* new BadRequestError({
+              message: "No active subscription found",
+            });
           }
 
           return yield* polarService.createPortal({

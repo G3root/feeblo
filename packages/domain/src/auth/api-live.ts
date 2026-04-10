@@ -49,9 +49,7 @@ function postVerificationOtp(
 
     const email = payload.email.toLowerCase();
     if (!isValidVerificationOTPEmail(email)) {
-      return yield* Effect.fail(
-        new BadRequestError({ message: "Invalid verification state" })
-      );
+      return yield* new BadRequestError({ message: "Invalid verification state" });
     }
 
     const encryptedState = yield* encryptVerificationOTPState(
@@ -103,9 +101,9 @@ function getVerificationOtp(): Effect.Effect<
     const cookieValue = request.cookies[cookieData.name];
 
     if (!cookieValue) {
-      return yield* Effect.fail(
-        new NotFoundError({ message: "No verification request found" })
-      );
+      return yield* new NotFoundError({
+        message: "No verification request found",
+      });
     }
 
     const stateResult = yield* getCookieVerificationOTPState(
@@ -114,9 +112,9 @@ function getVerificationOtp(): Effect.Effect<
     ).pipe(Effect.either);
 
     if (Either.isLeft(stateResult)) {
-      return yield* Effect.fail(
-        new BadRequestError({ message: "Invalid verification request" })
-      );
+      return yield* new BadRequestError({
+        message: "Invalid verification request",
+      });
     }
 
     return {

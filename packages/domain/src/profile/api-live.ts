@@ -24,20 +24,16 @@ export const ProfileApiLive = HttpApiBuilder.group(
         const session = yield* CurrentSession;
 
         if (!ALLOWED_CONTENT_TYPES.has(file.contentType)) {
-          return yield* Effect.fail(
-            new BadRequestError({
-              message: "Unsupported file type. Use JPEG, PNG, or WEBP",
-            })
-          );
+          return yield* new BadRequestError({
+            message: "Unsupported file type. Use JPEG, PNG, or WEBP",
+          });
         }
 
         const extension = getFileExtension(file.contentType);
         if (!extension) {
-          return yield* Effect.fail(
-            new BadRequestError({
-              message: "Unsupported file type. Use JPEG, PNG, or WEBP",
-            })
-          );
+          return yield* new BadRequestError({
+            message: "Unsupported file type. Use JPEG, PNG, or WEBP",
+          });
         }
 
         const fs = yield* FileSystem.FileSystem;
@@ -50,11 +46,9 @@ export const ProfileApiLive = HttpApiBuilder.group(
           );
 
         if (bytes.length === 0 || bytes.length > MAX_PROFILE_IMAGE_BYTES) {
-          return yield* Effect.fail(
-            new BadRequestError({
-              message: "Profile image must be between 1B and 5MB",
-            })
-          );
+          return yield* new BadRequestError({
+            message: "Profile image must be between 1B and 5MB",
+          });
         }
 
         const s3Service = yield* S3UploadService;

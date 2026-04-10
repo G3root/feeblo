@@ -24,12 +24,10 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
     const commentPolicy = yield* CommentPolicy;
 
     return {
-      CommentList: (args: TCommentList) => {
-        return Effect.gen(function* () {
-          return yield* repository.findMany({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          });
+      CommentList: (args: TCommentList) =>
+        repository.findMany({
+          organizationId: args.organizationId,
+          postId: args.postId,
         }).pipe(
           Effect.catchTags({
             SqlError: () =>
@@ -37,15 +35,12 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
                 new InternalServerError({ message: "Failed to list comments" })
               ),
           })
-        );
-      },
-      CommentListPublic: (args: TCommentList) => {
-        return Effect.gen(function* () {
-          return yield* repository.findMany({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            visibility: "PUBLIC",
-          });
+        ),
+      CommentListPublic: (args: TCommentList) =>
+        repository.findMany({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          visibility: "PUBLIC",
         }).pipe(
           Effect.catchTags({
             SqlError: () =>
@@ -53,8 +48,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
                 new InternalServerError({ message: "Failed to list comments" })
               ),
           })
-        );
-      },
+        ),
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;

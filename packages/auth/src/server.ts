@@ -20,18 +20,23 @@ import {
   organization,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
-import { Config, Effect, Layer, Redacted } from "effect";
+import { Config, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 
 export const initAuthHandler = () =>
   Effect.gen(function* () {
     const appUrl = yield* Config.string("VITE_APP_URL");
     const apiUrl = yield* Config.string("VITE_API_URL");
     const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
-    const billingRepository = yield* BillingRepository;
     const polarService = yield* PolarService;
-    const mailer = yield* Mailer;
 
     const db = yield* DB;
+    const callbackRuntime = ManagedRuntime.make(
+      Layer.mergeAll(
+        PolarService.Default,
+        BillingRepository.Default,
+        Mailer.Default
+      ).pipe(Layer.provide(Layer.succeed(DB, db)))
+    );
 
     const config = {
       database: drizzleAdapter(db, {
@@ -61,14 +66,16 @@ export const initAuthHandler = () =>
         enabled: true,
 
         async sendResetPassword(data) {
-          await Effect.runPromise(
-            mailer.send({
-              to: data.user.email,
-              ...createPasswordResetEmail({
-                resetUrl: data.url,
-                recipientName: data.user.name,
-              }),
-            })
+          await callbackRuntime.runPromise(
+            Mailer.use((mailer) =>
+              mailer.send({
+                to: data.user.email,
+                ...createPasswordResetEmail({
+                  resetUrl: data.url,
+                  recipientName: data.user.name,
+                }),
+              })
+            )
           );
         },
 
@@ -92,9 +99,13 @@ export const initAuthHandler = () =>
                       switch (payload.type) {
                         case "product.created":
                         case "product.updated": {
-                          await Effect.runPromise(
-                            billingRepository.upsertProduct(payload.data)
-                          ).then(() => undefined);
+                          await callbackRuntime
+                            .runPromise(
+                              BillingRepository.use((billingRepository) =>
+                                billingRepository.upsertProduct(payload.data)
+                              )
+                            )
+                            .then(() => undefined);
                           break;
                         }
 
@@ -104,9 +115,13 @@ export const initAuthHandler = () =>
                         case "subscription.revoked":
                         case "subscription.uncanceled":
                         case "subscription.active": {
-                          await Effect.runPromise(
-                            billingRepository.upsertSubscription(payload.data)
-                          ).then(() => undefined);
+                          await callbackRuntime
+                            .runPromise(
+                              BillingRepository.use((billingRepository) =>
+                                billingRepository.upsertSubscription(payload.data)
+                              )
+                            )
+                            .then(() => undefined);
                           break;
                         }
                         default: {
@@ -151,8 +166,9 @@ export const initAuthHandler = () =>
           allowUserToCreateOrganization: false,
           async sendInvitationEmail(data) {
             const inviteLink = `${appUrl}/invitation/${data.id}`;
-            await Effect.runPromise(
-              mailer.send({
+            await callbackRuntime.runPromise(
+              Mailer.use((mailer) =>
+                mailer.send({
                 to: data.email,
                 ...createOrganizationInvitationEmail({
                   inviteUrl: inviteLink,
@@ -161,6 +177,7 @@ export const initAuthHandler = () =>
                   role: data.role,
                 }),
               })
+              )
             );
           },
         }),
@@ -177,14 +194,16 @@ export const initAuthHandler = () =>
                   ? "sign-in"
                   : "email verification";
 
-            await Effect.runPromise(
-              mailer.send({
+            await callbackRuntime.runPromise(
+              Mailer.use((mailer) =>
+                mailer.send({
                 to: email,
                 ...createVerificationOtpEmail({
                   otp,
                   flowLabel,
                 }),
               })
+              )
             );
           },
         }),

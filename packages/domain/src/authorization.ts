@@ -13,9 +13,7 @@ export const requireOrganizationMembership = (organizationId: string) =>
     );
 
     if (!belongsToOrganization) {
-      return yield* Effect.fail(
-        new UnauthorizedError({ message: "Membership not found" })
-      );
+      return yield* new UnauthorizedError({ message: "Membership not found" });
     }
   });
 

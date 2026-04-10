@@ -9,18 +9,48 @@ const EmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const VERIFICATION_OTP_COOKIE_NAME = "verification_otp";
 
+const VerificationOTPStateFromJson = Schema.parseJson(
+  VerificationOTPStateSchema
+);
+
+class VerificationOTPEncryptionError extends Schema.TaggedError<VerificationOTPEncryptionError>()(
+  "VerificationOTPEncryptionError",
+  {
+    cause: Schema.Defect,
+  }
+) {}
+
+class VerificationOTPDecryptionError extends Schema.TaggedError<VerificationOTPDecryptionError>()(
+  "VerificationOTPDecryptionError",
+  {
+    cause: Schema.Defect,
+  }
+) {}
+
+class InvalidVerificationOTPStateError extends Schema.TaggedError<InvalidVerificationOTPStateError>()(
+  "InvalidVerificationOTPStateError",
+  {
+    cause: Schema.optional(Schema.Defect),
+  }
+) {}
+
 export const encryptVerificationOTPState = (
   state: VerificationOTPState,
   secret: string
 ) =>
-  Effect.tryPromise({
-    try: () =>
-      symmetricEncrypt({
-        key: secret,
-        data: JSON.stringify(state),
-      }),
-    catch: () => new Error("Failed to encrypt verification OTP state"),
-  });
+  Schema.encode(VerificationOTPStateFromJson)(state).pipe(
+    Effect.mapError((cause) => new InvalidVerificationOTPStateError({ cause })),
+    Effect.flatMap((data) =>
+      Effect.tryPromise({
+        try: () =>
+          symmetricEncrypt({
+            key: secret,
+            data,
+          }),
+        catch: (cause) => new VerificationOTPEncryptionError({ cause }),
+      })
+    )
+  );
 
 const decryptVerificationOTPState = (data: string, secret: string) =>
   Effect.tryPromise({
@@ -29,7 +59,7 @@ const decryptVerificationOTPState = (data: string, secret: string) =>
         key: secret,
         data,
       }),
-    catch: () => new Error("Failed to decrypt verification OTP state"),
+    catch: (cause) => new VerificationOTPDecryptionError({ cause }),
   });
 
 export const generateVerificationOTPCookieData = (isSecure: boolean) => ({
@@ -46,14 +76,10 @@ export const generateVerificationOTPCookieData = (isSecure: boolean) => ({
 export const getCookieVerificationOTPState = (data: string, secret: string) =>
   decryptVerificationOTPState(data, secret).pipe(
     Effect.flatMap((decrypted) =>
-      Effect.try({
-        try: () => JSON.parse(decrypted),
-        catch: () => new Error("Failed to parse verification OTP state"),
-      })
-    ),
-    Effect.flatMap((parsed) =>
-      Schema.decodeUnknown(VerificationOTPStateSchema)(parsed).pipe(
-        Effect.mapError(() => new Error("Invalid verification OTP state"))
+      Schema.decodeUnknown(VerificationOTPStateFromJson)(decrypted).pipe(
+        Effect.mapError(
+          (cause) => new InvalidVerificationOTPStateError({ cause })
+        )
       )
     ),
     Effect.flatMap((state) =>
@@ -62,7 +88,7 @@ export const getCookieVerificationOTPState = (data: string, secret: string) =>
             ...state,
             email: state.email.toLowerCase(),
           })
-        : Effect.fail(new Error("Invalid verification OTP state"))
+        : new InvalidVerificationOTPStateError({})
     )
   );
 

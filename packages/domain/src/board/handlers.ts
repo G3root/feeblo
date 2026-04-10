@@ -23,12 +23,12 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
     const repository = yield* BoardRepository;
     const boardPolicy = yield* BoardPolicy;
     return {
-      BoardList: (args: TBoardList) => {
-        return Effect.gen(function* () {
-          return yield* repository.findMany({
+      BoardList: (args: TBoardList) =>
+        repository
+          .findMany({
             organizationId: args.organizationId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () =>
@@ -36,23 +36,21 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
                 new InternalServerError({ message: "Failed to list boards" })
               ),
           })
-        );
-      },
-      BoardListPublic: (args: TBoardList) => {
-        return Effect.gen(function* () {
-          return yield* repository.findMany({
+        ),
+      BoardListPublic: (args: TBoardList) =>
+        repository
+          .findMany({
             organizationId: args.organizationId,
             visibility: "PUBLIC",
-          });
-        }).pipe(
+          })
+          .pipe(
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
                 new InternalServerError({ message: "Failed to list boards" })
               ),
           })
-        );
-      },
+        ),
       BoardDelete: (args: TBoardDelete) => {
         return Effect.gen(function* () {
           yield* requireOrganizationMembership(args.organizationId);
@@ -83,11 +81,9 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           );
 
           if (!isMember) {
-            return yield* Effect.fail(
-              new Policy.PolicyDeniedError({
-                reason: "You are not a member of this organization",
-              })
-            );
+            return yield* new Policy.PolicyDeniedError({
+              reason: "You are not a member of this organization",
+            });
           }
           yield* repository.create({
             ...args,
@@ -101,10 +97,8 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           })
         );
       },
-      BoardUpdate: (args: TBoardUpdate) => {
-        return Effect.gen(function* () {
-          return yield* repository.update(args);
-        }).pipe(
+      BoardUpdate: (args: TBoardUpdate) =>
+        repository.update(args).pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
@@ -117,8 +111,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToUpdateBoardError()),
           })
-        );
-      },
+        ),
     };
   })
 ).pipe(

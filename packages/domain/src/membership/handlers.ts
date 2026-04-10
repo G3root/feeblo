@@ -137,9 +137,7 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           })
         ),
       OrganizationCancelInvitation: ({ organizationId, invitationId }) =>
-        Effect.gen(function* () {
-          yield* repository.cancelInvitation({ organizationId, invitationId });
-        }).pipe(
+        repository.cancelInvitation({ organizationId, invitationId }).pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
