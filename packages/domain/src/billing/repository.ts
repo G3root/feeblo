@@ -129,7 +129,7 @@ export class BillingRepository extends Effect.Service<BillingRepository>()(
       return {
         createSubscription: (payload: SubscriptionPayload) =>
           db.insert(subscriptionTable).values(toSubscriptionValues(payload)),
-        updateSubscription: (payload: SubscriptionPayload) =>
+        upsertSubscription: (payload: SubscriptionPayload) =>
           Effect.gen(function* () {
             const existingSubscription = yield* db
               .select({ id: subscriptionTable.id })
@@ -157,7 +157,7 @@ export class BillingRepository extends Effect.Service<BillingRepository>()(
           }),
         createProduct: (payload: ProductPayload) =>
           db.insert(productTable).values(toProductValues(payload)),
-        updateProduct: (payload: ProductPayload) =>
+        upsertProduct: (payload: ProductPayload) =>
           Effect.gen(function* () {
             const existingProduct = yield* db
               .select({ id: productTable.id })
@@ -179,6 +179,20 @@ export class BillingRepository extends Effect.Service<BillingRepository>()(
 
             yield* db.insert(productTable).values(toProductValues(payload));
           }),
+        findSubscriptionByOrganizationId: ({
+          organizationId,
+        }: {
+          organizationId: string;
+        }) =>
+          db
+            .select({
+              id: subscriptionTable.id,
+              customerId: subscriptionTable.customerId,
+              organizationId: subscriptionTable.organizationId,
+            })
+            .from(subscriptionTable)
+            .where(eq(subscriptionTable.organizationId, organizationId))
+            .pipe(Effect.map(EffectArray.get(0))),
       };
     }),
   }

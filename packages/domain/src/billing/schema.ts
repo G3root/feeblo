@@ -13,3 +13,14 @@ export class BillingCheckoutOutput extends Schema.Class<BillingCheckoutOutput>(
   url: Schema.String,
 }) {}
 
+export class BillingPortalInput extends Schema.Class<BillingPortalInput>(
+  "BillingPortalInput"
+)({
+  organizationId: Schema.String,
+}) {}
+
+export class BillingPortalOutput extends Schema.Class<BillingPortalOutput>(
+  "BillingPortalOutput"
+)({
+  url: Schema.String,
+}) {}

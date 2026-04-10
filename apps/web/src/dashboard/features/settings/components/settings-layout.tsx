@@ -2,12 +2,15 @@ import { cn } from "~/lib/utils";
 
 interface RootProps extends React.ComponentProps<"div"> {
   children: React.ReactNode;
+  size?: "default" | "large";
 }
-function Root({ children, className, ...props }: RootProps) {
+function Root({ children, className, size = "default", ...props }: RootProps) {
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 lg:py-12",
+        "mx-auto flex w-full flex-col gap-6 p-4 lg:py-12",
+        size === "default" ? "max-w-3xl" : "max-w-6xl",
+
         className
       )}
       {...props}

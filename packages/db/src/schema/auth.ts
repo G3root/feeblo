@@ -183,7 +183,7 @@ export const invitation = pgTable(
 
 export const subscription = pgTable("subscription", {
   id: text("id").primaryKey(),
-  externalId: text("external_id").notNull(),
+  externalId: text("external_id").unique().notNull(),
   organizationId: text("organization_id")
     .notNull()
     .references(() => organization.id, { onDelete: "cascade" }),

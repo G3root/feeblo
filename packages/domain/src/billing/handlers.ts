@@ -1,12 +1,15 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
+import { BadRequestError, onInternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { BillingRepository } from "./repository";
 import { BillingRpcs } from "./rpcs";
 import { PolarService } from "./service";
 
 export const BillingRpcHandlers = BillingRpcs.toLayer(
   Effect.gen(function* () {
     const polarService = yield* PolarService;
+    const repository = yield* BillingRepository;
 
     return {
       BillingCheckout: ({ organizationId, productId }) =>
@@ -22,7 +25,43 @@ export const BillingRpcHandlers = BillingRpcs.toLayer(
               name: session.user.name,
             },
           });
-        }).pipe(Policy.withPolicy(Policy.hasMembership(organizationId))),
+        }).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(organizationId),
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
+            )
+          )
+        ),
+      BillingPortal: ({ organizationId }) =>
+        Effect.gen(function* () {
+          const subscription =
+            yield* repository.findSubscriptionByOrganizationId({
+              organizationId,
+            });
+
+          if (subscription._tag === "None") {
+            return yield* Effect.fail(
+              new BadRequestError({
+                message: "No active subscription found",
+              })
+            );
+          }
+
+          return yield* polarService.createPortal({
+            customerId: subscription.value.customerId,
+          });
+        }).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(organizationId),
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
+            )
+          ),
+          Effect.catchAll(onInternalServerError)
+        ),
     };
   })
-).pipe(Layer.provide(PolarService.Default));
+).pipe(
+  Layer.provide(Layer.mergeAll(PolarService.Default, BillingRepository.Default))
+);

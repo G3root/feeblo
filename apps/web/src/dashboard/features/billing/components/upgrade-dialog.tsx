@@ -4,7 +4,7 @@ import {
   SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { Suspense, useMemo, useState } from "react";
 import { Badge } from "~/components/ui/badge";
@@ -34,17 +34,23 @@ import {
   ItemTitle,
 } from "~/components/ui/item";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
-import { Switch } from "~/components/ui/switch";
 import { Skeleton } from "~/components/ui/skeleton";
-import { toastManager } from "~/components/ui/toast";
+import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   workspaceProductCollection,
   workspaceSubscriptionCollection,
 } from "~/lib/collections";
-import { fetchRpc } from "~/lib/runtime";
-import { cn } from "~/lib/utils";
 import { useUpgradePlanDialogContext } from "../dialog-stores";
+import { startBillingCheckout, startBillingPortal } from "../lib/checkout";
+import {
+  type BillingInterval,
+  buildPlanCards,
+  formatPlanBillingNote,
+  formatPlanPrice,
+  type PlanType,
+  type WorkspaceProduct,
+} from "../lib/plans";
 
 type PlanFeature = {
   title: string;
@@ -52,21 +58,13 @@ type PlanFeature = {
   icon: typeof CheckmarkCircle02Icon;
 };
 
-type PlanType = "free" | "starter" | "professional";
-type BillingInterval = "month" | "year";
-
-type Price = {
-  priceAmount: number;
-  priceCurrency: string;
-};
-
 type PlanView = {
   planType: PlanType;
   name: string;
   description: string;
   features: PlanFeature[];
-  monthlyLabel: string;
-  yearlyLabel: string;
+  month: WorkspaceProduct | undefined;
+  year: WorkspaceProduct | undefined;
   productId: {
     month: string;
     year: string;
@@ -112,39 +110,6 @@ const PLAN_FEATURES: Record<PlanType, PlanFeature[]> = {
   ],
 };
 
-const PLAN_META: Record<PlanType, { name: string; description: string }> = {
-  free: {
-    name: "Hobby",
-    description: "For casual users",
-  },
-  starter: {
-    name: "Starter",
-    description: "For small teams",
-  },
-  professional: {
-    name: "Professional",
-    description: "For growing teams",
-  },
-};
-
-function formatPriceLabel(prices: Price[], interval: BillingInterval): string {
-  const price = prices.find((p) => p.priceAmount > 0);
-  if (!price) {
-    return "Free";
-  }
-
-  const amount =
-    interval === "year" ? price.priceAmount / 12 : price.priceAmount;
-
-  const formatted = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: price.priceCurrency,
-    maximumFractionDigits: 0,
-  }).format(amount / 100);
-
-  return `${formatted} / mo`;
-}
-
 export function UpgradePlanDialog() {
   const store = useUpgradePlanDialogContext();
   const isOpen = useSelector(store, (state) => state.context.open);
@@ -181,63 +146,39 @@ function UpgradePlanDialogContent() {
         ({ product, subscription }) => eq(product.id, subscription.productId)
       )
       .where(({ subscription }) =>
-        eq(subscription.organizationId, organizationId)
+        and(
+          eq(subscription.organizationId, organizationId),
+          eq(subscription.status, "active")
+        )
       )
   );
 
   const { plans, currentPlanType, currentInterval } = useMemo(() => {
-    const buildPlan = (planType: Exclude<PlanType, "free">): PlanView => {
-      const monthly = products.find(
-        (p) => p.metadata?.plan === planType && p.recurringInterval === "month"
-      );
-      const yearly = products.find(
-        (p) => p.metadata?.plan === planType && p.recurringInterval === "year"
-      );
-      return {
-        planType,
-        ...PLAN_META[planType],
-        features: PLAN_FEATURES[planType],
-        monthlyLabel: monthly
-          ? formatPriceLabel(monthly.prices as Price[], "month")
-          : "—",
-        yearlyLabel: yearly
-          ? formatPriceLabel(yearly.prices as Price[], "year")
-          : "—",
-        productId: {
-          month: monthly?.id ?? "",
-          year: yearly?.id ?? "",
-        },
-      };
-    };
+    const currentProduct = subscriptions[0]?.product as
+      | WorkspaceProduct
+      | undefined;
+    const { plans, currentPlanType, currentInterval } = buildPlanCards(
+      products as WorkspaceProduct[],
+      currentProduct
+    );
 
-    const plans: PlanView[] = [
-      {
-        planType: "free",
-        ...PLAN_META.free,
-        features: PLAN_FEATURES.free,
-        monthlyLabel: "Free",
-        yearlyLabel: "Free",
-        productId: {
-          month: "free",
-          year: "free",
-        },
+    const planViews: PlanView[] = plans.map((plan) => ({
+      ...plan,
+      features: PLAN_FEATURES[plan.planType],
+      productId: {
+        month: plan.month?.id ?? "free",
+        year: plan.year?.id ?? "free",
       },
-      buildPlan("starter"),
-      buildPlan("professional"),
-    ];
+    }));
 
-    const currentProduct = subscriptions[0]?.product;
-    const currentPlanType: PlanType = currentProduct?.metadata?.plan ?? "free";
-    const currentInterval: BillingInterval =
-      currentProduct?.recurringInterval ?? "month";
-
-    return { plans, currentPlanType, currentInterval };
+    return { plans: planViews, currentPlanType, currentInterval };
   }, [products, subscriptions]);
 
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>(currentInterval);
   const [selectedPlanType, setSelectedPlanType] =
     useState<PlanType>(currentPlanType);
+  const hasSubscription = subscriptions.length > 0;
 
   const selectedPlan =
     plans.find((p) => p.planType === selectedPlanType) ?? plans[0];
@@ -265,52 +206,31 @@ function UpgradePlanDialogContent() {
             <div className="flex flex-1 flex-col px-6 pb-6">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <div className="font-medium text-sm">Select plan:</div>
-                <div className="flex items-center gap-3 rounded-full border border-border bg-muted/40 px-3 py-2 text-sm">
-                  <span
-                    className={cn(
-                      "transition-colors",
-                      selectedInterval === "month"
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    Monthly
-                  </span>
-                  <Switch
-                    checked={selectedInterval === "year"}
-                    onCheckedChange={(checked) =>
-                      setSelectedInterval(checked ? "year" : "month")
-                    }
-                  />
-                  <span
-                    className={cn(
-                      "transition-colors",
-                      selectedInterval === "year"
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    Yearly
-                  </span>
-                </div>
+                <BillingIntervalTabs
+                  onValueChange={setSelectedInterval}
+                  value={selectedInterval}
+                />
               </div>
 
               <RadioGroup
                 className="gap-3"
-                onValueChange={(value) => setSelectedPlanType(value as PlanType)}
+                onValueChange={(value) =>
+                  setSelectedPlanType(value as PlanType)
+                }
                 value={selectedPlanType}
               >
                 {plans.map((plan) => {
                   const isCurrent = plan.planType === currentPlanType;
-                  const priceLabel =
-                    selectedInterval === "year"
-                      ? plan.yearlyLabel
-                      : plan.monthlyLabel;
+                  const selectedProduct =
+                    selectedInterval === "year" ? plan.year : plan.month;
 
                   return (
                     <FieldLabel htmlFor={plan.planType} key={plan.planType}>
                       <Field orientation="horizontal">
-                        <RadioGroupItem id={plan.planType} value={plan.planType} />
+                        <RadioGroupItem
+                          id={plan.planType}
+                          value={plan.planType}
+                        />
                         <FieldContent>
                           <FieldTitle>
                             {plan.name}{" "}
@@ -318,11 +238,13 @@ function UpgradePlanDialogContent() {
                               <Badge variant="default">Current</Badge>
                             ) : null}
                           </FieldTitle>
-                          <FieldDescription>{plan.description}</FieldDescription>
+                          <FieldDescription>
+                            {plan.description}
+                          </FieldDescription>
                         </FieldContent>
                         <div className="flex items-center">
                           <div className="text-muted-foreground">
-                            {priceLabel}
+                            {formatPlanPrice(selectedProduct, selectedInterval)}
                           </div>
                         </div>
                       </Field>
@@ -333,6 +255,7 @@ function UpgradePlanDialogContent() {
 
               <DialogFooter className="pt-6" variant="bare">
                 <UpgradePlanButton
+                  hasSubscription={hasSubscription}
                   isCurrentPlan={isCurrentPlan}
                   organizationId={organizationId}
                   selectedInterval={selectedInterval}
@@ -349,6 +272,14 @@ function UpgradePlanDialogContent() {
               </div>
               <p className="mt-2 text-base text-muted-foreground">
                 {selectedPlan.description}
+              </p>
+              <p className="mt-2 text-muted-foreground text-sm">
+                {formatPlanBillingNote(
+                  selectedInterval === "year"
+                    ? selectedPlan.year
+                    : selectedPlan.month,
+                  selectedInterval
+                )}
               </p>
             </div>
 
@@ -416,11 +347,13 @@ function UpgradePlanDialogSkeleton() {
 }
 
 function UpgradePlanButton({
+  hasSubscription,
   isCurrentPlan,
   organizationId,
   selectedPlan,
   selectedInterval,
 }: {
+  hasSubscription: boolean;
   isCurrentPlan: boolean;
   organizationId: string;
   selectedPlan: PlanView;
@@ -431,37 +364,55 @@ function UpgradePlanButton({
   return (
     <Button
       className="w-full"
-      disabled={isCurrentPlan || loading}
+      disabled={
+        loading ||
+        (selectedPlan.planType === "free" && !isCurrentPlan) ||
+        (isCurrentPlan && !hasSubscription)
+      }
       onClick={async () => {
         try {
+          if (isCurrentPlan && hasSubscription) {
+            setLoading(true);
+            const didStart = await startBillingPortal({
+              organizationId,
+            });
+
+            if (!didStart) {
+              setLoading(false);
+            }
+            return;
+          }
+
           const productId = selectedPlan.productId[selectedInterval];
           if (!productId || productId === "free") {
             throw new Error("Missing product id");
           }
 
           setLoading(true);
-          const result = await fetchRpc((rpc) =>
-            rpc.BillingCheckout({
-              organizationId,
-              productId,
-            })
-          );
-
-          window.location.href = result.url;
-
-          setLoading(false);
-        } catch (_error) {
-          toastManager.add({
-            title: "Failed to create checkout session.",
-            type: "error",
+          const didStart = await startBillingCheckout({
+            organizationId,
+            productId,
           });
+
+          if (!didStart) {
+            setLoading(false);
+          }
+        } catch (_error) {
           setLoading(false);
         }
       }}
       size="lg"
       type="button"
     >
-      {isCurrentPlan ? "Current Plan" : `Upgrade to ${selectedPlan.name}`}
+      {loading
+        ? "Redirecting..."
+        : isCurrentPlan && hasSubscription
+          ? "Manage Billing"
+          : isCurrentPlan
+            ? "Current Plan"
+            : selectedPlan.planType === "free"
+              ? "Unavailable"
+              : `Upgrade to ${selectedPlan.name}`}
     </Button>
   );
 }

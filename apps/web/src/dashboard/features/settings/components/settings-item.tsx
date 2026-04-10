@@ -42,7 +42,13 @@ function Item({
   variant = "outline",
   ...props
 }: React.ComponentProps<typeof BaseItem>) {
-  return <BaseItem className={className} variant={variant} {...props} />;
+  return (
+    <BaseItem
+      className={cn("bg-card", className)}
+      variant={variant}
+      {...props}
+    />
+  );
 }
 
 function Field({

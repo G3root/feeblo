@@ -32,7 +32,7 @@ import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { PolicyGuard, hasOwnerOrAdminRole } from "~/hooks/use-policy";
+import { hasOwnerOrAdminRole, PolicyGuard } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";

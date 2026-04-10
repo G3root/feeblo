@@ -90,31 +90,22 @@ export const initAuthHandler = () =>
 
                     onPayload: async (payload) => {
                       switch (payload.type) {
-                        case "product.created": {
-                          await Effect.runPromise(
-                            billingRepository.createProduct(payload.data)
-                          ).then(() => undefined);
-                          break;
-                        }
+                        case "product.created":
                         case "product.updated": {
                           await Effect.runPromise(
-                            billingRepository.updateProduct(payload.data)
+                            billingRepository.upsertProduct(payload.data)
                           ).then(() => undefined);
                           break;
                         }
-                        case "subscription.created": {
-                          await Effect.runPromise(
-                            billingRepository.createSubscription(payload.data)
-                          ).then(() => undefined);
-                          break;
-                        }
+
                         case "subscription.updated":
                         case "subscription.canceled":
+                        case "subscription.created":
                         case "subscription.revoked":
                         case "subscription.uncanceled":
                         case "subscription.active": {
                           await Effect.runPromise(
-                            billingRepository.updateSubscription(payload.data)
+                            billingRepository.upsertSubscription(payload.data)
                           ).then(() => undefined);
                           break;
                         }

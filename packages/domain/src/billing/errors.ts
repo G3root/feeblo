@@ -18,10 +18,22 @@ export class FailedToCreateCheckoutError extends Schema.TaggedError<FailedToCrea
   })
 ) {}
 
+export class FailedToCreatePortalError extends Schema.TaggedError<FailedToCreatePortalError>()(
+  "FailedToCreatePortalError",
+  {
+    message: Schema.optional(Schema.String),
+  },
+  HttpApiSchema.annotations({
+    status: 400,
+    identifier: "FailedToCreatePortalError",
+  })
+) {}
+
 export const BillingServiceErrors = Schema.Union(
   UnauthorizedError,
   BadRequestError,
   InternalServerError,
   PolicyDeniedError,
-  FailedToCreateCheckoutError
+  FailedToCreateCheckoutError,
+  FailedToCreatePortalError
 );

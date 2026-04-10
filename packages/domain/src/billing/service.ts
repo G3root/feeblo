@@ -1,7 +1,10 @@
 import { Polar } from "@polar-sh/sdk";
 import { Config, Effect, Redacted, Schema } from "effect";
 import { BadRequestError } from "../rpc-errors";
-import { FailedToCreateCheckoutError } from "./errors";
+import {
+  FailedToCreateCheckoutError,
+  FailedToCreatePortalError,
+} from "./errors";
 
 const PolarModeConfig = Schema.Config(
   "POLAR_MODE",
@@ -80,6 +83,35 @@ export class PolarService extends Effect.Service<PolarService>()(
 
             return {
               url: checkout.url,
+            };
+          }),
+        createPortal: ({
+          customerId,
+        }: {
+          customerId: string;
+        }) =>
+          Effect.gen(function* () {
+            if (!client) {
+              return yield* Effect.fail(
+                new BadRequestError({
+                  message: "Polar billing is not configured",
+                })
+              );
+            }
+
+            const portalSession = yield* Effect.tryPromise({
+              try: () =>
+                client.customerSessions.create({
+                  customerId,
+                }),
+              catch: () =>
+                new FailedToCreatePortalError({
+                  message: "Failed to create Polar customer portal session",
+                }),
+            });
+
+            return {
+              url: portalSession.customerPortalUrl,
             };
           }),
       };
