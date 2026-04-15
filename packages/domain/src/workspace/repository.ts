@@ -9,6 +9,7 @@ import {
   board as boardTable,
   DEFAULT_POST_STATUSES,
   postStatus as postStatusTable,
+  site as siteTable,
 } from "@feeblo/db/schema/feedback";
 import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
@@ -90,6 +91,16 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             updatedAt: new Date(),
           });
         }
+
+        yield* db.insert(siteTable).values({
+          id: generateId("site"),
+          organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          name: workspaceName,
+          subdomain: slug,
+          hidePoweredBy: false,
+        });
 
         return organizationId;
       }),
