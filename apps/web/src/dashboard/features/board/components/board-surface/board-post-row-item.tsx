@@ -19,7 +19,7 @@ export function BoardPostRowItem({
   );
 
   return (
-    <div className="group flex items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/50">
+    <div className="group mt-1 flex items-center gap-2 rounded-xl px-4 py-3 transition-colors hover:bg-muted/50">
       <Checkbox
         aria-label={`Select ${post.title}`}
         checked={checked}

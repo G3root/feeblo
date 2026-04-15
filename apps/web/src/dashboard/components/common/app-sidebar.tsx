@@ -187,7 +187,11 @@ function CreateBoardButton() {
 
   return (
     <div>
-      <SidebarMenuButton onClick={() => store.send({ type: "toggle" })}>
+      <SidebarMenuButton
+        aria-label="Create board"
+        onClick={() => store.send({ type: "toggle" })}
+        size="sm"
+      >
         <HugeiconsIcon className="size-4" icon={Plus} />
       </SidebarMenuButton>
     </div>
