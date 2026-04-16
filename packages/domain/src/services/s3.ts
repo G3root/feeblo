@@ -41,7 +41,9 @@ export const S3Layer = Layer.unwrapEffect(
   })
 );
 
+const TRAILING_SLASH_REGEX = /\/$/;
 const PROFILE_IMAGE_PREFIX = "profile-images";
+const ORGANIZATION_LOGO_PREFIX = "organization-logos";
 const EDITOR_MEDIA_PREFIX = "editor-media";
 
 const makeS3UploadService = Effect.gen(function* () {
@@ -55,8 +57,8 @@ const makeS3UploadService = Effect.gen(function* () {
       .join("/");
     const baseUrl =
       config.publicBaseUrl._tag === "Some"
-        ? config.publicBaseUrl.value.replace(/\/$/, "")
-        : `${config.endpoint.replace(/\/$/, "")}/${bucket}`;
+        ? config.publicBaseUrl.value.replace(TRAILING_SLASH_REGEX, "")
+        : `${config.endpoint.replace(TRAILING_SLASH_REGEX, "")}/${bucket}`;
 
     return {
       bucket,
@@ -77,6 +79,20 @@ const makeS3UploadService = Effect.gen(function* () {
     }) =>
       Effect.gen(function* () {
         const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        yield* fileSystem.writeFile(fileKey, bytes);
+        return resolvePublicUrl(fileKey);
+      }),
+    uploadOrganizationLogo: ({
+      bytes,
+      extension,
+      organizationId,
+    }: {
+      bytes: Uint8Array;
+      extension: string;
+      organizationId: string;
+    }) =>
+      Effect.gen(function* () {
+        const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
         yield* fileSystem.writeFile(fileKey, bytes);
         return resolvePublicUrl(fileKey);
       }),

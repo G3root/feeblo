@@ -2,6 +2,7 @@ import { HttpLayerRouter } from "@effect/platform";
 import { Layer } from "effect";
 import { AuthApiLive } from "../auth/api-live";
 import { MediaApiLive } from "../media/api-live";
+import { OrganizationApiLive } from "../organization/api-live";
 import { ProfileApiLive } from "../profile/api-live";
 import { S3UploadServiceLive } from "../services/s3";
 import { Api } from "./api";
@@ -11,6 +12,7 @@ export const HttpRoute = HttpLayerRouter.addHttpApi(Api, {
 }).pipe(
   Layer.provide(AuthApiLive),
   Layer.provide(MediaApiLive),
+  Layer.provide(OrganizationApiLive),
   Layer.provide(ProfileApiLive),
   Layer.provide(S3UploadServiceLive)
 );

@@ -2,7 +2,6 @@ import { DB } from "@feeblo/db";
 import {
   invitation as invitationTable,
   member as memberTable,
-  organization as organizationTable,
   user as userTable,
 } from "@feeblo/db/schema/auth";
 import { and, eq } from "drizzle-orm";
@@ -56,17 +55,8 @@ const makeMembershipRepository = Effect.gen(function* () {
           userId: memberTable.userId,
           role: memberTable.role,
           createdAt: memberTable.createdAt,
-          organization: {
-            id: organizationTable.id,
-            name: organizationTable.name,
-            slug: organizationTable.slug,
-          },
         })
         .from(memberTable)
-        .innerJoin(
-          organizationTable,
-          eq(memberTable.organizationId, organizationTable.id)
-        )
         .where(eq(memberTable.userId, args.userId)),
     findOrganizationMembers: (args: TFindOrganizationMembers) =>
       db

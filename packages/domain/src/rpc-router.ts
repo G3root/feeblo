@@ -6,9 +6,10 @@ import { ChangelogRpcHandlers } from "./changelog/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
+import { OrganizationRpcHandlers } from "./organization/handlers";
 import { PostRpcHandlers } from "./post/handlers";
-import { PostStatusRpcHandlers } from "./post-status/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
+import { PostStatusRpcHandlers } from "./post-status/handlers";
 import { AllRpcs } from "./rpc-group";
 import {
   AuthMiddlewareLive,
@@ -29,6 +30,7 @@ export const RpcRoute = RpcServer.layerHttpRouter({
   Layer.provide(BoardRpcHandlers),
   Layer.provide(ChangelogRpcHandlers),
   Layer.provide(MembershipRpcHandlers),
+  Layer.provide(OrganizationRpcHandlers),
   Layer.provide(CommentReactionRpcHandlers),
   Layer.provide(CommentRpcHandlers),
   Layer.provide(SiteRpcHandlers),

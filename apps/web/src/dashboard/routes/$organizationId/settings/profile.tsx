@@ -1,21 +1,11 @@
-import {
-  Cancel01Icon,
-  Delete02Icon,
-  Edit01Icon,
-} from "@hugeicons/core-free-icons";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { toastManager } from "~/components/ui/toast";
+import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { authClient, profilePictureUploadEndpoint } from "~/lib/auth-client";
@@ -155,130 +145,65 @@ function DangerZone() {
 
 function ProfileButton() {
   const { data, refetch } = authClient.useSession();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!data) {
     return null;
   }
 
-  const imageUrl = data.user.image;
-  const name = data.user.name;
-
-  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
+  async function uploadProfilePicture(file: File) {
     const formData = new FormData();
     formData.set("file", file);
 
-    try {
-      const response = await fetch(profilePictureUploadEndpoint, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
+    const response = await fetch(profilePictureUploadEndpoint, {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
 
-      if (!response.ok) {
-        toastManager.add({
-          title: "Failed to upload profile picture",
-          type: "error",
-        });
-        return;
-      }
-
-      await refetch();
-      toastManager.add({ title: "Profile picture updated", type: "success" });
-    } catch {
+    if (!response.ok) {
       toastManager.add({
         title: "Failed to upload profile picture",
         type: "error",
       });
+      throw new Error("Failed to upload profile picture");
     }
 
-    event.target.value = "";
-  }
-
-  function triggerFileInput() {
-    fileInputRef.current?.click();
+    await refetch();
+    toastManager.add({ title: "Profile picture updated", type: "success" });
   }
 
   return (
-    <>
-      <input
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={handleFileChange}
-        ref={fileInputRef}
-        type="file"
-      />
-      {imageUrl ? (
-        <AvatarDropdown onChangeAvatar={triggerFileInput} />
+    <SettingsAvatarControl.Root
+      ariaLabel="Edit profile picture"
+      imageAlt="Profile picture"
+      imageUrl={data.user.image}
+      name={data.user.name}
+      onRemove={async () => {
+        await authClient.updateUser({
+          image: null,
+        });
+        await refetch();
+      }}
+      onUpload={uploadProfilePicture}
+    >
+      {data.user.image ? (
+        <SettingsAvatarControl.Dropdown>
+          <SettingsAvatarControl.DropdownTrigger />
+          <SettingsAvatarControl.Menu>
+            <SettingsAvatarControl.ChangeItem>
+              Change Avatar
+            </SettingsAvatarControl.ChangeItem>
+            <SettingsAvatarControl.RemoveItem
+              errorTitle="Failed to remove avatar"
+              successTitle="Avatar removed successfully"
+            >
+              Remove Avatar
+            </SettingsAvatarControl.RemoveItem>
+          </SettingsAvatarControl.Menu>
+        </SettingsAvatarControl.Dropdown>
       ) : (
-        <AvatarButton
-          imageUrl={imageUrl}
-          name={name}
-          onClick={triggerFileInput}
-        />
+        <SettingsAvatarControl.Button />
       )}
-    </>
-  );
-}
-
-interface AvatarButtonProps extends React.ComponentProps<"button"> {
-  imageUrl: string | null | undefined;
-  name: string;
-}
-
-function AvatarButton({ name, imageUrl, ...props }: AvatarButtonProps) {
-  return (
-    <button aria-label="Edit profile picture" type="button" {...props}>
-      <Avatar>
-        {imageUrl ? <AvatarImage alt="Profile picture" src={imageUrl} /> : null}
-        <AvatarFallback>
-          {name.trim().slice(0, 1).toUpperCase() || "U"}
-        </AvatarFallback>
-      </Avatar>
-    </button>
-  );
-}
-
-function AvatarDropdown({ onChangeAvatar }: { onChangeAvatar: () => void }) {
-  const { data, refetch } = authClient.useSession();
-  if (!data) {
-    return null;
-  }
-
-  const imageUrl = data.user.image;
-  const name = data.user.name;
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<AvatarButton imageUrl={imageUrl} name={name} />}
-      />
-      <DropdownMenuContent className="w-40">
-        <DropdownMenuItem onClick={onChangeAvatar}>
-          <HugeiconsIcon icon={Edit01Icon} />
-          <span>Change Avatar</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={async () => {
-            await authClient.updateUser({
-              image: null,
-            });
-            refetch();
-            toastManager.add({
-              title: "Avatar removed successfully",
-              type: "success",
-            });
-          }}
-        >
-          <HugeiconsIcon icon={Cancel01Icon} />
-          <span>Remove Avatar</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    </SettingsAvatarControl.Root>
   );
 }

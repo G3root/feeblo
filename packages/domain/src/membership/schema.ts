@@ -8,11 +8,6 @@ export const Membership = Schema.Struct({
   userId: Schema.String,
   role: ROLE_LITERAL,
   createdAt: Schema.Date,
-  organization: Schema.Struct({
-    id: Schema.String,
-    name: Schema.String,
-    slug: Schema.String,
-  }),
 });
 
 export type TMembership = Schema.Schema.Type<typeof Membership>;

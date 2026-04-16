@@ -572,6 +572,34 @@ export const membershipCollection = createCollection(
   })
 );
 
+export const organizationCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: ["organizations"],
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const data = await fetchRpc((rpc) => rpc.OrganizationList(), {
+        signal: ctx.signal,
+      });
+
+      return [...data];
+    },
+    queryClient: TanstackQuery.getContext().queryClient,
+    getKey: (item) => item.id,
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedOrganization } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.OrganizationUpdate({
+          organizationId: updatedOrganization.id,
+          name: updatedOrganization.name,
+          logo: updatedOrganization.logo,
+        })
+      );
+    },
+  })
+);
+
 export const membersCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(20)),
