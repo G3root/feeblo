@@ -24,9 +24,23 @@ import { Config, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 
 export const initAuthHandler = () =>
   Effect.gen(function* () {
+    const optionalString = (name: string) =>
+      Config.string(name).pipe(
+        Config.option,
+        Effect.map((value) =>
+          value._tag === "Some" && value.value.trim() !== ""
+            ? value
+            : { _tag: "None" as const }
+        )
+      );
+
     const appUrl = yield* Config.string("VITE_APP_URL");
     const apiUrl = yield* Config.string("VITE_API_URL");
     const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
+    const githubClientId = yield* optionalString("GITHUB_CLIENT_ID");
+    const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
+    const googleClientId = yield* optionalString("GOOGLE_CLIENT_ID");
+    const googleClientSecret = yield* optionalString("GOOGLE_CLIENT_SECRET");
     const polarService = yield* PolarService;
 
     const db = yield* DB;
@@ -46,6 +60,33 @@ export const initAuthHandler = () =>
       }),
       baseURL: appUrl,
       secret: Redacted.value(secret),
+      ...((githubClientId._tag === "Some" &&
+        githubClientSecret._tag === "Some") ||
+      (googleClientId._tag === "Some" && googleClientSecret._tag === "Some")
+        ? {
+            socialProviders: {
+              ...(githubClientId._tag === "Some" &&
+              githubClientSecret._tag === "Some"
+                ? {
+                    github: {
+                      clientId: githubClientId.value,
+                      clientSecret: githubClientSecret.value,
+                    },
+                  }
+                : {}),
+              ...(googleClientId._tag === "Some" &&
+              googleClientSecret._tag === "Some"
+                ? {
+                    google: {
+                      prompt: "select_account",
+                      clientId: googleClientId.value,
+                      clientSecret: googleClientSecret.value,
+                    },
+                  }
+                : {}),
+            },
+          }
+        : {}),
       telemetry: {
         enabled: false,
       },
