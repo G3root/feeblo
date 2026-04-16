@@ -6,6 +6,9 @@
       "types": "./dist/server.d.ts",
       "default": "./src/server.ts"
     },
+    "./config": {
+      "default": "./src/config.ts"
+    },
     "./client": {
       "types": "./dist/auth-client.d.ts",
       "default": "./src/auth-client.ts"
@@ -13,6 +16,7 @@
   },
   "scripts": {},
   "dependencies": {
+    "@feeblo/config": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/transactional": "workspace:*",
@@ -23,7 +27,6 @@
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@feeblo/config": "workspace:*",
     "typescript": "catalog:"
   }
 }

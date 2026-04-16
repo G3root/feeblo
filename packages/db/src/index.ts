@@ -2,18 +2,16 @@
 
 import * as Pg from "@effect/sql-drizzle/Pg";
 import { PgClient } from "@effect/sql-pg";
-import { Config, Effect, Layer } from "effect";
+import { Effect, Layer } from "effect";
+import { DatabaseConfig } from "./config";
 import * as relationalSchema from "./relations";
 import * as schema from "./schema";
 
 export const PgClientLive = Layer.unwrapEffect(
-  Config.redacted("DATABASE_URL").pipe(
-    Effect.map((url) =>
-      PgClient.layer({
-        url,
-      })
-    )
-  )
+  Effect.gen(function* () {
+    const { url } = yield* DatabaseConfig;
+    return PgClient.layer({ url });
+  }).pipe(Effect.provide(DatabaseConfig.layer))
 );
 
 const makeDb = Pg.make({

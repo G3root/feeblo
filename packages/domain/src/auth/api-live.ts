@@ -4,13 +4,14 @@ import {
   HttpServerRequest,
   HttpServerResponse,
 } from "@effect/platform";
-import { Config, Effect, Either } from "effect";
+import { Effect, Either } from "effect";
 import { Api } from "../http/api";
 import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
 } from "../rpc-errors";
+import { VerificationOtpConfig } from "./config";
 import type { VerificationOTPState } from "./schema";
 import {
   encryptVerificationOTPState,
@@ -35,21 +36,13 @@ function postVerificationOtp(
   payload: VerificationOTPState
 ): Effect.Effect<{ success: boolean }, BadRequestError | InternalServerError> {
   return Effect.gen(function* () {
-    const appUrl = yield* Config.string("VITE_APP_URL").pipe(
-      Effect.mapError(
-        () => new InternalServerError({ message: "Missing VITE_APP_URL" })
-      )
-    );
-    const secret = yield* Config.string("AUTH_ENCRYPTION_KEY").pipe(
-      Effect.mapError(
-        () =>
-          new InternalServerError({ message: "Missing AUTH_ENCRYPTION_KEY" })
-      )
-    );
+    const { appUrl, secret } = yield* VerificationOtpConfig;
 
     const email = payload.email.toLowerCase();
     if (!isValidVerificationOTPEmail(email)) {
-      return yield* new BadRequestError({ message: "Invalid verification state" });
+      return yield* new BadRequestError({
+        message: "Invalid verification state",
+      });
     }
 
     const encryptedState = yield* encryptVerificationOTPState(
@@ -81,7 +74,7 @@ function postVerificationOtp(
     );
 
     return { success: true };
-  });
+  }).pipe(Effect.provide(VerificationOtpConfig.layer));
 }
 
 function getVerificationOtp(): Effect.Effect<
@@ -90,12 +83,7 @@ function getVerificationOtp(): Effect.Effect<
   HttpServerRequest.HttpServerRequest
 > {
   return Effect.gen(function* () {
-    const secret = yield* Config.string("AUTH_ENCRYPTION_KEY").pipe(
-      Effect.mapError(
-        () =>
-          new InternalServerError({ message: "Missing AUTH_ENCRYPTION_KEY" })
-      )
-    );
+    const { secret } = yield* VerificationOtpConfig;
     const request = yield* HttpServerRequest.HttpServerRequest;
     const cookieData = generateVerificationOTPCookieData(false);
     const cookieValue = request.cookies[cookieData.name];
@@ -121,7 +109,7 @@ function getVerificationOtp(): Effect.Effect<
       email: stateResult.right.email,
       type: stateResult.right.type,
     };
-  });
+  }).pipe(Effect.provide(VerificationOtpConfig.layer));
 }
 
 function deleteVerificationOtp(): Effect.Effect<{ success: boolean }> {

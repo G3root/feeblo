@@ -1,28 +1,12 @@
 import { FileSystem } from "@effect/platform";
 import { S3 } from "@effect-aws/client-s3";
 import { S3FileSystem } from "@effect-aws/s3";
-import { Config, Effect, Layer } from "effect";
+import { Effect, Layer } from "effect";
+import { S3Config } from "./s3-config";
 
-/**
- * Configuration for S3 service
- */
-const S3ConfigSchema = Effect.all({
-  region: Config.string("MEDIA_UPLOAD_REGION"),
-  endpoint: Config.string("MEDIA_UPLOAD_ENDPOINT"),
-  accessKeyId: Config.string("MEDIA_UPLOAD_ACCESS_KEY_ID").pipe(Config.option),
-  secretAccessKey: Config.string("MEDIA_UPLOAD_SECRET_ACCESS_KEY").pipe(
-    Config.option
-  ),
-  publicBucketName: Config.string("MEDIA_PUBLIC_BUCKET_NAME"),
-  publicBaseUrl: Config.string("MEDIA_PUBLIC_BASE_URL").pipe(Config.option),
-});
-
-/**
- * Layer that provides S3Service with custom configuration
- */
 export const S3Layer = Layer.unwrapEffect(
   Effect.gen(function* () {
-    const config = yield* S3ConfigSchema;
+    const config = yield* S3Config;
 
     const credentials =
       config.accessKeyId._tag === "Some" &&
@@ -38,7 +22,7 @@ export const S3Layer = Layer.unwrapEffect(
       endpoint: config.endpoint,
       ...(credentials ? { credentials } : {}),
     });
-  })
+  }).pipe(Effect.provide(S3Config.layer))
 );
 
 const TRAILING_SLASH_REGEX = /\/$/;
@@ -47,7 +31,7 @@ const ORGANIZATION_LOGO_PREFIX = "organization-logos";
 const EDITOR_MEDIA_PREFIX = "editor-media";
 
 const makeS3UploadService = Effect.gen(function* () {
-  const config = yield* S3ConfigSchema;
+  const config = yield* S3Config;
   const bucket = config.publicBucketName;
   const fileSystem = yield* FileSystem.FileSystem;
   const resolvePublicUrl = (fileKey: string) => {
@@ -118,20 +102,19 @@ const makeS3UploadService = Effect.gen(function* () {
 export class S3UploadService extends Effect.Service<S3UploadService>()(
   "S3UploadService",
   {
-    effect: makeS3UploadService,
+    effect: makeS3UploadService.pipe(Effect.provide(S3Config.layer)),
   }
 ) {
   static readonly layer = this.Default;
 }
 
 export const S3UploadServiceLive = Layer.unwrapEffect(
-  Config.string("MEDIA_PUBLIC_BUCKET_NAME").pipe(
-    Effect.map((bucketName) => {
-      const S3FileSystemLive = S3FileSystem.layer({ bucketName }).pipe(
-        Layer.provide(S3Layer)
-      );
+  Effect.gen(function* () {
+    const { publicBucketName } = yield* S3Config;
+    const S3FileSystemLive = S3FileSystem.layer({
+      bucketName: publicBucketName,
+    }).pipe(Layer.provide(S3Layer));
 
-      return S3UploadService.layer.pipe(Layer.provide(S3FileSystemLive));
-    })
-  )
+    return S3UploadService.layer.pipe(Layer.provide(S3FileSystemLive));
+  }).pipe(Effect.provide(S3Config.layer))
 );

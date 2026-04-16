@@ -1,27 +1,16 @@
 import { Polar } from "@polar-sh/sdk";
-import { Config, Effect, Redacted, Schema } from "effect";
+import { Effect, Redacted } from "effect";
 import { BadRequestError } from "../rpc-errors";
+import { PolarConfig } from "./config";
 import {
   FailedToCreateCheckoutError,
   FailedToCreatePortalError,
 } from "./errors";
 
-const PolarModeConfig = Schema.Config(
-  "POLAR_MODE",
-  Schema.Literal("sandbox", "production")
-).pipe(Config.withDefault("sandbox"));
-
 const URLRegex = /\/$/;
 
 const makePolarService = Effect.gen(function* () {
-  const appUrl = yield* Config.string("VITE_APP_URL");
-  const accessToken = yield* Config.redacted("POLAR_ACCESS_TOKEN").pipe(
-    Config.option
-  );
-  const webhookSecret = yield* Config.redacted("POLAR_WEBHOOK_SECRET").pipe(
-    Config.option
-  );
-  const server = yield* PolarModeConfig;
+  const { accessToken, appUrl, server, webhookSecret } = yield* PolarConfig;
 
   const client =
     accessToken._tag === "Some"
@@ -37,7 +26,7 @@ const makePolarService = Effect.gen(function* () {
   return {
     client,
     webhookSecret,
-    createCheckout: ({
+    createCheckout: Effect.fn("PolarService.createCheckout")(function* ({
       organizationId,
       productId,
       user,
@@ -49,67 +38,69 @@ const makePolarService = Effect.gen(function* () {
         email?: string | null;
         name?: string | null;
       };
-    }) =>
-      Effect.gen(function* () {
-        if (!client) {
-          return yield* new BadRequestError({
-            message: "Polar billing is not configured",
-          });
-        }
-
-        const checkout = yield* Effect.tryPromise({
-          try: () =>
-            client.checkouts.create({
-              products: [productId],
-              metadata: {
-                org: organizationId,
-              },
-              externalCustomerId: user.id,
-              customerEmail: user.email ?? undefined,
-              customerName: user.name ?? undefined,
-              successUrl: `${billingBaseUrl(organizationId)}?checkout_id={CHECKOUT_ID}`,
-              returnUrl: billingBaseUrl(organizationId),
-            }),
-          catch: () =>
-            new FailedToCreateCheckoutError({
-              message: "Failed to create Polar checkout",
-            }),
+    }) {
+      if (!client) {
+        return yield* new BadRequestError({
+          message: "Polar billing is not configured",
         });
+      }
 
-        return {
-          url: checkout.url,
-        };
-      }),
-    createPortal: ({ customerId }: { customerId: string }) =>
-      Effect.gen(function* () {
-        if (!client) {
-          return yield* new BadRequestError({
-            message: "Polar billing is not configured",
-          });
-        }
+      const checkout = yield* Effect.tryPromise({
+        try: () =>
+          client.checkouts.create({
+            products: [productId],
+            metadata: {
+              org: organizationId,
+            },
+            externalCustomerId: user.id,
+            customerEmail: user.email ?? undefined,
+            customerName: user.name ?? undefined,
+            successUrl: `${billingBaseUrl(organizationId)}?checkout_id={CHECKOUT_ID}`,
+            returnUrl: billingBaseUrl(organizationId),
+          }),
+        catch: () =>
+          new FailedToCreateCheckoutError({
+            message: "Failed to create Polar checkout",
+          }),
+      });
 
-        const portalSession = yield* Effect.tryPromise({
-          try: () =>
-            client.customerSessions.create({
-              customerId,
-            }),
-          catch: () =>
-            new FailedToCreatePortalError({
-              message: "Failed to create Polar customer portal session",
-            }),
+      return {
+        url: checkout.url,
+      };
+    }),
+    createPortal: Effect.fn("PolarService.createPortal")(function* ({
+      customerId,
+    }: {
+      customerId: string;
+    }) {
+      if (!client) {
+        return yield* new BadRequestError({
+          message: "Polar billing is not configured",
         });
+      }
 
-        return {
-          url: portalSession.customerPortalUrl,
-        };
-      }),
+      const portalSession = yield* Effect.tryPromise({
+        try: () =>
+          client.customerSessions.create({
+            customerId,
+          }),
+        catch: () =>
+          new FailedToCreatePortalError({
+            message: "Failed to create Polar customer portal session",
+          }),
+      });
+
+      return {
+        url: portalSession.customerPortalUrl,
+      };
+    }),
   };
 });
 
 export class PolarService extends Effect.Service<PolarService>()(
   "PolarService",
   {
-    effect: makePolarService,
+    effect: makePolarService.pipe(Effect.provide(PolarConfig.layer)),
   }
 ) {
   static readonly layer = this.Default;

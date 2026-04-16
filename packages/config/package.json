@@ -1,5 +1,13 @@
 {
   "name": "@feeblo/config",
+  "type": "module",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "exports": {
+    "./effect": "./src/effect.ts",
+    "./tsconfig.base.json": "./tsconfig.base.json"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  }
 }

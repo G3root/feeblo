@@ -21,13 +21,15 @@ import {
   HttpApiAuthMiddlewareLive,
 } from "@feeblo/domain/session-middleware";
 import { Config, Effect, Layer } from "effect";
+import { ServerConfig } from "./config";
 
 const ServiceLayers = DB.Client;
 const AuthLayer = Layer.effect(Auth, initAuthHandler());
 
-const BetterAuthApp = Effect.flatMap(initAuthHandler(), (auth) =>
-  HttpApp.fromWebHandler(auth.handler)
-);
+const BetterAuthApp = Effect.gen(function* () {
+  const auth = yield* Auth;
+  return yield* HttpApp.fromWebHandler(auth.handler);
+});
 
 const BetterAuthRouterLive = HttpLayerRouter.use((router) =>
   router.add("*", "/api/auth/*", (request) =>
@@ -45,20 +47,20 @@ const DocsRoute = HttpApiScalar.layerHttpLayerRouter({
 });
 
 const CorsLayer = Layer.unwrapEffect(
-  Config.all({
-    appUrl: Config.string("VITE_APP_URL"),
-    apiUrl: Config.string("VITE_API_URL"),
-  }).pipe(
-    Effect.map(({ appUrl, apiUrl }) => {
-      const appParsed = new URL(appUrl);
-      const apiParsed = new URL(apiUrl);
-      const appOrigin = appParsed.origin;
-      const apiOrigin = apiParsed.origin;
+  Effect.gen(function* () {
+    const { appUrl, apiUrl } = yield* ServerConfig;
 
-      const isAllowedOrigin = (origin: string) => {
+    const appParsed = new URL(appUrl);
+    const apiParsed = new URL(apiUrl);
+    const appOrigin = appParsed.origin;
+    const apiOrigin = apiParsed.origin;
+
+    return HttpLayerRouter.cors({
+      allowedOrigins: (origin: string) => {
         if (origin === appOrigin || origin === apiOrigin) {
           return true;
         }
+
         try {
           const { hostname, port } = new URL(origin);
           return (
@@ -68,15 +70,11 @@ const CorsLayer = Layer.unwrapEffect(
         } catch {
           return false;
         }
-      };
-
-      return HttpLayerRouter.cors({
-        allowedOrigins: isAllowedOrigin,
-        allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        credentials: true,
-      });
-    })
-  )
+      },
+      allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      credentials: true,
+    });
+  }).pipe(Effect.provide(ServerConfig.layer))
 );
 
 const HealthRouter = HttpLayerRouter.use((router) =>

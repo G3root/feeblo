@@ -20,27 +20,20 @@ import {
   organization,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
-import { Config, Effect, Layer, ManagedRuntime, Redacted } from "effect";
+import { Effect, Layer, ManagedRuntime, Redacted } from "effect";
+import { AuthConfig } from "./config";
 
 export const initAuthHandler = () =>
   Effect.gen(function* () {
-    const optionalString = (name: string) =>
-      Config.string(name).pipe(
-        Config.option,
-        Effect.map((value) =>
-          value._tag === "Some" && value.value.trim() !== ""
-            ? value
-            : { _tag: "None" as const }
-        )
-      );
-
-    const appUrl = yield* Config.string("VITE_APP_URL");
-    const apiUrl = yield* Config.string("VITE_API_URL");
-    const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
-    const githubClientId = yield* optionalString("GITHUB_CLIENT_ID");
-    const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
-    const googleClientId = yield* optionalString("GOOGLE_CLIENT_ID");
-    const googleClientSecret = yield* optionalString("GOOGLE_CLIENT_SECRET");
+    const {
+      appUrl,
+      apiUrl,
+      githubClientId,
+      githubClientSecret,
+      googleClientId,
+      googleClientSecret,
+      secret,
+    } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
     const db = yield* DB;
@@ -255,7 +248,12 @@ export const initAuthHandler = () =>
     return betterAuth(config);
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(PolarService.layer, BillingRepository.layer, Mailer.layer)
+      Layer.mergeAll(
+        AuthConfig.layer,
+        PolarService.layer,
+        BillingRepository.layer,
+        Mailer.layer
+      )
     )
   );
 

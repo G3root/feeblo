@@ -20,6 +20,7 @@
     "email:start": "email start"
   },
   "dependencies": {
+    "@feeblo/config": "workspace:*",
     "@react-email/components": "^1.0.9",
     "@react-email/render": "^2.0.4",
     "effect": "catalog:",
