@@ -1,15 +1,19 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
+import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { Badge } from "~/components/ui/badge";
-import { buttonVariants } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
-import { cn } from "~/lib/utils";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "~/components/ui/item";
 import {
   FeedbackBrowseLayout,
   FeedbackBrowseLayoutContent,
@@ -17,6 +21,16 @@ import {
 } from "../components/layout/feedback-browse-layout";
 import { publicChangelogCollection } from "../lib/collections";
 import { useSite } from "../providers/site-provider";
+
+function MainLayout({ children }: { children: ReactNode }) {
+  return (
+    <FeedbackBrowseLayout>
+      <FeedbackBrowseLayoutContent fullWidth>
+        <FeedbackBrowseLayoutMain>{children}</FeedbackBrowseLayoutMain>
+      </FeedbackBrowseLayoutContent>
+    </FeedbackBrowseLayout>
+  );
+}
 
 export function ChangelogPage() {
   const site = useSite();
@@ -36,95 +50,62 @@ export function ChangelogPage() {
   );
 
   if (isLoading) {
-    return (
-      <FeedbackBrowseLayout>
-        <FeedbackBrowseLayoutContent fullWidth>
-          <FeedbackBrowseLayoutMain>
-            Loading changelog...
-          </FeedbackBrowseLayoutMain>
-        </FeedbackBrowseLayoutContent>
-      </FeedbackBrowseLayout>
-    );
+    return <MainLayout>Loading changelog...</MainLayout>;
   }
 
   if (isError) {
     return (
-      <FeedbackBrowseLayout>
-        <FeedbackBrowseLayoutContent fullWidth>
-          <FeedbackBrowseLayoutMain>
-            <Empty className="border">
-              <EmptyHeader>
-                <EmptyTitle>Changelog unavailable</EmptyTitle>
-                <EmptyDescription>
-                  There was a problem loading published changelog entries.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          </FeedbackBrowseLayoutMain>
-        </FeedbackBrowseLayoutContent>
-      </FeedbackBrowseLayout>
+      <MainLayout>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>Changelog unavailable</EmptyTitle>
+            <EmptyDescription>
+              There was a problem loading published changelog entries.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </MainLayout>
     );
   }
 
   return (
-    <FeedbackBrowseLayout>
-      <FeedbackBrowseLayoutContent fullWidth>
-        <FeedbackBrowseLayoutMain>
-          <h2 className="pb-3 font-semibold text-base tracking-tight">
-            Changelogs
-          </h2>
-          {changelogs.length === 0 ? (
-            <Empty className="border">
-              <EmptyHeader>
-                <EmptyTitle>No published changelogs yet</EmptyTitle>
-                <EmptyDescription>
-                  Published changelog updates will appear here once they are
-                  released.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
-              {changelogs.map((item) => (
-                <Card className="ring-1 ring-border/60" key={item.id}>
-                  <CardHeader className="space-y-3">
-                    <Badge variant="outline">
-                      {formatDate(item.publishedAt ?? item.createdAt)}
-                    </Badge>
-                    <CardTitle>{item.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground text-sm leading-6">
-                      {getChangelogExcerpt(item.content)}
-                    </p>
-                    <Link
-                      className={cn(
-                        buttonVariants({ size: "sm", variant: "outline" }),
-                        "w-fit"
-                      )}
-                      href={`/changelog/${item.slug}`}
-                    >
-                      Read update
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </FeedbackBrowseLayoutMain>
-      </FeedbackBrowseLayoutContent>
-    </FeedbackBrowseLayout>
+    <MainLayout>
+      <h2 className="pb-3 font-semibold text-base tracking-tight">
+        Changelogs
+      </h2>
+      {changelogs.length === 0 ? (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>No published changelogs yet</EmptyTitle>
+            <EmptyDescription>
+              Published changelog updates will appear here once they are
+              released.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <ItemGroup className="gap-2">
+          {changelogs.map((item) => (
+            <Item
+              key={item.id}
+              render={
+                <Link href={`/changelog/${item.slug}`}>
+                  <ItemContent>
+                    <ItemTitle>{item.title}</ItemTitle>
+                    <ItemDescription>
+                      Published {formatDate(item.publishedAt ?? item.createdAt)}
+                    </ItemDescription>
+                  </ItemContent>
+                </Link>
+              }
+              role="listitem"
+              variant="muted"
+            />
+          ))}
+        </ItemGroup>
+      )}
+    </MainLayout>
   );
-}
-
-function getChangelogExcerpt(content: string) {
-  const textOnly = content
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return textOnly || "Published changelog update.";
 }
 
 function formatDate(value: Date) {

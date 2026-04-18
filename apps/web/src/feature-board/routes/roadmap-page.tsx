@@ -1,4 +1,5 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
+import type { ReactNode } from "react";
 import { useLocation } from "wouter";
 import {
   Empty,
@@ -22,6 +23,16 @@ import {
   publicPostStatusCollection,
 } from "../lib/collections";
 import { useSite } from "../providers/site-provider";
+
+function MainLayout({ children }: { children: ReactNode }) {
+  return (
+    <FeedbackBrowseLayout>
+      <FeedbackBrowseLayoutContent fullWidth>
+        <FeedbackBrowseLayoutMain>{children}</FeedbackBrowseLayoutMain>
+      </FeedbackBrowseLayoutContent>
+    </FeedbackBrowseLayout>
+  );
+}
 
 export function RoadmapPage() {
   const site = useSite();
@@ -124,55 +135,47 @@ export function RoadmapPage() {
 
   if (statusError || boardError || postError) {
     return (
-      <FeedbackBrowseLayout>
-        <FeedbackBrowseLayoutContent fullWidth>
-          <FeedbackBrowseLayoutMain>
-            <Empty className="border">
-              <EmptyHeader>
-                <EmptyTitle>Roadmap unavailable</EmptyTitle>
-                <EmptyDescription>
-                  There was a problem loading the roadmap.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          </FeedbackBrowseLayoutMain>
-        </FeedbackBrowseLayoutContent>
-      </FeedbackBrowseLayout>
+      <MainLayout>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>Roadmap unavailable</EmptyTitle>
+            <EmptyDescription>
+              There was a problem loading the roadmap.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </MainLayout>
     );
   }
 
   return (
-    <FeedbackBrowseLayout>
-      <FeedbackBrowseLayoutContent fullWidth>
-        <FeedbackBrowseLayoutMain>
-          <h2 className="px-3 pb-3 font-semibold text-base tracking-tight">
-            RoadMap
-          </h2>
+    <MainLayout>
+      <h2 className="px-3 pb-3 font-semibold text-base tracking-tight">
+        RoadMap
+      </h2>
 
-          {statusLoading || boardLoading || postLoading ? (
-            <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
-              {["planned", "progress", "completed"].map((key) => (
-                <div className="h-96 w-80 rounded-lg bg-muted/30" key={key} />
-              ))}
-            </div>
-          ) : (
-            <RoadmapGrid
-              emptyLaneMessage="No updates in this stage."
-              lanes={groupedPosts}
-              renderCard={({ post }) => (
-                <PublicRoadmapIssueCard
-                  boardName={post.boardName}
-                  key={post.id}
-                  onClick={() => navigate(`/p/${post.slug}`)}
-                  status={post.status}
-                  title={post.title}
-                  updatedAt={post.updatedAt}
-                />
-              )}
+      {statusLoading || boardLoading || postLoading ? (
+        <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
+          {["planned", "progress", "completed"].map((key) => (
+            <div className="h-96 w-80 rounded-lg bg-muted/30" key={key} />
+          ))}
+        </div>
+      ) : (
+        <RoadmapGrid
+          emptyLaneMessage="No updates in this stage."
+          lanes={groupedPosts}
+          renderCard={({ post }) => (
+            <PublicRoadmapIssueCard
+              boardName={post.boardName}
+              key={post.id}
+              onClick={() => navigate(`/p/${post.slug}`)}
+              status={post.status}
+              title={post.title}
+              updatedAt={post.updatedAt}
             />
           )}
-        </FeedbackBrowseLayoutMain>
-      </FeedbackBrowseLayoutContent>
-    </FeedbackBrowseLayout>
+        />
+      )}
+    </MainLayout>
   );
 }
