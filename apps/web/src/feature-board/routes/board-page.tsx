@@ -1,5 +1,11 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
 import { BoardListCard } from "../components/feedback/board-list-card";
 import {
   FeedbackCard,
@@ -116,12 +122,14 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
   if (boardError || postsError) {
     return (
       <MainContent>
-        <div className="min-w-0 rounded-lg border border-border/60 p-12 text-center">
-          <p className="font-medium text-sm">Posts unavailable</p>
-          <p className="mt-1 text-muted-foreground text-xs">
-            There was a problem loading this board.
-          </p>
-        </div>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>Posts unavailable</EmptyTitle>
+            <EmptyDescription>
+              There was a problem loading this board.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </MainContent>
     );
   }
@@ -129,12 +137,14 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
   if (!board) {
     return (
       <MainContent>
-        <div className="min-w-0 rounded-lg border border-border/60 p-12 text-center">
-          <p className="font-medium text-sm">Board not found</p>
-          <p className="mt-1 text-muted-foreground text-xs">
-            This public board does not exist anymore.
-          </p>
-        </div>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>Board not found</EmptyTitle>
+            <EmptyDescription>
+              This public board does not exist anymore.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </MainContent>
     );
   }
@@ -144,14 +154,14 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
       <MainContent>
         <div className="min-w-0">
           <ListHeader count={0} title={board.name} />
-          <div className="w-full rounded-lg border border-border/70 border-dashed p-12 text-center">
-            <p className="font-medium text-foreground/80 text-sm">
-              No posts yet
-            </p>
-            <p className="mt-1 text-muted-foreground text-xs">
-              New updates and requests for this board will appear here.
-            </p>
-          </div>
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyTitle>No feedback yet</EmptyTitle>
+              <EmptyDescription>
+                Posts from this board will appear here once shared publicly.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </div>
       </MainContent>
     );

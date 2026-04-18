@@ -11,7 +11,6 @@ import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 import { Link } from "wouter";
 import { z } from "zod";
-import { getPostReactionCollectionKey } from "../../dashboard/lib/reaction-keys";
 import {
   Avatar,
   AvatarFallback,
@@ -41,14 +40,15 @@ import {
 import { authClient } from "~/lib/auth-client";
 import { fetchRpc } from "~/lib/runtime";
 import { cn } from "~/lib/utils";
+import { getPostReactionCollectionKey } from "../../dashboard/lib/reaction-keys";
 import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { useUpvote } from "../hooks/use-upvote";
 import {
   publicBoardCollection,
   publicPostCollection,
-  publicPostStatusCollection,
   publicPostReactionCollection,
+  publicPostStatusCollection,
   publicUpvoteCollection,
 } from "../lib/collections";
 import { formatPostStatus, getInitials } from "../lib/utils";
@@ -160,7 +160,14 @@ export function PostPage({ slug }: { slug: string }) {
         )
         .findOne();
     },
-    [site.organizationId, slug, statusLoading, boardsLoading, statusError, boardsError]
+    [
+      site.organizationId,
+      slug,
+      statusLoading,
+      boardsLoading,
+      statusError,
+      boardsError,
+    ]
   );
   const postStatus = statuses.find((status) => status.id === post?.statusId);
   const postId = post?.id ?? "";
@@ -213,7 +220,7 @@ export function PostPage({ slug }: { slug: string }) {
 
   if (statusLoading || boardsLoading || postLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
         Loading post...
       </div>
     );
@@ -221,7 +228,7 @@ export function PostPage({ slug }: { slug: string }) {
 
   if (statusError || boardsError || postError) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="rounded-lg border border-border/60 p-10 text-center">
           <p className="font-medium text-sm">Post unavailable</p>
           <p className="mt-1 text-muted-foreground text-sm">
@@ -234,7 +241,7 @@ export function PostPage({ slug }: { slug: string }) {
 
   if (!post) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="rounded-lg border border-border/60 p-10 text-center">
           <p className="font-medium text-sm">Post not found</p>
           <p className="mt-1 text-muted-foreground text-sm">

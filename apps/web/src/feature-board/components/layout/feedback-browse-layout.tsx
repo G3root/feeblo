@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
+import { cn } from "~/lib/utils";
 
 export function FeedbackBrowseLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto max-w-5xl overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
       {children}
     </div>
   );
@@ -10,11 +11,18 @@ export function FeedbackBrowseLayout({ children }: { children: ReactNode }) {
 
 export function FeedbackBrowseLayoutContent({
   children,
+  fullWidth,
 }: {
   children: ReactNode;
+  fullWidth?: boolean;
 }) {
   return (
-    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_220px]">
+    <div
+      className={cn(
+        "grid min-w-0 gap-8",
+        fullWidth ? "lg:grid-cols-1" : "lg:grid-cols-[minmax(0,1fr)_220px]"
+      )}
+    >
       {children}
     </div>
   );

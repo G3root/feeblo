@@ -3,7 +3,18 @@ import { Link } from "wouter";
 import { Badge } from "~/components/ui/badge";
 import { buttonVariants } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
 import { cn } from "~/lib/utils";
+import {
+  FeedbackBrowseLayout,
+  FeedbackBrowseLayoutContent,
+  FeedbackBrowseLayoutMain,
+} from "../components/layout/feedback-browse-layout";
 import { publicChangelogCollection } from "../lib/collections";
 import { useSite } from "../providers/site-provider";
 
@@ -26,73 +37,83 @@ export function ChangelogPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
-        Loading changelog...
-      </div>
+      <FeedbackBrowseLayout>
+        <FeedbackBrowseLayoutContent fullWidth>
+          <FeedbackBrowseLayoutMain>
+            Loading changelog...
+          </FeedbackBrowseLayoutMain>
+        </FeedbackBrowseLayoutContent>
+      </FeedbackBrowseLayout>
     );
   }
 
   if (isError) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-border/60 p-10 text-center">
-          <p className="font-medium text-sm">Changelog unavailable</p>
-          <p className="mt-1 text-muted-foreground text-sm">
-            There was a problem loading published changelog entries.
-          </p>
-        </div>
-      </div>
+      <FeedbackBrowseLayout>
+        <FeedbackBrowseLayoutContent fullWidth>
+          <FeedbackBrowseLayoutMain>
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>Changelog unavailable</EmptyTitle>
+                <EmptyDescription>
+                  There was a problem loading published changelog entries.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </FeedbackBrowseLayoutMain>
+        </FeedbackBrowseLayoutContent>
+      </FeedbackBrowseLayout>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="space-y-3">
-        <Badge variant="outline">Published updates</Badge>
-        <h1 className="font-semibold text-3xl tracking-tight">Changelog</h1>
-        <p className="max-w-2xl text-muted-foreground text-sm leading-6">
-          Track product updates, launches, and shipped improvements.
-        </p>
-      </div>
-
-      {changelogs.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-border/70 border-dashed p-12 text-center">
-          <p className="font-medium text-foreground/80 text-sm">
-            No published changelogs yet
-          </p>
-          <p className="mt-1 text-muted-foreground text-xs">
-            Published updates will appear here once they are released.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {changelogs.map((item) => (
-            <Card className="ring-1 ring-border/60" key={item.id}>
-              <CardHeader className="space-y-3">
-                <Badge variant="outline">
-                  {formatDate(item.publishedAt ?? item.createdAt)}
-                </Badge>
-                <CardTitle>{item.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground text-sm leading-6">
-                  {getChangelogExcerpt(item.content)}
-                </p>
-                <Link
-                  className={cn(
-                    buttonVariants({ size: "sm", variant: "outline" }),
-                    "w-fit"
-                  )}
-                  href={`/changelog/${item.slug}`}
-                >
-                  Read update
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+    <FeedbackBrowseLayout>
+      <FeedbackBrowseLayoutContent fullWidth>
+        <FeedbackBrowseLayoutMain>
+          <h2 className="pb-3 font-semibold text-base tracking-tight">
+            Changelogs
+          </h2>
+          {changelogs.length === 0 ? (
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>No published changelogs yet</EmptyTitle>
+                <EmptyDescription>
+                  Published changelog updates will appear here once they are
+                  released.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {changelogs.map((item) => (
+                <Card className="ring-1 ring-border/60" key={item.id}>
+                  <CardHeader className="space-y-3">
+                    <Badge variant="outline">
+                      {formatDate(item.publishedAt ?? item.createdAt)}
+                    </Badge>
+                    <CardTitle>{item.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground text-sm leading-6">
+                      {getChangelogExcerpt(item.content)}
+                    </p>
+                    <Link
+                      className={cn(
+                        buttonVariants({ size: "sm", variant: "outline" }),
+                        "w-fit"
+                      )}
+                      href={`/changelog/${item.slug}`}
+                    >
+                      Read update
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </FeedbackBrowseLayoutMain>
+      </FeedbackBrowseLayoutContent>
+    </FeedbackBrowseLayout>
   );
 }
 

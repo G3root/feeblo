@@ -1,16 +1,20 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useLocation } from "wouter";
 import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
+import {
   groupRoadmapPostsByStatus,
   PublicRoadmapIssueCard,
   RoadmapGrid,
 } from "../../dashboard/features/roadmap/components";
-import { BoardListCard } from "../components/feedback/board-list-card";
 import {
   FeedbackBrowseLayout,
   FeedbackBrowseLayoutContent,
   FeedbackBrowseLayoutMain,
-  FeedbackBrowseLayoutSidebar,
 } from "../components/layout/feedback-browse-layout";
 import {
   publicBoardCollection,
@@ -121,18 +125,17 @@ export function RoadmapPage() {
   if (statusError || boardError || postError) {
     return (
       <FeedbackBrowseLayout>
-        <FeedbackBrowseLayoutContent>
+        <FeedbackBrowseLayoutContent fullWidth>
           <FeedbackBrowseLayoutMain>
-            <div className="rounded-lg border border-border/60 p-12 text-center">
-              <p className="font-medium text-sm">Roadmap unavailable</p>
-              <p className="mt-1 text-muted-foreground text-xs">
-                There was a problem loading the roadmap.
-              </p>
-            </div>
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>Roadmap unavailable</EmptyTitle>
+                <EmptyDescription>
+                  There was a problem loading the roadmap.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           </FeedbackBrowseLayoutMain>
-          <FeedbackBrowseLayoutSidebar>
-            <BoardListCard />
-          </FeedbackBrowseLayoutSidebar>
         </FeedbackBrowseLayoutContent>
       </FeedbackBrowseLayout>
     );
@@ -140,15 +143,11 @@ export function RoadmapPage() {
 
   return (
     <FeedbackBrowseLayout>
-      <FeedbackBrowseLayoutContent>
+      <FeedbackBrowseLayoutContent fullWidth>
         <FeedbackBrowseLayoutMain>
-          <div className="space-y-3 px-3 pb-2">
-            <h1 className="font-semibold text-3xl tracking-tight">Roadmap</h1>
-            <p className="max-w-2xl text-muted-foreground text-sm leading-6">
-              Follow planned, in-progress, and completed work across the
-              product.
-            </p>
-          </div>
+          <h2 className="px-3 pb-3 font-semibold text-base tracking-tight">
+            RoadMap
+          </h2>
 
           {statusLoading || boardLoading || postLoading ? (
             <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
@@ -173,10 +172,6 @@ export function RoadmapPage() {
             />
           )}
         </FeedbackBrowseLayoutMain>
-
-        <FeedbackBrowseLayoutSidebar>
-          <BoardListCard />
-        </FeedbackBrowseLayoutSidebar>
       </FeedbackBrowseLayoutContent>
     </FeedbackBrowseLayout>
   );

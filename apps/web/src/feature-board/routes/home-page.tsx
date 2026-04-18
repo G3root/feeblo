@@ -1,6 +1,12 @@
 import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
 
 import type { ReactNode } from "react";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
 import { BoardListCard } from "../components/feedback/board-list-card";
 import {
   FeedbackCard,
@@ -29,6 +35,19 @@ function MainContent({ children }: { children: ReactNode }) {
         </FeedbackBrowseLayoutSidebar>
       </FeedbackBrowseLayoutContent>
     </FeedbackBrowseLayout>
+  );
+}
+
+function ListHeader({ count, title }: { count?: number; title: string }) {
+  return (
+    <div className="flex items-baseline justify-between px-1 pb-3">
+      <h2 className="font-semibold text-base tracking-tight">{title}</h2>
+      {count !== undefined && (
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {count} {count === 1 ? "post" : "posts"}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -113,11 +132,7 @@ export function HomePage() {
     return (
       <MainContent>
         <div className="min-w-0">
-          <div className="flex items-baseline justify-between px-1 pb-3">
-            <h2 className="font-semibold text-base tracking-tight">
-              All feedback
-            </h2>
-          </div>
+          <ListHeader title="Loading..." />
           <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
             {["a", "b", "c", "d", "e"].map((key) => (
               <FeedbackCardSkeleton key={key} />
@@ -131,11 +146,31 @@ export function HomePage() {
   if (statusError || boardError || postsError) {
     return (
       <MainContent>
-        <div className="min-w-0 rounded-lg border border-border/60 p-12 text-center">
-          <p className="font-medium text-sm">Feedback unavailable</p>
-          <p className="mt-1 text-muted-foreground text-xs">
-            There was a problem loading feedback.
-          </p>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>Feedback unavailable</EmptyTitle>
+            <EmptyDescription>
+              There was a problem loading feedback.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </MainContent>
+    );
+  }
+
+  if (postsWithBoards.length === 0) {
+    return (
+      <MainContent>
+        <div className="min-w-0">
+          <ListHeader count={0} title="All feedback" />
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyTitle>No feedback yet</EmptyTitle>
+              <EmptyDescription>
+                Posts from all boards will appear here once shared publicly.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         </div>
       </MainContent>
     );
@@ -144,47 +179,26 @@ export function HomePage() {
   return (
     <MainContent>
       <div className="min-w-0">
-        <div className="flex items-baseline justify-between px-1 pb-3">
-          <h2 className="font-semibold text-base tracking-tight">
-            All feedback
-          </h2>
-          {postsWithBoards.length > 0 && (
-            <span className="text-muted-foreground text-xs tabular-nums">
-              {postsWithBoards.length}{" "}
-              {postsWithBoards.length === 1 ? "post" : "posts"}
-            </span>
-          )}
+        <ListHeader count={postsWithBoards.length} title="All feedback" />
+        <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
+          {postsWithBoards.map((post) => {
+            const board = post.board[0];
+            const status = post.status[0];
+
+            if (!(board && status)) {
+              return null;
+            }
+
+            return (
+              <FeedbackCard
+                board={board}
+                key={post.id}
+                post={post}
+                status={status.type}
+              />
+            );
+          })}
         </div>
-        {postsWithBoards.length === 0 ? (
-          <div className="w-full rounded-lg border border-border/70 border-dashed p-12 text-center">
-            <p className="font-medium text-foreground/80 text-sm">
-              No feedback yet
-            </p>
-            <p className="mt-1 text-muted-foreground text-xs">
-              Posts from all boards will appear here once shared publicly.
-            </p>
-          </div>
-        ) : (
-          <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
-            {postsWithBoards.map((post) => {
-              const board = post.board[0];
-              const status = post.status[0];
-
-              if (!(board && status)) {
-                return null;
-              }
-
-              return (
-                <FeedbackCard
-                  board={board}
-                  key={post.id}
-                  post={post}
-                  status={status.type}
-                />
-              );
-            })}
-          </div>
-        )}
       </div>
     </MainContent>
   );

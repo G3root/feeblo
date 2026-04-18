@@ -33,7 +33,7 @@ export function ChangeLogDetailPage({
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
         Loading changelog...
       </div>
     );
@@ -41,7 +41,7 @@ export function ChangeLogDetailPage({
 
   if (isError) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="rounded-lg border border-border/60 p-10 text-center">
           <p className="font-medium text-sm">Changelog unavailable</p>
           <p className="mt-1 text-muted-foreground text-sm">
@@ -54,7 +54,7 @@ export function ChangeLogDetailPage({
 
   if (!changelog) {
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="rounded-lg border border-border/60 p-10 text-center">
           <p className="font-medium text-sm">Changelog not found</p>
           <p className="mt-1 text-muted-foreground text-sm">
@@ -66,7 +66,7 @@ export function ChangeLogDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <article className="space-y-8">
         <Link
           className={cn(
