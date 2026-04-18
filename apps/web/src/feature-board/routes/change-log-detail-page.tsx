@@ -1,11 +1,33 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { ArrowLeft } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { Badge } from "~/components/ui/badge";
 import { buttonVariants } from "~/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
 import { cn } from "~/lib/utils";
+import {
+  FeedbackBrowseLayout,
+  FeedbackBrowseLayoutContent,
+  FeedbackBrowseLayoutMain,
+} from "../components/layout/feedback-browse-layout";
 import { publicChangelogCollection } from "../lib/collections";
 import { useSite } from "../providers/site-provider";
+
+function MainLayout({ children }: { children: ReactNode }) {
+  return (
+    <FeedbackBrowseLayout>
+      <FeedbackBrowseLayoutContent fullWidth>
+        <FeedbackBrowseLayoutMain>{children}</FeedbackBrowseLayoutMain>
+      </FeedbackBrowseLayoutContent>
+    </FeedbackBrowseLayout>
+  );
+}
 
 export function ChangeLogDetailPage({
   changelogSlug,
@@ -32,41 +54,41 @@ export function ChangeLogDetailPage({
   );
 
   if (isLoading) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
-        Loading changelog...
-      </div>
-    );
+    return <MainLayout>Loading changelog...</MainLayout>;
   }
 
   if (isError) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-border/60 p-10 text-center">
-          <p className="font-medium text-sm">Changelog unavailable</p>
-          <p className="mt-1 text-muted-foreground text-sm">
-            There was a problem loading this published changelog.
-          </p>
-        </div>
-      </div>
+      <MainLayout>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Changelog unavailable</EmptyTitle>
+            <EmptyDescription>
+              There was a problem loading this published changelog.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </MainLayout>
     );
   }
 
   if (!changelog) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-border/60 p-10 text-center">
-          <p className="font-medium text-sm">Changelog not found</p>
-          <p className="mt-1 text-muted-foreground text-sm">
-            This published changelog entry does not exist anymore.
-          </p>
-        </div>
-      </div>
+      <MainLayout>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Changelog not found</EmptyTitle>
+            <EmptyDescription>
+              This published changelog entry does not exist anymore.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </MainLayout>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <MainLayout>
       <article className="space-y-8">
         <Link
           className={cn(
@@ -94,11 +116,11 @@ export function ChangeLogDetailPage({
         </header>
 
         <div
-          className="prose prose-sm max-w-none prose-img:rounded-lg prose-img:border prose-a:text-foreground prose-headings:text-foreground text-foreground/85 prose-p:leading-7"
+          className="typography"
           dangerouslySetInnerHTML={{ __html: changelog.content }}
         />
       </article>
-    </div>
+    </MainLayout>
   );
 }
 

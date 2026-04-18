@@ -7,13 +7,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle,
-} from "~/components/ui/item";
 import { Separator } from "~/components/ui/separator";
 import {
   FeedbackBrowseLayout,
@@ -85,41 +78,60 @@ export function ChangelogPage() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <ItemGroup className="gap-2">
-          {changelogs.map((item) => (
-            <Item
-              key={item.id}
-              render={
-                <Link href={`/changelog/${item.slug}`}>
-                  <ItemContent>
-                    <ItemTitle>{item.title}</ItemTitle>
-                    <ItemDescription>
-                      {getChangelogExcerpt(item.content)}
-                    </ItemDescription>
-                    <Separator />
-                    <ItemDescription>
-                      Published {formatDate(item.publishedAt ?? item.createdAt)}
-                    </ItemDescription>
-                  </ItemContent>
-                </Link>
-              }
-              role="listitem"
+        <>
+          <div className="pt-6 pb-8">
+            <Separator />
+          </div>
+
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-3 hidden h-full w-px bg-border/60 md:block"
             />
-          ))}
-        </ItemGroup>
+            {changelogs.map((item) => (
+              <article
+                className="grid gap-6 pb-14 md:grid-cols-[11rem_minmax(0,1fr)] md:items-start md:gap-10 md:pb-16"
+                key={item.id}
+              >
+                <div className="relative md:self-start">
+                  <div className="relative flex items-center gap-3 md:sticky md:top-24 md:pl-8">
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-1/2 left-3 hidden size-2.5 -translate-x-1/2 -translate-y-1/2 md:block"
+                    >
+                      <span className="absolute inset-0 size-2.5 animate-ping rounded-full bg-foreground/35" />
+                      <span className="relative block size-2.5 rounded-full bg-foreground" />
+                    </span>
+                    <time className="font-medium text-muted-foreground text-sm tracking-tight">
+                      {formatDate(item.publishedAt ?? item.createdAt)}
+                    </time>
+                  </div>
+                </div>
+
+                <div className="min-w-0 space-y-6 p-0 sm:p-0">
+                  <header>
+                    <Link
+                      className="block w-fit transition-opacity hover:opacity-80"
+                      href={`/changelog/${item.slug}`}
+                    >
+                      <h3 className="font-semibold text-2xl tracking-tight sm:text-3xl">
+                        {item.title}
+                      </h3>
+                    </Link>
+                  </header>
+
+                  <div
+                    className="typography"
+                    dangerouslySetInnerHTML={{ __html: item.content }}
+                  />
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
       )}
     </MainLayout>
   );
-}
-
-function getChangelogExcerpt(content: string) {
-  const textOnly = content
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return textOnly || "Published changelog update.";
 }
 
 function formatDate(value: Date) {
