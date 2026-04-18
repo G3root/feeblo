@@ -1,8 +1,6 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { Badge } from "~/components/ui/badge";
 import { buttonVariants } from "~/components/ui/button";
 import {
   Empty,
@@ -12,22 +10,14 @@ import {
 } from "~/components/ui/empty";
 import { cn } from "~/lib/utils";
 import {
-  FeedbackBrowseLayout,
-  FeedbackBrowseLayoutContent,
-  FeedbackBrowseLayoutMain,
-} from "../components/layout/feedback-browse-layout";
+  ChangelogPageLayout,
+  ChangelogStickyRail,
+  ChangelogTimelineBody,
+  ChangelogTimelineItem,
+  formatChangelogDate,
+} from "../components/changelog/changelog-layout";
 import { publicChangelogCollection } from "../lib/collections";
 import { useSite } from "../providers/site-provider";
-
-function MainLayout({ children }: { children: ReactNode }) {
-  return (
-    <FeedbackBrowseLayout>
-      <FeedbackBrowseLayoutContent fullWidth>
-        <FeedbackBrowseLayoutMain>{children}</FeedbackBrowseLayoutMain>
-      </FeedbackBrowseLayoutContent>
-    </FeedbackBrowseLayout>
-  );
-}
 
 export function ChangeLogDetailPage({
   changelogSlug,
@@ -54,12 +44,12 @@ export function ChangeLogDetailPage({
   );
 
   if (isLoading) {
-    return <MainLayout>Loading changelog...</MainLayout>;
+    return <ChangelogPageLayout>Loading changelog...</ChangelogPageLayout>;
   }
 
   if (isError) {
     return (
-      <MainLayout>
+      <ChangelogPageLayout>
         <Empty>
           <EmptyHeader>
             <EmptyTitle>Changelog unavailable</EmptyTitle>
@@ -68,13 +58,13 @@ export function ChangeLogDetailPage({
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
-      </MainLayout>
+      </ChangelogPageLayout>
     );
   }
 
   if (!changelog) {
     return (
-      <MainLayout>
+      <ChangelogPageLayout>
         <Empty>
           <EmptyHeader>
             <EmptyTitle>Changelog not found</EmptyTitle>
@@ -83,51 +73,47 @@ export function ChangeLogDetailPage({
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
-      </MainLayout>
+      </ChangelogPageLayout>
     );
   }
 
   return (
-    <MainLayout>
-      <article className="space-y-8">
-        <Link
-          className={cn(
-            buttonVariants({ size: "sm", variant: "ghost" }),
-            "w-fit"
-          )}
-          href="/changelog"
-        >
-          <ArrowLeft />
-          Back
-        </Link>
+    <ChangelogPageLayout>
+      <ChangelogTimelineItem>
+        <ChangelogStickyRail>
+          <Link
+            className={cn(
+              buttonVariants({ size: "sm", variant: "ghost" }),
+              "w-fit"
+            )}
+            href="/changelog"
+          >
+            <ArrowLeft />
+            Back
+          </Link>
+        </ChangelogStickyRail>
 
-        <header className="space-y-4">
-          <Badge variant="outline">
-            {formatDate(changelog.publishedAt ?? changelog.createdAt)}
-          </Badge>
-          <div className="space-y-3">
-            <h1 className="max-w-3xl font-semibold text-4xl tracking-tight">
-              {changelog.title}
-            </h1>
-            <p className="text-muted-foreground text-sm">
-              Published by {changelog.user.name ?? "Anonymous"}
+        <ChangelogTimelineBody className="space-y-8">
+          <header className="space-y-4">
+            <p className="font-medium text-muted-foreground text-sm tracking-tight">
+              {formatChangelogDate(changelog.publishedAt ?? changelog.createdAt)}
             </p>
-          </div>
-        </header>
+            <div className="space-y-3">
+              <h1 className="max-w-3xl font-semibold text-4xl tracking-tight sm:text-5xl">
+                {changelog.title}
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Published by {changelog.user.name ?? "Anonymous"}
+              </p>
+            </div>
+          </header>
 
-        <div
-          className="typography"
-          dangerouslySetInnerHTML={{ __html: changelog.content }}
-        />
-      </article>
-    </MainLayout>
+          <div
+            className="typography"
+            dangerouslySetInnerHTML={{ __html: changelog.content }}
+          />
+        </ChangelogTimelineBody>
+      </ChangelogTimelineItem>
+    </ChangelogPageLayout>
   );
-}
-
-function formatDate(value: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(value);
 }
