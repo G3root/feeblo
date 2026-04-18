@@ -14,6 +14,7 @@ import {
   ItemGroup,
   ItemTitle,
 } from "~/components/ui/item";
+import { Separator } from "~/components/ui/separator";
 import {
   FeedbackBrowseLayout,
   FeedbackBrowseLayoutContent,
@@ -93,19 +94,32 @@ export function ChangelogPage() {
                   <ItemContent>
                     <ItemTitle>{item.title}</ItemTitle>
                     <ItemDescription>
+                      {getChangelogExcerpt(item.content)}
+                    </ItemDescription>
+                    <Separator />
+                    <ItemDescription>
                       Published {formatDate(item.publishedAt ?? item.createdAt)}
                     </ItemDescription>
                   </ItemContent>
                 </Link>
               }
               role="listitem"
-              variant="muted"
             />
           ))}
         </ItemGroup>
       )}
     </MainLayout>
   );
+}
+
+function getChangelogExcerpt(content: string) {
+  const textOnly = content
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return textOnly || "Published changelog update.";
 }
 
 function formatDate(value: Date) {
