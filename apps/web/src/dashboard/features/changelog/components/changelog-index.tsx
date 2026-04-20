@@ -16,6 +16,14 @@ import {
   EmptyTitle,
 } from "~/components/ui/empty";
 import { Skeleton } from "~/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 import { toastManager } from "~/components/ui/toast";
 import type { ChangelogStatus } from "~/features/changelog/constants";
 import { hasMembership, usePolicy } from "~/hooks/use-policy";
@@ -200,14 +208,41 @@ export function ChangelogIndexPending({
             <Skeleton className="h-9 w-28 rounded-md" />
           </div>
         </div>
-        <div className="grid gap-4 px-4 py-4 md:grid-cols-2 lg:px-6 xl:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div className="space-y-3 border-b pb-4" key={index}>
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-          ))}
+        <div className="px-4 py-4 lg:px-6">
+          <div className="overflow-hidden rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Author</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Publish date</TableHead>
+                  <TableHead>Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <Skeleton className="h-4 w-40" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-36" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </section>
     </div>

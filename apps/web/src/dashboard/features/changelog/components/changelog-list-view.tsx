@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemGroup,
-  ItemTitle,
-} from "~/components/ui/item";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 import type { ChangelogStatus } from "../constants";
 import { ChangelogStatusBadge } from "./changelog-status";
 
@@ -31,30 +32,62 @@ export function ChangelogListView({
   organizationId: string;
 }) {
   return (
-    <div className="flex flex-col p-3">
-      <ItemGroup className="gap-1">
-        {changelogs.map((changelog) => (
-          <Item
-            className="rounded-xl"
-            key={changelog.id}
-            render={
-              <Link
-                params={{ organizationId, changelogSlug: changelog.slug }}
-                to="/$organizationId/changelog/edit/$changelogSlug"
-              >
-                <ItemContent>
-                  <ItemTitle>{changelog.title}</ItemTitle>
-                  <ItemDescription>{changelog.user.name}</ItemDescription>
-                </ItemContent>
-                <ItemContent className="flex-none text-center">
-                  <ChangelogStatusBadge status={changelog.status} />
-                </ItemContent>
-              </Link>
-            }
-            variant="default"
-          />
-        ))}
-      </ItemGroup>
+    <div className="p-3">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Title</TableHead>
+            <TableHead>Author</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Publish date</TableHead>
+            <TableHead>Updated</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {changelogs.map((changelog) => (
+            <TableRow key={changelog.id}>
+              <TableCell>
+                <Link
+                  params={{ organizationId, changelogSlug: changelog.slug }}
+                  to="/$organizationId/changelog/edit/$changelogSlug"
+                >
+                  {changelog.title}
+                </Link>
+              </TableCell>
+              <TableCell>{changelog.user.name ?? "Unknown"}</TableCell>
+              <TableCell>
+                <ChangelogStatusBadge status={changelog.status} />
+              </TableCell>
+              <TableCell>
+                {formatPublishDate(
+                  changelog.publishedAt,
+                  changelog.scheduledAt
+                )}
+              </TableCell>
+              <TableCell>{formatDate(changelog.updatedAt)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
+}
+
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  }).format(date);
+}
+
+function formatPublishDate(publishedAt: Date | null, scheduledAt: Date | null) {
+  const value = publishedAt ?? scheduledAt;
+
+  if (!value) {
+    return "Not scheduled";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(value);
 }
