@@ -1,4 +1,4 @@
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
 import {
@@ -15,16 +15,15 @@ import {
 import { changelogCollection } from "~/lib/collections";
 
 export const Route = createFileRoute(
-  "/$organizationId/_dashboard-layout/changelog/$changelogSlug"
+  "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 )({
   component: RouteComponent,
-  pendingComponent: ChangelogRoutePending,
 });
 
 function RouteComponent() {
   const { organizationId, changelogSlug } = Route.useParams();
 
-  const { data: changelog } = useLiveSuspenseQuery(
+  const changelogQuery = useLiveQuery(
     (q) =>
       q
         .from({ changelog: changelogCollection })
@@ -37,6 +36,24 @@ function RouteComponent() {
         .findOne(),
     [organizationId, changelogSlug]
   );
+  const changelog = changelogQuery.data;
+
+  if (changelogQuery.isLoading) {
+    return <ChangelogEditorSkeleton />;
+  }
+
+  if (changelogQuery.isError) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyTitle>Changelog unavailable</EmptyTitle>
+          <EmptyDescription>
+            There was a problem loading this changelog entry.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
 
   if (!changelog) {
     return (
@@ -72,8 +89,4 @@ function RouteComponent() {
       organizationId={organizationId}
     />
   );
-}
-
-function ChangelogRoutePending() {
-  return <ChangelogEditorSkeleton />;
 }
