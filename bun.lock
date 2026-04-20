@@ -123,6 +123,9 @@
     "packages/config": {
       "name": "@feeblo/config",
       "version": "0.0.0",
+      "dependencies": {
+        "effect": "catalog:",
+      },
     },
     "packages/db": {
       "name": "@feeblo/db",
@@ -181,6 +184,7 @@
       "name": "@feeblo/transactional",
       "version": "0.0.1",
       "dependencies": {
+        "@feeblo/config": "workspace:*",
         "@react-email/components": "^1.0.9",
         "@react-email/render": "^2.0.4",
         "effect": "catalog:",
