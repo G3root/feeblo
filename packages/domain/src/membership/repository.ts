@@ -4,8 +4,9 @@ import {
   member as memberTable,
   user as userTable,
 } from "@feeblo/db/schema/auth";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Effect, Array as EffectArray } from "effect";
+import { PRIVILEGED_MEMBER_ROLES } from "../plan-entitlements";
 
 type TFindMembershipsByUserId = {
   userId: string;
@@ -216,6 +217,39 @@ const makeMembershipRepository = Effect.gen(function* () {
             eq(memberTable.role, "owner")
           )
         ),
+    countPrivilegedMembers: ({ organizationId }: { organizationId: string }) =>
+      Effect.gen(function* () {
+        const members = yield* db
+          .select({ id: memberTable.id })
+          .from(memberTable)
+          .where(
+            and(
+              eq(memberTable.organizationId, organizationId),
+              inArray(memberTable.role, [...PRIVILEGED_MEMBER_ROLES])
+            )
+          );
+
+        return members.length;
+      }),
+    countPendingPrivilegedInvitations: ({
+      organizationId,
+    }: {
+      organizationId: string;
+    }) =>
+      Effect.gen(function* () {
+        const invitations = yield* db
+          .select({ id: invitationTable.id })
+          .from(invitationTable)
+          .where(
+            and(
+              eq(invitationTable.organizationId, organizationId),
+              eq(invitationTable.status, "pending"),
+              inArray(invitationTable.role, [...PRIVILEGED_MEMBER_ROLES])
+            )
+          );
+
+        return invitations.length;
+      }),
   };
 });
 

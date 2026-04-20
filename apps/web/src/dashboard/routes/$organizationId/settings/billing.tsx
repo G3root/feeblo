@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -22,22 +22,18 @@ import {
 import {
   type BillingInterval,
   buildPlanCards,
-  formatPlanBillingNote,
   formatPlanPrice,
-  formatRenewalDate,
-  getCurrentPlanIntervalLabel,
-  getCurrentProduct,
-  getPlanDetails,
+  PLAN_FEATURES,
   PLAN_COPY,
   type PlanType,
+  type WorkspacePlan,
   type WorkspaceProduct,
-  type WorkspaceSubscription,
 } from "~/features/billing/lib/plans";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
+  workspacePlanCollection,
   workspaceProductCollection,
-  workspaceSubscriptionCollection,
 } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
@@ -56,36 +52,20 @@ function BillingSettingsPage() {
     isError: productsError,
   } = useLiveQuery((q) => q.from({ product: workspaceProductCollection }), []);
 
-  const { data: subscriptions = [] } = useLiveQuery(
+  const { data: workspacePlans = [] } = useLiveQuery(
     (q) =>
       q
-        .from({ subscription: workspaceSubscriptionCollection })
-        .where(({ subscription }) =>
-          and(
-            eq(subscription.organizationId, organizationId),
-            eq(subscription.status, "active")
-          )
-        ),
+        .from({ plan: workspacePlanCollection })
+        .where(({ plan }) => eq(plan.organizationId, organizationId)),
     [organizationId]
   );
 
-  console.log({ subscriptions });
-
   const productList = products as WorkspaceProduct[];
-  const subscriptionList = subscriptions as WorkspaceSubscription[];
-
-  const currentProduct = useMemo(
-    () => getCurrentProduct(productList, subscriptionList),
-    [productList, subscriptionList]
-  );
-  const { currentPlanType, plans } = useMemo(
-    () => buildPlanCards(productList, currentProduct),
-    [productList, currentProduct]
-  );
-
-  const renewalLabel = formatRenewalDate(subscriptionList[0]?.currentPeriodEnd);
-  const currentPlanInterval = getCurrentPlanIntervalLabel(currentProduct);
-  const hasSubscription = subscriptionList.length > 0;
+  const currentPlanType =
+    (workspacePlans[0] as WorkspacePlan | undefined)?.plan ?? "free";
+  const { plans } = buildPlanCards(productList, currentPlanType);
+  const currentPlan = plans.find((plan) => plan.planType === currentPlanType);
+  const hasPaidPlan = currentPlanType !== "free";
 
   return (
     <SettingsLayout.Root size="large">
@@ -106,45 +86,29 @@ function BillingSettingsPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">
-                  {PLAN_COPY[currentPlanType].name}
-                </Badge>
-                {currentPlanType !== "free" ? (
-                  <Badge variant="outline">{currentPlanInterval}</Badge>
-                ) : null}
+                <Badge variant="secondary">{PLAN_COPY[currentPlanType].name}</Badge>
               </div>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <div className="font-semibold text-3xl tracking-tight">
-                    {formatPlanPrice(
-                      currentProduct,
-                      currentProduct?.recurringInterval ?? "year"
-                    )}
-                  </div>
                   <div className="text-muted-foreground text-sm">
-                    {currentProduct?.description ||
-                      PLAN_COPY[currentPlanType].description}
+                    {currentPlan?.description || PLAN_COPY[currentPlanType].description}
                   </div>
                 </div>
                 <Separator />
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <CurrentPlanStat
                     label="Plan"
                     value={PLAN_COPY[currentPlanType].name}
                   />
                   <CurrentPlanStat
-                    label="Billing"
-                    value={currentPlanInterval}
-                  />
-                  <CurrentPlanStat
-                    label="Renewal"
-                    value={renewalLabel || "No renewal scheduled"}
+                    label="Access"
+                    value={hasPaidPlan ? "Paid workspace" : "Free workspace"}
                   />
                 </div>
               </div>
-              {hasSubscription ? (
+              {hasPaidPlan ? (
                 <div className="flex justify-start">
                   <Button
                     onClick={async () => {
@@ -184,13 +148,9 @@ function BillingSettingsPage() {
                 <div className="grid gap-4 xl:grid-cols-3">
                   {plans.map((plan) => {
                     const selectedProduct = plan[selectedInterval];
-                    const details = getPlanDetails(
-                      selectedProduct,
-                      selectedInterval
-                    );
                     const isCurrentPlan = plan.planType === currentPlanType;
                     const ctaLabel =
-                      isCurrentPlan && hasSubscription
+                      isCurrentPlan && hasPaidPlan
                         ? "Manage billing"
                         : isCurrentPlan
                           ? "Current plan"
@@ -225,20 +185,14 @@ function BillingSettingsPage() {
                                 selectedInterval
                               )}
                             </div>
-                            <div className="text-muted-foreground text-sm">
-                              {formatPlanBillingNote(
-                                selectedProduct,
-                                selectedInterval
-                              )}
-                            </div>
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
                           <Separator />
                           <div className="space-y-3">
-                            {details.map((detail) => (
-                              <div className="text-sm" key={detail}>
-                                {detail}
+                            {PLAN_FEATURES[plan.planType].map((feature) => (
+                              <div className="text-sm" key={feature.feature}>
+                                {feature.feature}
                               </div>
                             ))}
                           </div>
@@ -249,11 +203,11 @@ function BillingSettingsPage() {
                             disabled={
                               loadingPlanType !== null ||
                               (!isCurrentPlan && plan.planType === "free") ||
-                              (isCurrentPlan && !hasSubscription) ||
+                              (isCurrentPlan && !hasPaidPlan) ||
                               (plan.planType !== "free" && !selectedProduct)
                             }
                             onClick={async () => {
-                              if (isCurrentPlan && hasSubscription) {
+                              if (isCurrentPlan && hasPaidPlan) {
                                 setLoadingPlanType(plan.planType);
                                 const didStart = await startBillingPortal({
                                   organizationId,
@@ -296,7 +250,7 @@ function BillingSettingsPage() {
                 </div>
               )}
 
-              {currentProduct ? (
+              {hasPaidPlan ? (
                 <div className="rounded-4xl border px-4 py-3 text-muted-foreground text-sm">
                   You are on the {PLAN_COPY[currentPlanType].name} plan. Use the
                   upgrade action to review plan changes and checkout options.

@@ -13,7 +13,7 @@ import {
 } from "@feeblo/db/schema/feedback";
 import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Effect, Array as EffectArray, Option } from "effect";
 import { FailedToCreateWorkspaceError } from "./errors";
 
@@ -125,40 +125,39 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         })
         .from(productTable)
         .where(eq(productTable.isArchived, false)),
-    findSubscriptionByOrganizationId: ({
+    findPlanByOrganizationId: ({
       organizationId,
     }: {
       organizationId: string;
     }) =>
-      db
-        .select({
-          id: subscriptionTable.id,
-          externalId: subscriptionTable.externalId,
-          organizationId: subscriptionTable.organizationId,
-          amount: subscriptionTable.amount,
-          cancelAtPeriodEnd: subscriptionTable.cancelAtPeriodEnd,
-          currency: subscriptionTable.currency,
-          recurringInterval: subscriptionTable.recurringInterval,
-          recurringIntervalCount: subscriptionTable.recurringIntervalCount,
-          status: subscriptionTable.status,
-          currentPeriodStart: subscriptionTable.currentPeriodStart,
-          currentPeriodEnd: subscriptionTable.currentPeriodEnd,
-          trialStart: subscriptionTable.trialStart,
-          trialEnd: subscriptionTable.trialEnd,
-          canceledAt: subscriptionTable.canceledAt,
-          startedAt: subscriptionTable.startedAt,
-          endsAt: subscriptionTable.endsAt,
-          endedAt: subscriptionTable.endedAt,
-          customerId: subscriptionTable.customerId,
-          productId: subscriptionTable.productId,
-          discountId: subscriptionTable.discountId,
-          checkoutId: subscriptionTable.checkoutId,
-          seats: subscriptionTable.seats,
-          createdAt: subscriptionTable.createdAt,
-          updatedAt: subscriptionTable.updatedAt,
-        })
-        .from(subscriptionTable)
-        .where(and(eq(subscriptionTable.organizationId, organizationId))),
+      Effect.gen(function* () {
+        const [subscription] = yield* db
+          .select({
+            organizationId: subscriptionTable.organizationId,
+            plan: productTable.metadata,
+          })
+          .from(subscriptionTable)
+          .innerJoin(
+            productTable,
+            eq(productTable.id, subscriptionTable.productId)
+          )
+          .where(
+            and(
+              eq(subscriptionTable.organizationId, organizationId),
+              eq(subscriptionTable.status, "active")
+            )
+          )
+          .orderBy(
+            desc(subscriptionTable.currentPeriodEnd),
+            desc(subscriptionTable.createdAt)
+          )
+          .limit(1);
+
+        return {
+          organizationId,
+          plan: subscription?.plan?.plan ?? "free",
+        } as const;
+      }),
   };
 });
 

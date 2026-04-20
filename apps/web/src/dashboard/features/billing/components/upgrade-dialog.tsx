@@ -1,12 +1,9 @@
-import {
-  CheckmarkCircle02Icon,
-  Clock01Icon,
-  SparklesIcon,
-} from "@hugeicons/core-free-icons";
+/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useState } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -28,7 +25,6 @@ import {
 import {
   Item,
   ItemContent,
-  ItemDescription,
   ItemGroup,
   ItemMedia,
   ItemTitle,
@@ -38,76 +34,32 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
+  workspacePlanCollection,
   workspaceProductCollection,
-  workspaceSubscriptionCollection,
 } from "~/lib/collections";
 import { useUpgradePlanDialogContext } from "../dialog-stores";
 import { startBillingCheckout, startBillingPortal } from "../lib/checkout";
 import {
   type BillingInterval,
   buildPlanCards,
-  formatPlanBillingNote,
   formatPlanPrice,
+  PLAN_FEATURES,
   type PlanType,
+  type WorkspacePlan,
   type WorkspaceProduct,
 } from "../lib/plans";
-
-type PlanFeature = {
-  title: string;
-  description: string;
-  icon: typeof CheckmarkCircle02Icon;
-};
 
 type PlanView = {
   planType: PlanType;
   name: string;
   description: string;
-  features: PlanFeature[];
+
   month: WorkspaceProduct | undefined;
   year: WorkspaceProduct | undefined;
   productId: {
     month: string;
     year: string;
   };
-};
-
-const PLAN_FEATURES: Record<PlanType, PlanFeature[]> = {
-  free: [
-    {
-      title: "Lorem ipsum dolor sit amet",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      icon: CheckmarkCircle02Icon,
-    },
-  ],
-  starter: [
-    {
-      title: "Lorem ipsum dolor sit amet",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      icon: CheckmarkCircle02Icon,
-    },
-    {
-      title: "Lorem ipsum dolor sit amet",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      icon: Clock01Icon,
-    },
-  ],
-  professional: [
-    {
-      title: "Lorem ipsum dolor sit amet",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      icon: CheckmarkCircle02Icon,
-    },
-    {
-      title: "Lorem ipsum dolor sit amet",
-      description:
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      icon: Clock01Icon,
-    },
-  ],
 };
 
 export function UpgradePlanDialog() {
@@ -138,47 +90,31 @@ function UpgradePlanDialogContent() {
     q.from({ product: workspaceProductCollection })
   );
 
-  const { data: subscriptions } = useLiveSuspenseQuery((q) =>
+  const { data: workspacePlans } = useLiveSuspenseQuery((q) =>
     q
-      .from({ subscription: workspaceSubscriptionCollection })
-      .join(
-        { product: workspaceProductCollection },
-        ({ product, subscription }) => eq(product.id, subscription.productId)
-      )
-      .where(({ subscription }) =>
-        and(
-          eq(subscription.organizationId, organizationId),
-          eq(subscription.status, "active")
-        )
-      )
+      .from({ plan: workspacePlanCollection })
+      .where(({ plan }) => eq(plan.organizationId, organizationId))
   );
 
-  const { plans, currentPlanType, currentInterval } = useMemo(() => {
-    const currentProduct = subscriptions[0]?.product as
-      | WorkspaceProduct
-      | undefined;
-    const { plans, currentPlanType, currentInterval } = buildPlanCards(
-      products as WorkspaceProduct[],
-      currentProduct
-    );
-
-    const planViews: PlanView[] = plans.map((plan) => ({
-      ...plan,
-      features: PLAN_FEATURES[plan.planType],
-      productId: {
-        month: plan.month?.id ?? "free",
-        year: plan.year?.id ?? "free",
-      },
-    }));
-
-    return { plans: planViews, currentPlanType, currentInterval };
-  }, [products, subscriptions]);
+  const currentPlanType =
+    (workspacePlans[0] as WorkspacePlan | undefined)?.plan ?? "free";
+  const { plans: rawPlans } = buildPlanCards(
+    products as WorkspaceProduct[],
+    currentPlanType
+  );
+  const plans: PlanView[] = rawPlans.map((plan) => ({
+    ...plan,
+    productId: {
+      month: plan.month?.id ?? "free",
+      year: plan.year?.id ?? "free",
+    },
+  }));
 
   const [selectedInterval, setSelectedInterval] =
-    useState<BillingInterval>(currentInterval);
+    useState<BillingInterval>("year");
   const [selectedPlanType, setSelectedPlanType] =
     useState<PlanType>(currentPlanType);
-  const hasSubscription = subscriptions.length > 0;
+  const hasPaidPlan = currentPlanType !== "free";
 
   const selectedPlan =
     plans.find((p) => p.planType === selectedPlanType) ?? plans[0];
@@ -188,7 +124,7 @@ function UpgradePlanDialogContent() {
     <DialogContent className="max-w-5xl">
       <DialogPanel scrollFade={false}>
         <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-          <div className="flex flex-col border-border bg-background lg:border-r">
+          <div className="flex flex-col border-border lg:border-r">
             <DialogHeader className="gap-4 px-6 pt-6 pb-5">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
@@ -255,7 +191,7 @@ function UpgradePlanDialogContent() {
 
               <DialogFooter className="pt-6" variant="bare">
                 <UpgradePlanButton
-                  hasSubscription={hasSubscription}
+                  hasPaidPlan={hasPaidPlan}
                   isCurrentPlan={isCurrentPlan}
                   organizationId={organizationId}
                   selectedInterval={selectedInterval}
@@ -273,37 +209,24 @@ function UpgradePlanDialogContent() {
               <p className="mt-2 text-base text-muted-foreground">
                 {selectedPlan.description}
               </p>
-              <p className="mt-2 text-muted-foreground text-sm">
-                {formatPlanBillingNote(
-                  selectedInterval === "year"
-                    ? selectedPlan.year
-                    : selectedPlan.month,
-                  selectedInterval
-                )}
-              </p>
             </div>
 
-            <div className="mt-10">
-              <div className="font-semibold text-muted-foreground text-xs uppercase tracking-[0.22em]">
-                Key benefits
-              </div>
-              <ItemGroup className="mt-5 gap-4">
-                {selectedPlan.features.map((feature) => (
-                  <Item key={feature.title} size="sm" variant="outline">
-                    <ItemMedia
-                      className="h-10 w-10 rounded-xl bg-muted text-muted-foreground"
-                      variant="icon"
-                    >
-                      <HugeiconsIcon className="h-5 w-5" icon={feature.icon} />
-                    </ItemMedia>
-                    <ItemContent>
-                      <ItemTitle>{feature.title}</ItemTitle>
-                      <ItemDescription>{feature.description}</ItemDescription>
-                    </ItemContent>
-                  </Item>
-                ))}
-              </ItemGroup>
-            </div>
+            <ItemGroup className="mt-5 gap-1">
+              {PLAN_FEATURES[selectedPlan.planType].map((feature) => (
+                <Item
+                  key={feature.feature + selectedPlan.name}
+                  size="sm"
+                  variant="outline"
+                >
+                  <ItemMedia>
+                    <HugeiconsIcon icon={StarIcon} />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>{feature.feature}</ItemTitle>
+                  </ItemContent>
+                </Item>
+              ))}
+            </ItemGroup>
           </aside>
         </div>
       </DialogPanel>
@@ -347,13 +270,13 @@ function UpgradePlanDialogSkeleton() {
 }
 
 function UpgradePlanButton({
-  hasSubscription,
+  hasPaidPlan,
   isCurrentPlan,
   organizationId,
   selectedPlan,
   selectedInterval,
 }: {
-  hasSubscription: boolean;
+  hasPaidPlan: boolean;
   isCurrentPlan: boolean;
   organizationId: string;
   selectedPlan: PlanView;
@@ -367,11 +290,11 @@ function UpgradePlanButton({
       disabled={
         loading ||
         (selectedPlan.planType === "free" && !isCurrentPlan) ||
-        (isCurrentPlan && !hasSubscription)
+        (isCurrentPlan && !hasPaidPlan)
       }
       onClick={async () => {
         try {
-          if (isCurrentPlan && hasSubscription) {
+          if (isCurrentPlan && hasPaidPlan) {
             setLoading(true);
             const didStart = await startBillingPortal({
               organizationId,
@@ -406,7 +329,7 @@ function UpgradePlanButton({
     >
       {loading
         ? "Redirecting..."
-        : isCurrentPlan && hasSubscription
+        : isCurrentPlan && hasPaidPlan
           ? "Manage Billing"
           : isCurrentPlan
             ? "Current Plan"

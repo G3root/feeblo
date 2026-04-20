@@ -1131,11 +1131,11 @@ export const workspaceProductCollection = createCollection(
   })
 );
 
-export const workspaceSubscriptionCollection = createCollection(
+export const workspacePlanCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["workspace-subscription"];
+      const cacheKey = ["workspace-plan"];
       for (const { field, value } of parsed.filters) {
         if (field.join(".") === "organizationId") {
           cacheKey.push(`organizationId-${value}`);
@@ -1155,16 +1155,13 @@ export const workspaceSubscriptionCollection = createCollection(
       if (!organizationId) {
         return [];
       }
-      const data = await fetchRpc(
-        (rpc) => rpc.WorkspaceSubscriptionGet({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-      return [...data];
+      const data = await fetchRpc((rpc) => rpc.WorkspacePlanGet({ organizationId }), {
+        signal: ctx.signal,
+      });
+      return [data];
     },
     queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
+    getKey: (item) => item.organizationId,
     staleTime: Number.POSITIVE_INFINITY,
   })
 );

@@ -114,6 +114,8 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
             catch: (error) =>
               toMembershipError(error, "Failed to invite member"),
           });
+
+          return;
         }).pipe(
           Policy.withPolicy(
             Policy.all(

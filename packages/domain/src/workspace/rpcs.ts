@@ -6,8 +6,8 @@ import {
   CreateWorkspaceInput,
   CreateWorkspaceOutput,
   WorkspaceInput,
+  WorkspacePlan,
   WorkspaceProduct,
-  WorkspaceSubscription,
 } from "./schema";
 
 export class WorkspaceRpcs extends RpcGroup.make(
@@ -20,9 +20,9 @@ export class WorkspaceRpcs extends RpcGroup.make(
     success: Schema.Array(WorkspaceProduct),
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("WorkspaceSubscriptionGet", {
+  Rpc.make("WorkspacePlanGet", {
     payload: WorkspaceInput,
-    success: Schema.Array(WorkspaceSubscription),
+    success: WorkspacePlan,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

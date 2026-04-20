@@ -1,5 +1,7 @@
 import { Effect, Array as EffectArray, Option } from "effect";
 import * as Policy from "../policy";
+import { PLAN_ENTITLEMENTS, isPrivilegedMemberRole } from "../plan-entitlements";
+import { WorkspaceRepository } from "../workspace/repository";
 import { MembershipRepository } from "./repository";
 
 type TIsNotMember = {
@@ -17,8 +19,15 @@ type TIsMember = {
   memberId: string;
 };
 
+type TCanAssignRoleWithinPlan = {
+  organizationId: string;
+  memberId: string;
+  role: "owner" | "admin" | "member";
+};
+
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
+  const workspaceRepository = yield* WorkspaceRepository;
 
   const isNotMember = (args: TIsNotMember) =>
     repository
@@ -45,11 +54,56 @@ const makeMembershipPolicy = Effect.gen(function* () {
         Effect.map((members) => members.length > 0)
       );
 
+  const canAssignRoleWithinPlan = (args: TCanAssignRoleWithinPlan) =>
+    Effect.gen(function* () {
+      const member = yield* repository.findMemberById({
+        memberId: args.memberId,
+      });
+
+      if (Option.isNone(member)) {
+        return yield* new Policy.PolicyDeniedError({ reason: "Member not found" });
+      }
+
+      if (
+        !isPrivilegedMemberRole(args.role) ||
+        isPrivilegedMemberRole(member.value.role)
+      ) {
+        return;
+      }
+
+      const planState = yield* workspaceRepository.findPlanByOrganizationId({
+        organizationId: args.organizationId,
+      });
+      const entitlements = PLAN_ENTITLEMENTS[planState.plan];
+
+      if (entitlements.privilegedRoleLimit === null) {
+        return;
+      }
+
+      const privilegedMembersCount = yield* repository.countPrivilegedMembers({
+        organizationId: args.organizationId,
+      });
+      const pendingPrivilegedInvitationsCount =
+        yield* repository.countPendingPrivilegedInvitations({
+          organizationId: args.organizationId,
+        });
+
+      if (
+        privilegedMembersCount + pendingPrivilegedInvitationsCount >=
+        entitlements.privilegedRoleLimit
+      ) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: `The ${planState.plan} plan allows up to ${entitlements.privilegedRoleLimit} admin roles.`,
+        });
+      }
+    });
+
   return {
     isNotMember,
     isMember,
     hasOtherOwners: (args: THasOtherOwners) =>
       Policy.all(hasOtherOwners(args), isMember(args)),
+    canAssignRoleWithinPlan,
   };
 });
 
@@ -57,7 +111,7 @@ export class MembershipPolicy extends Effect.Service<MembershipPolicy>()(
   "MembershipPolicy",
   {
     effect: makeMembershipPolicy,
-    dependencies: [MembershipRepository.Default],
+    dependencies: [MembershipRepository.Default, WorkspaceRepository.Default],
   }
 ) {
   static readonly layer = this.Default;

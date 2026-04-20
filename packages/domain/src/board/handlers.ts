@@ -1,7 +1,7 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { requireOrganizationMembership } from "../authorization";
 import * as Policy from "../policy";
-import { InternalServerError } from "../rpc-errors";
+import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import {
   FailedToCreateBoardError,
@@ -85,26 +85,53 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
               reason: "You are not a member of this organization",
             });
           }
+
           yield* repository.create({
             ...args,
             creatorId: session.session.userId,
             creatorMemberId: isMember.membershipId,
           });
         }).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              boardPolicy.canCreate({
+                organizationId: args.organizationId,
+                visibility: args.visibility,
+              })
+            )
+          ),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToCreateBoardError()),
           })
         );
       },
       BoardUpdate: (args: TBoardUpdate) =>
-        repository.update(args).pipe(
+        Effect.gen(function* () {
+          const currentBoard = yield* repository.getById({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+
+          if (Option.isNone(currentBoard)) {
+            return yield* new BadRequestError({
+              message: "Board not found",
+            });
+          }
+
+          return yield* repository.update(args);
+        }).pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
               boardPolicy.isOwner({
                 organizationId: args.organizationId,
                 boardId: args.id,
+              }),
+              boardPolicy.canUpdate({
+                organizationId: args.organizationId,
+                boardId: args.id,
+                visibility: args.visibility,
               })
             )
           ),
@@ -114,4 +141,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(BoardRepository.layer), Layer.provide(BoardPolicy.layer));
+).pipe(
+  Layer.provide(BoardRepository.layer),
+  Layer.provide(BoardPolicy.layer)
+);

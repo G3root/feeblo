@@ -25,6 +25,15 @@
     "./billing/repository": {
       "default": "./src/billing/repository.ts"
     },
+    "./membership/repository": {
+      "default": "./src/membership/repository.ts"
+    },
+    "./workspace/repository": {
+      "default": "./src/workspace/repository.ts"
+    },
+    "./plan-entitlements": {
+      "default": "./src/plan-entitlements.ts"
+    },
     "./session-middleware": {
       "default": "./src/session-middleware.ts"
     },

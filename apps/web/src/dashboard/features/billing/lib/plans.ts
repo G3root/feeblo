@@ -22,9 +22,9 @@ export type WorkspaceProduct = {
   } | null;
 };
 
-export type WorkspaceSubscription = {
-  productId: string;
-  currentPeriodEnd: string | Date | null;
+export type WorkspacePlan = {
+  organizationId: string;
+  plan: PlanType;
 };
 
 export type PlanCard = {
@@ -55,25 +55,9 @@ export const PLAN_COPY: Record<
   },
 };
 
-export function getCurrentProduct(
-  products: WorkspaceProduct[],
-  subscriptions: WorkspaceSubscription[]
-) {
-  const productById = new Map(products.map((product) => [product.id, product]));
-
-  for (const subscription of subscriptions) {
-    const product = productById.get(subscription.productId);
-    if (product) {
-      return product;
-    }
-  }
-
-  return undefined;
-}
-
 export function buildPlanCards(
   products: WorkspaceProduct[],
-  currentProduct: WorkspaceProduct | undefined
+  currentPlanType: PlanType
 ) {
   const productsByPlan: Record<
     Exclude<PlanType, "free">,
@@ -93,10 +77,6 @@ export function buildPlanCards(
 
     productsByPlan[plan][interval] = product;
   }
-
-  const currentPlanType: PlanType = currentProduct?.metadata?.plan ?? "free";
-  const currentInterval: BillingInterval =
-    currentProduct?.recurringInterval ?? "month";
 
   const plans: PlanCard[] = [
     {
@@ -120,7 +100,6 @@ export function buildPlanCards(
   return {
     plans,
     currentPlanType,
-    currentInterval,
   };
 }
 
@@ -205,33 +184,54 @@ export function getPlanDetails(
   ];
 }
 
-export function formatRenewalDate(value: string | Date | null | undefined) {
-  if (!value) {
-    return null;
-  }
+export type PlanFeature = {
+  feature: string;
+};
 
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
-export function getCurrentPlanIntervalLabel(
-  product: WorkspaceProduct | undefined
-) {
-  if (product?.recurringInterval === "month") {
-    return "Monthly";
-  }
-
-  if (product?.recurringInterval === "year") {
-    return "Yearly";
-  }
-
-  return "Free";
-}
+export const PLAN_FEATURES: Record<PlanType, PlanFeature[]> = {
+  free: [
+    {
+      feature: "2 Feedback Boards",
+    },
+    {
+      feature: "2 Admin Roles",
+    },
+    {
+      feature: "Roadmap",
+    },
+    {
+      feature: "Changelog",
+    },
+    {
+      feature: "Unlimited End Users",
+    },
+    {
+      feature: "Unlimited Posts",
+    },
+  ],
+  starter: [
+    {
+      feature: "Everything in free",
+    },
+    {
+      feature: "5 Feedback Boards",
+    },
+    {
+      feature: "5 Admin Roles",
+    },
+    {
+      feature: "Private Boards",
+    },
+  ],
+  professional: [
+    {
+      feature: "Everything in starter",
+    },
+    {
+      feature: "Unlimited Boards",
+    },
+    {
+      feature: "Unlimited Admin Roles",
+    },
+  ],
+};

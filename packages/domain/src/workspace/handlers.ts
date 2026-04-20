@@ -63,9 +63,9 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
               ),
           })
         ),
-      WorkspaceSubscriptionGet: (args: TWorkspaceInput) =>
+      WorkspacePlanGet: (args: TWorkspaceInput) =>
         repository
-          .findSubscriptionByOrganizationId({
+          .findPlanByOrganizationId({
             organizationId: args.organizationId,
           })
           .pipe(
@@ -74,7 +74,7 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
               SqlError: () =>
                 Effect.fail(
                   new InternalServerError({
-                    message: "Failed to get workspace subscription",
+                    message: "Failed to get workspace plan",
                   })
                 ),
             })

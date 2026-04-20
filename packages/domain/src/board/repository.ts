@@ -27,6 +27,11 @@ type TBoardFindById = {
   memberId: string;
 };
 
+type TBoardGetById = {
+  id: string;
+  organizationId: string;
+};
+
 const makeBoardRepository = Effect.gen(function* () {
   const db = yield* DB;
 
@@ -40,6 +45,20 @@ const makeBoardRepository = Effect.gen(function* () {
             eq(boardTable.id, id),
             eq(boardTable.organizationId, organizationId),
             eq(boardTable.creatorMemberId, memberId)
+          )
+        )
+        .pipe(Effect.map(EffectArray.get(0))),
+    getById: ({ id, organizationId }: TBoardGetById) =>
+      db
+        .select({
+          id: boardTable.id,
+          visibility: boardTable.visibility,
+        })
+        .from(boardTable)
+        .where(
+          and(
+            eq(boardTable.id, id),
+            eq(boardTable.organizationId, organizationId)
           )
         )
         .pipe(Effect.map(EffectArray.get(0))),
@@ -95,6 +114,15 @@ const makeBoardRepository = Effect.gen(function* () {
               organizationId: entry.organizationId,
             })
         );
+      }),
+    countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
+      Effect.gen(function* () {
+        const boards = yield* db
+          .select({ id: boardTable.id })
+          .from(boardTable)
+          .where(eq(boardTable.organizationId, organizationId));
+
+        return boards.length;
       }),
 
     delete: ({ id, organizationId }: { id: string; organizationId: string }) =>

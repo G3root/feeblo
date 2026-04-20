@@ -1,8 +1,15 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+
 import { DB } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema/index";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
+import { MembershipRepository } from "@feeblo/domain/membership/repository";
+import {
+  isPrivilegedMemberRole,
+  PLAN_ENTITLEMENTS,
+} from "@feeblo/domain/plan-entitlements";
+import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import {
   createOrganizationInvitationEmail,
   createPasswordResetEmail,
@@ -12,6 +19,7 @@ import {
 import { polar, webhooks } from "@polar-sh/better-auth";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError } from "better-auth/api";
 import {
   admin,
   customSession,
@@ -41,7 +49,9 @@ export const initAuthHandler = () =>
       Layer.mergeAll(
         PolarService.layer,
         BillingRepository.layer,
-        Mailer.layer
+        MembershipRepository.layer,
+        Mailer.layer,
+        WorkspaceRepository.layer
       ).pipe(Layer.provide(Layer.succeed(DB, db)))
     );
 
@@ -200,6 +210,101 @@ export const initAuthHandler = () =>
         }),
         organization({
           allowUserToCreateOrganization: false,
+          organizationHooks: {
+            async beforeCreateInvitation(data) {
+              if (!isPrivilegedMemberRole(data.invitation.role)) {
+                return;
+              }
+
+              await callbackRuntime.runPromise(
+                Effect.gen(function* () {
+                  const workspaceRepository = yield* WorkspaceRepository;
+                  const membershipRepository = yield* MembershipRepository;
+
+                  const planState =
+                    yield* workspaceRepository.findPlanByOrganizationId({
+                      organizationId: data.organization.id,
+                    });
+                  const entitlements = PLAN_ENTITLEMENTS[planState.plan];
+
+                  if (entitlements.privilegedRoleLimit === null) {
+                    return;
+                  }
+
+                  const privilegedMembersCount =
+                    yield* membershipRepository.countPrivilegedMembers({
+                      organizationId: data.organization.id,
+                    });
+                  const pendingPrivilegedInvitationsCount =
+                    yield* membershipRepository.countPendingPrivilegedInvitations(
+                      {
+                        organizationId: data.organization.id,
+                      }
+                    );
+
+                  if (
+                    privilegedMembersCount +
+                      pendingPrivilegedInvitationsCount >=
+                    entitlements.privilegedRoleLimit
+                  ) {
+                    return yield* Effect.fail(
+                      new APIError("FORBIDDEN", {
+                        message: `The ${planState.plan} plan allows up to ${entitlements.privilegedRoleLimit} admin roles.`,
+                      })
+                    );
+                  }
+                })
+              );
+            },
+            async beforeUpdateMemberRole(data) {
+              if (
+                !isPrivilegedMemberRole(data.newRole) ||
+                isPrivilegedMemberRole(data.member.role)
+              ) {
+                return;
+              }
+
+              await callbackRuntime.runPromise(
+                Effect.gen(function* () {
+                  const workspaceRepository = yield* WorkspaceRepository;
+                  const membershipRepository = yield* MembershipRepository;
+
+                  const planState =
+                    yield* workspaceRepository.findPlanByOrganizationId({
+                      organizationId: data.organization.id,
+                    });
+                  const entitlements = PLAN_ENTITLEMENTS[planState.plan];
+
+                  if (entitlements.privilegedRoleLimit === null) {
+                    return;
+                  }
+
+                  const privilegedMembersCount =
+                    yield* membershipRepository.countPrivilegedMembers({
+                      organizationId: data.organization.id,
+                    });
+                  const pendingPrivilegedInvitationsCount =
+                    yield* membershipRepository.countPendingPrivilegedInvitations(
+                      {
+                        organizationId: data.organization.id,
+                      }
+                    );
+
+                  if (
+                    privilegedMembersCount +
+                      pendingPrivilegedInvitationsCount >=
+                    entitlements.privilegedRoleLimit
+                  ) {
+                    return yield* Effect.fail(
+                      new APIError("FORBIDDEN", {
+                        message: `The ${planState.plan} plan allows up to ${entitlements.privilegedRoleLimit} admin roles.`,
+                      })
+                    );
+                  }
+                })
+              );
+            },
+          },
           async sendInvitationEmail(data) {
             const inviteLink = `${appUrl}/invitation/${data.id}`;
             await callbackRuntime.runPromise(
@@ -252,7 +357,9 @@ export const initAuthHandler = () =>
         AuthConfig.layer,
         PolarService.layer,
         BillingRepository.layer,
-        Mailer.layer
+        MembershipRepository.layer,
+        Mailer.layer,
+        WorkspaceRepository.layer
       )
     )
   );

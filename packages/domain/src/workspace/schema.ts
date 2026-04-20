@@ -4,6 +4,11 @@ export const WorkspaceInput = Schema.Struct({
   organizationId: Schema.String,
 });
 
+export const WorkspacePlan = Schema.Struct({
+  organizationId: Schema.String,
+  plan: Schema.Literal("free", "starter", "professional"),
+});
+
 export class CreateWorkspaceInput extends Schema.Class<CreateWorkspaceInput>(
   "CreateWorkspaceInput"
 )({
@@ -21,6 +26,7 @@ export type TCreateWorkspaceInput = Schema.Schema.Type<
 >;
 
 export type TWorkspaceInput = Schema.Schema.Type<typeof WorkspaceInput>;
+export type TWorkspacePlan = Schema.Schema.Type<typeof WorkspacePlan>;
 
 export const WorkspacePreferences = Schema.Struct({
   allowMemberInvites: Schema.Boolean,
@@ -67,34 +73,3 @@ export const WorkspaceProduct = Schema.Struct({
 });
 
 export type TWorkspaceProduct = Schema.Schema.Type<typeof WorkspaceProduct>;
-
-export const WorkspaceSubscription = Schema.Struct({
-  id: Schema.String,
-  externalId: Schema.String,
-  organizationId: Schema.String,
-  amount: Schema.Number,
-  cancelAtPeriodEnd: Schema.Boolean,
-  currency: Schema.String,
-  recurringInterval: Schema.String,
-  recurringIntervalCount: Schema.Number,
-  status: Schema.String,
-  currentPeriodStart: Schema.Date,
-  currentPeriodEnd: Schema.NullOr(Schema.Date),
-  trialStart: Schema.NullOr(Schema.Date),
-  trialEnd: Schema.NullOr(Schema.Date),
-  canceledAt: Schema.NullOr(Schema.Date),
-  startedAt: Schema.NullOr(Schema.Date),
-  endsAt: Schema.NullOr(Schema.Date),
-  endedAt: Schema.NullOr(Schema.Date),
-  customerId: Schema.String,
-  productId: Schema.String,
-  discountId: Schema.NullOr(Schema.String),
-  checkoutId: Schema.NullOr(Schema.String),
-  seats: Schema.NullOr(Schema.Number),
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-});
-
-export type TWorkspaceSubscription = Schema.Schema.Type<
-  typeof WorkspaceSubscription
->;
