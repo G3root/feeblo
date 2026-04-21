@@ -1,9 +1,12 @@
 import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { organizationCollection } from "~/lib/collections";
+import {
+  organizationCollection,
+  workspacePlanCollection,
+} from "~/lib/collections";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +27,7 @@ export function WorkspaceSwitcher() {
         .orderBy(({ organization }) => organization.createdAt, "desc"),
     []
   );
+
   const data = organizationsQuery.data ?? [];
 
   const selectedOrganization =
@@ -50,10 +54,10 @@ export function WorkspaceSwitcher() {
                       </span>
                     </div>
                     <div className="flex flex-col gap-0.5 leading-none">
-                      <span className="font-medium">Workspace</span>
-                      <span className="max-w-44 truncate text-muted-foreground text-xs">
+                      <span className="font-medium">
                         {selectedOrganization?.name ?? "Select workspace"}
                       </span>
+                      <WorkspacePlan />
                     </div>
                     <HugeiconsIcon className="ml-auto" icon={UnfoldMoreIcon} />
                   </SidebarMenuButton>
@@ -82,6 +86,27 @@ export function WorkspaceSwitcher() {
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
+    </SkeletonLoader>
+  );
+}
+
+function WorkspacePlan() {
+  const organizationId = useOrganizationId();
+  const workspacePlan = useLiveQuery(
+    (q) =>
+      q
+        .from({ plan: workspacePlanCollection })
+        .where(({ plan }) => eq(plan.organizationId, organizationId)),
+    [organizationId]
+  );
+
+  const plan = workspacePlan?.data?.[0]?.plan ?? "free";
+
+  return (
+    <SkeletonLoader isLoading={workspacePlan.isLoading}>
+      <SkeletonWrapper>
+        <span className="text-muted-foreground text-sm">{plan}</span>
+      </SkeletonWrapper>
     </SkeletonLoader>
   );
 }

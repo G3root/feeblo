@@ -1155,9 +1155,12 @@ export const workspacePlanCollection = createCollection(
       if (!organizationId) {
         return [];
       }
-      const data = await fetchRpc((rpc) => rpc.WorkspacePlanGet({ organizationId }), {
-        signal: ctx.signal,
-      });
+      const data = await fetchRpc(
+        (rpc) => rpc.WorkspacePlanGet({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
       return [data];
     },
     queryClient: TanstackQuery.getContext().queryClient,

@@ -18,18 +18,12 @@ type ChangelogEditorMetadataProps = {
 function Root({ children, className }: ChangelogEditorRootProps) {
   return (
     <div className={cn("mx-auto w-full", className)}>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        {children}
-      </div>
+      <div className="grid gap-6">{children}</div>
     </div>
   );
 }
 
-function Main({
-  children,
-  className,
-  ...props
-}: ChangelogEditorSectionProps) {
+function Main({ children, className, ...props }: ChangelogEditorSectionProps) {
   return (
     <section
       className={cn("space-y-6 px-4 py-6 md:px-6 md:py-8", className)}
@@ -40,11 +34,7 @@ function Main({
   );
 }
 
-function Header({
-  children,
-  className,
-  ...props
-}: ChangelogEditorDivProps) {
+function Header({ children, className, ...props }: ChangelogEditorDivProps) {
   return (
     <div
       className={cn("flex items-start justify-between gap-4", className)}
@@ -67,14 +57,13 @@ function HeaderContent({
   );
 }
 
-function Sidebar({
-  children,
-  className,
-  ...props
-}: ChangelogEditorAsideProps) {
+function Sidebar({ children, className, ...props }: ChangelogEditorAsideProps) {
   return (
     <aside
-      className={cn("h-fit space-y-4 border-l bg-muted/20 p-4 md:p-6", className)}
+      className={cn(
+        "h-fit space-y-4 border-l bg-muted/20 p-4 md:p-6",
+        className
+      )}
       {...props}
     >
       {children}

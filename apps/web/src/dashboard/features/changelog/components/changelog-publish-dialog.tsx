@@ -115,21 +115,25 @@ export function ChangelogPublishDialog({
 
               {currentStatus !== "published" ? (
                 <label
-                  className="flex items-start gap-3 rounded-xl border p-4"
+                  className="flex items-start gap-3 rounded-xl border p-4 opacity-50"
                   htmlFor="schedule-later"
                 >
-                  <RadioGroupItem id="schedule-later" value="schedule-later" />
+                  <RadioGroupItem
+                    disabled
+                    id="schedule-later"
+                    value="schedule-later"
+                  />
                   <div className="space-y-1">
                     <p className="font-medium text-sm">Publish later</p>
                     <p className="text-muted-foreground text-sm">
-                      Pick a future date and time for this release note.
+                      Not available yet.
                     </p>
                   </div>
                 </label>
               ) : null}
             </RadioGroup>
 
-            {currentStatus !== "published" && mode === "schedule-later" ? (
+            {false ? (
               <div className="space-y-2">
                 <Label htmlFor="scheduled-at">Publish date</Label>
                 <Input

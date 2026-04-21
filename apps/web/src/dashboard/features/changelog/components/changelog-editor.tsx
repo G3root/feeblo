@@ -1,7 +1,6 @@
 import {
   ArrowLeft01Icon,
   Delete02Icon,
-  Edit01Icon,
   Ellipsis,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -13,7 +12,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { toastManager } from "~/components/ui/toast";
@@ -28,6 +26,10 @@ import {
 } from "~/hooks/use-policy";
 import { changelogCollection } from "~/lib/collections";
 import type { ChangelogStatus } from "../constants";
+import {
+  useChangelogDeleteDialogContext,
+  useChangelogMoveToDraftDialogContext,
+} from "../dialog-stores";
 import { updatedChangelogSchema } from "../schema";
 import { ChangelogPublishDialog } from "./changelog-publish-dialog";
 import { ChangelogStatusBadge } from "./changelog-status";
@@ -225,6 +227,10 @@ function useChangelogEditor() {
   return value;
 }
 
+export function useChangelogEditorContext() {
+  return useChangelogEditor();
+}
+
 export function ChangelogEditorForm({ children }: { children: ReactNode }) {
   const { submitDefault } = useChangelogEditor();
 
@@ -291,6 +297,7 @@ export function ChangelogEditorTitleField() {
 
 export function ChangelogEditorSubmitAction() {
   const { changelog, form, isOwner } = useChangelogEditor();
+  const moveToDraftDialogStore = useChangelogMoveToDraftDialogContext();
 
   if (!isOwner) {
     return null;
@@ -298,40 +305,54 @@ export function ChangelogEditorSubmitAction() {
 
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
-      {(isSubmitting) =>
-        changelog.status === "published" ? (
-          <Button disabled={isSubmitting} type="submit">
+      {(isSubmitting) => (
+        <div className="flex items-center gap-2">
+          <Button disabled={isSubmitting} type="submit" variant="outline">
             Save
           </Button>
-        ) : (
-          <ChangelogPublishDialog
-            currentStatus={changelog.status}
-            defaultScheduledAt={changelog.scheduledAt}
-            key={changelog.status}
-            onPublishNow={() =>
-              form.handleSubmit({
-                successTitle: "Changelog published",
-                overrides: {
-                  status: "published",
-                  publishedAt: new Date(),
-                  scheduledAt: null,
-                },
-              })
-            }
-            onScheduleLater={(scheduledAt) =>
-              form.handleSubmit({
-                successTitle: "Changelog scheduled",
-                overrides: {
-                  status: "scheduled",
-                  scheduledAt,
-                  publishedAt: null,
-                },
-              })
-            }
-            triggerLabel="Save"
-          />
-        )
-      }
+          {changelog.status === "published" ? (
+            <Button
+              disabled={isSubmitting}
+              onClick={() =>
+                moveToDraftDialogStore.send({
+                  type: "toggle",
+                  data: { changelogId: changelog.id },
+                })
+              }
+              type="button"
+            >
+              Turn into draft
+            </Button>
+          ) : (
+            <ChangelogPublishDialog
+              currentStatus={changelog.status}
+              defaultScheduledAt={changelog.scheduledAt}
+              key={changelog.status}
+              onPublishNow={() =>
+                form.handleSubmit({
+                  successTitle: "Changelog published",
+                  overrides: {
+                    status: "published",
+                    publishedAt: new Date(),
+                    scheduledAt: null,
+                  },
+                })
+              }
+              onScheduleLater={(scheduledAt) =>
+                form.handleSubmit({
+                  successTitle: "Changelog scheduled",
+                  overrides: {
+                    status: "scheduled",
+                    scheduledAt,
+                    publishedAt: null,
+                  },
+                })
+              }
+              triggerLabel="Publish"
+            />
+          )}
+        </div>
+      )}
     </form.Subscribe>
   );
 }
@@ -386,8 +407,8 @@ export function ChangelogEditorMetadata() {
 }
 
 export function ChangelogEditorMoreActions() {
-  const { changelog, handleDelete, handleMoveToDraft, isOwner } =
-    useChangelogEditor();
+  const { changelog, isOwner } = useChangelogEditor();
+  const deleteDialogStore = useChangelogDeleteDialogContext();
 
   if (!isOwner) {
     return null;
@@ -409,14 +430,15 @@ export function ChangelogEditorMoreActions() {
         )}
       />
       <DropdownMenuContent align="end" className="w-48">
-        {changelog.status !== "draft" ? (
-          <DropdownMenuItem onClick={handleMoveToDraft}>
-            <HugeiconsIcon icon={Edit01Icon} />
-            <span>Move to draft</span>
-          </DropdownMenuItem>
-        ) : null}
-        {changelog.status !== "draft" ? <DropdownMenuSeparator /> : null}
-        <DropdownMenuItem onClick={handleDelete} variant="destructive">
+        <DropdownMenuItem
+          onClick={() =>
+            deleteDialogStore.send({
+              type: "toggle",
+              data: { changelogId: changelog.id },
+            })
+          }
+          variant="destructive"
+        >
           <HugeiconsIcon icon={Delete02Icon} />
           <span>Delete</span>
         </DropdownMenuItem>

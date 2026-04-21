@@ -22,7 +22,15 @@ import {
   ChangelogEditorSubmitAction,
   ChangelogEditorTitleField,
 } from "~/features/changelog/components/changelog-editor";
+import {
+  ChangelogDeleteDialog,
+  ChangelogMoveToDraftDialog,
+} from "~/features/changelog/components/changelog-editor-alert-dialogs";
 import { ChangelogEditor } from "~/features/changelog/components/changelog-editor-layout";
+import {
+  ChangelogDeleteDialogProvider,
+  ChangelogMoveToDraftDialogProvider,
+} from "~/features/changelog/dialog-stores";
 import { changelogCollection } from "~/lib/collections";
 
 export const Route = createFileRoute(
@@ -99,25 +107,31 @@ function RouteComponent() {
       changelog={changelog}
       organizationId={organizationId}
     >
-      <ChangelogEditorForm>
-        <ChangelogEditor className="max-w-6xl">
-          <ChangelogEditor.Main className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
-            <ChangelogEditor.Header className="items-center gap-3">
-              <ChangelogEditorBackLink />
-              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                <ChangelogEditorStatus />
-                <ChangelogEditorMoreActions />
-              </div>
-            </ChangelogEditor.Header>
+      <ChangelogMoveToDraftDialogProvider>
+        <ChangelogDeleteDialogProvider>
+          <ChangelogEditorForm>
+            <ChangelogEditor className="max-w-6xl">
+              <ChangelogEditor.Main className="mx-auto flex w-full flex-col space-y-6 px-4 py-4 sm:px-6 sm:py-6">
+                <ChangelogEditor.Header className="items-center gap-3">
+                  <ChangelogEditorBackLink />
+                  <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                    <ChangelogEditorStatus />
+                    <ChangelogEditorMoreActions />
+                  </div>
+                </ChangelogEditor.Header>
 
-            <ChangelogEditorTitleField />
-            <ChangelogEditorContentField />
-            <div className="flex justify-end pt-2">
-              <ChangelogEditorSubmitAction />
-            </div>
-          </ChangelogEditor.Main>
-        </ChangelogEditor>
-      </ChangelogEditorForm>
+                <ChangelogEditorTitleField />
+                <ChangelogEditorContentField />
+                <div className="flex justify-end pt-2">
+                  <ChangelogEditorSubmitAction />
+                </div>
+              </ChangelogEditor.Main>
+            </ChangelogEditor>
+          </ChangelogEditorForm>
+          <ChangelogMoveToDraftDialog />
+          <ChangelogDeleteDialog />
+        </ChangelogDeleteDialogProvider>
+      </ChangelogMoveToDraftDialogProvider>
     </ChangelogEditorProvider>
   );
 }
@@ -126,7 +140,7 @@ function ChangelogEditorLoadingState() {
   return (
     <SkeletonLoader isLoading>
       <ChangelogEditor className="max-w-6xl">
-        <ChangelogEditor.Main className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
+        <ChangelogEditor.Main className="mx-auto flex w-full flex-col space-y-6 px-4 py-4 sm:px-6 sm:py-6">
           <ChangelogEditor.Header className="items-center gap-3">
             <SkeletonWrapper>
               <div className="size-8 rounded-full border bg-background" />
