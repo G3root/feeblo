@@ -1,6 +1,6 @@
 import { HttpApiMiddleware, HttpApiSecurity } from "@effect/platform";
 import { RpcMiddleware } from "@effect/rpc";
-import type { Auth as AuthHandler, Session } from "@feeblo/auth";
+import type { Auth as AuthHandler, Session } from "@feeblo/auth/server";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { UnauthorizedError } from "./rpc-errors";
 

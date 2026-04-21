@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 
 import { DB } from "@feeblo/db";
-import * as schema from "@feeblo/db/schema/index";
+import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
@@ -10,7 +10,7 @@ import {
   PLAN_ENTITLEMENTS,
 } from "@feeblo/domain/plan-entitlements";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
-import { Mailer } from "@feeblo/transactional";
+import { Mailer } from "@feeblo/transactional/mailer";
 import { polar, webhooks } from "@polar-sh/better-auth";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";

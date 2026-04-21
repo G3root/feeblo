@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noConsole: Seed script requires console output
 import { faker } from "@faker-js/faker";
-import { initAuthHandler } from "@feeblo/auth";
+import { initAuthHandler } from "@feeblo/auth/server";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import { DB } from "./src";

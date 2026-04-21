@@ -11,7 +11,7 @@ import {
   BunPath,
   BunRuntime,
 } from "@effect/platform-bun";
-import { initAuthHandler } from "@feeblo/auth";
+import { initAuthHandler } from "@feeblo/auth/server";
 import { DB } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";

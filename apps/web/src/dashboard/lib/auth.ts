@@ -1,4 +1,4 @@
-import { initAuthHandler } from "@feeblo/auth";
+import { initAuthHandler } from "@feeblo/auth/server";
 import { DB } from "@feeblo/db";
 import { ManagedRuntime } from "effect";
 
