@@ -10,12 +10,7 @@ import {
   PLAN_ENTITLEMENTS,
 } from "@feeblo/domain/plan-entitlements";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
-import {
-  createOrganizationInvitationEmail,
-  createPasswordResetEmail,
-  createVerificationOtpEmail,
-  Mailer,
-} from "@feeblo/transactional";
+import { Mailer } from "@feeblo/transactional";
 import { polar, webhooks } from "@polar-sh/better-auth";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -30,6 +25,15 @@ import {
 import { eq } from "drizzle-orm";
 import { Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { AuthConfig } from "./config";
+
+const loadPasswordResetEmail = () =>
+  import("@feeblo/transactional/templates/password-reset");
+
+const loadOrganizationInvitationEmail = () =>
+  import("@feeblo/transactional/templates/organization-invitation");
+
+const loadVerificationOtpEmail = () =>
+  import("@feeblo/transactional/templates/verification-otp");
 
 export const initAuthHandler = () =>
   Effect.gen(function* () {
@@ -110,6 +114,7 @@ export const initAuthHandler = () =>
         enabled: true,
 
         async sendResetPassword(data) {
+          const { createPasswordResetEmail } = await loadPasswordResetEmail();
           await callbackRuntime.runPromise(
             Mailer.use((mailer) =>
               mailer.send({
@@ -307,6 +312,8 @@ export const initAuthHandler = () =>
           },
           async sendInvitationEmail(data) {
             const inviteLink = `${appUrl}/invitation/${data.id}`;
+            const { createOrganizationInvitationEmail } =
+              await loadOrganizationInvitationEmail();
             await callbackRuntime.runPromise(
               Mailer.use((mailer) =>
                 mailer.send({
@@ -334,6 +341,8 @@ export const initAuthHandler = () =>
                 : type === "sign-in"
                   ? "sign-in"
                   : "email verification";
+            const { createVerificationOtpEmail } =
+              await loadVerificationOtpEmail();
 
             await callbackRuntime.runPromise(
               Mailer.use((mailer) =>
