@@ -1,5 +1,6 @@
 // @ts-check
 
+import cloudflare from "@astrojs/cloudflare";
 import react from "@astrojs/react";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -10,6 +11,7 @@ import { defineConfig, envField, fontProviders } from "astro/config";
 export default defineConfig({
   output: "server",
   // adapter: alchemy(),
+  adapter: cloudflare(),
   fonts: [
     {
       provider: fontProviders.google(),

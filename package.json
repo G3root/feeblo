@@ -32,7 +32,8 @@
       "react": "^19.2.4",
       "react-dom": "^19.2.4",
       "@types/react": "^19.2.14",
-      "@types/react-dom": "^19.2.3"
+      "@types/react-dom": "^19.2.3",
+      "rolldown": "v1.0.0-rc.16"
     }
   },
   "type": "module",

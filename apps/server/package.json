@@ -4,6 +4,7 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
+    "build": "dotenvx run -f ../../.env -- rolldown -c",
     "dev": "dotenvx run -f ../../.env -- bun run --watch src/index.ts",
     "start": "dotenvx run -f ../../.env -- bun run src/index.ts"
   },
@@ -17,6 +18,7 @@
     "@effect/platform": "catalog:"
   },
   "devDependencies": {
-    "@feeblo/config": "workspace:*"
+    "@feeblo/config": "workspace:*",
+    "rolldown": "catalog:"
   }
 }
