@@ -1,6 +1,6 @@
 import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useLiveSuspenseQuery } from "@tanstack/react-db";
+import { useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { organizationCollection } from "~/lib/collections";
@@ -12,11 +12,12 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
+import { SkeletonLoader, SkeletonWrapper } from "../ui/skeleton-loader";
 
 export function WorkspaceSwitcher() {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
-  const organizationsQuery = useLiveSuspenseQuery(
+  const organizationsQuery = useLiveQuery(
     (q) =>
       q
         .from({ organization: organizationCollection })
@@ -31,53 +32,56 @@ export function WorkspaceSwitcher() {
     null;
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={(props) => (
-              <SidebarMenuButton
-                {...props}
-                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                size="lg"
-              >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <span className="font-semibold text-sm">
-                    {selectedOrganization?.name.slice(0, 1) ?? "W"}
-                  </span>
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-medium">Workspace</span>
-                  <span className="max-w-44 truncate text-muted-foreground text-xs">
-                    {selectedOrganization?.name ?? "Select workspace"}
-                  </span>
-                </div>
-                <HugeiconsIcon className="ml-auto" icon={UnfoldMoreIcon} />
-              </SidebarMenuButton>
-            )}
-          />
-          <DropdownMenuContent align="start">
-            <WorkspaceList
-              organizations={data}
-              selectedOrganizationId={selectedOrganization?.id ?? null}
-            />
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem
-              className="justify-center"
-              onClick={() =>
-                navigate({
-                  to: "/register",
-                })
+    <SkeletonLoader isLoading={organizationsQuery.isLoading}>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <SkeletonWrapper>
+                  <SidebarMenuButton
+                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                    size="lg"
+                  >
+                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                      <span className="font-semibold text-sm">
+                        {selectedOrganization?.name.slice(0, 1) ?? "W"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 leading-none">
+                      <span className="font-medium">Workspace</span>
+                      <span className="max-w-44 truncate text-muted-foreground text-xs">
+                        {selectedOrganization?.name ?? "Select workspace"}
+                      </span>
+                    </div>
+                    <HugeiconsIcon className="ml-auto" icon={UnfoldMoreIcon} />
+                  </SidebarMenuButton>
+                </SkeletonWrapper>
               }
-            >
-              <HugeiconsIcon className="text-muted-foreground" icon={Plus} />
-              <span>Create workspace</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
-    </SidebarMenu>
+            />
+            <DropdownMenuContent align="start">
+              <WorkspaceList
+                organizations={data}
+                selectedOrganizationId={selectedOrganization?.id ?? null}
+              />
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                className="justify-center"
+                onClick={() =>
+                  navigate({
+                    to: "/register",
+                  })
+                }
+              >
+                <HugeiconsIcon className="text-muted-foreground" icon={Plus} />
+                <span>Create workspace</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SkeletonLoader>
   );
 }
 

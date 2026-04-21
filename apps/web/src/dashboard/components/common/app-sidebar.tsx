@@ -12,9 +12,8 @@ import {
   WebDesign01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Suspense } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -27,10 +26,8 @@ import {
   SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSkeleton,
   useSidebar,
 } from "~/components/ui/sidebar";
-import { Skeleton } from "~/components/ui/skeleton";
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import {
@@ -49,6 +46,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { SkeletonLoader, SkeletonWrapper } from "../ui/skeleton-loader";
 import { NavUser } from "./nav-user";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
@@ -61,9 +59,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
-        <Suspense fallback={<WorkspaceSwitcherSkeleton />}>
-          <WorkspaceSwitcher />
-        </Suspense>
+        <WorkspaceSwitcher />
       </SidebarHeader>
 
       <SidebarContent>
@@ -162,9 +158,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <CreateBoardButton />
           </div>
           <SidebarMenu>
-            <Suspense fallback={<BoardListSkeleton />}>
-              <BoardList />
-            </Suspense>
+            <BoardList />
           </SidebarMenu>
         </SidebarGroup>
         <SidebarGroup className="mt-auto">
@@ -200,10 +194,8 @@ function CreateBoardButton() {
 
 function BoardList() {
   const organizationId = useOrganizationId();
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  });
-  const { data } = useLiveSuspenseQuery(
+
+  const boardQuery = useLiveQuery(
     (q) =>
       q
         .from({ board: boardCollection })
@@ -213,48 +205,73 @@ function BoardList() {
     [organizationId]
   );
 
-  return data.map((board) => (
-    <SidebarMenuItem key={board.slug}>
-      <SidebarMenuButton
-        isActive={pathname.startsWith(`/${organizationId}/board/${board.slug}`)}
-        render={(props) => (
-          <Link
-            {...props}
-            params={{ organizationId, boardSlug: board.slug }}
-            to="/$organizationId/board/$boardSlug"
-          >
-            <span>{board.name}</span>
-          </Link>
-        )}
-      />
-      <BoardMenuWithPolicy boardPublicId={board.id} />
-    </SidebarMenuItem>
-  ));
-}
+  if (boardQuery.isLoading) {
+    return (
+      <SkeletonLoader isLoading>
+        {Array.from({ length: 2 }, (_, index) => (
+          <BoardItem
+            boardPublicId=""
+            boardSlug=""
+            key={`board-skeleton-${
+              // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+              index
+            }`}
+            name="Loading"
+          />
+        ))}
+      </SkeletonLoader>
+    );
+  }
 
-function WorkspaceSwitcherSkeleton() {
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <div className="flex h-12 items-center gap-3 rounded-lg px-2">
-          <Skeleton className="size-8 rounded-lg" />
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="h-3 w-32" />
-          </div>
-        </div>
-      </SidebarMenuItem>
-    </SidebarMenu>
+    <SkeletonLoader isLoading={false}>
+      {boardQuery.data.map((board) => (
+        <BoardItem
+          boardPublicId={board.id}
+          boardSlug={board.slug}
+          key={board.id}
+          name={board.name}
+        />
+      ))}
+    </SkeletonLoader>
   );
 }
 
-function BoardListSkeleton() {
+interface BoardItemProp {
+  boardPublicId: string;
+  boardSlug: string;
+  name: string;
+}
+
+function BoardItem({
+  boardPublicId,
+  name,
+
+  boardSlug,
+}: BoardItemProp) {
+  const organizationId = useOrganizationId();
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   return (
-    <>
-      <SidebarMenuSkeleton showIcon />
-      <SidebarMenuSkeleton showIcon />
-      <SidebarMenuSkeleton showIcon />
-    </>
+    <SkeletonWrapper>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          isActive={pathname.startsWith(
+            `/${organizationId}/board/${boardSlug}`
+          )}
+          render={
+            <Link
+              params={{ organizationId, boardSlug }}
+              to="/$organizationId/board/$boardSlug"
+            >
+              <span>{name}</span>
+            </Link>
+          }
+        />
+        <BoardMenuWithPolicy boardPublicId={boardPublicId} />
+      </SidebarMenuItem>
+    </SkeletonWrapper>
   );
 }
 
