@@ -7,6 +7,7 @@ import {
   organizationCollection,
   workspacePlanCollection,
 } from "~/lib/collections";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,11 +49,18 @@ export function WorkspaceSwitcher() {
                     size="lg"
                     {...props}
                   >
-                    <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                      <span className="font-semibold text-sm">
+                    <Avatar>
+                      {selectedOrganization?.logo ? (
+                        <AvatarImage
+                          alt={selectedOrganization.name}
+                          className="rounded-lg"
+                          src={selectedOrganization.logo}
+                        />
+                      ) : null}
+                      <AvatarFallback>
                         {selectedOrganization?.name.slice(0, 1) ?? "W"}
-                      </span>
-                    </div>
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="flex flex-col gap-0.5 leading-none">
                       <span className="font-medium">
                         {selectedOrganization?.name ?? "Select workspace"}
