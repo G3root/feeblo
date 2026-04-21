@@ -16,9 +16,8 @@ import {
   ChangelogEditorBackLink,
   ChangelogEditorContentField,
   ChangelogEditorForm,
-  ChangelogEditorMetadata,
+  ChangelogEditorMoreActions,
   ChangelogEditorProvider,
-  ChangelogEditorSidebarActionsSection,
   ChangelogEditorStatus,
   ChangelogEditorSubmitAction,
   ChangelogEditorTitleField,
@@ -101,34 +100,22 @@ function RouteComponent() {
       organizationId={organizationId}
     >
       <ChangelogEditorForm>
-        <ChangelogEditor>
-          <ChangelogEditor.Main>
-            <ChangelogEditor.Header>
-              <ChangelogEditor.HeaderContent>
-                <ChangelogEditorBackLink />
-                <ChangelogEditorTitleField />
-              </ChangelogEditor.HeaderContent>
-              <ChangelogEditorSubmitAction />
+        <ChangelogEditor className="max-w-6xl">
+          <ChangelogEditor.Main className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
+            <ChangelogEditor.Header className="items-center gap-3">
+              <ChangelogEditorBackLink />
+              <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                <ChangelogEditorStatus />
+                <ChangelogEditorMoreActions />
+              </div>
             </ChangelogEditor.Header>
+
+            <ChangelogEditorTitleField />
             <ChangelogEditorContentField />
+            <div className="flex justify-end pt-2">
+              <ChangelogEditorSubmitAction />
+            </div>
           </ChangelogEditor.Main>
-
-          <ChangelogEditor.Sidebar>
-            <ChangelogEditor.SidebarSection>
-              <p className="text-muted-foreground text-xs uppercase tracking-[0.2em]">
-                Status
-              </p>
-              <ChangelogEditorStatus />
-            </ChangelogEditor.SidebarSection>
-
-            <ChangelogEditor.SidebarSeparator />
-
-            <ChangelogEditor.MetadataList>
-              <ChangelogEditorMetadata />
-            </ChangelogEditor.MetadataList>
-
-            <ChangelogEditorSidebarActionsSection />
-          </ChangelogEditor.Sidebar>
         </ChangelogEditor>
       </ChangelogEditorForm>
     </ChangelogEditorProvider>
@@ -138,85 +125,37 @@ function RouteComponent() {
 function ChangelogEditorLoadingState() {
   return (
     <SkeletonLoader isLoading>
-      <ChangelogEditor>
-        <ChangelogEditor.Main>
-          <ChangelogEditor.Header>
-            <ChangelogEditor.HeaderContent>
-              <SkeletonWrapper>
-                <div className="h-4 w-28 rounded-md" />
-              </SkeletonWrapper>
-              <SkeletonWrapper>
-                <div className="h-10 w-3/5 rounded-md" />
-              </SkeletonWrapper>
-            </ChangelogEditor.HeaderContent>
-
+      <ChangelogEditor className="max-w-6xl">
+        <ChangelogEditor.Main className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
+          <ChangelogEditor.Header className="items-center gap-3">
             <SkeletonWrapper>
-              <Button type="button">Save</Button>
+              <div className="size-8 rounded-full border bg-background" />
             </SkeletonWrapper>
+            <div className="flex flex-1 items-center justify-end gap-2">
+              <SkeletonWrapper>
+                <div className="h-6 w-24 rounded-full" />
+              </SkeletonWrapper>
+              <SkeletonWrapper>
+                <div className="size-8 rounded-full border bg-background" />
+              </SkeletonWrapper>
+            </div>
           </ChangelogEditor.Header>
+
+          <SkeletonWrapper>
+            <div className="h-10 w-3/5 rounded-md" />
+          </SkeletonWrapper>
 
           <SkeletonWrapper>
             <div className="h-72 w-full rounded-2xl border bg-background" />
           </SkeletonWrapper>
-        </ChangelogEditor.Main>
 
-        <ChangelogEditor.Sidebar>
-          <ChangelogEditor.SidebarSection>
-            <p className="text-muted-foreground text-xs uppercase tracking-[0.2em]">
-              <SkeletonWrapper>Status</SkeletonWrapper>
-            </p>
+          <div className="flex justify-end pt-2">
             <SkeletonWrapper>
-              <div className="h-6 w-24 rounded-full" />
+              <Button type="button">Save</Button>
             </SkeletonWrapper>
-          </ChangelogEditor.SidebarSection>
-
-          <ChangelogEditor.SidebarSeparator />
-
-          <ChangelogEditor.MetadataList>
-            <ChangelogEditor.MetadataRow
-              label="Slug"
-              value={<LoadingLine className="w-32" />}
-            />
-            <ChangelogEditor.MetadataRow
-              label="Author"
-              value={<LoadingLine className="w-28" />}
-            />
-            <ChangelogEditor.MetadataRow
-              label="Publish At"
-              value={<LoadingLine className="w-36" />}
-            />
-            <ChangelogEditor.MetadataRow
-              label="Created"
-              value={<LoadingLine className="w-24" />}
-            />
-            <ChangelogEditor.MetadataRow
-              label="Updated"
-              value={<LoadingLine className="w-24" />}
-            />
-          </ChangelogEditor.MetadataList>
-
-          <ChangelogEditor.SidebarSeparator />
-
-          <SkeletonWrapper>
-            <Button className="w-full" type="button" variant="outline">
-              Move to draft
-            </Button>
-          </SkeletonWrapper>
-          <SkeletonWrapper>
-            <Button className="w-full" type="button" variant="destructive">
-              Delete changelog
-            </Button>
-          </SkeletonWrapper>
-        </ChangelogEditor.Sidebar>
+          </div>
+        </ChangelogEditor.Main>
       </ChangelogEditor>
     </SkeletonLoader>
-  );
-}
-
-function LoadingLine({ className }: { className: string }) {
-  return (
-    <SkeletonWrapper>
-      <div className={`h-4 rounded-md ${className}`} />
-    </SkeletonWrapper>
   );
 }

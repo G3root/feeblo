@@ -1,11 +1,21 @@
-import { Link, useNavigate } from "@tanstack/react-router";
 import {
-  createContext,
-  type ReactNode,
-  use,
-} from "react";
+  ArrowLeft01Icon,
+  Delete02Icon,
+  Edit01Icon,
+  Ellipsis,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { createContext, type ReactNode, use } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import { toastManager } from "~/components/ui/toast";
 import { PostContentEditor } from "~/features/post/components/post-content";
 import { PostTitleInput } from "~/features/post/components/post-title-input";
@@ -19,7 +29,6 @@ import {
 import { changelogCollection } from "~/lib/collections";
 import type { ChangelogStatus } from "../constants";
 import { updatedChangelogSchema } from "../schema";
-import { ChangelogEditor } from "./changelog-editor-layout";
 import { ChangelogPublishDialog } from "./changelog-publish-dialog";
 import { ChangelogStatusBadge } from "./changelog-status";
 
@@ -208,7 +217,9 @@ function useChangelogEditor() {
   const value = use(ChangelogEditorContext);
 
   if (!value) {
-    throw new Error("Changelog editor components must be used within the provider");
+    throw new Error(
+      "Changelog editor components must be used within the provider"
+    );
   }
 
   return value;
@@ -234,13 +245,22 @@ export function ChangelogEditorBackLink() {
   const { organizationId } = useChangelogEditor();
 
   return (
-    <Link
-      className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
-      params={{ organizationId }}
-      to="/$organizationId/changelog"
-    >
-      Back to changelog
-    </Link>
+    <Button
+      aria-label="Back to changelog"
+      className="rounded-full transition-transform active:scale-[0.96]"
+      nativeButton={false}
+      render={(props) => (
+        <Link
+          {...props}
+          params={{ organizationId }}
+          to="/$organizationId/changelog"
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} />
+        </Link>
+      )}
+      size="icon-sm"
+      variant="outline"
+    />
   );
 }
 
@@ -345,7 +365,10 @@ export function ChangelogEditorMetadata() {
   return (
     <>
       <MetadataRow label="Slug" value={changelog.slug} />
-      <MetadataRow label="Author" value={changelog.user.name ?? "Unknown author"} />
+      <MetadataRow
+        label="Author"
+        value={changelog.user.name ?? "Unknown author"}
+      />
       <MetadataRow
         label="Publish At"
         value={formatDateTime(changelog.publishedAt, changelog.scheduledAt)}
@@ -362,7 +385,7 @@ export function ChangelogEditorMetadata() {
   );
 }
 
-export function ChangelogEditorSidebarActions() {
+export function ChangelogEditorMoreActions() {
   const { changelog, handleDelete, handleMoveToDraft, isOwner } =
     useChangelogEditor();
 
@@ -371,41 +394,34 @@ export function ChangelogEditorSidebarActions() {
   }
 
   return (
-    <>
-      {changelog.status !== "draft" ? (
-        <Button
-          className="w-full"
-          onClick={handleMoveToDraft}
-          type="button"
-          variant="outline"
-        >
-          Move to draft
-        </Button>
-      ) : null}
-      <Button
-        className="w-full"
-        onClick={handleDelete}
-        type="button"
-        variant="destructive"
-      >
-        Delete changelog
-      </Button>
-    </>
-  );
-}
-
-export function ChangelogEditorSidebarActionsSection() {
-  const { isOwner } = useChangelogEditor();
-
-  if (!isOwner) {
-    return null;
-  }
-
-  return (
-    <>
-      <ChangelogEditor.SidebarSeparator />
-      <ChangelogEditorSidebarActions />
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={(props) => (
+          <Button
+            {...props}
+            aria-label="More actions"
+            className="rounded-full transition-transform active:scale-[0.96]"
+            size="icon-sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Ellipsis} />
+          </Button>
+        )}
+      />
+      <DropdownMenuContent align="end" className="w-48">
+        {changelog.status !== "draft" ? (
+          <DropdownMenuItem onClick={handleMoveToDraft}>
+            <HugeiconsIcon icon={Edit01Icon} />
+            <span>Move to draft</span>
+          </DropdownMenuItem>
+        ) : null}
+        {changelog.status !== "draft" ? <DropdownMenuSeparator /> : null}
+        <DropdownMenuItem onClick={handleDelete} variant="destructive">
+          <HugeiconsIcon icon={Delete02Icon} />
+          <span>Delete</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
