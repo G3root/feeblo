@@ -208,6 +208,12 @@ function WorkspaceLogoButton({
       imageAlt="Workspace logo"
       imageUrl={imageUrl}
       name={name}
+      onRemove={async () => {
+        const tx = organizationCollection.update(organizationId, (draft) => {
+          draft.logo = null;
+        });
+        await tx.isPersisted.promise;
+      }}
       onUpload={uploadWorkspaceLogo}
     >
       {imageUrl && canEdit ? (
@@ -217,6 +223,12 @@ function WorkspaceLogoButton({
             <SettingsAvatarControl.ChangeItem>
               Change Logo
             </SettingsAvatarControl.ChangeItem>
+            <SettingsAvatarControl.RemoveItem
+              errorTitle="Failed to remove logo"
+              successTitle="Logo removed successfully"
+            >
+              Remove Logo
+            </SettingsAvatarControl.RemoveItem>
           </SettingsAvatarControl.Menu>
         </SettingsAvatarControl.Dropdown>
       ) : (
