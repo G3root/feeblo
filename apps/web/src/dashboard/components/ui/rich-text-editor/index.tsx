@@ -983,7 +983,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     </button>
   );
   return (
-    <div {...props} className={cn("cn-editor", className)}>
+    <div {...props} className={cn("typography max-w-full", className)}>
       <BubbleMenu
         className="z-50 w-fit max-w-[95vw] text-popover-foreground outline-hidden"
         editor={editor}

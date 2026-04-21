@@ -260,14 +260,15 @@ function BoardItem({
           isActive={pathname.startsWith(
             `/${organizationId}/board/${boardSlug}`
           )}
-          render={
+          render={(props) => (
             <Link
               params={{ organizationId, boardSlug }}
               to="/$organizationId/board/$boardSlug"
+              {...props}
             >
               <span>{name}</span>
             </Link>
-          }
+          )}
         />
         <BoardMenuWithPolicy boardPublicId={boardPublicId} />
       </SidebarMenuItem>

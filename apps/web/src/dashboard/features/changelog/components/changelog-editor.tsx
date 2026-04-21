@@ -1,9 +1,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import {
+  createContext,
+  type ReactNode,
+  use,
+} from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
-import { Separator } from "~/components/ui/separator";
-import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { PostContentEditor } from "~/features/post/components/post-content";
 import { PostTitleInput } from "~/features/post/components/post-title-input";
@@ -17,10 +19,11 @@ import {
 import { changelogCollection } from "~/lib/collections";
 import type { ChangelogStatus } from "../constants";
 import { updatedChangelogSchema } from "../schema";
+import { ChangelogEditor } from "./changelog-editor-layout";
 import { ChangelogPublishDialog } from "./changelog-publish-dialog";
 import { ChangelogStatusBadge } from "./changelog-status";
 
-type TChangelogEditorRecord = {
+export type TChangelogEditorRecord = {
   id: string;
   title: string;
   slug: string;
@@ -50,20 +53,21 @@ type ChangelogSubmitMeta = {
   >;
 };
 
-export function ChangelogEditorScreen({
+type ChangelogEditorProviderProps = {
+  changelog: TChangelogEditorRecord;
+  children: ReactNode;
+  organizationId: string;
+};
+
+function useChangelogEditorForm({
   changelog,
   organizationId,
 }: {
   changelog: TChangelogEditorRecord;
   organizationId: string;
 }) {
-  const navigate = useNavigate();
-  const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
-  const { allowed: isOwner } = usePolicy(
-    allPolicy(hasMembership(organizationId), isUser(changelog.creatorId ?? ""))
-  );
-  const form = useAppForm({
-    formId: formResetKey,
+  return useAppForm({
+    formId: `${changelog.id}:${changelog.updatedAt.getTime()}`,
     defaultValues: {
       title: changelog.title,
       content: changelog.content,
@@ -117,6 +121,33 @@ export function ChangelogEditorScreen({
       }
     },
   });
+}
+
+type ChangelogEditorContextValue = {
+  changelog: TChangelogEditorRecord;
+  form: ReturnType<typeof useChangelogEditorForm>;
+  formResetKey: string;
+  handleDelete: () => Promise<void>;
+  handleMoveToDraft: () => Promise<void>;
+  isOwner: boolean;
+  organizationId: string;
+  submitDefault: () => void;
+};
+
+const ChangelogEditorContext =
+  createContext<ChangelogEditorContextValue | null>(null);
+
+export function ChangelogEditorProvider({
+  changelog,
+  children,
+  organizationId,
+}: ChangelogEditorProviderProps) {
+  const navigate = useNavigate();
+  const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
+  const { allowed: isOwner } = usePolicy(
+    allPolicy(hasMembership(organizationId), isUser(changelog.creatorId ?? ""))
+  );
+  const form = useChangelogEditorForm({ changelog, organizationId });
 
   async function handleMoveToDraft() {
     await form.handleSubmit({
@@ -153,174 +184,245 @@ export function ChangelogEditorScreen({
     }
   }
 
+  const value: ChangelogEditorContextValue = {
+    changelog,
+    form,
+    formResetKey,
+    handleDelete,
+    handleMoveToDraft,
+    isOwner,
+    organizationId,
+    submitDefault: () => {
+      form.handleSubmit({ successTitle: "Changes saved" });
+    },
+  };
+
+  return (
+    <ChangelogEditorContext.Provider value={value}>
+      {children}
+    </ChangelogEditorContext.Provider>
+  );
+}
+
+function useChangelogEditor() {
+  const value = use(ChangelogEditorContext);
+
+  if (!value) {
+    throw new Error("Changelog editor components must be used within the provider");
+  }
+
+  return value;
+}
+
+export function ChangelogEditorForm({ children }: { children: ReactNode }) {
+  const { submitDefault } = useChangelogEditor();
+
   return (
     <form
-      className="mx-auto w-full"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        form.handleSubmit({ successTitle: "Changes saved" });
+        submitDefault();
       }}
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <section className="space-y-6 px-4 py-6 md:px-6 md:py-8">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1 space-y-3">
-              <Link
-                className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
-                params={{ organizationId }}
-                to="/$organizationId/changelog"
-              >
-                Back to changelog
-              </Link>
-
-              <form.Field name="title">
-                {(field) => (
-                  <PostTitleInput
-                    name={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={
-                      isOwner
-                        ? (event) => {
-                            field.handleChange(event.target.value);
-                          }
-                        : undefined
-                    }
-                    placeholder="Untitled changelog"
-                    readOnly={!isOwner}
-                    value={field.state.value}
-                  />
-                )}
-              </form.Field>
-            </div>
-
-            {isOwner ? (
-              <form.Subscribe selector={(state) => state.isSubmitting}>
-                {(isSubmitting) =>
-                  changelog.status === "published" ? (
-                    <Button disabled={isSubmitting} type="submit">
-                      Save
-                    </Button>
-                  ) : (
-                    <ChangelogPublishDialog
-                      currentStatus={changelog.status}
-                      defaultScheduledAt={changelog.scheduledAt}
-                      key={changelog.status}
-                      onPublishNow={() =>
-                        form.handleSubmit({
-                          successTitle: "Changelog published",
-                          overrides: {
-                            status: "published",
-                            publishedAt: new Date(),
-                            scheduledAt: null,
-                          },
-                        })
-                      }
-                      onScheduleLater={(scheduledAt) =>
-                        form.handleSubmit({
-                          successTitle: "Changelog scheduled",
-                          overrides: {
-                            status: "scheduled",
-                            scheduledAt,
-                            publishedAt: null,
-                          },
-                        })
-                      }
-                      triggerLabel="Save"
-                    />
-                  )
-                }
-              </form.Subscribe>
-            ) : null}
-          </div>
-
-          <form.Field name="content">
-            {(field) => (
-              <PostContentEditor
-                disabled={!isOwner}
-                key={formResetKey}
-                onChange={field.handleChange}
-                value={field.state.value}
-              />
-            )}
-          </form.Field>
-        </section>
-
-        <aside className="h-fit space-y-4 border-l bg-muted/20 p-4 md:p-6">
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-xs uppercase tracking-[0.2em]">
-              Status
-            </p>
-            <ChangelogStatusBadge status={changelog.status} />
-          </div>
-
-          <Separator />
-
-          <div className="space-y-3 text-sm">
-            <MetadataRow label="Slug" value={changelog.slug} />
-            <MetadataRow
-              label="Author"
-              value={changelog.user.name ?? "Unknown author"}
-            />
-            <MetadataRow
-              label="Publish At"
-              value={formatDateTime(
-                changelog.publishedAt,
-                changelog.scheduledAt
-              )}
-            />
-            <MetadataRow
-              label="Created"
-              value={changelog.createdAt.toLocaleDateString()}
-            />
-            <MetadataRow
-              label="Updated"
-              value={changelog.updatedAt.toLocaleDateString()}
-            />
-          </div>
-
-          {isOwner ? (
-            <>
-              {changelog.status !== "draft" ? (
-                <Button
-                  className="w-full"
-                  onClick={handleMoveToDraft}
-                  type="button"
-                  variant="outline"
-                >
-                  Move to draft
-                </Button>
-              ) : null}
-              <Separator />
-              <Button
-                className="w-full"
-                onClick={handleDelete}
-                type="button"
-                variant="destructive"
-              >
-                Delete changelog
-              </Button>
-            </>
-          ) : null}
-        </aside>
-      </div>
+      {children}
     </form>
+  );
+}
+
+export function ChangelogEditorBackLink() {
+  const { organizationId } = useChangelogEditor();
+
+  return (
+    <Link
+      className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
+      params={{ organizationId }}
+      to="/$organizationId/changelog"
+    >
+      Back to changelog
+    </Link>
+  );
+}
+
+export function ChangelogEditorTitleField() {
+  const { form, isOwner } = useChangelogEditor();
+
+  return (
+    <form.Field name="title">
+      {(field) => (
+        <PostTitleInput
+          name={field.name}
+          onBlur={field.handleBlur}
+          onChange={
+            isOwner
+              ? (event) => {
+                  field.handleChange(event.target.value);
+                }
+              : undefined
+          }
+          placeholder="Untitled changelog"
+          readOnly={!isOwner}
+          value={field.state.value}
+        />
+      )}
+    </form.Field>
+  );
+}
+
+export function ChangelogEditorSubmitAction() {
+  const { changelog, form, isOwner } = useChangelogEditor();
+
+  if (!isOwner) {
+    return null;
+  }
+
+  return (
+    <form.Subscribe selector={(state) => state.isSubmitting}>
+      {(isSubmitting) =>
+        changelog.status === "published" ? (
+          <Button disabled={isSubmitting} type="submit">
+            Save
+          </Button>
+        ) : (
+          <ChangelogPublishDialog
+            currentStatus={changelog.status}
+            defaultScheduledAt={changelog.scheduledAt}
+            key={changelog.status}
+            onPublishNow={() =>
+              form.handleSubmit({
+                successTitle: "Changelog published",
+                overrides: {
+                  status: "published",
+                  publishedAt: new Date(),
+                  scheduledAt: null,
+                },
+              })
+            }
+            onScheduleLater={(scheduledAt) =>
+              form.handleSubmit({
+                successTitle: "Changelog scheduled",
+                overrides: {
+                  status: "scheduled",
+                  scheduledAt,
+                  publishedAt: null,
+                },
+              })
+            }
+            triggerLabel="Save"
+          />
+        )
+      }
+    </form.Subscribe>
+  );
+}
+
+export function ChangelogEditorContentField() {
+  const { form, formResetKey, isOwner } = useChangelogEditor();
+
+  return (
+    <form.Field name="content">
+      {(field) => (
+        <PostContentEditor
+          disabled={!isOwner}
+          key={formResetKey}
+          onChange={field.handleChange}
+          value={field.state.value}
+        />
+      )}
+    </form.Field>
+  );
+}
+
+export function ChangelogEditorStatus() {
+  const { changelog } = useChangelogEditor();
+
+  return <ChangelogStatusBadge status={changelog.status} />;
+}
+
+export function ChangelogEditorMetadata() {
+  const { changelog } = useChangelogEditor();
+
+  return (
+    <>
+      <MetadataRow label="Slug" value={changelog.slug} />
+      <MetadataRow label="Author" value={changelog.user.name ?? "Unknown author"} />
+      <MetadataRow
+        label="Publish At"
+        value={formatDateTime(changelog.publishedAt, changelog.scheduledAt)}
+      />
+      <MetadataRow
+        label="Created"
+        value={changelog.createdAt.toLocaleDateString()}
+      />
+      <MetadataRow
+        label="Updated"
+        value={changelog.updatedAt.toLocaleDateString()}
+      />
+    </>
+  );
+}
+
+export function ChangelogEditorSidebarActions() {
+  const { changelog, handleDelete, handleMoveToDraft, isOwner } =
+    useChangelogEditor();
+
+  if (!isOwner) {
+    return null;
+  }
+
+  return (
+    <>
+      {changelog.status !== "draft" ? (
+        <Button
+          className="w-full"
+          onClick={handleMoveToDraft}
+          type="button"
+          variant="outline"
+        >
+          Move to draft
+        </Button>
+      ) : null}
+      <Button
+        className="w-full"
+        onClick={handleDelete}
+        type="button"
+        variant="destructive"
+      >
+        Delete changelog
+      </Button>
+    </>
+  );
+}
+
+export function ChangelogEditorSidebarActionsSection() {
+  const { isOwner } = useChangelogEditor();
+
+  if (!isOwner) {
+    return null;
+  }
+
+  return (
+    <>
+      <ChangelogEditor.SidebarSeparator />
+      <ChangelogEditorSidebarActions />
+    </>
   );
 }
 
 function MetadataRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="space-y-1">
+    <>
       <p className="text-muted-foreground text-xs uppercase tracking-[0.2em]">
         {label}
       </p>
       <div className="text-sm">{value}</div>
-    </div>
+    </>
   );
 }
 
 function formatDateTime(publishedAt: Date | null, scheduledAt: Date | null) {
   const value = publishedAt ?? scheduledAt;
+
   if (!value) {
     return "Not scheduled";
   }
@@ -329,29 +431,4 @@ function formatDateTime(publishedAt: Date | null, scheduledAt: Date | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(value);
-}
-
-export function ChangelogEditorSkeleton() {
-  return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6 md:py-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <section className="space-y-6">
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-10 w-3/5" />
-          </div>
-          <Skeleton className="h-72 w-full rounded-2xl" />
-        </section>
-
-        <aside className="space-y-4 rounded-2xl border bg-muted/20 p-4">
-          <Skeleton className="h-10 w-full" />
-          <Separator />
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-4 w-24" />
-        </aside>
-      </div>
-    </div>
-  );
 }

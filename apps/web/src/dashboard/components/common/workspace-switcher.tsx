@@ -37,11 +37,12 @@ export function WorkspaceSwitcher() {
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={
+              render={(props) => (
                 <SkeletonWrapper>
                   <SidebarMenuButton
                     className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                     size="lg"
+                    {...props}
                   >
                     <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                       <span className="font-semibold text-sm">
@@ -57,7 +58,7 @@ export function WorkspaceSwitcher() {
                     <HugeiconsIcon className="ml-auto" icon={UnfoldMoreIcon} />
                   </SidebarMenuButton>
                 </SkeletonWrapper>
-              }
+              )}
             />
             <DropdownMenuContent align="start">
               <WorkspaceList
