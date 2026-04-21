@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { SkeletonWrapper } from "~/components/ui/skeleton-loader";
 import {
   Table,
   TableBody,
@@ -24,6 +25,8 @@ type TChangelogListItem = {
   };
 };
 
+const headItems = ["Title", "Author", "Status", "Publish date", "Updated"];
+
 export function ChangelogListView({
   changelogs,
   organizationId,
@@ -36,11 +39,11 @@ export function ChangelogListView({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Title</TableHead>
-            <TableHead>Author</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Publish date</TableHead>
-            <TableHead>Updated</TableHead>
+            {headItems.map((item) => (
+              <TableHead key={item}>
+                <SkeletonWrapper>{item}</SkeletonWrapper>
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>

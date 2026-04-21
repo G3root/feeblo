@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { SkeletonWrapper } from "~/components/ui/skeleton-loader";
 import { toggleVariants } from "~/components/ui/toggle";
 import { cn } from "~/lib/utils";
 
@@ -27,26 +28,28 @@ export function ChangelogToolbar({
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {links.map((link) => (
-            <Link
-              activeOptions={{
-                exact: true,
-              }}
-              activeProps={{
-                "data-active": "true",
-              }}
-              className={cn(
-                toggleVariants({
-                  variant: "outline",
-                  size: "sm",
-                }),
-                "h-7 min-w-7 data-active:bg-muted"
-              )}
-              key={link.to}
-              params={{ organizationId }}
-              to={link.to}
-            >
-              {link.name}
-            </Link>
+            <SkeletonWrapper key={link.to}>
+              <Link
+                activeOptions={{
+                  exact: true,
+                }}
+                activeProps={{
+                  "data-active": "true",
+                }}
+                className={cn(
+                  toggleVariants({
+                    variant: "outline",
+                    size: "sm",
+                  }),
+                  "h-7 min-w-7 data-active:bg-muted"
+                )}
+                key={link.to}
+                params={{ organizationId }}
+                to={link.to}
+              >
+                {link.name}
+              </Link>
+            </SkeletonWrapper>
           ))}
         </div>
       </div>

@@ -1,11 +1,6 @@
 import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
-import {
-  and,
-  eq,
-  inArray,
-  useLiveQuery,
-} from "@tanstack/react-db";
+import { and, eq, inArray, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
 import {
@@ -15,15 +10,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
-import { Skeleton } from "~/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
+import { SkeletonLoader } from "~/components/ui/skeleton-loader";
 import { toastManager } from "~/components/ui/toast";
 import type { ChangelogStatus } from "~/features/changelog/constants";
 import { hasMembership, usePolicy } from "~/hooks/use-policy";
@@ -132,10 +119,6 @@ export function ChangelogIndex({
     }
   }
 
-  if (changelogsQuery.isLoading) {
-    return <ChangelogIndexPending organizationId={organizationId} />;
-  }
-
   if (changelogsQuery.isError) {
     return (
       <div className="mx-auto w-full">
@@ -152,7 +135,7 @@ export function ChangelogIndex({
     );
   }
 
-  if (visibleChangelogs.length === 0) {
+  if (!changelogsQuery.isLoading && visibleChangelogs.length === 0) {
     return (
       <div className="mx-auto w-full">
         <ChangelogToolbar organizationId={organizationId} />
@@ -178,73 +161,14 @@ export function ChangelogIndex({
   }
 
   return (
-    <div className="mx-auto w-full">
-      <ChangelogToolbar organizationId={organizationId} />
-      <ChangelogListView
-        changelogs={visibleChangelogs}
-        organizationId={organizationId}
-      />
-    </div>
-  );
-}
-
-export function ChangelogIndexPending({
-  organizationId,
-}: {
-  organizationId?: string;
-} = {}) {
-  return (
-    <div className="mx-auto w-full">
-      {organizationId ? (
+    <SkeletonLoader isLoading={changelogsQuery.isLoading}>
+      <div className="mx-auto w-full">
         <ChangelogToolbar organizationId={organizationId} />
-      ) : null}
-      <section className="overflow-hidden text-card-foreground">
-        <div className="space-y-6 border-b px-4 py-6 lg:px-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-4 w-72" />
-            </div>
-            <Skeleton className="h-9 w-28 rounded-md" />
-          </div>
-        </div>
-        <div className="px-4 py-4 lg:px-6">
-          <div className="overflow-hidden rounded-xl border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Author</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Publish date</TableHead>
-                  <TableHead>Updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-40" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-6 w-20 rounded-full" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-36" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </section>
-    </div>
+        <ChangelogListView
+          changelogs={visibleChangelogs ?? []}
+          organizationId={organizationId}
+        />
+      </div>
+    </SkeletonLoader>
   );
 }
