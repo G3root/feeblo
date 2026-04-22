@@ -7,6 +7,7 @@ import {
   tag as tagTable,
 } from "@feeblo/db/schema/feedback";
 import { generatePublicId } from "@feeblo/utils/id";
+import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 import {
@@ -50,6 +51,7 @@ const makeTagRepository = Effect.gen(function* () {
         .select({
           id: tagTable.id,
           name: tagTable.name,
+          slug: tagTable.slug,
           type: tagTable.type,
           organizationId: tagTable.organizationId,
           createdAt: tagTable.createdAt,
@@ -78,6 +80,7 @@ const makeTagRepository = Effect.gen(function* () {
         .values({
           id,
           name,
+          slug: slugify(name),
           type,
           organizationId,
           creatorId,
@@ -92,6 +95,7 @@ const makeTagRepository = Effect.gen(function* () {
         .update(tagTable)
         .set({
           name,
+          slug: slugify(name),
           type,
           updatedAt: new Date(),
         })

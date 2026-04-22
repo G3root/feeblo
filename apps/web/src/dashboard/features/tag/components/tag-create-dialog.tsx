@@ -1,4 +1,5 @@
 import { useSelector } from "@xstate/store-react";
+import { slugify } from "@feeblo/utils/url";
 import { z } from "zod";
 import {
   Sheet,
@@ -59,6 +60,7 @@ function TagCreateForm() {
           createdAt: new Date(),
           updatedAt: new Date(),
           name: data.value.name,
+          slug: slugify(data.value.name),
           type: data.value.type,
           organizationId,
         });

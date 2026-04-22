@@ -100,6 +100,7 @@ export const tag = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
+    slug: text("slug").notNull(),
     type: tagTypeEnum("type").notNull(),
     organizationId: text("organization_id")
       .notNull()
@@ -123,6 +124,11 @@ export const tag = pgTable(
       table.organizationId,
       table.type,
       table.name
+    ),
+    uniqueIndex("tag_organizationId_type_slug_uidx").on(
+      table.organizationId,
+      table.type,
+      table.slug
     ),
   ]
 );

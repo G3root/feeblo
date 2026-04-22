@@ -5,6 +5,7 @@ export const TagType = Schema.Literal("FEEDBACK", "CHANGELOG");
 export class Tag extends Schema.Class<Tag>("Tag")({
   id: Schema.String,
   name: Schema.String,
+  slug: Schema.String,
   type: TagType,
   organizationId: Schema.String,
   createdAt: Schema.Date,

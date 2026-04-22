@@ -1,4 +1,5 @@
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { slugify } from "@feeblo/utils/url";
 import { useSelector } from "@xstate/store-react";
 import { Suspense } from "react";
 import { z } from "zod";
@@ -90,6 +91,7 @@ function TagRenameForm() {
       try {
         const tx = tagCollection.update(tagId, (draft) => {
           draft.name = data.value.name;
+          draft.slug = slugify(data.value.name);
           draft.type = data.value.type;
         });
 
