@@ -74,7 +74,13 @@ function UserActions() {
   return (
     <div className="flex items-center gap-2">
       {session ? (
-        <Button size="sm" variant="outline">
+        <Button
+          onClick={async () => {
+            await authClient.signOut();
+          }}
+          size="sm"
+          variant="outline"
+        >
           Sign out
         </Button>
       ) : (
