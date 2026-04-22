@@ -1,9 +1,8 @@
 import { Delete02Icon, Plus, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
-import { Suspense } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -26,7 +25,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Skeleton } from "~/components/ui/skeleton";
+import {
+  SkeletonLoader,
+  SkeletonWrapper,
+} from "~/components/ui/skeleton-loader";
 import { toastManager } from "~/components/ui/toast";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
@@ -75,12 +77,8 @@ function MembersSettingsPage() {
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
-        <Suspense fallback={<MembersSectionSkeleton title="Members" />}>
-          <MembersSection />
-        </Suspense>
-        <Suspense fallback={<MembersSectionSkeleton title="Invitations" />}>
-          <InvitationsSection />
-        </Suspense>
+        <MembersSection />
+        <InvitationsSection />
       </SettingsLayout.Content>
     </SettingsLayout.Root>
   );
@@ -91,14 +89,14 @@ function MembersSection() {
   const { data: session } = authClient.useSession();
   const [search, setSearch] = React.useState("");
 
-  const { data: allMembers } = useLiveSuspenseQuery(
+  const membersQuery = useLiveQuery(
     (q) =>
       q
         .from({ member: membersCollection })
         .where(({ member }) => eq(member.organizationId, organizationId)),
     [organizationId]
   );
-  const membersSource = allMembers as OrganizationMemberRow[];
+  const membersSource = (membersQuery.data ?? []) as OrganizationMemberRow[];
 
   const members = React.useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -116,27 +114,70 @@ function MembersSection() {
   const noFilter = members.length === 0 && search.trim() !== "";
   const isEmpty = membersSource.length === 0;
 
+  if (membersQuery.isLoading) {
+    return (
+      <SkeletonLoader isLoading>
+        <MembersSettingsLayout.Section title="Members">
+          <MembersSectionControls
+            controls={
+              <>
+                <PolicyGuard policy={hasOwnerOrAdminRole()}>
+                  <InviteMemberForm />
+                </PolicyGuard>
+                <MembersSearchInput
+                  onChange={setSearch}
+                  placeholder="Search by name or email..."
+                  value={search}
+                />
+              </>
+            }
+          />
+          <MembersSettingsLayout.List>
+            {memberLoadingIds.map((id) => (
+              <MemberListItemLoading key={id} />
+            ))}
+          </MembersSettingsLayout.List>
+        </MembersSettingsLayout.Section>
+      </SkeletonLoader>
+    );
+  }
+
+  if (membersQuery.isError) {
+    return (
+      <MembersSettingsLayout.Section title="Members">
+        <MembersSectionControls
+          controls={
+            <PolicyGuard policy={hasOwnerOrAdminRole()}>
+              <InviteMemberForm />
+            </PolicyGuard>
+          }
+        />
+        <MembersSectionErrorState
+          description="There was a problem loading members. Try refreshing the page."
+          title="Unable to load members"
+        />
+      </MembersSettingsLayout.Section>
+    );
+  }
+
   return (
     <MembersSettingsLayout.Section title="Members">
-      <MembersSettingsLayout.Controls>
-        <PolicyGuard policy={hasOwnerOrAdminRole()}>
-          <InviteMemberForm />
-        </PolicyGuard>
-        {isEmpty ? null : (
-          <InputGroup>
-            <InputGroupInput
-              aria-label="Search members"
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name or email..."
-              type="search"
-              value={search}
-            />
-            <InputGroupAddon align="inline-end">
-              <HugeiconsIcon icon={Search01Icon} />
-            </InputGroupAddon>
-          </InputGroup>
-        )}
-      </MembersSettingsLayout.Controls>
+      <MembersSectionControls
+        controls={
+          <>
+            <PolicyGuard policy={hasOwnerOrAdminRole()}>
+              <InviteMemberForm />
+            </PolicyGuard>
+            {isEmpty ? null : (
+              <MembersSearchInput
+                onChange={setSearch}
+                placeholder="Search by name or email..."
+                value={search}
+              />
+            )}
+          </>
+        }
+      />
 
       {noFilter ? (
         <Empty>
@@ -179,83 +220,15 @@ function MembersSection() {
             const isCurrentUser = member.userId === session?.user?.id;
 
             return (
-              <div
-                className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between"
+              <MemberListItem
+                email={member.user?.email || "No email"}
+                id={member.id}
+                isCurrentUser={isCurrentUser}
+                isOwner={isOwner}
                 key={member.id}
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-sm">
-                    {member.user?.name || "Unnamed user"}
-                    {isCurrentUser ? " (You)" : ""}
-                  </p>
-                  <p className="truncate text-muted-foreground text-xs">
-                    {member.user?.email || "No email"}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <PolicyGuard policy={hasOwnerOrAdminRole()}>
-                    <Select
-                      onValueChange={async (value) => {
-                        const tx = membersCollection.update(
-                          member.id,
-                          (draft) => {
-                            draft.role = value as "owner" | "admin" | "member";
-                          }
-                        );
-                        try {
-                          await tx.isPersisted.promise;
-                          toastManager.add({
-                            title: "Member role updated",
-                            type: "success",
-                          });
-                        } catch (_error) {
-                          toastManager.add({
-                            title: "Failed to update role",
-                            type: "error",
-                          });
-                        }
-                      }}
-                      value={role}
-                    >
-                      <SelectTrigger className="w-28" disabled={isOwner}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {isOwner ? (
-                          <SelectItem value="owner">Owner</SelectItem>
-                        ) : null}
-                        <SelectItem value="member">Member</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Button
-                      disabled={isOwner}
-                      onClick={async () => {
-                        const tx = membersCollection.delete(member.id);
-                        try {
-                          await tx.isPersisted.promise;
-                          toastManager.add({
-                            title: "Member removed",
-                            type: "success",
-                          });
-                        } catch (_error) {
-                          toastManager.add({
-                            title: "Failed to remove member",
-                            type: "error",
-                          });
-                        }
-                      }}
-                      size="icon-sm"
-                      type="button"
-                      variant="destructive"
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} />
-                    </Button>
-                  </PolicyGuard>
-                </div>
-              </div>
+                name={member.user?.name || "Unnamed user"}
+                role={role}
+              />
             );
           })}
         </MembersSettingsLayout.List>
@@ -268,7 +241,7 @@ function InvitationsSection() {
   const organizationId = useOrganizationId();
   const [search, setSearch] = React.useState("");
 
-  const { data: allInvitations } = useLiveSuspenseQuery(
+  const invitationsQuery = useLiveQuery(
     (q) => {
       return q
         .from({ invitation: invitationsCollection })
@@ -281,7 +254,8 @@ function InvitationsSection() {
     },
     [organizationId]
   );
-  const invitationsSource = allInvitations as OrganizationInvitationRow[];
+  const invitationsSource = (invitationsQuery.data ??
+    []) as OrganizationInvitationRow[];
 
   const invitations = React.useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -297,21 +271,52 @@ function InvitationsSection() {
   const noFilter = invitations.length === 0 && search.trim() !== "";
   const isEmpty = invitationsSource.length === 0;
 
+  if (invitationsQuery.isLoading) {
+    return (
+      <SkeletonLoader isLoading>
+        <MembersSettingsLayout.Section title="Invitations">
+          <MembersSectionControls
+            controls={
+              <MembersSearchInput
+                onChange={setSearch}
+                placeholder="Search by email..."
+                value={search}
+              />
+            }
+          />
+          <MembersSettingsLayout.List>
+            {invitationLoadingIds.map((id) => (
+              <InvitationListItemLoading key={id} />
+            ))}
+          </MembersSettingsLayout.List>
+        </MembersSettingsLayout.Section>
+      </SkeletonLoader>
+    );
+  }
+
+  if (invitationsQuery.isError) {
+    return (
+      <MembersSettingsLayout.Section title="Invitations">
+        <MembersSectionErrorState
+          description="There was a problem loading invitations. Try refreshing the page."
+          title="Unable to load invitations"
+        />
+      </MembersSettingsLayout.Section>
+    );
+  }
+
   return (
     <MembersSettingsLayout.Section title="Invitations">
       {isEmpty ? null : (
-        <InputGroup>
-          <InputGroupInput
-            aria-label="Search invitations"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by email..."
-            type="search"
-            value={search}
-          />
-          <InputGroupAddon align="inline-end">
-            <HugeiconsIcon icon={Search01Icon} />
-          </InputGroupAddon>
-        </InputGroup>
+        <MembersSectionControls
+          controls={
+            <MembersSearchInput
+              onChange={setSearch}
+              placeholder="Search by email..."
+              value={search}
+            />
+          }
+        />
       )}
 
       {noFilter ? (
@@ -347,48 +352,13 @@ function InvitationsSection() {
       {noFilter || isEmpty ? null : (
         <MembersSettingsLayout.List>
           {invitations.map((invitation) => (
-            <div
-              className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between"
+            <InvitationListItem
+              email={invitation.email}
+              expiresAt={invitation.expiresAt}
+              id={invitation.id}
               key={invitation.id}
-            >
-              <div className="space-y-1">
-                <p className="font-medium text-sm">{invitation.email}</p>
-                <p className="text-muted-foreground text-xs">
-                  Invited as {invitation.role || "member"}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  Expires{" "}
-                  {invitation.expiresAt
-                    ? new Date(invitation.expiresAt).toLocaleString()
-                    : "Unknown"}
-                </p>
-              </div>
-
-              <PolicyGuard policy={hasOwnerOrAdminRole()}>
-                <Button
-                  onClick={async () => {
-                    const tx = invitationsCollection.delete(invitation.id);
-                    try {
-                      await tx.isPersisted.promise;
-                      toastManager.add({
-                        title: "Invitation revoked",
-                        type: "success",
-                      });
-                    } catch (_error) {
-                      toastManager.add({
-                        title: "Failed to revoke invitation",
-                        type: "error",
-                      });
-                    }
-                  }}
-                  size="icon-sm"
-                  type="button"
-                  variant="destructive"
-                >
-                  <HugeiconsIcon icon={Delete02Icon} />
-                </Button>
-              </PolicyGuard>
-            </div>
+              role={invitation.role || "member"}
+            />
           ))}
         </MembersSettingsLayout.List>
       )}
@@ -396,20 +366,247 @@ function InvitationsSection() {
   );
 }
 
-function MembersSectionSkeleton({ title }: { title: string }) {
+function MembersSectionControls({ controls }: { controls: React.ReactNode }) {
   return (
-    <MembersSettingsLayout.Section title={title}>
-      <MembersSettingsLayout.Controls>
-        <Skeleton className="h-9 w-full rounded-md" />
-        <Skeleton className="h-9 w-full rounded-md" />
-      </MembersSettingsLayout.Controls>
-      <MembersSettingsLayout.List>
-        <Skeleton className="h-20 w-full rounded-lg" />
-        <Skeleton className="h-20 w-full rounded-lg" />
-      </MembersSettingsLayout.List>
-    </MembersSettingsLayout.Section>
+    <MembersSettingsLayout.Controls>{controls}</MembersSettingsLayout.Controls>
   );
 }
+
+function MembersSearchInput({
+  onChange,
+  placeholder,
+  value,
+}: {
+  onChange: (value: string) => void;
+  placeholder: string;
+  value: string;
+}) {
+  return (
+    <SkeletonWrapper>
+      <InputGroup>
+        <InputGroupInput
+          aria-label={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          type="search"
+          value={value}
+        />
+        <InputGroupAddon align="inline-end">
+          <HugeiconsIcon icon={Search01Icon} />
+        </InputGroupAddon>
+      </InputGroup>
+    </SkeletonWrapper>
+  );
+}
+
+function MembersSectionErrorState({
+  description,
+  title,
+}: {
+  description: string;
+  title: string;
+}) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
+}
+
+function MemberListItem({
+  email,
+  id,
+  isCurrentUser,
+  isOwner,
+  name,
+  role,
+}: {
+  email: string;
+  id: string;
+  isCurrentUser: boolean;
+  isOwner: boolean;
+  name: string;
+  role: "owner" | "admin" | "member";
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-sm">
+          {name}
+          {isCurrentUser ? " (You)" : ""}
+        </p>
+        <p className="truncate text-muted-foreground text-xs">{email}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <PolicyGuard policy={hasOwnerOrAdminRole()}>
+          <Select
+            onValueChange={async (value) => {
+              const tx = membersCollection.update(id, (draft) => {
+                draft.role = value as "owner" | "admin" | "member";
+              });
+              try {
+                await tx.isPersisted.promise;
+                toastManager.add({
+                  title: "Member role updated",
+                  type: "success",
+                });
+              } catch (_error) {
+                toastManager.add({
+                  title: "Failed to update role",
+                  type: "error",
+                });
+              }
+            }}
+            value={role}
+          >
+            <SelectTrigger className="w-28" disabled={isOwner}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
+              <SelectItem value="member">Member</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            disabled={isOwner}
+            onClick={async () => {
+              const tx = membersCollection.delete(id);
+              try {
+                await tx.isPersisted.promise;
+                toastManager.add({
+                  title: "Member removed",
+                  type: "success",
+                });
+              } catch (_error) {
+                toastManager.add({
+                  title: "Failed to remove member",
+                  type: "error",
+                });
+              }
+            }}
+            size="icon-sm"
+            type="button"
+            variant="destructive"
+          >
+            <HugeiconsIcon icon={Delete02Icon} />
+          </Button>
+        </PolicyGuard>
+      </div>
+    </div>
+  );
+}
+
+function MemberListItemLoading() {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
+      <div className="min-w-0 space-y-1">
+        <SkeletonWrapper>
+          <p className="truncate font-medium text-sm">Loading member</p>
+        </SkeletonWrapper>
+        <SkeletonWrapper>
+          <p className="truncate text-muted-foreground text-xs">
+            loading@example.com
+          </p>
+        </SkeletonWrapper>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <SkeletonWrapper>
+          <Button size="sm" type="button" variant="outline">
+            Member
+          </Button>
+        </SkeletonWrapper>
+        <SkeletonWrapper>
+          <Button size="icon-sm" type="button" variant="destructive">
+            <HugeiconsIcon icon={Delete02Icon} />
+          </Button>
+        </SkeletonWrapper>
+      </div>
+    </div>
+  );
+}
+
+function InvitationListItem({
+  email,
+  expiresAt,
+  id,
+  role,
+}: {
+  email: string;
+  expiresAt: Date | string;
+  id: string;
+  role: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
+      <div className="space-y-1">
+        <p className="font-medium text-sm">{email}</p>
+        <p className="text-muted-foreground text-xs">Invited as {role}</p>
+        <p className="text-muted-foreground text-xs">
+          Expires {expiresAt ? new Date(expiresAt).toLocaleString() : "Unknown"}
+        </p>
+      </div>
+
+      <PolicyGuard policy={hasOwnerOrAdminRole()}>
+        <Button
+          onClick={async () => {
+            const tx = invitationsCollection.delete(id);
+            try {
+              await tx.isPersisted.promise;
+              toastManager.add({
+                title: "Invitation revoked",
+                type: "success",
+              });
+            } catch (_error) {
+              toastManager.add({
+                title: "Failed to revoke invitation",
+                type: "error",
+              });
+            }
+          }}
+          size="icon-sm"
+          type="button"
+          variant="destructive"
+        >
+          <HugeiconsIcon icon={Delete02Icon} />
+        </Button>
+      </PolicyGuard>
+    </div>
+  );
+}
+
+function InvitationListItemLoading() {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
+      <div className="space-y-1">
+        <SkeletonWrapper>
+          <p className="font-medium text-sm">invite@example.com</p>
+        </SkeletonWrapper>
+        <SkeletonWrapper>
+          <p className="text-muted-foreground text-xs">Invited as member</p>
+        </SkeletonWrapper>
+        <SkeletonWrapper>
+          <p className="text-muted-foreground text-xs">Expires soon</p>
+        </SkeletonWrapper>
+      </div>
+
+      <SkeletonWrapper>
+        <Button size="icon-sm" type="button" variant="destructive">
+          <HugeiconsIcon icon={Delete02Icon} />
+        </Button>
+      </SkeletonWrapper>
+    </div>
+  );
+}
+
+const memberLoadingIds = ["member-loading-1", "member-loading-2"];
+const invitationLoadingIds = ["invitation-loading-1", "invitation-loading-2"];
 
 const InviteMemberFormSchema = z.object({
   email: z.email("Enter a valid email"),
@@ -466,15 +663,18 @@ function InviteMemberForm() {
     >
       <form.AppField
         children={(field) => (
-          <field.TextField
-            hideLabel
-            label="Invite email"
-            placeholder="teammate@company.com"
-            type="email"
-          />
+          <SkeletonWrapper>
+            <field.TextField
+              hideLabel
+              label="Invite email"
+              placeholder="teammate@company.com"
+              type="email"
+            />
+          </SkeletonWrapper>
         )}
         name="email"
       />
+
       <form.AppField
         children={(field) => (
           <Select
@@ -483,9 +683,11 @@ function InviteMemberForm() {
             }
             value={field.state.value}
           >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
+            <SkeletonWrapper>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+            </SkeletonWrapper>
             <SelectContent>
               <SelectItem value="member">Member</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
@@ -495,10 +697,12 @@ function InviteMemberForm() {
         name="role"
       />
       <form.AppForm>
-        <form.SubscribeButton label="Invite" type="submit">
-          <HugeiconsIcon icon={Plus} />
-          Invite
-        </form.SubscribeButton>
+        <SkeletonWrapper>
+          <form.SubscribeButton label="Invite" type="submit">
+            <HugeiconsIcon icon={Plus} />
+            Invite
+          </form.SubscribeButton>
+        </SkeletonWrapper>
       </form.AppForm>
     </form>
   );
