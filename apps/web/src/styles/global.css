@@ -463,7 +463,7 @@
 }
 
 .skeleton-loader {
-  @apply animate-pulse rounded-md bg-muted;
+  @apply animate-pulse bg-muted;
   background-image: none !important;
   background-clip: border-box !important;
   border: none !important;

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import { TagDeleteDialog } from "~/features/tag/components/tag-delete-dialog";
 import { TagRenameDialog } from "~/features/tag/components/tag-rename-dialog";
@@ -8,7 +9,6 @@ import {
   TagDeleteDialogProvider,
   TagEditDialogProvider,
 } from "~/features/tag/dialog-stores";
-import { SettingsLayout } from "~/features/settings/components/settings-layout";
 
 export const Route = createFileRoute("/$organizationId/settings/feedback-tags")(
   {
@@ -23,17 +23,17 @@ function RouteComponent() {
         <TagDeleteDialogProvider>
           <SettingsLayout.Root>
             <SettingsLayout.Header>
-              <SettingsLayout.HeaderTitle>Feedback Tags</SettingsLayout.HeaderTitle>
+              <SettingsLayout.HeaderTitle>
+                Feedback Tags
+              </SettingsLayout.HeaderTitle>
               <SettingsLayout.HeaderDescription>
                 Maintain the tags your team uses to categorize feedback.
               </SettingsLayout.HeaderDescription>
             </SettingsLayout.Header>
             <SettingsLayout.Content>
               <TagSettingsTable
-                description="Create and manage the tags your team uses to organize incoming feedback."
                 emptyDescription="Create your first feedback tag to start sorting requests and reports."
                 emptyTitle="No feedback tags yet"
-                title="Tag Library"
                 type="FEEDBACK"
               />
             </SettingsLayout.Content>

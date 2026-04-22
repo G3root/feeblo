@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import type { ReactNode } from "react";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -22,7 +23,10 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "~/components/ui/empty";
-import { Skeleton } from "~/components/ui/skeleton";
+import {
+  SkeletonLoader,
+  SkeletonWrapper,
+} from "~/components/ui/skeleton-loader";
 import {
   Table,
   TableBody,
@@ -33,6 +37,7 @@ import {
 } from "~/components/ui/table";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { tagCollection } from "~/lib/collections";
+import { cn } from "~/lib/utils";
 import {
   useTagCreateDialogContext,
   useTagDeleteDialogContext,
@@ -42,23 +47,14 @@ import {
 type TagType = "FEEDBACK" | "CHANGELOG";
 
 type TagSettingsTableProps = {
-  description: string;
   emptyDescription: string;
   emptyTitle: string;
-  title: string;
-  type: TagType;
-};
 
-type TagRow = {
-  createdAt: Date;
-  id: string;
-  name: string;
   type: TagType;
-  updatedAt: Date;
 };
 
 export function TagSettingsTable(props: TagSettingsTableProps) {
-  const { description, emptyDescription, emptyTitle, title, type } = props;
+  const { emptyDescription, emptyTitle, type } = props;
   const organizationId = useOrganizationId();
   const createDialogStore = useTagCreateDialogContext();
   const editDialogStore = useTagEditDialogContext();
@@ -76,34 +72,37 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   );
 
   const tags = tagsQuery?.data;
+  const handleCreate = () =>
+    createDialogStore.send({ type: "toggle", data: { type } });
 
-  return (
-    <section className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h2 className="font-medium text-sm">{title}</h2>
-          <p className="text-muted-foreground text-sm">{description}</p>
-        </div>
-        <Button
-          onClick={() =>
-            createDialogStore.send({ type: "toggle", data: { type } })
-          }
-          type="button"
-        >
-          <HugeiconsIcon icon={Plus} />
-          <span>New tag</span>
-        </Button>
-      </div>
+  if (tagsQuery.isLoading) {
+    return (
+      <SkeletonLoader isLoading>
+        <section className="space-y-6">
+          <TagTableActions onCreate={handleCreate} />
+          <TagTableShell>
+            {loadingRowIds.map((id) => (
+              <TagTableLoadingRow key={id} />
+            ))}
+          </TagTableShell>
+        </section>
+      </SkeletonLoader>
+    );
+  }
 
-      {tagsQuery.isLoading && !tagsQuery.isError ? (
-        <TagTableLoadingState />
-      ) : null}
-
-      {tagsQuery.isError && !tagsQuery.isLoading ? (
+  if (tagsQuery.isError) {
+    return (
+      <section className="space-y-6">
+        <TagTableActions onCreate={handleCreate} />
         <TagTableErrorState />
-      ) : null}
+      </section>
+    );
+  }
 
-      {!(tagsQuery.isLoading || tagsQuery.isError) && tags.length === 0 ? (
+  if (tags.length === 0) {
+    return (
+      <section className="space-y-6">
+        <TagTableActions onCreate={handleCreate} />
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -113,127 +112,149 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
             <EmptyDescription>{emptyDescription}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button
-              onClick={() =>
-                createDialogStore.send({ type: "toggle", data: { type } })
-              }
-              type="button"
-            >
+            <Button onClick={handleCreate} type="button">
               <HugeiconsIcon icon={Plus} />
               <span>Create tag</span>
             </Button>
           </EmptyContent>
         </Empty>
-      ) : null}
+      </section>
+    );
+  }
 
-      {!(tagsQuery.isLoading || tagsQuery.isError) && tags.length > 0 ? (
-        <div className="overflow-hidden rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead className="w-16 text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tags.map((tag) => (
-                <TableRow key={tag.id}>
-                  <TableCell className="font-medium">{tag.name}</TableCell>
-                  <TableCell>{formatDate(tag.createdAt)}</TableCell>
-                  <TableCell>{formatDate(tag.updatedAt)}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={(triggerProps) => (
-                          <Button
-                            {...triggerProps}
-                            size="icon-sm"
-                            type="button"
-                            variant="ghost"
-                          >
-                            <HugeiconsIcon icon={Ellipsis} />
-                            <span className="sr-only">
-                              Open actions for {tag.name}
-                            </span>
-                          </Button>
-                        )}
-                      />
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            editDialogStore.send({
-                              type: "toggle",
-                              data: { tagId: tag.id },
-                            })
-                          }
-                        >
-                          <HugeiconsIcon
-                            className="text-muted-foreground"
-                            icon={Edit}
-                          />
-                          <span>Rename</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            deleteDialogStore.send({
-                              type: "toggle",
-                              data: { tagId: tag.id },
-                            })
-                          }
-                          variant="destructive"
-                        >
-                          <HugeiconsIcon icon={Delete02Icon} />
-                          <span>Delete</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : null}
+  return (
+    <section className="space-y-6">
+      <TagTableActions onCreate={handleCreate} />
+      <TagTableShell>
+        {tags.map((tag) => (
+          <TagTableRow
+            createdAt={tag.createdAt}
+            key={tag.id}
+            name={tag.name}
+            onDelete={() =>
+              deleteDialogStore.send({
+                type: "toggle",
+                data: { tagId: tag.id },
+              })
+            }
+            onEdit={() =>
+              editDialogStore.send({
+                type: "toggle",
+                data: { tagId: tag.id },
+              })
+            }
+            updatedAt={tag.updatedAt}
+          />
+        ))}
+      </TagTableShell>
     </section>
   );
 }
 
-export function TagTableLoadingState() {
+function TagTableActions({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="flex items-center justify-end">
+      <SkeletonWrapper>
+        <Button onClick={onCreate} type="button">
+          <HugeiconsIcon icon={Plus} />
+          <span>New tag</span>
+        </Button>
+      </SkeletonWrapper>
+    </div>
+  );
+}
+
+type TagTableRowProps = {
+  createdAt: Date;
+  name: string;
+  onDelete: () => void;
+  onEdit: () => void;
+  updatedAt: Date;
+};
+
+function TagTableShell({ children }: { children: ReactNode }) {
   return (
     <div className="overflow-hidden rounded-xl border">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead>Updated</TableHead>
-            <TableHead className="w-16 text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: 4 }).map((_, index) => (
-            <TableRow key={index}>
-              <TableCell>
-                <Skeleton className="h-4 w-32" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-24" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-24" />
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
+        <TagTableHeader />
+        <TableBody>{children}</TableBody>
       </Table>
     </div>
+  );
+}
+
+function TagTableRow({
+  createdAt,
+  name,
+  onDelete,
+  onEdit,
+  updatedAt,
+}: TagTableRowProps) {
+  return (
+    <TableRow>
+      <TableCell className="font-medium">{name}</TableCell>
+      <TableCell>{formatDate(createdAt)}</TableCell>
+      <TableCell>{formatDate(updatedAt)}</TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={(triggerProps) => (
+              <Button
+                {...triggerProps}
+                size="icon-sm"
+                type="button"
+                variant="ghost"
+              >
+                <HugeiconsIcon icon={Ellipsis} />
+                <span className="sr-only">Open actions for {name}</span>
+              </Button>
+            )}
+          />
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem onClick={onEdit}>
+              <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
+              <span>Rename</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onDelete} variant="destructive">
+              <HugeiconsIcon icon={Delete02Icon} />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function TagTableLoadingRow() {
+  const placeholderDate = formatDate(new Date());
+
+  return (
+    <TableRow>
+      <TableCell className="font-medium">
+        <SkeletonWrapper>
+          <span>Loading tag</span>
+        </SkeletonWrapper>
+      </TableCell>
+      <TableCell>
+        <SkeletonWrapper>
+          <span>{placeholderDate}</span>
+        </SkeletonWrapper>
+      </TableCell>
+      <TableCell>
+        <SkeletonWrapper>
+          <span>{placeholderDate}</span>
+        </SkeletonWrapper>
+      </TableCell>
+      <TableCell className="text-right">
+        <SkeletonWrapper>
+          <Button size="icon-sm" type="button" variant="ghost">
+            <HugeiconsIcon icon={Ellipsis} />
+            <span className="sr-only">Open actions</span>
+          </Button>
+        </SkeletonWrapper>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -258,4 +279,25 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
   }).format(date);
+}
+
+const loadingRowIds = ["tag-loading-1", "tag-loading-2"];
+
+const headers = ["Name", "Created", "Updated", "Actions"];
+
+function TagTableHeader() {
+  return (
+    <TableHeader>
+      <TableRow>
+        {headers.map((item, index) => (
+          <TableHead
+            className={cn(index === 3 && "w-16 text-right")}
+            key={item}
+          >
+            {item}
+          </TableHead>
+        ))}
+      </TableRow>
+    </TableHeader>
+  );
 }
