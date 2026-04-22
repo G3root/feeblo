@@ -3,13 +3,13 @@ import {
   Edit,
   Ellipsis,
   Home,
+  InternetIcon,
   LayoutThreeColumnIcon,
   Megaphone03Icon,
   MessageMultiple01Icon,
   Plus,
   PreferenceVerticalIcon,
   SparklesIcon,
-  WebDesign01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -358,8 +358,8 @@ function MyBoardLink() {
       <SidebarMenuButton
         render={(props) => (
           <a {...props} href={publicSiteUrl}>
-            <HugeiconsIcon icon={WebDesign01Icon} />
-            <span>My Board</span>
+            <HugeiconsIcon icon={InternetIcon} />
+            <span>Public Board</span>
           </a>
         )}
       />
