@@ -12,6 +12,7 @@ import { type ReactNode, Suspense } from "react";
 import { Link } from "wouter";
 import { z } from "zod";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Badge } from "~/components/ui/badge";
 import { buttonVariants } from "~/components/ui/button";
 import {
   Empty,
@@ -51,6 +52,8 @@ import {
   publicPostCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
+  publicPostTagCollection,
+  publicTagCollection,
 } from "../lib/collections";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { useSite } from "../providers/site-provider";
@@ -96,21 +99,6 @@ function formatPublishedDate(value: Date | string) {
     month: "short",
     year: "numeric",
   }).format(date);
-}
-
-function SidebarSection({
-  children,
-  title,
-}: {
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <section className="border-border/80 border-b pb-5 last:border-b-0 last:pb-0">
-      <p className="mb-2 text-muted-foreground text-xs">{title}</p>
-      {children}
-    </section>
-  );
 }
 
 const UpdatedPostSchema = z.object({
@@ -173,6 +161,29 @@ export function PostPage({ slug }: { slug: string }) {
   const postStatus = postRow?.postStatus;
   const board = postRow?.board;
   const postId = post?.id ?? "";
+  const postTagsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ postTag: publicPostTagCollection })
+        .join(
+          { tag: publicTagCollection },
+          ({ postTag, tag }) => eq(postTag.tagId, tag.id),
+          "inner"
+        )
+        .where(({ postTag, tag }) =>
+          and(
+            eq(postTag.organizationId, site.organizationId),
+            eq(postTag.postId, postId),
+            eq(tag.organizationId, site.organizationId),
+            eq(tag.type, "FEEDBACK")
+          )
+        )
+        .select(({ tag }) => ({
+          id: tag.id,
+          name: tag.name,
+        })),
+    [site.organizationId, postId]
+  );
   const { allowed: canEdit } = usePolicy(
     anyPolicy(
       hasOwnerOrAdminRole(),
@@ -220,11 +231,21 @@ export function PostPage({ slug }: { slug: string }) {
     strategy: debounceStrategy({ wait: 500 }),
   });
 
-  if (postLoading || boardsQuery.isLoading || statusQuery.isLoading) {
+  if (
+    postLoading ||
+    boardsQuery.isLoading ||
+    statusQuery.isLoading ||
+    postTagsQuery.isLoading
+  ) {
     return <RootLayout>Loading post...</RootLayout>;
   }
 
-  if (postError || boardsQuery.isError || statusQuery.isError) {
+  if (
+    postError ||
+    boardsQuery.isError ||
+    statusQuery.isError ||
+    postTagsQuery.isError
+  ) {
     return (
       <RootLayout>
         <Empty>
@@ -258,11 +279,12 @@ export function PostPage({ slug }: { slug: string }) {
   const authorName = post?.user?.name ?? "Anonymous";
   const authorInitials = getInitials(post?.user?.name ?? "Anonymous");
   const publishedDate = formatPublishedDate(post.createdAt);
+  const selectedTags = postTagsQuery.data ?? [];
 
   return (
     <RootLayout>
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_264px] lg:items-start">
-        <article className="min-w-0">
+      <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
+        <article className="min-w-0 lg:col-span-9">
           <Link
             className={cn(
               buttonVariants({ size: "sm", variant: "ghost" }),
@@ -339,52 +361,160 @@ export function PostPage({ slug }: { slug: string }) {
           </div>
         </article>
 
-        <aside className="lg:pt-16">
-          <div className="space-y-5">
-            <PostVoterDialog.Root postId={post.id}>
-              <SidebarSection title="Voters">
-                <PostVoterDialog.Trigger />
-                <PostVoterDialog.Content />
-              </SidebarSection>
-            </PostVoterDialog.Root>
-
-            <SidebarSection title="Board">
-              <BoardNavLink
-                href={`/b/${board?.slug ?? ""}`}
-                label={boardName ?? "Unassigned"}
-                showActiveIndicator
-              />
-            </SidebarSection>
-
-            <SidebarSection title="Status">
-              <StatusPill status={postStatus?.type ?? "PLANNED"} />
-            </SidebarSection>
-
-            {/* <SidebarSection title="Tags">
-              <p className="text-muted-foreground">No tags assigned</p>
-            </SidebarSection> */}
-
-            <SidebarSection title="Posted by">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarImage src={post.user.image ?? undefined} />
-                  <AvatarFallback>{authorInitials}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium text-foreground">{authorName}</p>
-                </div>
-              </div>
-            </SidebarSection>
-
-            <SidebarSection title="Posted on">
-              <p className="font-medium text-foreground">{publishedDate}</p>
-            </SidebarSection>
-          </div>
-        </aside>
+        <PostMetaSidebar.Root>
+          <PostMetaSidebar.Voters postId={post.id} />
+          <PostMetaSidebar.Board
+            boardName={boardName}
+            boardSlug={board?.slug}
+          />
+          <PostMetaSidebar.Status status={postStatus?.type ?? "PLANNED"} />
+          <PostMetaSidebar.Tags tags={selectedTags} />
+          <PostMetaSidebar.Author
+            authorImage={post.user.image ?? undefined}
+            authorInitials={authorInitials}
+            authorName={authorName}
+          />
+          <PostMetaSidebar.PublishedOn publishedDate={publishedDate} />
+        </PostMetaSidebar.Root>
       </div>
     </RootLayout>
   );
 }
+
+function PostMetaSidebarRoot({ children }: { children: ReactNode }) {
+  return (
+    <aside className="lg:col-span-3 lg:pt-16">
+      <div className="space-y-3 rounded-2xl bg-background/80 p-4">
+        {children}
+      </div>
+    </aside>
+  );
+}
+
+function PostMetaSidebarSection({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <section className="space-y-2 border-border/70 border-b pb-3 last:border-b-0 last:pb-0">
+      <p className="font-medium text-muted-foreground/80 text-xs tracking-wider">
+        {title}
+      </p>
+      {children}
+    </section>
+  );
+}
+
+function PostMetaSidebarVoters({ postId }: { postId: string }) {
+  return (
+    <PostVoterDialog.Root postId={postId}>
+      <PostMetaSidebarSection title="Voters">
+        <PostVoterDialog.Trigger />
+        <PostVoterDialog.Content />
+      </PostMetaSidebarSection>
+    </PostVoterDialog.Root>
+  );
+}
+
+function PostMetaSidebarBoard({
+  boardName,
+  boardSlug,
+}: {
+  boardName: string;
+  boardSlug?: string | null;
+}) {
+  return (
+    <PostMetaSidebarSection title="Board">
+      <BoardNavLink
+        href={`/b/${boardSlug ?? ""}`}
+        label={boardName}
+        showActiveIndicator
+      />
+    </PostMetaSidebarSection>
+  );
+}
+
+function PostMetaSidebarStatus({ status }: { status: string }) {
+  return (
+    <PostMetaSidebarSection title="Status">
+      <StatusPill status={status} />
+    </PostMetaSidebarSection>
+  );
+}
+
+function PostMetaSidebarTags({
+  tags,
+}: {
+  tags: Array<{ id: string; name: string }>;
+}) {
+  if (tags.length === 0) {
+    return null;
+  }
+
+  return (
+    <PostMetaSidebarSection title="Tags">
+      <div className="flex flex-wrap gap-1.5">
+        {tags.map((tag) => (
+          <Badge
+            className="h-6 rounded-full border-border/70 bg-muted/40 px-2.5 text-foreground"
+            key={tag.id}
+            variant="outline"
+          >
+            {tag.name}
+          </Badge>
+        ))}
+      </div>
+    </PostMetaSidebarSection>
+  );
+}
+
+function PostMetaSidebarAuthor({
+  authorImage,
+  authorInitials,
+  authorName,
+}: {
+  authorImage?: string;
+  authorInitials: string;
+  authorName: string;
+}) {
+  return (
+    <PostMetaSidebarSection title="Posted by">
+      <div className="flex items-center gap-2.5">
+        <Avatar className="size-8">
+          <AvatarImage src={authorImage} />
+          <AvatarFallback>{authorInitials}</AvatarFallback>
+        </Avatar>
+        <p className="font-medium text-foreground text-sm">{authorName}</p>
+      </div>
+    </PostMetaSidebarSection>
+  );
+}
+
+function PostMetaSidebarPublishedOn({
+  publishedDate,
+}: {
+  publishedDate: string;
+}) {
+  return (
+    <PostMetaSidebarSection title="Posted on">
+      <p className="font-medium text-foreground text-sm">{publishedDate}</p>
+    </PostMetaSidebarSection>
+  );
+}
+
+const PostMetaSidebar = {
+  Root: PostMetaSidebarRoot,
+  Section: PostMetaSidebarSection,
+  Voters: PostMetaSidebarVoters,
+  Board: PostMetaSidebarBoard,
+  Status: PostMetaSidebarStatus,
+  Tags: PostMetaSidebarTags,
+  Author: PostMetaSidebarAuthor,
+  PublishedOn: PostMetaSidebarPublishedOn,
+};
 
 function PublicCommentFallback() {
   return (
