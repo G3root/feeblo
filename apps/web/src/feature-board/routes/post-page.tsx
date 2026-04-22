@@ -124,61 +124,54 @@ const UpdatedPostSchema = z.object({
 
 export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
-  const {
-    data: statuses = [],
-    isError: statusError,
-    isLoading: statusLoading,
-  } = useLiveQuery(
+
+  const statusQuery = useLiveQuery(
     (q) =>
       q
         .from({ status: publicPostStatusCollection })
         .where(({ status }) => eq(status.organizationId, site.organizationId)),
     [site.organizationId, slug]
   );
-  const {
-    data: boards = [],
-    isError: boardsError,
-    isLoading: boardsLoading,
-  } = useLiveQuery(
+  const boardsQuery = useLiveQuery(
     (q) =>
       q
         .from({ board: publicBoardCollection })
         .where(({ board }) => eq(board.organizationId, site.organizationId)),
     [site.organizationId]
   );
+
   const {
-    data: post,
+    data: postRow,
     isError: postError,
     isLoading: postLoading,
   } = useLiveQuery(
     (q) => {
-      if (
-        !site.organizationId ||
-        statusLoading ||
-        boardsLoading ||
-        statusError ||
-        boardsError
-      ) {
+      if (!site.organizationId) {
         return undefined;
       }
 
       return q
         .from({ post: publicPostCollection })
+        .join(
+          { postStatus: publicPostStatusCollection },
+          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
+          "inner"
+        )
+        .join(
+          { board: publicBoardCollection },
+          ({ post, board }) => eq(post.boardId, board.id),
+          "left"
+        )
         .where(({ post }) =>
           and(eq(post.slug, slug), eq(post.organizationId, site.organizationId))
         )
         .findOne();
     },
-    [
-      site.organizationId,
-      slug,
-      statusLoading,
-      boardsLoading,
-      statusError,
-      boardsError,
-    ]
+    [site.organizationId, slug]
   );
-  const postStatus = statuses.find((status) => status.id === post?.statusId);
+  const post = postRow?.post;
+  const postStatus = postRow?.postStatus;
+  const board = postRow?.board;
   const postId = post?.id ?? "";
   const { allowed: canEdit } = usePolicy(
     anyPolicy(
@@ -227,11 +220,11 @@ export function PostPage({ slug }: { slug: string }) {
     strategy: debounceStrategy({ wait: 500 }),
   });
 
-  if (statusLoading || boardsLoading || postLoading) {
+  if (postLoading || boardsQuery.isLoading || statusQuery.isLoading) {
     return <RootLayout>Loading post...</RootLayout>;
   }
 
-  if (statusError || boardsError || postError) {
+  if (postError || boardsQuery.isError || statusQuery.isError) {
     return (
       <RootLayout>
         <Empty>
@@ -261,7 +254,6 @@ export function PostPage({ slug }: { slug: string }) {
     );
   }
 
-  const board = boards.find((board) => board.id === post.boardId);
   const boardName = board?.name ?? "Unassigned";
   const authorName = post?.user?.name ?? "Anonymous";
   const authorInitials = getInitials(post?.user?.name ?? "Anonymous");
