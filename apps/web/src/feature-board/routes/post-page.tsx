@@ -8,11 +8,17 @@ import {
   usePacedMutations,
 } from "@tanstack/react-db";
 import { ArrowLeft } from "lucide-react";
-import { Suspense } from "react";
+import { type ReactNode, Suspense } from "react";
 import { Link } from "wouter";
 import { z } from "zod";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { buttonVariants } from "~/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { PostCommentComposer } from "~/features/post/components/post-comment-composer";
@@ -48,6 +54,14 @@ import {
 } from "../lib/collections";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { useSite } from "../providers/site-provider";
+
+function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8 lg:py-14">
+      {children}
+    </div>
+  );
+}
 
 const statusColors: Record<string, string> = {
   PENDING: "bg-muted-foreground/50",
@@ -214,36 +228,36 @@ export function PostPage({ slug }: { slug: string }) {
   });
 
   if (statusLoading || boardsLoading || postLoading) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-8 text-muted-foreground text-sm sm:px-6 lg:px-8">
-        Loading post...
-      </div>
-    );
+    return <RootLayout>Loading post...</RootLayout>;
   }
 
   if (statusError || boardsError || postError) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-border/60 p-10 text-center">
-          <p className="font-medium text-sm">Post unavailable</p>
-          <p className="mt-1 text-muted-foreground text-sm">
-            There was a problem loading this post.
-          </p>
-        </div>
-      </div>
+      <RootLayout>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Post unavailable</EmptyTitle>
+            <EmptyDescription>
+              There was a problem loading this post.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </RootLayout>
     );
   }
 
   if (!post) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-lg border border-border/60 p-10 text-center">
-          <p className="font-medium text-sm">Post not found</p>
-          <p className="mt-1 text-muted-foreground text-sm">
-            This public post does not exist anymore.
-          </p>
-        </div>
-      </div>
+      <RootLayout>
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Post not found</EmptyTitle>
+            <EmptyDescription>
+              This public post does not exist anymore.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </RootLayout>
     );
   }
 
@@ -254,7 +268,7 @@ export function PostPage({ slug }: { slug: string }) {
   const publishedDate = formatPublishedDate(post.createdAt);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8 lg:py-14">
+    <RootLayout>
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_264px] lg:items-start">
         <article className="min-w-0">
           <Link
@@ -376,7 +390,7 @@ export function PostPage({ slug }: { slug: string }) {
           </div>
         </aside>
       </div>
-    </div>
+    </RootLayout>
   );
 }
 
