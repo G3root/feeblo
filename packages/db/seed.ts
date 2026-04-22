@@ -1,9 +1,10 @@
 // biome-ignore-all lint/suspicious/noConsole: Seed script requires console output
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import { DB } from "./src";
+import { nukeDatabase } from "./src/nuke";
 import {
   board,
   comment,
@@ -563,27 +564,7 @@ const seedEngagement = ({
 const seed = Effect.gen(function* () {
   console.log("Starting database seed...\n");
 
-  const db = yield* DB;
-  yield* db.execute(
-    sql`truncate table
-      "commentReaction",
-      "comment",
-      "postReaction",
-      "upvote",
-      "post",
-      "board",
-      "site",
-      "invitation",
-      "member",
-      "organization",
-      "two_factor",
-      "verification",
-      "account",
-      "session",
-      "subscription",
-      "user"
-    cascade`
-  );
+  yield* nukeDatabase();
   console.log("Database reset complete.\n");
 
   console.log("1) Creating test user and organization");
