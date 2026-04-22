@@ -11,7 +11,7 @@ export const useSite = () => {
         .from({ site: siteCollection })
         .where(({ site }) => eq(site.organizationId, organizationId))
         .findOne(),
-    []
+    [organizationId]
   );
 
   return site;

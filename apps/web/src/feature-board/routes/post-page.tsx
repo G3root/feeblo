@@ -11,12 +11,7 @@ import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 import { Link } from "wouter";
 import { z } from "zod";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarImage,
-} from "~/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { buttonVariants } from "~/components/ui/button";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
@@ -43,13 +38,13 @@ import { cn } from "~/lib/utils";
 import { getPostReactionCollectionKey } from "../../dashboard/lib/reaction-keys";
 import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
+import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 import { useUpvote } from "../hooks/use-upvote";
 import {
   publicBoardCollection,
   publicPostCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
-  publicUpvoteCollection,
 } from "../lib/collections";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { useSite } from "../providers/site-provider";
@@ -340,7 +335,12 @@ export function PostPage({ slug }: { slug: string }) {
 
         <aside className="lg:pt-16">
           <div className="space-y-5">
-            <UpvoteList postId={post.id} />
+            <PostVoterDialog.Root postId={post.id}>
+              <SidebarSection title="Voters">
+                <PostVoterDialog.Trigger />
+                <PostVoterDialog.Content />
+              </SidebarSection>
+            </PostVoterDialog.Root>
 
             <SidebarSection title="Board">
               <BoardNavLink
@@ -391,41 +391,6 @@ function PublicCommentFallback() {
         <AuthDialog variant="sign-in" />
       </div>
     </div>
-  );
-}
-
-function UpvoteList({ postId }: { postId: string }) {
-  const site = useSite();
-  const organizationId = site.organizationId;
-  const { data: upvotes } = useLiveQuery(
-    (q) =>
-      q
-        .from({ upvote: publicUpvoteCollection })
-        .where(({ upvote }) =>
-          and(
-            eq(upvote.postId, postId),
-            eq(upvote.organizationId, organizationId)
-          )
-        )
-        .orderBy(({ upvote }) => upvote.createdAt, "asc"),
-    [organizationId, postId]
-  );
-
-  if (upvotes?.length === 0) {
-    return null;
-  }
-
-  return (
-    <SidebarSection title="Voters">
-      <AvatarGroup>
-        {upvotes.map((upvote) => (
-          <Avatar key={upvote.id}>
-            <AvatarImage src={upvote?.user?.image ?? undefined} />
-            <AvatarFallback>{getInitials(upvote.user.name)}</AvatarFallback>
-          </Avatar>
-        ))}
-      </AvatarGroup>
-    </SidebarSection>
   );
 }
 
