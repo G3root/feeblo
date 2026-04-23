@@ -2,7 +2,7 @@ import { generateId } from "@feeblo/utils/id";
 import { useMemo, useState } from "react";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
-import { commentReactionCollection } from "~/lib/collections";
+import { commentReactionCollection as dashboardCommentReactionCollection } from "~/lib/collections";
 import { getCommentReactionCollectionKey } from "~/lib/reaction-keys";
 import { ReactionButton, ReactionList } from "./reaction-button";
 
@@ -18,11 +18,13 @@ export type CommentReaction = {
 export function CommentReactionSection({
   commentId,
   commentReactions,
+  commentReactionCollection = dashboardCommentReactionCollection,
   organizationId,
   postId,
 }: {
   commentId: string;
   commentReactions: CommentReaction[];
+  commentReactionCollection?: typeof dashboardCommentReactionCollection;
   organizationId: string;
   postId: string;
 }) {

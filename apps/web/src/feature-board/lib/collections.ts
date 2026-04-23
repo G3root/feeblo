@@ -4,6 +4,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { Duration } from "effect";
 import { fetchRpc } from "~/lib/runtime";
 import {
+  getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
   getUpvoteCollectionKey,
 } from "../../dashboard/lib/reaction-keys";
@@ -247,6 +248,67 @@ export function createPublicCollections({
     })
   );
 
+  const publicCommentReactionCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        return postId
+          ? ["public-comment-reaction", organizationId, `postId-${postId}`]
+          : ["public-comment-reaction", organizationId];
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        if (!postId) {
+          return [];
+        }
+
+        try {
+          const data = await fetchRpc(
+            (rpc) => rpc.CommentReactionList({ organizationId, postId }),
+            { signal: ctx.signal }
+          );
+
+          return [...data];
+        } catch {
+          return [];
+        }
+      },
+      queryClient,
+      getKey: getCommentReactionCollectionKey,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newCommentReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionToggle({
+            organizationId: newCommentReaction.organizationId,
+            postId: newCommentReaction.postId,
+            commentId: newCommentReaction.commentId,
+            emoji: newCommentReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedCommentReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionToggle({
+            organizationId: deletedCommentReaction.organizationId,
+            postId: deletedCommentReaction.postId,
+            commentId: deletedCommentReaction.commentId,
+            emoji: deletedCommentReaction.emoji,
+          })
+        );
+      },
+    })
+  );
+
   const publicUpvoteCollection = createCollection(
     queryCollectionOptions({
       queryKey: (opts) => {
@@ -364,6 +426,7 @@ export function createPublicCollections({
     publicChangelogCollection,
     publicChangelogTagCollection,
     publicCommentCollection,
+    publicCommentReactionCollection,
     publicPostCollection,
     publicPostReactionCollection,
     publicPostStatusCollection,

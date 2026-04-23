@@ -13,7 +13,10 @@ import {
   ItemTitle,
 } from "~/components/ui/item";
 import { Skeleton } from "~/components/ui/skeleton";
-import { commentCollection, commentReactionCollection } from "~/lib/collections";
+import {
+  commentCollection as dashboardCommentCollection,
+  commentReactionCollection as dashboardCommentReactionCollection,
+} from "~/lib/collections";
 import {
   CommentReactionSection,
   type CommentReaction,
@@ -30,6 +33,8 @@ type RenderCommentActionsArgs = {
 };
 
 type PostCommentListProps = {
+  commentCollection?: typeof dashboardCommentCollection;
+  commentReactionCollection?: typeof dashboardCommentReactionCollection;
   emptyState?: ReactNode;
   organizationId: string;
   postId: string;
@@ -37,6 +42,8 @@ type PostCommentListProps = {
 };
 
 export function PostCommentList({
+  commentCollection = dashboardCommentCollection,
+  commentReactionCollection = dashboardCommentReactionCollection,
   emptyState = null,
   organizationId,
   postId,
@@ -136,6 +143,7 @@ export function PostCommentList({
               <CommentReactionSection
                 commentId={comment.id}
                 commentReactions={commentReactions}
+                commentReactionCollection={commentReactionCollection}
                 organizationId={organizationId}
                 postId={postId}
               />

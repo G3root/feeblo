@@ -108,6 +108,8 @@ export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
   const {
     publicBoardCollection,
+    publicCommentCollection,
+    publicCommentReactionCollection,
     publicPostCollection,
     publicPostStatusCollection,
     publicPostTagCollection,
@@ -320,11 +322,14 @@ export function PostPage({ slug }: { slug: string }) {
 
               <div className="space-y-4">
                 <PostCommentComposer
+                  commentCollection={publicCommentCollection}
                   organizationId={site.organizationId}
                   postId={post.id}
                   unauthenticatedFallback={<PublicCommentFallback />}
                 />
                 <PostCommentList
+                  commentCollection={publicCommentCollection}
+                  commentReactionCollection={publicCommentReactionCollection}
                   emptyState={
                     <p className="py-6 text-center text-muted-foreground text-sm">
                       No comments yet.

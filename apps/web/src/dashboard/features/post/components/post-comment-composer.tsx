@@ -8,16 +8,18 @@ import { Editor, type EmailEditorRef } from "~/components/ui/editor";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
-import { commentCollection } from "~/lib/collections";
+import { commentCollection as dashboardCommentCollection } from "~/lib/collections";
 import { isRichTextContentEmpty } from "./post-editor-utils";
 
 type PostCommentComposerProps = {
+  commentCollection?: typeof dashboardCommentCollection;
   organizationId: string;
   postId: string;
   unauthenticatedFallback?: ReactNode;
 };
 
 export function PostCommentComposer({
+  commentCollection = dashboardCommentCollection,
   organizationId,
   postId,
   unauthenticatedFallback = null,
