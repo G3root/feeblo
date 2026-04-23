@@ -1,12 +1,9 @@
 import type { Comment } from "@feeblo/domain/comments/schema";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, use } from "react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
   Item,
-  ItemActions,
   ItemContent,
-  ItemDescription,
   ItemGroup,
   ItemHeader,
   ItemMedia,
@@ -14,145 +11,311 @@ import {
 } from "~/components/ui/item";
 import { Skeleton } from "~/components/ui/skeleton";
 import {
-  commentCollection as dashboardCommentCollection,
-  commentReactionCollection as dashboardCommentReactionCollection,
-} from "~/lib/collections";
-import {
-  CommentReactionSection,
   type CommentReaction,
+  CommentReactionSection,
+  type CommentReactionToggleInput,
 } from "./comment-reaction-section";
-import { toRenderableRichTextHtml } from "./post-editor-utils";
-
-const READONLY_RICH_TEXT_CLASS =
-  "prose prose-sm max-w-none text-foreground prose-headings:mb-2 prose-headings:mt-4 prose-headings:text-foreground prose-p:my-2 prose-p:text-foreground prose-strong:text-foreground prose-a:text-foreground prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-img:my-3 prose-img:max-h-80 prose-img:rounded-lg prose-img:border prose-img:border-border/60";
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
-type RenderCommentActionsArgs = {
-  comment: Comment;
-};
-
 type PostCommentListProps = {
-  commentCollection?: typeof dashboardCommentCollection;
-  commentReactionCollection?: typeof dashboardCommentReactionCollection;
+  comments?: Comment[];
+  commentReactions?: CommentReaction[];
   emptyState?: ReactNode;
+  errorState?: ReactNode;
+  handleToggleCommentReaction?: (
+    value: CommentReactionToggleInput
+  ) => Promise<void>;
+  isError?: boolean;
+  isLoading?: boolean;
+  loadingState?: ReactNode;
   organizationId: string;
   postId: string;
-  renderCommentActions?: (args: RenderCommentActionsArgs) => ReactNode;
 };
 
-export function PostCommentList({
-  commentCollection = dashboardCommentCollection,
-  commentReactionCollection = dashboardCommentReactionCollection,
-  emptyState = null,
-  organizationId,
-  postId,
-  renderCommentActions,
-}: PostCommentListProps) {
-  const commentsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ comment: commentCollection })
-        .where(({ comment }) =>
-          and(
-            eq(comment.organizationId, organizationId),
-            eq(comment.postId, postId)
-          )
-        )
-        .orderBy((comment) => comment.comment.createdAt, "desc"),
-    [organizationId, postId]
-  );
+type PostCommentListRootProps = PostCommentListProps & {
+  children: ReactNode;
+};
 
-  const commentReactionsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ commentReaction: commentReactionCollection })
-        .where(({ commentReaction }) =>
-          and(
-            eq(commentReaction.organizationId, organizationId),
-            eq(commentReaction.postId, postId)
-          )
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.commentId,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.emoji,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.createdAt,
-          "asc"
-        ),
-    [organizationId, postId]
-  );
+type PostCommentListContentProps = {
+  children?: ReactNode;
+  emptyState?: ReactNode;
+  errorState?: ReactNode;
+  loadingState?: ReactNode;
+};
 
-  if (commentsQuery.isLoading || commentReactionsQuery.isLoading) {
-    return <PostCommentListSkeleton />;
+type PostCommentListItemsProps = {
+  children?: ReactNode;
+};
+
+type PostCommentListContextValue = {
+  commentReactions: CommentReaction[];
+  comments: Comment[];
+  handleToggleCommentReaction?: (
+    value: CommentReactionToggleInput
+  ) => Promise<void>;
+  isError: boolean;
+  isLoading: boolean;
+  organizationId: string;
+  postId: string;
+};
+
+const PostCommentListContext =
+  createContext<PostCommentListContextValue | null>(null);
+const PostCommentItemContext = createContext<Comment | null>(null);
+
+function usePostCommentList() {
+  const value = use(PostCommentListContext);
+
+  if (!value) {
+    throw new Error("PostCommentList components must be used within Root.");
   }
 
-  if (commentsQuery.isError || commentReactionsQuery.isError) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        Comments are unavailable right now.
-      </p>
+  return value;
+}
+
+function usePostCommentItem() {
+  const value = use(PostCommentItemContext);
+
+  if (!value) {
+    throw new Error(
+      "PostCommentList item components must be used within Items."
     );
   }
 
-  const comments = (commentsQuery.data ?? []) as Comment[];
-  const commentReactions = (commentReactionsQuery.data ?? []) as CommentReaction[];
+  return value;
+}
+
+function PostCommentListRoot({
+  commentReactions = [],
+  comments = [],
+  children,
+  handleToggleCommentReaction,
+  isError = false,
+  isLoading = false,
+  organizationId,
+  postId,
+}: PostCommentListRootProps) {
+  return (
+    <PostCommentListContext
+      value={{
+        commentReactions,
+        comments,
+        handleToggleCommentReaction,
+        isError,
+        isLoading,
+        organizationId,
+        postId,
+      }}
+    >
+      {children}
+    </PostCommentListContext>
+  );
+}
+
+function PostCommentListContent({
+  children,
+  emptyState = null,
+  errorState,
+  loadingState,
+}: PostCommentListContentProps) {
+  const { comments, isError, isLoading } = usePostCommentList();
+
+  if (isLoading) {
+    return loadingState ?? <PostCommentListSkeleton />;
+  }
+
+  if (isError) {
+    return (
+      errorState ?? (
+        <p className="text-muted-foreground text-sm">
+          Comments are unavailable right now.
+        </p>
+      )
+    );
+  }
 
   if (comments.length === 0) {
     return emptyState;
   }
 
+  return children ?? <PostCommentListItems />;
+}
+
+function PostCommentListItems({ children }: PostCommentListItemsProps) {
+  const { comments } = usePostCommentList();
+
   return (
     <ItemGroup>
-      {comments.map((comment) => {
-        const actions = renderCommentActions?.({ comment });
-
-        return (
-          <Item
-            className="rounded-xl border-border/80 px-4 py-3"
-            key={comment.id}
-            variant="outline"
-          >
-            <ItemMedia variant="default">
-              <Avatar size="sm">
-                <AvatarFallback>{getInitials(comment.user.name)}</AvatarFallback>
-              </Avatar>
-            </ItemMedia>
-            <ItemContent className="gap-2">
-              <ItemHeader className="justify-start gap-2">
-                <ItemTitle className="font-medium text-sm">
-                  {comment.user.name}
-                </ItemTitle>
-                <span className="text-muted-foreground text-sm">
-                  {formatRelativeTime(comment.createdAt)}
-                </span>
-              </ItemHeader>
-              <ItemDescription className="line-clamp-none text-foreground">
-                <div
-                  className={READONLY_RICH_TEXT_CLASS}
-                  dangerouslySetInnerHTML={{
-                    __html: toRenderableRichTextHtml(comment.content),
-                  }}
-                />
-              </ItemDescription>
-              <CommentReactionSection
-                commentId={comment.id}
-                commentReactions={commentReactions}
-                commentReactionCollection={commentReactionCollection}
-                organizationId={organizationId}
-                postId={postId}
-              />
-            </ItemContent>
-            {actions ? <ItemActions className="self-start">{actions}</ItemActions> : null}
-          </Item>
-        );
-      })}
+      {comments.map((comment) => (
+        <PostCommentItemContext key={comment.id} value={comment}>
+          {children ?? <PostCommentListDefaultItem />}
+        </PostCommentItemContext>
+      ))}
     </ItemGroup>
+  );
+}
+
+function PostCommentListItem({ children }: { children?: ReactNode }) {
+  return (
+    <Item className="rounded-xl border-border/80 px-4 py-3" variant="outline">
+      {children ?? <PostCommentListDefaultItemContent />}
+    </Item>
+  );
+}
+
+function PostCommentListMedia({ children }: { children?: ReactNode }) {
+  return (
+    <ItemMedia variant="default">
+      {children ?? <PostCommentListAvatar />}
+    </ItemMedia>
+  );
+}
+
+function PostCommentListAvatar() {
+  const comment = usePostCommentItem();
+
+  return (
+    <Avatar size="sm">
+      <AvatarFallback>{getInitials(comment.user.name)}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+function PostCommentListMain({ children }: { children?: ReactNode }) {
+  return (
+    <ItemContent className="gap-2">
+      {children ?? <PostCommentListDefaultItemMain />}
+    </ItemContent>
+  );
+}
+
+function PostCommentListHeader({ children }: { children?: ReactNode }) {
+  return (
+    <ItemHeader className="justify-start gap-2">
+      {children ?? (
+        <>
+          <PostCommentListAuthor />
+          <PostCommentListTimestamp />
+        </>
+      )}
+    </ItemHeader>
+  );
+}
+
+function PostCommentListAuthor() {
+  const comment = usePostCommentItem();
+
+  return (
+    <ItemTitle className="font-medium text-sm">{comment.user.name}</ItemTitle>
+  );
+}
+
+function PostCommentListTimestamp() {
+  const comment = usePostCommentItem();
+
+  return (
+    <span className="text-muted-foreground text-sm">
+      {formatRelativeTime(comment.createdAt)}
+    </span>
+  );
+}
+
+function PostCommentListBody() {
+  const comment = usePostCommentItem();
+
+  return (
+    <div
+      className="typography"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
+      dangerouslySetInnerHTML={{
+        __html: comment.content,
+      }}
+      data-slot="item-description"
+    />
+  );
+}
+
+function PostCommentListReactions() {
+  const {
+    commentReactions,
+    handleToggleCommentReaction,
+    organizationId,
+    postId,
+  } = usePostCommentList();
+  const comment = usePostCommentItem();
+
+  if (!handleToggleCommentReaction) {
+    return null;
+  }
+
+  return (
+    <CommentReactionSection.Root
+      commentId={comment.id}
+      commentReactions={commentReactions}
+      handleToggleReaction={handleToggleCommentReaction}
+      organizationId={organizationId}
+      postId={postId}
+    >
+      <CommentReactionSection.Content>
+        <CommentReactionSection.List />
+        <CommentReactionSection.Button />
+      </CommentReactionSection.Content>
+    </CommentReactionSection.Root>
+  );
+}
+
+function PostCommentListDefaultItemContent() {
+  return (
+    <>
+      <PostCommentListMedia />
+      <PostCommentListMain />
+    </>
+  );
+}
+
+function PostCommentListDefaultItemMain() {
+  return (
+    <>
+      <PostCommentListHeader />
+      <PostCommentListBody />
+      <PostCommentListReactions />
+    </>
+  );
+}
+
+function PostCommentListDefaultItem() {
+  return <PostCommentListItem />;
+}
+
+function PostCommentListComponent({
+  commentReactions,
+  comments,
+  emptyState,
+  errorState,
+  handleToggleCommentReaction,
+  isError,
+  isLoading,
+  loadingState,
+  organizationId,
+  postId,
+}: PostCommentListProps) {
+  return (
+    <PostCommentListRoot
+      commentReactions={commentReactions}
+      comments={comments}
+      handleToggleCommentReaction={handleToggleCommentReaction}
+      isError={isError}
+      isLoading={isLoading}
+      organizationId={organizationId}
+      postId={postId}
+    >
+      <PostCommentListContent
+        emptyState={emptyState}
+        errorState={errorState}
+        loadingState={loadingState}
+      />
+    </PostCommentListRoot>
   );
 }
 
@@ -200,3 +363,19 @@ function getInitials(name: string | null | undefined) {
   const segments = normalized.split(/\s+/).slice(0, 2);
   return segments.map((segment) => segment.charAt(0).toUpperCase()).join("");
 }
+
+export const PostCommentList = Object.assign(PostCommentListComponent, {
+  Author: PostCommentListAuthor,
+  Avatar: PostCommentListAvatar,
+  Body: PostCommentListBody,
+  Content: PostCommentListContent,
+  Header: PostCommentListHeader,
+  Item: PostCommentListItem,
+  Items: PostCommentListItems,
+  Main: PostCommentListMain,
+  Media: PostCommentListMedia,
+  Reactions: PostCommentListReactions,
+  Root: PostCommentListRoot,
+  Skeleton: PostCommentListSkeleton,
+  Timestamp: PostCommentListTimestamp,
+});

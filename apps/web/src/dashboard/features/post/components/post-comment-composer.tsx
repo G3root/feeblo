@@ -1,28 +1,30 @@
-import { generateId } from "@feeblo/utils/id";
 import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type ReactNode, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Editor, type EmailEditorRef } from "~/components/ui/editor";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
-import { commentCollection as dashboardCommentCollection } from "~/lib/collections";
 import { isRichTextContentEmpty } from "./post-editor-utils";
 
+const Schema = z.object({
+  content: z
+    .string()
+    .refine((value) => !isRichTextContentEmpty(value), "Comment is required"),
+});
+
+type TSchema = z.infer<typeof Schema>;
+
 type PostCommentComposerProps = {
-  commentCollection?: typeof dashboardCommentCollection;
-  organizationId: string;
-  postId: string;
-  unauthenticatedFallback?: ReactNode;
+  handleAddComment: (value: TSchema) => Promise<void>;
+  isAuthenticated: boolean;
 };
 
 export function PostCommentComposer({
-  commentCollection = dashboardCommentCollection,
-  organizationId,
-  postId,
-  unauthenticatedFallback = null,
+  handleAddComment,
+  isAuthenticated,
 }: PostCommentComposerProps) {
   const editorRef = useRef<EmailEditorRef | null>(null);
   const [editorKey, setEditorKey] = useState(0);
@@ -34,14 +36,7 @@ export function PostCommentComposer({
   const form = useAppForm({
     defaultValues: { content: "" },
     validators: {
-      onSubmit: z.object({
-        content: z
-          .string()
-          .refine(
-            (value) => !isRichTextContentEmpty(value),
-            "Comment is required"
-          ),
-      }),
+      onSubmit: Schema,
     },
     onSubmit: async ({ value }) => {
       if (!(userId && userName)) {
@@ -50,23 +45,7 @@ export function PostCommentComposer({
       }
 
       try {
-        const tx = commentCollection.insert({
-          id: generateId("comment"),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          content: value.content,
-          visibility: "PUBLIC",
-          parentCommentId: null,
-          organizationId,
-          memberId: null,
-          postId,
-          userId,
-          user: {
-            name: userName,
-          },
-        });
-
-        await tx.isPersisted.promise;
+        await handleAddComment(value);
         setEditorKey((current) => current + 1);
         form.reset();
         toastManager.add({ title: "Comment added", type: "success" });
@@ -76,8 +55,8 @@ export function PostCommentComposer({
     },
   });
 
-  if (!(userId && userName)) {
-    return unauthenticatedFallback;
+  if (!isAuthenticated) {
+    return null;
   }
 
   return (

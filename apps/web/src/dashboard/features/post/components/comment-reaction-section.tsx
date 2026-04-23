@@ -1,9 +1,6 @@
-import { generateId } from "@feeblo/utils/id";
-import { useMemo, useState } from "react";
+import { createContext, type ReactNode, use, useMemo, useState } from "react";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
-import { commentReactionCollection as dashboardCommentReactionCollection } from "~/lib/collections";
-import { getCommentReactionCollectionKey } from "~/lib/reaction-keys";
 import { ReactionButton, ReactionList } from "./reaction-button";
 
 export type CommentReaction = {
@@ -15,19 +12,59 @@ export type CommentReaction = {
   emoji: string;
 };
 
-export function CommentReactionSection({
-  commentId,
-  commentReactions,
-  commentReactionCollection = dashboardCommentReactionCollection,
-  organizationId,
-  postId,
-}: {
+export type CommentReactionToggleInput = {
   commentId: string;
-  commentReactions: CommentReaction[];
-  commentReactionCollection?: typeof dashboardCommentReactionCollection;
+  emoji: string;
+  existingReaction?: CommentReaction;
   organizationId: string;
   postId: string;
-}) {
+  userId: string;
+};
+
+type CommentReactionSectionProps = {
+  commentId: string;
+  commentReactions: CommentReaction[];
+  handleToggleReaction: (value: CommentReactionToggleInput) => Promise<void>;
+  organizationId: string;
+  postId: string;
+};
+
+type CommentReactionRootProps = CommentReactionSectionProps & {
+  children: ReactNode;
+};
+
+type CommentReactionContextValue = {
+  commentId: string;
+  currentUserId?: string;
+  handleToggleReaction: (emoji: string) => Promise<void>;
+  isSelected: (emoji: string) => boolean;
+  isToggling: boolean;
+  reactionCounts: Record<string, number>;
+};
+
+const CommentReactionContext =
+  createContext<CommentReactionContextValue | null>(null);
+
+function useCommentReactionSection() {
+  const value = use(CommentReactionContext);
+
+  if (!value) {
+    throw new Error(
+      "CommentReactionSection components must be used within Root."
+    );
+  }
+
+  return value;
+}
+
+function CommentReactionRoot({
+  children,
+  commentId,
+  commentReactions,
+  handleToggleReaction: handleToggleReaction_,
+  organizationId,
+  postId,
+}: CommentReactionRootProps) {
   const { data: session } = authClient.useSession();
   const [isToggling, setIsToggling] = useState(false);
   const currentUserId = session?.user?.id;
@@ -35,7 +72,7 @@ export function CommentReactionSection({
   const reactionsForComment = useMemo(
     () =>
       commentReactions.filter((reaction) => reaction.commentId === commentId),
-    [commentReactions, commentId]
+    [commentId, commentReactions]
   );
 
   const reactionCounts = useMemo(() => {
@@ -58,7 +95,7 @@ export function CommentReactionSection({
         .filter((reaction) => reaction.userId === currentUserId)
         .map((reaction) => reaction.emoji)
     );
-  }, [reactionsForComment, currentUserId]);
+  }, [currentUserId, reactionsForComment]);
 
   const handleToggleReaction = async (emoji: string) => {
     if (!currentUserId) {
@@ -69,31 +106,19 @@ export function CommentReactionSection({
     try {
       setIsToggling(true);
 
-      const existingUserEmojiReaction = reactionsForComment.find(
+      const existingReaction = reactionsForComment.find(
         (reaction) =>
           reaction.userId === currentUserId && reaction.emoji === emoji
       );
 
-      if (existingUserEmojiReaction) {
-        const tx = commentReactionCollection.delete(
-          getCommentReactionCollectionKey(existingUserEmojiReaction)
-        );
-        await tx.isPersisted.promise;
-        return;
-      }
-
-      const tx = commentReactionCollection.insert({
-        id: generateId("commentReaction"),
+      await handleToggleReaction_({
         commentId,
-        postId,
-        organizationId,
-        userId: currentUserId,
-        memberId: null,
         emoji,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        existingReaction,
+        organizationId,
+        postId,
+        userId: currentUserId,
       });
-      await tx.isPersisted.promise;
     } catch (_error) {
       toastManager.add({
         title: "Failed to update comment reaction",
@@ -105,20 +130,71 @@ export function CommentReactionSection({
   };
 
   return (
-    <div className="flex items-center gap-1">
-      <ReactionList
-        isSelected={(emoji) => userReactionSet.has(emoji)}
-        isToggling={isToggling}
-        onToggleReaction={handleToggleReaction}
-        reactionCounts={reactionCounts}
-      />
-      <ReactionButton
-        isSelected={(emoji) => userReactionSet.has(emoji)}
-        isToggling={isToggling}
-        onToggleReaction={handleToggleReaction}
-        reactionCounts={reactionCounts}
-        showCount={false}
-      />
-    </div>
+    <CommentReactionContext
+      value={{
+        commentId,
+        currentUserId,
+        handleToggleReaction,
+        isSelected: (emoji) => userReactionSet.has(emoji),
+        isToggling,
+        reactionCounts,
+      }}
+    >
+      {children}
+    </CommentReactionContext>
   );
 }
+
+function CommentReactionContent({ children }: { children: ReactNode }) {
+  return <div className="flex items-center gap-1">{children}</div>;
+}
+
+function CommentReactionListContent() {
+  const { handleToggleReaction, isSelected, isToggling, reactionCounts } =
+    useCommentReactionSection();
+
+  return (
+    <ReactionList
+      isSelected={isSelected}
+      isToggling={isToggling}
+      onToggleReaction={handleToggleReaction}
+      reactionCounts={reactionCounts}
+    />
+  );
+}
+
+function CommentReactionButtonContent() {
+  const { handleToggleReaction, isSelected, isToggling, reactionCounts } =
+    useCommentReactionSection();
+
+  return (
+    <ReactionButton
+      isSelected={isSelected}
+      isToggling={isToggling}
+      onToggleReaction={handleToggleReaction}
+      reactionCounts={reactionCounts}
+      showCount={false}
+    />
+  );
+}
+
+function CommentReactionSectionComponent(props: CommentReactionSectionProps) {
+  return (
+    <CommentReactionRoot {...props}>
+      <CommentReactionContent>
+        <CommentReactionListContent />
+        <CommentReactionButtonContent />
+      </CommentReactionContent>
+    </CommentReactionRoot>
+  );
+}
+
+export const CommentReactionSection = Object.assign(
+  CommentReactionSectionComponent,
+  {
+    Button: CommentReactionButtonContent,
+    Content: CommentReactionContent,
+    List: CommentReactionListContent,
+    Root: CommentReactionRoot,
+  }
+);

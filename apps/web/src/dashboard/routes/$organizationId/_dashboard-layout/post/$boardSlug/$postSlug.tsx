@@ -1,3 +1,4 @@
+import { generateId } from "@feeblo/utils/id";
 import {
   Copy01Icon,
   LinkSquare02Icon,
@@ -19,7 +20,9 @@ import {
 import { toastManager } from "~/components/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
+import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";
+
 import {
   PostDetails,
   PostDetailsFormSkeleton,
@@ -37,13 +40,17 @@ import {
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
 import { getPublicSiteUrl } from "~/hooks/use-site";
+import { authClient } from "~/lib/auth-client";
 import {
   boardCollection,
+  commentCollection,
+  commentReactionCollection,
   postCollection,
   postStatusCollection,
   postTagCollection,
   tagCollection,
 } from "~/lib/collections";
+import { getCommentReactionCollectionKey } from "~/lib/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";
 
 export const Route = createFileRoute(
@@ -55,6 +62,7 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
+  const { data: session } = authClient.useSession();
   const navigate = useNavigate();
   const postDialogStore = usePostDeleteDialogContext();
 
@@ -145,6 +153,45 @@ function RouteComponent() {
     [organizationId, post?.id]
   );
 
+  const { data: comments } = useLiveSuspenseQuery(
+    (q) =>
+      q
+        .from({ comment: commentCollection })
+        .where(({ comment }) =>
+          and(
+            eq(comment.organizationId, organizationId),
+            eq(comment.postId, post?.id ?? "")
+          )
+        )
+        .orderBy((comment) => comment.comment.createdAt, "desc"),
+    [organizationId, post?.id]
+  );
+
+  const { data: commentReactions } = useLiveSuspenseQuery(
+    (q) =>
+      q
+        .from({ commentReaction: commentReactionCollection })
+        .where(({ commentReaction }) =>
+          and(
+            eq(commentReaction.organizationId, organizationId),
+            eq(commentReaction.postId, post?.id ?? "")
+          )
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.commentId,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.emoji,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.createdAt,
+          "asc"
+        ),
+    [organizationId, post?.id]
+  );
+
   if (!(board && post)) {
     return (
       <Empty>
@@ -205,6 +252,63 @@ function RouteComponent() {
     }
   };
 
+  const handleAddComment = async ({ content }: { content: string }) => {
+    if (!session) {
+      throw new Error("session not found");
+    }
+
+    const postId = post.id;
+
+    const tx = commentCollection.insert({
+      id: generateId("comment"),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      content,
+      visibility: "PUBLIC",
+      parentCommentId: null,
+      organizationId,
+      memberId: null,
+      postId,
+      userId: session.user.id,
+      user: {
+        name: session.user.name,
+      },
+    });
+
+    await tx.isPersisted.promise;
+  };
+
+  const handleToggleCommentReaction = async ({
+    commentId,
+    emoji,
+    existingReaction,
+    organizationId,
+    postId,
+    userId,
+  }: CommentReactionToggleInput) => {
+    if (existingReaction) {
+      const tx = commentReactionCollection.delete(
+        getCommentReactionCollectionKey(existingReaction)
+      );
+      await tx.isPersisted.promise;
+      return;
+    }
+
+    const tx = commentReactionCollection.insert({
+      id: generateId("commentReaction"),
+      commentId,
+      createdAt: new Date(),
+      emoji,
+      //todo fix
+      memberId: null,
+      organizationId,
+      postId,
+      updatedAt: new Date(),
+      userId,
+    });
+    await tx.isPersisted.promise;
+  };
+
   return (
     <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
       <CommentDeleteDialogProvider>
@@ -233,14 +337,35 @@ function RouteComponent() {
               </div>
             </Suspense>
             <PostDetails.CommentComposer
-              organizationId={organizationId}
-              postId={post.id}
+              handleAddComment={handleAddComment}
+              isAuthenticated
             />
             <Suspense fallback={<PostDetails.CommentListSkeleton />}>
-              <PostDetails.CommentList
+              <PostDetails.CommentList.Root
+                commentReactions={commentReactions}
+                comments={comments}
+                handleToggleCommentReaction={handleToggleCommentReaction}
                 organizationId={organizationId}
                 postId={post.id}
-              />
+              >
+                <PostDetails.CommentList.Content>
+                  <PostDetails.CommentList.Items>
+                    <PostDetails.CommentList.Item>
+                      <PostDetails.CommentList.Media>
+                        <PostDetails.CommentList.Avatar />
+                      </PostDetails.CommentList.Media>
+                      <PostDetails.CommentList.Main>
+                        <PostDetails.CommentList.Header>
+                          <PostDetails.CommentList.Author />
+                          <PostDetails.CommentList.Timestamp />
+                        </PostDetails.CommentList.Header>
+                        <PostDetails.CommentList.Body />
+                        <PostDetails.CommentList.Reactions />
+                      </PostDetails.CommentList.Main>
+                    </PostDetails.CommentList.Item>
+                  </PostDetails.CommentList.Items>
+                </PostDetails.CommentList.Content>
+              </PostDetails.CommentList.Root>
             </Suspense>
             <p className="text-muted-foreground text-xs">
               Created {post.createdAt.toLocaleDateString()}

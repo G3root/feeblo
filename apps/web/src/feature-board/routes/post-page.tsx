@@ -23,6 +23,7 @@ import {
 } from "~/components/ui/empty";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
+import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostCommentComposer } from "~/features/post/components/post-comment-composer";
 import { PostCommentList } from "~/features/post/components/post-comment-list";
 import { PostContentEditor } from "~/features/post/components/post-content";
@@ -43,7 +44,10 @@ import {
 import { authClient } from "~/lib/auth-client";
 import { fetchRpc } from "~/lib/runtime";
 import { cn } from "~/lib/utils";
-import { getPostReactionCollectionKey } from "../../dashboard/lib/reaction-keys";
+import {
+  getCommentReactionCollectionKey,
+  getPostReactionCollectionKey,
+} from "../../dashboard/lib/reaction-keys";
 import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
@@ -106,6 +110,7 @@ const UpdatedPostSchema = z.object({
 
 export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
+  const { data: session } = authClient.useSession();
   const {
     publicBoardCollection,
     publicCommentCollection,
@@ -170,6 +175,43 @@ export function PostPage({ slug }: { slug: string }) {
           id: tag.id,
           name: tag.name,
         })),
+    [site.organizationId, postId]
+  );
+  const commentsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ comment: publicCommentCollection })
+        .where(({ comment }) =>
+          and(
+            eq(comment.organizationId, site.organizationId),
+            eq(comment.postId, postId)
+          )
+        )
+        .orderBy((comment) => comment.comment.createdAt, "desc"),
+    [site.organizationId, postId]
+  );
+  const commentReactionsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ commentReaction: publicCommentReactionCollection })
+        .where(({ commentReaction }) =>
+          and(
+            eq(commentReaction.organizationId, site.organizationId),
+            eq(commentReaction.postId, postId)
+          )
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.commentId,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.emoji,
+          "asc"
+        )
+        .orderBy(
+          (commentReaction) => commentReaction.commentReaction.createdAt,
+          "asc"
+        ),
     [site.organizationId, postId]
   );
   const { allowed: canEdit } = usePolicy(
@@ -260,6 +302,62 @@ export function PostPage({ slug }: { slug: string }) {
   const publishedDate = formatPublishedDate(post.createdAt);
   const selectedTags = postTagsQuery.data ?? [];
 
+  const handleAddComment = async ({ content }: { content: string }) => {
+    if (!session) {
+      throw new Error("session not found");
+    }
+
+    const tx = publicCommentCollection.insert({
+      id: generateId("comment"),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      content,
+      visibility: "PUBLIC",
+      parentCommentId: null,
+      organizationId: site.organizationId,
+      //todo fix
+      memberId: null,
+      postId,
+      userId: session.user.id,
+      user: {
+        name: session.user.name,
+      },
+    });
+
+    await tx.isPersisted.promise;
+  };
+
+  const handleToggleCommentReaction = async ({
+    commentId,
+    emoji,
+    existingReaction,
+    organizationId,
+    postId,
+    userId,
+  }: CommentReactionToggleInput) => {
+    if (existingReaction) {
+      const tx = publicCommentReactionCollection.delete(
+        getCommentReactionCollectionKey(existingReaction)
+      );
+      await tx.isPersisted.promise;
+      return;
+    }
+
+    const tx = publicCommentReactionCollection.insert({
+      id: generateId("commentReaction"),
+      commentId,
+      createdAt: new Date(),
+      emoji,
+      //todo fix
+      memberId: null,
+      organizationId,
+      postId,
+      updatedAt: new Date(),
+      userId,
+    });
+    await tx.isPersisted.promise;
+  };
+
   return (
     <RootLayout>
       <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
@@ -322,22 +420,47 @@ export function PostPage({ slug }: { slug: string }) {
 
               <div className="space-y-4">
                 <PostCommentComposer
-                  commentCollection={publicCommentCollection}
-                  organizationId={site.organizationId}
-                  postId={post.id}
-                  unauthenticatedFallback={<PublicCommentFallback />}
+                  handleAddComment={handleAddComment}
+                  isAuthenticated={!!session?.session}
                 />
-                <PostCommentList
-                  commentCollection={publicCommentCollection}
-                  commentReactionCollection={publicCommentReactionCollection}
-                  emptyState={
-                    <p className="py-6 text-center text-muted-foreground text-sm">
-                      No comments yet.
-                    </p>
+                <PublicCommentFallback isAuthenticated={!!session?.session} />
+                <PostCommentList.Root
+                  commentReactions={commentReactionsQuery.data ?? []}
+                  comments={commentsQuery.data ?? []}
+                  handleToggleCommentReaction={handleToggleCommentReaction}
+                  isError={
+                    commentsQuery.isError || commentReactionsQuery.isError
+                  }
+                  isLoading={
+                    commentsQuery.isLoading || commentReactionsQuery.isLoading
                   }
                   organizationId={site.organizationId}
                   postId={post.id}
-                />
+                >
+                  <PostCommentList.Content
+                    emptyState={
+                      <p className="py-6 text-center text-muted-foreground text-sm">
+                        No comments yet.
+                      </p>
+                    }
+                  >
+                    <PostCommentList.Items>
+                      <PostCommentList.Item>
+                        <PostCommentList.Media>
+                          <PostCommentList.Avatar />
+                        </PostCommentList.Media>
+                        <PostCommentList.Main>
+                          <PostCommentList.Header>
+                            <PostCommentList.Author />
+                            <PostCommentList.Timestamp />
+                          </PostCommentList.Header>
+                          <PostCommentList.Body />
+                          <PostCommentList.Reactions />
+                        </PostCommentList.Main>
+                      </PostCommentList.Item>
+                    </PostCommentList.Items>
+                  </PostCommentList.Content>
+                </PostCommentList.Root>
               </div>
             </div>
           </div>
@@ -498,7 +621,16 @@ const PostMetaSidebar = {
   PublishedOn: PostMetaSidebarPublishedOn,
 };
 
-function PublicCommentFallback() {
+interface PublicCommentFallbackProps {
+  isAuthenticated: boolean;
+}
+
+function PublicCommentFallback({
+  isAuthenticated,
+}: PublicCommentFallbackProps) {
+  if (isAuthenticated) {
+    return null;
+  }
   return (
     <div className="rounded-xl border border-border/80 px-4 py-4">
       <p className="font-medium text-sm">Join the discussion</p>
