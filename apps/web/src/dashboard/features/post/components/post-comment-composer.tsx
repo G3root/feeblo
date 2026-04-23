@@ -9,10 +9,7 @@ import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
 import { commentCollection } from "~/lib/collections";
-import {
-  isRichTextContentEmpty,
-  uploadPostEditorImage,
-} from "./post-editor-utils";
+import { isRichTextContentEmpty } from "./post-editor-utils";
 
 type PostCommentComposerProps = {
   organizationId: string;
@@ -90,33 +87,36 @@ export function PostCommentComposer({
         form.handleSubmit();
       }}
     >
-      <div className="flex items-end gap-8 rounded-md border px-2 py-2">
-        <Editor
-          className="mb-7 min-w-0 flex-1 border-0 px-1 py-1 [&_p]:my-0"
-          content=""
-          editable
-          key={editorKey}
-          onUpdate={(ref) =>
-            form.setFieldValue("content", ref.editor?.getHTML() ?? "")
-          }
-          onUploadImage={uploadPostEditorImage}
-          placeholder="Leave a comment..."
-          ref={editorRef}
-        />
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(isSubmitting) => (
-            <Button
-              className="rounded-full"
-              disabled={isSubmitting}
-              size="icon-xs"
-              type="submit"
-              variant="outline"
-            >
-              <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />
-              <span className="sr-only">Submit comment</span>
-            </Button>
-          )}
-        </form.Subscribe>
+      <div className="flex rounded-md border p-2">
+        <div className="flex w-full flex-col gap-2">
+          <Editor
+            className="min-w-0 flex-1"
+            content=""
+            editable
+            key={editorKey}
+            onUpdate={(ref) =>
+              form.setFieldValue("content", ref.editor?.getHTML() ?? "")
+            }
+            placeholder="Leave a comment..."
+            ref={editorRef}
+          />
+          <div className="flex items-center justify-end">
+            <form.Subscribe selector={(state) => state.isSubmitting}>
+              {(isSubmitting) => (
+                <Button
+                  className="rounded-full"
+                  disabled={isSubmitting}
+                  size="icon-xs"
+                  type="submit"
+                  variant="outline"
+                >
+                  <HugeiconsIcon icon={ArrowUp02Icon} strokeWidth={2} />
+                  <span className="sr-only">Submit comment</span>
+                </Button>
+              )}
+            </form.Subscribe>
+          </div>
+        </div>
       </div>
     </form>
   );
