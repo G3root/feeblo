@@ -97,7 +97,7 @@ export function HomePage() {
           id: post.id,
           slug: post.slug,
           title: post.title,
-          content: post.content,
+          excerpt: post.excerpt,
           upVotes: post.upVotes,
           hasUserUpVoted: post.hasUserUpVoted,
           creatorId: post.creatorId,

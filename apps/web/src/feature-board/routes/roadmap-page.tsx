@@ -98,7 +98,7 @@ export function RoadmapPage() {
           id: post.id,
           slug: post.slug,
           statusId: post.statusId,
-          summary: post.content,
+          summary: post.excerpt,
           title: post.title,
           updatedAt: post.updatedAt,
         }));

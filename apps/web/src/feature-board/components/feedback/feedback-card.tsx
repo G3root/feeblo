@@ -5,7 +5,6 @@ import { useUpvote } from "src/feature-board/hooks/use-upvote";
 import {
   formatPostStatus,
   getInitials,
-  stripHtml,
   truncate,
 } from "src/feature-board/lib/utils";
 import { Link } from "wouter";
@@ -17,7 +16,7 @@ type FeedbackPost = {
   id: string;
   slug: string;
   title: string;
-  content: string;
+  excerpt: string;
   upVotes: number;
   hasUserUpVoted: boolean;
   creatorId: string | null;
@@ -81,8 +80,7 @@ export function FeedbackCard({
   const { handleToggleUpvote } = useUpvote();
   const existingUpvote = post.hasUserUpVoted;
   const upvoteCount = post.upVotes;
-  const description =
-    truncate(stripHtml(post.content), 100) || "No details yet.";
+  const description = truncate(post.excerpt, 100) || "No details yet.";
 
   return (
     <Link

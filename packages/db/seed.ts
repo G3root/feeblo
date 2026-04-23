@@ -1,6 +1,7 @@
 // biome-ignore-all lint/suspicious/noConsole: Seed script requires console output
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { and, eq, inArray } from "drizzle-orm";
 import { Data, Effect } from "effect";
 import { DB } from "./src";
@@ -363,12 +364,14 @@ const ensurePosts = ({
         }
 
         const title = faker.company.catchPhrase();
+        const content = faker.lorem.paragraphs({ min: 2, max: 4 });
 
         yield* db.insert(post).values({
           id: makeId("pst"),
           title,
           slug: slugify(`${title}-${i + 1}`),
-          content: faker.lorem.paragraphs({ min: 2, max: 4 }),
+          content,
+          excerpt: htmlToExcerpt(content),
           boardId,
           statusId: randomPostStatus.id,
           organizationId,

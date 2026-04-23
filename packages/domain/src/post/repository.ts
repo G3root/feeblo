@@ -4,6 +4,7 @@ import {
   post as postTable,
   upvote as upvoteTable,
 } from "@feeblo/db/schema/feedback";
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { Effect, Array as EffectArray } from "effect";
@@ -107,6 +108,7 @@ const makePostRepository = Effect.gen(function* () {
         .from(upvoteTable)
         .groupBy(upvoteTable.postId)
         .as("upvote_counts");
+      const excerptExpr = sql<string>`coalesce(nullif(${postTable.excerpt}, ''), trim(regexp_replace(regexp_replace(${postTable.content}, '<[^>]+>', ' ', 'gi'), '\\s+', ' ', 'g')))`;
 
       return db
         .select({
@@ -115,6 +117,7 @@ const makePostRepository = Effect.gen(function* () {
           boardId: postTable.boardId,
           slug: postTable.slug,
           content: postTable.content,
+          excerpt: excerptExpr,
           upVotes: sql<number>`coalesce(${upvoteCounts.upVotes}, 0)`,
           statusId: postTable.statusId,
           createdAt: postTable.createdAt,
@@ -144,7 +147,13 @@ const makePostRepository = Effect.gen(function* () {
     }: TPostUpdate) =>
       db
         .update(postTable)
-        .set({ statusId, boardId, title, content })
+        .set({
+          statusId,
+          boardId,
+          title,
+          content,
+          excerpt: htmlToExcerpt(content),
+        })
         .where(
           and(
             eq(postTable.id, id),
@@ -182,8 +191,10 @@ const makePostRepository = Effect.gen(function* () {
       statusId,
       creatorId,
       creatorMemberId,
-    }: TPostCreate) =>
-      db
+    }: TPostCreate) => {
+      const excerpt = htmlToExcerpt(content);
+
+      return db
         .insert(postTable)
         .values({
           id,
@@ -191,6 +202,7 @@ const makePostRepository = Effect.gen(function* () {
           organizationId,
           title,
           content,
+          excerpt,
           statusId,
           creatorId,
           creatorMemberId,
@@ -198,7 +210,8 @@ const makePostRepository = Effect.gen(function* () {
           slug: slugify(title),
           updatedAt: new Date(),
         })
-        .pipe(Effect.asVoid),
+        .pipe(Effect.asVoid);
+    },
   };
 });
 

@@ -229,6 +229,7 @@ export const post = pgTable(
     title: text("title").notNull(),
     slug: text("slug").notNull(),
     content: text("content").notNull(),
+    excerpt: text("excerpt").notNull().default(""),
     boardId: text("board_id")
       .notNull()
       .references(() => board.id, { onDelete: "cascade" }),

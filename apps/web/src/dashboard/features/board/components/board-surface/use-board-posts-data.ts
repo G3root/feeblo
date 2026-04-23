@@ -137,7 +137,7 @@ export function useBoardPostsData({
           slug: post.slug,
           statusId: post.statusId,
           status: postStatus.type,
-          summary: post.content,
+          summary: post.excerpt,
           title: post.title,
           updatedAt: post.updatedAt,
         }))

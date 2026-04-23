@@ -1,3 +1,4 @@
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { generateId } from "@feeblo/utils/id";
 import {
   and,
@@ -220,6 +221,7 @@ export function PostPage({ slug }: { slug: string }) {
 
       publicPostCollection.update(postId, (draft) => {
         draft.content = value;
+        draft.excerpt = htmlToExcerpt(value);
       });
     },
     mutationFn: async ({ transaction }) => {

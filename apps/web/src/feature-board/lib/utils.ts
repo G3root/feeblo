@@ -1,4 +1,5 @@
 import { VITE_APP_URL } from "astro:env/client";
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -35,10 +36,7 @@ export function formatPostStatus(status: string) {
 }
 
 export function stripHtml(value: string) {
-  return value
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return htmlToExcerpt(value);
 }
 
 export function truncate(value: string, maxLength = 180) {

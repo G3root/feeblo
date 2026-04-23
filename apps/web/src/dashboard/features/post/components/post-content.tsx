@@ -1,3 +1,4 @@
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { Image01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
@@ -14,8 +15,8 @@ import {
   usePolicy,
 } from "~/hooks/use-policy";
 import { postCollection } from "~/lib/collections";
-import { cn } from "~/lib/utils";
 import { fetchRpc } from "~/lib/runtime";
+import { cn } from "~/lib/utils";
 import {
   toRenderableRichTextHtml,
   uploadPostEditorImage,
@@ -73,7 +74,7 @@ export function PostContentEditor({
         ref={editorRef}
         value={initialValue.current}
       />
-      {!disabled ? (
+      {disabled ? null : (
         <div className="flex justify-end">
           <Button
             className="rounded-full"
@@ -86,7 +87,7 @@ export function PostContentEditor({
             <span>Add image</span>
           </Button>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -114,6 +115,7 @@ export function PostEditableContent({
     onMutate: ({ value }) => {
       postCollection.update(postId, (draft) => {
         draft.content = value;
+        draft.excerpt = htmlToExcerpt(value);
       });
     },
     mutationFn: async ({ transaction }) => {

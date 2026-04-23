@@ -1,3 +1,4 @@
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -165,6 +166,7 @@ function PostCreateForm() {
           title,
           slug: slugify(title) || "untitled",
           content: value.content,
+          excerpt: htmlToExcerpt(value.content),
           upVotes: 0,
           statusId: selectedPostStatus.id,
           createdAt: new Date(),

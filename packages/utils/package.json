@@ -6,7 +6,8 @@
   "exports": {
     "./id": "./src/id.ts",
     "./url": "./src/url.ts",
-    "./crypto": "./src/crypto.ts"
+    "./crypto": "./src/crypto.ts",
+    "./html": "./src/html.ts"
   },
   "dependencies": {
     "@noble/ciphers": "^2.0.1",
