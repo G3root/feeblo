@@ -1,9 +1,14 @@
-import { useCallback, useMemo, useState } from "react";
+/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+/** biome-ignore-all lint/style/useDefaultSwitchClause: <explanation> */
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useCallback, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogPanel,
   DialogTitle,
@@ -14,7 +19,6 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldLabel,
 } from "~/components/ui/field";
 import {
   InputOTP,
@@ -23,6 +27,7 @@ import {
   InputOTPSlot,
 } from "~/components/ui/input-otp";
 import { toastManager } from "~/components/ui/toast";
+import { SocialAuthButtons } from "~/features/auth/components/social-auth-buttons";
 import { useAppForm } from "~/hooks/form";
 import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
 import {
@@ -36,9 +41,12 @@ interface AuthDialogProps {
   variant: "sign-in" | "sign-up";
 }
 
+type EmailStep = "email-sign-in" | "email-sign-up";
+
 type DialogStep =
-  | { kind: "credentials" }
-  | { kind: "otp-verification"; email: string; mode: "sign-in" | "sign-up" };
+  | { kind: "chooser" }
+  | { kind: EmailStep }
+  | { kind: "otp-verification"; email: string; previous: EmailStep };
 
 const SignInSchema = z.object({
   email: EmailSchema,
@@ -56,54 +64,50 @@ const OtpSchema = z.object({
   otp: z.string().length(6, { message: "Verification code must be 6 digits" }),
 });
 
+const CHOOSER_STEP: DialogStep = { kind: "chooser" };
+
 export function AuthDialog({ variant }: AuthDialogProps) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<DialogStep>({ kind: "credentials" });
-  const isSignIn = variant === "sign-in";
+  const [step, setStep] = useState<DialogStep>(CHOOSER_STEP);
 
-  const triggerLabel = useMemo(
-    () => (isSignIn ? "Sign in" : "Sign up"),
-    [isSignIn]
-  );
+  const triggerLabel = variant === "sign-in" ? "Sign in" : "Sign up";
+  const preferredEmailStep: EmailStep =
+    variant === "sign-in" ? "email-sign-in" : "email-sign-up";
 
-  const headerTitle = useMemo(() => {
-    if (step.kind === "otp-verification") {
-      return "Verify your email";
-    }
-    return isSignIn ? "Sign in" : "Create account";
-  }, [isSignIn, step]);
-
-  const headerDescription = useMemo(() => {
-    if (step.kind === "otp-verification") {
-      return "Enter the 6‑digit code we just emailed you to activate your account.";
-    }
-    return isSignIn
-      ? "Use your email and password to continue."
-      : "Create an account to start collecting feedback.";
-  }, [isSignIn, step]);
+  const { title, description } = getStepCopy(step);
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) {
-      setStep({ kind: "credentials" });
+      setStep(CHOOSER_STEP);
     }
   }, []);
 
-  const handleVerify = useCallback(
-    (email: string) => {
-      setStep({
-        kind: "otp-verification",
-        email,
-        mode: isSignIn ? "sign-in" : "sign-up",
-      });
-    },
-    [isSignIn]
-  );
+  const handleVerify = useCallback((email: string, previous: EmailStep) => {
+    setStep({
+      kind: "otp-verification",
+      email,
+      previous,
+    });
+  }, []);
 
   const handleSuccess = useCallback(() => {
     setOpen(false);
-    setStep({ kind: "credentials" });
+    setStep(CHOOSER_STEP);
   }, []);
+
+  const handleSelectEmailStep = useCallback((nextStep: EmailStep) => {
+    setStep({ kind: nextStep });
+  }, []);
+
+  const handleBack = useCallback(() => {
+    if (step.kind === "otp-verification") {
+      setStep({ kind: step.previous });
+      return;
+    }
+
+    setStep(CHOOSER_STEP);
+  }, [step]);
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
@@ -116,29 +120,194 @@ export function AuthDialog({ variant }: AuthDialogProps) {
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{headerTitle}</DialogTitle>
-          <p className="text-muted-foreground text-sm">{headerDescription}</p>
+          {step.kind !== "chooser" ? (
+            <Button
+              className="mb-1 -ml-2 w-fit"
+              onClick={handleBack}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} />
+              Back
+            </Button>
+          ) : null}
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogPanel className="flex flex-col gap-5">
-          {step.kind === "otp-verification" && (
+          {step.kind === "chooser" ? (
+            <AuthMethodChooser
+              onSelectEmailStep={handleSelectEmailStep}
+              preferredEmailStep={preferredEmailStep}
+              socialMode={variant}
+            />
+          ) : null}
+          {step.kind === "email-sign-in" ? (
+            <SignInForm
+              onSuccess={handleSuccess}
+              onVerify={(email) => handleVerify(email, "email-sign-in")}
+            />
+          ) : null}
+          {step.kind === "email-sign-up" ? (
+            <SignUpForm
+              onVerify={(email) => handleVerify(email, "email-sign-up")}
+            />
+          ) : null}
+          {step.kind === "otp-verification" ? (
             <OtpVerificationForm email={step.email} onSuccess={handleSuccess} />
-          )}
-          {step.kind === "credentials" && isSignIn && (
-            <SignInForm onSuccess={handleSuccess} onVerify={handleVerify} />
-          )}
-          {step.kind === "credentials" && !isSignIn && (
-            <SignUpForm onVerify={handleVerify} />
-          )}
+          ) : null}
         </DialogPanel>
       </DialogContent>
     </Dialog>
   );
 }
 
+function getStepCopy(step: DialogStep) {
+  switch (step.kind) {
+    case "chooser":
+      return {
+        title: "Continue to Feeblo",
+        description:
+          "Choose how you want to get into your account or create a new one.",
+      };
+    case "email-sign-in":
+      return {
+        title: "Sign in with email",
+        description: "Use your email and password to continue.",
+      };
+    case "email-sign-up":
+      return {
+        title: "Sign up with email",
+        description: "Create an account to start collecting feedback.",
+      };
+    case "otp-verification":
+      return {
+        title: "Verify your email",
+        description:
+          "Enter the 6-digit code we just emailed you to activate your account.",
+      };
+  }
+}
+
+function AuthMethodChooser({
+  onSelectEmailStep,
+  preferredEmailStep,
+  socialMode,
+}: {
+  onSelectEmailStep: (step: EmailStep) => void;
+  preferredEmailStep: EmailStep;
+  socialMode: "sign-in" | "sign-up";
+}) {
+  const actions = getEmailChooserActions(preferredEmailStep);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {actions.map((action) => (
+        <Button
+          autoFocus={action.step === preferredEmailStep}
+          className="h-auto flex-col items-start gap-1.5 rounded-2xl px-4 py-3 text-left"
+          key={action.label}
+          onClick={() => onSelectEmailStep(action.step)}
+          type="button"
+          variant={action.variant}
+        >
+          <span>{action.label}</span>
+          <span className="font-normal text-current/70 text-sm">
+            {action.description}
+          </span>
+        </Button>
+      ))}
+      <SocialAuthButtons mode={socialMode} />
+    </div>
+  );
+}
+
+function getEmailChooserActions(preferredEmailStep: EmailStep) {
+  const baseActions: Array<{
+    description: string;
+    label: string;
+    step: EmailStep;
+  }> = [
+    {
+      description: "Use your email address and password.",
+      label: "Sign in with email",
+      step: "email-sign-in",
+    },
+    {
+      description: "Create a new account with your email.",
+      label: "Sign up with email",
+      step: "email-sign-up",
+    },
+  ];
+
+  return baseActions
+    .toSorted((a, b) =>
+      a.step === preferredEmailStep ? -1 : b.step === preferredEmailStep ? 1 : 0
+    )
+    .map((action) => ({
+      ...action,
+      variant: action.step === preferredEmailStep ? "default" : "outline",
+    }));
+}
+
+async function initializeVerification(email: string) {
+  const response = await fetch(verificationOtpEndpoint, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      email,
+      type: "email-verification",
+    }),
+  });
+
+  if (response.ok) {
+    return true;
+  }
+
+  toastManager.add({
+    title: "Failed to initialize verification",
+    type: "error",
+  });
+  return false;
+}
+
+function showAuthError(message: string) {
+  toastManager.add({
+    title: message,
+    type: "error",
+  });
+}
+
+function AuthForm({
+  children,
+  form,
+}: {
+  children: React.ReactNode;
+  form: { handleSubmit: () => void };
+}) {
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+    >
+      {children}
+    </form>
+  );
+}
+
 function SignInForm({
   onSuccess,
   onVerify,
-}: { onSuccess: () => void; onVerify: (email: string) => void }) {
+}: {
+  onSuccess: () => void;
+  onVerify: (email: string) => void;
+}) {
   const form = useAppForm({
     defaultValues: { email: "", password: "" },
     validators: { onSubmit: SignInSchema },
@@ -155,42 +324,20 @@ function SignInForm({
       }
 
       if (response.error.code === "EMAIL_NOT_VERIFIED") {
-        const otpRes = await fetch(verificationOtpEndpoint, {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            email: value.email,
-            type: "email-verification",
-          }),
-        });
-        if (!otpRes.ok) {
-          toastManager.add({
-            title: "Failed to initialize verification",
-            type: "error",
-          });
+        const isVerificationReady = await initializeVerification(value.email);
+        if (!isVerificationReady) {
           return;
         }
         onVerify(value.email);
         return;
       }
 
-      toastManager.add({
-        title: response.error.message,
-        type: "error",
-      });
+      showAuthError(response.error.message);
     },
   });
 
   return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        form.handleSubmit();
-      }}
-    >
+    <AuthForm form={form}>
       <form.AppField
         children={(field) => <field.TextField label="Email" type="email" />}
         name="email"
@@ -208,13 +355,11 @@ function SignInForm({
           type="submit"
         />
       </form.AppForm>
-    </form>
+    </AuthForm>
   );
 }
 
-function SignUpForm({
-  onVerify,
-}: { onVerify: (email: string) => void }) {
+function SignUpForm({ onVerify }: { onVerify: (email: string) => void }) {
   const form = useAppForm({
     defaultValues: {
       name: "",
@@ -232,29 +377,13 @@ function SignUpForm({
       });
 
       if (response.error) {
-        toastManager.add({
-          title: response.error.message,
-          type: "error",
-        });
+        showAuthError(response.error.message);
         return;
       }
 
       const email = response.data?.user?.email ?? value.email;
-      const otpRes = await fetch(verificationOtpEndpoint, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email,
-          type: "email-verification",
-        }),
-      });
-
-      if (!otpRes.ok) {
-        toastManager.add({
-          title: "Failed to initialize verification",
-          type: "error",
-        });
+      const isVerificationReady = await initializeVerification(email);
+      if (!isVerificationReady) {
         return;
       }
 
@@ -263,14 +392,7 @@ function SignUpForm({
   });
 
   return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        form.handleSubmit();
-      }}
-    >
+    <AuthForm form={form}>
       <form.AppField
         children={(field) => <field.TextField label="Full name" />}
         name="name"
@@ -298,7 +420,7 @@ function SignUpForm({
           type="submit"
         />
       </form.AppForm>
-    </form>
+    </AuthForm>
   );
 }
 
@@ -345,14 +467,7 @@ function OtpVerificationForm({
   });
 
   return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        form.handleSubmit();
-      }}
-    >
+    <AuthForm form={form}>
       <FieldGroup>
         <form.Field
           children={(field) => {
@@ -360,9 +475,6 @@ function OtpVerificationForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <FieldLabel className="sr-only" htmlFor={field.name}>
-                  Verification code
-                </FieldLabel>
                 <InputOTP
                   containerClassName="justify-center gap-4"
                   id={field.name}
@@ -384,9 +496,9 @@ function OtpVerificationForm({
                     <InputOTPSlot index={5} />
                   </InputOTPGroup>
                 </InputOTP>
-                {isInvalid && (
+                {isInvalid ? (
                   <FieldError errors={field.state.meta.errors} />
-                )}
+                ) : null}
                 <FieldDescription className="text-center">
                   Didn&apos;t receive the code?
                   <Button
@@ -399,10 +511,7 @@ function OtpVerificationForm({
                           type: "email-verification",
                         });
                       if (response.error) {
-                        toastManager.add({
-                          title: response.error.message,
-                          type: "error",
-                        });
+                        showAuthError(response.error.message);
                         return;
                       }
                       toastManager.add({
@@ -429,6 +538,6 @@ function OtpVerificationForm({
           />
         </form.AppForm>
       </FieldGroup>
-    </form>
+    </AuthForm>
   );
 }
