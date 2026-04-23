@@ -1,3 +1,14 @@
+import {
+  BULLET_LIST,
+  CODE,
+  H1,
+  H2,
+  H3,
+  NUMBERED_LIST,
+  QUOTE,
+  SlashCommand,
+  TEXT,
+} from "@react-email/editor/ui";
 import { Link } from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
@@ -106,6 +117,17 @@ function EmailEditorReadyBridge({
   return null;
 }
 
+const defaultSlashItems = [
+  TEXT,
+  H1,
+  H2,
+  H3,
+  BULLET_LIST,
+  NUMBERED_LIST,
+  QUOTE,
+  CODE,
+];
+
 export function Editor({
   content,
   onUpdate,
@@ -185,6 +207,8 @@ export function Editor({
     >
       <RefBridge editorRef={ref} onUpdateRef={onUpdateRef} />
       <EmailEditorReadyBridge onReadyRef={onReadyRef} />
+
+      <SlashCommand items={defaultSlashItems} />
 
       {children}
     </EditorProvider>
