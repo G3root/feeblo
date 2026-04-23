@@ -1,4 +1,12 @@
+import { Link } from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
+import {
+  Table,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@tiptap/extension-table";
+import { Underline } from "@tiptap/extension-underline";
 import {
   type Content,
   EditorProvider,
@@ -8,6 +16,7 @@ import {
   type UseEditorOptions,
   useCurrentEditor,
 } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
 import {
   type ReactNode,
   type Ref,
@@ -119,7 +128,24 @@ export function Editor({
 
   const extensions = useMemo(() => {
     const base = extensionsProp ?? [
-      //   StarterKit.configure(),
+      StarterKit.configure({
+        link: false,
+        underline: false,
+      }),
+      Underline,
+      Link.configure({
+        openOnClick: false,
+        enableClickSelection: true,
+        HTMLAttributes: {
+          rel: null,
+          target: null,
+        },
+      }),
+
+      Table,
+      TableRow,
+      TableHeader,
+      TableCell,
       Placeholder.configure({
         placeholder:
           placeholder ??
