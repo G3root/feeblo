@@ -1,5 +1,16 @@
 import {
   BULLET_LIST,
+  BubbleMenu,
+  BubbleMenuAlignCenter,
+  BubbleMenuAlignLeft,
+  BubbleMenuAlignRight,
+  BubbleMenuBold,
+  BubbleMenuCode,
+  BubbleMenuItalic,
+  BubbleMenuItemGroup,
+  BubbleMenuStrike,
+  BubbleMenuUnderline,
+  BubbleMenuUppercase,
   CODE,
   H1,
   H2,
@@ -7,6 +18,7 @@ import {
   NUMBERED_LIST,
   QUOTE,
   SlashCommand,
+  TableIcon,
   TEXT,
 } from "@react-email/editor/ui";
 import { Link } from "@tiptap/extension-link";
@@ -37,7 +49,8 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { createPasteHandler } from "./editor/core/create-paste-handler";
+import { createPasteHandler } from "./core/create-paste-handler";
+import { createImageExtension } from "./plugins/image/extension";
 
 export interface EmailEditorRef {
   editor: TipTapEditor | null;
@@ -126,6 +139,21 @@ const defaultSlashItems = [
   NUMBERED_LIST,
   QUOTE,
   CODE,
+  {
+    title: "Table",
+    description: "Insert a table",
+    icon: <TableIcon size={20} />,
+    category: "Layout",
+    searchTerms: ["table", "grid"],
+    command: ({ editor: currentEditor, range }) => {
+      currentEditor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run();
+    },
+  },
 ];
 
 export function Editor({
@@ -147,6 +175,13 @@ export function Editor({
 
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+
+  const imageExtension = useMemo(() => {
+    if (!onUploadImage) {
+      return null;
+    }
+    return createImageExtension({ uploadImage: onUploadImage });
+  }, [onUploadImage]);
 
   const extensions = useMemo(() => {
     const base = extensionsProp ?? [
@@ -184,8 +219,8 @@ export function Editor({
       }),
     ];
 
-    return base;
-  }, [extensionsProp, placeholder]);
+    return imageExtension ? [...base, imageExtension] : base;
+  }, [extensionsProp, placeholder, imageExtension]);
 
   const editorProps: UseEditorOptions["editorProps"] = useMemo(
     () => ({
@@ -205,9 +240,27 @@ export function Editor({
       extensions={extensions}
       immediatelyRender={false}
     >
+      <BubbleMenu.Root
+        hideWhenActiveMarks={bubbleMenu?.hideWhenActiveMarks ?? ["link"]}
+      >
+        <BubbleMenuItemGroup>
+          <BubbleMenuBold />
+          <BubbleMenuItalic />
+          <BubbleMenuUnderline />
+          <BubbleMenuStrike />
+          <BubbleMenuCode />
+          <BubbleMenuUppercase />
+        </BubbleMenuItemGroup>
+        <BubbleMenuItemGroup>
+          <BubbleMenuAlignLeft />
+          <BubbleMenuAlignCenter />
+          <BubbleMenuAlignRight />
+        </BubbleMenuItemGroup>
+      </BubbleMenu.Root>
+      <BubbleMenu.LinkDefault />
+      <BubbleMenu.ImageDefault />
       <RefBridge editorRef={ref} onUpdateRef={onUpdateRef} />
       <EmailEditorReadyBridge onReadyRef={onReadyRef} />
-
       <SlashCommand items={defaultSlashItems} />
 
       {children}
