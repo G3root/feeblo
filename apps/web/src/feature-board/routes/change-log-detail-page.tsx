@@ -16,7 +16,7 @@ import {
   ChangelogTimelineItem,
   formatChangelogDate,
 } from "../components/changelog/changelog-layout";
-import { publicChangelogCollection } from "../lib/collections";
+import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
 export function ChangeLogDetailPage({
@@ -25,6 +25,7 @@ export function ChangeLogDetailPage({
   changelogSlug: string;
 }) {
   const site = useSite();
+  const { publicChangelogCollection } = usePublicCollections();
   const {
     data: changelog,
     isLoading,

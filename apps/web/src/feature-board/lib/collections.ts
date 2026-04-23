@@ -1,659 +1,376 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import {
-  createCollection,
-  parseLoadSubsetOptions,
-  parseWhereExpression,
-} from "@tanstack/react-db";
+import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
+import type { QueryClient } from "@tanstack/react-query";
 import { Duration } from "effect";
-import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
 import { fetchRpc } from "~/lib/runtime";
 import {
   getPostReactionCollectionKey,
   getUpvoteCollectionKey,
 } from "../../dashboard/lib/reaction-keys";
 
-export const publicPostCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-post"];
-
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-
-        // if (fieldName === "boardId") {
-        //   cacheKey.push(`boardId-${value}`);
-        // }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        boardId?: string;
-        organizationId?: string;
-      } = {};
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator !== "eq") {
-          continue;
-        }
-
-        const fieldName = field.join(".");
-
-        // if (fieldName === "boardId") {
-        //   filters.boardId = value as string;
-        // }
-
-        if (fieldName === "organizationId") {
-          filters.organizationId = value as string;
-        }
-      }
-
-      // const boardId = filters.boardId;
-      const organizationId = filters.organizationId;
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) =>
-          rpc.PostListPublic({
-            // boardId,
-            organizationId,
-            boardId: null,
-          }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedPost } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostUpdate({
-          id: updatedPost.id,
-          statusId: updatedPost.statusId,
-          content: updatedPost.content,
-          title: updatedPost.title,
-          boardId: updatedPost.boardId,
-          organizationId: updatedPost.organizationId,
-        })
-      );
-    },
-  })
-);
-
-export const publicPostStatusCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: (opts) => {
-      const parsed = parseWhereExpression(opts.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-          or: (...filters) => Object.assign({}, ...filters),
-          not: () => ({}),
-          inArray: () => ({}),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
-      const cacheKey = ["public-post-status"];
-
-      if (parsed?.organizationId) {
-        cacheKey.push(`organizationId-${parsed.organizationId}`);
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-          or: (...filters) => Object.assign({}, ...filters),
-          not: () => ({}),
-          inArray: () => ({}),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
-      const organizationId = parsed?.organizationId;
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostStatusListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicChangelogCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-changelog"];
-
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq" && field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicBoardCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-board"];
-
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    refetchInterval: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq" && field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.BoardListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicTagCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-tag"];
-
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq" && field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.TagListPublic({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicPostTagCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-post-tag"];
-
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-      let postId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator !== "eq") {
-          continue;
-        }
-
-        if (field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-        if (field.join(".") === "postId") {
-          postId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostTagListPublic({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return postId
-        ? data.filter((entry) => entry.postId === postId)
-        : [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicChangelogTagCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(5)),
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-changelog-tag"];
-
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-        if (fieldName === "changelogId") {
-          cacheKey.push(`changelogId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-      let changelogId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator !== "eq") {
-          continue;
-        }
-
-        if (field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-        if (field.join(".") === "changelogId") {
-          changelogId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogTagListPublic({ organizationId }),
-        { signal: ctx.signal }
-      );
-
-      return changelogId
-        ? data.filter((entry) => entry.changelogId === changelogId)
-        : [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const publicCommentCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-comment"];
-
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-        postId?: string;
-      } = {};
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator !== "eq") {
-          continue;
-        }
-
-        const fieldName = field.join(".");
-
-        if (fieldName === "organizationId") {
-          filters.organizationId = value as string;
-        }
-
-        if (fieldName === "postId") {
-          filters.postId = value as string;
-        }
-      }
-
-      const organizationId = filters.organizationId;
-      const postId = filters.postId;
-
-      if (!(organizationId && postId)) {
-        return [];
-      }
-
-      try {
+type PublicCollectionScope = {
+  organizationId: string;
+  queryClient: QueryClient;
+};
+
+function getEqFilterValue(
+  filters: ReadonlyArray<{
+    field: ReadonlyArray<string | number>;
+    operator: string;
+    value?: unknown;
+  }>,
+  fieldName: string
+) {
+  for (const { field, operator, value } of filters) {
+    if (operator === "eq" && field.join(".") === fieldName) {
+      return value as string;
+    }
+  }
+
+  return undefined;
+}
+
+export function createPublicCollections({
+  organizationId,
+  queryClient,
+}: PublicCollectionScope) {
+  const publicPostCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: ["public-post", organizationId],
+      queryFn: async (ctx) => {
         const data = await fetchRpc(
           (rpc) =>
-            rpc.CommentListPublic({
+            rpc.PostListPublic({
               organizationId,
-              postId,
+              boardId: null,
             }),
           { signal: ctx.signal }
         );
 
         return [...data];
-      } catch {
-        return [];
-      }
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newComment } = mutation;
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedPost } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.CommentCreate({
-          organizationId: newComment.organizationId,
-          visibility: newComment.visibility,
-          content: newComment.content,
-          postId: newComment.postId,
-          parentCommentId: newComment.parentCommentId,
-          id: newComment.id,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedComment } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.PostUpdate({
+            id: updatedPost.id,
+            statusId: updatedPost.statusId,
+            content: updatedPost.content,
+            title: updatedPost.title,
+            boardId: updatedPost.boardId,
+            organizationId: updatedPost.organizationId,
+          })
+        );
+      },
+    })
+  );
 
-      await fetchRpc((rpc) =>
-        rpc.CommentUpdate({
-          id: updatedComment.id,
-          organizationId: updatedComment.organizationId,
-          postId: updatedComment.postId,
-          content: updatedComment.content,
-        })
-      );
-    },
-  })
-);
+  const publicPostStatusCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: ["public-post-status", organizationId],
 
-export const publicUpvoteCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-upvote"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.PostStatusListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
 
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-        postId?: string;
-      } = {};
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
 
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
-          const fieldName = field.join(".");
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
+  const publicChangelogCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: ["public-changelog", organizationId],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const publicBoardCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: ["public-board", organizationId],
+
+      refetchInterval: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.BoardListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const publicTagCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: ["public-tag", organizationId],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.TagListPublic({ organizationId }),
+          {
+            signal: ctx.signal,
           }
-          if (fieldName === "postId") {
-            filters.postId = value as string;
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const publicPostTagCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: ["public-post-tag", organizationId],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.PostTagListPublic({ organizationId }),
+          {
+            signal: ctx.signal,
           }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const publicChangelogTagCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(5)),
+      queryKey: ["public-changelog-tag", organizationId],
+
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogTagListPublic({ organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const publicCommentCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        return postId
+          ? ["public-comment", organizationId, `postId-${postId}`]
+          : ["public-comment", organizationId];
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        if (!postId) {
+          return [];
         }
-      }
 
-      const organizationId = filters.organizationId;
-      const postId = filters.postId;
-      if (!organizationId) {
-        return [];
-      }
-      if (!postId) {
-        return [];
-      }
+        try {
+          const data = await fetchRpc(
+            (rpc) =>
+              rpc.CommentListPublic({
+                organizationId,
+                postId,
+              }),
+            { signal: ctx.signal }
+          );
 
-      const data = await fetchRpc(
-        (rpc) => rpc.UpvoteList({ organizationId, postId }),
-        {
-          signal: ctx.signal,
+          return [...data];
+        } catch {
+          return [];
         }
-      );
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: getUpvoteCollectionKey,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newUpvote } = mutation;
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newComment } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.UpvoteToggle({
-          organizationId: newUpvote.organizationId,
-          postId: newUpvote.postId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedUpvote } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.CommentCreate({
+            organizationId: newComment.organizationId,
+            visibility: newComment.visibility,
+            content: newComment.content,
+            postId: newComment.postId,
+            parentCommentId: newComment.parentCommentId,
+            id: newComment.id,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedComment } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.UpvoteToggle({
-          organizationId: deletedUpvote.organizationId,
-          postId: deletedUpvote.postId,
-        })
-      );
-    },
-  })
-);
+        await fetchRpc((rpc) =>
+          rpc.CommentUpdate({
+            id: updatedComment.id,
+            organizationId: updatedComment.organizationId,
+            postId: updatedComment.postId,
+            content: updatedComment.content,
+          })
+        );
+      },
+    })
+  );
 
-export const publicPostReactionCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["public-post-reaction"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
+  const publicUpvoteCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        return postId
+          ? ["public-upvote", organizationId, `postId-${postId}`]
+          : ["public-upvote", organizationId];
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        if (!postId) {
+          return [];
         }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
 
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-        postId?: string;
-      } = {};
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
-          const fieldName = field.join(".");
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
+        const data = await fetchRpc(
+          (rpc) => rpc.UpvoteList({ organizationId, postId }),
+          {
+            signal: ctx.signal,
           }
-          if (fieldName === "postId") {
-            filters.postId = value as string;
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: getUpvoteCollectionKey,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteToggle({
+            organizationId: newUpvote.organizationId,
+            postId: newUpvote.postId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteToggle({
+            organizationId: deletedUpvote.organizationId,
+            postId: deletedUpvote.postId,
+          })
+        );
+      },
+    })
+  );
+
+  const publicPostReactionCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        return postId
+          ? ["public-post-reaction", organizationId, `postId-${postId}`]
+          : ["public-post-reaction", organizationId];
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const postId = getEqFilterValue(parsed.filters, "postId");
+
+        if (!postId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.PostReactionList({ organizationId, postId }),
+          {
+            signal: ctx.signal,
           }
-        }
-      }
+        );
 
-      const organizationId = filters.organizationId;
-      const postId = filters.postId;
-      if (!organizationId) {
-        return [];
-      }
-      if (!postId) {
-        return [];
-      }
+        return [...data];
+      },
+      queryClient,
+      getKey: getPostReactionCollectionKey,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newPostReaction } = mutation;
 
-      const data = await fetchRpc(
-        (rpc) => rpc.PostReactionList({ organizationId, postId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: getPostReactionCollectionKey,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newPostReaction } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.PostReactionToggle({
+            organizationId: newPostReaction.organizationId,
+            postId: newPostReaction.postId,
+            emoji: newPostReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedPostReaction } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.PostReactionToggle({
-          organizationId: newPostReaction.organizationId,
-          postId: newPostReaction.postId,
-          emoji: newPostReaction.emoji,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedPostReaction } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.PostReactionToggle({
+            organizationId: deletedPostReaction.organizationId,
+            postId: deletedPostReaction.postId,
+            emoji: deletedPostReaction.emoji,
+          })
+        );
+      },
+    })
+  );
 
-      await fetchRpc((rpc) =>
-        rpc.PostReactionToggle({
-          organizationId: deletedPostReaction.organizationId,
-          postId: deletedPostReaction.postId,
-          emoji: deletedPostReaction.emoji,
-        })
-      );
-    },
-  })
-);
+  return {
+    publicBoardCollection,
+    publicChangelogCollection,
+    publicChangelogTagCollection,
+    publicCommentCollection,
+    publicPostCollection,
+    publicPostReactionCollection,
+    publicPostStatusCollection,
+    publicPostTagCollection,
+    publicTagCollection,
+    publicUpvoteCollection,
+  };
+}
+
+export type PublicCollections = ReturnType<typeof createPublicCollections>;

@@ -5,6 +5,7 @@ import {
   Provider,
 } from "~/integrations/tanstack-query/root-provider";
 import { PublicBoardShell } from "../components/layout/public-board-shell";
+import { PublicCollectionsProvider } from "../providers/public-collections-provider";
 import { SiteProvider } from "../providers/site-provider";
 import { PublicBoardRoutes } from "./public-board-routes";
 
@@ -13,15 +14,19 @@ export interface PublicBoardAppProps {
   readonly site: Site;
 }
 
+const queryClient = getContext().queryClient;
+
 export function PublicBoardApp({ basePath = "", site }: PublicBoardAppProps) {
   return (
-    <Provider queryClient={getContext().queryClient}>
+    <Provider queryClient={queryClient}>
       <SiteProvider site={site}>
-        <Router base={basePath}>
-          <PublicBoardShell>
-            <PublicBoardRoutes />
-          </PublicBoardShell>
-        </Router>
+        <PublicCollectionsProvider organizationId={site.organizationId}>
+          <Router base={basePath}>
+            <PublicBoardShell>
+              <PublicBoardRoutes />
+            </PublicBoardShell>
+          </Router>
+        </PublicCollectionsProvider>
       </SiteProvider>
     </Provider>
   );

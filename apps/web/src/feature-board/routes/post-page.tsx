@@ -48,15 +48,8 @@ import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 import { useUpvote } from "../hooks/use-upvote";
-import {
-  publicBoardCollection,
-  publicPostCollection,
-  publicPostReactionCollection,
-  publicPostStatusCollection,
-  publicPostTagCollection,
-  publicTagCollection,
-} from "../lib/collections";
 import { formatPostStatus, getInitials } from "../lib/utils";
+import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
 function RootLayout({ children }: { children: ReactNode }) {
@@ -113,21 +106,13 @@ const UpdatedPostSchema = z.object({
 
 export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
-
-  const statusQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ status: publicPostStatusCollection })
-        .where(({ status }) => eq(status.organizationId, site.organizationId)),
-    [site.organizationId, slug]
-  );
-  const boardsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ board: publicBoardCollection })
-        .where(({ board }) => eq(board.organizationId, site.organizationId)),
-    [site.organizationId]
-  );
+  const {
+    publicBoardCollection,
+    publicPostCollection,
+    publicPostStatusCollection,
+    publicPostTagCollection,
+    publicTagCollection,
+  } = usePublicCollections();
 
   const {
     data: postRow,
@@ -233,21 +218,11 @@ export function PostPage({ slug }: { slug: string }) {
     strategy: debounceStrategy({ wait: 500 }),
   });
 
-  if (
-    postLoading ||
-    boardsQuery.isLoading ||
-    statusQuery.isLoading ||
-    postTagsQuery.isLoading
-  ) {
+  if (postLoading || postTagsQuery.isLoading) {
     return <RootLayout>Loading post...</RootLayout>;
   }
 
-  if (
-    postError ||
-    boardsQuery.isError ||
-    statusQuery.isError ||
-    postTagsQuery.isError
-  ) {
+  if (postError || postTagsQuery.isError) {
     return (
       <RootLayout>
         <Empty>
@@ -570,6 +545,7 @@ function PostReactionBar({
   postId: string;
 }) {
   const { data: session } = authClient.useSession();
+  const { publicPostReactionCollection } = usePublicCollections();
   const { data: postReactions } = useLiveSuspenseQuery(
     (q) =>
       q

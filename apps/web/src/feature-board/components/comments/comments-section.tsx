@@ -8,12 +8,13 @@ import {
   ItemTitle,
 } from "~/components/ui/item";
 import { authClient } from "~/lib/auth-client";
-import { publicCommentCollection } from "../../lib/collections";
+import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 import { AuthDialog } from "../common/auth-dialog";
 
 export function CommentsSection({ postId }: { postId: string }) {
   const site = useSite();
+  const { publicCommentCollection } = usePublicCollections();
   const { data: session } = authClient.useSession();
   const commentsQuery = useLiveQuery(
     (q) =>

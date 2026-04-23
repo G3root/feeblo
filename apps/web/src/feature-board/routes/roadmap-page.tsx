@@ -17,11 +17,7 @@ import {
   FeedbackBrowseLayoutContent,
   FeedbackBrowseLayoutMain,
 } from "../components/layout/feedback-browse-layout";
-import {
-  publicBoardCollection,
-  publicPostCollection,
-  publicPostStatusCollection,
-} from "../lib/collections";
+import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
 function MainLayout({ children }: { children: ReactNode }) {
@@ -37,6 +33,11 @@ function MainLayout({ children }: { children: ReactNode }) {
 export function RoadmapPage() {
   const site = useSite();
   const [, navigate] = useLocation();
+  const {
+    publicBoardCollection,
+    publicPostCollection,
+    publicPostStatusCollection,
+  } = usePublicCollections();
 
   const {
     data: statuses = [],

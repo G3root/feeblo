@@ -25,12 +25,8 @@ import {
   FeedbackBrowseLayoutContent,
   FeedbackBrowseLayoutMain,
 } from "../components/layout/feedback-browse-layout";
-import {
-  publicBoardCollection,
-  publicPostCollection,
-  publicPostStatusCollection,
-} from "../lib/collections";
 import { formatPostStatus } from "../lib/utils";
+import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
 type SortOption = "upvotes" | "newest" | "oldest";
@@ -94,6 +90,11 @@ function FilterSection({
 
 export function HomePage() {
   const site = useSite();
+  const {
+    publicBoardCollection,
+    publicPostCollection,
+    publicPostStatusCollection,
+  } = usePublicCollections();
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedBoard, setSelectedBoard] = useState("all");
   const [sortBy, setSortBy] = useState<SortOption>("upvotes");
@@ -256,21 +257,6 @@ export function HomePage() {
     ]
   );
 
-  const totalUpvotes = useMemo(
-    () => allPosts.reduce((sum, post) => sum + post.upVotes, 0),
-    [allPosts]
-  );
-
-  const contributorCount = useMemo(
-    () =>
-      new Set(
-        allPosts
-          .map((post) => post.creatorId ?? post.user.name ?? post.id)
-          .filter(Boolean)
-      ).size,
-    [allPosts]
-  );
-
   const statusItems = useMemo(() => {
     const counts = new Map<string, number>();
 
@@ -320,9 +306,6 @@ export function HomePage() {
   const activeBoardLabel =
     boardItems.find((item) => item.value === selectedBoard)?.label ??
     "All boards";
-  const activeStatusLabel =
-    statusItems.find((item) => item.value === selectedStatus)?.label ??
-    "All statuses";
 
   if (
     statusLoading ||

@@ -17,8 +17,8 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { cn } from "~/lib/utils";
-import { publicUpvoteCollection } from "../../lib/collections";
 import { getInitials } from "../../lib/utils";
+import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
 type PostVoter = {
@@ -58,6 +58,7 @@ function PostVoterDialogRoot({
 }) {
   const site = useSite();
   const organizationId = site.organizationId;
+  const { publicUpvoteCollection } = usePublicCollections();
   const { data: upvotes } = useLiveQuery(
     (q) =>
       q

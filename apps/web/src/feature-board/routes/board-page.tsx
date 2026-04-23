@@ -17,11 +17,7 @@ import {
   FeedbackBrowseLayoutMain,
   FeedbackBrowseLayoutSidebar,
 } from "../components/layout/feedback-browse-layout";
-import {
-  publicBoardCollection,
-  publicPostCollection,
-  publicPostStatusCollection,
-} from "../lib/collections";
+import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
 function MainContent({ children }: { children: ReactNode }) {
@@ -52,6 +48,11 @@ function ListHeader({ count, title }: { count?: number; title: string }) {
 
 export function BoardPage({ boardSlug }: { boardSlug: string }) {
   const site = useSite();
+  const {
+    publicBoardCollection,
+    publicPostCollection,
+    publicPostStatusCollection,
+  } = usePublicCollections();
 
   const {
     data: board,

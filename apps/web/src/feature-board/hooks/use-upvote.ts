@@ -4,13 +4,12 @@ import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { getUpvoteCollectionKey } from "~/lib/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";
-import {
-  publicPostCollection,
-  publicUpvoteCollection,
-} from "../lib/collections";
+import { usePublicCollections } from "../providers/public-collections-provider";
 
 export function useUpvote() {
   const { data: session } = authClient.useSession();
+  const { publicPostCollection, publicUpvoteCollection } =
+    usePublicCollections();
 
   const handleToggleUpvote = createOptimisticAction<{
     postId: string;

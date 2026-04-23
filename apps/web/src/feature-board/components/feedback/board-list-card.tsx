@@ -1,11 +1,12 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useLocation } from "wouter";
 import { cn } from "~/lib/utils";
-import { publicBoardCollection } from "../../lib/collections";
+import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
 export function BoardListCard() {
   const site = useSite();
+  const { publicBoardCollection } = usePublicCollections();
 
   const { data } = useLiveQuery(
     (q) =>

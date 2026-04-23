@@ -15,11 +15,12 @@ import {
   ChangelogTimelineItem,
   formatChangelogDate,
 } from "../components/changelog/changelog-layout";
-import { publicChangelogCollection } from "../lib/collections";
+import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
 export function ChangelogPage() {
   const site = useSite();
+  const { publicChangelogCollection } = usePublicCollections();
   const {
     data: changelogs = [],
     isLoading,
