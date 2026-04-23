@@ -1,10 +1,10 @@
 import { generateId } from "@feeblo/utils/id";
 import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState, type ReactNode, useRef } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
-import { Editor, type EditorHandle } from "~/components/ui/rich-text-editor";
+import { Editor, type EmailEditorRef } from "~/components/ui/editor";
 import { toastManager } from "~/components/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
@@ -25,7 +25,7 @@ export function PostCommentComposer({
   postId,
   unauthenticatedFallback = null,
 }: PostCommentComposerProps) {
-  const editorRef = useRef<EditorHandle | null>(null);
+  const editorRef = useRef<EmailEditorRef | null>(null);
   const [editorKey, setEditorKey] = useState(0);
   const { data: session } = authClient.useSession();
 
@@ -92,15 +92,16 @@ export function PostCommentComposer({
     >
       <div className="flex items-end gap-8 rounded-md border px-2 py-2">
         <Editor
-          className="min-w-0 flex-1 border-0"
-          editorClassName="mb-7 min-h-10 px-1 py-1 [&_p]:my-0"
-          enableImagePasteDrop
+          className="mb-7 min-w-0 flex-1 border-0 px-1 py-1 [&_p]:my-0"
+          content=""
+          editable
           key={editorKey}
-          onChange={(content) => form.setFieldValue("content", content)}
+          onUpdate={(ref) =>
+            form.setFieldValue("content", ref.editor?.getHTML() ?? "")
+          }
           onUploadImage={uploadPostEditorImage}
           placeholder="Leave a comment..."
           ref={editorRef}
-          value=""
         />
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(isSubmitting) => (

@@ -5,7 +5,7 @@ import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
 import { useRef } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
-import { Editor, type EditorHandle } from "~/components/ui/rich-text-editor";
+import { Editor, type EmailEditorRef } from "~/components/ui/editor";
 import {
   allPolicy,
   anyPolicy,
@@ -43,42 +43,32 @@ export function PostContentEditor({
   onChange: (value: string) => void;
   value: string;
 }) {
-  const editorRef = useRef<EditorHandle | null>(null);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<EmailEditorRef | null>(null);
   const initialValue = useRef(value);
 
   return (
     <div className="space-y-3">
-      <input
-        accept="image/gif,image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(event) => {
-          const files = Array.from(event.target.files ?? []);
-          event.target.value = "";
-          if (!files.length) {
-            return;
-          }
-          editorRef.current?.focus();
-          editorRef.current?.insertImageFiles(files);
-        }}
-        ref={imageInputRef}
-        type="file"
-      />
       <Editor
-        disabled={disabled}
-        editorClassName="min-h-24"
-        enableImagePasteDrop={!disabled}
-        onChange={onChange}
+        className="min-h-24"
+        content={initialValue.current}
+        editable={!disabled}
+        onUpdate={(ref) => onChange(ref.editor?.getHTML() ?? "")}
         onUploadImage={uploadPostEditorImage}
         placeholder="Add description..."
         ref={editorRef}
-        value={initialValue.current}
       />
       {disabled ? null : (
         <div className="flex justify-end">
           <Button
             className="rounded-full"
-            onClick={() => imageInputRef.current?.click()}
+            onClick={() => {
+              editorRef.current?.editor?.commands.focus();
+              (
+                editorRef.current?.editor?.commands as {
+                  uploadImage?: () => boolean;
+                }
+              )?.uploadImage?.();
+            }}
             size="sm"
             type="button"
             variant="outline"

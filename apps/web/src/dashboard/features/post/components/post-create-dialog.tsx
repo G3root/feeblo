@@ -3,6 +3,7 @@ import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
+import { useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -13,8 +14,8 @@ import {
   DialogPopup,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { Editor, type EmailEditorRef } from "~/components/ui/editor";
 import { Label } from "~/components/ui/label";
-import { Editor } from "~/components/ui/rich-text-editor";
 import { Switch } from "~/components/ui/switch";
 import { toastManager } from "~/components/ui/toast";
 import type { BoardPostStatus } from "~/features/board/constants";
@@ -122,6 +123,8 @@ function PostCreateForm() {
     postStatuses[0];
 
   const initialBoardId = store.get().context.data.boardId ?? "";
+  const [contentEditorKey, setContentEditorKey] = useState(0);
+  const contentEditorRef = useRef<EmailEditorRef | null>(null);
 
   const form = useAppForm({
     defaultValues: {
@@ -190,10 +193,12 @@ function PostCreateForm() {
         if (value.createMore) {
           form.resetField("title");
           form.resetField("content");
+          setContentEditorKey((current) => current + 1);
           return;
         }
 
         form.reset();
+        setContentEditorKey((current) => current + 1);
         store.send({ type: "toggle" });
       } catch (_error) {
         console.error(_error);
@@ -244,11 +249,15 @@ function PostCreateForm() {
         <form.Field name="content">
           {(field) => (
             <Editor
-              enableImagePasteDrop
-              onChange={field.handleChange}
+              content={field.state.value}
+              editable
+              key={contentEditorKey}
+              onUpdate={(ref) =>
+                field.handleChange(ref.editor?.getHTML() ?? "")
+              }
               onUploadImage={uploadPostEditorImage}
               placeholder="Type '/' for commands or start typing a description..."
-              value={field.state.value}
+              ref={contentEditorRef}
             />
           )}
         </form.Field>

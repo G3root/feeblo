@@ -1,4 +1,3 @@
-import type { ImageUploadResult } from "~/components/ui/rich-text-editor";
 import {
   editorMediaUploadEndpoint,
   uploadedEditorMediaSchema,
@@ -63,7 +62,7 @@ export function toRenderableRichTextHtml(content: string) {
 
 export async function uploadPostEditorImage(
   file: File
-): Promise<ImageUploadResult | null> {
+): Promise<{ url: string }> {
   if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
     throw new Error("Unsupported file type. Use PNG, JPEG, WEBP, or GIF");
   }
@@ -90,8 +89,5 @@ export async function uploadPostEditorImage(
     throw new Error("Upload did not return an image");
   }
 
-  return {
-    alt: file.name,
-    src: payload.url,
-  };
+  return { url: payload.url };
 }

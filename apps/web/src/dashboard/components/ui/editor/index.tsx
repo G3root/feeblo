@@ -1,3 +1,4 @@
+import "./editor.css";
 import {
   BULLET_LIST,
   BubbleMenu,
@@ -52,6 +53,7 @@ import {
 } from "react";
 import { createPasteHandler } from "./core/create-paste-handler";
 import { createImageExtension } from "./plugins/image/extension";
+import { imageSlashCommand } from "./plugins/image/slash-command";
 
 export interface EmailEditorRef {
   editor: TipTapEditor | null;
@@ -234,37 +236,54 @@ export function Editor({
     [extensions]
   );
 
+  const slashItems = useMemo(() => {
+    if (onUploadImage) {
+      return [...defaultSlashItems, imageSlashCommand];
+    }
+
+    return defaultSlashItems;
+  }, [onUploadImage]);
+
   return (
     <EditorProvider
       content={content}
       editable={editable}
       editorContainerProps={{ className }}
-      editorProps={editorProps}
+      editorProps={{
+        ...editorProps,
+        attributes: {
+          class: "typography",
+        },
+      }}
       extensions={extensions}
       immediatelyRender={false}
     >
-      <BubbleMenu.Root
-        hideWhenActiveMarks={bubbleMenu?.hideWhenActiveMarks ?? ["link"]}
-      >
-        <BubbleMenuItemGroup>
-          <BubbleMenuBold />
-          <BubbleMenuItalic />
-          <BubbleMenuUnderline />
-          <BubbleMenuStrike />
-          <BubbleMenuCode />
-          <BubbleMenuUppercase />
-        </BubbleMenuItemGroup>
-        <BubbleMenuItemGroup>
-          <BubbleMenuAlignLeft />
-          <BubbleMenuAlignCenter />
-          <BubbleMenuAlignRight />
-        </BubbleMenuItemGroup>
-      </BubbleMenu.Root>
-      <BubbleMenu.LinkDefault />
-      <BubbleMenu.ImageDefault />
+      {editable ? (
+        <>
+          <BubbleMenu.Root
+            hideWhenActiveMarks={bubbleMenu?.hideWhenActiveMarks ?? ["link"]}
+          >
+            <BubbleMenuItemGroup>
+              <BubbleMenuBold />
+              <BubbleMenuItalic />
+              <BubbleMenuUnderline />
+              <BubbleMenuStrike />
+              <BubbleMenuCode />
+              <BubbleMenuUppercase />
+            </BubbleMenuItemGroup>
+            <BubbleMenuItemGroup>
+              <BubbleMenuAlignLeft />
+              <BubbleMenuAlignCenter />
+              <BubbleMenuAlignRight />
+            </BubbleMenuItemGroup>
+          </BubbleMenu.Root>
+          <BubbleMenu.LinkDefault />
+          <BubbleMenu.ImageDefault />
+        </>
+      ) : null}
+      <SlashCommand items={slashItems} />
       <RefBridge editorRef={ref} onUpdateRef={onUpdateRef} />
       <EmailEditorReadyBridge onReadyRef={onReadyRef} />
-      <SlashCommand items={defaultSlashItems} />
 
       {children}
     </EditorProvider>

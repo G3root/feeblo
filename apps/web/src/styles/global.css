@@ -488,7 +488,7 @@
   visibility: hidden !important;
 }
 
-@layer components {
+/* @layer components {
   .cn-editor .tiptap > :first-child {
     @apply mt-0;
   }
@@ -575,4 +575,4 @@
   .cn-editor .tiptap .selectedCell *::selection {
     @apply bg-accent text-foreground!;
   }
-}
+} */
