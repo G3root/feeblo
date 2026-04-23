@@ -18,6 +18,7 @@ import {
   NUMBERED_LIST,
   QUOTE,
   SlashCommand,
+  type SlashCommandItem,
   TableIcon,
   TEXT,
 } from "@react-email/editor/ui";
@@ -130,6 +131,22 @@ function EmailEditorReadyBridge({
   return null;
 }
 
+const TABLE: SlashCommandItem = {
+  title: "Table",
+  description: "Insert a table",
+  icon: <TableIcon size={20} />,
+  category: "Layout",
+  searchTerms: ["table", "grid"],
+  command: ({ editor: currentEditor, range }) => {
+    currentEditor
+      .chain()
+      .focus()
+      .deleteRange(range)
+      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+      .run();
+  },
+};
+
 const defaultSlashItems = [
   TEXT,
   H1,
@@ -139,21 +156,7 @@ const defaultSlashItems = [
   NUMBERED_LIST,
   QUOTE,
   CODE,
-  {
-    title: "Table",
-    description: "Insert a table",
-    icon: <TableIcon size={20} />,
-    category: "Layout",
-    searchTerms: ["table", "grid"],
-    command: ({ editor: currentEditor, range }) => {
-      currentEditor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-        .run();
-    },
-  },
+  TABLE,
 ];
 
 export function Editor({
