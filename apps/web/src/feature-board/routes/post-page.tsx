@@ -27,7 +27,10 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
-import { PostCommentComposer } from "~/features/post/components/post-comment-composer";
+import {
+  PostCommentComposer,
+  PostCommentGuestPrompt,
+} from "~/features/post/components/post-comment-composer";
 import { PostCommentList } from "~/features/post/components/post-comment-list";
 import { PostContentEditor } from "~/features/post/components/post-content";
 import { PostUpvoteButton } from "~/features/post/components/post-engagement-bar";
@@ -361,6 +364,11 @@ export function PostPage({ slug }: { slug: string }) {
     await tx.isPersisted.promise;
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    const tx = publicCommentCollection.delete(commentId);
+    await tx.isPersisted.promise;
+  };
+
   return (
     <RootLayout>
       <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
@@ -426,10 +434,14 @@ export function PostPage({ slug }: { slug: string }) {
                   handleAddComment={handleAddComment}
                   isAuthenticated={!!session?.session}
                 />
-                <PublicCommentFallback isAuthenticated={!!session?.session} />
+                <PostCommentGuestPrompt
+                  action={<AuthDialog variant="sign-in" />}
+                  isAuthenticated={!!session?.session}
+                />
                 <PostCommentList.Root
                   commentReactions={commentReactionsQuery.data ?? []}
                   comments={commentsQuery.data ?? []}
+                  handleDeleteComment={handleDeleteComment}
                   handleToggleCommentReaction={handleToggleCommentReaction}
                   isError={
                     commentsQuery.isError || commentReactionsQuery.isError
@@ -465,6 +477,7 @@ export function PostPage({ slug }: { slug: string }) {
                           <PostCommentList.Body />
                           <PostCommentList.Reactions />
                         </PostCommentList.Main>
+                        <PostCommentList.Actions />
                       </PostCommentList.Item>
                     </PostCommentList.Items>
                   </PostCommentList.Content>
@@ -628,29 +641,6 @@ const PostMetaSidebar = {
   Author: PostMetaSidebarAuthor,
   PublishedOn: PostMetaSidebarPublishedOn,
 };
-
-interface PublicCommentFallbackProps {
-  isAuthenticated: boolean;
-}
-
-function PublicCommentFallback({
-  isAuthenticated,
-}: PublicCommentFallbackProps) {
-  if (isAuthenticated) {
-    return null;
-  }
-  return (
-    <div className="rounded-xl border border-border/80 px-4 py-4">
-      <p className="font-medium text-sm">Join the discussion</p>
-      <p className="mt-1 text-muted-foreground text-sm">
-        Sign in to leave a comment or react to this post.
-      </p>
-      <div className="mt-3">
-        <AuthDialog variant="sign-in" />
-      </div>
-    </div>
-  );
-}
 
 function UpvoteButton({
   hasUserUpVoted,

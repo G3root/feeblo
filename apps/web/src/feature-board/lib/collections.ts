@@ -245,6 +245,18 @@ export function createPublicCollections({
           })
         );
       },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedComment } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentDelete({
+            id: deletedComment.id,
+            organizationId: deletedComment.organizationId,
+            postId: deletedComment.postId,
+          })
+        );
+      },
     })
   );
 

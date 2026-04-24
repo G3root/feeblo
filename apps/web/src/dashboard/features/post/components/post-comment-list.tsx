@@ -1,8 +1,18 @@
 import type { Comment } from "@feeblo/domain/comments/schema";
+import { Delete02Icon, Ellipsis } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, type ReactNode, use } from "react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import {
   Item,
+  ItemActions,
   ItemContent,
   ItemGroup,
   ItemHeader,
@@ -10,6 +20,8 @@ import {
   ItemTitle,
 } from "~/components/ui/item";
 import { Skeleton } from "~/components/ui/skeleton";
+import { toastManager } from "~/components/ui/toast";
+import { authClient } from "~/lib/auth-client";
 import {
   type CommentReaction,
   CommentReactionSection,
@@ -23,6 +35,7 @@ type PostCommentListProps = {
   commentReactions?: CommentReaction[];
   emptyState?: ReactNode;
   errorState?: ReactNode;
+  handleDeleteComment?: (commentId: string) => Promise<void>;
   handleToggleCommentReaction?: (
     value: CommentReactionToggleInput
   ) => Promise<void>;
@@ -51,6 +64,7 @@ type PostCommentListItemsProps = {
 type PostCommentListContextValue = {
   commentReactions: CommentReaction[];
   comments: Comment[];
+  handleDeleteComment?: (commentId: string) => Promise<void>;
   handleToggleCommentReaction?: (
     value: CommentReactionToggleInput
   ) => Promise<void>;
@@ -90,6 +104,7 @@ function PostCommentListRoot({
   commentReactions = [],
   comments = [],
   children,
+  handleDeleteComment,
   handleToggleCommentReaction,
   isError = false,
   isLoading = false,
@@ -101,6 +116,7 @@ function PostCommentListRoot({
       value={{
         commentReactions,
         comments,
+        handleDeleteComment,
         handleToggleCommentReaction,
         isError,
         isLoading,
@@ -265,11 +281,63 @@ function PostCommentListReactions() {
   );
 }
 
+function PostCommentListActions() {
+  const { data: session } = authClient.useSession();
+  const { handleDeleteComment } = usePostCommentList();
+  const comment = usePostCommentItem();
+
+  if (!handleDeleteComment || session?.user?.id !== comment.userId) {
+    return null;
+  }
+
+  return (
+    <ItemActions className="self-start">
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              aria-label="Comment actions"
+              className="rounded-full"
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <HugeiconsIcon icon={Ellipsis} />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem
+            onClick={async () => {
+              try {
+                await handleDeleteComment(comment.id);
+                toastManager.add({
+                  title: "Comment deleted successfully",
+                  type: "success",
+                });
+              } catch (_error) {
+                toastManager.add({
+                  title: "Failed to delete comment",
+                  type: "error",
+                });
+              }
+            }}
+            variant="destructive"
+          >
+            <HugeiconsIcon icon={Delete02Icon} /> Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </ItemActions>
+  );
+}
+
 function PostCommentListDefaultItemContent() {
   return (
     <>
       <PostCommentListMedia />
       <PostCommentListMain />
+      <PostCommentListActions />
     </>
   );
 }
@@ -293,6 +361,7 @@ function PostCommentListComponent({
   comments,
   emptyState,
   errorState,
+  handleDeleteComment,
   handleToggleCommentReaction,
   isError,
   isLoading,
@@ -304,6 +373,7 @@ function PostCommentListComponent({
     <PostCommentListRoot
       commentReactions={commentReactions}
       comments={comments}
+      handleDeleteComment={handleDeleteComment}
       handleToggleCommentReaction={handleToggleCommentReaction}
       isError={isError}
       isLoading={isLoading}
@@ -365,6 +435,7 @@ function getInitials(name: string | null | undefined) {
 }
 
 export const PostCommentList = Object.assign(PostCommentListComponent, {
+  Actions: PostCommentListActions,
   Author: PostCommentListAuthor,
   Avatar: PostCommentListAvatar,
   Body: PostCommentListBody,

@@ -19,7 +19,6 @@ import {
 } from "~/components/ui/empty";
 import { toastManager } from "~/components/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
-import { CommentDeleteDialog } from "~/features/post/components/comment-delete-dialog";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";
 
@@ -28,10 +27,7 @@ import {
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
 import { StatusSelect } from "~/features/post/components/post-properties";
-import {
-  CommentDeleteDialogProvider,
-  usePostDeleteDialogContext,
-} from "~/features/post/dialog-stores";
+import { usePostDeleteDialogContext } from "~/features/post/dialog-stores";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
   TagList,
@@ -309,9 +305,13 @@ function RouteComponent() {
     await tx.isPersisted.promise;
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    const tx = commentCollection.delete(commentId);
+    await tx.isPersisted.promise;
+  };
+
   return (
     <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
-      <CommentDeleteDialogProvider>
         <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
           <PostDetails.Layout>
             <PostDetails.Header
@@ -344,6 +344,7 @@ function RouteComponent() {
               <PostDetails.CommentList.Root
                 commentReactions={commentReactions}
                 comments={comments}
+                handleDeleteComment={handleDeleteComment}
                 handleToggleCommentReaction={handleToggleCommentReaction}
                 organizationId={organizationId}
                 postId={post.id}
@@ -362,6 +363,7 @@ function RouteComponent() {
                         <PostDetails.CommentList.Body />
                         <PostDetails.CommentList.Reactions />
                       </PostDetails.CommentList.Main>
+                      <PostDetails.CommentList.Actions />
                     </PostDetails.CommentList.Item>
                   </PostDetails.CommentList.Items>
                 </PostDetails.CommentList.Content>
@@ -506,9 +508,7 @@ function RouteComponent() {
             </div>
           </aside>
         </div>
-        <CommentDeleteDialog />
         <TagCreateDialog />
-      </CommentDeleteDialogProvider>
     </TagCreateDialogProvider>
   );
 }

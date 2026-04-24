@@ -1,6 +1,6 @@
 import { ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Editor, type EmailEditorRef } from "~/components/ui/editor";
@@ -100,5 +100,31 @@ export function PostCommentComposer({
         </div>
       </div>
     </form>
+  );
+}
+
+type PostCommentGuestPromptProps = {
+  action: ReactNode;
+  description?: string;
+  isAuthenticated: boolean;
+  title?: string;
+};
+
+export function PostCommentGuestPrompt({
+  action,
+  description = "Sign in to leave a comment or react to this post.",
+  isAuthenticated,
+  title = "Join the discussion",
+}: PostCommentGuestPromptProps) {
+  if (isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-xl border border-border/80 px-4 py-4">
+      <p className="font-medium text-sm">{title}</p>
+      <p className="mt-1 text-muted-foreground text-sm">{description}</p>
+      <div className="mt-3">{action}</div>
+    </div>
   );
 }
