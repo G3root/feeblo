@@ -7,6 +7,7 @@ import {
   AvatarGroupCount,
   AvatarImage,
 } from "~/components/ui/avatar";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-import { cn } from "~/lib/utils";
 import { getInitials } from "../../lib/utils";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
@@ -96,34 +96,32 @@ function PostVoterDialogRoot({
 }
 
 function PostVoterDialogTrigger() {
-  const { hiddenVoterCount, visibleVoters, voterCount } = usePostVoterDialog();
-
   return (
     <DialogTrigger
       render={(props) => (
-        <button
-          aria-label={`View all ${voterCount} voters`}
-          className={cn(
-            "cursor-pointer rounded-xl focus-visible:outline-none",
-            "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          )}
-          type="button"
-          {...props}
-        >
-          <AvatarGroup>
-            {visibleVoters.map((voter) => (
-              <Avatar key={voter.id}>
-                <AvatarImage src={voter.user.image ?? undefined} />
-                <AvatarFallback>{getInitials(voter.user.name)}</AvatarFallback>
-              </Avatar>
-            ))}
-            {hiddenVoterCount > 0 ? (
-              <AvatarGroupCount>+{hiddenVoterCount}</AvatarGroupCount>
-            ) : null}
-          </AvatarGroup>
-        </button>
+        <Button size="xs" variant="link" {...props}>
+          See all
+        </Button>
       )}
     />
+  );
+}
+
+function PostVoterList() {
+  const { hiddenVoterCount, visibleVoters } = usePostVoterDialog();
+
+  return (
+    <AvatarGroup>
+      {visibleVoters.map((voter) => (
+        <Avatar key={voter.id}>
+          <AvatarImage src={voter.user.image ?? undefined} />
+          <AvatarFallback>{getInitials(voter.user.name)}</AvatarFallback>
+        </Avatar>
+      ))}
+      {hiddenVoterCount > 0 ? (
+        <AvatarGroupCount>+{hiddenVoterCount}</AvatarGroupCount>
+      ) : null}
+    </AvatarGroup>
   );
 }
 
@@ -166,4 +164,5 @@ export const PostVoterDialog = {
   Root: PostVoterDialogRoot,
   Trigger: PostVoterDialogTrigger,
   Content: PostVoterDialogContent,
+  Items: PostVoterList,
 };
