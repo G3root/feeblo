@@ -1,5 +1,7 @@
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { generateId } from "@feeblo/utils/id";
+import { Comment01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   and,
   debounceStrategy,
@@ -19,6 +21,7 @@ import {
   Empty,
   EmptyDescription,
   EmptyHeader,
+  EmptyMedia,
   EmptyTitle,
 } from "~/components/ui/empty";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -439,9 +442,14 @@ export function PostPage({ slug }: { slug: string }) {
                 >
                   <PostCommentList.Content
                     emptyState={
-                      <p className="py-6 text-center text-muted-foreground text-sm">
-                        No comments yet.
-                      </p>
+                      <Empty>
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            <HugeiconsIcon icon={Comment01Icon} />
+                          </EmptyMedia>
+                          <EmptyTitle>No comments yet.</EmptyTitle>
+                        </EmptyHeader>
+                      </Empty>
                     }
                   >
                     <PostCommentList.Items>
