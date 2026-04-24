@@ -53,6 +53,21 @@ export function createPublicCollections({
       },
       queryClient,
       getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newPost } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostCreate({
+            id: newPost.id,
+            boardId: newPost.boardId,
+            organizationId: newPost.organizationId,
+            title: newPost.title,
+            content: newPost.content,
+            statusId: newPost.statusId,
+          })
+        );
+      },
       onUpdate: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: updatedPost } = mutation;

@@ -27,6 +27,7 @@ import {
   postStatusCollection,
 } from "~/lib/collections";
 import { usePostCreateDialogContext } from "../dialog-stores";
+import { PostCreateLayout } from "./post-create-dialog-layout";
 import {
   PostBoardField,
   PostContentField,
@@ -210,8 +211,7 @@ function PostCreateForm() {
   }
 
   return (
-    <form
-      className="flex h-full flex-col gap-4 md:flex-row md:items-start"
+    <PostCreateLayout
       id="post-create-form"
       onSubmit={(event) => {
         event.preventDefault();
@@ -219,18 +219,18 @@ function PostCreateForm() {
         form.handleSubmit();
       }}
     >
-      <div className="flex h-full flex-1 flex-col gap-2">
+      <PostCreateLayout.Main>
         <PostTitleField form={form} />
         <PostContentField
           form={form}
           key={contentEditorKey}
           ref={contentEditorRef}
         />
-      </div>
+      </PostCreateLayout.Main>
 
-      <aside className="flex h-full w-full flex-col rounded-xl border bg-muted/40 p-3 text-sm md:min-h-150 md:w-sm md:p-4">
-        <div className="flex flex-1 flex-col gap-4">
-          <div className="flex-1 space-y-1.5">
+      <PostCreateLayout.Sidebar>
+        <PostCreateLayout.SidebarBody>
+          <PostCreateLayout.PropertyList>
             <PropertyRow label="Board">
               <PostBoardField boards={boards} form={form} />
             </PropertyRow>
@@ -238,13 +238,13 @@ function PostCreateForm() {
             <PropertyRow label="Status">
               <PostStatusField form={form} statuses={postStatuses} />
             </PropertyRow>
-          </div>
-        </div>
-        <div className="mt-auto flex items-center justify-between pt-4">
+          </PostCreateLayout.PropertyList>
+        </PostCreateLayout.SidebarBody>
+        <PostCreateLayout.Actions>
           <PostCreateMoreField form={form} />
           <Button type="submit">Create Post</Button>
-        </div>
-      </aside>
-    </form>
+        </PostCreateLayout.Actions>
+      </PostCreateLayout.Sidebar>
+    </PostCreateLayout>
   );
 }

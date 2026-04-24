@@ -60,7 +60,7 @@ export interface EmailEditorRef {
   getJSON: () => JSONContent;
 }
 
-export interface EmailEditorProps {
+export interface EditorProps {
   bubbleMenu?: {
     hideWhenActiveNodes?: string[];
     hideWhenActiveMarks?: string[];
@@ -174,7 +174,7 @@ export function Editor({
   className,
   children,
   ref,
-}: EmailEditorProps) {
+}: EditorProps) {
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
