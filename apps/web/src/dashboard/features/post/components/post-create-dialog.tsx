@@ -4,7 +4,6 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useRef, useState } from "react";
-import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -14,9 +13,7 @@ import {
   DialogPopup,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Editor, type EmailEditorRef } from "~/components/ui/editor";
-import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
+import type { EmailEditorRef } from "~/components/ui/editor";
 import { toastManager } from "~/components/ui/toast";
 import type { BoardPostStatus } from "~/features/board/constants";
 import { useAppForm } from "~/hooks/form";
@@ -30,13 +27,15 @@ import {
   postStatusCollection,
 } from "~/lib/collections";
 import { usePostCreateDialogContext } from "../dialog-stores";
-import { PostBoardSelect } from "./post-board-select";
 import {
-  isRichTextContentEmpty,
-  uploadPostEditorImage,
-} from "./post-editor-utils";
-import { PropertyRow, StatusSelect } from "./post-properties";
-import { PostTitleInput } from "./post-title-input";
+  PostBoardField,
+  PostContentField,
+  PostCreateMoreField,
+  PostStatusField,
+  PostTitleField,
+  postCreateFormOpts,
+} from "./post-create-form-shared";
+import { PropertyRow } from "./post-properties";
 
 export function PostCreateDialog() {
   const store = usePostCreateDialogContext();
@@ -127,6 +126,7 @@ function PostCreateForm() {
   const contentEditorRef = useRef<EmailEditorRef | null>(null);
 
   const form = useAppForm({
+    ...postCreateFormOpts,
     defaultValues: {
       boardId: initialBoardId,
       content: "",
@@ -134,20 +134,7 @@ function PostCreateForm() {
       statusId: initialPostStatus?.id ?? "",
       title: "",
     },
-    validators: {
-      onChange: z.object({
-        boardId: z.string().trim().min(1, "Board is required"),
-        content: z
-          .string()
-          .refine(
-            (value) => !isRichTextContentEmpty(value),
-            "Content is required"
-          ),
-        createMore: z.boolean(),
-        statusId: z.string().trim().min(1, "Status is required"),
-        title: z.string().trim().min(1, "Title is required"),
-      }),
-    },
+
     onSubmit: async ({ value }) => {
       if (!canCreate) {
         return;
@@ -233,87 +220,28 @@ function PostCreateForm() {
       }}
     >
       <div className="flex h-full flex-1 flex-col gap-2">
-        <form.Field name="title">
-          {(field) => (
-            <PostTitleInput
-              name={field.name}
-              onBlur={field.handleBlur}
-              onChange={(e) => field.handleChange(e.target.value)}
-              placeholder="Enter post title..."
-              size="sm"
-              value={field.state.value}
-            />
-          )}
-        </form.Field>
-
-        <form.Field name="content">
-          {(field) => (
-            <Editor
-              content={field.state.value}
-              editable
-              key={contentEditorKey}
-              onUpdate={(ref) =>
-                field.handleChange(ref.editor?.getHTML() ?? "")
-              }
-              onUploadImage={uploadPostEditorImage}
-              placeholder="Type '/' for commands or start typing a description..."
-              ref={contentEditorRef}
-            />
-          )}
-        </form.Field>
+        <PostTitleField form={form} />
+        <PostContentField
+          form={form}
+          key={contentEditorKey}
+          ref={contentEditorRef}
+        />
       </div>
 
       <aside className="flex h-full w-full flex-col rounded-xl border bg-muted/40 p-3 text-sm md:min-h-150 md:w-sm md:p-4">
         <div className="flex flex-1 flex-col gap-4">
           <div className="flex-1 space-y-1.5">
             <PropertyRow label="Board">
-              <form.Field name="boardId">
-                {(field) => (
-                  <PostBoardSelect
-                    boards={boards}
-                    currentBoardId={field.state.value}
-                    onValueChange={(nextBoardId) => {
-                      if (!nextBoardId) {
-                        return;
-                      }
-                      field.handleChange(nextBoardId);
-                    }}
-                  />
-                )}
-              </form.Field>
+              <PostBoardField boards={boards} form={form} />
             </PropertyRow>
 
             <PropertyRow label="Status">
-              <form.Field name="statusId">
-                {(field) => (
-                  <StatusSelect
-                    currentStatusId={field.state.value}
-                    onValueChange={(nextPostStatus) => {
-                      if (!nextPostStatus) {
-                        return;
-                      }
-                      field.handleChange(nextPostStatus.id);
-                    }}
-                    statuses={postStatuses}
-                  />
-                )}
-              </form.Field>
+              <PostStatusField form={form} statuses={postStatuses} />
             </PropertyRow>
           </div>
         </div>
         <div className="mt-auto flex items-center justify-between pt-4">
-          <form.Field name="createMore">
-            {(field) => (
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={field.state.value}
-                  id="create-more"
-                  onCheckedChange={field.handleChange}
-                />
-                <Label htmlFor="create-more">Create more</Label>
-              </div>
-            )}
-          </form.Field>
+          <PostCreateMoreField form={form} />
           <Button type="submit">Create Post</Button>
         </div>
       </aside>
