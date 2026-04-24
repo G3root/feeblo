@@ -16,7 +16,7 @@ import { Link } from "wouter";
 import { z } from "zod";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
-import { buttonVariants } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
 import {
   Empty,
   EmptyDescription,
@@ -61,6 +61,10 @@ import { useUpvote } from "../hooks/use-upvote";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
+
+function surfaceClassName(className?: string) {
+  return cn("rounded-md bg-background py-0 shadow-none", className);
+}
 
 function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -501,6 +505,7 @@ export function PostPage({ slug }: { slug: string }) {
             authorName={authorName}
           />
           <PostMetaSidebar.PublishedOn publishedDate={publishedDate} />
+          {/* <PostMetaSidebar.Share /> */}
         </PostMetaSidebar.Root>
       </div>
     </RootLayout>
@@ -520,15 +525,20 @@ function PostMetaSidebarRoot({ children }: { children: ReactNode }) {
 function PostMetaSidebarSection({
   children,
   title,
+  actions,
 }: {
   children: ReactNode;
   title: string;
+  actions?: ReactNode;
 }) {
   return (
     <section className="space-y-2 border-border/70 border-b pb-3 last:border-b-0 last:pb-0">
-      <p className="font-medium text-muted-foreground/80 text-xs tracking-wider">
-        {title}
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="font-medium text-muted-foreground/80 text-xs tracking-wider">
+          {title}
+        </p>
+        {actions}
+      </div>
       {children}
     </section>
   );
@@ -537,8 +547,11 @@ function PostMetaSidebarSection({
 function PostMetaSidebarVoters({ postId }: { postId: string }) {
   return (
     <PostVoterDialog.Root postId={postId}>
-      <PostMetaSidebarSection title="Voters">
-        <PostVoterDialog.Trigger />
+      <PostMetaSidebarSection
+        actions={<PostVoterDialog.Trigger />}
+        title="Voters"
+      >
+        <PostVoterDialog.Items />
         <PostVoterDialog.Content />
       </PostMetaSidebarSection>
     </PostVoterDialog.Root>
@@ -631,6 +644,16 @@ function PostMetaSidebarPublishedOn({
   );
 }
 
+function ShareFeedBack() {
+  return (
+    <PostMetaSidebarSection title="Share this feedback">
+      <Button className="-ml-2 w-full justify-start" size="sm" variant="ghost">
+        Copy Link
+      </Button>
+    </PostMetaSidebarSection>
+  );
+}
+
 const PostMetaSidebar = {
   Root: PostMetaSidebarRoot,
   Section: PostMetaSidebarSection,
@@ -640,6 +663,7 @@ const PostMetaSidebar = {
   Tags: PostMetaSidebarTags,
   Author: PostMetaSidebarAuthor,
   PublishedOn: PostMetaSidebarPublishedOn,
+  Share: ShareFeedBack,
 };
 
 function UpvoteButton({
