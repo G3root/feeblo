@@ -1,4 +1,3 @@
-import type { Board } from "@feeblo/domain/board/schema";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useUpvote } from "src/feature-board/hooks/use-upvote";
@@ -24,6 +23,11 @@ type FeedbackPost = {
     image: string | null;
     name: string | null;
   };
+};
+
+type FeedbackBoard = {
+  name: string;
+  organizationId: string;
 };
 
 const statusColors: Record<string, string> = {
@@ -73,7 +77,7 @@ export function FeedbackCard({
   post,
   status,
 }: {
-  board: Board;
+  board: FeedbackBoard;
   post: FeedbackPost;
   status: string;
 }) {

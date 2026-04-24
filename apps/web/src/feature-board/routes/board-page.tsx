@@ -100,7 +100,22 @@ export function BoardPage({ boardSlug }: { boardSlug: string }) {
             eq(post.boardId, board?.id),
             eq(post.organizationId, site.organizationId)
           )
-        );
+        )
+        .select(({ post, postStatus }) => ({
+          post: {
+            id: post.id,
+            slug: post.slug,
+            title: post.title,
+            excerpt: post.excerpt,
+            upVotes: post.upVotes,
+            hasUserUpVoted: post.hasUserUpVoted,
+            creatorId: post.creatorId,
+            user: post.user,
+          },
+          postStatus: {
+            type: postStatus.type,
+          },
+        }));
     },
     [board?.id, site.organizationId]
   );

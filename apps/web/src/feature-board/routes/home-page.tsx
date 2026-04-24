@@ -240,15 +240,38 @@ export function HomePage() {
           return condition;
         });
 
+      const projectedQuery = query.select(({ post, board, status }) => ({
+        board: {
+          id: board.id,
+          name: board.name,
+          organizationId: board.organizationId,
+        },
+        post: {
+          id: post.id,
+          slug: post.slug,
+          title: post.title,
+          excerpt: post.excerpt,
+          upVotes: post.upVotes,
+          hasUserUpVoted: post.hasUserUpVoted,
+          creatorId: post.creatorId,
+          user: post.user,
+        },
+        status: {
+          type: status.type,
+        },
+        createdAt: post.createdAt,
+        upVotes: post.upVotes,
+      }));
+
       if (sortBy === "newest") {
-        return query.orderBy(({ post }) => post.createdAt, "desc");
+        return projectedQuery.orderBy(({ $selected }) => $selected.createdAt, "desc");
       }
 
       if (sortBy === "oldest") {
-        return query.orderBy(({ post }) => post.createdAt, "asc");
+        return projectedQuery.orderBy(({ $selected }) => $selected.createdAt, "asc");
       }
 
-      return query.orderBy(({ post }) => post.upVotes, "desc");
+      return projectedQuery.orderBy(({ $selected }) => $selected.upVotes, "desc");
     },
     [
       site.organizationId,
