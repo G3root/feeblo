@@ -1,6 +1,6 @@
 import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
   Empty,
@@ -25,11 +25,13 @@ import {
   FeedbackBrowseLayoutContent,
   FeedbackBrowseLayoutMain,
 } from "../components/layout/feedback-browse-layout";
+import {
+  type HomePageSortOption,
+  useHomePageFilters,
+} from "../hooks/use-home-page-filters";
 import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
-
-type SortOption = "upvotes" | "newest" | "oldest";
 
 function MainContent({ children }: { children: ReactNode }) {
   return (
@@ -95,9 +97,6 @@ export function HomePage() {
     publicPostCollection,
     publicPostStatusCollection,
   } = usePublicCollections();
-  const [selectedStatus, setSelectedStatus] = useState("all");
-  const [selectedBoard, setSelectedBoard] = useState("all");
-  const [sortBy, setSortBy] = useState<SortOption>("upvotes");
 
   const {
     data: statuses = [],
@@ -178,6 +177,12 @@ export function HomePage() {
     [site.organizationId, statusLoading, boardLoading, statusError, boardError]
   );
 
+  const { selectedBoard, selectedStatus, sortBy, updateFilters } =
+    useHomePageFilters({
+      boardSlugs: boards.map((board) => board.slug),
+      statusIds: statuses.map((status) => status.id),
+    });
+
   const {
     data: filteredPosts = [],
     isError: filteredPostsError,
@@ -217,7 +222,7 @@ export function HomePage() {
             condition = and(
               condition,
               eq(board.slug, selectedBoard),
-              eq(status.type, selectedStatus)
+              eq(status.id, selectedStatus)
             );
             return condition;
           }
@@ -228,7 +233,7 @@ export function HomePage() {
           }
 
           if (selectedStatus !== "all") {
-            condition = and(condition, eq(status.type, selectedStatus));
+            condition = and(condition, eq(status.id, selectedStatus));
             return condition;
           }
 
@@ -267,15 +272,15 @@ export function HomePage() {
         continue;
       }
 
-      counts.set(status.type, (counts.get(status.type) ?? 0) + 1);
+      counts.set(status.id, (counts.get(status.id) ?? 0) + 1);
     }
 
     return [
       { count: allPosts.length, label: "All statuses", value: "all" },
       ...statuses.map((status) => ({
-        count: counts.get(status.type) ?? 0,
+        count: counts.get(status.id) ?? 0,
         label: formatPostStatus(status.type),
-        value: status.type,
+        value: status.id,
       })),
     ];
   }, [allPosts, statuses]);
@@ -400,7 +405,9 @@ export function HomePage() {
                     { label: "Newest", value: "newest" },
                     { label: "Oldest", value: "oldest" },
                   ]}
-                  onValueChange={(value) => setSortBy(value as SortOption)}
+                  onValueChange={(value) =>
+                    updateFilters({ sort: value as HomePageSortOption })
+                  }
                   value={sortBy}
                 >
                   <SelectTrigger className="w-full sm:w-40">
@@ -446,13 +453,13 @@ export function HomePage() {
             <CardContent className="space-y-6 pt-4 pb-4">
               <FilterSection
                 items={statusItems}
-                onSelect={setSelectedStatus}
+                onSelect={(value) => updateFilters({ status: value })}
                 selectedValue={selectedStatus}
                 title="Status"
               />
               <FilterSection
                 items={boardItems}
-                onSelect={setSelectedBoard}
+                onSelect={(value) => updateFilters({ board: value })}
                 selectedValue={selectedBoard}
                 title="Boards"
               />
