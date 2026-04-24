@@ -1,6 +1,9 @@
+import { ChatFeedback01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
+import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
   Empty,
@@ -264,14 +267,23 @@ export function HomePage() {
       }));
 
       if (sortBy === "newest") {
-        return projectedQuery.orderBy(({ $selected }) => $selected.createdAt, "desc");
+        return projectedQuery.orderBy(
+          ({ $selected }) => $selected.createdAt,
+          "desc"
+        );
       }
 
       if (sortBy === "oldest") {
-        return projectedQuery.orderBy(({ $selected }) => $selected.createdAt, "asc");
+        return projectedQuery.orderBy(
+          ({ $selected }) => $selected.createdAt,
+          "asc"
+        );
       }
 
-      return projectedQuery.orderBy(({ $selected }) => $selected.upVotes, "desc");
+      return projectedQuery.orderBy(
+        ({ $selected }) => $selected.upVotes,
+        "desc"
+      );
     },
     [
       site.organizationId,
@@ -402,21 +414,8 @@ export function HomePage() {
     <MainContent>
       <div className="space-y-6">
         <div className="grid gap-6 lg:grid-cols-4">
-          <Card
-            className={surfaceClassName("overflow-hidden lg:col-span-3")}
-            id="feedback-list"
-          >
-            <CardHeader className="flex items-center justify-between gap-4 border-border/60 border-b px-5 py-4">
-              {/* <div className="space-y-1">
-                <CardTitle>
-                  {selectedBoard === "all" ? "All feedback" : activeBoardLabel}
-                </CardTitle>
-                <CardDescription>
-                  {activeStatusLabel} • {filteredPosts.length}{" "}
-                  {filteredPosts.length === 1 ? "post" : "posts"}
-                </CardDescription>
-              </div> */}
-
+          <div className="overflow-hidden lg:col-span-3">
+            <CardHeader className="flex items-center justify-between gap-4 px-5 py-4">
               <CardTitle>
                 {selectedBoard === "all" ? "All feedback" : activeBoardLabel}
               </CardTitle>
@@ -442,52 +441,61 @@ export function HomePage() {
                     <SelectItem value="oldest">Oldest</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Button>
+                  <HugeiconsIcon icon={ChatFeedback01Icon} />
+                  Give Feedback
+                </Button>
               </div>
             </CardHeader>
 
-            <CardContent className="px-0 py-0">
-              {filteredPosts.length === 0 ? (
-                <div className="p-5">
-                  <Empty className="border">
-                    <EmptyHeader>
-                      <EmptyTitle>No matching feedback</EmptyTitle>
-                      <EmptyDescription>
-                        Try another status or board to see more public posts.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                </div>
-              ) : (
-                <div className="divide-y divide-border/40">
-                  {filteredPosts.map(({ board, post, status }) => (
-                    <FeedbackCard
-                      board={board}
-                      key={post.id}
-                      post={post}
-                      status={status.type}
-                    />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            <Card className={surfaceClassName()} id="feedback-list">
+              <CardContent className="px-0 py-0">
+                {filteredPosts.length === 0 ? (
+                  <div className="p-5">
+                    <Empty className="border">
+                      <EmptyHeader>
+                        <EmptyTitle>No matching feedback</EmptyTitle>
+                        <EmptyDescription>
+                          Try another status or board to see more public posts.
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/40">
+                    {filteredPosts.map(({ board, post, status }) => (
+                      <FeedbackCard
+                        board={board}
+                        key={post.id}
+                        post={post}
+                        status={status.type}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card className={surfaceClassName("h-fit")}>
-            <CardContent className="space-y-6 pt-4 pb-4">
-              <FilterSection
-                items={statusItems}
-                onSelect={(value) => updateFilters({ status: value })}
-                selectedValue={selectedStatus}
-                title="Status"
-              />
-              <FilterSection
-                items={boardItems}
-                onSelect={(value) => updateFilters({ board: value })}
-                selectedValue={selectedBoard}
-                title="Boards"
-              />
-            </CardContent>
-          </Card>
+          <div className="flex flex-col gap-2">
+            <Card className={surfaceClassName("h-fit")}>
+              <CardContent className="space-y-6 pt-4 pb-4">
+                <FilterSection
+                  items={statusItems}
+                  onSelect={(value) => updateFilters({ status: value })}
+                  selectedValue={selectedStatus}
+                  title="Status"
+                />
+                <FilterSection
+                  items={boardItems}
+                  onSelect={(value) => updateFilters({ board: value })}
+                  selectedValue={selectedBoard}
+                  title="Boards"
+                />
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </MainContent>
