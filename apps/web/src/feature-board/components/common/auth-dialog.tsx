@@ -1,8 +1,9 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-/** biome-ignore-all lint/style/useDefaultSwitchClause: <explanation> */
+/** biome-ignore-all lint/style/noNestedTernary: Keeps the auth action ordering compact. */
+/** biome-ignore-all lint/style/useDefaultSwitchClause: DialogStep is an exhaustive union. */
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useCallback, useState } from "react";
+import { useStore } from "@nanostores/react";
+import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
@@ -12,7 +13,6 @@ import {
   DialogHeader,
   DialogPanel,
   DialogTitle,
-  DialogTrigger,
 } from "~/components/ui/dialog";
 import {
   Field,
@@ -36,6 +36,7 @@ import {
   PasswordAndConfirmPasswordSchema,
   PasswordSchema,
 } from "~/utils/user-validation";
+import { authDialogStore, closeAuthDialog, openAuthDialog } from "../../stores";
 
 interface AuthDialogProps {
   variant: "sign-in" | "sign-up";
@@ -67,18 +68,27 @@ const OtpSchema = z.object({
 const CHOOSER_STEP: DialogStep = { kind: "chooser" };
 
 export function AuthDialog({ variant }: AuthDialogProps) {
-  const [open, setOpen] = useState(false);
+  const triggerLabel = variant === "sign-in" ? "Sign in" : "Sign up";
+
+  return (
+    <Button onClick={() => openAuthDialog(variant)} variant="secondary">
+      {triggerLabel}
+    </Button>
+  );
+}
+
+export function AuthDialogRoot() {
+  const { isOpen, variant } = useStore(authDialogStore);
   const [step, setStep] = useState<DialogStep>(CHOOSER_STEP);
 
-  const triggerLabel = variant === "sign-in" ? "Sign in" : "Sign up";
   const preferredEmailStep: EmailStep =
     variant === "sign-in" ? "email-sign-in" : "email-sign-up";
 
   const { title, description } = getStepCopy(step);
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
-    setOpen(nextOpen);
     if (!nextOpen) {
+      closeAuthDialog();
       setStep(CHOOSER_STEP);
     }
   }, []);
@@ -92,7 +102,7 @@ export function AuthDialog({ variant }: AuthDialogProps) {
   }, []);
 
   const handleSuccess = useCallback(() => {
-    setOpen(false);
+    closeAuthDialog();
     setStep(CHOOSER_STEP);
   }, []);
 
@@ -109,15 +119,13 @@ export function AuthDialog({ variant }: AuthDialogProps) {
     setStep(CHOOSER_STEP);
   }, [step]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the dialog step whenever the store opens or switches variant.
+  useEffect(() => {
+    setStep(CHOOSER_STEP);
+  }, [variant, isOpen]);
+
   return (
-    <Dialog onOpenChange={handleOpenChange} open={open}>
-      <DialogTrigger
-        render={(props) => (
-          <Button variant="secondary" {...props}>
-            {triggerLabel}
-          </Button>
-        )}
-      />
+    <Dialog onOpenChange={handleOpenChange} open={isOpen}>
       <DialogContent>
         <DialogHeader>
           {step.kind !== "chooser" ? (
@@ -247,7 +255,10 @@ function getEmailChooserActions(preferredEmailStep: EmailStep) {
     )
     .map((action) => ({
       ...action,
-      variant: action.step === preferredEmailStep ? "default" : "outline",
+      variant:
+        action.step === preferredEmailStep
+          ? ("default" as const)
+          : ("outline" as const),
     }));
 }
 
@@ -273,9 +284,9 @@ async function initializeVerification(email: string) {
   return false;
 }
 
-function showAuthError(message: string) {
+function showAuthError(message?: string | null) {
   toastManager.add({
-    title: message,
+    title: message ?? "Something went wrong",
     type: "error",
   });
 }
@@ -312,8 +323,9 @@ function SignInForm({
     defaultValues: { email: "", password: "" },
     validators: { onSubmit: SignInSchema },
     onSubmit: async ({ value }) => {
+      const email = value.email ?? "";
       const response = await authClient.signIn.email({
-        email: value.email,
+        email,
         password: value.password,
         callbackURL: "/",
       });
@@ -324,11 +336,11 @@ function SignInForm({
       }
 
       if (response.error.code === "EMAIL_NOT_VERIFIED") {
-        const isVerificationReady = await initializeVerification(value.email);
+        const isVerificationReady = await initializeVerification(email);
         if (!isVerificationReady) {
           return;
         }
-        onVerify(value.email);
+        onVerify(email);
         return;
       }
 
@@ -369,8 +381,9 @@ function SignUpForm({ onVerify }: { onVerify: (email: string) => void }) {
     },
     validators: { onSubmit: SignUpSchema },
     onSubmit: async ({ value }) => {
+      const email = value.email ?? "";
       const response = await authClient.signUp.email({
-        email: value.email,
+        email,
         name: value.name,
         password: value.password,
         callbackURL: "/",
@@ -381,13 +394,14 @@ function SignUpForm({ onVerify }: { onVerify: (email: string) => void }) {
         return;
       }
 
-      const email = response.data?.user?.email ?? value.email;
-      const isVerificationReady = await initializeVerification(email);
+      const verificationEmail = response.data?.user?.email ?? email;
+      const isVerificationReady =
+        await initializeVerification(verificationEmail);
       if (!isVerificationReady) {
         return;
       }
 
-      onVerify(email);
+      onVerify(verificationEmail);
     },
   });
 

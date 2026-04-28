@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import {
   FeedbackCard,
@@ -35,6 +36,7 @@ import {
 import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
+import { openAuthDialog, openPostCreateDialog } from "../stores";
 
 function MainContent({ children }: { children: ReactNode }) {
   return (
@@ -94,6 +96,7 @@ function FilterSection({
 }
 
 export function HomePage() {
+  const { data: session } = authClient.useSession();
   const site = useSite();
   const {
     publicBoardCollection,
@@ -346,6 +349,10 @@ export function HomePage() {
   const activeBoardLabel =
     boardItems.find((item) => item.value === selectedBoard)?.label ??
     "All boards";
+  const activeBoardId =
+    selectedBoard === "all"
+      ? ""
+      : (boards.find((board) => board.slug === selectedBoard)?.id ?? "");
 
   if (
     statusLoading ||
@@ -442,7 +449,15 @@ export function HomePage() {
                   </SelectContent>
                 </Select>
 
-                <Button>
+                <Button
+                  onClick={() => {
+                    if (session) {
+                      openPostCreateDialog(activeBoardId);
+                    } else {
+                      openAuthDialog("sign-in");
+                    }
+                  }}
+                >
                   <HugeiconsIcon icon={ChatFeedback01Icon} />
                   Give Feedback
                 </Button>
