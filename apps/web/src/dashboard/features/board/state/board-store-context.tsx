@@ -18,6 +18,7 @@ const DEFAULT_TAG_OPERATOR: BoardTagOperator = "includeAllOf";
 export type BoardView = {
   filters: {
     postStatus: BoardPostStatusFilter;
+    search: string;
     statusOperator: BoardStatusOperator;
     statuses: BoardPostStatus[];
     tagOperator: BoardTagOperator;
@@ -54,6 +55,7 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
         name: "All feedbacks",
         filters: {
           postStatus: "all",
+          search: "",
           statusOperator: DEFAULT_STATUS_OPERATOR,
           statuses: [],
           tagOperator: DEFAULT_TAG_OPERATOR,
@@ -89,10 +91,21 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
           ...context.activeView,
           filters: {
             ...context.activeView.filters,
+            search: "",
             statusOperator: DEFAULT_STATUS_OPERATOR,
             statuses: [],
             tagOperator: DEFAULT_TAG_OPERATOR,
             tagIds: [],
+          },
+        },
+      }),
+      setSearch: (context, event: { value: string }) => ({
+        ...context,
+        activeView: {
+          ...context.activeView,
+          filters: {
+            ...context.activeView.filters,
+            search: event.value,
           },
         },
       }),

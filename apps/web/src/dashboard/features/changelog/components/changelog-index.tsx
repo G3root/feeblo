@@ -1,4 +1,5 @@
-import { and, eq, inArray, useLiveQuery } from "@tanstack/react-db";
+import { and, eq, ilike, inArray, useLiveQuery } from "@tanstack/react-db";
+import { useSelector } from "@xstate/store-react";
 import { Button } from "~/components/ui/button";
 import {
   Empty,
@@ -11,6 +12,10 @@ import { SkeletonLoader } from "~/components/ui/skeleton-loader";
 import type { ChangelogStatus } from "~/features/changelog/constants";
 import { changelogCollection } from "~/lib/collections";
 import { useChangelogAction } from "../hooks/use-changelog-action";
+import {
+  ChangelogStoreProvider,
+  useChangelogStore,
+} from "../state/changelog-store-context";
 import { ChangelogListView } from "./changelog-list-view";
 import { ChangelogToolbar } from "./changelog-toolbar";
 
@@ -28,9 +33,27 @@ export function ChangelogIndex({
   organizationId: string;
   statuses?: ChangelogStatus[];
 }) {
-  const { createChangeLog, canCreate } = useChangelogAction();
+  return (
+    <ChangelogStoreProvider
+      defaultValue={{
+        filters: {
+          statuses: statuses ?? [],
+        },
+      }}
+    >
+      <ChangelogIndexContent organizationId={organizationId} />
+    </ChangelogStoreProvider>
+  );
+}
 
-  const statusesKey = statuses?.join(",") ?? "";
+function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
+  const { createChangeLog, canCreate } = useChangelogAction();
+  const store = useChangelogStore();
+  const search = useSelector(store, (s) => s.context.filters.search);
+  const statuses = useSelector(store, (s) => s.context.filters.statuses);
+
+  const normalizedSearch = search.trim();
+  const statusesKey = statuses.join(",");
 
   const changelogsQuery = useLiveQuery(
     (q) =>
@@ -39,18 +62,33 @@ export function ChangelogIndex({
         .where(({ changelog }) => {
           let condition = eq(changelog.organizationId, organizationId);
 
-          if (statuses?.length) {
+          if (statuses.length > 0) {
             condition = and(condition, inArray(changelog.status, statuses));
+          }
+
+          if (normalizedSearch) {
+            condition = and(
+              condition,
+              ilike(changelog.title, `%${normalizedSearch}%`)
+            );
           }
 
           return condition;
         })
         .orderBy(({ changelog }) => changelog.updatedAt, "desc"),
-    [organizationId, statusesKey]
+    [organizationId, statusesKey, normalizedSearch]
   );
   const visibleChangelogs = changelogsQuery.data ?? [];
   const filterLabel =
-    statuses?.length === 1 ? FILTER_LABELS[statuses[0]] : FILTER_LABELS.all;
+    statuses.length === 1 ? FILTER_LABELS[statuses[0]] : FILTER_LABELS.all;
+  const hasSearchFilter = normalizedSearch.length > 0;
+  const emptyTitle = hasSearchFilter
+    ? `No ${filterLabel} match this search`
+    : `No ${filterLabel} yet`;
+  const emptyDescription = getEmptyDescription({
+    hasSearchFilter,
+    statusesLength: statuses.length,
+  });
 
   if (changelogsQuery.isError) {
     return (
@@ -74,13 +112,9 @@ export function ChangelogIndex({
         <ChangelogToolbar />
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>No {filterLabel} yet</EmptyTitle>
-            <EmptyDescription>
-              {statuses?.length === 1
-                ? "Create a new changelog entry or switch tabs to review entries in another state."
-                : "Draft your first product update and publish it when it is ready."}
-            </EmptyDescription>
-            {canCreate ? (
+            <EmptyTitle>{emptyTitle}</EmptyTitle>
+            <EmptyDescription>{emptyDescription}</EmptyDescription>
+            {canCreate && !hasSearchFilter ? (
               <EmptyContent>
                 <Button onClick={createChangeLog} type="button">
                   Create your first entry
@@ -104,4 +138,22 @@ export function ChangelogIndex({
       </div>
     </SkeletonLoader>
   );
+}
+
+function getEmptyDescription({
+  hasSearchFilter,
+  statusesLength,
+}: {
+  hasSearchFilter: boolean;
+  statusesLength: number;
+}) {
+  if (hasSearchFilter) {
+    return "Try a different title search or clear the current filter.";
+  }
+
+  if (statusesLength === 1) {
+    return "Create a new changelog entry or switch tabs to review entries in another state.";
+  }
+
+  return "Draft your first product update and publish it when it is ready.";
 }

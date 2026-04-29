@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { Button } from "~/components/ui/button";
 import {
   Empty,
@@ -6,28 +7,34 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
-import { PolicyGuard, hasMembership } from "~/hooks/use-policy";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
+import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
 
 export function BoardPostsEmpty({
   boardId,
+  hasFilters = false,
   organizationId,
 }: {
   boardId?: string;
+  hasFilters?: boolean;
   organizationId: string;
 }) {
   const store = usePostCreateDialogContext();
   return (
     <Empty>
       <EmptyHeader>
-        <EmptyTitle>No posts yet</EmptyTitle>
+        <EmptyTitle>
+          {hasFilters ? "No posts match this filter" : "No posts yet"}
+        </EmptyTitle>
         <EmptyDescription>
-          {boardId
-            ? "This board does not have any posts yet. Create one to get started."
-            : "This workspace does not have any feedback yet."}
+          {hasFilters
+            ? "Try a different title search or clear the current filters."
+            : boardId
+              ? "This board does not have any posts yet. Create one to get started."
+              : "This workspace does not have any feedback yet."}
         </EmptyDescription>
       </EmptyHeader>
-      {boardId ? (
+      {boardId && !hasFilters ? (
         <EmptyContent>
           <PolicyGuard policy={hasMembership(organizationId)}>
             <Button

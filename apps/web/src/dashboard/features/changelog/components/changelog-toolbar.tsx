@@ -1,10 +1,20 @@
+import { Search01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
+import { useSelector } from "@xstate/store-react";
 import { Button } from "~/components/ui/button";
+import { DebouncedInputGroupInput } from "~/components/ui/debounced-input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupText,
+} from "~/components/ui/input-group";
 import { SkeletonWrapper } from "~/components/ui/skeleton-loader";
 import { toggleVariants } from "~/components/ui/toggle";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { cn } from "~/lib/utils";
 import { useChangelogAction } from "../hooks/use-changelog-action";
+import { useChangelogStore } from "../state/changelog-store-context";
 
 const links = [
   {
@@ -26,8 +36,8 @@ export function ChangelogToolbar() {
   const { createChangeLog } = useChangelogAction();
   return (
     <div className="flex flex-col gap-3 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {links.map((link) => (
             <SkeletonWrapper key={link.to}>
               <Link
@@ -54,10 +64,35 @@ export function ChangelogToolbar() {
           ))}
         </div>
 
-        <div>
+        <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+          <div className="w-full sm:w-72">
+            <InputGroup>
+              <InputGroupAddon>
+                <InputGroupText>
+                  <HugeiconsIcon icon={Search01Icon} />
+                </InputGroupText>
+              </InputGroupAddon>
+              <DebouncedSearch />
+            </InputGroup>
+          </div>
           <Button onClick={createChangeLog}>New Entry</Button>
         </div>
       </div>
     </div>
+  );
+}
+
+function DebouncedSearch() {
+  const store = useChangelogStore();
+  const search = useSelector(store, (s) => s.context.filters.search);
+  return (
+    <DebouncedInputGroupInput
+      aria-label="Search changelog titles"
+      onChange={(value) => {
+        store.send({ type: "setSearch", value });
+      }}
+      placeholder="Search changelog titles"
+      value={search}
+    />
   );
 }

@@ -21,6 +21,7 @@ export function BoardPosts({
   const activeView = useActiveBoardView();
   const {
     postStatus: postStatusFilter,
+    search,
     statusOperator,
     statuses,
     tagIds,
@@ -30,6 +31,7 @@ export function BoardPosts({
     boardId,
     organizationId,
     postStatusFilter,
+    search,
     statusOperator,
     statuses,
     tagIds,
@@ -54,7 +56,13 @@ export function BoardPosts({
 
   if (posts.length === 0) {
     return (
-      <BoardPostsEmpty boardId={boardId} organizationId={organizationId} />
+      <BoardPostsEmpty
+        boardId={boardId}
+        hasFilters={
+          search.trim().length > 0 || statuses.length > 0 || tagIds.length > 0
+        }
+        organizationId={organizationId}
+      />
     );
   }
 

@@ -1,12 +1,19 @@
 import {
   GridViewIcon,
   ListViewIcon,
+  Search01Icon,
   SlidersHorizontalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { Button } from "~/components/ui/button";
+import { DebouncedInputGroupInput } from "~/components/ui/debounced-input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupText,
+} from "~/components/ui/input-group";
 import {
   Popover,
   PopoverContent,
@@ -60,8 +67,8 @@ export function BoardToolbar({
   return (
     <BoardFilter.Root organizationId={organizationId}>
       <div className="flex flex-col gap-3 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             {variant === "feedback"
               ? feedbackLinks.map((link) => (
                   <Link
@@ -108,7 +115,10 @@ export function BoardToolbar({
                   </Link>
                 ))}
           </div>
-          <div className="flex gap-2">
+          <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
+            <div className="w-full sm:w-72">
+              <BoardSearchInput />
+            </div>
             <BoardFilter.Trigger />
             <DisplayPopOver />
           </div>
@@ -116,6 +126,32 @@ export function BoardToolbar({
         <BoardFilter.ActiveRow />
       </div>
     </BoardFilter.Root>
+  );
+}
+
+function BoardSearchInput() {
+  const store = useBoardStore();
+  const search = useSelector(
+    store,
+    (state) => state.context.activeView.filters.search
+  );
+
+  return (
+    <InputGroup>
+      <InputGroupAddon>
+        <InputGroupText>
+          <HugeiconsIcon icon={Search01Icon} />
+        </InputGroupText>
+      </InputGroupAddon>
+      <DebouncedInputGroupInput
+        aria-label="Search feedback titles"
+        onChange={(value) => {
+          store.send({ type: "setSearch", value });
+        }}
+        placeholder="Search feedback titles"
+        value={search}
+      />
+    </InputGroup>
   );
 }
 

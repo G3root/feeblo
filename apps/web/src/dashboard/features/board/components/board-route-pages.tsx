@@ -177,6 +177,7 @@ const allFeedbackView: BoardView = {
   name: "All feedbacks",
   filters: {
     postStatus: "all",
+    search: "",
     statusOperator: "isAnyOf",
     statuses: [],
     tagOperator: "includeAllOf",
@@ -189,6 +190,7 @@ const activeFeedbackView: BoardView = {
   name: "Active",
   filters: {
     postStatus: "active",
+    search: "",
     statusOperator: "isAnyOf",
     statuses: [],
     tagOperator: "includeAllOf",
@@ -201,6 +203,7 @@ const backlogFeedbackView: BoardView = {
   name: "Backlog",
   filters: {
     postStatus: "backlog",
+    search: "",
     statusOperator: "isAnyOf",
     statuses: [],
     tagOperator: "includeAllOf",

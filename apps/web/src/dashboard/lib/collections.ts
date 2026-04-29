@@ -190,27 +190,39 @@ export const postStatusCollection = createCollection(
 export const changelogCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
+      const parsed = parseWhereExpression(opts.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+          inArray: () => ({}),
+          ilike: () => ({}),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
       const cacheKey = ["changelog"];
 
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
+      if (parsed?.organizationId) {
+        cacheKey.push(`organizationId-${parsed.organizationId}`);
       }
 
       return cacheKey;
     },
     syncMode: "on-demand",
     queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq" && field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-      }
+      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
+        handlers: {
+          eq: (field, value) => ({ [field.join(".")]: value }),
+          and: (...filters) => Object.assign({}, ...filters),
+          inArray: () => ({}),
+          ilike: () => ({}),
+        },
+        onUnknownOperator: () => {
+          return null;
+        },
+      });
+      const organizationId = parsed?.organizationId;
 
       if (!organizationId) {
         return [];

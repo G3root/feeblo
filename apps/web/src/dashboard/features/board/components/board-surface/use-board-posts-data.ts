@@ -2,9 +2,9 @@ import {
   and,
   count,
   eq,
+  ilike,
   inArray,
   not,
-  or,
   useLiveQuery,
 } from "@tanstack/react-db";
 import {
@@ -25,6 +25,7 @@ type UseBoardPostsDataOptions = {
   boardId?: string;
   organizationId: string;
   postStatusFilter: BoardPostStatusFilter;
+  search: string;
   statusOperator: BoardStatusOperator;
   statuses: BoardPostStatus[];
   tagIds: string[];
@@ -35,11 +36,13 @@ export function useBoardPostsData({
   boardId,
   organizationId,
   postStatusFilter,
+  search,
   statusOperator,
   statuses,
   tagIds,
   tagOperator,
 }: UseBoardPostsDataOptions) {
+  const normalizedSearch = search.trim();
   const statusesKey = statuses.join(",");
   const tagIdsKey = tagIds.join(",");
 
@@ -151,17 +154,21 @@ export function useBoardPostsData({
           if (postStatusFilter === "backlog") {
             condition = and(
               condition,
-              or(eq(postStatus.type, "PENDING"), eq(postStatus.type, "REVIEW"))
+              inArray(postStatus.type, ["PENDING", "REVIEW"])
             );
           }
 
           if (postStatusFilter === "active") {
             condition = and(
               condition,
-              or(
-                eq(postStatus.type, "PLANNED"),
-                eq(postStatus.type, "IN_PROGRESS")
-              )
+              inArray(postStatus.type, ["PLANNED", "IN_PROGRESS"])
+            );
+          }
+
+          if (normalizedSearch) {
+            condition = and(
+              condition,
+              ilike(post.title, `%${normalizedSearch}%`)
             );
           }
 
@@ -192,6 +199,7 @@ export function useBoardPostsData({
       boardId,
       organizationId,
       postStatusFilter,
+      normalizedSearch,
       statusesKey,
       statusOperator,
       tagIdsKey,

@@ -18,6 +18,7 @@ function RouteComponent() {
   const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
     organizationId,
     postStatusFilter: "all",
+    search: "",
     statusOperator: "isAnyOf",
     statuses: ["PLANNED", "IN_PROGRESS", "COMPLETED"],
     tagIds: [],
