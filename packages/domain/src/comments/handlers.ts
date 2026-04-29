@@ -96,12 +96,19 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
 
-          yield* repository.delete({
+          const deletedComment = yield* repository.delete({
             id: args.id,
             organizationId: args.organizationId,
             postId: args.postId,
             userId: session.session.userId,
           });
+
+          if (!deletedComment) {
+            return yield* new FailedToDeleteCommentError({
+              message: "Failed to delete comment",
+            });
+          }
+
           return {
             message: "Comment deleted successfully",
           };
@@ -126,13 +133,20 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
       CommentUpdate: (args: TCommentUpdate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
-          yield* repository.update({
+          const updatedComment = yield* repository.update({
             id: args.id,
             organizationId: args.organizationId,
             postId: args.postId,
             content: sanitizeRichText(args.content),
             userId: session.session.userId,
           });
+
+          if (!updatedComment) {
+            return yield* new FailedToUpdateCommentError({
+              message: "Failed to update comment",
+            });
+          }
+
           return {
             message: "Comment updated successfully",
           };

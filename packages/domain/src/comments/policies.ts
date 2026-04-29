@@ -26,15 +26,17 @@ const makeCommentPolicy = Effect.gen(function* () {
       )
     );
 
-  const isOwner = (args: TIsOwner) => {
-    return repository
-      .findById({
-        id: args.commentId,
-        organizationId: args.organizationId,
-        postId: args.postId,
-      })
-      .pipe(Effect.map(Option.isSome));
-  };
+  const isOwner = (args: TIsOwner) =>
+    Policy.policy((user) =>
+      repository
+        .findById({
+          id: args.commentId,
+          organizationId: args.organizationId,
+          postId: args.postId,
+          userId: user.session.userId,
+        })
+        .pipe(Effect.map(Option.isSome))
+    );
 
   return {
     canCreate,

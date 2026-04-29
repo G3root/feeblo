@@ -26,6 +26,7 @@ type FindByIdComment = {
   id: string;
   organizationId: string;
   postId: string;
+  userId?: string;
 };
 const makeCommentRepository = Effect.gen(function* () {
   const db = yield* DB;
@@ -85,7 +86,7 @@ const makeCommentRepository = Effect.gen(function* () {
       }),
     delete: (args: DeleteComment) =>
       Effect.gen(function* () {
-        yield* db
+        const [deletedComment] = yield* db
           .delete(commentTable)
           .where(
             and(
@@ -94,7 +95,12 @@ const makeCommentRepository = Effect.gen(function* () {
               eq(commentTable.postId, args.postId),
               eq(commentTable.userId, args.userId)
             )
-          );
+          )
+          .returning({
+            id: commentTable.id,
+          });
+
+        return deletedComment;
       }),
     update: (args: UpdateComment) =>
       Effect.gen(function* () {
@@ -125,7 +131,8 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(commentTable.id, args.id),
             eq(commentTable.organizationId, args.organizationId),
-            eq(commentTable.postId, args.postId)
+            eq(commentTable.postId, args.postId),
+            ...(args.userId ? [eq(commentTable.userId, args.userId)] : [])
           )
         )
         .pipe(Effect.map(EffectArray.get(0))),
