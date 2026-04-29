@@ -16,7 +16,7 @@ export function PublicBoardRoutes() {
       <Route path="/">
         <HomePage />
       </Route>
-      {site.changelogVisibility === "PUBLIC" ? (
+      {site.roadmapVisibility === "PUBLIC" ? (
         <Route path="/roadmap">
           <RoadmapPage />
         </Route>
