@@ -261,7 +261,13 @@ function RouteComponent() {
     }
   };
 
-  const handleAddComment = async ({ content }: { content: string }) => {
+  const handleAddComment = async ({
+    content,
+    visibility,
+  }: {
+    content: string;
+    visibility: "PUBLIC" | "INTERNAL";
+  }) => {
     if (!session) {
       throw new Error("session not found");
     }
@@ -273,7 +279,7 @@ function RouteComponent() {
       createdAt: new Date(),
       updatedAt: new Date(),
       content,
-      visibility: "PUBLIC",
+      visibility,
       parentCommentId: null,
       organizationId,
       memberId: null,
@@ -350,8 +356,10 @@ function RouteComponent() {
             </div>
           </Suspense>
           <PostDetails.CommentComposer
+            defaultVisibility="PUBLIC"
             handleAddComment={handleAddComment}
             isAuthenticated
+            showVisibilityPicker
           />
           <Suspense fallback={<PostDetails.CommentListSkeleton />}>
             <PostDetails.CommentList.Root

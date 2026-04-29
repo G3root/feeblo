@@ -3,6 +3,7 @@ import { Delete02Icon, Ellipsis } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, type ReactNode, use } from "react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -22,6 +23,7 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
+import { cn } from "~/lib/utils";
 import {
   type CommentReaction,
   CommentReactionSection,
@@ -29,6 +31,7 @@ import {
 } from "./comment-reaction-section";
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+const WHITESPACE_REGEX = /\s+/;
 
 type PostCommentListProps = {
   comments?: Comment[];
@@ -173,8 +176,12 @@ function PostCommentListItems({ children }: PostCommentListItemsProps) {
 }
 
 function PostCommentListItem({ children }: { children?: ReactNode }) {
+  const comment = usePostCommentItem();
   return (
-    <Item className="rounded-xl border-border/80 px-4 py-3" variant="outline">
+    <Item
+      className={cn(comment.visibility === "INTERNAL" && "bg-primary/10")}
+      variant="outline"
+    >
       {children ?? <PostCommentListDefaultItemContent />}
     </Item>
   );
@@ -223,7 +230,12 @@ function PostCommentListAuthor() {
   const comment = usePostCommentItem();
 
   return (
-    <ItemTitle className="font-medium text-sm">{comment.user.name}</ItemTitle>
+    <div className="flex items-center gap-2">
+      <ItemTitle className="font-medium text-sm">{comment.user.name}</ItemTitle>
+      {comment.visibility === "INTERNAL" ? (
+        <Badge variant="default">Internal note</Badge>
+      ) : null}
+    </div>
   );
 }
 
@@ -243,7 +255,7 @@ function PostCommentListBody() {
   return (
     <div
       className="typography"
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: comments are stored as sanitized rich text
       dangerouslySetInnerHTML={{
         __html: comment.content,
       }}
@@ -430,7 +442,7 @@ function getInitials(name: string | null | undefined) {
     return "??";
   }
 
-  const segments = normalized.split(/\s+/).slice(0, 2);
+  const segments = normalized.split(WHITESPACE_REGEX).slice(0, 2);
   return segments.map((segment) => segment.charAt(0).toUpperCase()).join("");
 }
 

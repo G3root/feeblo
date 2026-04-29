@@ -1,4 +1,5 @@
 import { Effect, Option } from "effect";
+import * as Policy from "../policy";
 import { CommentRepository } from "./repository";
 
 type TIsOwner = {
@@ -7,8 +8,23 @@ type TIsOwner = {
   postId: string;
 };
 
+type TCanCreate = {
+  organizationId: string;
+  visibility: "PUBLIC" | "INTERNAL";
+};
+
 const makeCommentPolicy = Effect.gen(function* () {
   const repository = yield* CommentRepository;
+
+  const canCreate = (args: TCanCreate) =>
+    Policy.policy((user) =>
+      Effect.succeed(
+        args.visibility === "PUBLIC" ||
+          user.memberships.some(
+            (membership) => membership.organizationId === args.organizationId
+          )
+      )
+    );
 
   const isOwner = (args: TIsOwner) => {
     return repository
@@ -21,6 +37,7 @@ const makeCommentPolicy = Effect.gen(function* () {
   };
 
   return {
+    canCreate,
     isOwner,
   };
 });

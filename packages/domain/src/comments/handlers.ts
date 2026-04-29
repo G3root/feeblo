@@ -76,6 +76,12 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             message: "Comment created successfully",
           };
         }).pipe(
+          Policy.withPolicy(
+            commentPolicy.canCreate({
+              organizationId: args.organizationId,
+              visibility: args.visibility,
+            })
+          ),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(

@@ -305,7 +305,13 @@ export function PostPage({ slug }: { slug: string }) {
   const publishedDate = formatPublishedDate(post.createdAt);
   const selectedTags = postTagsQuery.data ?? [];
 
-  const handleAddComment = async ({ content }: { content: string }) => {
+  const handleAddComment = async ({
+    content,
+    visibility,
+  }: {
+    content: string;
+    visibility: "PUBLIC" | "INTERNAL";
+  }) => {
     if (!session) {
       throw new Error("session not found");
     }
@@ -315,7 +321,7 @@ export function PostPage({ slug }: { slug: string }) {
       createdAt: new Date(),
       updatedAt: new Date(),
       content,
-      visibility: "PUBLIC",
+      visibility,
       parentCommentId: null,
       organizationId: site.organizationId,
       //todo fix
@@ -433,6 +439,7 @@ export function PostPage({ slug }: { slug: string }) {
 
               <div className="space-y-4">
                 <PostCommentComposer
+                  defaultVisibility="PUBLIC"
                   handleAddComment={handleAddComment}
                   isAuthenticated={!!session?.session}
                 />
