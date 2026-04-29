@@ -1,7 +1,4 @@
-import { generateId } from "@feeblo/utils/id";
-import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, useLiveQuery } from "@tanstack/react-db";
-import { useNavigate } from "@tanstack/react-router";
 import { Button } from "~/components/ui/button";
 import {
   Empty,
@@ -11,11 +8,9 @@ import {
   EmptyTitle,
 } from "~/components/ui/empty";
 import { SkeletonLoader } from "~/components/ui/skeleton-loader";
-import { toastManager } from "~/components/ui/toast";
 import type { ChangelogStatus } from "~/features/changelog/constants";
-import { hasMembership, usePolicy } from "~/hooks/use-policy";
-import { authClient } from "~/lib/auth-client";
-import { changelogCollection, membersCollection } from "~/lib/collections";
+import { changelogCollection } from "~/lib/collections";
+import { useChangelogAction } from "../hooks/use-changelog-action";
 import { ChangelogListView } from "./changelog-list-view";
 import { ChangelogToolbar } from "./changelog-toolbar";
 
@@ -33,28 +28,8 @@ export function ChangelogIndex({
   organizationId: string;
   statuses?: ChangelogStatus[];
 }) {
-  const navigate = useNavigate();
-  const { data: session } = authClient.useSession();
-  const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
+  const { createChangeLog, canCreate } = useChangelogAction();
 
-  const { data: member } = useLiveQuery(
-    (q) => {
-      if (!(organizationId && session?.user?.id)) {
-        return undefined;
-      }
-
-      return q
-        .from({ member: membersCollection })
-        .where(({ member }) =>
-          and(
-            eq(member.organizationId, organizationId),
-            eq(member.userId, session.user.id)
-          )
-        )
-        .findOne();
-    },
-    [organizationId, session?.user?.id]
-  );
   const statusesKey = statuses?.join(",") ?? "";
 
   const changelogsQuery = useLiveQuery(
@@ -77,52 +52,10 @@ export function ChangelogIndex({
   const filterLabel =
     statuses?.length === 1 ? FILTER_LABELS[statuses[0]] : FILTER_LABELS.all;
 
-  async function handleCreate() {
-    if (!canCreate) {
-      return;
-    }
-
-    try {
-      const id = generateId("changelog");
-      const title = "Untitled changelog";
-      const slug = `${slugify(title) || "changelog"}-${id.slice(-6)}`;
-      const tx = changelogCollection.insert({
-        id,
-        title,
-        slug,
-        content: "",
-        status: "draft" as ChangelogStatus,
-        scheduledAt: null,
-        publishedAt: null,
-        organizationId,
-        creatorId: session?.user?.id ?? null,
-        creatorMemberId: member?.id ?? null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        user: {
-          name: session?.user?.name ?? null,
-          image: session?.user?.image ?? null,
-        },
-      });
-
-      await tx.isPersisted.promise;
-
-      navigate({
-        to: "/$organizationId/changelog/edit/$changelogSlug",
-        params: { organizationId, changelogSlug: slug },
-      });
-    } catch (_error) {
-      toastManager.add({
-        title: "Failed to create changelog",
-        type: "error",
-      });
-    }
-  }
-
   if (changelogsQuery.isError) {
     return (
       <div className="mx-auto w-full">
-        <ChangelogToolbar organizationId={organizationId} />
+        <ChangelogToolbar />
         <Empty>
           <EmptyHeader>
             <EmptyTitle>Changelog unavailable</EmptyTitle>
@@ -138,7 +71,7 @@ export function ChangelogIndex({
   if (!changelogsQuery.isLoading && visibleChangelogs.length === 0) {
     return (
       <div className="mx-auto w-full">
-        <ChangelogToolbar organizationId={organizationId} />
+        <ChangelogToolbar />
         <Empty>
           <EmptyHeader>
             <EmptyTitle>No {filterLabel} yet</EmptyTitle>
@@ -149,7 +82,7 @@ export function ChangelogIndex({
             </EmptyDescription>
             {canCreate ? (
               <EmptyContent>
-                <Button onClick={handleCreate} type="button">
+                <Button onClick={createChangeLog} type="button">
                   Create your first entry
                 </Button>
               </EmptyContent>
@@ -163,7 +96,7 @@ export function ChangelogIndex({
   return (
     <SkeletonLoader isLoading={changelogsQuery.isLoading}>
       <div className="mx-auto w-full">
-        <ChangelogToolbar organizationId={organizationId} />
+        <ChangelogToolbar />
         <ChangelogListView
           changelogs={visibleChangelogs ?? []}
           organizationId={organizationId}

@@ -1,7 +1,10 @@
 import { Link } from "@tanstack/react-router";
+import { Button } from "~/components/ui/button";
 import { SkeletonWrapper } from "~/components/ui/skeleton-loader";
 import { toggleVariants } from "~/components/ui/toggle";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { cn } from "~/lib/utils";
+import { useChangelogAction } from "../hooks/use-changelog-action";
 
 const links = [
   {
@@ -18,11 +21,9 @@ const links = [
   },
 ];
 
-export function ChangelogToolbar({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
+export function ChangelogToolbar() {
+  const organizationId = useOrganizationId();
+  const { createChangeLog } = useChangelogAction();
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -51,6 +52,10 @@ export function ChangelogToolbar({
               </Link>
             </SkeletonWrapper>
           ))}
+        </div>
+
+        <div>
+          <Button onClick={createChangeLog}>New Entry</Button>
         </div>
       </div>
     </div>
