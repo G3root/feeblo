@@ -390,9 +390,6 @@ function RouteComponent() {
               </PostDetails.CommentList.Content>
             </PostDetails.CommentList.Root>
           </Suspense>
-          <p className="text-muted-foreground text-xs">
-            Created {post.createdAt.toLocaleDateString()}
-          </p>
         </PostDetails.Layout>
 
         <aside className="hidden px-6 py-6 lg:block">
