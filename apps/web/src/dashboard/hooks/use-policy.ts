@@ -3,7 +3,14 @@ import { authClient } from "~/lib/auth-client";
 
 type SessionData = NonNullable<
   ReturnType<typeof authClient.useSession>["data"]
->;
+> & {
+  memberships: Array<{
+    membershipId: string;
+    organizationId: string;
+    role: "owner" | "admin" | "member";
+    userId: string;
+  }>;
+};
 
 export type ClientPolicy = (session: SessionData) => boolean;
 
@@ -17,7 +24,7 @@ export function usePolicy(policy: ClientPolicy): {
     if (!session) {
       return false;
     }
-    return policy(session);
+    return policy(session as SessionData);
   }, [session, policy]);
 
   return { allowed, isPending };
@@ -52,11 +59,21 @@ export const anyPolicy = (
 
 /**
  * Client policy: current user is organization owner or admin.
- * Mirrors server Policy.any(hasRole("owner"), hasRole("admin")) used in
- * membership (invite, update role, remove, cancel invitation) and board/post isOwner.
+ * When an organization id is provided, the role must belong to that organization.
  */
-export const hasOwnerOrAdminRole = (): ClientPolicy =>
-  anyPolicy(hasRole("owner"), hasRole("admin"));
+export const hasOwnerOrAdminRole = (organizationId?: string): ClientPolicy => {
+  if (!organizationId) {
+    return anyPolicy(hasRole("owner"), hasRole("admin"));
+  }
+
+  return policy((session) =>
+    session.memberships.some(
+      (membership) =>
+        membership.organizationId === organizationId &&
+        (membership.role === "owner" || membership.role === "admin")
+    )
+  );
+};
 
 /**
  * Conditionally renders children based on a policy evaluation.

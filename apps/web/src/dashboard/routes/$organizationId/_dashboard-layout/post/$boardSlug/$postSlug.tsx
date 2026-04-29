@@ -35,6 +35,12 @@ import {
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
+import {
+  anyPolicy,
+  hasOwnerOrAdminRole,
+  isUser,
+  usePolicy,
+} from "~/hooks/use-policy";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { authClient } from "~/lib/auth-client";
 import {
@@ -188,6 +194,13 @@ function RouteComponent() {
     [organizationId, post?.id]
   );
 
+  const { allowed: canManagePost } = usePolicy(
+    anyPolicy(
+      hasOwnerOrAdminRole(organizationId),
+      isUser(post?.creatorId ?? "")
+    )
+  );
+
   if (!(board && post)) {
     return (
       <Empty>
@@ -312,75 +325,76 @@ function RouteComponent() {
 
   return (
     <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
-        <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
-          <PostDetails.Layout>
-            <PostDetails.Header
-              boardName={board.name}
-              boardSlug={board.slug}
-              organizationId={organizationId}
-              postCreatorId={post.creatorId}
-              postId={post.id}
-              title={post.title}
-            />
-            <PostDetails.Description
-              description={post.content}
-              organizationId={organizationId}
-              postCreatorId={post.creatorId}
-              postId={post.id}
-            />
-            <Suspense fallback={<PostDetails.ActionsSkeleton />}>
-              <div className="flex items-center justify-between py-1">
-                <PostDetails.EngagementBar
-                  organizationId={organizationId}
-                  postId={post.id}
-                />
-              </div>
-            </Suspense>
-            <PostDetails.CommentComposer
-              handleAddComment={handleAddComment}
-              isAuthenticated
-            />
-            <Suspense fallback={<PostDetails.CommentListSkeleton />}>
-              <PostDetails.CommentList.Root
-                commentReactions={commentReactions}
-                comments={comments}
-                handleDeleteComment={handleDeleteComment}
-                handleToggleCommentReaction={handleToggleCommentReaction}
+      <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
+        <PostDetails.Layout>
+          <PostDetails.Header
+            boardName={board.name}
+            boardSlug={board.slug}
+            organizationId={organizationId}
+            postCreatorId={post.creatorId}
+            postId={post.id}
+            title={post.title}
+          />
+          <PostDetails.Description
+            description={post.content}
+            organizationId={organizationId}
+            postCreatorId={post.creatorId}
+            postId={post.id}
+          />
+          <Suspense fallback={<PostDetails.ActionsSkeleton />}>
+            <div className="flex items-center justify-between py-1">
+              <PostDetails.EngagementBar
                 organizationId={organizationId}
                 postId={post.id}
-              >
-                <PostDetails.CommentList.Content>
-                  <PostDetails.CommentList.Items>
-                    <PostDetails.CommentList.Item>
-                      <PostDetails.CommentList.Media>
-                        <PostDetails.CommentList.Avatar />
-                      </PostDetails.CommentList.Media>
-                      <PostDetails.CommentList.Main>
-                        <PostDetails.CommentList.Header>
-                          <PostDetails.CommentList.Author />
-                          <PostDetails.CommentList.Timestamp />
-                        </PostDetails.CommentList.Header>
-                        <PostDetails.CommentList.Body />
-                        <PostDetails.CommentList.Reactions />
-                      </PostDetails.CommentList.Main>
-                      <PostDetails.CommentList.Actions />
-                    </PostDetails.CommentList.Item>
-                  </PostDetails.CommentList.Items>
-                </PostDetails.CommentList.Content>
-              </PostDetails.CommentList.Root>
-            </Suspense>
-            <p className="text-muted-foreground text-xs">
-              Created {post.createdAt.toLocaleDateString()}
-            </p>
-          </PostDetails.Layout>
+              />
+            </div>
+          </Suspense>
+          <PostDetails.CommentComposer
+            handleAddComment={handleAddComment}
+            isAuthenticated
+          />
+          <Suspense fallback={<PostDetails.CommentListSkeleton />}>
+            <PostDetails.CommentList.Root
+              commentReactions={commentReactions}
+              comments={comments}
+              handleDeleteComment={handleDeleteComment}
+              handleToggleCommentReaction={handleToggleCommentReaction}
+              organizationId={organizationId}
+              postId={post.id}
+            >
+              <PostDetails.CommentList.Content>
+                <PostDetails.CommentList.Items>
+                  <PostDetails.CommentList.Item>
+                    <PostDetails.CommentList.Media>
+                      <PostDetails.CommentList.Avatar />
+                    </PostDetails.CommentList.Media>
+                    <PostDetails.CommentList.Main>
+                      <PostDetails.CommentList.Header>
+                        <PostDetails.CommentList.Author />
+                        <PostDetails.CommentList.Timestamp />
+                      </PostDetails.CommentList.Header>
+                      <PostDetails.CommentList.Body />
+                      <PostDetails.CommentList.Reactions />
+                    </PostDetails.CommentList.Main>
+                    <PostDetails.CommentList.Actions />
+                  </PostDetails.CommentList.Item>
+                </PostDetails.CommentList.Items>
+              </PostDetails.CommentList.Content>
+            </PostDetails.CommentList.Root>
+          </Suspense>
+          <p className="text-muted-foreground text-xs">
+            Created {post.createdAt.toLocaleDateString()}
+          </p>
+        </PostDetails.Layout>
 
-          <aside className="hidden px-6 py-6 lg:block">
-            <div className="sticky top-0 space-y-4">
-              <div className="flex items-center justify-end gap-2">
-                <RedirectToPostUrlButton postSlug={post.slug} />
-                <CopyPostButton postSlug={post.slug} />
+        <aside className="hidden px-6 py-6 lg:block">
+          <div className="sticky top-0 space-y-4">
+            <div className="flex items-center justify-end gap-2">
+              <RedirectToPostUrlButton postSlug={post.slug} />
+              <CopyPostButton postSlug={post.slug} />
+              {canManagePost ? (
                 <Button
-                  aria-label="Close"
+                  aria-label="Delete post"
                   className="rounded-full"
                   onClick={() =>
                     postDialogStore.send({
@@ -402,8 +416,10 @@ function RouteComponent() {
                 >
                   <HugeiconsIcon icon={Trash2} />
                 </Button>
-              </div>
+              ) : null}
+            </div>
 
+            {canManagePost ? (
               <SidebarCard title="Properties">
                 <div>
                   <StatusSelect
@@ -483,32 +499,33 @@ function RouteComponent() {
                   }}
                 />
               </SidebarCard>
+            ) : null}
 
-              <SidebarCard title="Tags">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <TagList selectedTags={postTags} tags={tags} />
-                  <TagSelect
-                    onTagSelect={handleTagSelect}
-                    selectedTags={postTags}
-                    tags={tags}
-                    type="FEEDBACK"
-                  />
-                </div>
-              </SidebarCard>
+            <SidebarCard title="Tags">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <TagList selectedTags={postTags} tags={tags} />
+                <TagSelect
+                  onTagSelect={handleTagSelect}
+                  selectedTags={postTags}
+                  tags={tags}
+                  type="FEEDBACK"
+                />
+              </div>
+            </SidebarCard>
 
-              <SidebarCard title="Details">
-                <p className="text-muted-foreground text-sm">
-                  {formatPostDate(post.createdAt)}
-                </p>
+            <SidebarCard title="Details">
+              <p className="text-muted-foreground text-sm">
+                {formatPostDate(post.createdAt)}
+              </p>
 
-                <p className="text-muted-foreground text-sm">
-                  {post.user?.name ?? "Unknown author"}
-                </p>
-              </SidebarCard>
-            </div>
-          </aside>
-        </div>
-        <TagCreateDialog />
+              <p className="text-muted-foreground text-sm">
+                {post.user?.name ?? "Unknown author"}
+              </p>
+            </SidebarCard>
+          </div>
+        </aside>
+      </div>
+      <TagCreateDialog />
     </TagCreateDialogProvider>
   );
 }

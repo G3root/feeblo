@@ -37,7 +37,7 @@ function WorkspaceSettingsPage() {
 function WorkspaceDetailsSection() {
   const organizationId = useOrganizationId();
   const { allowed: canManageOrganization, isPending: isPolicyPending } =
-    usePolicy(hasOwnerOrAdminRole());
+    usePolicy(hasOwnerOrAdminRole(organizationId));
   const organizationQuery = useLiveQuery(
     (q) =>
       q

@@ -10,13 +10,12 @@ import {
   useLiveSuspenseQuery,
   usePacedMutations,
 } from "@tanstack/react-db";
-import { ArrowLeft } from "lucide-react";
 import { type ReactNode, Suspense } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { z } from "zod";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Badge } from "~/components/ui/badge";
-import { Button, buttonVariants } from "~/components/ui/button";
+import { Button } from "~/components/ui/button";
 import {
   Empty,
   EmptyDescription,
@@ -40,9 +39,7 @@ import {
 } from "~/features/post/components/post-reaction-section";
 import { PostTitleInput } from "~/features/post/components/post-title-input";
 import {
-  allPolicy,
   anyPolicy,
-  hasMembership,
   hasOwnerOrAdminRole,
   isUser,
   usePolicy,
@@ -56,15 +53,12 @@ import {
 } from "../../dashboard/lib/reaction-keys";
 import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
+import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 import { useUpvote } from "../hooks/use-upvote";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
-
-function surfaceClassName(className?: string) {
-  return cn("rounded-md bg-background py-0 shadow-none", className);
-}
 
 function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -121,6 +115,7 @@ const UpdatedPostSchema = z.object({
 export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
   const { data: session } = authClient.useSession();
+  const [, navigate] = useLocation();
   const {
     publicBoardCollection,
     publicCommentCollection,
@@ -226,13 +221,11 @@ export function PostPage({ slug }: { slug: string }) {
   );
   const { allowed: canEdit } = usePolicy(
     anyPolicy(
-      hasOwnerOrAdminRole(),
-      allPolicy(
-        hasMembership(site.organizationId),
-        isUser(post?.creatorId ?? "")
-      )
+      hasOwnerOrAdminRole(site.organizationId),
+      isUser(post?.creatorId ?? "")
     )
   );
+
   const titleMutate = usePacedMutations<{ value: string }>({
     onMutate: ({ value }) => {
       if (!postId) {
@@ -373,20 +366,25 @@ export function PostPage({ slug }: { slug: string }) {
     await tx.isPersisted.promise;
   };
 
+  const handleDeletePost = async () => {
+    try {
+      const tx = publicPostCollection.delete(postId);
+      await tx.isPersisted.promise;
+      navigate("/");
+    } catch (_error) {
+      toastManager.add({
+        title: "Failed to delete post",
+        type: "error",
+      });
+      throw _error;
+    }
+  };
+
   return (
     <RootLayout>
       <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
         <article className="min-w-0 lg:col-span-9">
-          <Link
-            className={cn(
-              buttonVariants({ size: "sm", variant: "ghost" }),
-              "mb-8"
-            )}
-            href="/"
-          >
-            <ArrowLeft />
-            Back
-          </Link>
+          <PostPageActions canDelete={canEdit} onDelete={handleDeletePost} />
 
           <div className="flex items-start gap-4 sm:gap-6">
             <div className="shrink-0 pt-1">

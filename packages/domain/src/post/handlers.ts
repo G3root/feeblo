@@ -71,14 +71,11 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           })
           .pipe(
             Policy.withPolicy(
-              Policy.all(
-                Policy.hasMembership(args.organizationId),
-                postPolicy.isOwner({
-                  organizationId: args.organizationId,
-                  postId: args.id,
-                  boardId: args.boardId,
-                })
-              )
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
             ),
             Effect.catchTags({
               SqlError: () => Effect.fail(new FailedToDeletePostError()),
@@ -90,14 +87,11 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           .update({ ...args, content: sanitizeRichText(args.content) })
           .pipe(
             Policy.withPolicy(
-              Policy.all(
-                Policy.hasMembership(args.organizationId),
-                postPolicy.isOwner({
-                  organizationId: args.organizationId,
-                  postId: args.id,
-                  boardId: args.boardId,
-                })
-              )
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
             ),
             Effect.catchTags({
               SqlError: () => Effect.fail(new FailedToUpdatePostError()),

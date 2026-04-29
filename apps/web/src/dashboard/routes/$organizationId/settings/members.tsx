@@ -121,7 +121,7 @@ function MembersSection() {
           <MembersSectionControls
             controls={
               <>
-                <PolicyGuard policy={hasOwnerOrAdminRole()}>
+                <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
                   <InviteMemberForm />
                 </PolicyGuard>
                 <MembersSearchInput
@@ -147,7 +147,7 @@ function MembersSection() {
       <MembersSettingsLayout.Section title="Members">
         <MembersSectionControls
           controls={
-            <PolicyGuard policy={hasOwnerOrAdminRole()}>
+            <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
               <InviteMemberForm />
             </PolicyGuard>
           }
@@ -165,7 +165,7 @@ function MembersSection() {
       <MembersSectionControls
         controls={
           <>
-            <PolicyGuard policy={hasOwnerOrAdminRole()}>
+            <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
               <InviteMemberForm />
             </PolicyGuard>
             {isEmpty ? null : (
@@ -227,6 +227,7 @@ function MembersSection() {
                 isOwner={isOwner}
                 key={member.id}
                 name={member.user?.name || "Unnamed user"}
+                organizationId={organizationId}
                 role={role}
               />
             );
@@ -357,6 +358,7 @@ function InvitationsSection() {
               expiresAt={invitation.expiresAt}
               id={invitation.id}
               key={invitation.id}
+              organizationId={organizationId}
               role={invitation.role || "member"}
             />
           ))}
@@ -422,6 +424,7 @@ function MemberListItem({
   isCurrentUser,
   isOwner,
   name,
+  organizationId,
   role,
 }: {
   email: string;
@@ -429,6 +432,7 @@ function MemberListItem({
   isCurrentUser: boolean;
   isOwner: boolean;
   name: string;
+  organizationId: string;
   role: "owner" | "admin" | "member";
 }) {
   return (
@@ -442,7 +446,7 @@ function MemberListItem({
       </div>
 
       <div className="flex items-center gap-2">
-        <PolicyGuard policy={hasOwnerOrAdminRole()}>
+        <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
           <Select
             onValueChange={async (value) => {
               const tx = membersCollection.update(id, (draft) => {
@@ -536,11 +540,13 @@ function InvitationListItem({
   email,
   expiresAt,
   id,
+  organizationId,
   role,
 }: {
   email: string;
   expiresAt: Date | string;
   id: string;
+  organizationId: string;
   role: string;
 }) {
   return (
@@ -553,7 +559,7 @@ function InvitationListItem({
         </p>
       </div>
 
-      <PolicyGuard policy={hasOwnerOrAdminRole()}>
+      <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
         <Button
           onClick={async () => {
             const tx = invitationsCollection.delete(id);

@@ -6,9 +6,7 @@ import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
 import { toastManager } from "~/components/ui/toast";
 import {
-  allPolicy,
   anyPolicy,
-  hasMembership,
   hasOwnerOrAdminRole,
   isUser,
   usePolicy,
@@ -54,10 +52,7 @@ function PostDetailsHeader({
   postCreatorId: string | null;
 }) {
   const { allowed: isOwner } = usePolicy(
-    anyPolicy(
-      hasOwnerOrAdminRole(),
-      allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
-    )
+    anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
   );
 
   const mutate = usePacedMutations<{ value: string }>({

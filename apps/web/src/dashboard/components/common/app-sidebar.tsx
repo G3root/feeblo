@@ -213,7 +213,7 @@ function BoardList() {
             boardPublicId=""
             boardSlug=""
             key={`board-skeleton-${
-              // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders are static.
               index
             }`}
             name="Loading"
@@ -281,7 +281,10 @@ interface BoardMenuProps {
 }
 
 function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
-  const { allowed: canManageBoard } = usePolicy(hasOwnerOrAdminRole());
+  const organizationId = useOrganizationId();
+  const { allowed: canManageBoard } = usePolicy(
+    hasOwnerOrAdminRole(organizationId)
+  );
   if (!canManageBoard) {
     return null;
   }

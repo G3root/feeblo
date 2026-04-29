@@ -6,6 +6,7 @@ import { toastManager } from "~/components/ui/toast";
 import { isPaidPlan } from "~/features/billing/lib/plans";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
 import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { useSite } from "~/hooks/use-site";
@@ -17,7 +18,8 @@ export const Route = createFileRoute("/$organizationId/settings/customize")({
 });
 
 function RouteComponent() {
-  const { allowed, isPending } = usePolicy(hasOwnerOrAdminRole());
+  const organizationId = useOrganizationId();
+  const { allowed, isPending } = usePolicy(hasOwnerOrAdminRole(organizationId));
   const plan = usePlan();
 
   const isAdmin = allowed && !isPending;

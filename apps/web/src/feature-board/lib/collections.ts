@@ -83,6 +83,18 @@ export function createPublicCollections({
           })
         );
       },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: deletedPost } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostDelete({
+            organizationId: deletedPost.organizationId,
+            boardId: deletedPost.boardId,
+            id: deletedPost.id,
+          })
+        );
+      },
     })
   );
 

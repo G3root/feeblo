@@ -7,9 +7,7 @@ import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import { Editor, type EmailEditorRef } from "~/components/ui/editor";
 import {
-  allPolicy,
   anyPolicy,
-  hasMembership,
   hasOwnerOrAdminRole,
   isUser,
   usePolicy,
@@ -94,10 +92,7 @@ export function PostEditableContent({
   postId: string;
 }) {
   const { allowed: isOwner } = usePolicy(
-    anyPolicy(
-      hasOwnerOrAdminRole(),
-      allPolicy(hasMembership(organizationId), isUser(postCreatorId ?? ""))
-    )
+    anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
   );
   const initialDescription = useRef(description);
 
@@ -136,6 +131,7 @@ export function PostReadonlyContent({
   return (
     <div
       className={cn(READONLY_RICH_TEXT_CLASS, className)}
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: rich text is sanitized before rendering.
       dangerouslySetInnerHTML={{ __html: toRenderableRichTextHtml(content) }}
     />
   );

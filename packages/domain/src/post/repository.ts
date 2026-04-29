@@ -36,14 +36,14 @@ type TPostCreate = {
 type TPostFindByCreatorId = {
   id: string;
   organizationId: string;
-  memberId: string;
+  userId: string;
   boardId: string;
 };
 
 type TPostFindByCreatorIds = {
   ids: readonly string[];
   organizationId: string;
-  memberId: string;
+  userId: string;
   boardId: string;
 };
 
@@ -54,7 +54,7 @@ const makePostRepository = Effect.gen(function* () {
     findByCreatorId: ({
       id,
       organizationId,
-      memberId,
+      userId,
       boardId,
     }: TPostFindByCreatorId) => {
       return db
@@ -64,7 +64,7 @@ const makePostRepository = Effect.gen(function* () {
           and(
             eq(postTable.id, id),
             eq(postTable.organizationId, organizationId),
-            eq(postTable.creatorMemberId, memberId),
+            eq(postTable.creatorId, userId),
             eq(postTable.boardId, boardId)
           )
         )
@@ -73,7 +73,7 @@ const makePostRepository = Effect.gen(function* () {
     findByCreatorIds: ({
       ids,
       organizationId,
-      memberId,
+      userId,
       boardId,
     }: TPostFindByCreatorIds) => {
       return db
@@ -83,7 +83,7 @@ const makePostRepository = Effect.gen(function* () {
           and(
             inArray(postTable.id, ids),
             eq(postTable.organizationId, organizationId),
-            eq(postTable.creatorMemberId, memberId),
+            eq(postTable.creatorId, userId),
             eq(postTable.boardId, boardId)
           )
         );

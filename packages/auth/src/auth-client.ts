@@ -9,18 +9,16 @@ import {
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import type { Auth } from "./server";
 
-const plugins = [
-  customSessionClient<Auth>(),
-  inferAdditionalFields<Auth>(),
-  emailOTPClient(),
-  organizationClient(),
-  twoFactorClient(),
-  adminClient(),
-];
-
 export const createAuthClient = (baseURL: string) => {
   return createAuthClientBase({
-    plugins,
+    plugins: [
+      customSessionClient<Auth>(),
+      inferAdditionalFields<Auth>(),
+      emailOTPClient(),
+      organizationClient(),
+      twoFactorClient(),
+      adminClient(),
+    ],
     baseURL,
   });
 };
