@@ -186,7 +186,7 @@ function CreateBoardButton() {
         onClick={() => store.send({ type: "toggle" })}
         size="sm"
       >
-        <HugeiconsIcon className="size-4" icon={Plus} />
+        <HugeiconsIcon icon={Plus} />
       </SidebarMenuButton>
     </div>
   );
@@ -298,7 +298,7 @@ function BoardMenu({ boardPublicId }: BoardMenuProps) {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={(props) => (
-          <SidebarMenuAction {...props} showOnHover>
+          <SidebarMenuAction {...props} className="mr-2" showOnHover>
             <HugeiconsIcon icon={Ellipsis} />
             <span className="sr-only">More</span>
           </SidebarMenuAction>
