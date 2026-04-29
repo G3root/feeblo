@@ -1,4 +1,15 @@
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowLeft01Icon,
+  Building03Icon,
+  CreditCardIcon,
+  LayoutThreeColumnIcon,
+  PaintBrush04Icon,
+  Settings05Icon,
+  Shield01Icon,
+  Tag01Icon,
+  UserIcon,
+  UserMultipleIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Fragment } from "react";
@@ -17,31 +28,41 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 
 const settingsItems = [
   {
-    group: "Settings",
+    group: "Personal",
     subItems: [
       {
         label: "Profile",
-
+        icon: UserIcon,
         to: "/$organizationId/settings/profile" as const,
       },
       {
-        label: "Appearance",
-
-        to: "/$organizationId/settings/appearance" as const,
+        label: "Preferences",
+        icon: Settings05Icon,
+        to: "/$organizationId/settings/preferences" as const,
       },
+    ],
+  },
+  {
+    group: "Administration",
+    subItems: [
       {
         label: "Workspace",
-
+        icon: Building03Icon,
         to: "/$organizationId/settings/workspace" as const,
       },
       {
+        label: "Customize Public Site",
+        icon: PaintBrush04Icon,
+        to: "/$organizationId/settings/customize" as const,
+      },
+      {
         label: "Members",
-
+        icon: UserMultipleIcon,
         to: "/$organizationId/settings/members" as const,
       },
       {
         label: "Billing",
-
+        icon: CreditCardIcon,
         to: "/$organizationId/settings/billing" as const,
       },
     ],
@@ -51,10 +72,12 @@ const settingsItems = [
     subItems: [
       {
         label: "Roadmap",
+        icon: LayoutThreeColumnIcon,
         to: "/$organizationId/settings/roadmap" as const,
       },
       {
         label: "Tags",
+        icon: Tag01Icon,
         to: "/$organizationId/settings/feedback-tags" as const,
       },
     ],
@@ -64,12 +87,12 @@ const settingsItems = [
     subItems: [
       {
         label: "Privacy",
-
+        icon: Shield01Icon,
         to: "/$organizationId/settings/changelog-privacy" as const,
       },
       {
         label: "Tags",
-
+        icon: Tag01Icon,
         to: "/$organizationId/settings/changelog-tags" as const,
       },
     ],
@@ -124,6 +147,7 @@ export function SettingsSidebar({
                           params={{ organizationId }}
                           to={item.to}
                         >
+                          <HugeiconsIcon icon={item.icon} />
                           <span>{item.label}</span>
                         </Link>
                       )}

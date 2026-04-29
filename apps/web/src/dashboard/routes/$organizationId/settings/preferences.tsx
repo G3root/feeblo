@@ -10,20 +10,17 @@ import { useTheme } from "~/components/ui/theme-provider";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 
-export const Route = createFileRoute("/$organizationId/settings/appearance")({
-  component: AppearanceSettingsPage,
+export const Route = createFileRoute("/$organizationId/settings/preferences")({
+  component: PreferencesSettingsPage,
 });
 
-function AppearanceSettingsPage() {
+function PreferencesSettingsPage() {
   const { themeMode, setTheme } = useTheme();
 
   return (
     <SettingsLayout.Root>
       <SettingsLayout.Header>
-        <SettingsLayout.HeaderTitle>Appearance</SettingsLayout.HeaderTitle>
-        <SettingsLayout.HeaderDescription>
-          Customize visual preferences for your workspace and board views.
-        </SettingsLayout.HeaderDescription>
+        <SettingsLayout.HeaderTitle>Preferences</SettingsLayout.HeaderTitle>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <SettingsItem.Root>

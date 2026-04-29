@@ -27,9 +27,20 @@ export const SiteUpdate = Schema.Struct({
   organizationId: Schema.String,
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
+  name: Schema.String,
 });
 
 export type TSiteUpdate = Schema.Schema.Type<typeof SiteUpdate>;
+
+export const SiteHidePoweredByBranding = Schema.Struct({
+  id: Schema.String,
+  organizationId: Schema.String,
+  hidePoweredBy: Schema.Boolean,
+});
+
+export type TSiteHidePoweredByBranding = Schema.Schema.Type<
+  typeof SiteHidePoweredByBranding
+>;
 
 export const SiteListBySubdomain = Schema.Struct({
   subdomain: Schema.String,

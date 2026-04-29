@@ -1,17 +1,12 @@
-import { Badge } from "~/components/ui/badge";
-
 export function PoweredByTag() {
   return (
     <a
-      className="fixed right-4 bottom-4 z-50 transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="fixed bottom-4 left-[50%] flex -translate-x-[50%] items-center justify-center space-x-1 rounded-md border-border bg-primary px-3 py-2 text-primary-foreground text-xs transition-all duration-200 hover:scale-105 hover:cursor-pointer hover:bg-primary hover:text-primary-foreground md:right-4 md:left-[unset] md:translate-x-0"
       href="https://feeblo.com"
       rel="noreferrer"
       target="_blank"
     >
-      <Badge className="h-7 gap-1 rounded-full border-border/70 bg-background/90 px-3 text-foreground text-xs shadow-black/10 shadow-lg backdrop-blur-md">
-        <span className="text-muted-foreground">Powered by</span>
-        <span className="font-semibold tracking-tight">feeblo</span>
-      </Badge>
+      Powered by Feeblo
     </a>
   );
 }

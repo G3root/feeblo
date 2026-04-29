@@ -20,12 +20,13 @@ import { Route as OrganizationIdDashboardLayoutIndexRouteImport } from "./routes
 import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$organizationId/settings/workspace"
 import { Route as OrganizationIdSettingsRoadmapRouteImport } from "./routes/$organizationId/settings/roadmap"
 import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
+import { Route as OrganizationIdSettingsPreferencesRouteImport } from "./routes/$organizationId/settings/preferences"
 import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
 import { Route as OrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/$organizationId/settings/feedback-tags"
+import { Route as OrganizationIdSettingsCustomizeRouteImport } from "./routes/$organizationId/settings/customize"
 import { Route as OrganizationIdSettingsChangelogTagsRouteImport } from "./routes/$organizationId/settings/changelog-tags"
 import { Route as OrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/$organizationId/settings/changelog-privacy"
 import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
-import { Route as OrganizationIdSettingsAppearanceRouteImport } from "./routes/$organizationId/settings/appearance"
 import { Route as OrganizationIdDashboardLayoutSettingsRouteImport } from "./routes/$organizationId/_dashboard-layout/settings"
 import { Route as OrganizationIdDashboardLayoutRoadmapRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap"
 import { Route as OrganizationIdDashboardLayoutFeedbackIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/index"
@@ -101,6 +102,12 @@ const OrganizationIdSettingsProfileRoute =
     path: "/profile",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
+const OrganizationIdSettingsPreferencesRoute =
+  OrganizationIdSettingsPreferencesRouteImport.update({
+    id: "/preferences",
+    path: "/preferences",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
 const OrganizationIdSettingsMembersRoute =
   OrganizationIdSettingsMembersRouteImport.update({
     id: "/members",
@@ -111,6 +118,12 @@ const OrganizationIdSettingsFeedbackTagsRoute =
   OrganizationIdSettingsFeedbackTagsRouteImport.update({
     id: "/feedback-tags",
     path: "/feedback-tags",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsCustomizeRoute =
+  OrganizationIdSettingsCustomizeRouteImport.update({
+    id: "/customize",
+    path: "/customize",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdSettingsChangelogTagsRoute =
@@ -129,12 +142,6 @@ const OrganizationIdSettingsBillingRoute =
   OrganizationIdSettingsBillingRouteImport.update({
     id: "/billing",
     path: "/billing",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsAppearanceRoute =
-  OrganizationIdSettingsAppearanceRouteImport.update({
-    id: "/appearance",
-    path: "/appearance",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdDashboardLayoutSettingsRoute =
@@ -224,12 +231,13 @@ export interface FileRoutesByFullPath {
   "/$organizationId": typeof OrganizationIdDashboardLayoutRouteWithChildren
   "/$organizationId/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
   "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
-  "/$organizationId/settings/appearance": typeof OrganizationIdSettingsAppearanceRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
+  "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/preferences": typeof OrganizationIdSettingsPreferencesRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
@@ -254,12 +262,13 @@ export interface FileRoutesByTo {
   "/sign-up": typeof SignUpRoute
   "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
   "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
-  "/$organizationId/settings/appearance": typeof OrganizationIdSettingsAppearanceRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
+  "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/preferences": typeof OrganizationIdSettingsPreferencesRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
@@ -286,12 +295,13 @@ export interface FileRoutesById {
   "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
   "/$organizationId/_dashboard-layout/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
   "/$organizationId/_dashboard-layout/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
-  "/$organizationId/settings/appearance": typeof OrganizationIdSettingsAppearanceRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
+  "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
+  "/$organizationId/settings/preferences": typeof OrganizationIdSettingsPreferencesRoute
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
@@ -319,12 +329,13 @@ export interface FileRouteTypes {
     | "/$organizationId"
     | "/$organizationId/settings"
     | "/$organizationId/roadmap"
-    | "/$organizationId/settings/appearance"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
+    | "/$organizationId/settings/customize"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
+    | "/$organizationId/settings/preferences"
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/workspace"
@@ -349,12 +360,13 @@ export interface FileRouteTypes {
     | "/sign-up"
     | "/$organizationId/roadmap"
     | "/$organizationId/settings"
-    | "/$organizationId/settings/appearance"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
+    | "/$organizationId/settings/customize"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
+    | "/$organizationId/settings/preferences"
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/workspace"
@@ -380,12 +392,13 @@ export interface FileRouteTypes {
     | "/$organizationId/settings"
     | "/$organizationId/_dashboard-layout/roadmap"
     | "/$organizationId/_dashboard-layout/settings"
-    | "/$organizationId/settings/appearance"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
+    | "/$organizationId/settings/customize"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
+    | "/$organizationId/settings/preferences"
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/workspace"
@@ -492,6 +505,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsProfileRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
+    "/$organizationId/settings/preferences": {
+      id: "/$organizationId/settings/preferences"
+      path: "/preferences"
+      fullPath: "/$organizationId/settings/preferences"
+      preLoaderRoute: typeof OrganizationIdSettingsPreferencesRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
     "/$organizationId/settings/members": {
       id: "/$organizationId/settings/members"
       path: "/members"
@@ -504,6 +524,13 @@ declare module "@tanstack/react-router" {
       path: "/feedback-tags"
       fullPath: "/$organizationId/settings/feedback-tags"
       preLoaderRoute: typeof OrganizationIdSettingsFeedbackTagsRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/customize": {
+      id: "/$organizationId/settings/customize"
+      path: "/customize"
+      fullPath: "/$organizationId/settings/customize"
+      preLoaderRoute: typeof OrganizationIdSettingsCustomizeRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/settings/changelog-tags": {
@@ -525,13 +552,6 @@ declare module "@tanstack/react-router" {
       path: "/billing"
       fullPath: "/$organizationId/settings/billing"
       preLoaderRoute: typeof OrganizationIdSettingsBillingRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/appearance": {
-      id: "/$organizationId/settings/appearance"
-      path: "/appearance"
-      fullPath: "/$organizationId/settings/appearance"
-      preLoaderRoute: typeof OrganizationIdSettingsAppearanceRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/_dashboard-layout/settings": {
@@ -683,12 +703,13 @@ const OrganizationIdDashboardLayoutRouteWithChildren =
   )
 
 interface OrganizationIdSettingsRouteChildren {
-  OrganizationIdSettingsAppearanceRoute: typeof OrganizationIdSettingsAppearanceRoute
   OrganizationIdSettingsBillingRoute: typeof OrganizationIdSettingsBillingRoute
   OrganizationIdSettingsChangelogPrivacyRoute: typeof OrganizationIdSettingsChangelogPrivacyRoute
   OrganizationIdSettingsChangelogTagsRoute: typeof OrganizationIdSettingsChangelogTagsRoute
+  OrganizationIdSettingsCustomizeRoute: typeof OrganizationIdSettingsCustomizeRoute
   OrganizationIdSettingsFeedbackTagsRoute: typeof OrganizationIdSettingsFeedbackTagsRoute
   OrganizationIdSettingsMembersRoute: typeof OrganizationIdSettingsMembersRoute
+  OrganizationIdSettingsPreferencesRoute: typeof OrganizationIdSettingsPreferencesRoute
   OrganizationIdSettingsProfileRoute: typeof OrganizationIdSettingsProfileRoute
   OrganizationIdSettingsRoadmapRoute: typeof OrganizationIdSettingsRoadmapRoute
   OrganizationIdSettingsWorkspaceRoute: typeof OrganizationIdSettingsWorkspaceRoute
@@ -697,16 +718,17 @@ interface OrganizationIdSettingsRouteChildren {
 
 const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
   {
-    OrganizationIdSettingsAppearanceRoute:
-      OrganizationIdSettingsAppearanceRoute,
     OrganizationIdSettingsBillingRoute: OrganizationIdSettingsBillingRoute,
     OrganizationIdSettingsChangelogPrivacyRoute:
       OrganizationIdSettingsChangelogPrivacyRoute,
     OrganizationIdSettingsChangelogTagsRoute:
       OrganizationIdSettingsChangelogTagsRoute,
+    OrganizationIdSettingsCustomizeRoute: OrganizationIdSettingsCustomizeRoute,
     OrganizationIdSettingsFeedbackTagsRoute:
       OrganizationIdSettingsFeedbackTagsRoute,
     OrganizationIdSettingsMembersRoute: OrganizationIdSettingsMembersRoute,
+    OrganizationIdSettingsPreferencesRoute:
+      OrganizationIdSettingsPreferencesRoute,
     OrganizationIdSettingsProfileRoute: OrganizationIdSettingsProfileRoute,
     OrganizationIdSettingsRoadmapRoute: OrganizationIdSettingsRoadmapRoute,
     OrganizationIdSettingsWorkspaceRoute: OrganizationIdSettingsWorkspaceRoute,

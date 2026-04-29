@@ -1,13 +1,20 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { InternalServerError } from "../rpc-errors";
+import { SitePolicy } from "./policies";
 import { SiteRepository } from "./repository";
 import { SiteRpcs } from "./rpcs";
-import type { TSiteList, TSiteListBySubdomain, TSiteUpdate } from "./schema";
+import type {
+  TSiteHidePoweredByBranding,
+  TSiteList,
+  TSiteListBySubdomain,
+  TSiteUpdate,
+} from "./schema";
 
 export const SiteRpcHandlers = SiteRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* SiteRepository;
+    const sitePolicy = yield* SitePolicy;
 
     return {
       SiteList: (args: TSiteList) =>
@@ -60,6 +67,27 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
               ),
           })
         ),
+      SiteHidePoweredByBranding: (args: TSiteHidePoweredByBranding) =>
+        repository.updateHidePoweredByBranding(args).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin")),
+              sitePolicy.canHidePoweredByBranding({
+                organizationId: args.organizationId,
+                hidePoweredBy: args.hidePoweredBy,
+              })
+            )
+          ),
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to update Site branding",
+                })
+              ),
+          })
+        ),
     };
   })
-).pipe(Layer.provide(SiteRepository.layer));
+).pipe(Layer.provide(SiteRepository.layer), Layer.provide(SitePolicy.layer));

@@ -235,3 +235,10 @@ export const PLAN_FEATURES: Record<PlanType, PlanFeature[]> = {
     },
   ],
 };
+
+export const isPaidPlan = (plan?: PlanType): boolean => {
+  if (!plan || plan === "free") {
+    return false;
+  }
+  return true;
+};

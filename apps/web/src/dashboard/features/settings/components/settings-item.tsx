@@ -1,3 +1,5 @@
+import { LockedIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
 import type { VariantProps } from "class-variance-authority";
 import type * as React from "react";
 import {
@@ -15,6 +17,11 @@ import {
   ItemTitle,
 } from "~/components/ui/item";
 import { Separator } from "~/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 
 function Root({ children }: { children: React.ReactNode }) {
@@ -90,6 +97,29 @@ function FieldDescription({
   return <BaseFieldDescription className={className} {...props} />;
 }
 
+interface PaidPlanIndicatorProps extends Omit<HugeiconsIconProps, "icon"> {
+  content?: React.ReactNode;
+}
+
+function PaidPlanIndicator({
+  content = "This feature is only available on our Pro plans.",
+  ...rest
+}: PaidPlanIndicatorProps) {
+  return (
+    <Tooltip>
+      <TooltipTrigger>
+        <HugeiconsIcon
+          strokeWidth={2.5}
+          {...rest}
+          className={cn("size-4 text-primary-yellow", rest?.className)}
+          icon={LockedIcon}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{content}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export const SettingsItem = {
   Root,
   Header,
@@ -107,4 +137,5 @@ export const SettingsItem = {
   FieldLabel,
   FieldDescription,
   Separator,
+  PaidPlanIndicator,
 };

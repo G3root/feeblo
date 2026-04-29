@@ -2,7 +2,6 @@ import { DB } from "@feeblo/db";
 import { site as siteTable } from "@feeblo/db/schema/feedback";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Effect } from "effect";
-import { Site } from "./schema";
 
 const makeSiteRepository = Effect.gen(function* () {
   const db = yield* DB;
@@ -45,18 +44,20 @@ const makeSiteRepository = Effect.gen(function* () {
           .where(whereClause)
           .limit(limit);
 
-        return sites.map((entry) => new Site(entry));
+        return sites;
       }),
     update: ({
       id,
       organizationId,
       changelogVisibility,
       roadmapVisibility,
+      name,
     }: {
       id: string;
       organizationId: string;
       changelogVisibility: "PUBLIC" | "HIDDEN";
       roadmapVisibility: "PUBLIC" | "HIDDEN";
+      name: string;
     }) =>
       Effect.gen(function* () {
         yield* db
@@ -65,6 +66,30 @@ const makeSiteRepository = Effect.gen(function* () {
             changelogVisibility,
             updatedAt: new Date(),
             roadmapVisibility,
+            name,
+          })
+          .where(
+            and(
+              eq(siteTable.id, id),
+              eq(siteTable.organizationId, organizationId)
+            )
+          );
+      }),
+    updateHidePoweredByBranding: ({
+      id,
+      organizationId,
+      hidePoweredBy,
+    }: {
+      id: string;
+      organizationId: string;
+      hidePoweredBy: boolean;
+    }) =>
+      Effect.gen(function* () {
+        yield* db
+          .update(siteTable)
+          .set({
+            hidePoweredBy,
+            updatedAt: new Date(),
           })
           .where(
             and(

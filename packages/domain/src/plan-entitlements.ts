@@ -4,6 +4,7 @@ export type PlanEntitlements = {
   boardLimit: number | null;
   privilegedRoleLimit: number | null;
   privateBoards: boolean;
+  whitelist: boolean;
 };
 
 export const PLAN_ENTITLEMENTS: Record<OrganizationPlan, PlanEntitlements> = {
@@ -11,16 +12,19 @@ export const PLAN_ENTITLEMENTS: Record<OrganizationPlan, PlanEntitlements> = {
     boardLimit: 2,
     privilegedRoleLimit: 2,
     privateBoards: false,
+    whitelist: false,
   },
   starter: {
     boardLimit: 5,
     privilegedRoleLimit: 5,
     privateBoards: true,
+    whitelist: true,
   },
   professional: {
     boardLimit: null,
     privilegedRoleLimit: null,
     privateBoards: true,
+    whitelist: true,
   },
 };
 

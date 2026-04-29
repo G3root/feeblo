@@ -2,7 +2,13 @@ import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
 import { AuthMiddleware } from "../session-middleware";
 import { SiteServiceErrors } from "./errors";
-import { Site, SiteList, SiteListBySubdomain, SiteUpdate } from "./schema";
+import {
+  Site,
+  SiteHidePoweredByBranding,
+  SiteList,
+  SiteListBySubdomain,
+  SiteUpdate,
+} from "./schema";
 
 export class SiteRpcs extends RpcGroup.make(
   Rpc.make("SiteList", {
@@ -18,6 +24,11 @@ export class SiteRpcs extends RpcGroup.make(
   Rpc.make("SiteUpdate", {
     success: Schema.Void,
     payload: SiteUpdate,
+    error: SiteServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("SiteHidePoweredByBranding", {
+    success: Schema.Void,
+    payload: SiteHidePoweredByBranding,
     error: SiteServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

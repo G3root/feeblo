@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
@@ -23,18 +23,15 @@ import {
   type BillingInterval,
   buildPlanCards,
   formatPlanPrice,
-  PLAN_FEATURES,
   PLAN_COPY,
+  PLAN_FEATURES,
   type PlanType,
-  type WorkspacePlan,
   type WorkspaceProduct,
 } from "~/features/billing/lib/plans";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  workspacePlanCollection,
-  workspaceProductCollection,
-} from "~/lib/collections";
+import { usePlan } from "~/hooks/use-plan";
+import { workspaceProductCollection } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
   component: BillingSettingsPage,
@@ -52,17 +49,10 @@ function BillingSettingsPage() {
     isError: productsError,
   } = useLiveQuery((q) => q.from({ product: workspaceProductCollection }), []);
 
-  const { data: workspacePlans = [] } = useLiveQuery(
-    (q) =>
-      q
-        .from({ plan: workspacePlanCollection })
-        .where(({ plan }) => eq(plan.organizationId, organizationId)),
-    [organizationId]
-  );
+  const currentSubscribedPlan = usePlan();
 
   const productList = products as WorkspaceProduct[];
-  const currentPlanType =
-    (workspacePlans[0] as WorkspacePlan | undefined)?.plan ?? "free";
+  const currentPlanType = currentSubscribedPlan.data?.plan ?? "free";
   const { plans } = buildPlanCards(productList, currentPlanType);
   const currentPlan = plans.find((plan) => plan.planType === currentPlanType);
   const hasPaidPlan = currentPlanType !== "free";
@@ -86,14 +76,17 @@ function BillingSettingsPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">{PLAN_COPY[currentPlanType].name}</Badge>
+                <Badge variant="secondary">
+                  {PLAN_COPY[currentPlanType].name}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <div className="text-muted-foreground text-sm">
-                    {currentPlan?.description || PLAN_COPY[currentPlanType].description}
+                    {currentPlan?.description ||
+                      PLAN_COPY[currentPlanType].description}
                   </div>
                 </div>
                 <Separator />

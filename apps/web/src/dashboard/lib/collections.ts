@@ -1109,6 +1109,7 @@ export const siteCollection = createCollection(
           organizationId: updatedSite.organizationId,
           changelogVisibility: updatedSite.changelogVisibility,
           roadmapVisibility: updatedSite.roadmapVisibility,
+          name: updatedSite.name,
         })
       );
     },
