@@ -8,6 +8,7 @@ import type { TPostStatusList } from "./schema";
 export const PostStatusRpcHandlers = PostStatusRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* PostStatusRepository;
+    // const sitePolicy = yield* SitePolicy;
 
     return {
       PostStatusList: (args: TPostStatusList) =>
@@ -27,20 +28,25 @@ export const PostStatusRpcHandlers = PostStatusRpcs.toLayer(
             })
           ),
       PostStatusListPublic: (args: TPostStatusList) =>
-        repository
-          .findMany({
+        Effect.gen(function* () {
+          //TODO: comeback later
+          // yield* sitePolicy.canViewRoadmap(args.organizationId);
+          return yield* repository.findMany({
             organizationId: args.organizationId,
+          });
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list post statuses",
+                })
+              ),
           })
-          .pipe(
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Failed to list post statuses",
-                  })
-                ),
-            })
-          ),
+        ),
     };
   })
-).pipe(Layer.provide(PostStatusRepository.layer));
+).pipe(
+  // Layer.provide(SitePolicy.layer),
+  Layer.provide(PostStatusRepository.layer)
+);

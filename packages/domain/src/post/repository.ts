@@ -2,6 +2,7 @@
 import { DB } from "@feeblo/db";
 import { user as userTable } from "@feeblo/db/schema/auth";
 import {
+  board as boardTable,
   comment as commentTable,
   postReaction as postReactionTable,
   post as postTable,
@@ -149,6 +150,73 @@ const makePostRepository = Effect.gen(function* () {
         .leftJoin(userTable, eq(userTable.id, postTable.creatorId))
         .where(whereClause);
     },
+    findManyPublic: ({ boardId, organizationId, userId }: TPostFindMany) => {
+      const where: SQL[] = [eq(postTable.organizationId, organizationId)];
+      if (boardId) {
+        where.push(eq(postTable.boardId, boardId));
+      }
+      where.push(eq(boardTable.visibility, "PUBLIC"));
+
+      const whereClause = and(...where);
+      const hasUserUpVotedExpr = userId
+        ? sql<boolean>`exists(select 1 from ${upvoteTable} where ${upvoteTable.postId} = ${postTable.id} and ${upvoteTable.userId} = ${userId})`
+        : sql<boolean>`false`;
+      const upvoteCounts = db
+        .select({
+          postId: upvoteTable.postId,
+          upVotes: sql<number>`count(*)::int`.as("upVotes"),
+        })
+        .from(upvoteTable)
+        .groupBy(upvoteTable.postId)
+        .as("upvote_counts");
+      const excerptExpr = sql<string>`coalesce(nullif(${postTable.excerpt}, ''), trim(regexp_replace(regexp_replace(${postTable.content}, '<[^>]+>', ' ', 'gi'), '\\s+', ' ', 'g')))`;
+
+      return db
+        .select({
+          id: postTable.id,
+          title: postTable.title,
+          boardId: postTable.boardId,
+          slug: postTable.slug,
+          content: postTable.content,
+          excerpt: excerptExpr,
+          upVotes: sql<number>`coalesce(${upvoteCounts.upVotes}, 0)`,
+          statusId: postTable.statusId,
+          createdAt: postTable.createdAt,
+          updatedAt: postTable.updatedAt,
+          organizationId: postTable.organizationId,
+          user: {
+            name: sql<string | null>`${userTable.name}`,
+            image: sql<string | null>`${userTable.image}`,
+          },
+          hasUserUpVoted: hasUserUpVotedExpr,
+          creatorMemberId: postTable.creatorMemberId,
+          creatorId: postTable.creatorId,
+        })
+        .from(postTable)
+        .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+        .leftJoin(upvoteCounts, eq(upvoteCounts.postId, postTable.id))
+        .leftJoin(userTable, eq(userTable.id, postTable.creatorId))
+        .where(whereClause);
+    },
+    isPublicPost: ({
+      id,
+      organizationId,
+    }: {
+      id: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: postTable.id })
+        .from(postTable)
+        .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+        .where(
+          and(
+            eq(postTable.id, id),
+            eq(postTable.organizationId, organizationId),
+            eq(boardTable.visibility, "PUBLIC")
+          )
+        )
+        .pipe(Effect.map((rows) => rows.length > 0)),
 
     update: ({
       id,

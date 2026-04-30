@@ -55,7 +55,10 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
-              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
+              Policy.any(
+                Policy.hasOrganizationRole(args.organizationId, "owner"),
+                Policy.hasOrganizationRole(args.organizationId, "admin")
+              )
             )
           ),
           Effect.catchTags({
@@ -72,7 +75,10 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
-              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin")),
+              Policy.any(
+                Policy.hasOrganizationRole(args.organizationId, "owner"),
+                Policy.hasOrganizationRole(args.organizationId, "admin")
+              ),
               sitePolicy.canHidePoweredByBranding({
                 organizationId: args.organizationId,
                 hidePoweredBy: args.hidePoweredBy,

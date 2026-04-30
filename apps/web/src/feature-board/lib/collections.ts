@@ -308,7 +308,7 @@ export function createPublicCollections({
 
         try {
           const data = await fetchRpc(
-            (rpc) => rpc.CommentReactionList({ organizationId, postId }),
+            (rpc) => rpc.CommentReactionListPublic({ organizationId, postId }),
             { signal: ctx.signal }
           );
 
@@ -324,7 +324,7 @@ export function createPublicCollections({
         const { modified: newCommentReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentReactionToggle({
+          rpc.CommentReactionTogglePublic({
             organizationId: newCommentReaction.organizationId,
             postId: newCommentReaction.postId,
             commentId: newCommentReaction.commentId,
@@ -337,7 +337,7 @@ export function createPublicCollections({
         const { original: deletedCommentReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.CommentReactionToggle({
+          rpc.CommentReactionTogglePublic({
             organizationId: deletedCommentReaction.organizationId,
             postId: deletedCommentReaction.postId,
             commentId: deletedCommentReaction.commentId,
@@ -368,7 +368,7 @@ export function createPublicCollections({
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.UpvoteList({ organizationId, postId }),
+          (rpc) => rpc.UpvoteListPublic({ organizationId, postId }),
           {
             signal: ctx.signal,
           }
@@ -383,7 +383,7 @@ export function createPublicCollections({
         const { modified: newUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteToggle({
+          rpc.UpvoteTogglePublic({
             organizationId: newUpvote.organizationId,
             postId: newUpvote.postId,
           })
@@ -394,7 +394,7 @@ export function createPublicCollections({
         const { original: deletedUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteToggle({
+          rpc.UpvoteTogglePublic({
             organizationId: deletedUpvote.organizationId,
             postId: deletedUpvote.postId,
           })
@@ -423,7 +423,7 @@ export function createPublicCollections({
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.PostReactionList({ organizationId, postId }),
+          (rpc) => rpc.PostReactionListPublic({ organizationId, postId }),
           {
             signal: ctx.signal,
           }
@@ -438,7 +438,7 @@ export function createPublicCollections({
         const { modified: newPostReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostReactionToggle({
+          rpc.PostReactionTogglePublic({
             organizationId: newPostReaction.organizationId,
             postId: newPostReaction.postId,
             emoji: newPostReaction.emoji,
@@ -450,7 +450,7 @@ export function createPublicCollections({
         const { original: deletedPostReaction } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.PostReactionToggle({
+          rpc.PostReactionTogglePublic({
             organizationId: deletedPostReaction.organizationId,
             postId: deletedPostReaction.postId,
             emoji: deletedPostReaction.emoji,

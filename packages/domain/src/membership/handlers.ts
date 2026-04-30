@@ -120,7 +120,10 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
+              Policy.any(
+                Policy.hasOrganizationRole(organizationId, "owner"),
+                Policy.hasOrganizationRole(organizationId, "admin")
+              )
             )
           )
         ),
@@ -135,7 +138,10 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin")),
+              Policy.any(
+                Policy.hasOrganizationRole(organizationId, "owner"),
+                Policy.hasOrganizationRole(organizationId, "admin")
+              ),
               membershipPolicy.hasOtherOwners({ organizationId, memberId })
             )
           ),
@@ -158,7 +164,10 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin")),
+              Policy.any(
+                Policy.hasOrganizationRole(organizationId, "owner"),
+                Policy.hasOrganizationRole(organizationId, "admin")
+              ),
               membershipPolicy.hasOtherOwners({ organizationId, memberId })
             )
           ),
@@ -176,7 +185,10 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
-              Policy.any(Policy.hasRole("owner"), Policy.hasRole("admin"))
+              Policy.any(
+                Policy.hasOrganizationRole(organizationId, "owner"),
+                Policy.hasOrganizationRole(organizationId, "admin")
+              )
             )
           ),
           Effect.catchTags({

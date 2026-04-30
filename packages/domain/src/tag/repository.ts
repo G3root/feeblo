@@ -11,9 +11,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 import {
-  ChangelogTagAssignment,
   PostTagAssignment,
-  Tag,
   type TChangelogTagList,
   type TChangelogTagSet,
   type TPostTagList,
@@ -58,14 +56,7 @@ const makeTagRepository = Effect.gen(function* () {
           updatedAt: tagTable.updatedAt,
         })
         .from(tagTable)
-        .where(eq(tagTable.organizationId, organizationId))
-        .pipe(
-          Effect.map((tags) =>
-            tags.map((tag) => {
-              return new Tag(tag);
-            })
-          )
-        ),
+        .where(eq(tagTable.organizationId, organizationId)),
 
     create: ({
       id,
@@ -141,12 +132,7 @@ const makeTagRepository = Effect.gen(function* () {
           updatedAt: changelogTagTable.updatedAt,
         })
         .from(changelogTagTable)
-        .where(eq(changelogTagTable.organizationId, organizationId))
-        .pipe(
-          Effect.map((entries) =>
-            entries.map((entry) => new ChangelogTagAssignment(entry))
-          )
-        ),
+        .where(eq(changelogTagTable.organizationId, organizationId)),
 
     setPostTags: ({ postId, organizationId, tagIds }: TPostTagSet) =>
       Effect.gen(function* () {

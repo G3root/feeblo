@@ -4,6 +4,7 @@ import {
   user as userTable,
 } from "@feeblo/db/schema/auth";
 import {
+  board as boardTable,
   post as postTable,
   upvote as upvoteTable,
 } from "@feeblo/db/schema/feedback";
@@ -14,29 +15,32 @@ import { Effect, Array as EffectArray, Option } from "effect";
 type TUpvoteList = {
   postId: string;
   organizationId: string;
+  visibility?: "PUBLIC" | "PRIVATE";
 };
 
 type TUpvoteToggle = {
   organizationId: string;
   postId: string;
   userId: string;
+  visibility?: "PUBLIC" | "PRIVATE";
 };
 
 const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* DB;
 
   return {
-    list: ({ postId, organizationId }: TUpvoteList) =>
+    list: ({ postId, organizationId, visibility }: TUpvoteList) =>
       Effect.gen(function* () {
+        const operators = [
+          eq(postTable.id, postId),
+          eq(postTable.organizationId, organizationId),
+          ...(visibility ? [eq(boardTable.visibility, visibility)] : []),
+        ];
         const post = yield* db
           .select({ id: postTable.id })
           .from(postTable)
-          .where(
-            and(
-              eq(postTable.id, postId),
-              eq(postTable.organizationId, organizationId)
-            )
-          )
+          .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+          .where(and(...operators))
           .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
@@ -69,17 +73,18 @@ const makeUpvoteRepository = Effect.gen(function* () {
           );
       }),
 
-    toggle: ({ organizationId, postId, userId }: TUpvoteToggle) =>
+    toggle: ({ organizationId, postId, userId, visibility }: TUpvoteToggle) =>
       Effect.gen(function* () {
+        const operators = [
+          eq(postTable.id, postId),
+          eq(postTable.organizationId, organizationId),
+          ...(visibility ? [eq(boardTable.visibility, visibility)] : []),
+        ];
         const post = yield* db
           .select({ id: postTable.id })
           .from(postTable)
-          .where(
-            and(
-              eq(postTable.id, postId),
-              eq(postTable.organizationId, organizationId)
-            )
-          )
+          .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+          .where(and(...operators))
           .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 

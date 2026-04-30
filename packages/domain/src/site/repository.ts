@@ -7,6 +7,31 @@ const makeSiteRepository = Effect.gen(function* () {
   const db = yield* DB;
 
   return {
+    findByOrganizationId: ({
+      organizationId,
+    }: {
+      organizationId: string;
+    }) =>
+      Effect.gen(function* () {
+        const [site] = yield* db
+          .select({
+            id: siteTable.id,
+            name: siteTable.name,
+            subdomain: siteTable.subdomain,
+            customDomain: siteTable.customDomain,
+            changelogVisibility: siteTable.changelogVisibility,
+            roadmapVisibility: siteTable.roadmapVisibility,
+            createdAt: siteTable.createdAt,
+            updatedAt: siteTable.updatedAt,
+            organizationId: siteTable.organizationId,
+            hidePoweredBy: siteTable.hidePoweredBy,
+          })
+          .from(siteTable)
+          .where(eq(siteTable.organizationId, organizationId))
+          .limit(1);
+
+        return site;
+      }),
     findMany: ({
       organizationId,
       subdomain,

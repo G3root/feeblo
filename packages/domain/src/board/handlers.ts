@@ -1,5 +1,4 @@
 import { Effect, Layer, Option } from "effect";
-import { requireOrganizationMembership } from "../authorization";
 import * as Policy from "../policy";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -22,6 +21,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* BoardRepository;
     const boardPolicy = yield* BoardPolicy;
+    // const sitePolicy = yield* SitePolicy;
     return {
       BoardList: (args: TBoardList) =>
         repository
@@ -38,22 +38,23 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             })
           ),
       BoardListPublic: (args: TBoardList) =>
-        repository
-          .findMany({
+        Effect.gen(function* () {
+          //TODO: comeback later
+          // yield* sitePolicy.canViewRoadmap(args.organizationId);
+          return yield* repository.findMany({
             organizationId: args.organizationId,
             visibility: "PUBLIC",
+          });
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list boards" })
+              ),
           })
-          .pipe(
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({ message: "Failed to list boards" })
-                ),
-            })
-          ),
+        ),
       BoardDelete: (args: TBoardDelete) => {
         return Effect.gen(function* () {
-          yield* requireOrganizationMembership(args.organizationId);
           return yield* repository.delete({
             id: args.id,
             organizationId: args.organizationId,
@@ -144,4 +145,5 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
 ).pipe(
   Layer.provide(BoardRepository.layer),
   Layer.provide(BoardPolicy.layer)
+  // Layer.provide(SitePolicy.layer)
 );

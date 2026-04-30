@@ -9,8 +9,21 @@ export class UpvoteRpcs extends RpcGroup.make(
     payload: UpvoteList,
     success: Schema.Array(Upvote),
     error: UpvoteServiceErrors,
-  }),
+  }).middleware(AuthMiddleware),
   Rpc.make("UpvoteToggle", {
+    payload: UpvoteToggle,
+    success: Schema.Struct({
+      upvoted: Schema.Boolean,
+    }),
+    error: UpvoteServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("UpvoteListPublic", {
+    payload: UpvoteList,
+    success: Schema.Array(Upvote),
+    error: UpvoteServiceErrors,
+  }),
+  Rpc.make("UpvoteTogglePublic", {
     payload: UpvoteToggle,
     success: Schema.Struct({
       upvoted: Schema.Boolean,

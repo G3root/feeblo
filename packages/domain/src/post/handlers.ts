@@ -1,4 +1,5 @@
 import { Effect, Layer } from "effect";
+import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
@@ -22,8 +23,10 @@ import type {
 
 export const PostRpcHandlers = PostRpcs.toLayer(
   Effect.gen(function* () {
+    const boardRepository = yield* BoardRepository;
     const repository = yield* PostRepository;
     const postPolicy = yield* PostPolicy;
+    // const sitePolicy = yield* SitePolicy;
     return {
       PostList: (args: TPostList) => {
         return Effect.gen(function* () {
@@ -50,7 +53,9 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             sessionOption._tag === "Some"
               ? sessionOption.value.session.userId
               : undefined;
-          return yield* repository.findMany({
+          //TODO: comeback later
+          // yield* sitePolicy.canViewRoadmap(args.organizationId);
+          return yield* repository.findManyPublic({
             organizationId: args.organizationId,
             boardId: args.boardId,
             userId,
@@ -103,15 +108,29 @@ export const PostRpcHandlers = PostRpcs.toLayer(
       PostCreate: (args: TPostCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
-          const isMember = session.memberships.find(
-            (membership) => membership.organizationId === args.organizationId
-          );
+          const membership = Policy.getMembership(session, args.organizationId);
+          const board = yield* boardRepository.getById({
+            id: args.boardId,
+            organizationId: args.organizationId,
+          });
+
+          if (board._tag === "None") {
+            return yield* new Policy.PolicyDeniedError({
+              reason: "You are not allowed to post to this board.",
+            });
+          }
+
+          if (!membership && board.value.visibility !== "PUBLIC") {
+            return yield* new Policy.PolicyDeniedError({
+              reason: "You are not allowed to post to this board.",
+            });
+          }
 
           yield* repository.create({
             ...args,
             content: sanitizeRichText(args.content),
             creatorId: session.session.userId,
-            ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
+            ...(membership ? { creatorMemberId: membership.membershipId } : {}),
           });
         }).pipe(
           Effect.catchTags({
@@ -143,4 +162,9 @@ export const PostRpcHandlers = PostRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(PostPolicy.layer), Layer.provide(PostRepository.layer));
+).pipe(
+  // Layer.provide(SitePolicy.layer),
+  Layer.provide(BoardRepository.layer),
+  Layer.provide(PostPolicy.layer),
+  Layer.provide(PostRepository.layer)
+);
