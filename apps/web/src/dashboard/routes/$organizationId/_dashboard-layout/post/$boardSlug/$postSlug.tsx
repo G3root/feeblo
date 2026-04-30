@@ -1,10 +1,4 @@
 import { generateId } from "@feeblo/utils/id";
-import {
-  Copy01Icon,
-  LinkSquare02Icon,
-  Trash2,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Suspense } from "react";
@@ -18,21 +12,16 @@ import {
   EmptyTitle,
 } from "~/components/ui/empty";
 import { toastManager } from "~/components/ui/toast";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";
+import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 
 import {
   PostDetails,
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
 import { StatusSelect } from "~/features/post/components/post-properties";
-import { usePostDeleteDialogContext } from "~/features/post/dialog-stores";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
   TagList,
@@ -46,7 +35,6 @@ import {
   isUser,
   usePolicy,
 } from "~/hooks/use-policy";
-import { getPublicSiteUrl } from "~/hooks/use-site";
 import { authClient } from "~/lib/auth-client";
 import {
   boardCollection,
@@ -71,7 +59,6 @@ function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { data: session } = authClient.useSession();
   const navigate = useNavigate();
-  const postDialogStore = usePostDeleteDialogContext();
 
   const { data: board } = useLiveSuspenseQuery(
     (q) => {
@@ -399,43 +386,15 @@ function RouteComponent() {
 
         <aside className="hidden px-6 py-6 lg:block">
           <div className="sticky top-0 space-y-4">
-            <div className="flex items-center justify-end gap-2">
-              <RedirectToPostUrlButton postSlug={post.slug} />
-              <CopyPostButton postSlug={post.slug} />
-              {canManagePost ? (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={(props) => (
-                      <Button
-                        {...props}
-                        aria-label="Delete post"
-                        className="rounded-full"
-                        onClick={() =>
-                          postDialogStore.send({
-                            type: "toggle",
-                            data: {
-                              postId: post.id,
-                              redirectOptions: {
-                                to: "/$organizationId/board/$boardSlug",
-                                params: {
-                                  organizationId,
-                                  boardSlug,
-                                },
-                              },
-                            },
-                          })
-                        }
-                        size="icon-sm"
-                        variant="outline"
-                      >
-                        <HugeiconsIcon icon={Trash2} />
-                      </Button>
-                    )}
-                  />
-                  <TooltipContent>Delete post</TooltipContent>
-                </Tooltip>
-              ) : null}
-            </div>
+            <PostSidebarActions
+              archivedAt={post.archivedAt}
+              boardSlug={boardSlug}
+              canManagePost={canManagePost}
+              lockedAt={post.lockedAt}
+              organizationId={organizationId}
+              postId={post.id}
+              postSlug={post.slug}
+            />
 
             {canManagePost ? (
               <SidebarCard title="Properties">
@@ -550,82 +509,6 @@ function RouteComponent() {
 
 function PostDetailsRoutePending() {
   return <PostDetailsFormSkeleton />;
-}
-
-function RedirectToPostUrlButton({ postSlug }: { postSlug: string }) {
-  const publicSiteUrl = getPublicSiteUrl();
-
-  if (!publicSiteUrl) {
-    return null;
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={(props) => (
-          <Button
-            {...props}
-            className="rounded-full"
-            nativeButton={false}
-            render={(props) => (
-              <a
-                {...props}
-                href={`${publicSiteUrl}/p/${postSlug}`}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <HugeiconsIcon icon={LinkSquare02Icon} />
-              </a>
-            )}
-            size="icon-sm"
-            variant="outline"
-          />
-        )}
-      />
-      <TooltipContent>Go to Public Post</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function CopyPostButton({ postSlug }: { postSlug: string }) {
-  const publicSiteUrl = getPublicSiteUrl();
-
-  if (!publicSiteUrl) {
-    return null;
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={(props) => (
-          <Button
-            {...props}
-            className="rounded-full"
-            onClick={() => {
-              try {
-                navigator.clipboard.writeText(`${publicSiteUrl}/p/${postSlug}`);
-                toastManager.add({
-                  title: "Post URL copied to clipboard",
-                  type: "success",
-                });
-              } catch (_error) {
-                toastManager.add({
-                  title: "Failed to copy post URL to clipboard",
-                  type: "error",
-                });
-              }
-            }}
-            size="icon-sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={Copy01Icon} />
-          </Button>
-        )}
-      />
-
-      <TooltipContent>Copy post link</TooltipContent>
-    </Tooltip>
-  );
 }
 
 function SidebarCard({
