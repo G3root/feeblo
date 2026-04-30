@@ -60,6 +60,74 @@ type TPostFindByCreatorIds = {
 
 const makePostRepository = Effect.gen(function* () {
   const db = yield* DB;
+  const createHasUserUpVotedExpr = (userId?: string | null) =>
+    userId
+      ? sql<boolean>`exists(select 1 from ${upvoteTable} where ${upvoteTable.postId} = ${postTable.id} and ${upvoteTable.userId} = ${userId})`
+      : sql<boolean>`false`;
+  const upvoteCounts = db
+    .select({
+      postId: upvoteTable.postId,
+      upVotes: sql<number>`count(*)::int`.as("upVotes"),
+    })
+    .from(upvoteTable)
+    .groupBy(upvoteTable.postId)
+    .as("upvote_counts");
+  const excerptExpr =
+    sql<string>`coalesce(nullif(${postTable.excerpt}, ''), trim(regexp_replace(regexp_replace(${postTable.content}, '<[^>]+>', ' ', 'gi'), '\\s+', ' ', 'g')))`;
+  const selectPostFields = (userId?: string | null) => ({
+    id: postTable.id,
+    title: postTable.title,
+    boardId: postTable.boardId,
+    slug: postTable.slug,
+    content: postTable.content,
+    excerpt: excerptExpr,
+    upVotes: sql<number>`coalesce(${upvoteCounts.upVotes}, 0)`,
+    statusId: postTable.statusId,
+    createdAt: postTable.createdAt,
+    updatedAt: postTable.updatedAt,
+    organizationId: postTable.organizationId,
+    user: {
+      name: sql<string | null>`${userTable.name}`,
+      image: sql<string | null>`${userTable.image}`,
+    },
+    hasUserUpVoted: createHasUserUpVotedExpr(userId),
+    creatorMemberId: postTable.creatorMemberId,
+    creatorId: postTable.creatorId,
+    lockedAt: postTable.lockedAt,
+    archivedAt: postTable.archivedAt,
+    mergedIntoPostId: postTable.mergedIntoPostId,
+    mergedAt: postTable.mergedAt,
+  });
+  const createFindManyQuery = ({
+    whereClause,
+    userId,
+  }: {
+    whereClause: SQL | undefined;
+    userId: string | null | undefined;
+  }) => {
+    const baseSelect = selectPostFields(userId);
+
+    return db
+      .select(baseSelect)
+      .from(postTable)
+      .leftJoin(upvoteCounts, eq(upvoteCounts.postId, postTable.id))
+      .leftJoin(userTable, eq(userTable.id, postTable.creatorId))
+      .where(whereClause);
+  };
+  const createFindManyPublicQuery = ({
+    whereClause,
+    userId,
+  }: {
+    whereClause: SQL | undefined;
+    userId: string | null | undefined;
+  }) =>
+    db
+      .select(selectPostFields(userId))
+      .from(postTable)
+      .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+      .leftJoin(upvoteCounts, eq(upvoteCounts.postId, postTable.id))
+      .leftJoin(userTable, eq(userTable.id, postTable.creatorId))
+      .where(whereClause);
 
   return {
     findByCreatorId: ({
@@ -107,48 +175,8 @@ const makePostRepository = Effect.gen(function* () {
 
       where.push(eq(postTable.organizationId, organizationId));
       const whereClause = where.length > 1 ? and(...where) : where[0];
-      const hasUserUpVotedExpr = userId
-        ? sql<boolean>`exists(select 1 from ${upvoteTable} where ${upvoteTable.postId} = ${postTable.id} and ${upvoteTable.userId} = ${userId})`
-        : sql<boolean>`false`;
-      const upvoteCounts = db
-        .select({
-          postId: upvoteTable.postId,
-          upVotes: sql<number>`count(*)::int`.as("upVotes"),
-        })
-        .from(upvoteTable)
-        .groupBy(upvoteTable.postId)
-        .as("upvote_counts");
-      const excerptExpr = sql<string>`coalesce(nullif(${postTable.excerpt}, ''), trim(regexp_replace(regexp_replace(${postTable.content}, '<[^>]+>', ' ', 'gi'), '\\s+', ' ', 'g')))`;
 
-      return db
-        .select({
-          id: postTable.id,
-          title: postTable.title,
-          boardId: postTable.boardId,
-          slug: postTable.slug,
-          content: postTable.content,
-          excerpt: excerptExpr,
-          upVotes: sql<number>`coalesce(${upvoteCounts.upVotes}, 0)`,
-          statusId: postTable.statusId,
-          createdAt: postTable.createdAt,
-          updatedAt: postTable.updatedAt,
-          organizationId: postTable.organizationId,
-          lockedAt: postTable.lockedAt,
-          archivedAt: postTable.archivedAt,
-          mergedIntoPostId: postTable.mergedIntoPostId,
-          mergedAt: postTable.mergedAt,
-          user: {
-            name: sql<string | null>`${userTable.name}`,
-            image: sql<string | null>`${userTable.image}`,
-          },
-          hasUserUpVoted: hasUserUpVotedExpr,
-          creatorMemberId: postTable.creatorMemberId,
-          creatorId: postTable.creatorId,
-        })
-        .from(postTable)
-        .leftJoin(upvoteCounts, eq(upvoteCounts.postId, postTable.id))
-        .leftJoin(userTable, eq(userTable.id, postTable.creatorId))
-        .where(whereClause);
+      return createFindManyQuery({ whereClause, userId });
     },
     findManyPublic: ({ boardId, organizationId, userId }: TPostFindMany) => {
       const where: SQL[] = [eq(postTable.organizationId, organizationId)];
@@ -158,45 +186,8 @@ const makePostRepository = Effect.gen(function* () {
       where.push(eq(boardTable.visibility, "PUBLIC"));
 
       const whereClause = and(...where);
-      const hasUserUpVotedExpr = userId
-        ? sql<boolean>`exists(select 1 from ${upvoteTable} where ${upvoteTable.postId} = ${postTable.id} and ${upvoteTable.userId} = ${userId})`
-        : sql<boolean>`false`;
-      const upvoteCounts = db
-        .select({
-          postId: upvoteTable.postId,
-          upVotes: sql<number>`count(*)::int`.as("upVotes"),
-        })
-        .from(upvoteTable)
-        .groupBy(upvoteTable.postId)
-        .as("upvote_counts");
-      const excerptExpr = sql<string>`coalesce(nullif(${postTable.excerpt}, ''), trim(regexp_replace(regexp_replace(${postTable.content}, '<[^>]+>', ' ', 'gi'), '\\s+', ' ', 'g')))`;
 
-      return db
-        .select({
-          id: postTable.id,
-          title: postTable.title,
-          boardId: postTable.boardId,
-          slug: postTable.slug,
-          content: postTable.content,
-          excerpt: excerptExpr,
-          upVotes: sql<number>`coalesce(${upvoteCounts.upVotes}, 0)`,
-          statusId: postTable.statusId,
-          createdAt: postTable.createdAt,
-          updatedAt: postTable.updatedAt,
-          organizationId: postTable.organizationId,
-          user: {
-            name: sql<string | null>`${userTable.name}`,
-            image: sql<string | null>`${userTable.image}`,
-          },
-          hasUserUpVoted: hasUserUpVotedExpr,
-          creatorMemberId: postTable.creatorMemberId,
-          creatorId: postTable.creatorId,
-        })
-        .from(postTable)
-        .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
-        .leftJoin(upvoteCounts, eq(upvoteCounts.postId, postTable.id))
-        .leftJoin(userTable, eq(userTable.id, postTable.creatorId))
-        .where(whereClause);
+      return createFindManyPublicQuery({ whereClause, userId });
     },
     isPublicPost: ({
       id,
