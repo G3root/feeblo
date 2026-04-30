@@ -1,6 +1,7 @@
 import { DB } from "@feeblo/db";
 import { member as memberTable } from "@feeblo/db/schema/auth";
 import {
+  board as boardTable,
   postReaction as postReactionTable,
   post as postTable,
 } from "@feeblo/db/schema/feedback";
@@ -62,6 +63,46 @@ const makePostReactionRepository = Effect.gen(function* () {
           );
       }),
 
+    listPublic: ({ postId, organizationId }: TPostReactionList) =>
+      Effect.gen(function* () {
+        const [post] = yield* db
+          .select({ id: postTable.id })
+          .from(postTable)
+          .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+          .where(
+            and(
+              eq(postTable.id, postId),
+              eq(postTable.organizationId, organizationId),
+              eq(boardTable.visibility, "PUBLIC")
+            )
+          )
+          .limit(1);
+
+        if (!post) {
+          return [];
+        }
+
+        return yield* db
+          .select({
+            id: postReactionTable.id,
+            postId: postReactionTable.postId,
+            organizationId: postTable.organizationId,
+            userId: postReactionTable.userId,
+            memberId: postReactionTable.memberId,
+            emoji: postReactionTable.emoji,
+            createdAt: postReactionTable.createdAt,
+            updatedAt: postReactionTable.updatedAt,
+          })
+          .from(postReactionTable)
+          .innerJoin(postTable, eq(postTable.id, postReactionTable.postId))
+          .where(
+            and(
+              eq(postTable.organizationId, organizationId),
+              eq(postReactionTable.postId, postId)
+            )
+          );
+      }),
+
     toggle: ({ organizationId, postId, userId, emoji }: TPostReactionToggle) =>
       Effect.gen(function* () {
         const [post] = yield* db
@@ -71,6 +112,74 @@ const makePostReactionRepository = Effect.gen(function* () {
             and(
               eq(postTable.id, postId),
               eq(postTable.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!post) {
+          return { reacted: false, emoji: null };
+        }
+
+        const [existingReaction] = yield* db
+          .select({
+            id: postReactionTable.id,
+          })
+          .from(postReactionTable)
+          .where(
+            and(
+              eq(postReactionTable.postId, postId),
+              eq(postReactionTable.userId, userId),
+              eq(postReactionTable.emoji, emoji)
+            )
+          )
+          .limit(1);
+
+        if (existingReaction) {
+          yield* db
+            .delete(postReactionTable)
+            .where(eq(postReactionTable.id, existingReaction.id));
+
+          return { reacted: false, emoji: null };
+        }
+
+        const [member] = yield* db
+          .select({ id: memberTable.id })
+          .from(memberTable)
+          .where(
+            and(
+              eq(memberTable.organizationId, organizationId),
+              eq(memberTable.userId, userId)
+            )
+          )
+          .limit(1);
+
+        yield* db.insert(postReactionTable).values({
+          id: generateId("postReaction"),
+          postId,
+          userId,
+          memberId: member?.id ?? null,
+          emoji,
+        });
+
+        return { reacted: true, emoji };
+      }),
+
+    togglePublic: ({
+      organizationId,
+      postId,
+      userId,
+      emoji,
+    }: TPostReactionToggle) =>
+      Effect.gen(function* () {
+        const [post] = yield* db
+          .select({ id: postTable.id })
+          .from(postTable)
+          .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+          .where(
+            and(
+              eq(postTable.id, postId),
+              eq(postTable.organizationId, organizationId),
+              eq(boardTable.visibility, "PUBLIC")
             )
           )
           .limit(1);

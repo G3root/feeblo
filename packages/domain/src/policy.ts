@@ -102,12 +102,22 @@ export const any = <E, R>(
 ): Policy<E, R> => Effect.firstSuccessOf(policies);
 
 export const hasMembership = (organizationId: string): Policy =>
-  policy((user) =>
-    Effect.succeed(
-      user.memberships.some(
-        (membership) => membership.organizationId === organizationId
-      )
-    )
+  policy((user) => Effect.succeed(isMember(user, organizationId)));
+
+export const isMember = (
+  session: CurrentSession["Type"],
+  organizationId: string
+) =>
+  session.memberships.some(
+    (membership) => membership.organizationId === organizationId
+  );
+
+export const getMembership = (
+  session: CurrentSession["Type"],
+  organizationId: string
+) =>
+  session.memberships.find(
+    (membership) => membership.organizationId === organizationId
   );
 
 export const hasOrganizationRole = (

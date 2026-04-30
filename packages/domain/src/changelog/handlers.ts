@@ -3,6 +3,7 @@ import * as Policy from "../policy";
 import { InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
+import { SitePolicy } from "../site/policies";
 import {
   FailedToCreateChangelogError,
   FailedToDeleteChangelogError,
@@ -22,6 +23,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* ChangelogRepository;
     const changelogPolicy = yield* ChangelogPolicy;
+    const sitePolicy = yield* SitePolicy;
 
     return {
       ChangelogList: (args: TChangelogList) =>
@@ -38,7 +40,10 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
         ),
 
       ChangelogListPublic: (args: TChangelogList) =>
-        repository.findManyPublished(args).pipe(
+        Effect.gen(function* () {
+          return yield* repository.findManyPublished(args);
+        }).pipe(
+          Policy.withPolicy(sitePolicy.canViewChangelog(args.organizationId)),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
@@ -52,9 +57,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
       ChangelogCreate: (args: TChangelogCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
-          const isMember = session.memberships.find(
-            (membership) => membership.organizationId === args.organizationId
-          );
+          const isMember = Policy.getMembership(session, args.organizationId);
 
           yield* repository.create({
             ...args,
@@ -63,6 +66,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
             ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
           });
         }).pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           Effect.catchTags({
             SqlError: () => Effect.fail(new FailedToCreateChangelogError()),
           })
@@ -108,6 +112,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
     };
   })
 ).pipe(
+  Layer.provide(SitePolicy.layer),
   Layer.provide(ChangelogPolicy.layer),
   Layer.provide(ChangelogRepository.layer)
 );

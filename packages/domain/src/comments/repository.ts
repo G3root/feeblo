@@ -1,8 +1,10 @@
 import { DB } from "@feeblo/db";
 import { user as userTable } from "@feeblo/db/schema/auth";
 import {
+  board as boardTable,
   comment as commentTable,
   type InsertComment,
+  post as postTable,
 } from "@feeblo/db/schema/feedback";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Effect, Array as EffectArray } from "effect";
@@ -69,6 +71,45 @@ const makeCommentRepository = Effect.gen(function* () {
           .from(commentTable)
           .innerJoin(userTable, eq(commentTable.userId, userTable.id))
           .where(and(...where));
+
+        return rows;
+      }),
+    findManyPublic: ({
+      organizationId,
+      postId,
+    }: {
+      organizationId: string;
+      postId: string;
+    }) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({
+            id: commentTable.id,
+            content: commentTable.content,
+            createdAt: commentTable.createdAt,
+            updatedAt: commentTable.updatedAt,
+            organizationId: commentTable.organizationId,
+            postId: commentTable.postId,
+            userId: commentTable.userId,
+            visibility: commentTable.visibility,
+            parentCommentId: commentTable.parentCommentId,
+            memberId: commentTable.memberId,
+            user: {
+              name: userTable.name,
+            },
+          })
+          .from(commentTable)
+          .innerJoin(userTable, eq(commentTable.userId, userTable.id))
+          .innerJoin(postTable, eq(postTable.id, commentTable.postId))
+          .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+          .where(
+            and(
+              eq(commentTable.organizationId, organizationId),
+              eq(commentTable.postId, postId),
+              eq(commentTable.visibility, "PUBLIC"),
+              eq(boardTable.visibility, "PUBLIC")
+            )
+          );
 
         return rows;
       }),

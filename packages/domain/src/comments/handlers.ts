@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
+import { PostRepository } from "../post/repository";
 import { InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
@@ -22,6 +23,8 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* CommentRepository;
     const commentPolicy = yield* CommentPolicy;
+    const postRepository = yield* PostRepository;
+    // const sitePolicy = yield* SitePolicy;
 
     return {
       CommentList: (args: TCommentList) =>
@@ -31,6 +34,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             postId: args.postId,
           })
           .pipe(
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
             Effect.catchTags({
               SqlError: () =>
                 Effect.fail(
@@ -41,35 +45,44 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             })
           ),
       CommentListPublic: (args: TCommentList) =>
-        repository
-          .findMany({
+        Effect.gen(function* () {
+          //TODO: comeback later
+          // yield* sitePolicy.canViewRoadmap(args.organizationId);
+          return yield* repository.findManyPublic({
             organizationId: args.organizationId,
             postId: args.postId,
-            visibility: "PUBLIC",
+          });
+        }).pipe(
+          Effect.catchTags({
+            SqlError: () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to list comments",
+                })
+              ),
           })
-          .pipe(
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Failed to list comments",
-                  })
-                ),
-            })
-          ),
+        ),
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
+          const membership = Policy.getMembership(session, args.organizationId);
 
-          const isMember = session.memberships.find(
-            (membership) => membership.organizationId === args.organizationId
-          );
+          const isPublicPost = yield* postRepository.isPublicPost({
+            id: args.postId,
+            organizationId: args.organizationId,
+          });
+
+          if (!membership && (args.visibility !== "PUBLIC" || !isPublicPost)) {
+            return yield* new Policy.PolicyDeniedError({
+              reason: "You are not allowed to comment on this post.",
+            });
+          }
 
           yield* repository.create({
             ...args,
             content: sanitizeRichText(args.content),
             userId: session.session.userId,
-            ...(isMember ? { memberId: isMember.membershipId } : {}),
+            ...(membership ? { memberId: membership.membershipId } : {}),
           });
 
           return {
@@ -171,6 +184,8 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
     };
   })
 ).pipe(
+  // Layer.provide(SitePolicy.layer),
+  Layer.provide(PostRepository.layer),
   Layer.provide(CommentPolicy.layer),
   Layer.provide(CommentRepository.layer)
 );

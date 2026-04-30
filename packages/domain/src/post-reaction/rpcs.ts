@@ -17,5 +17,19 @@ export class PostReactionRpcs extends RpcGroup.make(
       emoji: Schema.Union(Schema.String, Schema.Null),
     }),
     error: PostReactionServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostReactionListPublic", {
+    payload: PostReactionList,
+    success: Schema.Array(PostReaction),
+    error: PostReactionServiceErrors,
+  }),
+  Rpc.make("PostReactionTogglePublic", {
+    payload: PostReactionToggle,
+    success: Schema.Struct({
+      reacted: Schema.Boolean,
+      emoji: Schema.Union(Schema.String, Schema.Null),
+    }),
+    error: PostReactionServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}
