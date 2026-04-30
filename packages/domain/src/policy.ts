@@ -110,9 +110,16 @@ export const hasMembership = (organizationId: string): Policy =>
     )
   );
 
-export const hasRole = (role: "owner" | "admin" | "member") =>
+export const hasOrganizationRole = (
+  organizationId: string,
+  role: "owner" | "admin" | "member"
+): Policy =>
   policy((user) =>
     Effect.succeed(
-      user.memberships.some((membership) => membership.role === role)
+      user.memberships.some(
+        (membership) =>
+          membership.organizationId === organizationId &&
+          membership.role === role
+      )
     )
   );

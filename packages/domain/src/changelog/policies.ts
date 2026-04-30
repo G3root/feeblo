@@ -33,8 +33,8 @@ const makeChangelogPolicy = Effect.gen(function* () {
 
   const isOwner = (args: TIsCreator) =>
     Policy.any(
-      Policy.hasRole("owner"),
-      Policy.hasRole("admin"),
+      Policy.hasOrganizationRole(args.organizationId, "owner"),
+      Policy.hasOrganizationRole(args.organizationId, "admin"),
       isCreator(args)
     );
 
