@@ -9,7 +9,7 @@ export class PostReactionRpcs extends RpcGroup.make(
     payload: PostReactionList,
     success: Schema.Array(PostReaction),
     error: PostReactionServiceErrors,
-  }),
+  }).middleware(AuthMiddleware),
   Rpc.make("PostReactionToggle", {
     payload: PostReactionToggle,
     success: Schema.Struct({
