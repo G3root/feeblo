@@ -18,6 +18,11 @@ import {
   EmptyTitle,
 } from "~/components/ui/empty";
 import { toastManager } from "~/components/ui/toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";
@@ -398,29 +403,37 @@ function RouteComponent() {
               <RedirectToPostUrlButton postSlug={post.slug} />
               <CopyPostButton postSlug={post.slug} />
               {canManagePost ? (
-                <Button
-                  aria-label="Delete post"
-                  className="rounded-full"
-                  onClick={() =>
-                    postDialogStore.send({
-                      type: "toggle",
-                      data: {
-                        postId: post.id,
-                        redirectOptions: {
-                          to: "/$organizationId/board/$boardSlug",
-                          params: {
-                            organizationId,
-                            boardSlug,
-                          },
-                        },
-                      },
-                    })
-                  }
-                  size="icon-sm"
-                  variant="outline"
-                >
-                  <HugeiconsIcon icon={Trash2} />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={(props) => (
+                      <Button
+                        {...props}
+                        aria-label="Delete post"
+                        className="rounded-full"
+                        onClick={() =>
+                          postDialogStore.send({
+                            type: "toggle",
+                            data: {
+                              postId: post.id,
+                              redirectOptions: {
+                                to: "/$organizationId/board/$boardSlug",
+                                params: {
+                                  organizationId,
+                                  boardSlug,
+                                },
+                              },
+                            },
+                          })
+                        }
+                        size="icon-sm"
+                        variant="outline"
+                      >
+                        <HugeiconsIcon icon={Trash2} />
+                      </Button>
+                    )}
+                  />
+                  <TooltipContent>Delete post</TooltipContent>
+                </Tooltip>
               ) : null}
             </div>
 
@@ -547,22 +560,30 @@ function RedirectToPostUrlButton({ postSlug }: { postSlug: string }) {
   }
 
   return (
-    <Button
-      className="rounded-full"
-      nativeButton={false}
-      render={(props) => (
-        <a
-          {...props}
-          href={`${publicSiteUrl}/p/${postSlug}`}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <HugeiconsIcon icon={LinkSquare02Icon} />
-        </a>
-      )}
-      size="icon-sm"
-      variant="outline"
-    />
+    <Tooltip>
+      <TooltipTrigger
+        render={(props) => (
+          <Button
+            {...props}
+            className="rounded-full"
+            nativeButton={false}
+            render={(props) => (
+              <a
+                {...props}
+                href={`${publicSiteUrl}/p/${postSlug}`}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <HugeiconsIcon icon={LinkSquare02Icon} />
+              </a>
+            )}
+            size="icon-sm"
+            variant="outline"
+          />
+        )}
+      />
+      <TooltipContent>Go to Public Post</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -574,27 +595,36 @@ function CopyPostButton({ postSlug }: { postSlug: string }) {
   }
 
   return (
-    <Button
-      className="rounded-full"
-      onClick={() => {
-        try {
-          navigator.clipboard.writeText(`${publicSiteUrl}/p/${postSlug}`);
-          toastManager.add({
-            title: "Post URL copied to clipboard",
-            type: "success",
-          });
-        } catch (_error) {
-          toastManager.add({
-            title: "Failed to copy post URL to clipboard",
-            type: "error",
-          });
-        }
-      }}
-      size="icon-sm"
-      variant="outline"
-    >
-      <HugeiconsIcon icon={Copy01Icon} />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={(props) => (
+          <Button
+            {...props}
+            className="rounded-full"
+            onClick={() => {
+              try {
+                navigator.clipboard.writeText(`${publicSiteUrl}/p/${postSlug}`);
+                toastManager.add({
+                  title: "Post URL copied to clipboard",
+                  type: "success",
+                });
+              } catch (_error) {
+                toastManager.add({
+                  title: "Failed to copy post URL to clipboard",
+                  type: "error",
+                });
+              }
+            }}
+            size="icon-sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Copy01Icon} />
+          </Button>
+        )}
+      />
+
+      <TooltipContent>Copy post link</TooltipContent>
+    </Tooltip>
   );
 }
 
