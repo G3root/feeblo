@@ -365,6 +365,7 @@ const ensurePosts = ({
 
         const title = faker.company.catchPhrase();
         const content = faker.lorem.paragraphs({ min: 2, max: 4 });
+        const lockedAt = i % 13 === 0 ? now : null;
 
         yield* db.insert(post).values({
           id: makeId("pst"),
@@ -377,6 +378,10 @@ const ensurePosts = ({
           organizationId,
           creatorId: creatorId ?? null,
           creatorMemberId: creatorMemberId ?? null,
+          lockedAt,
+          archivedAt: null,
+          mergedIntoPostId: null,
+          mergedAt: null,
           createdAt: faker.date.recent({ days: 120, refDate: now }),
           updatedAt: now,
         });

@@ -135,12 +135,16 @@ function PostCreateForm({
         }
 
         const tx = publicPostCollection.insert({
+          archivedAt: null,
           id: postId,
           boardId: value.boardId,
           title,
           slug: slugify(title) || "untitled",
           content: value.content,
           excerpt: htmlToExcerpt(value.content),
+          lockedAt: null,
+          mergedAt: null,
+          mergedIntoPostId: null,
           upVotes: 0,
           statusId: selectedPostStatus.id,
           createdAt: new Date(),
@@ -154,7 +158,6 @@ function PostCreateForm({
             image: session.user.image ?? null,
           },
         });
-
         await tx.isPersisted.promise;
         toastManager.add({
           title: "Feedback submitted",

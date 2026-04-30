@@ -14,6 +14,10 @@ export class Post extends Schema.Class<Post>("Post")({
   organizationId: Schema.String,
   creatorMemberId: Schema.NullOr(Schema.String),
   creatorId: Schema.NullOr(Schema.String),
+  lockedAt: Schema.NullOr(Schema.Date),
+  archivedAt: Schema.NullOr(Schema.Date),
+  mergedIntoPostId: Schema.NullOr(Schema.String),
+  mergedAt: Schema.NullOr(Schema.Date),
   user: Schema.Struct({
     name: Schema.NullOr(Schema.String),
     image: Schema.NullOr(Schema.String),
@@ -50,6 +54,23 @@ export const PostUpdate = Schema.Struct({
 });
 
 export type TPostUpdate = Schema.Schema.Type<typeof PostUpdate>;
+
+export const PostAdminUpdate = Schema.Struct({
+  id: Schema.String,
+  organizationId: Schema.String,
+  archived: Schema.optional(Schema.Boolean),
+  locked: Schema.optional(Schema.Boolean),
+});
+
+export type TPostAdminUpdate = Schema.Schema.Type<typeof PostAdminUpdate>;
+
+export const PostMerge = Schema.Struct({
+  organizationId: Schema.String,
+  sourcePostId: Schema.String,
+  targetPostId: Schema.String,
+});
+
+export type TPostMerge = Schema.Schema.Type<typeof PostMerge>;
 
 export const PostCreate = Schema.Struct({
   id: Schema.String,

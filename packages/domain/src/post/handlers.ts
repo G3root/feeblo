@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { InternalServerError } from "../rpc-errors";
+import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
@@ -12,9 +12,11 @@ import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
 import type {
+  TPostAdminUpdate,
   TPostCreate,
   TPostDelete,
   TPostList,
+  TPostMerge,
   TPostUpdate,
 } from "./schema";
 
@@ -117,6 +119,28 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           })
         );
       },
+      PostAdminUpdate: (args: TPostAdminUpdate) =>
+        repository.adminUpdate(args).pipe(
+          Policy.withPolicy(
+            postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
+          ),
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToUpdatePostError()),
+          })
+        ),
+      PostMerge: (args: TPostMerge) =>
+        (args.sourcePostId === args.targetPostId
+          ? Effect.fail(
+              new BadRequestError({
+                message: "Source and target posts must be different",
+              })
+            )
+          : repository.merge(args)
+        ).pipe(
+          Policy.withPolicy(
+            postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
+          )
+        ),
     };
   })
 ).pipe(Layer.provide(PostPolicy.layer), Layer.provide(PostRepository.layer));

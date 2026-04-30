@@ -52,7 +52,7 @@ const makePostPolicy = Effect.gen(function* () {
       isCreator(args)
     );
 
-  return { isOwner, isCreator };
+  return { isCreator, isOrganizationOwnerOrAdmin, isOwner };
 });
 
 export class PostPolicy extends Effect.Service<PostPolicy>()("PostPolicy", {

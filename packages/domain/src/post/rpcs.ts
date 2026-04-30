@@ -2,7 +2,15 @@ import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { PostServiceErrors } from "./errors";
-import { Post, PostCreate, PostDelete, PostList, PostUpdate } from "./schema";
+import {
+  Post,
+  PostAdminUpdate,
+  PostCreate,
+  PostDelete,
+  PostList,
+  PostMerge,
+  PostUpdate,
+} from "./schema";
 
 export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostList", {
@@ -32,6 +40,18 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostUpdate", {
     success: Schema.Void,
     payload: PostUpdate,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostAdminUpdate", {
+    success: Schema.Void,
+    payload: PostAdminUpdate,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostMerge", {
+    success: Schema.Void,
+    payload: PostMerge,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

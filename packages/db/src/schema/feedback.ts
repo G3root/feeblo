@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   boolean,
+  check,
+  foreignKey,
   index,
   integer,
   pgEnum,
@@ -245,6 +248,10 @@ export const post = pgTable(
     creatorMemberId: text("creator_member_id").references(() => member.id, {
       onDelete: "set null",
     }),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    mergedIntoPostId: text("merged_into_post_id"),
+    mergedAt: timestamp("merged_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -252,10 +259,33 @@ export const post = pgTable(
   },
   (table) => [
     index("post_statusId_idx").on(table.statusId),
+    index("post_archivedAt_idx").on(table.archivedAt),
+    index("post_mergedIntoPostId_idx").on(table.mergedIntoPostId),
+    uniqueIndex("post_id_organizationId_uidx").on(
+      table.id,
+      table.organizationId
+    ),
     uniqueIndex("post_organizationId_boardId_slug_uidx").on(
       table.organizationId,
       table.boardId,
       table.slug
+    ),
+    foreignKey({
+      name: "post_merged_into_same_organization_fk",
+      columns: [table.mergedIntoPostId, table.organizationId],
+      foreignColumns: [table.id, table.organizationId],
+    }).onDelete("restrict"),
+    check(
+      "post_merge_requires_target_and_timestamp_chk",
+      sql`(${table.mergedIntoPostId} is null and ${table.mergedAt} is null) or (${table.mergedIntoPostId} is not null and ${table.mergedAt} is not null)`
+    ),
+    check(
+      "post_merged_rows_must_be_archived_chk",
+      sql`${table.mergedIntoPostId} is null or ${table.archivedAt} is not null`
+    ),
+    check(
+      "post_no_self_merge_chk",
+      sql`${table.mergedIntoPostId} is null or ${table.mergedIntoPostId} <> ${table.id}`
     ),
   ]
 );
