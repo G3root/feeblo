@@ -368,7 +368,7 @@ export function createPublicCollections({
         }
 
         const data = await fetchRpc(
-          (rpc) => rpc.UpvoteList({ organizationId, postId }),
+          (rpc) => rpc.UpvoteListPublic({ organizationId, postId }),
           {
             signal: ctx.signal,
           }
@@ -383,7 +383,7 @@ export function createPublicCollections({
         const { modified: newUpvote } = mutation;
 
         await fetchRpc((rpc) =>
-          rpc.UpvoteToggle({
+          rpc.UpvoteTogglePublic({
             organizationId: newUpvote.organizationId,
             postId: newUpvote.postId,
           })
