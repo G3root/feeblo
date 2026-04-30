@@ -142,7 +142,9 @@ export function PostCommentComposer({
                           disabled={isSubmitting}
                           size="sm"
                           type="submit"
-                          variant="outline"
+                          variant={
+                            visibility === "INTERNAL" ? "default" : "outline"
+                          }
                         >
                           {selectedCopy.label}
                         </Button>
@@ -157,7 +159,15 @@ export function PostCommentComposer({
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         render={
-                          <Button className="pl-2!" size="sm" variant="outline">
+                          <Button
+                            className="pl-2!"
+                            size="sm"
+                            variant={
+                              field.state.value === "INTERNAL"
+                                ? "default"
+                                : "outline"
+                            }
+                          >
                             <HugeiconsIcon
                               icon={ArrowDown01Icon}
                               strokeWidth={2}
