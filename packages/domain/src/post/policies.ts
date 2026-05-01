@@ -9,6 +9,11 @@ type TIsCreator = {
   boardId: string;
 };
 
+type TIsUnlocked = {
+  organizationId: string;
+  postId: string;
+};
+
 const makePostPolicy = Effect.gen(function* () {
   const repository = yield* PostRepository;
 
@@ -52,7 +57,31 @@ const makePostPolicy = Effect.gen(function* () {
       isCreator(args)
     );
 
-  return { isCreator, isOrganizationOwnerOrAdmin, isOwner };
+  const isUnlocked = (args: TIsUnlocked) =>
+    Policy.policy(() =>
+      repository
+        .isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+    );
+
+  const isUnlockedPublic = (args: TIsUnlocked) =>
+    Policy.publicPolicy(() =>
+      repository
+        .isUnlockedPublic({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+    );
+
+  return {
+    isCreator,
+    isOrganizationOwnerOrAdmin,
+    isOwner,
+    isUnlocked,
+    isUnlockedPublic,
+  };
 });
 
 export class PostPolicy extends Effect.Service<PostPolicy>()("PostPolicy", {

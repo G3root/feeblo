@@ -24,6 +24,7 @@ export type CommentReactionToggleInput = {
 type CommentReactionSectionProps = {
   commentId: string;
   commentReactions: CommentReaction[];
+  disabled?: boolean;
   handleToggleReaction: (value: CommentReactionToggleInput) => Promise<void>;
   organizationId: string;
   postId: string;
@@ -36,6 +37,7 @@ type CommentReactionRootProps = CommentReactionSectionProps & {
 type CommentReactionContextValue = {
   commentId: string;
   currentUserId?: string;
+  disabled: boolean;
   handleToggleReaction: (emoji: string) => Promise<void>;
   isSelected: (emoji: string) => boolean;
   isToggling: boolean;
@@ -61,6 +63,7 @@ function CommentReactionRoot({
   children,
   commentId,
   commentReactions,
+  disabled = false,
   handleToggleReaction: handleToggleReaction_,
   organizationId,
   postId,
@@ -98,6 +101,14 @@ function CommentReactionRoot({
   }, [currentUserId, reactionsForComment]);
 
   const handleToggleReaction = async (emoji: string) => {
+    if (disabled) {
+      toastManager.add({
+        title: "This post is locked",
+        type: "error",
+      });
+      return;
+    }
+
     if (!currentUserId) {
       toastManager.add({ title: "Sign in to react", type: "error" });
       return;
@@ -134,6 +145,7 @@ function CommentReactionRoot({
       value={{
         commentId,
         currentUserId,
+        disabled,
         handleToggleReaction,
         isSelected: (emoji) => userReactionSet.has(emoji),
         isToggling,
@@ -150,11 +162,12 @@ function CommentReactionContent({ children }: { children: ReactNode }) {
 }
 
 function CommentReactionListContent() {
-  const { handleToggleReaction, isSelected, isToggling, reactionCounts } =
+  const { disabled, handleToggleReaction, isSelected, isToggling, reactionCounts } =
     useCommentReactionSection();
 
   return (
     <ReactionList
+      disabled={disabled}
       isSelected={isSelected}
       isToggling={isToggling}
       onToggleReaction={handleToggleReaction}
@@ -164,11 +177,12 @@ function CommentReactionListContent() {
 }
 
 function CommentReactionButtonContent() {
-  const { handleToggleReaction, isSelected, isToggling, reactionCounts } =
+  const { disabled, handleToggleReaction, isSelected, isToggling, reactionCounts } =
     useCommentReactionSection();
 
   return (
     <ReactionButton
+      disabled={disabled}
       isSelected={isSelected}
       isToggling={isToggling}
       onToggleReaction={handleToggleReaction}

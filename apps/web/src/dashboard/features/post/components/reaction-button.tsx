@@ -11,6 +11,7 @@ import {
 const REACTION_EMOJIS = ["👍", "❤️", "🔥", "😂", "🎯"] as const;
 
 type ReactionButtonProps = {
+  disabled?: boolean;
   isSelected: (emoji: string) => boolean;
   isToggling: boolean;
   onToggleReaction: (emoji: string) => Promise<void>;
@@ -19,6 +20,7 @@ type ReactionButtonProps = {
 };
 
 type ReactionListProps = {
+  disabled?: boolean;
   isSelected: (emoji: string) => boolean;
   isToggling: boolean;
   onToggleReaction: (emoji: string) => Promise<void>;
@@ -26,6 +28,7 @@ type ReactionListProps = {
 };
 
 export function ReactionButton({
+  disabled = false,
   isSelected,
   isToggling,
   onToggleReaction,
@@ -40,7 +43,7 @@ export function ReactionButton({
         render={
           <Button
             className="rounded-full"
-            disabled={isToggling}
+            disabled={disabled || isToggling}
             size="icon-sm"
             type="button"
             variant="ghost"
@@ -54,7 +57,7 @@ export function ReactionButton({
           {REACTION_EMOJIS.map((emoji) => (
             <ReactionPill
               count={reactionCounts[emoji] ?? 0}
-              disabled={isToggling}
+              disabled={disabled || isToggling}
               emoji={emoji}
               key={emoji}
               onClick={() => {
@@ -72,6 +75,7 @@ export function ReactionButton({
 }
 
 export function ReactionList({
+  disabled = false,
   isSelected,
   isToggling,
   onToggleReaction,
@@ -88,7 +92,7 @@ export function ReactionList({
   return reactedEmojis.map((emoji) => (
     <ReactionPill
       count={reactionCounts[emoji] ?? 0}
-      disabled={isToggling}
+      disabled={disabled || isToggling}
       emoji={emoji}
       key={emoji}
       onClick={() => {

@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
+import { PostPolicy } from "../post/policies";
 import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostReactionRepository } from "./repository";
@@ -9,6 +10,7 @@ import type { TPostReactionList, TPostReactionToggle } from "./schema";
 export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* PostReactionRepository;
+    const postPolicy = yield* PostPolicy;
     // const sitePolicy = yield* SitePolicy;
 
     return {
@@ -44,7 +46,15 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             emoji: args.emoji,
           });
         }).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              })
+            )
+          ),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
@@ -85,6 +95,12 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             emoji: args.emoji,
           });
         }).pipe(
+          Policy.withPolicy(
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          ),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
@@ -98,5 +114,6 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
   })
 ).pipe(
   // Layer.provide(SitePolicy.layer),
+  Layer.provide(PostPolicy.layer),
   Layer.provide(PostReactionRepository.layer)
 );

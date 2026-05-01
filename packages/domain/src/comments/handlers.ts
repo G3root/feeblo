@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
+import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { InternalServerError } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
@@ -23,6 +24,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* CommentRepository;
     const commentPolicy = yield* CommentPolicy;
+    const postPolicy = yield* PostPolicy;
     const postRepository = yield* PostRepository;
     // const sitePolicy = yield* SitePolicy;
 
@@ -90,10 +92,16 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           };
         }).pipe(
           Policy.withPolicy(
-            commentPolicy.canCreate({
-              organizationId: args.organizationId,
-              visibility: args.visibility,
-            })
+            Policy.all(
+              postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              }),
+              commentPolicy.canCreate({
+                organizationId: args.organizationId,
+                visibility: args.visibility,
+              })
+            )
           ),
           Effect.catchTags({
             SqlError: () =>
@@ -127,11 +135,17 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           };
         }).pipe(
           Policy.withPolicy(
-            commentPolicy.isOwner({
-              organizationId: args.organizationId,
-              commentId: args.id,
-              postId: args.postId,
-            })
+            Policy.all(
+              postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              }),
+              commentPolicy.isOwner({
+                organizationId: args.organizationId,
+                commentId: args.id,
+                postId: args.postId,
+              })
+            )
           ),
           Effect.catchTags({
             SqlError: () =>
@@ -165,11 +179,17 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           };
         }).pipe(
           Policy.withPolicy(
-            commentPolicy.isOwner({
-              organizationId: args.organizationId,
-              commentId: args.id,
-              postId: args.postId,
-            })
+            Policy.all(
+              postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              }),
+              commentPolicy.isOwner({
+                organizationId: args.organizationId,
+                commentId: args.id,
+                postId: args.postId,
+              })
+            )
           ),
           Effect.catchTags({
             SqlError: () =>
@@ -186,6 +206,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
 ).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostRepository.layer),
+  Layer.provide(PostPolicy.layer),
   Layer.provide(CommentPolicy.layer),
   Layer.provide(CommentRepository.layer)
 );

@@ -208,6 +208,44 @@ const makePostRepository = Effect.gen(function* () {
           )
         )
         .pipe(Effect.map((rows) => rows.length > 0)),
+    isUnlocked: ({
+      id,
+      organizationId,
+    }: {
+      id: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: postTable.id })
+        .from(postTable)
+        .where(
+          and(
+            eq(postTable.id, id),
+            eq(postTable.organizationId, organizationId),
+            sql`${postTable.lockedAt} is null`
+          )
+        )
+        .pipe(Effect.map((rows) => rows.length > 0)),
+    isUnlockedPublic: ({
+      id,
+      organizationId,
+    }: {
+      id: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: postTable.id })
+        .from(postTable)
+        .innerJoin(boardTable, eq(boardTable.id, postTable.boardId))
+        .where(
+          and(
+            eq(postTable.id, id),
+            eq(postTable.organizationId, organizationId),
+            eq(boardTable.visibility, "PUBLIC"),
+            sql`${postTable.lockedAt} is null`
+          )
+        )
+        .pipe(Effect.map((rows) => rows.length > 0)),
 
     update: ({
       id,

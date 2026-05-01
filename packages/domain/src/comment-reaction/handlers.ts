@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
+import { PostPolicy } from "../post/policies";
 import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { CommentReactionRepository } from "./repository";
@@ -9,6 +10,7 @@ import type { TCommentReactionList, TCommentReactionToggle } from "./schema";
 export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* CommentReactionRepository;
+    const postPolicy = yield* PostPolicy;
     // const sitePolicy = yield* SitePolicy;
 
     return {
@@ -44,7 +46,15 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             emoji: args.emoji,
           });
         }).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Policy.withPolicy(
+            Policy.all(
+              postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              }),
+              Policy.hasMembership(args.organizationId)
+            )
+          ),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
@@ -85,6 +95,12 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             emoji: args.emoji,
           });
         }).pipe(
+          Policy.withPublicPolicy(
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          ),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
@@ -98,5 +114,6 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
   })
 ).pipe(
   // Layer.provide(SitePolicy.layer),
+  Layer.provide(PostPolicy.layer),
   Layer.provide(CommentReactionRepository.layer)
 );

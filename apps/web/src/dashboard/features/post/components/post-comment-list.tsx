@@ -43,6 +43,7 @@ type PostCommentListProps = {
     value: CommentReactionToggleInput
   ) => Promise<void>;
   isError?: boolean;
+  isLocked?: boolean;
   isLoading?: boolean;
   loadingState?: ReactNode;
   organizationId: string;
@@ -72,6 +73,7 @@ type PostCommentListContextValue = {
     value: CommentReactionToggleInput
   ) => Promise<void>;
   isError: boolean;
+  isLocked: boolean;
   isLoading: boolean;
   organizationId: string;
   postId: string;
@@ -110,6 +112,7 @@ function PostCommentListRoot({
   handleDeleteComment,
   handleToggleCommentReaction,
   isError = false,
+  isLocked = false,
   isLoading = false,
   organizationId,
   postId,
@@ -122,6 +125,7 @@ function PostCommentListRoot({
         handleDeleteComment,
         handleToggleCommentReaction,
         isError,
+        isLocked,
         isLoading,
         organizationId,
         postId,
@@ -268,6 +272,7 @@ function PostCommentListReactions() {
   const {
     commentReactions,
     handleToggleCommentReaction,
+    isLocked,
     organizationId,
     postId,
   } = usePostCommentList();
@@ -281,6 +286,7 @@ function PostCommentListReactions() {
     <CommentReactionSection.Root
       commentId={comment.id}
       commentReactions={commentReactions}
+      disabled={isLocked}
       handleToggleReaction={handleToggleCommentReaction}
       organizationId={organizationId}
       postId={postId}
@@ -295,10 +301,14 @@ function PostCommentListReactions() {
 
 function PostCommentListActions() {
   const { data: session } = authClient.useSession();
-  const { handleDeleteComment } = usePostCommentList();
+  const { handleDeleteComment, isLocked } = usePostCommentList();
   const comment = usePostCommentItem();
 
-  if (!handleDeleteComment || session?.user?.id !== comment.userId) {
+  if (
+    !handleDeleteComment ||
+    isLocked ||
+    session?.user?.id !== comment.userId
+  ) {
     return null;
   }
 
@@ -376,6 +386,7 @@ function PostCommentListComponent({
   handleDeleteComment,
   handleToggleCommentReaction,
   isError,
+  isLocked,
   isLoading,
   loadingState,
   organizationId,
@@ -389,6 +400,7 @@ function PostCommentListComponent({
       handleToggleCommentReaction={handleToggleCommentReaction}
       isError={isError}
       isLoading={isLoading}
+      isLocked={isLocked}
       organizationId={organizationId}
       postId={postId}
     >

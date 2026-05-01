@@ -1,6 +1,4 @@
 import {
-  ArchiveArrowDownIcon,
-  ArchiveRestoreIcon,
   CircleLockIcon,
   CircleUnlockIcon,
   Copy01Icon,
@@ -32,11 +30,10 @@ import { getPublicSiteUrl } from "~/hooks/use-site";
 import { postCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 
-type DialogAction = "archive" | "lock" | null;
-type PostAdminAction = Exclude<DialogAction, null>;
+type DialogAction = "lock" | null;
+type PostAdminAction = "lock";
 
 type PostSidebarActionsProps = {
-  archivedAt: Date | string | null;
   boardSlug: string;
   canManagePost: boolean;
   lockedAt: Date | string | null;
@@ -46,7 +43,6 @@ type PostSidebarActionsProps = {
 };
 
 export function PostSidebarActions({
-  archivedAt,
   boardSlug,
   canManagePost,
   lockedAt,
@@ -58,7 +54,6 @@ export function PostSidebarActions({
     <div className="flex items-center justify-end gap-2">
       <PostPublicActionButtons postSlug={postSlug} />
       <PostAdminActionButtons
-        archivedAt={archivedAt}
         boardSlug={boardSlug}
         canManagePost={canManagePost}
         lockedAt={lockedAt}
@@ -83,14 +78,12 @@ const PostPublicActionButtons = memo(function PostPublicActionButtons({
 });
 
 function PostAdminActionButtons({
-  archivedAt,
   boardSlug,
   canManagePost,
   lockedAt,
   organizationId,
   postId,
 }: {
-  archivedAt: Date | string | null;
   boardSlug: string;
   canManagePost: boolean;
   lockedAt: Date | string | null;
@@ -103,29 +96,22 @@ function PostAdminActionButtons({
     null
   );
 
-  const isArchived = archivedAt !== null;
   const isLocked = lockedAt !== null;
-
-  const archiveLabel = isArchived ? "Unarchive post" : "Archive post";
   const lockLabel = isLocked ? "Unlock post" : "Lock post";
 
   const updatePostAdminState = createOptimisticAction<{
-    action: PostAdminAction;
-    archived: boolean;
     locked: boolean;
   }>({
-    onMutate: ({ archived, locked }) => {
+    onMutate: ({ locked }) => {
       postCollection.update(postId, (draft) => {
-        draft.archivedAt = archived ? new Date() : null;
         draft.lockedAt = locked ? new Date() : null;
       });
     },
-    mutationFn: async ({ archived, locked }) => {
+    mutationFn: async ({ locked }) => {
       await fetchRpc((rpc) =>
         rpc.PostAdminUpdate({
           id: postId,
           organizationId,
-          archived,
           locked,
         })
       );
@@ -138,34 +124,22 @@ function PostAdminActionButtons({
     setPendingAction(action);
 
     try {
-      const nextArchived = action === "archive" ? !isArchived : isArchived;
       const nextLocked = action === "lock" ? !isLocked : isLocked;
 
       await updatePostAdminState({
-        action,
-        archived: nextArchived,
         locked: nextLocked,
       });
 
       toastManager.add({
         title:
-          action === "archive"
-            ? isArchived
-              ? "Post unarchived"
-              : "Post archived"
-            : isLocked
-              ? "Post unlocked"
-              : "Post locked",
+          isLocked ? "Post unlocked" : "Post locked",
         type: "success",
       });
 
       setDialogAction(null);
     } catch (_error) {
       toastManager.add({
-        title:
-          action === "archive"
-            ? "Failed to update archive status"
-            : "Failed to update lock status",
+        title: "Failed to update lock status",
         type: "error",
       });
     } finally {
@@ -177,28 +151,6 @@ function PostAdminActionButtons({
     <>
       {canManagePost ? (
         <>
-          <Tooltip>
-            <TooltipTrigger
-              render={(props) => (
-                <Button
-                  {...props}
-                  aria-label={archiveLabel}
-                  className="rounded-full"
-                  onClick={() => setDialogAction("archive")}
-                  size="icon-sm"
-                  variant="outline"
-                >
-                  <HugeiconsIcon
-                    icon={
-                      isArchived ? ArchiveRestoreIcon : ArchiveArrowDownIcon
-                    }
-                  />
-                </Button>
-              )}
-            />
-            <TooltipContent>{archiveLabel}</TooltipContent>
-          </Tooltip>
-
           <Tooltip>
             <TooltipTrigger
               render={(props) => (
@@ -252,19 +204,6 @@ function PostAdminActionButtons({
           </Tooltip>
         </>
       ) : null}
-
-      <ConfirmActionDialog
-        description={
-          isArchived
-            ? "This will restore the post to active views."
-            : "This will hide the post from active views until it is restored."
-        }
-        isOpen={dialogAction === "archive"}
-        isPending={pendingAction === "archive"}
-        onConfirm={() => void handleAction("archive")}
-        onOpenChange={(open) => setDialogAction(open ? "archive" : null)}
-        title={isArchived ? "Unarchive Post" : "Archive Post"}
-      />
 
       <ConfirmActionDialog
         description={

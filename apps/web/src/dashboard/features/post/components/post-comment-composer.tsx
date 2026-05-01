@@ -1,7 +1,8 @@
-import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useRef, useState } from "react";
 import { z } from "zod";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { ButtonGroup } from "~/components/ui/button-group";
 import {
@@ -32,6 +33,8 @@ type TCommentVisibility = z.infer<typeof CommentVisibilitySchema>;
 type TSchema = z.infer<typeof Schema>;
 
 type PostCommentComposerProps = {
+  disabled?: boolean;
+  disabledReason?: string;
   handleAddComment: (value: TSchema) => Promise<void>;
   defaultVisibility?: TSchema["visibility"];
   isAuthenticated: boolean;
@@ -56,6 +59,8 @@ const commentVisibilityCopy: Record<
 };
 
 export function PostCommentComposer({
+  disabled = false,
+  disabledReason = "Comments are locked for this post.",
   defaultVisibility = "PUBLIC",
   handleAddComment,
   isAuthenticated,
@@ -74,6 +79,11 @@ export function PostCommentComposer({
       onSubmit: Schema,
     },
     onSubmit: async ({ value }) => {
+      if (disabled) {
+        toastManager.add({ title: disabledReason, type: "error" });
+        return;
+      }
+
       if (!(userId && userName)) {
         toastManager.add({ title: "Sign in to comment", type: "error" });
         return;
@@ -96,7 +106,7 @@ export function PostCommentComposer({
 
   return (
     <form
-      className="mt-3"
+      className="mt-3 flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -115,7 +125,7 @@ export function PostCommentComposer({
                     <Editor
                       className="min-w-0 flex-1"
                       content={field.state.value}
-                      editable
+                      editable={!disabled}
                       key={visibility + editorKey}
                       onUpdate={(ref) =>
                         field.handleChange(ref.editor?.getHTML() ?? "")
@@ -139,7 +149,7 @@ export function PostCommentComposer({
 
                       return (
                         <Button
-                          disabled={isSubmitting}
+                          disabled={disabled || isSubmitting}
                           size="sm"
                           type="submit"
                           variant={
@@ -161,6 +171,7 @@ export function PostCommentComposer({
                         render={
                           <Button
                             className="pl-2!"
+                            disabled={disabled}
                             size="sm"
                             variant={
                               field.state.value === "INTERNAL"
@@ -205,6 +216,13 @@ export function PostCommentComposer({
           </div>
         </div>
       </div>
+      {disabled && (
+        <Alert variant="info">
+          <HugeiconsIcon icon={MessageLock01Icon} />
+          <AlertTitle>Comments locked</AlertTitle>
+          <AlertDescription>{disabledReason}</AlertDescription>
+        </Alert>
+      )}
     </form>
   );
 }

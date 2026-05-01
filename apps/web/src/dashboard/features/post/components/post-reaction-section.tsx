@@ -12,9 +12,11 @@ export type PostReaction = {
 };
 
 export function PostReactionSection({
+  disabled = false,
   handleToggleReaction: handleToggleReaction_,
   postReactions,
 }: {
+  disabled?: boolean;
   handleToggleReaction: (
     emoji: string,
     existingUserEmojiReaction: PostReaction | undefined
@@ -48,6 +50,10 @@ export function PostReactionSection({
   }, [postReactions, currentUserId]);
 
   const handleToggleReaction = async (emoji: string) => {
+    if (disabled) {
+      return;
+    }
+
     if (!currentUserId) {
       toastManager.add({ title: "Sign in to react", type: "error" });
       return;
@@ -72,12 +78,14 @@ export function PostReactionSection({
   return (
     <div className="flex items-center gap-1">
       <ReactionList
+        disabled={disabled}
         isSelected={(emoji) => userReactionSet.has(emoji)}
         isToggling={isToggling}
         onToggleReaction={handleToggleReaction}
         reactionCounts={reactionCounts}
       />
       <ReactionButton
+        disabled={disabled}
         isSelected={(emoji) => userReactionSet.has(emoji)}
         isToggling={isToggling}
         onToggleReaction={handleToggleReaction}

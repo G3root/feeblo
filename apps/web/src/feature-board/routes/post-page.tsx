@@ -112,6 +112,12 @@ const UpdatedPostSchema = z.object({
   organizationId: z.string(),
 });
 
+type SessionMembership = {
+  membershipId: string;
+  organizationId: string;
+  userId: string;
+};
+
 export function PostPage({ slug }: { slug: string }) {
   const site = useSite();
   const { data: session } = authClient.useSession();
@@ -302,6 +308,7 @@ export function PostPage({ slug }: { slug: string }) {
   const boardName = board?.name ?? "Unassigned";
   const authorName = post?.user?.name ?? "Anonymous";
   const authorInitials = getInitials(post?.user?.name ?? "Anonymous");
+  const isLocked = post.lockedAt !== null;
   const publishedDate = formatPublishedDate(post.createdAt);
   const selectedTags = postTagsQuery.data ?? [];
 
@@ -312,6 +319,10 @@ export function PostPage({ slug }: { slug: string }) {
     content: string;
     visibility: "PUBLIC" | "INTERNAL";
   }) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
     if (!session) {
       throw new Error("session not found");
     }
@@ -344,6 +355,10 @@ export function PostPage({ slug }: { slug: string }) {
     postId,
     userId,
   }: CommentReactionToggleInput) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
     if (existingReaction) {
       const tx = publicCommentReactionCollection.delete(
         getCommentReactionCollectionKey(existingReaction)
@@ -368,6 +383,10 @@ export function PostPage({ slug }: { slug: string }) {
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
     const tx = publicCommentCollection.delete(commentId);
     await tx.isPersisted.promise;
   };
@@ -396,6 +415,7 @@ export function PostPage({ slug }: { slug: string }) {
             <div className="shrink-0 pt-1">
               <UpvoteButton
                 hasUserUpVoted={post.hasUserUpVoted}
+                isLocked={isLocked}
                 postId={post.id}
                 upvoteCount={post.upVotes}
               />
@@ -432,6 +452,7 @@ export function PostPage({ slug }: { slug: string }) {
 
               <Suspense fallback={<PostReactionBarSkeleton />}>
                 <PostReactionBar
+                  disabled={isLocked}
                   organizationId={site.organizationId}
                   postId={post.id}
                 />
@@ -440,6 +461,8 @@ export function PostPage({ slug }: { slug: string }) {
               <div className="space-y-4">
                 <PostCommentComposer
                   defaultVisibility="PUBLIC"
+                  disabled={isLocked}
+                  disabledReason="This post is locked, so new comments are disabled until it is unlocked."
                   handleAddComment={handleAddComment}
                   isAuthenticated={!!session?.session}
                 />
@@ -458,6 +481,7 @@ export function PostPage({ slug }: { slug: string }) {
                   isLoading={
                     commentsQuery.isLoading || commentReactionsQuery.isLoading
                   }
+                  isLocked={isLocked}
                   organizationId={site.organizationId}
                   postId={post.id}
                 >
@@ -673,10 +697,12 @@ const PostMetaSidebar = {
 
 function UpvoteButton({
   hasUserUpVoted,
+  isLocked = false,
   postId,
   upvoteCount,
 }: {
   hasUserUpVoted: boolean;
+  isLocked?: boolean;
   postId: string;
   upvoteCount: number;
 }) {
@@ -687,8 +713,10 @@ function UpvoteButton({
 
   return (
     <PostUpvoteButton
+      disabled={isLocked}
       handleToggleUpvote={async () => {
         await handleToggleUpvote({
+          disabled: isLocked,
           postId,
           organizationId,
           existingUpvote: hasUserUpVoted,
@@ -702,9 +730,11 @@ function UpvoteButton({
 }
 
 function PostReactionBar({
+  disabled = false,
   organizationId,
   postId,
 }: {
+  disabled?: boolean;
   organizationId: string;
   postId: string;
 }) {
@@ -727,14 +757,20 @@ function PostReactionBar({
     emoji: string,
     existingUserEmojiReaction: PostReaction | undefined
   ) => {
+    if (disabled) {
+      return;
+    }
+
     const currentUserId = session?.user?.id;
-    const memberships = session?.memberships;
+    const memberships = (
+      session as { memberships?: SessionMembership[] } | null
+    )?.memberships;
     if (!currentUserId) {
       toastManager.add({ title: "Sign in to react", type: "error" });
       return;
     }
     const isMember = memberships?.find(
-      (membership) =>
+      (membership: SessionMembership) =>
         membership.userId === currentUserId &&
         membership.organizationId === organizationId
     );
@@ -761,6 +797,7 @@ function PostReactionBar({
 
   return (
     <PostReactionSection
+      disabled={disabled}
       handleToggleReaction={handleToggleReaction}
       postReactions={postReactions}
     />

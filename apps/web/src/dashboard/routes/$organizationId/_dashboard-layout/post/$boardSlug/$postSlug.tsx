@@ -1,7 +1,10 @@
 import { generateId } from "@feeblo/utils/id";
+import { CircleLockIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Suspense } from "react";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
@@ -15,13 +18,12 @@ import { toastManager } from "~/components/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";
-import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
-
 import {
   PostDetails,
   PostDetailsFormSkeleton,
 } from "~/features/post/components/post-details-form";
 import { StatusSelect } from "~/features/post/components/post-properties";
+import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
   TagList,
@@ -221,6 +223,8 @@ function RouteComponent() {
     );
   }
 
+  const isLocked = post.lockedAt !== null;
+
   const handleTagSelect = async (
     option: TagSelectOption,
     isSelected: boolean
@@ -260,6 +264,10 @@ function RouteComponent() {
     content: string;
     visibility: "PUBLIC" | "INTERNAL";
   }) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
     if (!session) {
       throw new Error("session not found");
     }
@@ -293,6 +301,10 @@ function RouteComponent() {
     postId,
     userId,
   }: CommentReactionToggleInput) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
     if (existingReaction) {
       const tx = commentReactionCollection.delete(
         getCommentReactionCollectionKey(existingReaction)
@@ -317,6 +329,10 @@ function RouteComponent() {
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
     const tx = commentCollection.delete(commentId);
     await tx.isPersisted.promise;
   };
@@ -333,6 +349,7 @@ function RouteComponent() {
             postId={post.id}
             title={post.title}
           />
+          <PostStatusAlerts lockedAt={post.lockedAt} />
           <PostDetails.Description
             description={post.content}
             organizationId={organizationId}
@@ -342,6 +359,7 @@ function RouteComponent() {
           <Suspense fallback={<PostDetails.ActionsSkeleton />}>
             <div className="flex items-center justify-between py-1">
               <PostDetails.EngagementBar
+                disabled={isLocked}
                 organizationId={organizationId}
                 postId={post.id}
               />
@@ -349,6 +367,8 @@ function RouteComponent() {
           </Suspense>
           <PostDetails.CommentComposer
             defaultVisibility="PUBLIC"
+            disabled={isLocked}
+            disabledReason="This post is locked, so new comments and notes are disabled until it is unlocked."
             handleAddComment={handleAddComment}
             isAuthenticated
             showVisibilityPicker
@@ -359,6 +379,7 @@ function RouteComponent() {
               comments={comments}
               handleDeleteComment={handleDeleteComment}
               handleToggleCommentReaction={handleToggleCommentReaction}
+              isLocked={isLocked}
               organizationId={organizationId}
               postId={post.id}
             >
@@ -387,7 +408,6 @@ function RouteComponent() {
         <aside className="hidden px-6 py-6 lg:block">
           <div className="sticky top-0 space-y-4">
             <PostSidebarActions
-              archivedAt={post.archivedAt}
               boardSlug={boardSlug}
               canManagePost={canManagePost}
               lockedAt={post.lockedAt}
@@ -509,6 +529,25 @@ function RouteComponent() {
 
 function PostDetailsRoutePending() {
   return <PostDetailsFormSkeleton />;
+}
+
+function PostStatusAlerts({ lockedAt }: { lockedAt: Date | string | null }) {
+  const isLocked = lockedAt !== null;
+
+  if (!isLocked) {
+    return null;
+  }
+
+  return (
+    <Alert variant="info">
+      <HugeiconsIcon icon={CircleLockIcon} />
+      <AlertTitle>Locked post</AlertTitle>
+      <AlertDescription>
+        This post is locked, so members cannot continue interacting with it
+        until it is unlocked.
+      </AlertDescription>
+    </Alert>
+  );
 }
 
 function SidebarCard({

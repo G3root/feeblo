@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
+import { PostPolicy } from "../post/policies";
 import { InternalServerError } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { UpvoteRepository } from "./repository";
@@ -9,6 +10,7 @@ import type { TUpvoteList, TUpvoteToggle } from "./schema";
 export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* UpvoteRepository;
+    const postPolicy = yield* PostPolicy;
     // const sitePolicy = yield* SitePolicy;
 
     return {
@@ -39,7 +41,15 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             userId: session.session.userId,
           });
         }).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              })
+            )
+          ),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
@@ -80,6 +90,12 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             userId: session.session.userId,
           });
         }).pipe(
+          Policy.withPolicy(
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          ),
           Effect.catchTags({
             SqlError: () =>
               Effect.fail(
@@ -91,4 +107,4 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(UpvoteRepository.layer));
+).pipe(Layer.provide(PostPolicy.layer), Layer.provide(UpvoteRepository.layer));

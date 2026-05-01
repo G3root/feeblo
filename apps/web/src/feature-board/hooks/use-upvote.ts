@@ -6,17 +6,33 @@ import { getUpvoteCollectionKey } from "~/lib/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";
 import { usePublicCollections } from "../providers/public-collections-provider";
 
+type SessionMembership = {
+  membershipId: string;
+  organizationId: string;
+  userId: string;
+};
+
 export function useUpvote() {
   const { data: session } = authClient.useSession();
   const { publicPostCollection, publicUpvoteCollection } =
     usePublicCollections();
 
   const handleToggleUpvote = createOptimisticAction<{
+    disabled?: boolean;
     postId: string;
     organizationId: string;
     existingUpvote: boolean;
   }>({
-    onMutate: ({ postId, organizationId, existingUpvote }) => {
+    onMutate: ({
+      disabled = false,
+      postId,
+      organizationId,
+      existingUpvote,
+    }) => {
+      if (disabled) {
+        return;
+      }
+
       const currentUserId = session?.user?.id;
 
       if (!currentUserId) {
@@ -24,12 +40,16 @@ export function useUpvote() {
         return;
       }
 
-      const isMember = session?.memberships?.find(
-        (membership) =>
+      const memberships = (
+        session as { memberships?: SessionMembership[] } | null
+      )?.memberships;
+      const isMember = memberships?.find(
+        (membership: SessionMembership) =>
           membership.userId === currentUserId &&
           membership.organizationId === organizationId
       );
 
+      // TODO : use query once API
       const existingUpvoteRecord = Array.from(
         publicUpvoteCollection.values()
       ).find(
@@ -72,9 +92,13 @@ export function useUpvote() {
       });
     },
     mutationFn: async (
-      { postId, organizationId },
+      { disabled = false, postId, organizationId },
       _params
     ) => {
+      if (disabled) {
+        return;
+      }
+
       await fetchRpc((rpc) =>
         rpc.UpvoteToggle({
           organizationId,

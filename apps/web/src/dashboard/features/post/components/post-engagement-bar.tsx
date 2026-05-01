@@ -17,10 +17,18 @@ import {
   PostReactionSection,
 } from "./post-reaction-section";
 
+type SessionMembership = {
+  membershipId: string;
+  organizationId: string;
+  userId: string;
+};
+
 export function PostDetailsEngagementBar({
+  disabled = false,
   organizationId,
   postId,
 }: {
+  disabled?: boolean;
   organizationId: string;
   postId: string;
 }) {
@@ -59,15 +67,20 @@ export function PostDetailsEngagementBar({
       : false;
 
   const handleToggleUpvote = async () => {
+    if (disabled) {
+      return;
+    }
+
     const currentUserId = session?.user?.id;
     if (!currentUserId) {
       toastManager.add({ title: "Sign in to upvote", type: "error" });
       return;
     }
 
-    const memberships = session?.memberships;
+    const memberships = (session as { memberships?: SessionMembership[] } | null)
+      ?.memberships;
     const isMember = memberships?.find(
-      (membership) =>
+      (membership: SessionMembership) =>
         membership.userId === currentUserId &&
         membership.organizationId === organizationId
     );
@@ -103,14 +116,19 @@ export function PostDetailsEngagementBar({
     emoji: string,
     existingUserEmojiReaction: PostReaction | undefined
   ) => {
+    if (disabled) {
+      return;
+    }
+
     const currentUserId = session?.user?.id;
-    const memberships = session?.memberships;
+    const memberships = (session as { memberships?: SessionMembership[] } | null)
+      ?.memberships;
     if (!currentUserId) {
       toastManager.add({ title: "Sign in to react", type: "error" });
       return;
     }
     const isMember = memberships?.find(
-      (membership) =>
+      (membership: SessionMembership) =>
         membership.userId === currentUserId &&
         membership.organizationId === organizationId
     );
@@ -138,11 +156,13 @@ export function PostDetailsEngagementBar({
   return (
     <>
       <PostReactionSection
+        disabled={disabled}
         handleToggleReaction={handleToggleReaction}
         postReactions={postReactions}
       />
 
       <PostUpvoteButton
+        disabled={disabled}
         handleToggleUpvote={handleToggleUpvote}
         isUpvoted={hasCurrentUserUpvoted}
         upvoteCount={upvotes.length}
@@ -153,11 +173,13 @@ export function PostDetailsEngagementBar({
 }
 
 export function PostUpvoteButton({
+  disabled = false,
   isUpvoted,
   variant,
   handleToggleUpvote,
   upvoteCount,
 }: {
+  disabled?: boolean;
   isUpvoted: boolean;
   variant: "compact" | "default";
   handleToggleUpvote: () => Promise<void> | void;
@@ -185,7 +207,7 @@ export function PostUpvoteButton({
             ? "bg-primary/10 text-primary"
             : "bg-muted/70 text-muted-foreground hover:bg-muted"
         )}
-        disabled={isToggling}
+        disabled={disabled || isToggling}
         onClick={handleToggleUpvote_}
         type="button"
       >
@@ -200,7 +222,7 @@ export function PostUpvoteButton({
   return (
     <Button
       className="rounded-full"
-      disabled={isToggling}
+      disabled={disabled || isToggling}
       onClick={handleToggleUpvote_}
       size="sm"
       type="button"
