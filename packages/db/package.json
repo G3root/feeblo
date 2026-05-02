@@ -25,14 +25,14 @@
     "db:down": "docker compose down"
   },
   "dependencies": {
-    "@effect/sql-drizzle": "^0.48.1",
+    "@effect/sql-drizzle": "catalog:",
     "@effect/sql-pg": "catalog:",
     "dotenv": "catalog:",
-    "drizzle-orm": "^0.45.1",
+    "drizzle-orm": "catalog:",
     "effect": "catalog:",
-    "pg": "^8.17.1",
+    "pg": "catalog:",
     "zod": "catalog:"
-  },
+  }, 
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
     "@feeblo/config": "workspace:*",
