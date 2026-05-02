@@ -14,11 +14,7 @@ import {
 } from "~/hooks/use-policy";
 import { postCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
-import { cn } from "~/lib/utils";
-import {
-  toRenderableRichTextHtml,
-  uploadPostEditorImage,
-} from "./post-editor-utils";
+import { uploadPostEditorImage } from "./post-editor-utils";
 
 const UpdatedPostSchema = z.object({
   id: z.string(),
@@ -117,22 +113,6 @@ export function PostEditableContent({
       disabled={!isOwner}
       onChange={(value) => mutate({ value })}
       value={initialDescription.current}
-    />
-  );
-}
-
-export function PostReadonlyContent({
-  className,
-  content,
-}: {
-  className?: string;
-  content: string;
-}) {
-  return (
-    <div
-      className={cn(READONLY_RICH_TEXT_CLASS, className)}
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: rich text is sanitized before rendering.
-      dangerouslySetInnerHTML={{ __html: toRenderableRichTextHtml(content) }}
     />
   );
 }

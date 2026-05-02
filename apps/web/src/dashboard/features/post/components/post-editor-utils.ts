@@ -5,7 +5,7 @@ import {
 
 const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
 
-const SUPPORTED_IMAGE_TYPES = new Set([
+export const SUPPORTED_IMAGE_TYPES = new Set([
   "image/gif",
   "image/jpeg",
   "image/png",
@@ -33,31 +33,6 @@ export function isRichTextContentEmpty(content: string) {
     .trim();
 
   return textOnly.length === 0;
-}
-
-function escapeHtml(content: string) {
-  return content
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-export function toRenderableRichTextHtml(content: string) {
-  const trimmed = content.trim();
-  if (trimmed.length === 0) {
-    return "";
-  }
-
-  if (/<\/?[a-z][\s\S]*>/i.test(trimmed)) {
-    return content;
-  }
-
-  return content
-    .split(/\n+/)
-    .map((line) => `<p>${escapeHtml(line)}</p>`)
-    .join("");
 }
 
 export async function uploadPostEditorImage(

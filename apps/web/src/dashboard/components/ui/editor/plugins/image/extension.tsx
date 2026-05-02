@@ -2,6 +2,7 @@
 // credit https://github.com/resend/react-email/blob/canary/packages/editor/src/plugins/image/extension.tsx
 
 import { Node } from "@tiptap/core";
+import { SUPPORTED_IMAGE_TYPES } from "~/features/post/components/post-editor-utils";
 import { createImageFileHandlerPlugin } from "./file-handler";
 import type { UseEditorImageOptions } from "./types";
 import { executeUploadFlow } from "./upload-flow";
@@ -48,7 +49,7 @@ export function createImageExtension(options: UseEditorImageOptions) {
           ({ editor }) => {
             const input = document.createElement("input");
             input.type = "file";
-            input.accept = "image/*";
+            input.accept = [...SUPPORTED_IMAGE_TYPES].join(",");
             input.onchange = () => {
               const file = input.files?.[0];
               if (file) {
