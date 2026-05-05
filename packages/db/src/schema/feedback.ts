@@ -318,7 +318,7 @@ export const upvote = pgTable(
 );
 
 export const postReaction = pgTable(
-  "postReaction",
+  "post_reaction",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
@@ -382,7 +382,7 @@ export const comment = pgTable("comment", {
 });
 
 export const commentReaction = pgTable(
-  "commentReaction",
+  "comment_reaction",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
