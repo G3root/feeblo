@@ -10,7 +10,7 @@
     "./html": "./src/html.ts"
   },
   "dependencies": {
-    "@better-auth/utils": "^0.3.1",
+    "@better-auth/utils": "catalog:",
     "@noble/ciphers": "^2.0.1",
     "legid": "^0.1.4",
     "nanoid": "^5.1.6",

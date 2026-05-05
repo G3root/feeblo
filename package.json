@@ -1,10 +1,12 @@
 {
   "name": "feeblo",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ]
+  },
   "type": "module",
   "scripts": {
     "dev": "turbo dev",
@@ -30,12 +32,10 @@
     "check": "ultracite check",
     "fix": "ultracite fix"
   },
-  "dependencies": {
+  "devDependencies": {
     "dotenv": "catalog:",
     "zod": "catalog:",
-    "@dotenvx/dotenvx": "catalog:"
-  },
-  "devDependencies": {
+    "@dotenvx/dotenvx": "catalog:",
     "@biomejs/biome": "2.4.0",
     "@cloudflare/workers-types": "catalog:",
     "@effect/language-service": "^0.85.1",
