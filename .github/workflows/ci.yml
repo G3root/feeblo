@@ -1,0 +1,30 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_app:
+    name: Build App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/pnpm-install
+
+      - name: Copy env
+        run: cp .env.example .env
+
+      - name: Build app
+        run: pnpm run build
+  
