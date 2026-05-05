@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import {
   HttpApiScalar,
   HttpApp,
@@ -6,11 +7,11 @@ import {
   HttpServerResponse,
 } from "@effect/platform";
 import {
-  BunFileSystem,
-  BunHttpServer,
-  BunPath,
-  BunRuntime,
-} from "@effect/platform-bun";
+  NodeFileSystem,
+  NodeHttpServer,
+  NodePath,
+  NodeRuntime,
+} from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { DB } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
@@ -97,16 +98,16 @@ HttpLayerRouter.serve(AllRoutes, {
   Layer.provide(HttpApiAuthMiddlewareLive),
   Layer.provide(AuthLayer),
   Layer.provide(ServiceLayers),
-  Layer.provide(BunFileSystem.layer),
-  Layer.provide(BunPath.layer),
+  Layer.provide(NodeFileSystem.layer),
+  Layer.provide(NodePath.layer),
   Layer.provide(
-    BunHttpServer.layerConfig(
+    NodeHttpServer.layerConfig(
+      createServer,
       Config.all({
         port: Config.number("SERVER_PORT").pipe(Config.withDefault(3000)),
-        idleTimeout: Config.succeed(120),
       })
     )
   ),
   Layer.launch,
-  BunRuntime.runMain
+  NodeRuntime.runMain
 );

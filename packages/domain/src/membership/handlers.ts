@@ -1,4 +1,4 @@
-import { APIError as BetterAuthApiError } from "better-call";
+import { APIError as BetterAuthApiError } from "better-auth";
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import {
