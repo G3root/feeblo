@@ -1,12 +1,7 @@
 import { Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
-import { BadRequestError, InternalServerError } from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
-import {
-  FailedToCreateBoardError,
-  FailedToDeleteBoardError,
-  FailedToUpdateBoardError,
-} from "./errors";
 import { BoardPolicy } from "./policies";
 import { BoardRepository } from "./repository";
 import { BoardRpcs } from "./rpcs";
@@ -30,12 +25,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
           })
           .pipe(
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({ message: "Failed to list boards" })
-                ),
-            })
+            withRemapDbErrors("Board", "select")
           ),
       BoardListPublic: (args: TBoardList) =>
         Effect.gen(function* () {
@@ -45,14 +35,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             organizationId: args.organizationId,
             visibility: "PUBLIC",
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list boards" })
-              ),
-          })
-        ),
+        }).pipe(withRemapDbErrors("Board", "select")),
       BoardDelete: (args: TBoardDelete) => {
         return Effect.gen(function* () {
           return yield* repository.delete({
@@ -69,9 +52,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToDeleteBoardError()),
-          })
+          withRemapDbErrors("Board", "delete")
         );
       },
       BoardCreate: (args: TBoardCreate) => {
@@ -102,9 +83,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToCreateBoardError()),
-          })
+          withRemapDbErrors("Board", "create")
         );
       },
       BoardUpdate: (args: TBoardUpdate) =>
@@ -136,9 +115,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToUpdateBoardError()),
-          })
+          withRemapDbErrors("Board", "update")
         ),
     };
   })

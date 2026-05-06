@@ -1,15 +1,9 @@
 import { Effect, Layer } from "effect";
 import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
-import { BadRequestError, InternalServerError } from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
-import {
-  FailedToCreatePostError,
-  FailedToDeletePostError,
-  FailedToMergePostError,
-  FailedToUpdatePostError,
-} from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -39,12 +33,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list posts" })
-              ),
-          })
+          withRemapDbErrors("Post", "select")
         );
       },
       PostListPublic: (args: TPostList) => {
@@ -61,14 +50,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             boardId: args.boardId,
             userId,
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list posts" })
-              ),
-          })
-        );
+        }).pipe(withRemapDbErrors("Post", "select"));
       },
       PostDelete: (args: TPostDelete) => {
         return repository
@@ -85,9 +67,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
                 boardId: args.boardId,
               })
             ),
-            Effect.catchTags({
-              SqlError: () => Effect.fail(new FailedToDeletePostError()),
-            })
+            withRemapDbErrors("Post", "delete")
           );
       },
       PostUpdate: (args: TPostUpdate) => {
@@ -101,9 +81,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
                 boardId: args.boardId,
               })
             ),
-            Effect.catchTags({
-              SqlError: () => Effect.fail(new FailedToUpdatePostError()),
-            })
+            withRemapDbErrors("Post", "update")
           );
       },
       PostCreate: (args: TPostCreate) => {
@@ -133,21 +111,17 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             creatorId: session.session.userId,
             ...(membership ? { creatorMemberId: membership.membershipId } : {}),
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToCreatePostError()),
-          })
-        );
+        }).pipe(withRemapDbErrors("Post", "create"));
       },
       PostAdminUpdate: (args: TPostAdminUpdate) =>
-        repository.adminUpdate(args).pipe(
-          Policy.withPolicy(
-            postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
+        repository
+          .adminUpdate(args)
+          .pipe(
+            Policy.withPolicy(
+              postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
+            ),
+            withRemapDbErrors("Post", "update")
           ),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToUpdatePostError()),
-          })
-        ),
       PostMerge: (args: TPostMerge) =>
         Effect.gen(function* () {
           if (args.sourcePostId === args.targetPostId) {
@@ -160,9 +134,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           Policy.withPolicy(
             postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
           ),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToMergePostError()),
-          })
+          withRemapDbErrors("Post", "update")
         ),
     };
   })

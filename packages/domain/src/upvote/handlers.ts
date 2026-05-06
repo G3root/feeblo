@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
-import { InternalServerError } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { UpvoteRepository } from "./repository";
 import { UpvoteRpcs } from "./rpcs";
@@ -22,14 +22,7 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list upvotes",
-                })
-              ),
-          })
+          withRemapDbErrors("Upvote", "select")
         ),
       UpvoteToggle: (args: TUpvoteToggle) =>
         Effect.gen(function* () {
@@ -50,14 +43,7 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to toggle upvote",
-                })
-              ),
-          })
+          withRemapDbErrors("Upvote", "update")
         ),
       UpvoteListPublic: (args: TUpvoteList) =>
         Effect.gen(function* () {
@@ -67,16 +53,7 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             postId: args.postId,
             organizationId: args.organizationId,
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list upvotes",
-                })
-              ),
-          })
-        ),
+        }).pipe(withRemapDbErrors("Upvote", "select")),
       UpvoteTogglePublic: (args: TUpvoteToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -96,14 +73,7 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
               postId: args.postId,
             })
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to toggle upvote",
-                })
-              ),
-          })
+          withRemapDbErrors("Upvote", "update")
         ),
     };
   })

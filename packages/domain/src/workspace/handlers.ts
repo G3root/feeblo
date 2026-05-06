@@ -1,7 +1,7 @@
 import { slugify } from "@feeblo/utils/url";
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { BadRequestError, InternalServerError } from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "./repository";
 import { WorkspaceRpcs } from "./rpcs";
@@ -39,28 +39,12 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
           });
 
           return { organizationId };
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to create workspace",
-                })
-              ),
-          })
-        );
+        }).pipe(withRemapDbErrors("Workspace", "create"));
       },
       WorkspaceProductList: () =>
-        repository.findProducts().pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list workspace products",
-                })
-              ),
-          })
-        ),
+        repository
+          .findProducts()
+          .pipe(withRemapDbErrors("Workspace", "select")),
       WorkspacePlanGet: (args: TWorkspaceInput) =>
         repository
           .findPlanByOrganizationId({
@@ -68,14 +52,7 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
           })
           .pipe(
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Failed to get workspace plan",
-                  })
-                ),
-            })
+            withRemapDbErrors("Workspace", "select")
           ),
     };
   })

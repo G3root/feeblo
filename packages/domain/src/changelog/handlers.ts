@@ -1,14 +1,9 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { InternalServerError } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
-import {
-  FailedToCreateChangelogError,
-  FailedToDeleteChangelogError,
-  FailedToUpdateChangelogError,
-} from "./errors";
 import { ChangelogPolicy } from "./policies";
 import { ChangelogRepository } from "./repository";
 import { ChangelogRpcs } from "./rpcs";
@@ -27,31 +22,19 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
 
     return {
       ChangelogList: (args: TChangelogList) =>
-        repository.findMany(args).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list changelogs",
-                })
-              ),
-          })
-        ),
+        repository
+          .findMany(args)
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            withRemapDbErrors("Changelog", "select")
+          ),
 
       ChangelogListPublic: (args: TChangelogList) =>
         Effect.gen(function* () {
           return yield* repository.findManyPublished(args);
         }).pipe(
           Policy.withPolicy(sitePolicy.canViewChangelog(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list changelogs",
-                })
-              ),
-          })
+          withRemapDbErrors("Changelog", "select")
         ),
 
       ChangelogCreate: (args: TChangelogCreate) => {
@@ -67,9 +50,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToCreateChangelogError()),
-          })
+          withRemapDbErrors("Changelog", "create")
         );
       },
 
@@ -84,9 +65,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToDeleteChangelogError()),
-          })
+          withRemapDbErrors("Changelog", "delete")
         ),
 
       ChangelogUpdate: (args: TChangelogUpdate) =>
@@ -105,9 +84,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
                 })
               )
             ),
-            Effect.catchTags({
-              SqlError: () => Effect.fail(new FailedToUpdateChangelogError()),
-            })
+            withRemapDbErrors("Changelog", "update")
           ),
     };
   })

@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
-import { InternalServerError } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
@@ -24,14 +24,7 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list post reactions",
-                })
-              ),
-          })
+          withRemapDbErrors("PostReaction", "select")
         ),
       PostReactionToggle: (args: TPostReactionToggle) =>
         Effect.gen(function* () {
@@ -55,14 +48,7 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to toggle post reaction",
-                })
-              ),
-          })
+          withRemapDbErrors("PostReaction", "update")
         ),
       PostReactionListPublic: (args: TPostReactionList) =>
         Effect.gen(function* () {
@@ -72,16 +58,7 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             postId: args.postId,
             organizationId: args.organizationId,
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list post reactions",
-                })
-              ),
-          })
-        ),
+        }).pipe(withRemapDbErrors("PostReaction", "select")),
       PostReactionTogglePublic: (args: TPostReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -101,14 +78,7 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
               postId: args.postId,
             })
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to toggle post reaction",
-                })
-              ),
-          })
+          withRemapDbErrors("PostReaction", "update")
         ),
     };
   })
