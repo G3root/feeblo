@@ -8,7 +8,7 @@ import {
 } from "@feeblo/db/schema/feedback";
 import { generateId } from "@feeblo/utils/id";
 import { and, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 type TCommentReactionList = {
   organizationId: string;
@@ -216,11 +216,11 @@ const makeCommentReactionRepository = Effect.gen(function* () {
   };
 });
 
-export class CommentReactionRepository extends Effect.Service<CommentReactionRepository>()(
+export class CommentReactionRepository extends Context.Service<CommentReactionRepository>()(
   "CommentReactionRepository",
   {
-    effect: makeCommentReactionRepository,
+    make: makeCommentReactionRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

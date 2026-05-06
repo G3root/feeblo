@@ -6,9 +6,9 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export const MembershipServiceErrors = Schema.Union(
+export const MembershipServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   BadRequestError,
-  PolicyDeniedError
-);
+  PolicyDeniedError,
+]);

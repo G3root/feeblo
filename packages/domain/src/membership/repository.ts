@@ -5,7 +5,7 @@ import {
   user as userTable,
 } from "@feeblo/db/schema/auth";
 import { and, eq, inArray } from "drizzle-orm";
-import { Effect, Array as EffectArray } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 import { PRIVILEGED_MEMBER_ROLES } from "../plan-entitlements";
 
 type TFindMembershipsByUserId = {
@@ -253,11 +253,11 @@ const makeMembershipRepository = Effect.gen(function* () {
   };
 });
 
-export class MembershipRepository extends Effect.Service<MembershipRepository>()(
+export class MembershipRepository extends Context.Service<MembershipRepository>()(
   "MembershipRepository",
   {
-    effect: makeMembershipRepository,
+    make: makeMembershipRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

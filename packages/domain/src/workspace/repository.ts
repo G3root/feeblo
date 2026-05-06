@@ -14,7 +14,7 @@ import {
 import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, desc, eq } from "drizzle-orm";
-import { Effect, Array as EffectArray, Option } from "effect";
+import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 import { FailedToCreateWorkspaceError } from "./errors";
 
 const makeWorkspaceRepository = Effect.gen(function* () {
@@ -161,11 +161,11 @@ const makeWorkspaceRepository = Effect.gen(function* () {
   };
 });
 
-export class WorkspaceRepository extends Effect.Service<WorkspaceRepository>()(
+export class WorkspaceRepository extends Context.Service<WorkspaceRepository>()(
   "WorkspaceRepository",
   {
-    effect: makeWorkspaceRepository,
+    make: makeWorkspaceRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

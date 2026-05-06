@@ -9,7 +9,7 @@ import {
 import { generatePublicId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import {
   PostTagAssignment,
   type TChangelogTagList,
@@ -261,11 +261,11 @@ const makeTagRepository = Effect.gen(function* () {
   };
 });
 
-export class TagRepository extends Effect.Service<TagRepository>()(
+export class TagRepository extends Context.Service<TagRepository>()(
   "TagRepository",
   {
-    effect: makeTagRepository,
+    make: makeTagRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

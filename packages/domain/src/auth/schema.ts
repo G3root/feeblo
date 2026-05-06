@@ -2,7 +2,7 @@ import { Schema } from "effect";
 
 export const VerificationOTPStateSchema = Schema.Struct({
   email: Schema.String,
-  type: Schema.Literal("email-verification", "reset-password"),
+  type: Schema.Literals(["email-verification", "reset-password"]),
 });
 
 export type VerificationOTPState = Schema.Schema.Type<
@@ -11,5 +11,5 @@ export type VerificationOTPState = Schema.Schema.Type<
 
 export const VerificationOTPResponseSchema = Schema.Struct({
   email: Schema.String,
-  type: Schema.Literal("email-verification", "reset-password"),
+  type: Schema.Literals(["email-verification", "reset-password"]),
 });

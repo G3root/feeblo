@@ -7,7 +7,15 @@ import { generateId } from "@feeblo/utils/id";
 import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
 import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
 import { eq } from "drizzle-orm";
-import { Effect, Array as EffectArray, Option, Schema } from "effect";
+import {
+  Context,
+  Effect,
+  Array as EffectArray,
+  Layer,
+  Option,
+  Schema,
+  SchemaTransformation,
+} from "effect";
 
 type SubscriptionPayload = WebhookSubscriptionCreatedPayload["data"];
 type ProductPayload = WebhookProductCreatedPayload["data"];
@@ -15,53 +23,59 @@ type ProductPayload = WebhookProductCreatedPayload["data"];
 type SubscriptionInsert = typeof subscriptionTable.$inferInsert;
 type ProductInsert = typeof productTable.$inferInsert;
 
-const DbSubscriptionStatus = Schema.Literal(
+const DbSubscriptionStatus = Schema.Literals([
   "incomplete",
   "incomplete_expired",
   "trialing",
   "active",
   "past_due",
   "canceled",
-  "unpaid"
+  "unpaid",
+]);
+
+const SubscriptionStatusFromPolar = Schema.String.pipe(
+  Schema.decodeTo(
+    DbSubscriptionStatus,
+    SchemaTransformation.transform({
+      decode: (value) =>
+        Schema.is(DbSubscriptionStatus)(value) ? value : "incomplete",
+      encode: (value) => value,
+    })
+  )
 );
 
-const SubscriptionStatusFromPolar = Schema.transform(
-  Schema.String,
-  DbSubscriptionStatus,
-  {
-    strict: false,
-    decode: (value) =>
-      Schema.is(DbSubscriptionStatus)(value) ? value : "incomplete",
-    encode: (value) => value,
-  }
-);
-
-const ProductRecurringIntervalFromPolar = Schema.transform(
-  Schema.NullOr(Schema.String),
-  Schema.NullOr(Schema.Literal("month", "year")),
-  {
-    strict: false,
-    decode: (value) => (value === "month" || value === "year" ? value : null),
-    encode: (value) => value,
-  }
+const ProductRecurringIntervalFromPolar = Schema.NullOr(Schema.String).pipe(
+  Schema.decodeTo(
+    Schema.NullOr(Schema.Literals(["month", "year"])),
+    SchemaTransformation.transform({
+      decode: (value) => (value === "month" || value === "year" ? value : null),
+      encode: (value) => value,
+    })
+  )
 );
 
 const ProductMetadataSchema = Schema.Struct({
-  plan: Schema.Literal("starter", "professional"),
-  variant: Schema.Literal("monthly", "yearly"),
+  plan: Schema.Literals(["starter", "professional"]),
+  variant: Schema.Literals(["monthly", "yearly"]),
 });
 
-const ProductMetadataFromPolar = Schema.transform(
-  Schema.Unknown,
-  Schema.NullOr(ProductMetadataSchema),
-  {
-    strict: false,
-    decode: (value) => {
-      const decoded = Schema.decodeUnknownEither(ProductMetadataSchema)(value);
-      return decoded._tag === "Right" ? decoded.right : null;
-    },
-    encode: (value) => value,
-  }
+const ProductMetadataFromPolar = Schema.Unknown.pipe(
+  Schema.decodeTo(
+    Schema.NullOr(ProductMetadataSchema),
+    SchemaTransformation.transform({
+      decode: (value) => {
+        try {
+          const decoded = Schema.decodeUnknownSync(ProductMetadataSchema)(
+            value
+          );
+          return decoded;
+        } catch (_error) {
+          return null;
+        }
+      },
+      encode: (value) => value,
+    })
+  )
 );
 
 const decodeString = Schema.decodeUnknownSync(Schema.String);
@@ -193,11 +207,11 @@ const makeBillingRepository = Effect.gen(function* () {
   };
 });
 
-export class BillingRepository extends Effect.Service<BillingRepository>()(
+export class BillingRepository extends Context.Service<BillingRepository>()(
   "BillingRepository",
   {
-    effect: makeBillingRepository,
+    make: makeBillingRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

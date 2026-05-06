@@ -1,34 +1,33 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 
-export class BadRequestError extends Schema.TaggedError<BadRequestError>()(
+export class BadRequestError extends Schema.TaggedErrorClass<BadRequestError>()(
   "BadRequestError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({ status: 400, identifier: "BadRequestError" })
+  { httpApiStatus: 400, identifier: "BadRequestError" }
 ) {}
 
-export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
+export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
   "NotFoundError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({ status: 404, identifier: "NotFoundError" })
+  { httpApiStatus: 404, identifier: "NotFoundError" }
 ) {}
 
-export class UnauthorizedError extends Schema.TaggedError<UnauthorizedError>()(
+export class UnauthorizedError extends Schema.TaggedErrorClass<UnauthorizedError>()(
   "UnauthorizedError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({ status: 401, identifier: "UnauthorizedError" })
+  { httpApiStatus: 401, identifier: "UnauthorizedError" }
 ) {}
 
-export class InternalServerError extends Schema.TaggedError<InternalServerError>()(
+export class InternalServerError extends Schema.TaggedErrorClass<InternalServerError>()(
   "InternalServerError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({ status: 500, identifier: "InternalServerError" })
+  { httpApiStatus: 500, identifier: "InternalServerError" }
 ) {}

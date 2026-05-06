@@ -1,5 +1,9 @@
-import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "@effect/platform";
 import { Schema } from "effect";
+import {
+  HttpApiEndpoint,
+  HttpApiGroup,
+  OpenApi,
+} from "effect/unstable/httpapi";
 import {
   BadRequestError,
   InternalServerError,
@@ -16,43 +20,41 @@ export const VerificationOTPSuccessSchema = Schema.Struct({
 
 export const AuthApiGroup = HttpApiGroup.make("AuthApiGroup")
   .add(
-    HttpApiEndpoint.post("postVerificationOtp", "/auth/verification-otp")
-      .setPayload(VerificationOTPStateSchema)
-      .addSuccess(VerificationOTPSuccessSchema, { status: 200 })
-      .addError(BadRequestError)
-      .addError(InternalServerError)
-      .annotateContext(
-        OpenApi.annotations({
-          title: "Create Verification OTP",
-          description:
-            "Creates verification OTP state and stores it in a cookie",
-          summary: "Create verification OTP",
-        })
+    HttpApiEndpoint.post("postVerificationOtp", "/auth/verification-otp", {
+      payload: VerificationOTPStateSchema,
+      error: Schema.Union([BadRequestError, InternalServerError]),
+      success: VerificationOTPSuccessSchema,
+    })
+      .annotate(OpenApi.Title, "Create Verification OTP")
+      .annotate(
+        OpenApi.Description,
+        "Creates verification OTP state and stores it in a cookie"
       )
+      .annotate(OpenApi.Summary, "Create verification OTP")
   )
   .add(
-    HttpApiEndpoint.get("getVerificationOtp", "/auth/verification-otp")
-      .addSuccess(VerificationOTPResponseSchema, { status: 200 })
-      .addError(BadRequestError)
-      .addError(NotFoundError)
-      .addError(InternalServerError)
-      .annotateContext(
-        OpenApi.annotations({
-          title: "Get Verification OTP",
-          description: "Returns verification OTP state from cookie",
-          summary: "Get verification OTP",
-        })
+    HttpApiEndpoint.get("getVerificationOtp", "/auth/verification-otp", {
+      error: Schema.Union([
+        BadRequestError,
+        NotFoundError,
+        InternalServerError,
+      ]),
+      success: VerificationOTPResponseSchema,
+    })
+      .annotate(OpenApi.Title, "Get Verification OTP")
+      .annotate(
+        OpenApi.Description,
+        "Returns verification OTP state from cookie"
       )
+      .annotate(OpenApi.Summary, "Get verification OTP")
   )
   .add(
-    HttpApiEndpoint.del("deleteVerificationOtp", "/auth/verification-otp")
-      .addSuccess(VerificationOTPSuccessSchema, { status: 200 })
-      .addError(InternalServerError)
-      .annotateContext(
-        OpenApi.annotations({
-          title: "Delete Verification OTP",
-          description: "Clears verification OTP cookie state",
-          summary: "Delete verification OTP",
-        })
-      )
+    HttpApiEndpoint.delete("deleteVerificationOtp", "/auth/verification-otp", {
+      payload: VerificationOTPStateSchema,
+      error: InternalServerError,
+      success: VerificationOTPSuccessSchema,
+    })
+      .annotate(OpenApi.Title, "Delete Verification OTP")
+      .annotate(OpenApi.Description, "Clears verification OTP cookie state")
+      .annotate(OpenApi.Summary, "Delete Verification OTP")
   );

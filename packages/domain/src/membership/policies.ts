@@ -1,6 +1,9 @@
-import { Effect, Array as EffectArray, Option } from "effect";
+import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import {
+  isPrivilegedMemberRole,
+  PLAN_ENTITLEMENTS,
+} from "../plan-entitlements";
 import * as Policy from "../policy";
-import { PLAN_ENTITLEMENTS, isPrivilegedMemberRole } from "../plan-entitlements";
 import { WorkspaceRepository } from "../workspace/repository";
 import { MembershipRepository } from "./repository";
 
@@ -61,7 +64,9 @@ const makeMembershipPolicy = Effect.gen(function* () {
       });
 
       if (Option.isNone(member)) {
-        return yield* new Policy.PolicyDeniedError({ reason: "Member not found" });
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Member not found",
+        });
       }
 
       if (
@@ -107,12 +112,11 @@ const makeMembershipPolicy = Effect.gen(function* () {
   };
 });
 
-export class MembershipPolicy extends Effect.Service<MembershipPolicy>()(
+export class MembershipPolicy extends Context.Service<MembershipPolicy>()(
   "MembershipPolicy",
   {
-    effect: makeMembershipPolicy,
-    dependencies: [MembershipRepository.Default, WorkspaceRepository.Default],
+    make: makeMembershipPolicy,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

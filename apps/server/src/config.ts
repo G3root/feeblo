@@ -1,9 +1,9 @@
-import { Config, Effect } from "effect";
+import { Config, Context, Effect, Layer } from "effect";
 
-export class ServerConfig extends Effect.Service<ServerConfig>()(
+export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const appUrl = yield* Config.string("VITE_APP_URL");
       const apiUrl = yield* Config.string("VITE_API_URL");
 
@@ -14,5 +14,5 @@ export class ServerConfig extends Effect.Service<ServerConfig>()(
     }),
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

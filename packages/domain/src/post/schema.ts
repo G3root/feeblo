@@ -28,7 +28,7 @@ export class Post extends Schema.Class<Post>("Post")({
 export type TPost = Schema.Schema.Type<typeof Post>;
 
 export const PostList = Schema.Struct({
-  boardId: Schema.Union(Schema.String, Schema.Null, Schema.Undefined),
+  boardId: Schema.Union([Schema.String, Schema.Null, Schema.Undefined]),
   organizationId: Schema.String,
 });
 
@@ -37,7 +37,7 @@ export type TPostList = Schema.Schema.Type<typeof PostList>;
 export const PostIds = Schema.Array(Schema.String);
 
 export const PostDelete = Schema.Struct({
-  id: Schema.Union(Schema.String, PostIds),
+  id: Schema.Union([Schema.String, PostIds]),
   boardId: Schema.String,
   organizationId: Schema.String,
 });

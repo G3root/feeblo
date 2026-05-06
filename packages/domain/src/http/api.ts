@@ -1,4 +1,4 @@
-import { HttpApi } from "@effect/platform";
+import { HttpApi } from "effect/unstable/httpapi";
 import { AuthApiGroup } from "../auth/api-contract";
 import { MediaApiGroup } from "../media/api-contract";
 import { OrganizationApiGroup } from "../organization/api-contract";

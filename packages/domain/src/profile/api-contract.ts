@@ -1,16 +1,11 @@
+import { Schema } from "effect";
+import { Multipart } from "effect/unstable/http";
 import {
   HttpApiEndpoint,
   HttpApiGroup,
   HttpApiSchema,
-  Multipart,
-  OpenApi,
-} from "@effect/platform";
-import { Schema } from "effect";
-import {
-  BadRequestError,
-  InternalServerError,
-  UnauthorizedError,
-} from "../rpc-errors";
+} from "effect/unstable/httpapi";
+import { BadRequestError, UnauthorizedError } from "../rpc-errors";
 import { HttpApiAuthMiddleware } from "../session-middleware";
 
 export const ProfilePictureUploadResponseSchema = Schema.Struct({
@@ -21,25 +16,16 @@ export const ProfilePictureUploadResponseSchema = Schema.Struct({
 
 export class ProfileApiGroup extends HttpApiGroup.make("ProfileApiGroup")
   .add(
-    HttpApiEndpoint.post("uploadProfilePicture", "/profile/picture")
-      .addSuccess(ProfilePictureUploadResponseSchema, { status: 200 })
-      .addError(BadRequestError)
-      .addError(UnauthorizedError)
-      .addError(InternalServerError)
-      .setPayload(
-        HttpApiSchema.Multipart(
-          Schema.Struct({
-            file: Multipart.SingleFileSchema,
-          })
-        )
-      )
-      .annotateContext(
-        OpenApi.annotations({
-          title: "Upload Profile Picture",
-          description:
-            "Uploads the authenticated user's profile picture and stores bucket/key metadata",
-          summary: "Upload profile picture",
-        })
-      )
+    HttpApiEndpoint.post("uploadProfilePicture", "/profile/picture", {
+      success: ProfilePictureUploadResponseSchema,
+      error: Schema.Union([
+        BadRequestError,
+        UnauthorizedError,
+        UnauthorizedError,
+      ]),
+      payload: Schema.Struct({
+        file: Multipart.SingleFileSchema,
+      }).pipe(HttpApiSchema.asMultipart()),
+    })
   )
   .middleware(HttpApiAuthMiddleware) {}

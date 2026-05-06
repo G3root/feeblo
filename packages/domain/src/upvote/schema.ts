@@ -5,7 +5,7 @@ export const Upvote = Schema.Struct({
   postId: Schema.String,
   organizationId: Schema.String,
   userId: Schema.String,
-  memberId: Schema.Union(Schema.String, Schema.Null),
+  memberId: Schema.Union([Schema.String, Schema.Null]),
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   user: Schema.Struct({

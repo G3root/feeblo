@@ -1,17 +1,13 @@
 import { DB } from "@feeblo/db";
 import { site as siteTable } from "@feeblo/db/schema/feedback";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 const makeSiteRepository = Effect.gen(function* () {
   const db = yield* DB;
 
   return {
-    findByOrganizationId: ({
-      organizationId,
-    }: {
-      organizationId: string;
-    }) =>
+    findByOrganizationId: ({ organizationId }: { organizationId: string }) =>
       Effect.gen(function* () {
         const [site] = yield* db
           .select({
@@ -126,11 +122,11 @@ const makeSiteRepository = Effect.gen(function* () {
   };
 });
 
-export class SiteRepository extends Effect.Service<SiteRepository>()(
+export class SiteRepository extends Context.Service<SiteRepository>()(
   "SiteRepository",
   {
-    effect: makeSiteRepository,
+    make: makeSiteRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

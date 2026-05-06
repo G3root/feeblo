@@ -2,7 +2,7 @@ import { DB } from "@feeblo/db";
 import { board as boardTable } from "@feeblo/db/schema/feedback";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Effect, Array as EffectArray } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 import { Board } from "./schema";
 
 type TBoardCreate = {
@@ -160,11 +160,11 @@ const makeBoardRepository = Effect.gen(function* () {
   };
 });
 
-export class BoardRepository extends Effect.Service<BoardRepository>()(
+export class BoardRepository extends Context.Service<BoardRepository>()(
   "BoardRepository",
   {
-    effect: makeBoardRepository,
+    make: makeBoardRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

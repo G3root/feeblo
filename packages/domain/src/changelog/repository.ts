@@ -3,7 +3,7 @@ import { user as userTable } from "@feeblo/db/schema/auth";
 import { changelog as changelogTable } from "@feeblo/db/schema/feedback";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, sql } from "drizzle-orm";
-import { Effect, Array as EffectArray } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 import type {
   TChangelogCreate,
   TChangelogDelete,
@@ -164,11 +164,11 @@ const makeChangelogRepository = Effect.gen(function* () {
   };
 });
 
-export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
+export class ChangelogRepository extends Context.Service<ChangelogRepository>()(
   "ChangelogRepository",
   {
-    effect: makeChangelogRepository,
+    make: makeChangelogRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

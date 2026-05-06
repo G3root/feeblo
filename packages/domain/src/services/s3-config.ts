@@ -1,7 +1,7 @@
-import { Config, Effect } from "effect";
+import { Config, Context, Effect, Layer } from "effect";
 
-export class S3Config extends Effect.Service<S3Config>()("S3Config", {
-  effect: Effect.gen(function* () {
+export class S3Config extends Context.Service<S3Config>()("S3Config", {
+  make: Effect.gen(function* () {
     const region = yield* Config.string("MEDIA_UPLOAD_REGION");
     const endpoint = yield* Config.string("MEDIA_UPLOAD_ENDPOINT");
     const accessKeyId = yield* Config.string("MEDIA_UPLOAD_ACCESS_KEY_ID").pipe(
@@ -25,5 +25,5 @@ export class S3Config extends Effect.Service<S3Config>()("S3Config", {
     } as const;
   }),
 }) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

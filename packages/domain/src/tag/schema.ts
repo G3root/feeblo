@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-export const TagType = Schema.Literal("FEEDBACK", "CHANGELOG");
+export const TagType = Schema.Literals(["FEEDBACK", "CHANGELOG"]);
 
 export class Tag extends Schema.Class<Tag>("Tag")({
   id: Schema.String,

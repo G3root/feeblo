@@ -7,7 +7,7 @@ import {
 } from "@feeblo/db/schema/feedback";
 import { generateId } from "@feeblo/utils/id";
 import { and, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 type TPostReactionList = {
   postId: string;
@@ -234,11 +234,11 @@ const makePostReactionRepository = Effect.gen(function* () {
   };
 });
 
-export class PostReactionRepository extends Effect.Service<PostReactionRepository>()(
+export class PostReactionRepository extends Context.Service<PostReactionRepository>()(
   "PostReactionRepository",
   {
-    effect: makePostReactionRepository,
+    make: makePostReactionRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

@@ -4,7 +4,7 @@ import {
   organization as organizationTable,
 } from "@feeblo/db/schema/auth";
 import { and, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import { Organization } from "./schema";
 
 type TUpdate = {
@@ -86,11 +86,11 @@ const makeOrganizationRepository = Effect.gen(function* () {
   };
 });
 
-export class OrganizationRepository extends Effect.Service<OrganizationRepository>()(
+export class OrganizationRepository extends Context.Service<OrganizationRepository>()(
   "OrganizationRepository",
   {
-    effect: makeOrganizationRepository,
+    make: makeOrganizationRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

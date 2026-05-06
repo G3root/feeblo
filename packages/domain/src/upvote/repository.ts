@@ -10,7 +10,7 @@ import {
 } from "@feeblo/db/schema/feedback";
 import { generateId } from "@feeblo/utils/id";
 import { and, eq } from "drizzle-orm";
-import { Effect, Array as EffectArray, Option } from "effect";
+import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
 type TUpvoteList = {
   postId: string;
@@ -133,11 +133,11 @@ const makeUpvoteRepository = Effect.gen(function* () {
   };
 });
 
-export class UpvoteRepository extends Effect.Service<UpvoteRepository>()(
+export class UpvoteRepository extends Context.Service<UpvoteRepository>()(
   "UpvoteRepository",
   {
-    effect: makeUpvoteRepository,
+    make: makeUpvoteRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

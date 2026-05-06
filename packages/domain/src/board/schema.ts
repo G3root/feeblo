@@ -4,7 +4,7 @@ export class Board extends Schema.Class<Board>("Board")({
   id: Schema.String,
   name: Schema.String,
   slug: Schema.String,
-  visibility: Schema.Literal("PUBLIC", "PRIVATE"),
+  visibility: Schema.Literals(["PUBLIC", "PRIVATE"]),
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   organizationId: Schema.String,
@@ -13,7 +13,7 @@ export class Board extends Schema.Class<Board>("Board")({
 export const BoardCreate = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  visibility: Schema.Literal("PUBLIC", "PRIVATE"),
+  visibility: Schema.Literals(["PUBLIC", "PRIVATE"]),
   organizationId: Schema.String,
 });
 
@@ -27,7 +27,7 @@ export type TBoardCreate = Schema.Schema.Type<typeof BoardCreate>;
 export const BoardUpdate = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
-  visibility: Schema.Literal("PUBLIC", "PRIVATE"),
+  visibility: Schema.Literals(["PUBLIC", "PRIVATE"]),
   organizationId: Schema.String,
 });
 

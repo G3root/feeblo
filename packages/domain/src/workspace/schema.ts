@@ -6,13 +6,13 @@ export const WorkspaceInput = Schema.Struct({
 
 export const WorkspacePlan = Schema.Struct({
   organizationId: Schema.String,
-  plan: Schema.Literal("free", "starter", "professional"),
+  plan: Schema.Literals(["free", "starter", "professional"]),
 });
 
 export class CreateWorkspaceInput extends Schema.Class<CreateWorkspaceInput>(
   "CreateWorkspaceInput"
 )({
-  workspaceName: Schema.String.pipe(Schema.minLength(3)),
+  workspaceName: Schema.String.pipe(Schema.check(Schema.isMinLength(3))),
 }) {}
 
 export class CreateWorkspaceOutput extends Schema.Class<CreateWorkspaceOutput>(
@@ -30,7 +30,7 @@ export type TWorkspacePlan = Schema.Schema.Type<typeof WorkspacePlan>;
 
 export const WorkspacePreferences = Schema.Struct({
   allowMemberInvites: Schema.Boolean,
-  defaultBoardVisibility: Schema.Literal("private", "public"),
+  defaultBoardVisibility: Schema.Literals(["private", "public"]),
   timezone: Schema.String,
 });
 
@@ -51,7 +51,7 @@ export const Workspace = Schema.Struct({
 export type TWorkspace = Schema.Schema.Type<typeof Workspace>;
 
 export const WorkspaceProductMetadata = Schema.Struct({
-  plan: Schema.Literal("starter", "professional"),
+  plan: Schema.Literals(["starter", "professional"]),
 });
 
 export const WorkspaceProduct = Schema.Struct({
@@ -60,7 +60,7 @@ export const WorkspaceProduct = Schema.Struct({
   description: Schema.NullOr(Schema.String),
   trialInterval: Schema.NullOr(Schema.String),
   trialIntervalCount: Schema.NullOr(Schema.Number),
-  recurringInterval: Schema.NullOr(Schema.Literal("month", "year")),
+  recurringInterval: Schema.NullOr(Schema.Literals(["month", "year"])),
   recurringIntervalCount: Schema.NullOr(Schema.Number),
   isRecurring: Schema.Boolean,
   isArchived: Schema.Boolean,

@@ -1,11 +1,10 @@
+import { Schema } from "effect";
+import { Multipart } from "effect/unstable/http";
 import {
   HttpApiEndpoint,
   HttpApiGroup,
   HttpApiSchema,
-  Multipart,
-  OpenApi,
-} from "@effect/platform";
-import { Schema } from "effect";
+} from "effect/unstable/httpapi";
 import {
   BadRequestError,
   InternalServerError,
@@ -23,26 +22,17 @@ export class OrganizationApiGroup extends HttpApiGroup.make(
   "OrganizationApiGroup"
 )
   .add(
-    HttpApiEndpoint.post("uploadOrganizationLogo", "/organization/logo")
-      .addSuccess(OrganizationLogoUploadResponseSchema, { status: 200 })
-      .addError(BadRequestError)
-      .addError(UnauthorizedError)
-      .addError(InternalServerError)
-      .setPayload(
-        HttpApiSchema.Multipart(
-          Schema.Struct({
-            organizationId: Schema.String,
-            file: Multipart.SingleFileSchema,
-          })
-        )
-      )
-      .annotateContext(
-        OpenApi.annotations({
-          title: "Upload Organization Logo",
-          description:
-            "Uploads an organization logo for an owner or admin and stores bucket/key metadata",
-          summary: "Upload organization logo",
-        })
-      )
+    HttpApiEndpoint.post("uploadOrganizationLogo", "/organization/logo", {
+      success: OrganizationLogoUploadResponseSchema,
+      error: Schema.Union([
+        BadRequestError,
+        UnauthorizedError,
+        InternalServerError,
+      ]),
+      payload: Schema.Struct({
+        organizationId: Schema.String,
+        file: Multipart.SingleFileSchema,
+      }).pipe(HttpApiSchema.asMultipart()),
+    })
   )
   .middleware(HttpApiAuthMiddleware) {}

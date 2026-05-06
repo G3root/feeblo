@@ -1,7 +1,7 @@
 import { DB } from "@feeblo/db";
 import { postStatus as postStatusTable } from "@feeblo/db/schema/feedback";
 import { asc, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 
 const makePostStatusRepository = Effect.gen(function* () {
   const db = yield* DB;
@@ -27,11 +27,11 @@ const makePostStatusRepository = Effect.gen(function* () {
   };
 });
 
-export class PostStatusRepository extends Effect.Service<PostStatusRepository>()(
+export class PostStatusRepository extends Context.Service<PostStatusRepository>()(
   "PostStatusRepository",
   {
-    effect: makePostStatusRepository,
+    make: makePostStatusRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

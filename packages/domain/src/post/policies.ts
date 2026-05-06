@@ -1,4 +1,4 @@
-import { Effect, pipe, Schema } from "effect";
+import { Context, Effect, Layer, pipe, Schema } from "effect";
 import * as Policy from "../policy";
 import { PostRepository } from "./repository";
 import { PostIds } from "./schema";
@@ -59,20 +59,18 @@ const makePostPolicy = Effect.gen(function* () {
 
   const isUnlocked = (args: TIsUnlocked) =>
     Policy.policy(() =>
-      repository
-        .isUnlocked({
-          id: args.postId,
-          organizationId: args.organizationId,
-        })
+      repository.isUnlocked({
+        id: args.postId,
+        organizationId: args.organizationId,
+      })
     );
 
   const isUnlockedPublic = (args: TIsUnlocked) =>
     Policy.publicPolicy(() =>
-      repository
-        .isUnlockedPublic({
-          id: args.postId,
-          organizationId: args.organizationId,
-        })
+      repository.isUnlockedPublic({
+        id: args.postId,
+        organizationId: args.organizationId,
+      })
     );
 
   return {
@@ -84,9 +82,8 @@ const makePostPolicy = Effect.gen(function* () {
   };
 });
 
-export class PostPolicy extends Effect.Service<PostPolicy>()("PostPolicy", {
-  effect: makePostPolicy,
-  dependencies: [PostRepository.Default],
+export class PostPolicy extends Context.Service<PostPolicy>()("PostPolicy", {
+  make: makePostPolicy,
 }) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

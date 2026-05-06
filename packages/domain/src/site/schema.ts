@@ -1,13 +1,13 @@
 import { Schema } from "effect";
 
-export const changelogVisibilitySchema = Schema.Literal("PUBLIC", "HIDDEN");
-export const roadmapVisibilitySchema = Schema.Literal("PUBLIC", "HIDDEN");
+export const changelogVisibilitySchema = Schema.Literals(["PUBLIC", "HIDDEN"]);
+export const roadmapVisibilitySchema = Schema.Literals(["PUBLIC", "HIDDEN"]);
 
 export class Site extends Schema.Class<Site>("Site")({
   id: Schema.String,
   name: Schema.String,
   subdomain: Schema.String,
-  customDomain: Schema.Union(Schema.String, Schema.Null),
+  customDomain: Schema.Union([Schema.String, Schema.Null]),
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
   hidePoweredBy: Schema.Boolean,

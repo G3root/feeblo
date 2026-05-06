@@ -5,7 +5,7 @@ export class PostReaction extends Schema.Class<PostReaction>("PostReaction")({
   postId: Schema.String,
   organizationId: Schema.String,
   userId: Schema.String,
-  memberId: Schema.Union(Schema.String, Schema.Null),
+  memberId: Schema.Union([Schema.String, Schema.Null]),
   emoji: Schema.String,
   createdAt: Schema.Date,
   updatedAt: Schema.Date,

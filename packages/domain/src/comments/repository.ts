@@ -7,7 +7,7 @@ import {
   post as postTable,
 } from "@feeblo/db/schema/feedback";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Effect, Array as EffectArray } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 
 type DeleteComment = {
   id: string;
@@ -180,11 +180,11 @@ const makeCommentRepository = Effect.gen(function* () {
   };
 });
 
-export class CommentRepository extends Effect.Service<CommentRepository>()(
+export class CommentRepository extends Context.Service<CommentRepository>()(
   "CommentRepository",
   {
-    effect: makeCommentRepository,
+    make: makeCommentRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

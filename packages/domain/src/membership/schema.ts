@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-const ROLE_LITERAL = Schema.Literal("owner", "admin", "member");
+const ROLE_LITERAL = Schema.Literals(["owner", "admin", "member"]);
 
 export const Membership = Schema.Struct({
   id: Schema.String,

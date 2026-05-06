@@ -1,4 +1,3 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 import { PolicyDeniedError } from "../policy";
 import {
@@ -7,43 +6,31 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class FailedToCreateTagError extends Schema.TaggedError<FailedToCreateTagError>()(
+export class FailedToCreateTagError extends Schema.TaggedErrorClass<FailedToCreateTagError>()(
   "FailedToCreateTagError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToCreateTagError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToCreateTagError" }
 ) {}
 
-export class FailedToUpdateTagError extends Schema.TaggedError<FailedToUpdateTagError>()(
+export class FailedToUpdateTagError extends Schema.TaggedErrorClass<FailedToUpdateTagError>()(
   "FailedToUpdateTagError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToUpdateTagError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToUpdateTagError" }
 ) {}
 
-export class FailedToDeleteTagError extends Schema.TaggedError<FailedToDeleteTagError>()(
+export class FailedToDeleteTagError extends Schema.TaggedErrorClass<FailedToDeleteTagError>()(
   "FailedToDeleteTagError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToDeleteTagError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToDeleteTagError" }
 ) {}
 
-export class FailedToSetTagAssignmentsError extends Schema.TaggedError<FailedToSetTagAssignmentsError>()(
+export class FailedToSetTagAssignmentsError extends Schema.TaggedErrorClass<FailedToSetTagAssignmentsError>()(
   "FailedToSetTagAssignmentsError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToSetTagAssignmentsError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToSetTagAssignmentsError" }
 ) {}
 
-export const TagServiceErrors = Schema.Union(
+export const TagServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
@@ -51,5 +38,5 @@ export const TagServiceErrors = Schema.Union(
   FailedToCreateTagError,
   FailedToUpdateTagError,
   FailedToDeleteTagError,
-  FailedToSetTagAssignmentsError
-);
+  FailedToSetTagAssignmentsError,
+]);
