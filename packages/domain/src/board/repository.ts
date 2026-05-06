@@ -1,34 +1,57 @@
 import { Database, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 
-type TBoardCreate = {
-  name: string;
-  visibility: "PUBLIC" | "PRIVATE";
-  organizationId: string;
-  id: string;
+interface TBoardCreate {
   creatorId: string;
   creatorMemberId: string;
-};
+  id: string;
+  name: string;
+  organizationId: string;
+  visibility: "PUBLIC" | "PRIVATE";
+}
 
-type TBoardUpdate = {
+interface TBoardUpdate {
   id: string;
   name?: string;
+  organizationId: string;
   visibility?: "PUBLIC" | "PRIVATE";
-  organizationId: string;
-};
+}
 
-type TBoardFindById = {
+interface TBoardFindById {
   id: string;
-  organizationId: string;
   memberId: string;
-};
+  organizationId: string;
+}
 
-type TBoardGetById = {
+interface TBoardGetById {
   id: string;
   organizationId: string;
-};
+}
+
+interface TBoardFindMany {
+  organizationId: string;
+  visibility?: "PUBLIC" | "PRIVATE";
+}
+
+interface TBoardWhereClauseQuery {
+  whereClause: SQL | undefined;
+}
+
+interface TBoardCountByOrganizationId {
+  organizationId: string;
+}
+
+interface TBoardDelete {
+  id: string;
+  organizationId: string;
+}
+
+interface TBoardUpdateInput extends TBoardUpdate {
+  name?: string;
+  visibility?: "PUBLIC" | "PRIVATE";
+}
 
 const makeBoardRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
@@ -50,7 +73,7 @@ const makeBoardRepository = Effect.gen(function* () {
               )
           )
         )({ id, organizationId, memberId })
-        .pipe(Effect.map((rows) => rows[0])),
+        .pipe(Effect.map(EffectArray.get(0))),
     getById: ({ id, organizationId }: TBoardGetById) =>
       db
         .makeQuery((execute, input: TBoardGetById) =>
@@ -69,7 +92,7 @@ const makeBoardRepository = Effect.gen(function* () {
               )
           )
         )({ id, organizationId })
-        .pipe(Effect.map((rows) => rows[0])),
+        .pipe(Effect.map(EffectArray.get(0))),
     create: (args: TBoardCreate) =>
       db.makeQuery((execute, input: TBoardCreate) =>
         execute((client) =>
@@ -84,13 +107,7 @@ const makeBoardRepository = Effect.gen(function* () {
             .returning()
         )
       )(args),
-    findMany: ({
-      organizationId,
-      visibility,
-    }: {
-      organizationId: string;
-      visibility?: "PUBLIC" | "PRIVATE";
-    }) =>
+    findMany: ({ organizationId, visibility }: TBoardFindMany) =>
       Effect.gen(function* () {
         const where: SQL[] = [];
         if (visibility) {
@@ -102,7 +119,7 @@ const makeBoardRepository = Effect.gen(function* () {
         const whereClause = where.length > 1 ? and(...where) : where[0];
 
         const boards = yield* db.makeQuery(
-          (execute, input: { whereClause: SQL | undefined }) =>
+          (execute, input: TBoardWhereClauseQuery) =>
             execute((client) =>
               client
                 .select({
@@ -121,10 +138,10 @@ const makeBoardRepository = Effect.gen(function* () {
 
         return boards;
       }),
-    countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
+    countByOrganizationId: ({ organizationId }: TBoardCountByOrganizationId) =>
       Effect.gen(function* () {
         const boards = yield* db.makeQuery(
-          (execute, input: { organizationId: string }) =>
+          (execute, input: TBoardCountByOrganizationId) =>
             execute((client) =>
               client
                 .select({ id: schema.board.id })
@@ -136,36 +153,27 @@ const makeBoardRepository = Effect.gen(function* () {
         return boards.length;
       }),
 
-    delete: ({ id, organizationId }: { id: string; organizationId: string }) =>
+    delete: ({ id, organizationId }: TBoardDelete) =>
       Effect.gen(function* () {
-        yield* db.makeQuery(
-          (execute, input: { id: string; organizationId: string }) =>
-            execute((client) =>
-              client
-                .delete(schema.board)
-                .where(
-                  and(
-                    eq(schema.board.id, input.id),
-                    eq(schema.board.organizationId, input.organizationId)
-                  )
+        yield* db.makeQuery((execute, input: TBoardDelete) =>
+          execute((client) =>
+            client
+              .delete(schema.board)
+              .where(
+                and(
+                  eq(schema.board.id, input.id),
+                  eq(schema.board.organizationId, input.organizationId)
                 )
-            )
+              )
+          )
         )({ id, organizationId });
       }),
     update: (args: TBoardUpdate) =>
       Effect.gen(function* () {
         const { id, organizationId, ...rest } = args;
 
-        const [updatedBoard] = yield* db.makeQuery(
-          (
-            execute,
-            input: {
-              id: string;
-              organizationId: string;
-              name?: string;
-              visibility?: "PUBLIC" | "PRIVATE";
-            }
-          ) =>
+        const updatedBoard = yield* db
+          .makeQuery((execute, input: TBoardUpdateInput) =>
             execute((client) =>
               client
                 .update(schema.board)
@@ -182,7 +190,8 @@ const makeBoardRepository = Effect.gen(function* () {
                 )
                 .returning()
             )
-        )({ id, organizationId, ...rest });
+          )({ id, organizationId, ...rest })
+          .pipe(Effect.map(EffectArray.get(0)));
 
         return updatedBoard;
       }),

@@ -21,6 +21,10 @@ interface CreateBoardArgs {
   organizationId: string;
 }
 
+interface FindPlanByOrganizationIdArgs {
+  organizationId: string;
+}
+
 const makeWorkspaceRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
@@ -170,9 +174,12 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         .pipe(Effect.map((results) => results));
     },
 
-    findPlanByOrganizationId: (args: { organizationId: string }, tx?: TxFn) => {
+    findPlanByOrganizationId: (
+      args: FindPlanByOrganizationIdArgs,
+      tx?: TxFn
+    ) => {
       return db
-        .makeQuery((execute, input: { organizationId: string }) =>
+        .makeQuery((execute, input: FindPlanByOrganizationIdArgs) =>
           execute((client) =>
             client
               .select({

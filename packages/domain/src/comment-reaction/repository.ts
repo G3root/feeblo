@@ -3,18 +3,26 @@ import { generateId } from "@feeblo/utils/id";
 import { and, eq } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
-type TCommentReactionList = {
+interface TCommentReactionList {
   organizationId: string;
   postId: string;
-};
+}
 
-type TCommentReactionToggle = {
+interface TCommentReactionToggle {
+  commentId: string;
+  emoji: string;
   organizationId: string;
   postId: string;
-  commentId: string;
   userId: string;
-  emoji: string;
-};
+}
+
+interface TDeleteCommentReaction {
+  id: string;
+}
+
+interface TCommentReactionCreate extends TCommentReactionToggle {
+  memberId: string | null;
+}
 
 const makeCommentReactionRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
@@ -124,7 +132,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingReaction)) {
-          yield* db.makeQuery((execute, input: { id: string }) =>
+          yield* db.makeQuery((execute, input: TDeleteCommentReaction) =>
             execute((client) =>
               client
                 .delete(schema.commentReaction)
@@ -151,22 +159,16 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           )(args)
           .pipe(Effect.map(EffectArray.get(0)));
 
-        yield* db.makeQuery(
-          (
-            execute,
-            input: TCommentReactionToggle & {
-              memberId: string | null;
-            }
-          ) =>
-            execute((client) =>
-              client.insert(schema.commentReaction).values({
-                id: generateId("commentReaction"),
-                commentId: input.commentId,
-                userId: input.userId,
-                memberId: input.memberId,
-                emoji: input.emoji,
-              })
-            )
+        yield* db.makeQuery((execute, input: TCommentReactionCreate) =>
+          execute((client) =>
+            client.insert(schema.commentReaction).values({
+              id: generateId("commentReaction"),
+              commentId: input.commentId,
+              userId: input.userId,
+              memberId: input.memberId,
+              emoji: input.emoji,
+            })
+          )
         )({
           ...args,
           memberId: Option.isSome(member) ? member.value.id : null,
@@ -227,7 +229,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingReaction)) {
-          yield* db.makeQuery((execute, input: { id: string }) =>
+          yield* db.makeQuery((execute, input: TDeleteCommentReaction) =>
             execute((client) =>
               client
                 .delete(schema.commentReaction)
@@ -253,22 +255,16 @@ const makeCommentReactionRepository = Effect.gen(function* () {
             ).pipe(Effect.map(EffectArray.get(0)))
         )(args);
 
-        yield* db.makeQuery(
-          (
-            execute,
-            input: TCommentReactionToggle & {
-              memberId: string | null;
-            }
-          ) =>
-            execute((client) =>
-              client.insert(schema.commentReaction).values({
-                id: generateId("commentReaction"),
-                commentId: input.commentId,
-                userId: input.userId,
-                memberId: input.memberId,
-                emoji: input.emoji,
-              })
-            )
+        yield* db.makeQuery((execute, input: TCommentReactionCreate) =>
+          execute((client) =>
+            client.insert(schema.commentReaction).values({
+              id: generateId("commentReaction"),
+              commentId: input.commentId,
+              userId: input.userId,
+              memberId: input.memberId,
+              emoji: input.emoji,
+            })
+          )
         )({
           ...args,
           memberId: Option.isSome(member) ? member.value.id : null,

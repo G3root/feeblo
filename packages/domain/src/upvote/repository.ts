@@ -3,18 +3,42 @@ import { generateId } from "@feeblo/utils/id";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
-type TUpvoteList = {
-  postId: string;
+interface TUpvoteList {
   organizationId: string;
+  postId: string;
   visibility?: "PUBLIC" | "PRIVATE";
-};
+}
 
-type TUpvoteToggle = {
+interface TUpvoteToggle {
   organizationId: string;
   postId: string;
   userId: string;
   visibility?: "PUBLIC" | "PRIVATE";
-};
+}
+
+interface TOperatorsQuery {
+  operators: SQL[];
+}
+
+interface TFindExistingUpvote {
+  postId: string;
+  userId: string;
+}
+
+interface TDeleteUpvote {
+  id: string;
+}
+
+interface TFindMember {
+  organizationId: string;
+  userId: string;
+}
+
+interface TCreateUpvote {
+  memberId: string | null;
+  postId: string;
+  userId: string;
+}
 
 const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
@@ -28,12 +52,15 @@ const makeUpvoteRepository = Effect.gen(function* () {
           ...(visibility ? [eq(schema.board.visibility, visibility)] : []),
         ];
         const post = yield* db
-          .makeQuery((execute, input: { operators: SQL[] }) =>
+          .makeQuery((execute, input: TOperatorsQuery) =>
             execute((client) =>
               client
                 .select({ id: schema.post.id })
                 .from(schema.post)
-                .innerJoin(schema.board, eq(schema.board.id, schema.post.boardId))
+                .innerJoin(
+                  schema.board,
+                  eq(schema.board.id, schema.post.boardId)
+                )
                 .where(and(...input.operators))
                 .limit(1)
             )
@@ -44,38 +71,37 @@ const makeUpvoteRepository = Effect.gen(function* () {
           return [];
         }
 
-        return yield* db
-          .makeQuery((execute, input: TUpvoteList) =>
-            execute((client) =>
-              client
-                .select({
-                  id: schema.upvote.id,
-                  postId: schema.upvote.postId,
-                  organizationId: schema.post.organizationId,
-                  userId: schema.upvote.userId,
-                  user: {
-                    name: schema.user.name,
-                    image: schema.user.image,
-                  },
-                  memberId: schema.upvote.memberId,
-                  createdAt: schema.upvote.createdAt,
-                  updatedAt: schema.upvote.updatedAt,
-                })
-                .from(schema.upvote)
-                .innerJoin(schema.post, eq(schema.post.id, schema.upvote.postId))
-                .innerJoin(schema.user, eq(schema.user.id, schema.upvote.userId))
-                .where(
-                  and(
-                    eq(schema.post.organizationId, input.organizationId),
-                    eq(schema.upvote.postId, input.postId)
-                  )
+        return yield* db.makeQuery((execute, input: TUpvoteList) =>
+          execute((client) =>
+            client
+              .select({
+                id: schema.upvote.id,
+                postId: schema.upvote.postId,
+                organizationId: schema.post.organizationId,
+                userId: schema.upvote.userId,
+                user: {
+                  name: schema.user.name,
+                  image: schema.user.image,
+                },
+                memberId: schema.upvote.memberId,
+                createdAt: schema.upvote.createdAt,
+                updatedAt: schema.upvote.updatedAt,
+              })
+              .from(schema.upvote)
+              .innerJoin(schema.post, eq(schema.post.id, schema.upvote.postId))
+              .innerJoin(schema.user, eq(schema.user.id, schema.upvote.userId))
+              .where(
+                and(
+                  eq(schema.post.organizationId, input.organizationId),
+                  eq(schema.upvote.postId, input.postId)
                 )
-            )
-          )(
-            visibility
-              ? { postId, organizationId, visibility }
-              : { postId, organizationId }
-          );
+              )
+          )
+        )(
+          visibility
+            ? { postId, organizationId, visibility }
+            : { postId, organizationId }
+        );
       }),
 
     toggle: ({ organizationId, postId, userId, visibility }: TUpvoteToggle) =>
@@ -86,12 +112,15 @@ const makeUpvoteRepository = Effect.gen(function* () {
           ...(visibility ? [eq(schema.board.visibility, visibility)] : []),
         ];
         const post = yield* db
-          .makeQuery((execute, input: { operators: SQL[] }) =>
+          .makeQuery((execute, input: TOperatorsQuery) =>
             execute((client) =>
               client
                 .select({ id: schema.post.id })
                 .from(schema.post)
-                .innerJoin(schema.board, eq(schema.board.id, schema.post.boardId))
+                .innerJoin(
+                  schema.board,
+                  eq(schema.board.id, schema.post.boardId)
+                )
                 .where(and(...input.operators))
                 .limit(1)
             )
@@ -103,7 +132,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
         }
 
         const existingUpvote = yield* db
-          .makeQuery((execute, input: { postId: string; userId: string }) =>
+          .makeQuery((execute, input: TFindExistingUpvote) =>
             execute((client) =>
               client
                 .select({ id: schema.upvote.id })
@@ -120,7 +149,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingUpvote)) {
-          yield* db.makeQuery((execute, input: { id: string }) =>
+          yield* db.makeQuery((execute, input: TDeleteUpvote) =>
             execute((client) =>
               client.delete(schema.upvote).where(eq(schema.upvote.id, input.id))
             )
@@ -130,7 +159,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
         }
 
         const member = yield* db
-          .makeQuery((execute, input: { organizationId: string; userId: string }) =>
+          .makeQuery((execute, input: TFindMember) =>
             execute((client) =>
               client
                 .select({ id: schema.member.id })
@@ -146,7 +175,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
           )({ organizationId, userId })
           .pipe(Effect.map(EffectArray.get(0)));
 
-        yield* db.makeQuery((execute, input: { postId: string; userId: string; memberId: string | null }) =>
+        yield* db.makeQuery((execute, input: TCreateUpvote) =>
           execute((client) =>
             client.insert(schema.upvote).values({
               id: generateId("upvote"),

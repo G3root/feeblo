@@ -1,21 +1,30 @@
 import { Database, schema } from "@feeblo/db";
 import { and, eq } from "drizzle-orm";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
-type TUpdate = {
-  organizationId: string;
-  name: string;
+interface TUpdate {
   logo: string | null;
-};
+  name: string;
+  organizationId: string;
+}
+
+interface TFindManyByUserId {
+  userId: string;
+}
+
+interface TFindMemberRole {
+  organizationId: string;
+  userId: string;
+}
 
 const makeOrganizationRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
   return {
-    findManyByUserId: ({ userId }: { userId: string }) =>
+    findManyByUserId: ({ userId }: TFindManyByUserId) =>
       Effect.gen(function* () {
         const organizations = yield* db.makeQuery(
-          (execute, input: { userId: string }) =>
+          (execute, input: TFindManyByUserId) =>
             execute((client) =>
               client
                 .select({
@@ -38,8 +47,8 @@ const makeOrganizationRepository = Effect.gen(function* () {
       }),
     update: ({ organizationId, name, logo }: TUpdate) =>
       Effect.gen(function* () {
-        const [updatedOrganization] = yield* db.makeQuery(
-          (execute, input: TUpdate) =>
+        const updatedOrganization = yield* db
+          .makeQuery((execute, input: TUpdate) =>
             execute((client) =>
               client
                 .update(schema.organizationTable)
@@ -56,35 +65,37 @@ const makeOrganizationRepository = Effect.gen(function* () {
                   createdAt: schema.organizationTable.createdAt,
                 })
             )
-        )({ organizationId, name, logo });
+          )({ organizationId, name, logo })
+          .pipe(Effect.map(EffectArray.get(0)));
 
         return updatedOrganization;
       }),
-    findMemberRole: ({
-      organizationId,
-      userId,
-    }: {
-      organizationId: string;
-      userId: string;
-    }) =>
+    findMemberRole: ({ organizationId, userId }: TFindMemberRole) =>
       db
-        .makeQuery(
-          (execute, input: { organizationId: string; userId: string }) =>
-            execute((client) =>
-              client
-                .select({
-                  role: schema.member.role,
-                })
-                .from(schema.member)
-                .where(
-                  and(
-                    eq(schema.member.organizationId, input.organizationId),
-                    eq(schema.member.userId, input.userId)
-                  )
+        .makeQuery((execute, input: TFindMemberRole) =>
+          execute((client) =>
+            client
+              .select({
+                role: schema.member.role,
+              })
+              .from(schema.member)
+              .where(
+                and(
+                  eq(schema.member.organizationId, input.organizationId),
+                  eq(schema.member.userId, input.userId)
                 )
-            )
+              )
+          )
         )({ organizationId, userId })
-        .pipe(Effect.map((rows) => rows[0])),
+        .pipe(
+          Effect.map(EffectArray.get(0)),
+          Effect.map((row) =>
+            Option.match(row, {
+              onNone: () => undefined,
+              onSome: (value) => value,
+            })
+          )
+        ),
   };
 });
 

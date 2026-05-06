@@ -1,105 +1,124 @@
 import { Database, schema } from "@feeblo/db";
 import { and, eq, inArray } from "drizzle-orm";
-import { Context, Effect, Layer, Option } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 import { PRIVILEGED_MEMBER_ROLES } from "../plan-entitlements";
 
-type TFindMembershipsByUserId = {
+interface TFindMembershipsByUserId {
   userId: string;
-};
+}
 
-type TFindOrganizationMembers = {
+interface TFindOrganizationMembers {
   organizationId: string;
-};
+}
 
-type TFindOrganizationInvitations = {
+interface TFindOrganizationInvitations {
   organizationId: string;
-};
+}
 
-type TFindMemberByEmailInOrg = {
-  organizationId: string;
+interface TFindMemberByEmailInOrg {
   email: string;
-};
-
-type TFindOwnersInOrg = {
   organizationId: string;
-};
+}
 
-type TFindMemberById = {
-  memberId: string;
-};
-
-type TDeleteMember = {
+interface TFindOwnersInOrg {
   organizationId: string;
-  memberId: string;
-};
+}
 
-type TUpdateMemberRole = {
-  organizationId: string;
+interface TFindMemberById {
   memberId: string;
+}
+
+interface TDeleteMember {
+  memberId: string;
+  organizationId: string;
+}
+
+interface TUpdateMemberRole {
+  memberId: string;
+  organizationId: string;
   role: "owner" | "admin" | "member";
-};
+}
+
+interface TCreateInvitation {
+  email: string;
+  expiresAt: Date;
+  id: string;
+  inviterId: string;
+  organizationId: string;
+  role: string;
+}
+
+interface TCancelInvitation {
+  invitationId: string;
+  organizationId: string;
+}
+
+interface TCountByOrganizationId {
+  organizationId: string;
+}
 
 const makeMembershipRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
   return {
     findMembershipsByUserId: (args: TFindMembershipsByUserId) =>
-      db
-        .makeQuery((execute, input: TFindMembershipsByUserId) =>
-          execute((client) =>
-            client
-              .select({
-                id: schema.member.id,
-                organizationId: schema.member.organizationId,
-                userId: schema.member.userId,
-                role: schema.member.role,
-                createdAt: schema.member.createdAt,
-              })
-              .from(schema.member)
-              .where(eq(schema.member.userId, input.userId))
-          )
-        )(args),
+      db.makeQuery((execute, input: TFindMembershipsByUserId) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.member.id,
+              organizationId: schema.member.organizationId,
+              userId: schema.member.userId,
+              role: schema.member.role,
+              createdAt: schema.member.createdAt,
+            })
+            .from(schema.member)
+            .where(eq(schema.member.userId, input.userId))
+        )
+      )(args),
     findOrganizationMembers: (args: TFindOrganizationMembers) =>
       db.makeQuery((execute, input: TFindOrganizationMembers) =>
         execute((client) =>
-          client.select({
-            id: schema.member.id,
-            organizationId: schema.member.organizationId,
-            userId: schema.member.userId,
-            role: schema.member.role,
-            createdAt: schema.member.createdAt,
-            user: {
-              id: schema.user.id,
-              name: schema.user.name,
-              email: schema.user.email,
-              image: schema.user.image,
-            },
-          })
-          .from(schema.member)
-          .innerJoin(schema.user, eq(schema.member.userId, schema.user.id))
-          .where(eq(schema.member.organizationId, input.organizationId))
+          client
+            .select({
+              id: schema.member.id,
+              organizationId: schema.member.organizationId,
+              userId: schema.member.userId,
+              role: schema.member.role,
+              createdAt: schema.member.createdAt,
+              user: {
+                id: schema.user.id,
+                name: schema.user.name,
+                email: schema.user.email,
+                image: schema.user.image,
+              },
+            })
+            .from(schema.member)
+            .innerJoin(schema.user, eq(schema.member.userId, schema.user.id))
+            .where(eq(schema.member.organizationId, input.organizationId))
         )
       )(args),
     findOrganizationInvitations: (args: TFindOrganizationInvitations) =>
       db.makeQuery((execute, input: TFindOrganizationInvitations) =>
         execute((client) =>
-          client.select({
-            id: schema.invitation.id,
-            organizationId: schema.invitation.organizationId,
-            email: schema.invitation.email,
-            role: schema.invitation.role,
-            status: schema.invitation.status,
-            expiresAt: schema.invitation.expiresAt,
-            inviterId: schema.invitation.inviterId,
-            createdAt: schema.invitation.createdAt,
-          })
-          .from(schema.invitation)
-          .where(
-            and(
-              eq(schema.invitation.organizationId, input.organizationId),
-              eq(schema.invitation.status, "pending")
+          client
+            .select({
+              id: schema.invitation.id,
+              organizationId: schema.invitation.organizationId,
+              email: schema.invitation.email,
+              role: schema.invitation.role,
+              status: schema.invitation.status,
+              expiresAt: schema.invitation.expiresAt,
+              inviterId: schema.invitation.inviterId,
+              createdAt: schema.invitation.createdAt,
+            })
+            .from(schema.invitation)
+            .where(
+              and(
+                eq(schema.invitation.organizationId, input.organizationId),
+                eq(schema.invitation.status, "pending")
+              )
             )
-          )
         )
       )(args),
     createInvitation: ({
@@ -109,42 +128,31 @@ const makeMembershipRepository = Effect.gen(function* () {
       role,
       inviterId,
       expiresAt,
-    }: {
-      id: string;
-      organizationId: string;
-      email: string;
-      role: string;
-      inviterId: string;
-      expiresAt: Date;
-    }) =>
-      db.makeQuery((execute, input: {
-        id: string;
-        organizationId: string;
-        email: string;
-        role: string;
-        inviterId: string;
-        expiresAt: Date;
-      }) =>
+    }: TCreateInvitation) =>
+      db.makeQuery((execute, input: TCreateInvitation) =>
         execute((client) =>
-          client.insert(schema.invitation).values({
-            id: input.id,
-            organizationId: input.organizationId,
-            email: input.email,
-            role: input.role,
-            inviterId: input.inviterId,
-            expiresAt: input.expiresAt,
-            status: "pending",
-            createdAt: new Date(),
-          }).returning({
-            id: schema.invitation.id,
-            organizationId: schema.invitation.organizationId,
-            email: schema.invitation.email,
-            role: schema.invitation.role,
-            status: schema.invitation.status,
-            expiresAt: schema.invitation.expiresAt,
-            inviterId: schema.invitation.inviterId,
-            createdAt: schema.invitation.createdAt,
-          })
+          client
+            .insert(schema.invitation)
+            .values({
+              id: input.id,
+              organizationId: input.organizationId,
+              email: input.email,
+              role: input.role,
+              inviterId: input.inviterId,
+              expiresAt: input.expiresAt,
+              status: "pending",
+              createdAt: new Date(),
+            })
+            .returning({
+              id: schema.invitation.id,
+              organizationId: schema.invitation.organizationId,
+              email: schema.invitation.email,
+              role: schema.invitation.role,
+              status: schema.invitation.status,
+              expiresAt: schema.invitation.expiresAt,
+              inviterId: schema.invitation.inviterId,
+              createdAt: schema.invitation.createdAt,
+            })
         )
       )({ id, organizationId, email, role, inviterId, expiresAt }),
     updateMemberRole: (args: TUpdateMemberRole) =>
@@ -187,42 +195,37 @@ const makeMembershipRepository = Effect.gen(function* () {
               .where(eq(schema.member.id, input.memberId))
           )
         )(args)
-        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
+        .pipe(Effect.map(EffectArray.get(0))),
 
     deleteMember: (args: TDeleteMember) =>
       db.makeQuery((execute, input: TDeleteMember) =>
         execute((client) =>
-          client.delete(schema.member).where(
-            and(
-              eq(schema.member.id, input.memberId),
-              eq(schema.member.organizationId, input.organizationId)
+          client
+            .delete(schema.member)
+            .where(
+              and(
+                eq(schema.member.id, input.memberId),
+                eq(schema.member.organizationId, input.organizationId)
+              )
             )
-          )
         )
       )(args),
-    cancelInvitation: ({
-      organizationId,
-      invitationId,
-    }: {
-      organizationId: string;
-      invitationId: string;
-    }) =>
+    cancelInvitation: ({ organizationId, invitationId }: TCancelInvitation) =>
       Effect.gen(function* () {
-        yield* db.makeQuery(
-          (execute, input: { organizationId: string; invitationId: string }) =>
-            execute((client) =>
-              client
-                .update(schema.invitation)
-                .set({
-                  status: "canceled",
-                })
-                .where(
-                  and(
-                    eq(schema.invitation.id, input.invitationId),
-                    eq(schema.invitation.organizationId, input.organizationId)
-                  )
+        yield* db.makeQuery((execute, input: TCancelInvitation) =>
+          execute((client) =>
+            client
+              .update(schema.invitation)
+              .set({
+                status: "canceled",
+              })
+              .where(
+                and(
+                  eq(schema.invitation.id, input.invitationId),
+                  eq(schema.invitation.organizationId, input.organizationId)
                 )
-            )
+              )
+          )
         )({ organizationId, invitationId });
       }),
     findMemberByEmailInOrg: (args: TFindMemberByEmailInOrg) =>
@@ -241,7 +244,7 @@ const makeMembershipRepository = Effect.gen(function* () {
               )
           )
         )(args)
-        .pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]))),
+        .pipe(Effect.map(EffectArray.get(0))),
     findOwnersInOrg: (args: TFindOwnersInOrg) =>
       db.makeQuery((execute, input: TFindOwnersInOrg) =>
         execute((client) =>
@@ -256,10 +259,10 @@ const makeMembershipRepository = Effect.gen(function* () {
             )
         )
       )(args),
-    countPrivilegedMembers: ({ organizationId }: { organizationId: string }) =>
+    countPrivilegedMembers: ({ organizationId }: TCountByOrganizationId) =>
       Effect.gen(function* () {
         const members = yield* db.makeQuery(
-          (execute, input: { organizationId: string }) =>
+          (execute, input: TCountByOrganizationId) =>
             execute((client) =>
               client
                 .select({ id: schema.member.id })
@@ -277,12 +280,10 @@ const makeMembershipRepository = Effect.gen(function* () {
       }),
     countPendingPrivilegedInvitations: ({
       organizationId,
-    }: {
-      organizationId: string;
-    }) =>
+    }: TCountByOrganizationId) =>
       Effect.gen(function* () {
         const invitations = yield* db.makeQuery(
-          (execute, input: { organizationId: string }) =>
+          (execute, input: TCountByOrganizationId) =>
             execute((client) =>
               client
                 .select({ id: schema.invitation.id })
@@ -291,10 +292,9 @@ const makeMembershipRepository = Effect.gen(function* () {
                   and(
                     eq(schema.invitation.organizationId, input.organizationId),
                     eq(schema.invitation.status, "pending"),
-                    inArray(
-                      schema.invitation.role,
-                      [...PRIVILEGED_MEMBER_ROLES]
-                    )
+                    inArray(schema.invitation.role, [
+                      ...PRIVILEGED_MEMBER_ROLES,
+                    ])
                   )
                 )
             )

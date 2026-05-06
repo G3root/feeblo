@@ -11,6 +11,11 @@ interface findManyArgs {
   subdomain?: string;
 }
 
+interface findManyQuery {
+  limit: number;
+  whereClause: SQL | undefined;
+}
+
 interface updateArgs {
   changelogVisibility: "PUBLIC" | "HIDDEN";
   id: string;
@@ -64,26 +69,25 @@ const makeSiteRepository = Effect.gen(function* () {
 
       const whereClause = where.length > 1 ? and(...where) : where[0];
 
-      return db.makeQuery(
-        (execute, input: { whereClause: SQL | undefined; limit: number }) =>
-          execute((client) =>
-            client
-              .select({
-                id: schema.site.id,
-                name: schema.site.name,
-                subdomain: schema.site.subdomain,
-                customDomain: schema.site.customDomain,
-                changelogVisibility: schema.site.changelogVisibility,
-                roadmapVisibility: schema.site.roadmapVisibility,
-                createdAt: schema.site.createdAt,
-                updatedAt: schema.site.updatedAt,
-                organizationId: schema.site.organizationId,
-                hidePoweredBy: schema.site.hidePoweredBy,
-              })
-              .from(schema.site)
-              .where(input.whereClause)
-              .limit(input.limit)
-          )
+      return db.makeQuery((execute, input: findManyQuery) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.site.id,
+              name: schema.site.name,
+              subdomain: schema.site.subdomain,
+              customDomain: schema.site.customDomain,
+              changelogVisibility: schema.site.changelogVisibility,
+              roadmapVisibility: schema.site.roadmapVisibility,
+              createdAt: schema.site.createdAt,
+              updatedAt: schema.site.updatedAt,
+              organizationId: schema.site.organizationId,
+              hidePoweredBy: schema.site.hidePoweredBy,
+            })
+            .from(schema.site)
+            .where(input.whereClause)
+            .limit(input.limit)
+        )
       )({ whereClause, limit: findManyArgs.limit });
     },
     update: (args: updateArgs) =>

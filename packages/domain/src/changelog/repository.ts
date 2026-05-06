@@ -9,16 +9,16 @@ import type {
   TChangelogUpdate,
 } from "./schema";
 
-type TChangelogCreateInternal = TChangelogCreate & {
+interface TChangelogCreateInternal extends TChangelogCreate {
   creatorId: string;
   creatorMemberId?: string;
-};
+}
 
-type TFindByCreatorId = {
+interface TFindByCreatorId {
   id: string;
-  organizationId: string;
   memberId: string;
-};
+  organizationId: string;
+}
 
 const makeChangelogRepository = Effect.gen(function* () {
   const db = yield* Database.Database;

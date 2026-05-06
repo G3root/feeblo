@@ -19,6 +19,10 @@ type ProductPayload = WebhookProductCreatedPayload["data"];
 type SubscriptionInsert = typeof schema.subscriptionTable.$inferInsert;
 type ProductInsert = typeof schema.productTable.$inferInsert;
 
+interface TFindSubscriptionByOrganizationId {
+  organizationId: string;
+}
+
 const DbSubscriptionStatus = Schema.Literals([
   "incomplete",
   "incomplete_expired",
@@ -224,11 +228,9 @@ const makeBillingRepository = Effect.gen(function* () {
       }),
     findSubscriptionByOrganizationId: ({
       organizationId,
-    }: {
-      organizationId: string;
-    }) =>
+    }: TFindSubscriptionByOrganizationId) =>
       db
-        .makeQuery((execute, input: { organizationId: string }) =>
+        .makeQuery((execute, input: TFindSubscriptionByOrganizationId) =>
           execute((client) =>
             client
               .select({
