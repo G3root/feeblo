@@ -7,6 +7,7 @@ import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   FailedToCreatePostError,
   FailedToDeletePostError,
+  FailedToMergePostError,
   FailedToUpdatePostError,
 } from "./errors";
 import { PostPolicy } from "./policies";
@@ -148,17 +149,20 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           })
         ),
       PostMerge: (args: TPostMerge) =>
-        (args.sourcePostId === args.targetPostId
-          ? Effect.fail(
-              new BadRequestError({
-                message: "Source and target posts must be different",
-              })
-            )
-          : repository.merge(args)
-        ).pipe(
+        Effect.gen(function* () {
+          if (args.sourcePostId === args.targetPostId) {
+            return yield* new BadRequestError({
+              message: "Source and target posts must be different",
+            });
+          }
+          return yield* repository.merge(args);
+        }).pipe(
           Policy.withPolicy(
             postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
-          )
+          ),
+          Effect.catchTags({
+            SqlError: () => Effect.fail(new FailedToMergePostError()),
+          })
         ),
     };
   })

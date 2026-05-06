@@ -1,8 +1,8 @@
-import { FileSystem, HttpApiBuilder } from "@effect/platform";
-import { DB } from "@feeblo/db";
+import { Database } from "@feeblo/db";
 import { user as userTable } from "@feeblo/db/schema/auth";
 import { eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Effect, FileSystem } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
@@ -65,20 +65,19 @@ export const ProfileApiLive = HttpApiBuilder.group(
             )
           );
 
-        const db = yield* DB;
+        const db = yield* Database.Database;
 
-        yield* db
-          .update(userTable)
-          .set({ image: uploaded.url })
-          .where(eq(userTable.id, session.user.id))
-          .pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Failed to save profile image",
-                })
-            )
-          );
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(userTable)
+              .set({ image: uploaded.url })
+              .where(eq(userTable.id, session.user.id)),
+          catch: () =>
+            new InternalServerError({
+              message: "Failed to save profile image",
+            }),
+        });
 
         return uploaded;
       });

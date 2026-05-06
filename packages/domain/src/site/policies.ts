@@ -1,4 +1,4 @@
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -37,7 +37,7 @@ const makeSitePolicy = Effect.gen(function* () {
         organizationId,
       });
 
-      if (!site || site.roadmapVisibility !== "PUBLIC") {
+      if (Option.isNone(site) || site.value.roadmapVisibility !== "PUBLIC") {
         return yield* new Policy.PolicyDeniedError({
           reason: "Roadmap is not publicly visible.",
         });
@@ -50,7 +50,7 @@ const makeSitePolicy = Effect.gen(function* () {
         organizationId,
       });
 
-      if (!site || site.changelogVisibility !== "PUBLIC") {
+      if (Option.isNone(site) || site.value.changelogVisibility !== "PUBLIC") {
         return yield* new Policy.PolicyDeniedError({
           reason: "Changelog is not publicly visible.",
         });

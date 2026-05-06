@@ -120,7 +120,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             });
           }
 
-          return yield* repository.update(args);
+          yield* repository.update(args);
         }).pipe(
           Policy.withPolicy(
             Policy.all(

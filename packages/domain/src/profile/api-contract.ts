@@ -5,7 +5,11 @@ import {
   HttpApiGroup,
   HttpApiSchema,
 } from "effect/unstable/httpapi";
-import { BadRequestError, UnauthorizedError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../rpc-errors";
 import { HttpApiAuthMiddleware } from "../session-middleware";
 
 export const ProfilePictureUploadResponseSchema = Schema.Struct({
@@ -21,7 +25,7 @@ export class ProfileApiGroup extends HttpApiGroup.make("ProfileApiGroup")
       error: Schema.Union([
         BadRequestError,
         UnauthorizedError,
-        UnauthorizedError,
+        InternalServerError,
       ]),
       payload: Schema.Struct({
         file: Multipart.SingleFileSchema,
