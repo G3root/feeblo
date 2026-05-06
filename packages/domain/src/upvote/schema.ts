@@ -1,31 +1,31 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export const Upvote = Schema.Struct({
-  id: Schema.String,
-  postId: Schema.String,
-  organizationId: Schema.String,
-  userId: Schema.String,
-  memberId: Schema.Union([Schema.String, Schema.Null]),
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-  user: Schema.Struct({
-    name: Schema.NullOr(Schema.String),
-    image: Schema.NullOr(Schema.String),
+export const Upvote = S.Struct({
+  id: S.String,
+  postId: S.String,
+  organizationId: S.String,
+  userId: S.String,
+  memberId: S.Union([S.String, S.Null]),
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  user: S.Struct({
+    name: S.NullOr(S.String),
+    image: S.NullOr(S.String),
   }),
 });
 
-export type TUpvote = Schema.Schema.Type<typeof Upvote>;
+export type TUpvote = S.Schema.Type<typeof Upvote>;
 
-export const UpvoteList = Schema.Struct({
-  organizationId: Schema.String,
-  postId: Schema.String,
+export const UpvoteList = S.Struct({
+  organizationId: S.String,
+  postId: S.String,
 });
 
-export type TUpvoteList = Schema.Schema.Type<typeof UpvoteList>;
+export type TUpvoteList = S.Schema.Type<typeof UpvoteList>;
 
-export const UpvoteToggle = Schema.Struct({
-  organizationId: Schema.String,
-  postId: Schema.String,
+export const UpvoteToggle = S.Struct({
+  organizationId: S.String,
+  postId: S.String,
 });
 
-export type TUpvoteToggle = Schema.Schema.Type<typeof UpvoteToggle>;
+export type TUpvoteToggle = S.Schema.Type<typeof UpvoteToggle>;

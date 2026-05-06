@@ -1,51 +1,53 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export const changelogVisibilitySchema = Schema.Literals(["PUBLIC", "HIDDEN"]);
-export const roadmapVisibilitySchema = Schema.Literals(["PUBLIC", "HIDDEN"]);
+export const changelogVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
+export const roadmapVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
 
-export class Site extends Schema.Class<Site>("Site")({
-  id: Schema.String,
-  name: Schema.String,
-  subdomain: Schema.String,
-  customDomain: Schema.Union([Schema.String, Schema.Null]),
+export const Site = S.Struct({
+  id: S.String,
+  name: S.String,
+  subdomain: S.String,
+  customDomain: S.Union([S.String, S.Null]),
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
-  hidePoweredBy: Schema.Boolean,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-  organizationId: Schema.String,
-}) {}
-
-export const SiteList = Schema.Struct({
-  organizationId: Schema.String,
+  hidePoweredBy: S.Boolean,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  organizationId: S.String,
 });
 
-export type TSiteList = Schema.Schema.Type<typeof SiteList>;
+export type TSite = S.Schema.Type<typeof Site>;
 
-export const SiteUpdate = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
+export const SiteList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TSiteList = S.Schema.Type<typeof SiteList>;
+
+export const SiteUpdate = S.Struct({
+  id: S.String,
+  organizationId: S.String,
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
-  name: Schema.String,
+  name: S.String,
 });
 
-export type TSiteUpdate = Schema.Schema.Type<typeof SiteUpdate>;
+export type TSiteUpdate = S.Schema.Type<typeof SiteUpdate>;
 
-export const SiteHidePoweredByBranding = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  hidePoweredBy: Schema.Boolean,
+export const SiteHidePoweredByBranding = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  hidePoweredBy: S.Boolean,
 });
 
-export type TSiteHidePoweredByBranding = Schema.Schema.Type<
+export type TSiteHidePoweredByBranding = S.Schema.Type<
   typeof SiteHidePoweredByBranding
 >;
 
-export const SiteListBySubdomain = Schema.Struct({
-  subdomain: Schema.String,
+export const SiteListBySubdomain = S.Struct({
+  subdomain: S.String,
 });
 
-export type TSiteListBySubdomain = Schema.Schema.Type<
+export type TSiteListBySubdomain = S.Schema.Type<
   typeof SiteListBySubdomain
 >;

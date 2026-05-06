@@ -1,102 +1,98 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export const TagType = Schema.Literals(["FEEDBACK", "CHANGELOG"]);
+export const TagType = S.Literals(["FEEDBACK", "CHANGELOG"]);
 
-export class Tag extends Schema.Class<Tag>("Tag")({
-  id: Schema.String,
-  name: Schema.String,
-  slug: Schema.String,
+export const Tag = S.Struct({
+  id: S.String,
+  name: S.String,
+  slug: S.String,
   type: TagType,
-  organizationId: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-}) {}
-
-export type TTag = Schema.Schema.Type<typeof Tag>;
-
-export const TagList = Schema.Struct({
-  organizationId: Schema.String,
+  organizationId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
 });
 
-export type TTagList = Schema.Schema.Type<typeof TagList>;
+export type TTag = S.Schema.Type<typeof Tag>;
 
-export const TagCreate = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
+export const TagList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TTagList = S.Schema.Type<typeof TagList>;
+
+export const TagCreate = S.Struct({
+  id: S.String,
+  name: S.String,
   type: TagType,
-  organizationId: Schema.String,
+  organizationId: S.String,
 });
 
-export type TTagCreate = Schema.Schema.Type<typeof TagCreate>;
+export type TTagCreate = S.Schema.Type<typeof TagCreate>;
 
-export const TagUpdate = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
+export const TagUpdate = S.Struct({
+  id: S.String,
+  name: S.String,
   type: TagType,
-  organizationId: Schema.String,
+  organizationId: S.String,
 });
 
-export type TTagUpdate = Schema.Schema.Type<typeof TagUpdate>;
+export type TTagUpdate = S.Schema.Type<typeof TagUpdate>;
 
-export const TagDelete = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
+export const TagDelete = S.Struct({
+  id: S.String,
+  organizationId: S.String,
 });
 
-export type TTagDelete = Schema.Schema.Type<typeof TagDelete>;
+export type TTagDelete = S.Schema.Type<typeof TagDelete>;
 
-export class PostTagAssignment extends Schema.Class<PostTagAssignment>(
-  "PostTagAssignment"
-)({
-  id: Schema.String,
-  postId: Schema.String,
-  tagId: Schema.String,
-  organizationId: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-}) {}
+export const PostTagAssignment = S.Struct({
+  id: S.String,
+  postId: S.String,
+  tagId: S.String,
+  organizationId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
 
-export type TPostTagAssignment = Schema.Schema.Type<typeof PostTagAssignment>;
+export type TPostTagAssignment = S.Schema.Type<typeof PostTagAssignment>;
 
-export class ChangelogTagAssignment extends Schema.Class<ChangelogTagAssignment>(
-  "ChangelogTagAssignment"
-)({
-  id: Schema.String,
-  changelogId: Schema.String,
-  tagId: Schema.String,
-  organizationId: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-}) {}
+export const ChangelogTagAssignment = S.Struct({
+  id: S.String,
+  changelogId: S.String,
+  tagId: S.String,
+  organizationId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
 
-export type TChangelogTagAssignment = Schema.Schema.Type<
+export type TChangelogTagAssignment = S.Schema.Type<
   typeof ChangelogTagAssignment
 >;
 
-export const PostTagList = Schema.Struct({
-  organizationId: Schema.String,
+export const PostTagList = S.Struct({
+  organizationId: S.String,
 });
 
-export type TPostTagList = Schema.Schema.Type<typeof PostTagList>;
+export type TPostTagList = S.Schema.Type<typeof PostTagList>;
 
-export const ChangelogTagList = Schema.Struct({
-  organizationId: Schema.String,
+export const ChangelogTagList = S.Struct({
+  organizationId: S.String,
 });
 
-export type TChangelogTagList = Schema.Schema.Type<typeof ChangelogTagList>;
+export type TChangelogTagList = S.Schema.Type<typeof ChangelogTagList>;
 
-export const PostTagSet = Schema.Struct({
-  postId: Schema.String,
-  organizationId: Schema.String,
-  tagIds: Schema.Array(Schema.String),
+export const PostTagSet = S.Struct({
+  postId: S.String,
+  organizationId: S.String,
+  tagIds: S.Array(S.String),
 });
 
-export type TPostTagSet = Schema.Schema.Type<typeof PostTagSet>;
+export type TPostTagSet = S.Schema.Type<typeof PostTagSet>;
 
-export const ChangelogTagSet = Schema.Struct({
-  changelogId: Schema.String,
-  organizationId: Schema.String,
-  tagIds: Schema.Array(Schema.String),
+export const ChangelogTagSet = S.Struct({
+  changelogId: S.String,
+  organizationId: S.String,
+  tagIds: S.Array(S.String),
 });
 
-export type TChangelogTagSet = Schema.Schema.Type<typeof ChangelogTagSet>;
+export type TChangelogTagSet = S.Schema.Type<typeof ChangelogTagSet>;

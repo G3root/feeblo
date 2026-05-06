@@ -1,26 +1,26 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export class BillingCheckoutInput extends Schema.Class<BillingCheckoutInput>(
-  "BillingCheckoutInput"
-)({
-  organizationId: Schema.String,
-  productId: Schema.String,
-}) {}
+export const BillingCheckoutInput = S.Struct({
+  organizationId: S.String,
+  productId: S.String,
+});
 
-export class BillingCheckoutOutput extends Schema.Class<BillingCheckoutOutput>(
-  "BillingCheckoutOutput"
-)({
-  url: Schema.String,
-}) {}
+export type TBillingCheckoutInput = S.Schema.Type<typeof BillingCheckoutInput>;
 
-export class BillingPortalInput extends Schema.Class<BillingPortalInput>(
-  "BillingPortalInput"
-)({
-  organizationId: Schema.String,
-}) {}
+export const BillingCheckoutOutput = S.Struct({
+  url: S.String,
+});
 
-export class BillingPortalOutput extends Schema.Class<BillingPortalOutput>(
-  "BillingPortalOutput"
-)({
-  url: Schema.String,
-}) {}
+export type TBillingCheckoutOutput = S.Schema.Type<typeof BillingCheckoutOutput>;
+
+export const BillingPortalInput = S.Struct({
+  organizationId: S.String,
+});
+
+export type TBillingPortalInput = S.Schema.Type<typeof BillingPortalInput>;
+
+export const BillingPortalOutput = S.Struct({
+  url: S.String,
+});
+
+export type TBillingPortalOutput = S.Schema.Type<typeof BillingPortalOutput>;

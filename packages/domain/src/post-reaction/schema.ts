@@ -1,27 +1,29 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export class PostReaction extends Schema.Class<PostReaction>("PostReaction")({
-  id: Schema.String,
-  postId: Schema.String,
-  organizationId: Schema.String,
-  userId: Schema.String,
-  memberId: Schema.Union([Schema.String, Schema.Null]),
-  emoji: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-}) {}
-
-export const PostReactionList = Schema.Struct({
-  organizationId: Schema.String,
-  postId: Schema.String,
+export const PostReaction = S.Struct({
+  id: S.String,
+  postId: S.String,
+  organizationId: S.String,
+  userId: S.String,
+  memberId: S.Union([S.String, S.Null]),
+  emoji: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
 });
 
-export type TPostReactionList = Schema.Schema.Type<typeof PostReactionList>;
+export type TPostReaction = S.Schema.Type<typeof PostReaction>;
 
-export const PostReactionToggle = Schema.Struct({
-  organizationId: Schema.String,
-  postId: Schema.String,
-  emoji: Schema.String,
+export const PostReactionList = S.Struct({
+  organizationId: S.String,
+  postId: S.String,
 });
 
-export type TPostReactionToggle = Schema.Schema.Type<typeof PostReactionToggle>;
+export type TPostReactionList = S.Schema.Type<typeof PostReactionList>;
+
+export const PostReactionToggle = S.Struct({
+  organizationId: S.String,
+  postId: S.String,
+  emoji: S.String,
+});
+
+export type TPostReactionToggle = S.Schema.Type<typeof PostReactionToggle>;

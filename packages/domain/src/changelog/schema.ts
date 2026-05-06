@@ -1,69 +1,69 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export const ChangelogStatus = Schema.Literals([
+export const ChangelogStatus = S.Literals([
   "draft",
   "scheduled",
   "published",
 ]);
 
-export type TChangelogStatus = Schema.Schema.Type<typeof ChangelogStatus>;
+export type TChangelogStatus = S.Schema.Type<typeof ChangelogStatus>;
 
-export const Changelog = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  slug: Schema.String,
-  content: Schema.String,
+export const Changelog = S.Struct({
+  id: S.String,
+  title: S.String,
+  slug: S.String,
+  content: S.String,
   status: ChangelogStatus,
-  scheduledAt: Schema.NullOr(Schema.Date),
-  publishedAt: Schema.NullOr(Schema.Date),
-  organizationId: Schema.String,
-  creatorMemberId: Schema.NullOr(Schema.String),
-  creatorId: Schema.NullOr(Schema.String),
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-  user: Schema.Struct({
-    name: Schema.NullOr(Schema.String),
-    image: Schema.NullOr(Schema.String),
+  scheduledAt: S.NullOr(S.DateFromString),
+  publishedAt: S.NullOr(S.DateFromString),
+  organizationId: S.String,
+  creatorMemberId: S.NullOr(S.String),
+  creatorId: S.NullOr(S.String),
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  user: S.Struct({
+    name: S.NullOr(S.String),
+    image: S.NullOr(S.String),
   }),
 });
 
-export type TChangelog = Schema.Schema.Type<typeof Changelog>;
+export type TChangelog = S.Schema.Type<typeof Changelog>;
 
-export const ChangelogList = Schema.Struct({
-  organizationId: Schema.String,
+export const ChangelogList = S.Struct({
+  organizationId: S.String,
 });
 
-export type TChangelogList = Schema.Schema.Type<typeof ChangelogList>;
+export type TChangelogList = S.Schema.Type<typeof ChangelogList>;
 
-export const ChangelogCreate = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  slug: Schema.String,
-  content: Schema.String,
+export const ChangelogCreate = S.Struct({
+  id: S.String,
+  title: S.String,
+  slug: S.String,
+  content: S.String,
   status: ChangelogStatus,
-  scheduledAt: Schema.NullOr(Schema.Date),
-  publishedAt: Schema.NullOr(Schema.Date),
-  organizationId: Schema.String,
+  scheduledAt: S.NullOr(S.DateFromString),
+  publishedAt: S.NullOr(S.DateFromString),
+  organizationId: S.String,
 });
 
-export type TChangelogCreate = Schema.Schema.Type<typeof ChangelogCreate>;
+export type TChangelogCreate = S.Schema.Type<typeof ChangelogCreate>;
 
-export const ChangelogUpdate = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  slug: Schema.String,
-  content: Schema.String,
+export const ChangelogUpdate = S.Struct({
+  id: S.String,
+  title: S.String,
+  slug: S.String,
+  content: S.String,
   status: ChangelogStatus,
-  scheduledAt: Schema.NullOr(Schema.Date),
-  publishedAt: Schema.NullOr(Schema.Date),
-  organizationId: Schema.String,
+  scheduledAt: S.NullOr(S.DateFromString),
+  publishedAt: S.NullOr(S.DateFromString),
+  organizationId: S.String,
 });
 
-export type TChangelogUpdate = Schema.Schema.Type<typeof ChangelogUpdate>;
+export type TChangelogUpdate = S.Schema.Type<typeof ChangelogUpdate>;
 
-export const ChangelogDelete = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
+export const ChangelogDelete = S.Struct({
+  id: S.String,
+  organizationId: S.String,
 });
 
-export type TChangelogDelete = Schema.Schema.Type<typeof ChangelogDelete>;
+export type TChangelogDelete = S.Schema.Type<typeof ChangelogDelete>;

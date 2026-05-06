@@ -1,84 +1,84 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export class Post extends Schema.Class<Post>("Post")({
-  id: Schema.String,
-  boardId: Schema.String,
-  title: Schema.String,
-  slug: Schema.String,
-  content: Schema.String,
-  excerpt: Schema.String,
-  upVotes: Schema.Number,
-  statusId: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-  organizationId: Schema.String,
-  creatorMemberId: Schema.NullOr(Schema.String),
-  creatorId: Schema.NullOr(Schema.String),
-  lockedAt: Schema.NullOr(Schema.Date),
-  archivedAt: Schema.NullOr(Schema.Date),
-  mergedIntoPostId: Schema.NullOr(Schema.String),
-  mergedAt: Schema.NullOr(Schema.Date),
-  user: Schema.Struct({
-    name: Schema.NullOr(Schema.String),
-    image: Schema.NullOr(Schema.String),
+export const Post = S.Struct({
+  id: S.String,
+  boardId: S.String,
+  title: S.String,
+  slug: S.String,
+  content: S.String,
+  excerpt: S.String,
+  upVotes: S.Number,
+  statusId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  organizationId: S.String,
+  creatorMemberId: S.NullOr(S.String),
+  creatorId: S.NullOr(S.String),
+  lockedAt: S.NullOr(S.DateFromString),
+  archivedAt: S.NullOr(S.DateFromString),
+  mergedIntoPostId: S.NullOr(S.String),
+  mergedAt: S.NullOr(S.DateFromString),
+  user: S.Struct({
+    name: S.NullOr(S.String),
+    image: S.NullOr(S.String),
   }),
-  hasUserUpVoted: Schema.Boolean,
-}) {}
-
-export type TPost = Schema.Schema.Type<typeof Post>;
-
-export const PostList = Schema.Struct({
-  boardId: Schema.Union([Schema.String, Schema.Null, Schema.Undefined]),
-  organizationId: Schema.String,
+  hasUserUpVoted: S.Boolean,
 });
 
-export type TPostList = Schema.Schema.Type<typeof PostList>;
+export type TPost = S.Schema.Type<typeof Post>;
 
-export const PostIds = Schema.Array(Schema.String);
-
-export const PostDelete = Schema.Struct({
-  id: Schema.Union([Schema.String, PostIds]),
-  boardId: Schema.String,
-  organizationId: Schema.String,
+export const PostList = S.Struct({
+  boardId: S.Union([S.String, S.Null, S.Undefined]),
+  organizationId: S.String,
 });
 
-export type TPostDelete = Schema.Schema.Type<typeof PostDelete>;
+export type TPostList = S.Schema.Type<typeof PostList>;
 
-export const PostUpdate = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  content: Schema.String,
-  statusId: Schema.String,
-  boardId: Schema.String,
-  organizationId: Schema.String,
+export const PostIds = S.Array(S.String);
+
+export const PostDelete = S.Struct({
+  id: S.Union([S.String, PostIds]),
+  boardId: S.String,
+  organizationId: S.String,
 });
 
-export type TPostUpdate = Schema.Schema.Type<typeof PostUpdate>;
+export type TPostDelete = S.Schema.Type<typeof PostDelete>;
 
-export const PostAdminUpdate = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  archived: Schema.optional(Schema.Boolean),
-  locked: Schema.optional(Schema.Boolean),
+export const PostUpdate = S.Struct({
+  id: S.String,
+  title: S.String,
+  content: S.String,
+  statusId: S.String,
+  boardId: S.String,
+  organizationId: S.String,
 });
 
-export type TPostAdminUpdate = Schema.Schema.Type<typeof PostAdminUpdate>;
+export type TPostUpdate = S.Schema.Type<typeof PostUpdate>;
 
-export const PostMerge = Schema.Struct({
-  organizationId: Schema.String,
-  sourcePostId: Schema.String,
-  targetPostId: Schema.String,
+export const PostAdminUpdate = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  archived: S.optional(S.Boolean),
+  locked: S.optional(S.Boolean),
 });
 
-export type TPostMerge = Schema.Schema.Type<typeof PostMerge>;
+export type TPostAdminUpdate = S.Schema.Type<typeof PostAdminUpdate>;
 
-export const PostCreate = Schema.Struct({
-  id: Schema.String,
-  boardId: Schema.String,
-  title: Schema.String,
-  content: Schema.String,
-  statusId: Schema.String,
-  organizationId: Schema.String,
+export const PostMerge = S.Struct({
+  organizationId: S.String,
+  sourcePostId: S.String,
+  targetPostId: S.String,
 });
 
-export type TPostCreate = Schema.Schema.Type<typeof PostCreate>;
+export type TPostMerge = S.Schema.Type<typeof PostMerge>;
+
+export const PostCreate = S.Struct({
+  id: S.String,
+  boardId: S.String,
+  title: S.String,
+  content: S.String,
+  statusId: S.String,
+  organizationId: S.String,
+});
+
+export type TPostCreate = S.Schema.Type<typeof PostCreate>;
