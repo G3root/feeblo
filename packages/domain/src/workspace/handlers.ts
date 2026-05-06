@@ -24,9 +24,7 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
             });
           }
 
-          const isSlugTaken = yield* repository.isOrganizationSlugTaken({
-            slug,
-          });
+          const isSlugTaken = yield* repository.isOrganizationSlugTaken(slug);
 
           if (isSlugTaken) {
             return yield* new BadRequestError({
@@ -43,7 +41,7 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
           return { organizationId };
         }).pipe(
           Effect.catchTags({
-            SqlError: () =>
+            DatabaseError: () =>
               Effect.fail(
                 new InternalServerError({
                   message: "Failed to create workspace",
@@ -55,7 +53,7 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
       WorkspaceProductList: () =>
         repository.findProducts().pipe(
           Effect.catchTags({
-            SqlError: () =>
+            DatabaseError: () =>
               Effect.fail(
                 new InternalServerError({
                   message: "Failed to list workspace products",
@@ -71,7 +69,7 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
           .pipe(
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
             Effect.catchTags({
-              SqlError: () =>
+              DatabaseError: () =>
                 Effect.fail(
                   new InternalServerError({
                     message: "Failed to get workspace plan",
