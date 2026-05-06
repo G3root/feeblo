@@ -38,7 +38,6 @@
     "@faker-js/faker": "^10.3.0",
     "@feeblo/config": "workspace:*",
     "@feeblo/utils": "workspace:*",
-    "@feeblo/auth": "workspace:*",
     "@types/pg": "^8.16.0",
     "drizzle-kit": "catalog:",
     "drizzle-seed": "catalog:",
