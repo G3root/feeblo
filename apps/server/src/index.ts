@@ -22,6 +22,7 @@ import {
   HttpServerResponse,
 } from "effect/unstable/http";
 import { HttpApiScalar } from "effect/unstable/httpapi";
+import { ServerConfig } from "./config";
 
 const ServiceLayers = Database.Database.Client;
 const AuthLayer = Layer.effect(Auth, initAuthHandler());
@@ -51,44 +52,72 @@ const HealthRouter = HttpRouter.use((router) =>
   router.add("GET", "/health", HttpServerResponse.text("OK"))
 );
 
-const AllRoutes = Layer.mergeAll(
-  HealthRouter,
-  RpcRoute,
-  HttpRoute,
-  BetterAuthRouterLive,
-  DocsRoute
-).pipe(
-  Layer.provide(
-    HttpRouter.cors({
-      allowedOrigins: [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:5173",
-      ],
-      allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      credentials: true,
-    })
-  )
-);
+const program = Effect.gen(function* () {
+  const config = yield* ServerConfig;
 
-HttpRouter.serve(AllRoutes, {
-  routerConfig: {
-    maxParamLength: 500,
-  },
-}).pipe(
-  Layer.provide(HttpApiAuthMiddlewareLive),
-  Layer.provide(AuthLayer),
-  Layer.provide(ServiceLayers),
-  Layer.provide(NodeFileSystem.layer),
-  Layer.provide(NodePath.layer),
-  Layer.provide(
-    NodeHttpServer.layerConfig(
-      createServer,
-      Config.all({
-        port: Config.number("SERVER_PORT").pipe(Config.withDefault(3000)),
+  const isAllowedOrigin = (origin: string | undefined): boolean => {
+    if (!origin) {
+      return true;
+    }
+
+    try {
+      const originHost = new URL(origin).hostname;
+      const appHost = new URL(config.appUrl).hostname;
+      const apiHost = new URL(config.apiUrl).hostname;
+
+      if (originHost === apiHost) {
+        return true;
+      }
+      if (originHost === appHost) {
+        return true;
+      }
+      if (originHost.endsWith(`.${appHost}`)) {
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const AllRoutes = Layer.mergeAll(
+    HealthRouter,
+    RpcRoute,
+    HttpRoute,
+    BetterAuthRouterLive,
+    DocsRoute
+  ).pipe(
+    Layer.provide(
+      HttpRouter.cors({
+        allowedOrigins: isAllowedOrigin as unknown as readonly string[],
+        allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        credentials: true,
       })
     )
-  ),
-  Layer.launch,
-  NodeRuntime.runMain
-);
+  );
+
+  const server = HttpRouter.serve(AllRoutes, {
+    routerConfig: {
+      maxParamLength: 500,
+    },
+  }).pipe(
+    Layer.provide(HttpApiAuthMiddlewareLive),
+    Layer.provide(AuthLayer),
+    Layer.provide(ServiceLayers),
+    Layer.provide(NodeFileSystem.layer),
+    Layer.provide(NodePath.layer),
+    Layer.provide(
+      NodeHttpServer.layerConfig(
+        createServer,
+        Config.all({
+          port: Config.number("SERVER_PORT").pipe(Config.withDefault(3000)),
+        })
+      )
+    )
+  );
+
+  return yield* Layer.launch(server);
+});
+
+program.pipe(Effect.provide(ServerConfig.layer), NodeRuntime.runMain);
