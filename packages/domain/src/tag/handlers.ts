@@ -2,6 +2,7 @@ import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { TagPolicy } from "./policies";
 import { TagRepository } from "./repository";
 import { TagRpcs } from "./rpcs";
 import type {
@@ -84,6 +85,7 @@ const validateChangelog = ({
 export const TagRpcHandlers = TagRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* TagRepository;
+    const tagPolicy = yield* TagPolicy;
 
     return {
       TagList: (args: TTagList) =>
@@ -139,23 +141,30 @@ export const TagRpcHandlers = TagRpcs.toLayer(
         ),
 
       TagUpdate: (args: TTagUpdate) =>
-        repository
-          .update(args)
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("Tag", "update")
+        repository.update(args).pipe(
+          Policy.withPolicy(
+            tagPolicy.isOwner({
+              organizationId: args.organizationId,
+              tagId: args.id,
+            })
           ),
+          withRemapDbErrors("Tag", "update")
+        ),
 
       TagDelete: (args: TTagDelete) =>
-        repository
-          .delete(args)
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("Tag", "delete")
+        repository.delete(args).pipe(
+          Policy.withPolicy(
+            tagPolicy.isOwner({
+              organizationId: args.organizationId,
+              tagId: args.id,
+            })
           ),
+          withRemapDbErrors("Tag", "delete")
+        ),
 
       PostTagSet: (args: TPostTagSet) =>
         Effect.gen(function* () {
+          //TODO add ownership Policy
           const tagIds = normalizeTagIds(args.tagIds);
           yield* validatePost({
             postId: args.postId,
@@ -175,6 +184,7 @@ export const TagRpcHandlers = TagRpcs.toLayer(
 
       ChangelogTagSet: (args: TChangelogTagSet) =>
         Effect.gen(function* () {
+          //TODO add ownership Policy
           const tagIds = normalizeTagIds(args.tagIds);
           yield* validateChangelog({
             changelogId: args.changelogId,
@@ -193,4 +203,4 @@ export const TagRpcHandlers = TagRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(TagRepository.layer));
+).pipe(Layer.provide(TagPolicy.layer), Layer.provide(TagRepository.layer));

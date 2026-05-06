@@ -2,7 +2,7 @@ import { Database, schema } from "@feeblo/db";
 import { generatePublicId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 import type {
   TChangelogTagList,
   TChangelogTagSet,
@@ -63,6 +63,11 @@ interface THasPost {
 
 interface THasChangelog {
   changelogId: string;
+  organizationId: string;
+}
+
+interface TFindTagById {
+  id: string;
   organizationId: string;
 }
 
@@ -333,6 +338,27 @@ const makeTagRepository = Effect.gen(function* () {
           )
         )({ changelogId, organizationId })
         .pipe(Effect.map((rows) => rows.length > 0)),
+
+    findById: ({ id, organizationId }: TFindTagById) =>
+      db
+        .makeQuery((execute, input: TFindTagById) =>
+          execute((client) =>
+            client
+              .select({
+                id: schema.tag.id,
+                creatorId: schema.tag.creatorId,
+              })
+              .from(schema.tag)
+              .where(
+                and(
+                  eq(schema.tag.id, input.id),
+                  eq(schema.tag.organizationId, input.organizationId)
+                )
+              )
+              .limit(1)
+          )
+        )({ id, organizationId })
+        .pipe(Effect.map(EffectArray.get(0))),
   };
 });
 
