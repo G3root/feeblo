@@ -1,38 +1,42 @@
 import { createServer } from "node:http";
 import {
-  HttpApiScalar,
-  HttpApp,
-  HttpLayerRouter,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "@effect/platform";
-import {
   NodeFileSystem,
   NodeHttpServer,
   NodePath,
   NodeRuntime,
 } from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
-import { DB } from "@feeblo/db";
+import { Database } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
+import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import {
   Auth,
   HttpApiAuthMiddlewareLive,
 } from "@feeblo/domain/session-middleware";
 import { Config, Effect, Layer } from "effect";
+import {
+  HttpEffect,
+  HttpMiddleware,
+  HttpRouter,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/unstable/http";
+import { HttpApiScalar } from "effect/unstable/httpapi";
 import { ServerConfig } from "./config";
 
-const ServiceLayers = DB.Client;
+const ServiceLayers = Database.Database.Client;
 const AuthLayer = Layer.effect(Auth, initAuthHandler());
 
 const BetterAuthApp = Effect.gen(function* () {
   const auth = yield* Auth;
-  return yield* HttpApp.fromWebHandler(auth.handler);
+  return yield* HttpEffect.fromWebHandler((request) =>
+    Promise.resolve(auth.handler(request))
+  );
 });
 
-const BetterAuthRouterLive = HttpLayerRouter.use((router) =>
+const BetterAuthRouterLive = HttpRouter.use((router) =>
   router.add("*", "/api/auth/*", (request) =>
     Effect.provideService(
       BetterAuthApp,
@@ -42,43 +46,43 @@ const BetterAuthRouterLive = HttpLayerRouter.use((router) =>
   )
 );
 
-const DocsRoute = HttpApiScalar.layerHttpLayerRouter({
-  api: Api,
+const DocsRoute = HttpApiScalar.layer(Api, {
   path: "/docs",
 });
 
-const CorsLayer = Layer.unwrapEffect(
+const CorsLayer = Layer.unwrap(
   Effect.gen(function* () {
     const { appUrl, apiUrl } = yield* ServerConfig;
 
     const appParsed = new URL(appUrl);
     const apiParsed = new URL(apiUrl);
     const appOrigin = appParsed.origin;
-    const apiOrigin = apiParsed.origin;
 
-    return HttpLayerRouter.cors({
-      allowedOrigins: (origin: string) => {
-        if (origin === appOrigin || origin === apiOrigin) {
-          return true;
-        }
+    return HttpRouter.middleware(
+      HttpMiddleware.cors({
+        allowedOrigins: (origin: string) => {
+          if (origin === appOrigin || origin === apiParsed.origin) {
+            return true;
+          }
 
-        try {
-          const { hostname, port } = new URL(origin);
-          return (
-            hostname.endsWith(`.${appParsed.hostname}`) &&
-            port === appParsed.port
-          );
-        } catch {
-          return false;
-        }
-      },
-      allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      credentials: true,
-    });
+          try {
+            const { hostname, port } = new URL(origin);
+            return (
+              hostname.endsWith(`.${appParsed.hostname}`) &&
+              port === appParsed.port
+            );
+          } catch {
+            return false;
+          }
+        },
+        allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        credentials: true,
+      })
+    ).layer;
   }).pipe(Effect.provide(ServerConfig.layer))
 );
 
-const HealthRouter = HttpLayerRouter.use((router) =>
+const HealthRouter = HttpRouter.use((router) =>
   router.add("GET", "/health", HttpServerResponse.text("OK"))
 );
 
@@ -87,10 +91,11 @@ const AllRoutes = Layer.mergeAll(
   RpcRoute,
   HttpRoute,
   BetterAuthRouterLive,
-  DocsRoute
-).pipe(Layer.provide(CorsLayer));
+  DocsRoute,
+  CorsLayer
+);
 
-HttpLayerRouter.serve(AllRoutes, {
+const ServerLayer = HttpRouter.serve(AllRoutes, {
   routerConfig: {
     maxParamLength: 500,
   },
@@ -100,6 +105,7 @@ HttpLayerRouter.serve(AllRoutes, {
   Layer.provide(ServiceLayers),
   Layer.provide(NodeFileSystem.layer),
   Layer.provide(NodePath.layer),
+  Layer.provide(S3UploadServiceLive),
   Layer.provide(
     NodeHttpServer.layerConfig(
       createServer,
@@ -107,7 +113,7 @@ HttpLayerRouter.serve(AllRoutes, {
         port: Config.number("SERVER_PORT").pipe(Config.withDefault(3000)),
       })
     )
-  ),
-  Layer.launch,
-  NodeRuntime.runMain
+  )
 );
+
+NodeRuntime.runMain(Layer.launch(ServerLayer));
