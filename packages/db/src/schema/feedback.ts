@@ -12,7 +12,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { member, organization, user } from "./auth";
+import { member, organizationTable, user } from "./auth";
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PUBLIC",
@@ -78,7 +78,7 @@ export const board = pgTable(
     visibility: boardVisibilityEnum("visibility").notNull(),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     creatorId: text("creator_id").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -107,7 +107,7 @@ export const tag = pgTable(
     type: tagTypeEnum("type").notNull(),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     creatorId: text("creator_id").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -144,7 +144,7 @@ export const postStatus = pgTable(
     orderIndex: integer("order_index").notNull(),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -178,7 +178,7 @@ export const postTag = pgTable(
       .references(() => tag.id, { onDelete: "cascade" }),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -206,7 +206,7 @@ export const changelogTag = pgTable(
       .references(() => tag.id, { onDelete: "cascade" }),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -241,7 +241,7 @@ export const post = pgTable(
       .references(() => postStatus.id, { onDelete: "restrict" }),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     creatorId: text("creator_id").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -353,7 +353,7 @@ export const comment = pgTable("comment", {
   content: text("content").notNull(),
   organizationId: text("organization_id")
     .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
+    .references(() => organizationTable.id, { onDelete: "cascade" }),
   postId: text("post_id")
     .notNull()
     .references(() => post.id, { onDelete: "cascade" }),
@@ -428,7 +428,7 @@ export const site = pgTable(
     hidePoweredBy: boolean("hide_powered_by").default(false).notNull(),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -449,7 +449,7 @@ export const changelog = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     creatorId: text("creator_id").references(() => user.id, {
       onDelete: "set null",
     }),

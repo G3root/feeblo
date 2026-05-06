@@ -12,7 +12,7 @@ import {
   commentReaction,
   DEFAULT_POST_STATUSES,
   member,
-  organization,
+  organizationTable,
   post,
   postReaction,
   postStatus,
@@ -131,17 +131,17 @@ const ensureOrganization = (userId: string) =>
 
     let [org] = yield* db
       .select({
-        id: organization.id,
-        name: organization.name,
-        slug: organization.slug,
+        id: organizationTable.id,
+        name: organizationTable.name,
+        slug: organizationTable.slug,
       })
-      .from(organization)
-      .where(eq(organization.id, userId))
+      .from(organizationTable)
+      .where(eq(organizationTable.id, userId))
       .limit(1);
 
     if (!org) {
       [org] = yield* db
-        .insert(organization)
+        .insert(organizationTable)
         .values({
           id: userId,
           name: "Personal",
@@ -149,9 +149,9 @@ const ensureOrganization = (userId: string) =>
           createdAt: new Date(),
         })
         .returning({
-          id: organization.id,
-          name: organization.name,
-          slug: organization.slug,
+          id: organizationTable.id,
+          name: organizationTable.name,
+          slug: organizationTable.slug,
         });
     }
 

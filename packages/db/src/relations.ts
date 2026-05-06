@@ -8,15 +8,15 @@ import {
   commentReaction,
   invitation,
   member,
-  organization,
+  organizationTable,
   post,
   postReaction,
   postStatus,
   postTag,
-  product,
+  productTable,
   session,
   site,
-  subscription,
+  subscriptionTable,
   tag,
   twoFactor,
   upvote,
@@ -60,7 +60,7 @@ export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
 }));
 
 export const organizationRelations = relations(
-  organization,
+  organizationTable,
   ({ many, one }) => ({
     members: many(member),
     invitations: many(invitation),
@@ -73,17 +73,17 @@ export const organizationRelations = relations(
     changelogs: many(changelog),
     changelogTags: many(changelogTag),
     site: one(site, {
-      fields: [organization.id],
+      fields: [organizationTable.id],
       references: [site.organizationId],
     }),
-    subscriptions: many(subscription),
+    subscriptions: many(subscriptionTable),
   })
 );
 
 export const memberRelations = relations(member, ({ one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [member.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   user: one(user, {
     fields: [member.userId],
@@ -92,9 +92,9 @@ export const memberRelations = relations(member, ({ one }) => ({
 }));
 
 export const invitationRelations = relations(invitation, ({ one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [invitation.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   user: one(user, {
     fields: [invitation.inviterId],
@@ -103,17 +103,17 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
 }));
 
 export const boardRelations = relations(board, ({ many, one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [board.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   posts: many(post),
 }));
 
 export const tagRelations = relations(tag, ({ many, one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [tag.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   creator: one(user, {
     fields: [tag.creatorId],
@@ -136,16 +136,16 @@ export const postTagRelations = relations(postTag, ({ one }) => ({
     fields: [postTag.tagId],
     references: [tag.id],
   }),
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [postTag.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
 }));
 
 export const postStatusRelations = relations(postStatus, ({ many, one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [postStatus.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   posts: many(post),
 }));
@@ -155,9 +155,9 @@ export const postRelations = relations(post, ({ many, one }) => ({
     fields: [post.boardId],
     references: [board.id],
   }),
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [post.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   postStatus: one(postStatus, {
     fields: [post.statusId],
@@ -200,9 +200,9 @@ export const postReactionRelations = relations(postReaction, ({ one }) => ({
 }));
 
 export const commentRelations = relations(comment, ({ many, one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [comment.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   post: one(post, {
     fields: [comment.postId],
@@ -238,16 +238,16 @@ export const commentReactionRelations = relations(
 );
 
 export const siteRelations = relations(site, ({ one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [site.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
 }));
 
 export const changelogRelations = relations(changelog, ({ many, one }) => ({
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [changelog.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
   creator: one(user, {
     fields: [changelog.creatorId],
@@ -269,23 +269,26 @@ export const changelogTagRelations = relations(changelogTag, ({ one }) => ({
     fields: [changelogTag.tagId],
     references: [tag.id],
   }),
-  organization: one(organization, {
+  organization: one(organizationTable, {
     fields: [changelogTag.organizationId],
-    references: [organization.id],
+    references: [organizationTable.id],
   }),
 }));
 
-export const subscriptionRelations = relations(subscription, ({ one }) => ({
-  organization: one(organization, {
-    fields: [subscription.organizationId],
-    references: [organization.id],
-  }),
-  product: one(product, {
-    fields: [subscription.productId],
-    references: [product.id],
-  }),
-}));
+export const subscriptionRelations = relations(
+  subscriptionTable,
+  ({ one }) => ({
+    organization: one(organizationTable, {
+      fields: [subscriptionTable.organizationId],
+      references: [organizationTable.id],
+    }),
+    product: one(productTable, {
+      fields: [subscriptionTable.productId],
+      references: [productTable.id],
+    }),
+  })
+);
 
-export const productRelations = relations(product, ({ many }) => ({
-  subscriptions: many(subscription),
+export const productRelations = relations(productTable, ({ many }) => ({
+  subscriptions: many(subscriptionTable),
 }));

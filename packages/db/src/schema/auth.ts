@@ -118,7 +118,7 @@ export const twoFactor = pgTable(
   ]
 );
 
-export const organization = pgTable(
+export const organizationTable = pgTable(
   "organization",
   {
     id: text("id").primaryKey(),
@@ -137,7 +137,7 @@ export const member = pgTable(
     id: text("id").primaryKey(),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -163,7 +163,7 @@ export const invitation = pgTable(
     id: text("id").primaryKey(),
     organizationId: text("organization_id")
       .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     role: text("role"),
     status: text("status").default("pending").notNull(),
@@ -181,12 +181,12 @@ export const invitation = pgTable(
   ]
 );
 
-export const subscription = pgTable("subscription", {
+export const subscriptionTable = pgTable("subscription", {
   id: text("id").primaryKey(),
   externalId: text("external_id").unique().notNull(),
   organizationId: text("organization_id")
     .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
+    .references(() => organizationTable.id, { onDelete: "cascade" }),
   amount: real("amount").notNull(),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull(),
   currency: text("currency").notNull(),
@@ -239,7 +239,7 @@ export const subscription = pgTable("subscription", {
   customerId: text("customer_id").notNull(),
   productId: text("product_id")
     .notNull()
-    .references(() => product.id, { onDelete: "cascade" }),
+    .references(() => productTable.id, { onDelete: "cascade" }),
   discountId: text("discount_id"),
   checkoutId: text("checkout_id"),
   seats: integer("seats"),
@@ -252,7 +252,7 @@ export const subscription = pgTable("subscription", {
     .notNull(),
 });
 
-export const product = pgTable("product", {
+export const productTable = pgTable("product", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
@@ -276,3 +276,6 @@ export const product = pgTable("product", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
+
+export type Organization = typeof organizationTable.$inferSelect;
+export type NewOrganization = typeof organizationTable.$inferInsert;
