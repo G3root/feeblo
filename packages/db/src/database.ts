@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/useConsistentMemberAccessibility: <explanation> */
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
@@ -289,7 +290,13 @@ export const databaseConfig = Config.all({
 
 export class Database extends Context.Service<Database, Shape>()("Database") {
   static get Client() {
-    return Layer.effect(Database, makeService(databaseConfig.parse));
+    return Layer.effect(
+      Database,
+      Effect.gen(function* () {
+        const config = yield* databaseConfig;
+        return yield* makeService(config);
+      })
+    );
   }
 }
 
