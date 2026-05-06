@@ -1,8 +1,4 @@
-import { DB } from "@feeblo/db";
-import {
-  product as productTable,
-  subscription as subscriptionTable,
-} from "@feeblo/db/schema/auth";
+import { Database, schema } from "@feeblo/db";
 import { generateId } from "@feeblo/utils/id";
 import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
 import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
@@ -20,8 +16,8 @@ import {
 type SubscriptionPayload = WebhookSubscriptionCreatedPayload["data"];
 type ProductPayload = WebhookProductCreatedPayload["data"];
 
-type SubscriptionInsert = typeof subscriptionTable.$inferInsert;
-type ProductInsert = typeof productTable.$inferInsert;
+type SubscriptionInsert = typeof schema.subscriptionTable.$inferInsert;
+type ProductInsert = typeof schema.productTable.$inferInsert;
 
 const DbSubscriptionStatus = Schema.Literals([
   "incomplete",
@@ -135,60 +131,96 @@ const toProductValues = (payload: ProductPayload): ProductInsert => ({
 });
 
 const makeBillingRepository = Effect.gen(function* () {
-  const db = yield* DB;
+  const db = yield* Database.Database;
 
   return {
     createSubscription: (payload: SubscriptionPayload) =>
-      db.insert(subscriptionTable).values(toSubscriptionValues(payload)),
+      db.makeQuery((execute, input: SubscriptionPayload) =>
+        execute((client) =>
+          client
+            .insert(schema.subscriptionTable)
+            .values(toSubscriptionValues(input))
+        )
+      )(payload),
     upsertSubscription: (payload: SubscriptionPayload) =>
       Effect.gen(function* () {
         const existingSubscription = yield* db
-          .select({ id: subscriptionTable.id })
-          .from(subscriptionTable)
-          .where(eq(subscriptionTable.externalId, payload.id))
-          .limit(1)
+          .makeQuery((execute, input: SubscriptionPayload) =>
+            execute((client) =>
+              client
+                .select({ id: schema.subscriptionTable.id })
+                .from(schema.subscriptionTable)
+                .where(eq(schema.subscriptionTable.externalId, input.id))
+                .limit(1)
+            )
+          )(payload)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingSubscription)) {
           const { id: _id, ...values } = toSubscriptionValues(payload);
 
-          yield* db
-            .update(subscriptionTable)
-            .set({
-              ...values,
-              updatedAt: new Date(),
-            })
-            .where(eq(subscriptionTable.externalId, payload.id));
+          yield* db.makeQuery((execute, input: SubscriptionPayload) =>
+            execute((client) =>
+              client
+                .update(schema.subscriptionTable)
+                .set({
+                  ...values,
+                  updatedAt: new Date(),
+                })
+                .where(eq(schema.subscriptionTable.externalId, input.id))
+            )
+          )(payload);
           return;
         }
 
-        yield* db
-          .insert(subscriptionTable)
-          .values(toSubscriptionValues(payload));
+        yield* db.makeQuery((execute, input: SubscriptionPayload) =>
+          execute((client) =>
+            client
+              .insert(schema.subscriptionTable)
+              .values(toSubscriptionValues(input))
+          )
+        )(payload);
       }),
     createProduct: (payload: ProductPayload) =>
-      db.insert(productTable).values(toProductValues(payload)),
+      db.makeQuery((execute, input: ProductPayload) =>
+        execute((client) =>
+          client.insert(schema.productTable).values(toProductValues(input))
+        )
+      )(payload),
     upsertProduct: (payload: ProductPayload) =>
       Effect.gen(function* () {
         const existingProduct = yield* db
-          .select({ id: productTable.id })
-          .from(productTable)
-          .where(eq(productTable.id, payload.id))
-          .limit(1)
+          .makeQuery((execute, input: ProductPayload) =>
+            execute((client) =>
+              client
+                .select({ id: schema.productTable.id })
+                .from(schema.productTable)
+                .where(eq(schema.productTable.id, input.id))
+                .limit(1)
+            )
+          )(payload)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingProduct)) {
-          yield* db
-            .update(productTable)
-            .set({
-              ...toProductValues(payload),
-              updatedAt: payload.modifiedAt ?? new Date(),
-            })
-            .where(eq(productTable.id, payload.id));
+          yield* db.makeQuery((execute, input: ProductPayload) =>
+            execute((client) =>
+              client
+                .update(schema.productTable)
+                .set({
+                  ...toProductValues(input),
+                  updatedAt: input.modifiedAt ?? new Date(),
+                })
+                .where(eq(schema.productTable.id, input.id))
+            )
+          )(payload);
           return;
         }
 
-        yield* db.insert(productTable).values(toProductValues(payload));
+        yield* db.makeQuery((execute, input: ProductPayload) =>
+          execute((client) =>
+            client.insert(schema.productTable).values(toProductValues(input))
+          )
+        )(payload);
       }),
     findSubscriptionByOrganizationId: ({
       organizationId,
@@ -196,13 +228,23 @@ const makeBillingRepository = Effect.gen(function* () {
       organizationId: string;
     }) =>
       db
-        .select({
-          id: subscriptionTable.id,
-          customerId: subscriptionTable.customerId,
-          organizationId: subscriptionTable.organizationId,
-        })
-        .from(subscriptionTable)
-        .where(eq(subscriptionTable.organizationId, organizationId))
+        .makeQuery((execute, input: { organizationId: string }) =>
+          execute((client) =>
+            client
+              .select({
+                id: schema.subscriptionTable.id,
+                customerId: schema.subscriptionTable.customerId,
+                organizationId: schema.subscriptionTable.organizationId,
+              })
+              .from(schema.subscriptionTable)
+              .where(
+                eq(
+                  schema.subscriptionTable.organizationId,
+                  input.organizationId
+                )
+              )
+          )
+        )({ organizationId })
         .pipe(Effect.map(EffectArray.get(0))),
   };
 });

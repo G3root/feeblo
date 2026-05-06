@@ -1,9 +1,7 @@
-import { DB } from "@feeblo/db";
-import { board as boardTable } from "@feeblo/db/schema/feedback";
+import { Database, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer } from "effect";
-import { Board } from "./schema";
+import { Context, Effect, Layer } from "effect";
 
 type TBoardCreate = {
   name: string;
@@ -33,45 +31,59 @@ type TBoardGetById = {
 };
 
 const makeBoardRepository = Effect.gen(function* () {
-  const db = yield* DB;
+  const db = yield* Database.Database;
 
   return {
     findById: ({ id, organizationId, memberId }: TBoardFindById) =>
       db
-        .select({ id: boardTable.id })
-        .from(boardTable)
-        .where(
-          and(
-            eq(boardTable.id, id),
-            eq(boardTable.organizationId, organizationId),
-            eq(boardTable.creatorMemberId, memberId)
+        .makeQuery((execute, input: TBoardFindById) =>
+          execute((client) =>
+            client
+              .select({ id: schema.board.id })
+              .from(schema.board)
+              .where(
+                and(
+                  eq(schema.board.id, input.id),
+                  eq(schema.board.organizationId, input.organizationId),
+                  eq(schema.board.creatorMemberId, input.memberId)
+                )
+              )
           )
-        )
-        .pipe(Effect.map(EffectArray.get(0))),
+        )({ id, organizationId, memberId })
+        .pipe(Effect.map((rows) => rows[0])),
     getById: ({ id, organizationId }: TBoardGetById) =>
       db
-        .select({
-          id: boardTable.id,
-          visibility: boardTable.visibility,
-        })
-        .from(boardTable)
-        .where(
-          and(
-            eq(boardTable.id, id),
-            eq(boardTable.organizationId, organizationId)
+        .makeQuery((execute, input: TBoardGetById) =>
+          execute((client) =>
+            client
+              .select({
+                id: schema.board.id,
+                visibility: schema.board.visibility,
+              })
+              .from(schema.board)
+              .where(
+                and(
+                  eq(schema.board.id, input.id),
+                  eq(schema.board.organizationId, input.organizationId)
+                )
+              )
           )
-        )
-        .pipe(Effect.map(EffectArray.get(0))),
+        )({ id, organizationId })
+        .pipe(Effect.map((rows) => rows[0])),
     create: (args: TBoardCreate) =>
-      db
-        .insert(boardTable)
-        .values({
-          ...args,
-          slug: slugify(args.name),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning(),
+      db.makeQuery((execute, input: TBoardCreate) =>
+        execute((client) =>
+          client
+            .insert(schema.board)
+            .values({
+              ...input,
+              slug: slugify(input.name),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .returning()
+        )
+      )(args),
     findMany: ({
       organizationId,
       visibility,
@@ -82,78 +94,95 @@ const makeBoardRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const where: SQL[] = [];
         if (visibility) {
-          where.push(eq(boardTable.visibility, visibility));
+          where.push(eq(schema.board.visibility, visibility));
         }
 
-        where.push(eq(boardTable.organizationId, organizationId));
+        where.push(eq(schema.board.organizationId, organizationId));
 
         const whereClause = where.length > 1 ? and(...where) : where[0];
 
-        const boards = yield* db
-          .select({
-            id: boardTable.id,
-            name: boardTable.name,
-            slug: boardTable.slug,
-            visibility: boardTable.visibility,
-            createdAt: boardTable.createdAt,
-            updatedAt: boardTable.updatedAt,
-            organizationId: boardTable.organizationId,
-          })
-          .from(boardTable)
-          .where(whereClause);
+        const boards = yield* db.makeQuery(
+          (execute, input: { whereClause: SQL | undefined }) =>
+            execute((client) =>
+              client
+                .select({
+                  id: schema.board.id,
+                  name: schema.board.name,
+                  slug: schema.board.slug,
+                  visibility: schema.board.visibility,
+                  createdAt: schema.board.createdAt,
+                  updatedAt: schema.board.updatedAt,
+                  organizationId: schema.board.organizationId,
+                })
+                .from(schema.board)
+                .where(input.whereClause)
+            )
+        )({ whereClause });
 
-        return boards.map(
-          (entry) =>
-            new Board({
-              id: entry.id,
-              name: entry.name,
-              slug: entry.slug,
-              visibility: entry.visibility,
-              createdAt: entry.createdAt,
-              updatedAt: entry.updatedAt,
-              organizationId: entry.organizationId,
-            })
-        );
+        return boards;
       }),
     countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
       Effect.gen(function* () {
-        const boards = yield* db
-          .select({ id: boardTable.id })
-          .from(boardTable)
-          .where(eq(boardTable.organizationId, organizationId));
+        const boards = yield* db.makeQuery(
+          (execute, input: { organizationId: string }) =>
+            execute((client) =>
+              client
+                .select({ id: schema.board.id })
+                .from(schema.board)
+                .where(eq(schema.board.organizationId, input.organizationId))
+            )
+        )({ organizationId });
 
         return boards.length;
       }),
 
     delete: ({ id, organizationId }: { id: string; organizationId: string }) =>
       Effect.gen(function* () {
-        yield* db
-          .delete(boardTable)
-          .where(
-            and(
-              eq(boardTable.id, id),
-              eq(boardTable.organizationId, organizationId)
+        yield* db.makeQuery(
+          (execute, input: { id: string; organizationId: string }) =>
+            execute((client) =>
+              client
+                .delete(schema.board)
+                .where(
+                  and(
+                    eq(schema.board.id, input.id),
+                    eq(schema.board.organizationId, input.organizationId)
+                  )
+                )
             )
-          );
+        )({ id, organizationId });
       }),
     update: (args: TBoardUpdate) =>
       Effect.gen(function* () {
         const { id, organizationId, ...rest } = args;
 
-        const [updatedBoard] = yield* db
-          .update(boardTable)
-          .set({
-            ...rest,
-            ...(rest.name && { slug: slugify(rest.name) }),
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(boardTable.id, id),
-              eq(boardTable.organizationId, organizationId)
+        const [updatedBoard] = yield* db.makeQuery(
+          (
+            execute,
+            input: {
+              id: string;
+              organizationId: string;
+              name?: string;
+              visibility?: "PUBLIC" | "PRIVATE";
+            }
+          ) =>
+            execute((client) =>
+              client
+                .update(schema.board)
+                .set({
+                  ...input,
+                  ...(input.name && { slug: slugify(input.name) }),
+                  updatedAt: new Date(),
+                })
+                .where(
+                  and(
+                    eq(schema.board.id, input.id),
+                    eq(schema.board.organizationId, input.organizationId)
+                  )
+                )
+                .returning()
             )
-          )
-          .returning();
+        )({ id, organizationId, ...rest });
 
         return updatedBoard;
       }),
