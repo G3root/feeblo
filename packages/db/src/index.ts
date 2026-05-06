@@ -1,27 +1,35 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 
-import * as Pg from "@effect/sql-drizzle/Pg";
 import { PgClient } from "@effect/sql-pg";
-import { Effect, Layer } from "effect";
-import { DatabaseConfig } from "./config";
-import * as relationalSchema from "./relations";
-import * as schema from "./schema";
+import * as PgDrizzle from "drizzle-orm/effect-postgres";
+import { Context, Layer, Redacted } from "effect";
+import { types } from "pg";
+import { relations } from "./relations";
 
-export const PgClientLive = Layer.unwrapEffect(
-  Effect.gen(function* () {
-    const { url } = yield* DatabaseConfig;
-    return PgClient.layer({ url });
-  }).pipe(Effect.provide(DatabaseConfig.layer))
-);
-
-const makeDb = Pg.make({
-  schema: { ...schema, ...relationalSchema },
+const PgClientLive = PgClient.layer({
+  url: Redacted.make(process.env.DATABASE_URL!),
+  types: {
+    getTypeParser: (typeId, format) => {
+      // Return raw values for date/time types to let Drizzle handle parsing
+      if (
+        [1184, 1114, 1082, 1186, 1231, 1115, 1185, 1187, 1182].includes(typeId)
+      ) {
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        return (val: any) => val;
+      }
+      return types.getTypeParser(typeId, format);
+    },
+  },
 });
 
-export class DB extends Effect.Service<DB>()("DB", {
-  effect: makeDb,
+const makeDb = PgDrizzle.makeWithDefaults({
+  relations,
+});
+
+export class DB extends Context.Service<DB>()("DB", {
+  make: makeDb,
 }) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
   static readonly Client = this.layer.pipe(Layer.provideMerge(PgClientLive));
 }
 
