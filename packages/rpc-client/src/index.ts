@@ -20,7 +20,7 @@ export const FetchWithCredentials = FetchHttpClient.layer.pipe(
 
 const RpcProtocolLive = RpcClient.layerProtocolHttp({
   url: `${VITE_API_URL}/rpc`,
-}).pipe(Layer.provide([FetchHttpClient.layer, RpcSerialization.layerNdjson]));
+}).pipe(Layer.provide([FetchWithCredentials, RpcSerialization.layerNdjson]));
 
 export type RpcClientType = RpcClient.FromGroup<
   typeof AllRpcs,
