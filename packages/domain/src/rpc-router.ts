@@ -10,6 +10,7 @@ import { OrganizationRpcHandlers } from "./organization/handlers";
 import { PostRpcHandlers } from "./post/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { PostStatusRpcHandlers } from "./post-status/handlers";
+import { AllRpcs } from "./rpc-group";
 import {
   AuthMiddlewareLive,
   OptionalAuthMiddlewareLive,
@@ -19,8 +20,10 @@ import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
-export const RpcRoute = RpcServer.layerProtocolHttp({
+export const RpcRoute = RpcServer.layerHttp({
   path: "/rpc",
+  protocol: "http",
+  group: AllRpcs,
 }).pipe(
   Layer.provide(PostRpcHandlers),
   Layer.provide(BillingRpcHandlers),

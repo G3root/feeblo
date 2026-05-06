@@ -60,7 +60,7 @@ export const initAuthHandler = () =>
     );
 
     const config = {
-      database: drizzleAdapter(db, {
+      database: drizzleAdapter(db.db, {
         provider: "pg",
 
         schema,
