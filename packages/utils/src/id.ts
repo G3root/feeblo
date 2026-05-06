@@ -5,6 +5,7 @@ const nanoid = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 12);
 
 const prefixes = {
   organization: "org",
+  workspace: "org",
   project: "prj",
   member: "mem",
   board: "brd",
