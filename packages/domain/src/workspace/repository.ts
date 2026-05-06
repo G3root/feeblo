@@ -1,8 +1,25 @@
 import { Database, schema, type TxFn } from "@feeblo/db";
-import { generateId, type UserId, type WorkspaceId } from "@feeblo/utils/id";
+import { generateId } from "@feeblo/utils/id";
+import { slugify } from "@feeblo/utils/url";
 import { and, desc, eq } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 import { FailedToCreateWorkspaceError } from "./errors";
+
+interface CreateWorkspaceArgs {
+  slug: string;
+  userId: string;
+  workspaceName: string;
+}
+
+interface CreatePostStatusArgs {
+  organizationId: string;
+  postStatus: (typeof schema.DEFAULT_POST_STATUSES)[number];
+}
+
+interface CreateBoardArgs {
+  boardName: string;
+  organizationId: string;
+}
 
 const makeWorkspaceRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
@@ -19,121 +36,108 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               .limit(1)
           )
         )(slug, tx)
-        .pipe(Effect.map((results) => Option.fromNullishOr(results[0])));
+        .pipe(Effect.map((results) => results.length > 0));
     },
 
-    createWorkspace: (
-      args: {
-        userId: UserId;
-        workspaceName: string;
-        slug: string;
-      },
-      tx?: TxFn
-    ) => {
-      const organization = db
-        .makeQuery((execute) =>
-          execute((client) =>
-            client
-              .insert(schema.organizationTable)
-              .values({
-                id: generateId("workspace"),
-                name: args.workspaceName,
-                slug: args.slug,
-                createdAt: new Date(),
-              })
-              .returning()
-          )
-        )(tx)
-        .pipe(Effect.map(EffectArray.get(0)));
+    createWorkspace: (args: CreateWorkspaceArgs, tx?: TxFn) =>
+      Effect.gen(function* () {
+        const organization = yield* db
+          .makeQuery((execute, input: CreateWorkspaceArgs) =>
+            execute((client) =>
+              client
+                .insert(schema.organizationTable)
+                .values({
+                  id: generateId("workspace"),
+                  name: input.workspaceName,
+                  slug: input.slug,
+                  createdAt: new Date(),
+                })
+                .returning()
+            )
+          )(args, tx)
+          .pipe(Effect.map(EffectArray.get(0)));
 
-      if (Option.isNone(organization)) {
-        return (
-          yield *
-          new FailedToCreateWorkspaceError({
+        if (Option.isNone(organization)) {
+          return yield* new FailedToCreateWorkspaceError({
             message: "Failed to create organization",
-          })
-        );
-      }
+          });
+        }
 
-      const organizationId = organization.value.id;
-    },
+        const organizationId = organization.value.id;
 
-    // createWorkspace: (
-    //   {
-    //     userId,
-    //     workspaceName,
-    //     slug,
-    //   }: {
-    //     userId: UserId;
-    //     workspaceName: string;
-    //     slug: string;
-    //   },
-    //   tx?: TxFn
-    // ) =>
-    //   Effect.gen(function* () {
-    //     const organization = yield* db
-    //       .insert(organizationTable)
-    //       .values({
-    //         id: generateId("organization"),
-    //         name: workspaceName,
-    //         slug,
-    //         createdAt: new Date(),
-    //       })
-    //       .returning()
-    //       .pipe(Effect.map(EffectArray.get(0)));
+        yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
+          execute((client) =>
+            client.insert(schema.member).values({
+              id: generateId("member"),
+              organizationId,
+              role: "owner",
+              createdAt: new Date(),
+              userId: input.userId,
+            })
+          )
+        )(args, tx);
 
-    //     if (Option.isNone(organization)) {
-    //       return yield* new FailedToCreateWorkspaceError({
-    //         message: "Failed to create organization",
-    //       });
-    //     }
-    //     const organizationId = organization.value.id;
+        for (const postStatus of schema.DEFAULT_POST_STATUSES) {
+          yield* db.makeQuery((execute, input: CreatePostStatusArgs) =>
+            execute((client) =>
+              client.insert(schema.postStatus).values({
+                id: generateId("postStatus"),
+                organizationId: input.organizationId,
+                type: input.postStatus.type,
+                orderIndex: input.postStatus.orderIndex,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+            )
+          )(
+            {
+              organizationId,
+              postStatus,
+            },
+            tx
+          );
+        }
 
-    //     yield* db.insert(memberTable).values({
-    //       id: generateId("member"),
-    //       organizationId,
-    //       role: "owner",
-    //       createdAt: new Date(),
-    //       userId,
-    //     });
+        const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
 
-    //     for (const postStatus of DEFAULT_POST_STATUSES) {
-    //       yield* db.insert(postStatusTable).values({
-    //         id: generateId("postStatus"),
-    //         organizationId,
-    //         type: postStatus.type,
-    //         orderIndex: postStatus.orderIndex,
-    //         createdAt: new Date(),
-    //         updatedAt: new Date(),
-    //       });
-    //     }
+        for (const boardName of defaultBoards) {
+          yield* db.makeQuery((execute, input: CreateBoardArgs) =>
+            execute((client) =>
+              client.insert(schema.board).values({
+                id: generateId("board"),
+                name: input.boardName,
+                slug: slugify(input.boardName),
+                visibility: "PUBLIC",
+                organizationId: input.organizationId,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              })
+            )
+          )(
+            {
+              boardName,
+              organizationId,
+            },
+            tx
+          );
+        }
 
-    //     const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
+        yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
+          execute((client) =>
+            client.insert(schema.site).values({
+              id: generateId("site"),
+              organizationId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              name: input.workspaceName,
+              subdomain: input.slug,
+              hidePoweredBy: false,
+            })
+          )
+        )(args, tx);
 
-    //     for (const boardName of defaultBoards) {
-    //       yield* db.insert(boardTable).values({
-    //         id: generateId("board"),
-    //         name: boardName,
-    //         slug: slugify(boardName),
-    //         visibility: "PUBLIC",
-    //         organizationId,
-    //         createdAt: new Date(),
-    //         updatedAt: new Date(),
-    //       });
-    //     }
-
-    //     yield* db.insert(siteTable).values({
-    //       id: generateId("site"),
-    //       organizationId,
-    //       createdAt: new Date(),
-    //       updatedAt: new Date(),
-    //       name: workspaceName,
-    //       subdomain: slug,
-    //       hidePoweredBy: false,
-    //     });
-
-    //     return organizationId;
-    //   }),
+        return organizationId;
+      }),
 
     findProducts: (tx?: TxFn) => {
       return db
@@ -162,13 +166,13 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               .from(schema.productTable)
               .where(eq(schema.productTable.isArchived, false))
           )
-        )(tx)
+        )(undefined, tx)
         .pipe(Effect.map((results) => results));
     },
 
-    findPlanByOrganizationId: (workspaceId: WorkspaceId, tx?: TxFn) => {
+    findPlanByOrganizationId: (args: { organizationId: string }, tx?: TxFn) => {
       return db
-        .makeQuery((execute, workspaceId: WorkspaceId) =>
+        .makeQuery((execute, input: { organizationId: string }) =>
           execute((client) =>
             client
               .select({
@@ -182,7 +186,10 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               )
               .where(
                 and(
-                  eq(schema.subscriptionTable.organizationId, workspaceId),
+                  eq(
+                    schema.subscriptionTable.organizationId,
+                    input.organizationId
+                  ),
                   eq(schema.subscriptionTable.status, "active")
                 )
               )
@@ -192,14 +199,17 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               )
               .limit(1)
           )
-        )(workspaceId, tx)
+        )(args, tx)
         .pipe(
           Effect.map(EffectArray.get(0)),
           Effect.map(
-            Option.map((subscription) => subscription.plan?.plan ?? "free")
+            Option.match({
+              onNone: () => "free" as const,
+              onSome: (subscription) => subscription.plan?.plan ?? "free",
+            })
           ),
           Effect.map((plan) => ({
-            organizationId: workspaceId,
+            organizationId: args.organizationId,
             plan,
           }))
         );
