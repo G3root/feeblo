@@ -1,5 +1,4 @@
-import { Database } from "@feeblo/db";
-import { user as userTable } from "@feeblo/db/schema/auth";
+import { Database, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
 import { Effect, FileSystem } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -67,20 +66,23 @@ export const ProfileApiLive = HttpApiBuilder.group(
 
         const db = yield* Database.Database;
 
-        yield* Effect.tryPromise({
-          try: () =>
-            db
-              .update(userTable)
-              .set({ image: uploaded.url })
-              .where(eq(userTable.id, session.user.id)),
-          catch: () =>
-            new InternalServerError({
-              message: "Failed to save profile image",
-            }),
-        });
+        yield* db.execute((client) =>
+          client
+            .update(schema.user)
+            .set({ image: uploaded.url })
+            .where(eq(schema.user.id, session.user.id))
+        );
 
         return uploaded;
-      });
+      }).pipe(
+        Effect.catchTag("DatabaseError", () =>
+          Effect.fail(
+            new InternalServerError({
+              message: "Failed to update profile logo",
+            })
+          )
+        )
+      );
     })
 );
 

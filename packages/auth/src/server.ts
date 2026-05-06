@@ -187,15 +187,19 @@ export const initAuthHandler = () =>
           : []),
 
         customSession(async ({ user, session }) => {
-          const memberships = await db
-            .select({
-              userId: schema.member.userId,
-              organizationId: schema.member.organizationId,
-              role: schema.member.role,
-              membershipId: schema.member.id,
-            })
-            .from(schema.member)
-            .where(eq(schema.member.userId, session.userId));
+          const memberships = await Effect.runPromise(
+            db.execute((client) =>
+              client
+                .select({
+                  userId: schema.member.userId,
+                  organizationId: schema.member.organizationId,
+                  role: schema.member.role,
+                  membershipId: schema.member.id,
+                })
+                .from(schema.member)
+                .where(eq(schema.member.userId, session.userId))
+            )
+          );
 
           const organizations = memberships.map((membership) => ({
             id: membership.organizationId,

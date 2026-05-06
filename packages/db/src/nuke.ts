@@ -3,10 +3,10 @@ import { Effect } from "effect";
 import { Database } from "./index";
 
 export const nukeDatabase = Effect.fn("nukeDatabase")(function* () {
-  const db = yield* Database.Database;
+  const dbService = yield* Database.Database;
 
   yield* Effect.promise(() =>
-    db.execute(
+    dbService.db.execute(
       sql.raw(`
       DO $$
       DECLARE
