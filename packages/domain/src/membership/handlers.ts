@@ -8,6 +8,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { Auth, CurrentSession } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import { MembershipPolicy } from "./policies";
 import { MembershipRepository } from "./repository";
 import { MembershipRpcs } from "./rpcs";
@@ -162,6 +163,7 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
     };
   })
 ).pipe(
+  Layer.provide(MembershipPolicy.layer),
   Layer.provide(MembershipRepository.layer),
-  Layer.provide(MembershipPolicy.layer)
+  Layer.provide(WorkspaceRepository.layer)
 );

@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
+import { PostRepository } from "../post/repository";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostReactionRepository } from "./repository";
@@ -85,5 +86,6 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
 ).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
+  Layer.provide(PostRepository.layer),
   Layer.provide(PostReactionRepository.layer)
 );

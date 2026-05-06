@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
+import { WorkspaceRepository } from "../workspace/repository";
 import { SitePolicy } from "./policies";
 import { SiteRepository } from "./repository";
 import { SiteRpcs } from "./rpcs";
@@ -68,4 +69,8 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(SiteRepository.layer), Layer.provide(SitePolicy.layer));
+).pipe(
+  Layer.provide(SitePolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(SiteRepository.layer)
+);

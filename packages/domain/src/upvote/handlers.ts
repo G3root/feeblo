@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
+import { PostRepository } from "../post/repository";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { UpvoteRepository } from "./repository";
@@ -77,4 +78,8 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
         ),
     };
   })
-).pipe(Layer.provide(PostPolicy.layer), Layer.provide(UpvoteRepository.layer));
+).pipe(
+  Layer.provide(PostPolicy.layer),
+  Layer.provide(PostRepository.layer),
+  Layer.provide(UpvoteRepository.layer)
+);

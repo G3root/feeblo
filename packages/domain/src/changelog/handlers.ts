@@ -4,6 +4,8 @@ import { withRemapDbErrors } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogPolicy } from "./policies";
 import { ChangelogRepository } from "./repository";
 import { ChangelogRpcs } from "./rpcs";
@@ -91,5 +93,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
 ).pipe(
   Layer.provide(SitePolicy.layer),
   Layer.provide(ChangelogPolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(SiteRepository.layer),
   Layer.provide(ChangelogRepository.layer)
 );

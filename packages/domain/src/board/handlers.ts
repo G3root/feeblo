@@ -2,6 +2,7 @@ import { Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import { BoardPolicy } from "./policies";
 import { BoardRepository } from "./repository";
 import { BoardRpcs } from "./rpcs";
@@ -120,7 +121,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
     };
   })
 ).pipe(
-  Layer.provide(BoardRepository.layer),
-  Layer.provide(BoardPolicy.layer)
-  // Layer.provide(SitePolicy.layer)
+  Layer.provide(BoardPolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(BoardRepository.layer)
 );

@@ -167,8 +167,8 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   })
 ).pipe(
   // Layer.provide(SitePolicy.layer),
-  Layer.provide(PostRepository.layer),
   Layer.provide(PostPolicy.layer),
   Layer.provide(CommentPolicy.layer),
+  Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer)
 );

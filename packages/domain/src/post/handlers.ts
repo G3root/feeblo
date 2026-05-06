@@ -140,7 +140,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
   })
 ).pipe(
   // Layer.provide(SitePolicy.layer),
-  Layer.provide(BoardRepository.layer),
   Layer.provide(PostPolicy.layer),
+  Layer.provide(BoardRepository.layer),
   Layer.provide(PostRepository.layer)
 );
