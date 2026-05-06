@@ -5,7 +5,7 @@ import {
   type PostgresJsDatabase,
   type PostgresJsQueryResultHKT,
 } from "drizzle-orm/postgres-js";
-import { Context, Schema } from "effect";
+import { Config, Context, Schema } from "effect";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -96,12 +96,12 @@ class EffectTransactionRollback extends Error {
   }
 }
 
-export type Config = {
+export type DatabaseConfig = {
   url: Redacted.Redacted;
   ssl: boolean;
 };
 
-const makeService = (config: Config) =>
+const makeService = (config: DatabaseConfig) =>
   Effect.gen(function* () {
     const sql = yield* Effect.acquireRelease(
       Effect.sync(() =>
@@ -272,6 +272,7 @@ const makeService = (config: Config) =>
     };
 
     return {
+      db,
       execute,
       transaction,
       makeQuery,
@@ -281,7 +282,16 @@ const makeService = (config: Config) =>
 
 type Shape = Effect.Success<ReturnType<typeof makeService>>;
 
-export class Database extends Context.Service<Database, Shape>()("Database") {}
+export const databaseConfig = Config.all({
+  url: Config.redacted("DATABASE_URL"),
+  ssl: Config.boolean("DATABASE_SSL").pipe(Config.withDefault(false)),
+});
 
-export const layer = (config: Config) =>
+export class Database extends Context.Service<Database, Shape>()("Database") {
+  static get Client() {
+    return Layer.effect(Database, makeService(databaseConfig.parse));
+  }
+}
+
+export const layer = (config: DatabaseConfig) =>
   Layer.effect(Database, makeService(config));
