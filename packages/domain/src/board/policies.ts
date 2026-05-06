@@ -1,6 +1,6 @@
-import { Effect, Option } from "effect";
-import * as Policy from "../policy";
+import { Context, Effect, Layer, Option } from "effect";
 import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
+import * as Policy from "../policy";
 import { WorkspaceRepository } from "../workspace/repository";
 import { BoardRepository } from "./repository";
 
@@ -26,7 +26,7 @@ const makeBoardPolicy = Effect.gen(function* () {
 
   const isCreator = (args: TIsCreator) =>
     Policy.policy((user) =>
-      Option.fromNullable(
+      Option.fromNullishOr(
         user.memberships.find((m) => m.organizationId === args.organizationId)
       ).pipe(
         Option.match({
@@ -105,9 +105,8 @@ const makeBoardPolicy = Effect.gen(function* () {
   return { isOwner, canCreate, canUpdate };
 });
 
-export class BoardPolicy extends Effect.Service<BoardPolicy>()("BoardPolicy", {
-  effect: makeBoardPolicy,
-  dependencies: [BoardRepository.Default, WorkspaceRepository.Default],
+export class BoardPolicy extends Context.Service<BoardPolicy>()("BoardPolicy", {
+  make: makeBoardPolicy,
 }) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }
