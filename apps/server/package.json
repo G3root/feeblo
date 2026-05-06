@@ -13,9 +13,8 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/utils": "workspace:*",
-    "effect": "catalog:",
     "@effect/platform-node": "catalog:",
-    "@effect/platform": "catalog:"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",

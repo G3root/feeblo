@@ -18,7 +18,6 @@
     "@dnd-kit/abstract": "^0.4.0",
     "@dnd-kit/dom": "^0.4.0",
     "@dnd-kit/react": "^0.3.2",
-    "@effect/platform": "catalog:",
     "@feeblo/auth": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",

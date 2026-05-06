@@ -5,8 +5,22 @@ import { UnauthorizedError } from "./rpc-errors";
 
 const SESSION_COOKIE_KEY = "better-auth.session_token";
 
+//TODO: infer session later
 export type Session = {
+  readonly user: {
+    readonly id: string;
+    readonly email: string;
+    readonly name: string;
+  };
+  readonly session: {
+    readonly userId: string;
+    readonly token: string;
+  };
+  readonly organizations: ReadonlyArray<{
+    readonly id: string;
+  }>;
   readonly memberships: ReadonlyArray<{
+    readonly membershipId: string;
     readonly organizationId: string;
     readonly role: "owner" | "admin" | "member";
   }>;
@@ -18,6 +32,14 @@ export type AuthHandler = {
     readonly getSession: (args: {
       readonly headers: Headers;
     }) => Promise<Session | null>;
+    readonly createInvitation: (args: {
+      readonly headers: Headers;
+      readonly body: {
+        readonly organizationId: string;
+        readonly email: string;
+        readonly role: "owner" | "admin" | "member";
+      };
+    }) => Promise<unknown>;
   };
 };
 

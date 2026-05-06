@@ -87,13 +87,17 @@
     },
     "./tag/schema": {
       "default": "./src/tag/schema.ts"
+    },
+    "./organization/repository": {
+      "default": "./src/organization/repository.ts"
+    },
+    "./services/s3": {
+      "default": "./src/services/s3.ts"
     }
   },
   "dependencies": {
-    "@effect-aws/client-s3": "^1.10.9",
-    "@effect-aws/s3": "^0.2.6",
-    "@effect/platform": "catalog:",
-    "@effect/rpc": "catalog:",
+    "@effect-aws/client-s3": "catalog:",
+    "@effect-aws/s3": "catalog:",
     "@feeblo/db": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@polar-sh/sdk": "catalog:",
