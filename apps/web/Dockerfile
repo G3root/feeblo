@@ -39,4 +39,5 @@ COPY --from=installer /app /app
 WORKDIR /app/apps/web
 EXPOSE 4321
 
-CMD ["sh", "-c", "test -n \"$PUBLIC_API_URL\" && test -n \"$PUBLIC_APP_URL\" && test -n \"$PUBLIC_APP_ROOT_DOMAIN\" && exec node /app/node_modules/astro/bin/astro.mjs preview --host 0.0.0.0 --port ${PORT:-4321}"]
+CMD ["node", "./dist/server/entry.mjs"]
+
