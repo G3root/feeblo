@@ -1,7 +1,7 @@
 services:
   server:
     container_name: feeblo-server
-    image: ghcr.io/feeblo/server:${IMAGE_TAG:-nightly}
+    image: ghcr.io/g3root/server:${IMAGE_TAG:-nightly}
     restart: always
     environment:
       NODE_ENV: production
@@ -15,7 +15,7 @@ services:
 
   web:
     container_name: feeblo-web
-    image: ghcr.io/feeblo/web:${IMAGE_TAG:-nightly}
+    image: ghcr.io/g3root/web:${IMAGE_TAG:-nightly}
     restart: always
     environment:
       NODE_ENV: production
