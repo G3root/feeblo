@@ -1,8 +1,10 @@
+import { getSecret } from "astro:env/server";
+
 export function getPublicEnvServer() {
   return {
-    PUBLIC_API_URL: import.meta.env.PUBLIC_API_URL as string,
-    PUBLIC_APP_URL: import.meta.env.PUBLIC_APP_URL as string,
-    PUBLIC_APP_ROOT_DOMAIN: import.meta.env.PUBLIC_APP_ROOT_DOMAIN as string,
+    PUBLIC_API_URL: getSecret("PUBLIC_API_URL") as string,
+    PUBLIC_APP_URL: getSecret("PUBLIC_APP_URL") as string,
+    PUBLIC_APP_ROOT_DOMAIN: getSecret("PUBLIC_APP_ROOT_DOMAIN") as string,
   };
 }
 
