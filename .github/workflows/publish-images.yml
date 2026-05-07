@@ -11,12 +11,12 @@ on:
     types: [published]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: feeblo
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
 
 jobs:
   build-and-push:
