@@ -1,3 +1,5 @@
+//credit https://github.com/HazelChat/hazel/blob/main/packages/domain/src/models/utils.ts
+
 import type { Brand } from "effect/Brand";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";

@@ -1,4 +1,6 @@
 /** biome-ignore-all lint/style/useConsistentMemberAccessibility: <explanation> */
+// credit https://github.com/HazelChat/hazel/blob/main/packages/db/src/services/database.ts
+
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {

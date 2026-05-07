@@ -1,3 +1,5 @@
+//credit https://github.com/HazelChat/hazel/blob/main/packages/db/src/services/drizzle-effect.ts
+
 import * as Drizzle from "drizzle-orm";
 import * as DrizzleMysql from "drizzle-orm/mysql-core";
 import * as DrizzlePg from "drizzle-orm/pg-core";
