@@ -1,4 +1,3 @@
-import { VITE_APP_URL } from "astro:env/client";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -49,10 +48,6 @@ export function truncate(value: string, maxLength = 180) {
 
 export function hasRichTextContent(value: string) {
   return /<[a-z][\s\S]*>/i.test(value);
-}
-
-export function getDashboardSignInUrl() {
-  return new URL("/sign-in", VITE_APP_URL).toString();
 }
 
 export function toSortedByCreatedAt<T extends { createdAt: Date | string }>(
