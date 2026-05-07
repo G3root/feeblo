@@ -1,9 +1,9 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { VITE_APP_ROOT_DOMAIN } from "astro:env/client";
 import { sequence } from "astro:middleware";
 import { extractSubdomain, RESERVED_SUBDOMAINS } from "@feeblo/utils/url";
 import type { APIContext, MiddlewareNext } from "astro";
-import { authClient } from "~/lib/auth-client";
+import { authClient } from "~/lib/server-auth-client";
+import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
 
 const AUTH_SIGN_IN_PATH = "/sign-in";
 const AUTH_SIGN_UP_PATH = "/sign-up";
@@ -30,7 +30,7 @@ function normalizePathname(pathname: string) {
 function resolveSubdomain(context: APIContext) {
   return extractSubdomain({
     url: context.request.url,
-    rootDomain: VITE_APP_ROOT_DOMAIN,
+    rootDomain: getServerRuntimePublicEnv().appRootDomain,
   });
 }
 

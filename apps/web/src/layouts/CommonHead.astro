@@ -6,6 +6,9 @@ interface Props {
 const { title = "feeblo" } = Astro.props;
 
 import { Font } from "astro:assets";
+import { getPublicEnv } from "../dashboard/lib/server-runtime-public-env";
+
+const publicEnv = getPublicEnv();
 ---
 
 <head>
@@ -16,6 +19,11 @@ import { Font } from "astro:assets";
   <title>{title}</title>
   <Font cssVariable="--font-inter" preload />
 </head>
+
+<script is:inline define:vars={{ publicEnv }}>
+  window.global = window.global || {};
+  window.global.__ENV = publicEnv;
+</script>
 
 <script is:inline>
   (function () {

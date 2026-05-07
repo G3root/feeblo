@@ -39,20 +39,17 @@ export default defineConfig({
 
   env: {
     schema: {
-      VITE_API_URL: envField.string({
-        context: "client",
-        access: "public",
-        optional: false,
+      PUBLIC_API_URL: envField.string({
+        context: "server",
+        access: "secret",
       }),
-      VITE_APP_URL: envField.string({
-        context: "client",
-        access: "public",
-        optional: false,
+      PUBLIC_APP_URL: envField.string({
+        context: "server",
+        access: "secret",
       }),
-      VITE_APP_ROOT_DOMAIN: envField.string({
-        context: "client",
-        access: "public",
-        optional: false,
+      PUBLIC_APP_ROOT_DOMAIN: envField.string({
+        context: "server",
+        access: "secret",
       }),
     },
   },
