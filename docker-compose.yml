@@ -1,13 +1,7 @@
 services:
   server:
     container_name: feeblo-server
-    build:
-      context: .
-      dockerfile: apps/server/Dockerfile
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
-        VITE_APP_URL: ${VITE_APP_URL}
-        VITE_API_URL: ${VITE_API_URL}
+    image: ghcr.io/feeblo/server:${IMAGE_TAG:-nightly}
     restart: always
     environment:
       NODE_ENV: production
@@ -21,14 +15,7 @@ services:
 
   web:
     container_name: feeblo-web
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA:-unknown}
-        VITE_API_URL: ${VITE_API_URL}
-        VITE_APP_URL: ${VITE_APP_URL}
-        VITE_APP_ROOT_DOMAIN: ${VITE_APP_ROOT_DOMAIN}
+    image: ghcr.io/feeblo/web:${IMAGE_TAG:-nightly}
     restart: always
     environment:
       NODE_ENV: production
