@@ -6,9 +6,9 @@ interface Props {
 const { title = "feeblo" } = Astro.props;
 
 import { Font } from "astro:assets";
-import { getPublicEnv } from "../dashboard/lib/server-runtime-public-env";
+import { getPublicEnvServer } from "../dashboard/lib/server-runtime-public-env";
 
-const publicEnv = getPublicEnv();
+const publicEnv = getPublicEnvServer();
 ---
 
 <head>

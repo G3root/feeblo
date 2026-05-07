@@ -1,24 +1,14 @@
-import { z } from "zod";
+type ProcessEnv = Record<string, string>;
 
-const runtimePublicEnvSchema = z.object({
-  apiUrl: z.url(),
-  appUrl: z.url(),
-  appRootDomain: z.string().min(1),
-});
-
-export type RuntimePublicEnv = z.infer<typeof runtimePublicEnvSchema>;
-
-type ProcessEnv = Record<string, string | undefined>;
-
-function parseRuntimePublicEnv(env: ProcessEnv): RuntimePublicEnv {
-  return runtimePublicEnvSchema.parse({
+function parseRuntimePublicEnv(env: ProcessEnv) {
+  return {
     apiUrl: env.PUBLIC_API_URL,
     appUrl: env.PUBLIC_APP_URL,
     appRootDomain: env.PUBLIC_APP_ROOT_DOMAIN,
-  });
+  };
 }
 
-function readClientRuntimePublicEnv(): RuntimePublicEnv {
+function readClientRuntimePublicEnv() {
   const runtimeWindow = window as Window & {
     global?: { __ENV?: ProcessEnv };
   };
@@ -26,6 +16,6 @@ function readClientRuntimePublicEnv(): RuntimePublicEnv {
   return parseRuntimePublicEnv(runtimeWindow.global?.__ENV ?? {});
 }
 
-export function getRuntimePublicEnv(): RuntimePublicEnv {
+export function getRuntimePublicEnv() {
   return readClientRuntimePublicEnv();
 }
