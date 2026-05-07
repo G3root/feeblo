@@ -75,7 +75,6 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' }}
         uses: docker/metadata-action@v6
         with:
-          context: git
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
           flavor: |
             suffix=-${{ matrix.platform.arch }},onlatest=true
@@ -151,7 +150,6 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' }}
         uses: docker/metadata-action@v6
         with:
-          context: git
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
           tags: |
             type=sha,prefix=
