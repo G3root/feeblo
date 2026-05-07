@@ -1,5 +1,4 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <explanation> */
-import { VITE_API_URL } from "astro:env/client";
 import { AllRpcs } from "@feeblo/domain/rpc-group";
 import { Context, Effect, Layer, ManagedRuntime } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
@@ -18,9 +17,14 @@ export const FetchWithCredentials = FetchHttpClient.layer.pipe(
   )
 );
 
-const RpcProtocolLive = RpcClient.layerProtocolHttp({
-  url: `${VITE_API_URL}/rpc`,
-}).pipe(Layer.provide([FetchWithCredentials, RpcSerialization.layerNdjson]));
+function normalizeApiUrl(apiUrl: string) {
+  return apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
+}
+
+export const createRpcProtocolLive = (apiUrl: string) =>
+  RpcClient.layerProtocolHttp({
+    url: `${normalizeApiUrl(apiUrl)}/rpc`,
+  }).pipe(Layer.provide([FetchWithCredentials, RpcSerialization.layerNdjson]));
 
 export type RpcClientType = RpcClient.FromGroup<
   typeof AllRpcs,
@@ -31,19 +35,15 @@ export class Rpc extends Context.Service<Rpc, RpcClientType>()("Rpc", {
   make: RpcClient.make(AllRpcs),
 }) {}
 
-export const RpcLive = Layer.effect(Rpc, Rpc.make).pipe(
-  Layer.provide(RpcProtocolLive)
-);
+export const createRpcLive = (apiUrl: string) =>
+  Layer.effect(Rpc, Rpc.make).pipe(Layer.provide(createRpcProtocolLive(apiUrl)));
 
 export const withRpc = <A, E, R>(
   cb: (rpc: RpcClientType) => Effect.Effect<A, E, R>
 ) => Effect.flatMap(Rpc.asEffect(), cb);
 
-export const runtimeLayer = Layer.mergeAll(RpcLive, FetchWithCredentials);
+export const createRuntimeLayer = (apiUrl: string) =>
+  Layer.mergeAll(createRpcLive(apiUrl), FetchWithCredentials);
 
-export const runtime = ManagedRuntime.make(runtimeLayer);
-
-/** Services provided by the default runtime (used for runEffect typing). */
-export type RuntimeRequirements = ManagedRuntime.ManagedRuntime.Services<
-  typeof runtime
->;
+export const createRuntime = (apiUrl: string) =>
+  ManagedRuntime.make(createRuntimeLayer(apiUrl));

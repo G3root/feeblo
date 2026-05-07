@@ -98,11 +98,6 @@ jobs:
             ${{ steps.workflow-run-meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.platform.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}-${{ matrix.platform.arch }}
-          build-args: |
-            GIT_COMMIT_SHA=${{ github.event.workflow_run.head_sha || github.sha }}
-            VITE_API_URL=${{ vars.VITE_API_URL }}
-            VITE_APP_URL=${{ vars.VITE_APP_URL }}
-            VITE_APP_ROOT_DOMAIN=${{ vars.VITE_APP_ROOT_DOMAIN }}
 
   merge-manifests:
     name: Merge ${{ matrix.service }} Manifest

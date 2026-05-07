@@ -1,8 +1,10 @@
-import { VITE_API_URL } from "astro:env/client";
 import { createAuthClient } from "@feeblo/auth/client";
 import { z } from "zod";
+import { getRuntimePublicEnv } from "./runtime-public-env";
 
-const baseUrl = VITE_API_URL?.endsWith("/") ? VITE_API_URL : `${VITE_API_URL}/`;
+const API_URL = getRuntimePublicEnv().apiUrl;
+
+const baseUrl = API_URL?.endsWith("/") ? API_URL : `${API_URL}/`;
 
 export const verificationOtpEndpoint = `${baseUrl}api/auth/verification-otp`;
 export const profilePictureUploadEndpoint = `${baseUrl}api/profile/picture`;

@@ -210,8 +210,8 @@ function BoardList() {
       <SkeletonLoader isLoading>
         {Array.from({ length: 2 }, (_, index) => (
           <BoardItem
-            boardPublicId=""
-            boardSlug=""
+            boardPublicId={`board-id-${index}`}
+            boardSlug={`board-slug-${index}`}
             key={`board-skeleton-${
               // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders are static.
               index

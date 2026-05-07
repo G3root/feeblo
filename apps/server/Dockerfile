@@ -20,14 +20,11 @@ RUN pnpm install --frozen-lockfile
 
 COPY --from=builder /app/out/full/ .
 
-ARG VITE_APP_URL=""
-ARG VITE_API_URL=""
-ARG GIT_COMMIT_SHA="unknown"
-LABEL org.opencontainers.image.revision=$GIT_COMMIT_SHA
+ARG PUBLIC_APP_URL=""
+ARG PUBLIC_API_URL=""
 ENV NODE_ENV=production
-ENV GIT_COMMIT_SHA="${GIT_COMMIT_SHA}"
-ENV VITE_APP_URL="${VITE_APP_URL}"
-ENV VITE_API_URL="${VITE_API_URL}"
+ENV PUBLIC_APP_URL="${PUBLIC_APP_URL}"
+ENV PUBLIC_API_URL="${PUBLIC_API_URL}"
 
 WORKDIR /app/apps/server
 RUN pnpm exec rolldown -c
@@ -35,16 +32,13 @@ RUN pnpm exec rolldown -c
 FROM base AS runner
 WORKDIR /app
 
-ARG GIT_COMMIT_SHA="unknown"
-ARG VITE_APP_URL=""
-ARG VITE_API_URL=""
-LABEL org.opencontainers.image.revision=$GIT_COMMIT_SHA
+ARG PUBLIC_APP_URL=""
+ARG PUBLIC_API_URL=""
 
 ENV NODE_ENV=production
 ENV SERVER_PORT=8080
-ENV GIT_COMMIT_SHA="${GIT_COMMIT_SHA}"
-ENV VITE_APP_URL="${VITE_APP_URL}"
-ENV VITE_API_URL="${VITE_API_URL}"
+ENV PUBLIC_APP_URL="${PUBLIC_APP_URL}"
+ENV PUBLIC_API_URL="${PUBLIC_API_URL}"
 
 COPY --from=installer /app/apps/server/dist /app/apps/server/dist
 

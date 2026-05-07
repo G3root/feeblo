@@ -1,4 +1,3 @@
-import { VITE_APP_ROOT_DOMAIN } from "astro:env/client";
 import { useStore } from "@tanstack/react-store";
 import {
   Field,
@@ -13,9 +12,12 @@ import {
   InputGroupText,
 } from "~/components/ui/input-group";
 import { withForm } from "~/hooks/form";
+import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
 import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
 import { registerFormOpts } from "../shared-form";
 import { toWorkspaceSlug } from "../utils";
+
+const appRootDomain = getRuntimePublicEnv().appRootDomain;
 
 const slugStatusMessages: Partial<
   Record<ReturnType<typeof useWorkspaceSlugAvailability>, React.ReactNode>
@@ -78,7 +80,7 @@ export const RegisterWorkspaceStep = withForm({
               value={slug}
             />
             <InputGroupAddon align="inline-end">
-              <InputGroupText>.{VITE_APP_ROOT_DOMAIN}</InputGroupText>
+              <InputGroupText>.{appRootDomain}</InputGroupText>
             </InputGroupAddon>
           </InputGroup>
           {slug.length >= 2 ? slugStatusMessages[slugStatus] : null}
