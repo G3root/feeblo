@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 
-import { DB } from "@feeblo/db";
+import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
@@ -48,7 +48,7 @@ export const initAuthHandler = () =>
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
-    const db = yield* DB;
+    const db = yield* Database.Database;
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
         PolarService.layer,
@@ -56,11 +56,11 @@ export const initAuthHandler = () =>
         MembershipRepository.layer,
         Mailer.layer,
         WorkspaceRepository.layer
-      ).pipe(Layer.provide(Layer.succeed(DB, db)))
+      ).pipe(Layer.provide(Layer.succeed(Database.Database, db)))
     );
 
     const config = {
-      database: drizzleAdapter(db, {
+      database: drizzleAdapter(db.db, {
         provider: "pg",
 
         schema,
@@ -187,15 +187,19 @@ export const initAuthHandler = () =>
           : []),
 
         customSession(async ({ user, session }) => {
-          const memberships = await db
-            .select({
-              userId: schema.member.userId,
-              organizationId: schema.member.organizationId,
-              role: schema.member.role,
-              membershipId: schema.member.id,
-            })
-            .from(schema.member)
-            .where(eq(schema.member.userId, session.userId));
+          const memberships = await Effect.runPromise(
+            db.execute((client) =>
+              client
+                .select({
+                  userId: schema.member.userId,
+                  organizationId: schema.member.organizationId,
+                  role: schema.member.role,
+                  membershipId: schema.member.id,
+                })
+                .from(schema.member)
+                .where(eq(schema.member.userId, session.userId))
+            )
+          );
 
           const organizations = memberships.map((membership) => ({
             id: membership.organizationId,
@@ -373,7 +377,7 @@ export const initAuthHandler = () =>
     )
   );
 
-export type Auth = Effect.Effect.Success<ReturnType<typeof initAuthHandler>>;
+export type Auth = Effect.Success<ReturnType<typeof initAuthHandler>>;
 export type Session = Auth["$Infer"]["Session"];
 
 export const auth = initAuthHandler();

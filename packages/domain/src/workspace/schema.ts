@@ -1,75 +1,71 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export const WorkspaceInput = Schema.Struct({
-  organizationId: Schema.String,
+export const WorkspaceInput = S.Struct({
+  organizationId: S.String,
 });
 
-export const WorkspacePlan = Schema.Struct({
-  organizationId: Schema.String,
-  plan: Schema.Literal("free", "starter", "professional"),
+export const WorkspacePlan = S.Struct({
+  organizationId: S.String,
+  plan: S.Literals(["free", "starter", "professional"]),
 });
 
-export class CreateWorkspaceInput extends Schema.Class<CreateWorkspaceInput>(
-  "CreateWorkspaceInput"
-)({
-  workspaceName: Schema.String.pipe(Schema.minLength(3)),
-}) {}
+export const CreateWorkspaceInput = S.Struct({
+  workspaceName: S.String.pipe(S.check(S.isMinLength(3))),
+});
 
-export class CreateWorkspaceOutput extends Schema.Class<CreateWorkspaceOutput>(
-  "CreateWorkspaceOutput"
-)({
-  organizationId: Schema.String,
-}) {}
+export const CreateWorkspaceOutput = S.Struct({
+  organizationId: S.String,
+});
 
-export type TCreateWorkspaceInput = Schema.Schema.Type<
+export type TCreateWorkspaceInput = S.Schema.Type<
   typeof CreateWorkspaceInput
 >;
 
-export type TWorkspaceInput = Schema.Schema.Type<typeof WorkspaceInput>;
-export type TWorkspacePlan = Schema.Schema.Type<typeof WorkspacePlan>;
+export type TWorkspaceInput = S.Schema.Type<typeof WorkspaceInput>;
+export type TWorkspacePlan = S.Schema.Type<typeof WorkspacePlan>;
 
-export const WorkspacePreferences = Schema.Struct({
-  allowMemberInvites: Schema.Boolean,
-  defaultBoardVisibility: Schema.Literal("private", "public"),
-  timezone: Schema.String,
+export const WorkspacePreferences = S.Struct({
+  allowMemberInvites: S.Boolean,
+  defaultBoardVisibility: S.Literals(["private", "public"]),
+  timezone: S.String,
 });
 
-export const Workspace = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  slug: Schema.String,
-  plan: Schema.Literal("free"),
-  region: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-  memberCount: Schema.Number,
-  boardCount: Schema.Number,
-  siteCount: Schema.Number,
+export const Workspace = S.Struct({
+  id: S.String,
+  name: S.String,
+  slug: S.String,
+  plan: S.Literal("free"),
+  region: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  memberCount: S.Number,
+  boardCount: S.Number,
+  siteCount: S.Number,
   preferences: WorkspacePreferences,
 });
 
-export type TWorkspace = Schema.Schema.Type<typeof Workspace>;
+export type TWorkspace = S.Schema.Type<typeof Workspace>;
 
-export const WorkspaceProductMetadata = Schema.Struct({
-  plan: Schema.Literal("starter", "professional"),
+export const WorkspaceProductMetadata = S.Struct({
+  plan: S.Literals(["starter", "professional"]),
 });
 
-export const WorkspaceProduct = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  description: Schema.NullOr(Schema.String),
-  trialInterval: Schema.NullOr(Schema.String),
-  trialIntervalCount: Schema.NullOr(Schema.Number),
-  recurringInterval: Schema.NullOr(Schema.Literal("month", "year")),
-  recurringIntervalCount: Schema.NullOr(Schema.Number),
-  isRecurring: Schema.Boolean,
-  isArchived: Schema.Boolean,
-  externalOrganizationId: Schema.String,
-  visibility: Schema.String,
-  prices: Schema.NullOr(Schema.Unknown),
-  metadata: Schema.NullOr(WorkspaceProductMetadata),
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
+export const WorkspaceProduct = S.Struct({
+  id: S.String,
+  name: S.String,
+  description: S.NullOr(S.String),
+  trialInterval: S.NullOr(S.String),
+  trialIntervalCount: S.NullOr(S.Number),
+  recurringInterval: S.NullOr(S.Literals(["month", "year"])),
+  recurringIntervalCount: S.NullOr(S.Number),
+  isRecurring: S.Boolean,
+  isArchived: S.Boolean,
+  externalOrganizationId: S.String,
+  visibility: S.String,
+  prices: S.NullOr(S.Unknown),
+  metadata: S.NullOr(WorkspaceProductMetadata),
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
 });
 
-export type TWorkspaceProduct = Schema.Schema.Type<typeof WorkspaceProduct>;
+export type TWorkspaceProduct = S.Schema.Type<typeof WorkspaceProduct>;

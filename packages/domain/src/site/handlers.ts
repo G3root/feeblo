@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { InternalServerError } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
+import { WorkspaceRepository } from "../workspace/repository";
 import { SitePolicy } from "./policies";
 import { SiteRepository } from "./repository";
 import { SiteRpcs } from "./rpcs";
@@ -25,14 +26,7 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
           })
           .pipe(
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Failed to list Sites",
-                  })
-                ),
-            })
+            withRemapDbErrors("Site", "select")
           ),
       SiteListBySubdomain: (args: TSiteListBySubdomain) =>
         repository
@@ -40,36 +34,22 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
             subdomain: args.subdomain,
             limit: 1,
           })
-          .pipe(
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Failed to list Sites by subdomain",
-                  })
-                ),
-            })
-          ),
+          .pipe(withRemapDbErrors("Site", "select")),
       SiteUpdate: (args: TSiteUpdate) =>
-        repository.update(args).pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(args.organizationId),
-              Policy.any(
-                Policy.hasOrganizationRole(args.organizationId, "owner"),
-                Policy.hasOrganizationRole(args.organizationId, "admin")
+        repository
+          .update(args)
+          .pipe(
+            Policy.withPolicy(
+              Policy.all(
+                Policy.hasMembership(args.organizationId),
+                Policy.any(
+                  Policy.hasOrganizationRole(args.organizationId, "owner"),
+                  Policy.hasOrganizationRole(args.organizationId, "admin")
+                )
               )
-            )
+            ),
+            withRemapDbErrors("Site", "update")
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to update Site",
-                })
-              ),
-          })
-        ),
       SiteHidePoweredByBranding: (args: TSiteHidePoweredByBranding) =>
         repository.updateHidePoweredByBranding(args).pipe(
           Policy.withPolicy(
@@ -85,15 +65,12 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to update Site branding",
-                })
-              ),
-          })
+          withRemapDbErrors("Site", "update")
         ),
     };
   })
-).pipe(Layer.provide(SiteRepository.layer), Layer.provide(SitePolicy.layer));
+).pipe(
+  Layer.provide(SitePolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(SiteRepository.layer)
+);

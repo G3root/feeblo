@@ -1,37 +1,44 @@
-import { DB } from "@feeblo/db";
-import { postStatus as postStatusTable } from "@feeblo/db/schema/feedback";
+import { Database, schema } from "@feeblo/db";
 import { asc, eq } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
+
+interface TFindMany {
+  organizationId: string;
+}
 
 const makePostStatusRepository = Effect.gen(function* () {
-  const db = yield* DB;
+  const db = yield* Database.Database;
 
   return {
-    findMany: ({ organizationId }: { organizationId: string }) =>
+    findMany: ({ organizationId }: TFindMany) =>
       Effect.gen(function* () {
-        const postStatuses = yield* db
-          .select({
-            id: postStatusTable.id,
-            type: postStatusTable.type,
-            orderIndex: postStatusTable.orderIndex,
-            organizationId: postStatusTable.organizationId,
-            createdAt: postStatusTable.createdAt,
-            updatedAt: postStatusTable.updatedAt,
-          })
-          .from(postStatusTable)
-          .where(eq(postStatusTable.organizationId, organizationId))
-          .orderBy(asc(postStatusTable.orderIndex));
+        const postStatuses = yield* db.makeQuery((execute, input: TFindMany) =>
+          execute((client) =>
+            client
+              .select({
+                id: schema.postStatus.id,
+                type: schema.postStatus.type,
+                orderIndex: schema.postStatus.orderIndex,
+                organizationId: schema.postStatus.organizationId,
+                createdAt: schema.postStatus.createdAt,
+                updatedAt: schema.postStatus.updatedAt,
+              })
+              .from(schema.postStatus)
+              .where(eq(schema.postStatus.organizationId, input.organizationId))
+              .orderBy(asc(schema.postStatus.orderIndex))
+          )
+        )({ organizationId });
 
         return postStatuses;
       }),
   };
 });
 
-export class PostStatusRepository extends Effect.Service<PostStatusRepository>()(
+export class PostStatusRepository extends Context.Service<PostStatusRepository>()(
   "PostStatusRepository",
   {
-    effect: makePostStatusRepository,
+    make: makePostStatusRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

@@ -1,12 +1,14 @@
-import { APIError as BetterAuthApiError } from "better-call";
+import { APIError as BetterAuthApiError } from "better-auth";
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import {
   BadRequestError,
   InternalServerError,
   UnauthorizedError,
+  withRemapDbErrors,
 } from "../rpc-errors";
 import { Auth, CurrentSession } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import { MembershipPolicy } from "./policies";
 import { MembershipRepository } from "./repository";
 import { MembershipRpcs } from "./rpcs";
@@ -56,30 +58,14 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           return yield* repository.findMembershipsByUserId({
             userId: session.session.userId,
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list members",
-                })
-              ),
-          })
-        );
+        }).pipe(withRemapDbErrors("Membership", "select"));
       },
       OrganizationMembersList: ({ organizationId }) =>
         Effect.gen(function* () {
           return yield* repository.findOrganizationMembers({ organizationId });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list members",
-                })
-              ),
-          })
+          withRemapDbErrors("Membership", "select")
         ),
       OrganizationInvitationsList: ({ organizationId }) =>
         Effect.gen(function* () {
@@ -88,14 +74,7 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list invitations",
-                })
-              ),
-          })
+          withRemapDbErrors("Invitation", "select")
         ),
       OrganizationInviteMember: ({ organizationId, email, role }) =>
         Effect.gen(function* () {
@@ -145,14 +124,7 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
               membershipPolicy.hasOtherOwners({ organizationId, memberId })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to update member role",
-                })
-              ),
-          })
+          withRemapDbErrors("Membership", "update")
         ),
       OrganizationRemoveMember: ({ organizationId, memberId }) =>
         Effect.gen(function* () {
@@ -171,38 +143,27 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
               membershipPolicy.hasOtherOwners({ organizationId, memberId })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to remove member",
-                })
-              ),
-          })
+          withRemapDbErrors("Membership", "delete")
         ),
       OrganizationCancelInvitation: ({ organizationId, invitationId }) =>
-        repository.cancelInvitation({ organizationId, invitationId }).pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(organizationId),
-              Policy.any(
-                Policy.hasOrganizationRole(organizationId, "owner"),
-                Policy.hasOrganizationRole(organizationId, "admin")
+        repository
+          .cancelInvitation({ organizationId, invitationId })
+          .pipe(
+            Policy.withPolicy(
+              Policy.all(
+                Policy.hasMembership(organizationId),
+                Policy.any(
+                  Policy.hasOrganizationRole(organizationId, "owner"),
+                  Policy.hasOrganizationRole(organizationId, "admin")
+                )
               )
-            )
+            ),
+            withRemapDbErrors("Invitation", "update")
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to cancel invitation",
-                })
-              ),
-          })
-        ),
     };
   })
 ).pipe(
+  Layer.provide(MembershipPolicy.layer),
   Layer.provide(MembershipRepository.layer),
-  Layer.provide(MembershipPolicy.layer)
+  Layer.provide(WorkspaceRepository.layer)
 );

@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
 import { ChangelogRepository } from "./repository";
 
@@ -12,7 +12,7 @@ const makeChangelogPolicy = Effect.gen(function* () {
 
   const isCreator = (args: TIsCreator) =>
     Policy.policy((user) =>
-      Option.fromNullable(
+      Option.fromNullishOr(
         user.memberships.find(
           (membership) => membership.organizationId === args.organizationId
         )
@@ -41,12 +41,11 @@ const makeChangelogPolicy = Effect.gen(function* () {
   return { isCreator, isOwner };
 });
 
-export class ChangelogPolicy extends Effect.Service<ChangelogPolicy>()(
+export class ChangelogPolicy extends Context.Service<ChangelogPolicy>()(
   "ChangelogPolicy",
   {
-    effect: makeChangelogPolicy,
-    dependencies: [ChangelogRepository.Default],
+    make: makeChangelogPolicy,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

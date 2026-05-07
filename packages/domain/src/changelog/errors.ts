@@ -1,40 +1,30 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 import { PolicyDeniedError } from "../policy";
 import { InternalServerError, UnauthorizedError } from "../rpc-errors";
 
-export class FailedToCreateChangelogError extends Schema.TaggedError<FailedToCreateChangelogError>()(
+export class FailedToCreateChangelogError extends Schema.TaggedErrorClass<FailedToCreateChangelogError>()(
   "FailedToCreateChangelogError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToCreateChangelogError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToCreateChangelogError" }
 ) {}
 
-export class FailedToDeleteChangelogError extends Schema.TaggedError<FailedToDeleteChangelogError>()(
+export class FailedToDeleteChangelogError extends Schema.TaggedErrorClass<FailedToDeleteChangelogError>()(
   "FailedToDeleteChangelogError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToDeleteChangelogError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToDeleteChangelogError" }
 ) {}
 
-export class FailedToUpdateChangelogError extends Schema.TaggedError<FailedToUpdateChangelogError>()(
+export class FailedToUpdateChangelogError extends Schema.TaggedErrorClass<FailedToUpdateChangelogError>()(
   "FailedToUpdateChangelogError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToUpdateChangelogError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToUpdateChangelogError" }
 ) {}
 
-export const ChangelogServiceErrors = Schema.Union(
+export const ChangelogServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
   FailedToCreateChangelogError,
   FailedToDeleteChangelogError,
-  FailedToUpdateChangelogError
-);
+  FailedToUpdateChangelogError,
+]);

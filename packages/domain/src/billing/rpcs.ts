@@ -1,4 +1,4 @@
-import { Rpc, RpcGroup } from "@effect/rpc";
+import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { AuthMiddleware } from "../session-middleware";
 import { BillingServiceErrors } from "./errors";
 import {

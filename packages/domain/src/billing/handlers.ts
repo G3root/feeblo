@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { BadRequestError, InternalServerError } from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { BillingRepository } from "./repository";
 import { BillingRpcs } from "./rpcs";
@@ -62,14 +62,7 @@ export const BillingRpcHandlers = BillingRpcs.toLayer(
               )
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to create billing portal",
-                })
-              ),
-          })
+          withRemapDbErrors("Billing", "select")
         ),
     };
   })

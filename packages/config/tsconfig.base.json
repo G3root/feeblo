@@ -27,6 +27,6 @@
         "name": "@effect/language-service"
       }
     ],
-    "types": ["bun", "@cloudflare/workers-types"]
+    "types": ["node", "@cloudflare/workers-types"]
   }
 }

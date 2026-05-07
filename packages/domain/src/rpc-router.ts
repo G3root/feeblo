@@ -1,5 +1,5 @@
-import { RpcSerialization, RpcServer } from "@effect/rpc";
 import { Layer } from "effect";
+import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
@@ -20,10 +20,10 @@ import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
-export const RpcRoute = RpcServer.layerHttpRouter({
-  group: AllRpcs,
+export const RpcRoute = RpcServer.layerHttp({
   path: "/rpc",
   protocol: "http",
+  group: AllRpcs,
 }).pipe(
   Layer.provide(PostRpcHandlers),
   Layer.provide(BillingRpcHandlers),

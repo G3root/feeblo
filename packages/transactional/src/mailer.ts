@@ -1,5 +1,5 @@
 import { render, toPlainText } from "@react-email/render";
-import { Effect, Redacted, Schema } from "effect";
+import { Context, Effect, Layer, Redacted, Schema } from "effect";
 import { createTransport } from "nodemailer";
 import type { ReactElement } from "react";
 import { MailerConfig } from "./config";
@@ -12,7 +12,7 @@ type MailMessage = {
   readonly replyTo?: string;
 };
 
-class MailTemplateRenderError extends Schema.TaggedError<MailTemplateRenderError>()(
+class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplateRenderError>()(
   "MailTemplateRenderError",
   {
     subject: Schema.String,
@@ -20,7 +20,7 @@ class MailTemplateRenderError extends Schema.TaggedError<MailTemplateRenderError
   }
 ) {}
 
-class MailDeliveryError extends Schema.TaggedError<MailDeliveryError>()(
+class MailDeliveryError extends Schema.TaggedErrorClass<MailDeliveryError>()(
   "MailDeliveryError",
   {
     subject: Schema.String,
@@ -88,8 +88,8 @@ const makeMailer = Effect.gen(function* () {
   };
 });
 
-export class Mailer extends Effect.Service<Mailer>()("Mailer", {
-  effect: makeMailer.pipe(Effect.provide(MailerConfig.layer)),
+export class Mailer extends Context.Service<Mailer>()("Mailer", {
+  make: makeMailer.pipe(Effect.provide(MailerConfig.layer)),
 }) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

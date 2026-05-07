@@ -1,13 +1,8 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { InternalServerError } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
-import {
-  FailedToCreateTagError,
-  FailedToDeleteTagError,
-  FailedToSetTagAssignmentsError,
-  FailedToUpdateTagError,
-} from "./errors";
+import { TagPolicy } from "./policies";
 import { TagRepository } from "./repository";
 import { TagRpcs } from "./rpcs";
 import type {
@@ -90,74 +85,43 @@ const validateChangelog = ({
 export const TagRpcHandlers = TagRpcs.toLayer(
   Effect.gen(function* () {
     const repository = yield* TagRepository;
+    const tagPolicy = yield* TagPolicy;
 
     return {
       TagList: (args: TTagList) =>
-        repository.findMany(args).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list tags" })
-              ),
-          })
-        ),
+        repository
+          .findMany(args)
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            withRemapDbErrors("Tag", "select")
+          ),
 
       TagListPublic: (args: TTagList) =>
-        repository.findMany(args).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list tags" })
-              ),
-          })
-        ),
+        repository.findMany(args).pipe(withRemapDbErrors("Tag", "select")),
 
       PostTagList: (args: TPostTagList) =>
-        repository.findPostTags(args).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list post tags" })
-              ),
-          })
-        ),
+        repository
+          .findPostTags(args)
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            withRemapDbErrors("Tag", "select")
+          ),
 
       PostTagListPublic: (args: TPostTagList) =>
-        repository.findPostTags(args).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list post tags" })
-              ),
-          })
-        ),
+        repository.findPostTags(args).pipe(withRemapDbErrors("Tag", "select")),
 
       ChangelogTagList: (args: TChangelogTagList) =>
-        repository.findChangelogTags(args).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list changelog tags",
-                })
-              ),
-          })
-        ),
+        repository
+          .findChangelogTags(args)
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            withRemapDbErrors("Tag", "select")
+          ),
 
       ChangelogTagListPublic: (args: TChangelogTagList) =>
-        repository.findChangelogTags(args).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list changelog tags",
-                })
-              ),
-          })
-        ),
+        repository
+          .findChangelogTags(args)
+          .pipe(withRemapDbErrors("Tag", "select")),
 
       TagCreate: (args: TTagCreate) =>
         Effect.gen(function* () {
@@ -173,29 +137,34 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToCreateTagError()),
-          })
+          withRemapDbErrors("Tag", "create")
         ),
 
       TagUpdate: (args: TTagUpdate) =>
         repository.update(args).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToUpdateTagError()),
-          })
+          Policy.withPolicy(
+            tagPolicy.isOwner({
+              organizationId: args.organizationId,
+              tagId: args.id,
+            })
+          ),
+          withRemapDbErrors("Tag", "update")
         ),
 
       TagDelete: (args: TTagDelete) =>
         repository.delete(args).pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToDeleteTagError()),
-          })
+          Policy.withPolicy(
+            tagPolicy.isOwner({
+              organizationId: args.organizationId,
+              tagId: args.id,
+            })
+          ),
+          withRemapDbErrors("Tag", "delete")
         ),
 
       PostTagSet: (args: TPostTagSet) =>
         Effect.gen(function* () {
+          //TODO add ownership Policy
           const tagIds = normalizeTagIds(args.tagIds);
           yield* validatePost({
             postId: args.postId,
@@ -210,13 +179,12 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           yield* repository.setPostTags({ ...args, tagIds });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToSetTagAssignmentsError()),
-          })
+          withRemapDbErrors("Tag", "update")
         ),
 
       ChangelogTagSet: (args: TChangelogTagSet) =>
         Effect.gen(function* () {
+          //TODO add ownership Policy
           const tagIds = normalizeTagIds(args.tagIds);
           yield* validateChangelog({
             changelogId: args.changelogId,
@@ -231,10 +199,8 @@ export const TagRpcHandlers = TagRpcs.toLayer(
           yield* repository.setChangelogTags({ ...args, tagIds });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () => Effect.fail(new FailedToSetTagAssignmentsError()),
-          })
+          withRemapDbErrors("Tag", "update")
         ),
     };
   })
-).pipe(Layer.provide(TagRepository.layer));
+).pipe(Layer.provide(TagPolicy.layer), Layer.provide(TagRepository.layer));

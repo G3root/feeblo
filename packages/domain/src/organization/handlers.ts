@@ -1,6 +1,6 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
-import { InternalServerError, NotFoundError } from "../rpc-errors";
+import { NotFoundError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { OrganizationRepository } from "./repository";
 import { OrganizationRpcs } from "./rpcs";
@@ -29,16 +29,7 @@ export const OrganizationRpcHandlers = OrganizationRpcs.toLayer(
           return yield* repository.findManyByUserId({
             userId: session.session.userId,
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list organizations",
-                })
-              ),
-          })
-        ),
+        }).pipe(withRemapDbErrors("Organization", "select")),
       OrganizationUpdate: (args: TOrganizationUpdate) =>
         Effect.gen(function* () {
           const organization = yield* repository.update(args);
@@ -52,13 +43,7 @@ export const OrganizationRpcHandlers = OrganizationRpcs.toLayer(
           return;
         }).pipe(
           Policy.withPolicy(canManageOrganization(args.organizationId)),
-          Effect.catchTag("SqlError", () =>
-            Effect.fail(
-              new InternalServerError({
-                message: "Failed to update organization",
-              })
-            )
-          )
+          withRemapDbErrors("Organization", "update")
         ),
     };
   })

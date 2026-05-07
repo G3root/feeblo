@@ -1,9 +1,7 @@
-import { DB } from "@feeblo/db";
-import { user as userTable } from "@feeblo/db/schema/auth";
-import { changelog as changelogTable } from "@feeblo/db/schema/feedback";
+import { Database, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, sql } from "drizzle-orm";
-import { Effect, Array as EffectArray } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
 import type {
   TChangelogCreate,
   TChangelogDelete,
@@ -11,86 +9,105 @@ import type {
   TChangelogUpdate,
 } from "./schema";
 
-type TChangelogCreateInternal = TChangelogCreate & {
+interface TChangelogCreateInternal extends TChangelogCreate {
   creatorId: string;
   creatorMemberId?: string;
-};
+}
 
-type TFindByCreatorId = {
+interface TFindByCreatorId {
   id: string;
-  organizationId: string;
   memberId: string;
-};
+  organizationId: string;
+}
 
 const makeChangelogRepository = Effect.gen(function* () {
-  const db = yield* DB;
+  const db = yield* Database.Database;
 
   return {
     findByCreatorId: ({ id, organizationId, memberId }: TFindByCreatorId) =>
       db
-        .select({ id: changelogTable.id })
-        .from(changelogTable)
-        .where(
-          and(
-            eq(changelogTable.id, id),
-            eq(changelogTable.organizationId, organizationId),
-            eq(changelogTable.creatorMemberId, memberId)
+        .makeQuery((execute, input: TFindByCreatorId) =>
+          execute((client) =>
+            client
+              .select({ id: schema.changelog.id })
+              .from(schema.changelog)
+              .where(
+                and(
+                  eq(schema.changelog.id, input.id),
+                  eq(schema.changelog.organizationId, input.organizationId),
+                  eq(schema.changelog.creatorMemberId, input.memberId)
+                )
+              )
           )
-        )
+        )({ id, organizationId, memberId })
         .pipe(Effect.map(EffectArray.get(0))),
 
     findMany: ({ organizationId }: TChangelogList) =>
-      db
-        .select({
-          id: changelogTable.id,
-          title: changelogTable.title,
-          slug: changelogTable.slug,
-          content: changelogTable.content,
-          status: changelogTable.status,
-          scheduledAt: changelogTable.scheduledAt,
-          publishedAt: changelogTable.publishedAt,
-          organizationId: changelogTable.organizationId,
-          creatorMemberId: changelogTable.creatorMemberId,
-          creatorId: changelogTable.creatorId,
-          createdAt: changelogTable.createdAt,
-          updatedAt: changelogTable.updatedAt,
-          user: {
-            name: sql<string | null>`${userTable.name}`,
-            image: sql<string | null>`${userTable.image}`,
-          },
-        })
-        .from(changelogTable)
-        .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
-        .where(eq(changelogTable.organizationId, organizationId)),
+      db.makeQuery((execute, input: TChangelogList) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.changelog.id,
+              title: schema.changelog.title,
+              slug: schema.changelog.slug,
+              content: schema.changelog.content,
+              status: schema.changelog.status,
+              scheduledAt: schema.changelog.scheduledAt,
+              publishedAt: schema.changelog.publishedAt,
+              organizationId: schema.changelog.organizationId,
+              creatorMemberId: schema.changelog.creatorMemberId,
+              creatorId: schema.changelog.creatorId,
+              createdAt: schema.changelog.createdAt,
+              updatedAt: schema.changelog.updatedAt,
+              user: {
+                name: sql<string | null>`${schema.user.name}`,
+                image: sql<string | null>`${schema.user.image}`,
+              },
+            })
+            .from(schema.changelog)
+            .leftJoin(
+              schema.user,
+              eq(schema.user.id, schema.changelog.creatorId)
+            )
+            .where(eq(schema.changelog.organizationId, input.organizationId))
+        )
+      )({ organizationId }),
 
     findManyPublished: ({ organizationId }: TChangelogList) =>
-      db
-        .select({
-          id: changelogTable.id,
-          title: changelogTable.title,
-          slug: changelogTable.slug,
-          content: changelogTable.content,
-          status: changelogTable.status,
-          scheduledAt: changelogTable.scheduledAt,
-          publishedAt: changelogTable.publishedAt,
-          organizationId: changelogTable.organizationId,
-          creatorMemberId: changelogTable.creatorMemberId,
-          creatorId: changelogTable.creatorId,
-          createdAt: changelogTable.createdAt,
-          updatedAt: changelogTable.updatedAt,
-          user: {
-            name: sql<string | null>`${userTable.name}`,
-            image: sql<string | null>`${userTable.image}`,
-          },
-        })
-        .from(changelogTable)
-        .leftJoin(userTable, eq(userTable.id, changelogTable.creatorId))
-        .where(
-          and(
-            eq(changelogTable.organizationId, organizationId),
-            eq(changelogTable.status, "published")
-          )
-        ),
+      db.makeQuery((execute, input: TChangelogList) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.changelog.id,
+              title: schema.changelog.title,
+              slug: schema.changelog.slug,
+              content: schema.changelog.content,
+              status: schema.changelog.status,
+              scheduledAt: schema.changelog.scheduledAt,
+              publishedAt: schema.changelog.publishedAt,
+              organizationId: schema.changelog.organizationId,
+              creatorMemberId: schema.changelog.creatorMemberId,
+              creatorId: schema.changelog.creatorId,
+              createdAt: schema.changelog.createdAt,
+              updatedAt: schema.changelog.updatedAt,
+              user: {
+                name: sql<string | null>`${schema.user.name}`,
+                image: sql<string | null>`${schema.user.image}`,
+              },
+            })
+            .from(schema.changelog)
+            .leftJoin(
+              schema.user,
+              eq(schema.user.id, schema.changelog.creatorId)
+            )
+            .where(
+              and(
+                eq(schema.changelog.organizationId, input.organizationId),
+                eq(schema.changelog.status, "published")
+              )
+            )
+        )
+      )({ organizationId }),
 
     create: ({
       id,
@@ -105,20 +122,36 @@ const makeChangelogRepository = Effect.gen(function* () {
       creatorMemberId,
     }: TChangelogCreateInternal) =>
       db
-        .insert(changelogTable)
-        .values({
+        .makeQuery((execute, input: TChangelogCreateInternal) =>
+          execute((client) =>
+            client.insert(schema.changelog).values({
+              id: input.id,
+              title: input.title,
+              slug: input.slug || slugify(input.title),
+              content: input.content,
+              status: input.status,
+              scheduledAt: input.scheduledAt,
+              publishedAt: input.publishedAt,
+              organizationId: input.organizationId,
+              creatorId: input.creatorId,
+              ...(input.creatorMemberId
+                ? { creatorMemberId: input.creatorMemberId }
+                : {}),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+          )
+        )({
           id,
           title,
-          slug: slug || slugify(title),
+          slug,
           content,
           status,
           scheduledAt,
           publishedAt,
           organizationId,
           creatorId,
-          creatorMemberId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          ...(creatorMemberId ? { creatorMemberId } : {}),
         })
         .pipe(Effect.asVoid),
 
@@ -133,42 +166,61 @@ const makeChangelogRepository = Effect.gen(function* () {
       organizationId,
     }: TChangelogUpdate) =>
       db
-        .update(changelogTable)
-        .set({
+        .makeQuery((execute, input: TChangelogUpdate) =>
+          execute((client) =>
+            client
+              .update(schema.changelog)
+              .set({
+                title,
+                slug: slug || slugify(title),
+                content,
+                status,
+                scheduledAt,
+                publishedAt,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(schema.changelog.id, input.id),
+                  eq(schema.changelog.organizationId, input.organizationId)
+                )
+              )
+          )
+        )({
+          id,
           title,
-          slug: slug || slugify(title),
+          slug,
           content,
           status,
           scheduledAt,
           publishedAt,
-          updatedAt: new Date(),
+          organizationId,
         })
-        .where(
-          and(
-            eq(changelogTable.id, id),
-            eq(changelogTable.organizationId, organizationId)
-          )
-        )
         .pipe(Effect.asVoid),
 
     delete: ({ id, organizationId }: TChangelogDelete) =>
       db
-        .delete(changelogTable)
-        .where(
-          and(
-            eq(changelogTable.id, id),
-            eq(changelogTable.organizationId, organizationId)
+        .makeQuery((execute, input: TChangelogDelete) =>
+          execute((client) =>
+            client
+              .delete(schema.changelog)
+              .where(
+                and(
+                  eq(schema.changelog.id, input.id),
+                  eq(schema.changelog.organizationId, input.organizationId)
+                )
+              )
           )
-        )
+        )({ id, organizationId })
         .pipe(Effect.asVoid),
   };
 });
 
-export class ChangelogRepository extends Effect.Service<ChangelogRepository>()(
+export class ChangelogRepository extends Context.Service<ChangelogRepository>()(
   "ChangelogRepository",
   {
-    effect: makeChangelogRepository,
+    make: makeChangelogRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

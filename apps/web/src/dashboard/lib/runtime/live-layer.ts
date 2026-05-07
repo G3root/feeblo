@@ -1,6 +1,6 @@
-import { FetchHttpClient } from "@effect/platform";
 import { FetchWithCredentials, RpcLive } from "@feeblo/rpc-client";
 import { Layer, type ManagedRuntime } from "effect";
+import { FetchHttpClient } from "effect/unstable/http";
 
 export const makeLiveLayer = (
   requestInit: RequestInit = { credentials: "include" }
@@ -14,6 +14,6 @@ export const makeLiveLayer = (
 export const LiveLayer = makeLiveLayer();
 
 export type LiveManagedRuntime = ManagedRuntime.ManagedRuntime<
-  Layer.Layer.Success<typeof LiveLayer>,
+  Layer.Success<typeof LiveLayer>,
   never
 >;

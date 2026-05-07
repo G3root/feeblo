@@ -1,10 +1,10 @@
+import { Effect } from "effect";
 import {
-  HttpApiBuilder,
-  HttpApp,
+  HttpEffect,
   HttpServerRequest,
   HttpServerResponse,
-} from "@effect/platform";
-import { Effect, Either } from "effect";
+} from "effect/unstable/http";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -34,7 +34,11 @@ export const AuthApiLive = HttpApiBuilder.group(
 
 function postVerificationOtp(
   payload: VerificationOTPState
-): Effect.Effect<{ success: boolean }, BadRequestError | InternalServerError> {
+): Effect.Effect<
+  { success: boolean },
+  BadRequestError | InternalServerError,
+  HttpServerRequest.HttpServerRequest
+> {
   return Effect.gen(function* () {
     const { appUrl, secret } = yield* VerificationOtpConfig;
 
@@ -61,10 +65,10 @@ function postVerificationOtp(
       appUrl.startsWith("https://")
     );
 
-    yield* HttpApp.appendPreResponseHandler((_request, response) =>
+    yield* HttpEffect.appendPreResponseHandler((_request, response) =>
       Effect.succeed(
         response.pipe(
-          HttpServerResponse.unsafeSetCookie(
+          HttpServerResponse.setCookieUnsafe(
             cookieData.name,
             encryptedState,
             cookieData.attributes
@@ -94,29 +98,31 @@ function getVerificationOtp(): Effect.Effect<
       });
     }
 
-    const stateResult = yield* getCookieVerificationOTPState(
-      cookieValue,
-      secret
-    ).pipe(Effect.either);
-
-    if (Either.isLeft(stateResult)) {
-      return yield* new BadRequestError({
-        message: "Invalid verification request",
-      });
-    }
+    const state = yield* getCookieVerificationOTPState(cookieValue, secret).pipe(
+      Effect.mapError(
+        () =>
+          new BadRequestError({
+            message: "Invalid verification request",
+          })
+      )
+    );
 
     return {
-      email: stateResult.right.email,
-      type: stateResult.right.type,
+      email: state.email,
+      type: state.type,
     };
   }).pipe(Effect.provide(VerificationOtpConfig.layer));
 }
 
-function deleteVerificationOtp(): Effect.Effect<{ success: boolean }> {
+function deleteVerificationOtp(): Effect.Effect<
+  { success: boolean },
+  never,
+  HttpServerRequest.HttpServerRequest
+> {
   return Effect.gen(function* () {
     const cookieData = generateVerificationOTPCookieData(false);
 
-    yield* HttpApp.appendPreResponseHandler((_request, response) =>
+    yield* HttpEffect.appendPreResponseHandler((_request, response) =>
       Effect.succeed(
         response.pipe(HttpServerResponse.removeCookie(cookieData.name))
       )

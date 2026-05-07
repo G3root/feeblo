@@ -1,8 +1,7 @@
-import { FileSystem, HttpApiBuilder } from "@effect/platform";
-import { DB } from "@feeblo/db";
-import { organization as organizationTable } from "@feeblo/db/schema/auth";
+import { Database, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, FileSystem, Layer } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -89,24 +88,18 @@ export const OrganizationApiLive = HttpApiBuilder.group(
               )
             );
 
-          const db = yield* DB;
+          const db = yield* Database.Database;
 
-          yield* db
-            .update(organizationTable)
-            .set({ logo: uploaded.url })
-            .where(eq(organizationTable.id, organizationId))
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({
-                    message: "Failed to save workspace logo",
-                  })
-              )
-            );
+          yield* db.execute((client) =>
+            client
+              .update(schema.organizationTable)
+              .set({ logo: uploaded.url })
+              .where(eq(schema.organizationTable.id, organizationId))
+          );
 
           return uploaded;
         }).pipe(
-          Effect.catchTag("SqlError", () =>
+          Effect.catchTag("DatabaseError", () =>
             Effect.fail(
               new InternalServerError({
                 message: "Failed to update workspace logo",

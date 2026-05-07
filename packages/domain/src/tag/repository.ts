@@ -1,62 +1,97 @@
-import { DB } from "@feeblo/db";
-import {
-  changelog as changelogTable,
-  changelogTag as changelogTagTable,
-  post as postTable,
-  postTag as postTagTable,
-  tag as tagTable,
-} from "@feeblo/db/schema/feedback";
+import { Database, schema } from "@feeblo/db";
 import { generatePublicId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
-import { Effect } from "effect";
-import {
-  PostTagAssignment,
-  type TChangelogTagList,
-  type TChangelogTagSet,
-  type TPostTagList,
-  type TPostTagSet,
-  type TTag,
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
+import type {
+  TChangelogTagList,
+  TChangelogTagSet,
+  TPostTagList,
+  TPostTagSet,
+  TTag,
 } from "./schema";
 
-type TTagCreate = {
-  id: string;
-  name: string;
-  type: TTag["type"];
-  organizationId: string;
+interface TTagCreate {
   creatorId: string;
   creatorMemberId?: string;
-};
-
-type TTagUpdate = {
   id: string;
   name: string;
-  type: TTag["type"];
   organizationId: string;
-};
+  type: TTag["type"];
+}
 
-type TTagDelete = {
+interface TTagUpdate {
+  id: string;
+  name: string;
+  organizationId: string;
+  type: TTag["type"];
+}
+
+interface TTagDelete {
   id: string;
   organizationId: string;
-};
+}
+
+interface TFindManyTags {
+  organizationId: string;
+}
+
+interface TDeletePostTags {
+  organizationId: string;
+  postId: string;
+}
+
+interface TDeleteChangelogTags {
+  changelogId: string;
+  organizationId: string;
+}
+
+interface TInsertRows<Row> {
+  rows: Row;
+}
+
+interface TCountExistingTags {
+  organizationId: string;
+  tagIds: readonly string[];
+  type?: TTag["type"];
+}
+
+interface THasPost {
+  organizationId: string;
+  postId: string;
+}
+
+interface THasChangelog {
+  changelogId: string;
+  organizationId: string;
+}
+
+interface TFindTagById {
+  id: string;
+  organizationId: string;
+}
 
 const makeTagRepository = Effect.gen(function* () {
-  const db = yield* DB;
+  const db = yield* Database.Database;
 
   return {
-    findMany: ({ organizationId }: { organizationId: string }) =>
-      db
-        .select({
-          id: tagTable.id,
-          name: tagTable.name,
-          slug: tagTable.slug,
-          type: tagTable.type,
-          organizationId: tagTable.organizationId,
-          createdAt: tagTable.createdAt,
-          updatedAt: tagTable.updatedAt,
-        })
-        .from(tagTable)
-        .where(eq(tagTable.organizationId, organizationId)),
+    findMany: ({ organizationId }: TFindManyTags) =>
+      db.makeQuery((execute, input: TFindManyTags) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.tag.id,
+              name: schema.tag.name,
+              slug: schema.tag.slug,
+              type: schema.tag.type,
+              organizationId: schema.tag.organizationId,
+              createdAt: schema.tag.createdAt,
+              updatedAt: schema.tag.updatedAt,
+            })
+            .from(schema.tag)
+            .where(eq(schema.tag.organizationId, input.organizationId))
+        )
+      )({ organizationId }),
 
     create: ({
       id,
@@ -67,83 +102,115 @@ const makeTagRepository = Effect.gen(function* () {
       creatorMemberId,
     }: TTagCreate) =>
       db
-        .insert(tagTable)
-        .values({
-          id,
-          name,
-          slug: slugify(name),
-          type,
-          organizationId,
-          creatorId,
-          creatorMemberId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
+        .makeQuery((execute, input: TTagCreate) =>
+          execute((client) =>
+            client.insert(schema.tag).values({
+              id: input.id,
+              name: input.name,
+              slug: slugify(input.name),
+              type: input.type,
+              organizationId: input.organizationId,
+              creatorId: input.creatorId,
+              ...(input.creatorMemberId
+                ? { creatorMemberId: input.creatorMemberId }
+                : {}),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })
+          )
+        )(
+          creatorMemberId
+            ? { id, name, type, organizationId, creatorId, creatorMemberId }
+            : { id, name, type, organizationId, creatorId }
+        )
         .pipe(Effect.asVoid),
 
     update: ({ id, name, type, organizationId }: TTagUpdate) =>
       db
-        .update(tagTable)
-        .set({
-          name,
-          slug: slugify(name),
-          type,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(eq(tagTable.id, id), eq(tagTable.organizationId, organizationId))
-        )
+        .makeQuery((execute, input: TTagUpdate) =>
+          execute((client) =>
+            client
+              .update(schema.tag)
+              .set({
+                name: input.name,
+                slug: slugify(input.name),
+                type: input.type,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(schema.tag.id, input.id),
+                  eq(schema.tag.organizationId, input.organizationId)
+                )
+              )
+          )
+        )({ id, name, type, organizationId })
         .pipe(Effect.asVoid),
 
     delete: ({ id, organizationId }: TTagDelete) =>
       db
-        .delete(tagTable)
-        .where(
-          and(eq(tagTable.id, id), eq(tagTable.organizationId, organizationId))
-        )
+        .makeQuery((execute, input: TTagDelete) =>
+          execute((client) =>
+            client
+              .delete(schema.tag)
+              .where(
+                and(
+                  eq(schema.tag.id, input.id),
+                  eq(schema.tag.organizationId, input.organizationId)
+                )
+              )
+          )
+        )({ id, organizationId })
         .pipe(Effect.asVoid),
 
     findPostTags: ({ organizationId }: TPostTagList) =>
-      db
-        .select({
-          id: postTagTable.id,
-          postId: postTagTable.postId,
-          tagId: postTagTable.tagId,
-          organizationId: postTagTable.organizationId,
-          createdAt: postTagTable.createdAt,
-          updatedAt: postTagTable.updatedAt,
-        })
-        .from(postTagTable)
-        .where(eq(postTagTable.organizationId, organizationId))
-        .pipe(
-          Effect.map((entries) =>
-            entries.map((entry) => new PostTagAssignment(entry))
-          )
-        ),
+      db.makeQuery((execute, input: TPostTagList) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.postTag.id,
+              postId: schema.postTag.postId,
+              tagId: schema.postTag.tagId,
+              organizationId: schema.postTag.organizationId,
+              createdAt: schema.postTag.createdAt,
+              updatedAt: schema.postTag.updatedAt,
+            })
+            .from(schema.postTag)
+            .where(eq(schema.postTag.organizationId, input.organizationId))
+        )
+      )({ organizationId }),
 
     findChangelogTags: ({ organizationId }: TChangelogTagList) =>
-      db
-        .select({
-          id: changelogTagTable.id,
-          changelogId: changelogTagTable.changelogId,
-          tagId: changelogTagTable.tagId,
-          organizationId: changelogTagTable.organizationId,
-          createdAt: changelogTagTable.createdAt,
-          updatedAt: changelogTagTable.updatedAt,
-        })
-        .from(changelogTagTable)
-        .where(eq(changelogTagTable.organizationId, organizationId)),
+      db.makeQuery((execute, input: TChangelogTagList) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.changelogTag.id,
+              changelogId: schema.changelogTag.changelogId,
+              tagId: schema.changelogTag.tagId,
+              organizationId: schema.changelogTag.organizationId,
+              createdAt: schema.changelogTag.createdAt,
+              updatedAt: schema.changelogTag.updatedAt,
+            })
+            .from(schema.changelogTag)
+            .where(eq(schema.changelogTag.organizationId, input.organizationId))
+        )
+      )({ organizationId }),
 
     setPostTags: ({ postId, organizationId, tagIds }: TPostTagSet) =>
       Effect.gen(function* () {
-        yield* db
-          .delete(postTagTable)
-          .where(
-            and(
-              eq(postTagTable.postId, postId),
-              eq(postTagTable.organizationId, organizationId)
-            )
-          );
+        yield* db.makeQuery((execute, input: TDeletePostTags) =>
+          execute((client) =>
+            client
+              .delete(schema.postTag)
+              .where(
+                and(
+                  eq(schema.postTag.postId, input.postId),
+                  eq(schema.postTag.organizationId, input.organizationId)
+                )
+              )
+          )
+        )({ postId, organizationId });
 
         if (tagIds.length === 0) {
           return;
@@ -162,7 +229,9 @@ const makeTagRepository = Effect.gen(function* () {
           )
         );
 
-        yield* db.insert(postTagTable).values(rows);
+        yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
+          execute((client) => client.insert(schema.postTag).values(input.rows))
+        )({ rows });
       }).pipe(Effect.asVoid),
 
     setChangelogTags: ({
@@ -171,14 +240,18 @@ const makeTagRepository = Effect.gen(function* () {
       tagIds,
     }: TChangelogTagSet) =>
       Effect.gen(function* () {
-        yield* db
-          .delete(changelogTagTable)
-          .where(
-            and(
-              eq(changelogTagTable.changelogId, changelogId),
-              eq(changelogTagTable.organizationId, organizationId)
-            )
-          );
+        yield* db.makeQuery((execute, input: TDeleteChangelogTags) =>
+          execute((client) =>
+            client
+              .delete(schema.changelogTag)
+              .where(
+                and(
+                  eq(schema.changelogTag.changelogId, input.changelogId),
+                  eq(schema.changelogTag.organizationId, input.organizationId)
+                )
+              )
+          )
+        )({ changelogId, organizationId });
 
         if (tagIds.length === 0) {
           return;
@@ -197,75 +270,103 @@ const makeTagRepository = Effect.gen(function* () {
           )
         );
 
-        yield* db.insert(changelogTagTable).values(rows);
+        yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
+          execute((client) =>
+            client.insert(schema.changelogTag).values(input.rows)
+          )
+        )({ rows });
       }).pipe(Effect.asVoid),
 
     countExistingTags: ({
       organizationId,
       tagIds,
       type,
-    }: {
-      organizationId: string;
-      tagIds: readonly string[];
-      type?: TTag["type"];
-    }) =>
+    }: TCountExistingTags) =>
       tagIds.length === 0
         ? Effect.succeed(0)
         : db
-            .select({ id: tagTable.id })
-            .from(tagTable)
-            .where(
-              and(
-                eq(tagTable.organizationId, organizationId),
-                ...(type ? [eq(tagTable.type, type)] : []),
-                inArray(tagTable.id, tagIds)
+            .makeQuery((execute, input: TCountExistingTags) =>
+              execute((client) =>
+                client
+                  .select({ id: schema.tag.id })
+                  .from(schema.tag)
+                  .where(
+                    and(
+                      eq(schema.tag.organizationId, input.organizationId),
+                      ...(input.type ? [eq(schema.tag.type, input.type)] : []),
+                      inArray(schema.tag.id, input.tagIds)
+                    )
+                  )
               )
+            )(
+              type
+                ? { organizationId, tagIds, type }
+                : { organizationId, tagIds }
             )
             .pipe(Effect.map((rows) => rows.length)),
 
-    hasPost: ({
-      postId,
-      organizationId,
-    }: {
-      postId: string;
-      organizationId: string;
-    }) =>
+    hasPost: ({ postId, organizationId }: THasPost) =>
       db
-        .select({ id: postTable.id })
-        .from(postTable)
-        .where(
-          and(
-            eq(postTable.id, postId),
-            eq(postTable.organizationId, organizationId)
+        .makeQuery((execute, input: THasPost) =>
+          execute((client) =>
+            client
+              .select({ id: schema.post.id })
+              .from(schema.post)
+              .where(
+                and(
+                  eq(schema.post.id, input.postId),
+                  eq(schema.post.organizationId, input.organizationId)
+                )
+              )
           )
-        )
+        )({ postId, organizationId })
         .pipe(Effect.map((rows) => rows.length > 0)),
 
-    hasChangelog: ({
-      changelogId,
-      organizationId,
-    }: {
-      changelogId: string;
-      organizationId: string;
-    }) =>
+    hasChangelog: ({ changelogId, organizationId }: THasChangelog) =>
       db
-        .select({ id: changelogTable.id })
-        .from(changelogTable)
-        .where(
-          and(
-            eq(changelogTable.id, changelogId),
-            eq(changelogTable.organizationId, organizationId)
+        .makeQuery((execute, input: THasChangelog) =>
+          execute((client) =>
+            client
+              .select({ id: schema.changelog.id })
+              .from(schema.changelog)
+              .where(
+                and(
+                  eq(schema.changelog.id, input.changelogId),
+                  eq(schema.changelog.organizationId, input.organizationId)
+                )
+              )
           )
-        )
+        )({ changelogId, organizationId })
         .pipe(Effect.map((rows) => rows.length > 0)),
+
+    findById: ({ id, organizationId }: TFindTagById) =>
+      db
+        .makeQuery((execute, input: TFindTagById) =>
+          execute((client) =>
+            client
+              .select({
+                id: schema.tag.id,
+                creatorId: schema.tag.creatorId,
+              })
+              .from(schema.tag)
+              .where(
+                and(
+                  eq(schema.tag.id, input.id),
+                  eq(schema.tag.organizationId, input.organizationId)
+                )
+              )
+              .limit(1)
+          )
+        )({ id, organizationId })
+        .pipe(Effect.map(EffectArray.get(0))),
   };
 });
 
-export class TagRepository extends Effect.Service<TagRepository>()(
+export class TagRepository extends Context.Service<TagRepository>()(
   "TagRepository",
   {
-    effect: makeTagRepository,
+    make: makeTagRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

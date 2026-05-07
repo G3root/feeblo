@@ -1,5 +1,5 @@
-import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
+import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { AuthMiddleware } from "../session-middleware";
 import { BoardServiceErrors } from "./errors";
 import {

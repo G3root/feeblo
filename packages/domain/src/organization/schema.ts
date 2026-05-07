@@ -1,17 +1,17 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export class Organization extends Schema.Class<Organization>("Organization")({
-  id: Schema.String,
-  name: Schema.String,
-  slug: Schema.String,
-  logo: Schema.NullOr(Schema.String),
-  createdAt: Schema.Date,
-}) {}
-
-export const OrganizationUpdate = Schema.Struct({
-  organizationId: Schema.String,
-  name: Schema.String,
-  logo: Schema.NullOr(Schema.String),
+export const Organization = S.Struct({
+  id: S.String,
+  name: S.String,
+  slug: S.String,
+  logo: S.NullOr(S.String),
+  createdAt: S.DateFromString,
 });
 
-export type TOrganizationUpdate = Schema.Schema.Type<typeof OrganizationUpdate>;
+export const OrganizationUpdate = S.Struct({
+  organizationId: S.String,
+  name: S.String,
+  logo: S.NullOr(S.String),
+});
+
+export type TOrganizationUpdate = S.Schema.Type<typeof OrganizationUpdate>;

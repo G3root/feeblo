@@ -1,64 +1,64 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-const ROLE_LITERAL = Schema.Literal("owner", "admin", "member");
+const ROLE_LITERAL = S.Literals(["owner", "admin", "member"]);
 
-export const Membership = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  userId: Schema.String,
+export const Membership = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  userId: S.String,
   role: ROLE_LITERAL,
-  createdAt: Schema.Date,
+  createdAt: S.DateFromString,
 });
 
-export type TMembership = Schema.Schema.Type<typeof Membership>;
+export type TMembership = S.Schema.Type<typeof Membership>;
 
-export const OrganizationMember = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  userId: Schema.String,
+export const OrganizationMember = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  userId: S.String,
   role: ROLE_LITERAL,
-  createdAt: Schema.Date,
-  user: Schema.Struct({
-    id: Schema.String,
-    name: Schema.String,
-    email: Schema.String,
-    image: Schema.NullOr(Schema.String),
+  createdAt: S.DateFromString,
+  user: S.Struct({
+    id: S.String,
+    name: S.String,
+    email: S.String,
+    image: S.NullOr(S.String),
   }),
 });
 
-export const OrganizationInvitation = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  email: Schema.String,
-  role: Schema.NullOr(Schema.String),
-  status: Schema.String,
-  expiresAt: Schema.Date,
-  inviterId: Schema.String,
-  createdAt: Schema.Date,
+export const OrganizationInvitation = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  email: S.String,
+  role: S.NullOr(S.String),
+  status: S.String,
+  expiresAt: S.DateFromString,
+  inviterId: S.String,
+  createdAt: S.DateFromString,
 });
 
-export const OrganizationId = Schema.Struct({
-  organizationId: Schema.String,
+export const OrganizationId = S.Struct({
+  organizationId: S.String,
 });
 
-export const InviteMember = Schema.Struct({
-  organizationId: Schema.String,
-  email: Schema.String,
+export const InviteMember = S.Struct({
+  organizationId: S.String,
+  email: S.String,
   role: ROLE_LITERAL,
 });
 
-export const UpdateMemberRole = Schema.Struct({
-  organizationId: Schema.String,
-  memberId: Schema.String,
+export const UpdateMemberRole = S.Struct({
+  organizationId: S.String,
+  memberId: S.String,
   role: ROLE_LITERAL,
 });
 
-export const RemoveMember = Schema.Struct({
-  organizationId: Schema.String,
-  memberId: Schema.String,
+export const RemoveMember = S.Struct({
+  organizationId: S.String,
+  memberId: S.String,
 });
 
-export const CancelInvitation = Schema.Struct({
-  organizationId: Schema.String,
-  invitationId: Schema.String,
+export const CancelInvitation = S.Struct({
+  organizationId: S.String,
+  invitationId: S.String,
 });

@@ -2,11 +2,10 @@ import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
-import { InternalServerError } from "../rpc-errors";
+import { withRemapDbErrors } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
 import {
-  FailedToCreateCommentError,
   FailedToDeleteCommentError,
   FailedToUpdateCommentError,
 } from "./errors";
@@ -37,14 +36,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           })
           .pipe(
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            Effect.catchTags({
-              SqlError: () =>
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Failed to list comments",
-                  })
-                ),
-            })
+            withRemapDbErrors("Comment", "select")
           ),
       CommentListPublic: (args: TCommentList) =>
         Effect.gen(function* () {
@@ -54,16 +46,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             organizationId: args.organizationId,
             postId: args.postId,
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list comments",
-                })
-              ),
-          })
-        ),
+        }).pipe(withRemapDbErrors("Comment", "select")),
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -103,14 +86,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new FailedToCreateCommentError({
-                  message: "Failed to create comment",
-                })
-              ),
-          })
+          withRemapDbErrors("Comment", "create")
         );
       },
       CommentDelete: (args: TCommentDelete) => {
@@ -147,14 +123,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new FailedToDeleteCommentError({
-                  message: "Failed to delete comment",
-                })
-              ),
-          })
+          withRemapDbErrors("Comment", "delete")
         );
       },
       CommentUpdate: (args: TCommentUpdate) => {
@@ -191,22 +160,15 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
               })
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new FailedToUpdateCommentError({
-                  message: "Failed to update comment",
-                })
-              ),
-          })
+          withRemapDbErrors("Comment", "update")
         );
       },
     };
   })
 ).pipe(
   // Layer.provide(SitePolicy.layer),
-  Layer.provide(PostRepository.layer),
   Layer.provide(PostPolicy.layer),
   Layer.provide(CommentPolicy.layer),
+  Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer)
 );

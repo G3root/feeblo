@@ -17,28 +17,31 @@
     "db:generate": "dotenvx run -f ../../.env -- drizzle-kit generate",
     "db:studio": "dotenvx run -f ../../.env -- drizzle-kit studio",
     "db:migrate": "dotenvx run -f ../../.env -- drizzle-kit migrate",
-    "db:nuke": "dotenvx run -f ../../.env -- bun run nuke.ts",
-    "db:seed": "dotenvx run -f ../../.env -- bun run seed.ts",
+    "db:pull": "dotenvx run -f ../../.env -- drizzle-kit pull",
+    "db:nuke": "dotenvx run -f ../../.env -- tsx nuke.ts",
+    "db:seed": "dotenvx run -f ../../.env -- tsx seed.ts",
     "db:start": "docker compose up -d",
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
     "db:down": "docker compose down"
   },
   "dependencies": {
-    "@effect/sql-drizzle": "catalog:",
     "@effect/sql-pg": "catalog:",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
     "pg": "catalog:",
-    "zod": "catalog:"
-  }, 
+    "zod": "catalog:",
+    "postgres": "catalog:"
+  },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
     "@feeblo/config": "workspace:*",
+    "@feeblo/utils": "workspace:*",
     "@types/pg": "^8.16.0",
-    "drizzle-kit": "^0.31.9",
-    "drizzle-seed": "^0.3.1",
+    "drizzle-kit": "catalog:",
+    "drizzle-seed": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }

@@ -1,4 +1,4 @@
-import { Effect, Option } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
 import { CommentRepository } from "./repository";
 
@@ -44,12 +44,11 @@ const makeCommentPolicy = Effect.gen(function* () {
   };
 });
 
-export class CommentPolicy extends Effect.Service<CommentPolicy>()(
+export class CommentPolicy extends Context.Service<CommentPolicy>()(
   "CommentPolicy",
   {
-    effect: makeCommentPolicy,
-    dependencies: [CommentRepository.Default],
+    make: makeCommentPolicy,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

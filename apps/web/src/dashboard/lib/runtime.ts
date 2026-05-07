@@ -1,5 +1,6 @@
 import {
   Rpc,
+  type RpcClientType,
   type RuntimeRequirements,
   runtime,
   withRpc,
@@ -32,7 +33,7 @@ export async function runEffect<A, E, R extends RuntimeRequirements>(
  * Resolves with the value on success, throws the cause on failure.
  */
 export function fetchRpc<A, E>(
-  cb: (rpc: Rpc) => Effect.Effect<A, E>,
+  cb: (rpc: RpcClientType) => Effect.Effect<A, E>,
   options?: { signal?: AbortSignal }
 ): Promise<A> {
   return runEffect(withRpc(cb), options);
@@ -40,9 +41,9 @@ export function fetchRpc<A, E>(
 
 export const useFetchRpc = () => {
   const runtime = useRuntime();
-  return <A, E>(cb: (rpc: Rpc) => Effect.Effect<A, E>) => {
+  return <A, E>(cb: (rpc: RpcClientType) => Effect.Effect<A, E>) => {
     return runEffect(withRpc(cb), { runtime });
   };
 };
 
-export const useRpcClient = () => runtime.runSync(Rpc);
+export const useRpcClient = () => runtime.runSync(Rpc.asEffect());

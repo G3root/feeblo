@@ -7,12 +7,15 @@
     "./id": "./src/id.ts",
     "./url": "./src/url.ts",
     "./crypto": "./src/crypto.ts",
-    "./html": "./src/html.ts"
+    "./html": "./src/html.ts",
+    "./effect-ids": "./src/effect-ids.ts"
   },
   "dependencies": {
+    "@better-auth/utils": "catalog:",
     "@noble/ciphers": "^2.0.1",
     "legid": "^0.1.4",
     "nanoid": "^5.1.6",
-    "@sindresorhus/slugify": "^2.2.1"
+    "@sindresorhus/slugify": "^2.2.1",
+    "effect": "catalog:"
   }
 }

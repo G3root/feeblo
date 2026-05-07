@@ -1,18 +1,12 @@
+import { createServer } from "node:http";
 import {
-  HttpApiScalar,
-  HttpApp,
-  HttpLayerRouter,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "@effect/platform";
-import {
-  BunFileSystem,
-  BunHttpServer,
-  BunPath,
-  BunRuntime,
-} from "@effect/platform-bun";
+  NodeFileSystem,
+  NodeHttpServer,
+  NodePath,
+  NodeRuntime,
+} from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
-import { DB } from "@feeblo/db";
+import { Database } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
@@ -21,17 +15,26 @@ import {
   HttpApiAuthMiddlewareLive,
 } from "@feeblo/domain/session-middleware";
 import { Config, Effect, Layer } from "effect";
+import {
+  HttpEffect,
+  HttpRouter,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/unstable/http";
+import { HttpApiScalar } from "effect/unstable/httpapi";
 import { ServerConfig } from "./config";
 
-const ServiceLayers = DB.Client;
+const ServiceLayers = Database.Database.Client;
 const AuthLayer = Layer.effect(Auth, initAuthHandler());
 
 const BetterAuthApp = Effect.gen(function* () {
   const auth = yield* Auth;
-  return yield* HttpApp.fromWebHandler(auth.handler);
+  return yield* HttpEffect.fromWebHandler((request) =>
+    Promise.resolve(auth.handler(request))
+  );
 });
 
-const BetterAuthRouterLive = HttpLayerRouter.use((router) =>
+const BetterAuthRouterLive = HttpRouter.use((router) =>
   router.add("*", "/api/auth/*", (request) =>
     Effect.provideService(
       BetterAuthApp,
@@ -41,72 +44,80 @@ const BetterAuthRouterLive = HttpLayerRouter.use((router) =>
   )
 );
 
-const DocsRoute = HttpApiScalar.layerHttpLayerRouter({
-  api: Api,
+const DocsRoute = HttpApiScalar.layer(Api, {
   path: "/docs",
 });
 
-const CorsLayer = Layer.unwrapEffect(
-  Effect.gen(function* () {
-    const { appUrl, apiUrl } = yield* ServerConfig;
-
-    const appParsed = new URL(appUrl);
-    const apiParsed = new URL(apiUrl);
-    const appOrigin = appParsed.origin;
-    const apiOrigin = apiParsed.origin;
-
-    return HttpLayerRouter.cors({
-      allowedOrigins: (origin: string) => {
-        if (origin === appOrigin || origin === apiOrigin) {
-          return true;
-        }
-
-        try {
-          const { hostname, port } = new URL(origin);
-          return (
-            hostname.endsWith(`.${appParsed.hostname}`) &&
-            port === appParsed.port
-          );
-        } catch {
-          return false;
-        }
-      },
-      allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      credentials: true,
-    });
-  }).pipe(Effect.provide(ServerConfig.layer))
-);
-
-const HealthRouter = HttpLayerRouter.use((router) =>
+const HealthRouter = HttpRouter.use((router) =>
   router.add("GET", "/health", HttpServerResponse.text("OK"))
 );
 
-const AllRoutes = Layer.mergeAll(
-  HealthRouter,
-  RpcRoute,
-  HttpRoute,
-  BetterAuthRouterLive,
-  DocsRoute
-).pipe(Layer.provide(CorsLayer));
+const program = Effect.gen(function* () {
+  const config = yield* ServerConfig;
 
-HttpLayerRouter.serve(AllRoutes, {
-  routerConfig: {
-    maxParamLength: 500,
-  },
-}).pipe(
-  Layer.provide(HttpApiAuthMiddlewareLive),
-  Layer.provide(AuthLayer),
-  Layer.provide(ServiceLayers),
-  Layer.provide(BunFileSystem.layer),
-  Layer.provide(BunPath.layer),
-  Layer.provide(
-    BunHttpServer.layerConfig(
-      Config.all({
-        port: Config.number("SERVER_PORT").pipe(Config.withDefault(3000)),
-        idleTimeout: Config.succeed(120),
+  const isAllowedOrigin = (origin: string | undefined): boolean => {
+    if (!origin) {
+      return true;
+    }
+
+    try {
+      const originHost = new URL(origin).hostname;
+      const appHost = new URL(config.appUrl).hostname;
+      const apiHost = new URL(config.apiUrl).hostname;
+
+      if (originHost === apiHost) {
+        return true;
+      }
+      if (originHost === appHost) {
+        return true;
+      }
+      if (originHost.endsWith(`.${appHost}`)) {
+        return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const AllRoutes = Layer.mergeAll(
+    HealthRouter,
+    RpcRoute,
+    HttpRoute,
+    BetterAuthRouterLive,
+    DocsRoute
+  ).pipe(
+    Layer.provide(
+      HttpRouter.cors({
+        allowedOrigins: isAllowedOrigin as unknown as readonly string[],
+        allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        credentials: true,
       })
     )
-  ),
-  Layer.launch,
-  BunRuntime.runMain
-);
+  );
+
+  const server = HttpRouter.serve(AllRoutes, {
+    routerConfig: {
+      maxParamLength: 500,
+    },
+  }).pipe(
+    Layer.provide(HttpApiAuthMiddlewareLive),
+    Layer.provide(AuthLayer),
+    Layer.provide(ServiceLayers),
+    Layer.provide(NodeFileSystem.layer),
+    Layer.provide(NodePath.layer),
+    Layer.provide(
+      NodeHttpServer.layerConfig(
+        createServer,
+        Config.all({
+          port: Config.number("SERVER_PORT").pipe(Config.withDefault(3000)),
+        })
+      )
+    )
+  );
+
+  return yield* Layer.launch(server);
+});
+
+program.pipe(Effect.provide(ServerConfig.layer), NodeRuntime.runMain);

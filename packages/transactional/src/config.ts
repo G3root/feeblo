@@ -1,23 +1,27 @@
 import { optionalString } from "@feeblo/config/effect";
-import { Config, Effect } from "effect";
+import { Config, ConfigProvider, Context, Effect, Layer } from "effect";
 
 const optionalBoolean = (name: string) =>
   optionalString(name).pipe(
     Effect.flatMap((value) => {
       if (value._tag === "None") {
-        return Config.succeed(undefined);
+        return Effect.succeed(undefined);
       }
 
       if (value.value === "true") {
-        return Config.succeed(true);
+        return Effect.succeed(true);
       }
 
       if (value.value === "false") {
-        return Config.succeed(false);
+        return Effect.succeed(false);
       }
 
-      return Config.fail(
-        `Expected ${name} to be "true" or "false", received "${value.value}"`
+      return Effect.fail(
+        new Config.ConfigError(
+          new ConfigProvider.SourceError({
+            message: `Expected ${name} to be "true" or "false", received "${value.value}"`,
+          })
+        )
       );
     })
   );
@@ -26,22 +30,26 @@ const optionalInteger = (name: string) =>
   optionalString(name).pipe(
     Effect.flatMap((value) => {
       if (value._tag === "None") {
-        return Config.succeed(undefined);
+        return Effect.succeed(undefined);
       }
 
       const parsed = Number(value.value);
       return Number.isInteger(parsed)
-        ? Config.succeed(parsed)
-        : Config.fail(
-            `Expected ${name} to be an integer, received "${value.value}"`
+        ? Effect.succeed(parsed)
+        : Effect.fail(
+            new Config.ConfigError(
+              new ConfigProvider.SourceError({
+                message: `Expected ${name} to be an integer, received "${value.value}"`,
+              })
+            )
           );
     })
   );
 
-export class MailerConfig extends Effect.Service<MailerConfig>()(
+export class MailerConfig extends Context.Service<MailerConfig>()(
   "MailerConfig",
   {
-    effect: Effect.gen(function* () {
+    make: Effect.gen(function* () {
       const host = yield* optionalString("SMTP_HOST").pipe(
         Effect.map((value) =>
           value._tag === "Some" ? value.value : "127.0.0.1"
@@ -58,9 +66,9 @@ export class MailerConfig extends Effect.Service<MailerConfig>()(
       );
       const service = yield* optionalString("SMTP_SERVICE");
       const username = yield* optionalString("SMTP_USERNAME");
-      const password = yield* Config.redacted("SMTP_PASSWORD").pipe(
-        Config.option
-      );
+      const password = yield* Config.redacted("SMTP_PASSWORD")
+        .pipe(Config.option)
+        .asEffect();
       const defaultFrom = yield* optionalString("MAILER_FROM").pipe(
         Effect.map((value) =>
           value._tag === "Some" ? value.value : "Feeblo <noreply@feeblo.com>"
@@ -80,5 +88,5 @@ export class MailerConfig extends Effect.Service<MailerConfig>()(
     }),
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

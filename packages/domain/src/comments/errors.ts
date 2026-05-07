@@ -1,46 +1,36 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 import { PolicyDeniedError } from "../policy";
 import { InternalServerError, UnauthorizedError } from "../rpc-errors";
 
-export class FailedToDeleteCommentError extends Schema.TaggedError<FailedToDeleteCommentError>()(
+export class FailedToDeleteCommentError extends Schema.TaggedErrorClass<FailedToDeleteCommentError>()(
   "FailedToDeleteCommentError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToDeleteCommentError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToDeleteCommentError" }
 ) {}
 
-export class FailedToUpdateCommentError extends Schema.TaggedError<FailedToUpdateCommentError>()(
+export class FailedToUpdateCommentError extends Schema.TaggedErrorClass<FailedToUpdateCommentError>()(
   "FailedToUpdateCommentError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToUpdateCommentError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToUpdateCommentError" }
 ) {}
 
-export class FailedToCreateCommentError extends Schema.TaggedError<FailedToCreateCommentError>()(
+export class FailedToCreateCommentError extends Schema.TaggedErrorClass<FailedToCreateCommentError>()(
   "FailedToCreateCommentError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToCreateCommentError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToCreateCommentError" }
 ) {}
 
-export const CommentServiceErrors = Schema.Union(
+export const CommentServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
   FailedToDeleteCommentError,
   FailedToUpdateCommentError,
-  FailedToCreateCommentError
-);
+  FailedToCreateCommentError,
+]);

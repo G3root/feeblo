@@ -1,31 +1,27 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export const PostStatusType = Schema.Literal(
+export const PostStatusType = S.Literals([
   "PENDING",
   "REVIEW",
   "PLANNED",
   "IN_PROGRESS",
   "COMPLETED",
-  "CLOSED"
-);
+  "CLOSED",
+]);
 
-export class PostStatus extends Schema.Class<PostStatus>(
-  "PostStatus"
-)({
-  id: Schema.String,
+export const PostStatus = S.Struct({
+  id: S.String,
   type: PostStatusType,
-  orderIndex: Schema.Number,
-  organizationId: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-}) {}
-
-export type TPostStatus = Schema.Schema.Type<typeof PostStatus>;
-
-export const PostStatusList = Schema.Struct({
-  organizationId: Schema.String,
+  orderIndex: S.Number,
+  organizationId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
 });
 
-export type TPostStatusList = Schema.Schema.Type<
-  typeof PostStatusList
->;
+export type TPostStatus = S.Schema.Type<typeof PostStatus>;
+
+export const PostStatusList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TPostStatusList = S.Schema.Type<typeof PostStatusList>;

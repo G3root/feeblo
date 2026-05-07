@@ -1,5 +1,5 @@
 import { Polar } from "@polar-sh/sdk";
-import { Effect, Redacted } from "effect";
+import { Context, Effect, Layer, Redacted } from "effect";
 import { BadRequestError } from "../rpc-errors";
 import { PolarConfig } from "./config";
 import {
@@ -97,11 +97,11 @@ const makePolarService = Effect.gen(function* () {
   };
 });
 
-export class PolarService extends Effect.Service<PolarService>()(
+export class PolarService extends Context.Service<PolarService>()(
   "PolarService",
   {
-    effect: makePolarService.pipe(Effect.provide(PolarConfig.layer)),
+    make: makePolarService.pipe(Effect.provide(PolarConfig.layer)),
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

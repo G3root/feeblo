@@ -1,15 +1,15 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export const VerificationOTPStateSchema = Schema.Struct({
-  email: Schema.String,
-  type: Schema.Literal("email-verification", "reset-password"),
+export const VerificationOTPStateSchema = S.Struct({
+  email: S.String,
+  type: S.Literals(["email-verification", "reset-password"]),
 });
 
-export type VerificationOTPState = Schema.Schema.Type<
+export type VerificationOTPState = S.Schema.Type<
   typeof VerificationOTPStateSchema
 >;
 
-export const VerificationOTPResponseSchema = Schema.Struct({
-  email: Schema.String,
-  type: Schema.Literal("email-verification", "reset-password"),
+export const VerificationOTPResponseSchema = S.Struct({
+  email: S.String,
+  type: S.Literals(["email-verification", "reset-password"]),
 });

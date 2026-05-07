@@ -1,12 +1,12 @@
-import { Config, Effect, Schema } from "effect";
+import { Config, Context, Effect, Layer, Schema } from "effect";
 
-const PolarModeConfig = Schema.Config(
-  "POLAR_MODE",
-  Schema.Literal("sandbox", "production")
+const PolarModeConfig = Config.schema(
+  Schema.Literals(["sandbox", "production"]),
+  "POLAR_MODE"
 ).pipe(Config.withDefault("sandbox"));
 
-export class PolarConfig extends Effect.Service<PolarConfig>()("PolarConfig", {
-  effect: Effect.gen(function* () {
+export class PolarConfig extends Context.Service<PolarConfig>()("PolarConfig", {
+  make: Effect.gen(function* () {
     const appUrl = yield* Config.string("VITE_APP_URL");
     const accessToken = yield* Config.redacted("POLAR_ACCESS_TOKEN").pipe(
       Config.option
@@ -24,5 +24,5 @@ export class PolarConfig extends Effect.Service<PolarConfig>()("PolarConfig", {
     } as const;
   }),
 }) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

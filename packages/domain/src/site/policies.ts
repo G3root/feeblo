@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -33,9 +33,11 @@ const makeSitePolicy = Effect.gen(function* () {
 
   const canViewRoadmap = (organizationId: string) =>
     Effect.gen(function* () {
-      const site = yield* siteRepository.findByOrganizationId({ organizationId });
+      const site = yield* siteRepository.findByOrganizationId({
+        organizationId,
+      });
 
-      if (!site || site.roadmapVisibility !== "PUBLIC") {
+      if (Option.isNone(site) || site.value.roadmapVisibility !== "PUBLIC") {
         return yield* new Policy.PolicyDeniedError({
           reason: "Roadmap is not publicly visible.",
         });
@@ -44,9 +46,11 @@ const makeSitePolicy = Effect.gen(function* () {
 
   const canViewChangelog = (organizationId: string) =>
     Effect.gen(function* () {
-      const site = yield* siteRepository.findByOrganizationId({ organizationId });
+      const site = yield* siteRepository.findByOrganizationId({
+        organizationId,
+      });
 
-      if (!site || site.changelogVisibility !== "PUBLIC") {
+      if (Option.isNone(site) || site.value.changelogVisibility !== "PUBLIC") {
         return yield* new Policy.PolicyDeniedError({
           reason: "Changelog is not publicly visible.",
         });
@@ -56,9 +60,8 @@ const makeSitePolicy = Effect.gen(function* () {
   return { canHidePoweredByBranding, canViewRoadmap, canViewChangelog };
 });
 
-export class SitePolicy extends Effect.Service<SitePolicy>()("SitePolicy", {
-  effect: makeSitePolicy,
-  dependencies: [WorkspaceRepository.Default, SiteRepository.Default],
+export class SitePolicy extends Context.Service<SitePolicy>()("SitePolicy", {
+  make: makeSitePolicy,
 }) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

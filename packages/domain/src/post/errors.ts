@@ -1,4 +1,3 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 import { PolicyDeniedError } from "../policy";
 import {
@@ -7,43 +6,31 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class FailedToCreatePostError extends Schema.TaggedError<FailedToCreatePostError>()(
+export class FailedToCreatePostError extends Schema.TaggedErrorClass<FailedToCreatePostError>()(
   "FailedToCreatePostError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToCreatePostError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToCreatePostError" }
 ) {}
 
-export class FailedToDeletePostError extends Schema.TaggedError<FailedToDeletePostError>()(
+export class FailedToDeletePostError extends Schema.TaggedErrorClass<FailedToDeletePostError>()(
   "FailedToDeletePostError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToDeletePostError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToDeletePostError" }
 ) {}
 
-export class FailedToUpdatePostError extends Schema.TaggedError<FailedToUpdatePostError>()(
+export class FailedToUpdatePostError extends Schema.TaggedErrorClass<FailedToUpdatePostError>()(
   "FailedToUpdatePostError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToUpdatePostError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToUpdatePostError" }
 ) {}
 
-export class FailedToMergePostError extends Schema.TaggedError<FailedToMergePostError>()(
+export class FailedToMergePostError extends Schema.TaggedErrorClass<FailedToMergePostError>()(
   "FailedToMergePostError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToMergePostError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToMergePostError" }
 ) {}
 
-export const PostServiceErrors = Schema.Union(
+export const PostServiceErrors = Schema.Union([
   BadRequestError,
   UnauthorizedError,
   InternalServerError,
@@ -51,5 +38,5 @@ export const PostServiceErrors = Schema.Union(
   FailedToCreatePostError,
   FailedToDeletePostError,
   FailedToUpdatePostError,
-  FailedToMergePostError
-);
+  FailedToMergePostError,
+]);

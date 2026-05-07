@@ -9,25 +9,25 @@ const EmailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const VERIFICATION_OTP_COOKIE_NAME = "verification_otp";
 
-const VerificationOTPStateFromJson = Schema.parseJson(
+const VerificationOTPStateFromJson = Schema.fromJsonString(
   VerificationOTPStateSchema
 );
 
-class VerificationOTPEncryptionError extends Schema.TaggedError<VerificationOTPEncryptionError>()(
+class VerificationOTPEncryptionError extends Schema.TaggedErrorClass<VerificationOTPEncryptionError>()(
   "VerificationOTPEncryptionError",
   {
     cause: Schema.Defect,
   }
 ) {}
 
-class VerificationOTPDecryptionError extends Schema.TaggedError<VerificationOTPDecryptionError>()(
+class VerificationOTPDecryptionError extends Schema.TaggedErrorClass<VerificationOTPDecryptionError>()(
   "VerificationOTPDecryptionError",
   {
     cause: Schema.Defect,
   }
 ) {}
 
-class InvalidVerificationOTPStateError extends Schema.TaggedError<InvalidVerificationOTPStateError>()(
+class InvalidVerificationOTPStateError extends Schema.TaggedErrorClass<InvalidVerificationOTPStateError>()(
   "InvalidVerificationOTPStateError",
   {
     cause: Schema.optional(Schema.Defect),
@@ -38,7 +38,7 @@ export const encryptVerificationOTPState = (
   state: VerificationOTPState,
   secret: string
 ) =>
-  Schema.encode(VerificationOTPStateFromJson)(state).pipe(
+  Schema.encodeEffect(VerificationOTPStateFromJson)(state).pipe(
     Effect.mapError((cause) => new InvalidVerificationOTPStateError({ cause })),
     Effect.flatMap((data) =>
       Effect.tryPromise({
@@ -76,7 +76,7 @@ export const generateVerificationOTPCookieData = (isSecure: boolean) => ({
 export const getCookieVerificationOTPState = (data: string, secret: string) =>
   decryptVerificationOTPState(data, secret).pipe(
     Effect.flatMap((decrypted) =>
-      Schema.decodeUnknown(VerificationOTPStateFromJson)(decrypted).pipe(
+      Schema.decodeUnknownEffect(VerificationOTPStateFromJson)(decrypted).pipe(
         Effect.mapError(
           (cause) => new InvalidVerificationOTPStateError({ cause })
         )
@@ -88,7 +88,7 @@ export const getCookieVerificationOTPState = (data: string, secret: string) =>
             ...state,
             email: state.email.toLowerCase(),
           })
-        : new InvalidVerificationOTPStateError({})
+        : Effect.fail(new InvalidVerificationOTPStateError({}))
     )
   );
 

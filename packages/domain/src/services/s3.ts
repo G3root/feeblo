@@ -1,10 +1,9 @@
-import { FileSystem } from "@effect/platform";
 import { S3 } from "@effect-aws/client-s3";
 import { S3FileSystem } from "@effect-aws/s3";
-import { Effect, Layer } from "effect";
+import { Context, Effect, FileSystem, Layer } from "effect";
 import { S3Config } from "./s3-config";
 
-export const S3Layer = Layer.unwrapEffect(
+export const S3Layer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* S3Config;
 
@@ -99,16 +98,16 @@ const makeS3UploadService = Effect.gen(function* () {
   };
 });
 
-export class S3UploadService extends Effect.Service<S3UploadService>()(
+export class S3UploadService extends Context.Service<S3UploadService>()(
   "S3UploadService",
   {
-    effect: makeS3UploadService.pipe(Effect.provide(S3Config.layer)),
+    make: makeS3UploadService.pipe(Effect.provide(S3Config.layer)),
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }
 
-export const S3UploadServiceLive = Layer.unwrapEffect(
+export const S3UploadServiceLive = Layer.unwrap(
   Effect.gen(function* () {
     const { publicBucketName } = yield* S3Config;
     const S3FileSystemLive = S3FileSystem.layer({

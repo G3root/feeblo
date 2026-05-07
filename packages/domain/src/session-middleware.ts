@@ -1,42 +1,77 @@
-import { HttpApiMiddleware, HttpApiSecurity } from "@effect/platform";
-import { RpcMiddleware } from "@effect/rpc";
-import type { Auth as AuthHandler, Session } from "@feeblo/auth/server";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
+import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi";
+import { RpcMiddleware } from "effect/unstable/rpc";
 import { UnauthorizedError } from "./rpc-errors";
 
 const SESSION_COOKIE_KEY = "better-auth.session_token";
 
-export class Auth extends Context.Tag("@feeblo/api/Auth")<
-  Auth,
-  AuthHandler
->() {}
+//TODO: infer session later
+export type Session = {
+  readonly user: {
+    readonly id: string;
+    readonly email: string;
+    readonly name: string;
+  };
+  readonly session: {
+    readonly userId: string;
+    readonly token: string;
+  };
+  readonly organizations: ReadonlyArray<{
+    readonly id: string;
+  }>;
+  readonly memberships: ReadonlyArray<{
+    readonly membershipId: string;
+    readonly organizationId: string;
+    readonly role: "owner" | "admin" | "member";
+  }>;
+};
+
+export type AuthHandler = {
+  readonly handler: (request: Request) => Response | Promise<Response>;
+  readonly api: {
+    readonly getSession: (args: {
+      readonly headers: Headers;
+    }) => Promise<Session | null>;
+    readonly createInvitation: (args: {
+      readonly headers: Headers;
+      readonly body: {
+        readonly organizationId: string;
+        readonly email: string;
+        readonly role: "owner" | "admin" | "member";
+      };
+    }) => Promise<unknown>;
+  };
+};
+
+export class Auth extends Context.Service<Auth, AuthHandler>()(
+  "@feeblo/api/Auth"
+) {}
 
 /** @effect-leakable-service */
-export class CurrentSession extends Context.Tag(
+export class CurrentSession extends Context.Service<CurrentSession, Session>()(
   "@feeblo/domain/CurrentSession"
-)<CurrentSession, Session>() {}
+) {}
 
 /** Session when authenticated; None when unauthenticated. Use for optional-auth routes (e.g. PostListPublic). */
-export class OptionalCurrentSession extends Context.Tag(
-  "@feeblo/domain/OptionalCurrentSession"
-)<OptionalCurrentSession, Option.Option<Session>>() {}
+export class OptionalCurrentSession extends Context.Service<
+  OptionalCurrentSession,
+  Option.Option<Session>
+>()("@feeblo/domain/OptionalCurrentSession") {}
 
-export class AuthMiddleware extends RpcMiddleware.Tag<AuthMiddleware>()(
-  "@feeblo/api/AuthMiddleware",
-  {
-    provides: CurrentSession,
-    failure: UnauthorizedError,
-  }
-) {}
+export class AuthMiddleware extends RpcMiddleware.Service<
+  AuthMiddleware,
+  { provides: CurrentSession }
+>()("@feeblo/api/AuthMiddleware", {
+  error: UnauthorizedError,
+}) {}
 
 /** Resolves session when possible; never fails. Provides Option.none() when not authenticated. */
-export class OptionalAuthMiddleware extends RpcMiddleware.Tag<OptionalAuthMiddleware>()(
-  "@feeblo/api/OptionalAuthMiddleware",
-  {
-    provides: OptionalCurrentSession,
-    failure: UnauthorizedError as never,
-  }
-) {}
+export class OptionalAuthMiddleware extends RpcMiddleware.Service<
+  OptionalAuthMiddleware,
+  { provides: OptionalCurrentSession }
+>()("@feeblo/api/OptionalAuthMiddleware", {
+  error: UnauthorizedError as never,
+}) {}
 
 function getValidatedSessionFromToken(
   auth: AuthHandler,
@@ -80,14 +115,18 @@ export const AuthMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const auth = yield* Auth;
 
-    return (options) => {
+    return (effect, options) => {
       const cookieHeader =
         typeof options.headers?.cookie === "string"
           ? options.headers.cookie
           : options.headers?.Cookie;
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
-      return getValidatedSessionFromToken(auth, token ?? "");
+      return getValidatedSessionFromToken(auth, token ?? "").pipe(
+        Effect.flatMap((session) =>
+          effect.pipe(Effect.provideService(CurrentSession, session))
+        )
+      );
     };
   })
 );
@@ -97,7 +136,7 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const auth = yield* Auth;
 
-    return (options) => {
+    return (effect, options) => {
       const cookieHeader =
         typeof options.headers?.cookie === "string"
           ? options.headers.cookie
@@ -106,33 +145,39 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
 
       return getValidatedSessionFromToken(auth, token ?? "").pipe(
         Effect.map(Option.some),
-        Effect.catchAll(() => Effect.succeed(Option.none()))
+        Effect.catch(() => Effect.succeed(Option.none())),
+        Effect.flatMap((session) =>
+          effect.pipe(Effect.provideService(OptionalCurrentSession, session))
+        )
       );
     };
   })
 );
 
-export class HttpApiAuthMiddleware extends HttpApiMiddleware.Tag<HttpApiAuthMiddleware>()(
-  "@feeblo/domain/HttpApiAuthMiddleware",
-  {
-    provides: CurrentSession,
-    failure: UnauthorizedError,
-    security: {
-      cookie: HttpApiSecurity.apiKey({
-        in: "cookie",
-        key: SESSION_COOKIE_KEY,
-      }),
-    },
-  }
-) {}
+export class HttpApiAuthMiddleware extends HttpApiMiddleware.Service<
+  HttpApiAuthMiddleware,
+  { provides: CurrentSession }
+>()("@feeblo/domain/HttpApiAuthMiddleware", {
+  error: UnauthorizedError,
+  security: {
+    cookie: HttpApiSecurity.apiKey({
+      in: "cookie",
+      key: SESSION_COOKIE_KEY,
+    }),
+  },
+}) {}
 
 export const HttpApiAuthMiddlewareLive = Layer.effect(
   HttpApiAuthMiddleware,
   Effect.gen(function* () {
     const auth = yield* Auth;
     return {
-      cookie: (token: Redacted.Redacted<string>) =>
-        getValidatedSessionFromToken(auth, Redacted.value(token)),
+      cookie: (effect, { credential }) =>
+        getValidatedSessionFromToken(auth, Redacted.value(credential)).pipe(
+          Effect.flatMap((session) =>
+            effect.pipe(Effect.provideService(CurrentSession, session))
+          )
+        ),
     };
   })
 );

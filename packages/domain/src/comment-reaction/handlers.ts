@@ -1,7 +1,8 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
-import { InternalServerError } from "../rpc-errors";
+import { PostRepository } from "../post/repository";
+import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
@@ -24,14 +25,7 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
           });
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list comment reactions",
-                })
-              ),
-          })
+          withRemapDbErrors("CommentReaction", "select")
         ),
       CommentReactionToggle: (args: TCommentReactionToggle) =>
         Effect.gen(function* () {
@@ -55,14 +49,7 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
               Policy.hasMembership(args.organizationId)
             )
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to toggle comment reaction",
-                })
-              ),
-          })
+          withRemapDbErrors("CommentReaction", "update")
         ),
       CommentReactionListPublic: (args: TCommentReactionList) =>
         Effect.gen(function* () {
@@ -72,16 +59,7 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             organizationId: args.organizationId,
             postId: args.postId,
           });
-        }).pipe(
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to list comment reactions",
-                })
-              ),
-          })
-        ),
+        }).pipe(withRemapDbErrors("CommentReaction", "select")),
       CommentReactionTogglePublic: (args: TCommentReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -101,19 +79,13 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
               postId: args.postId,
             })
           ),
-          Effect.catchTags({
-            SqlError: () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to toggle comment reaction",
-                })
-              ),
-          })
+          withRemapDbErrors("CommentReaction", "update")
         ),
     };
   })
 ).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
+  Layer.provide(PostRepository.layer),
   Layer.provide(CommentReactionRepository.layer)
 );

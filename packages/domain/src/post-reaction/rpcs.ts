@@ -1,5 +1,5 @@
-import { Rpc, RpcGroup } from "@effect/rpc";
 import { Schema } from "effect";
+import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { AuthMiddleware } from "../session-middleware";
 import { PostReactionServiceErrors } from "./errors";
 import { PostReaction, PostReactionList, PostReactionToggle } from "./schema";
@@ -14,7 +14,7 @@ export class PostReactionRpcs extends RpcGroup.make(
     payload: PostReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
-      emoji: Schema.Union(Schema.String, Schema.Null),
+      emoji: Schema.Union([Schema.String, Schema.Null]),
     }),
     error: PostReactionServiceErrors,
   }).middleware(AuthMiddleware),
@@ -28,7 +28,7 @@ export class PostReactionRpcs extends RpcGroup.make(
     payload: PostReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
-      emoji: Schema.Union(Schema.String, Schema.Null),
+      emoji: Schema.Union([Schema.String, Schema.Null]),
     }),
     error: PostReactionServiceErrors,
   }).middleware(AuthMiddleware)

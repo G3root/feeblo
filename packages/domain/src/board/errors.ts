@@ -1,4 +1,3 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 import { PolicyDeniedError } from "../policy";
 import {
@@ -7,42 +6,33 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class BoardNotFoundError extends Schema.TaggedError<BoardNotFoundError>()(
+export class BoardNotFoundError extends Schema.TaggedErrorClass<BoardNotFoundError>()(
   "BoardNotFoundError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({ status: 404, identifier: "BoardNotFoundError" })
+  { httpApiStatus: 404, identifier: "BoardNotFoundError" }
 ) {}
 
-export class FailedToCreateBoardError extends Schema.TaggedError<FailedToCreateBoardError>()(
+export class FailedToCreateBoardError extends Schema.TaggedErrorClass<FailedToCreateBoardError>()(
   "FailedToCreateBoardError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToCreateBoardError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToCreateBoardError" }
 ) {}
 
-export class FailedToUpdateBoardError extends Schema.TaggedError<FailedToUpdateBoardError>()(
+export class FailedToUpdateBoardError extends Schema.TaggedErrorClass<FailedToUpdateBoardError>()(
   "FailedToUpdateBoardError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToUpdateBoardError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToUpdateBoardError" }
 ) {}
 
-export class FailedToDeleteBoardError extends Schema.TaggedError<FailedToDeleteBoardError>()(
+export class FailedToDeleteBoardError extends Schema.TaggedErrorClass<FailedToDeleteBoardError>()(
   "FailedToDeleteBoardError",
   {},
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToDeleteBoardError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToDeleteBoardError" }
 ) {}
 
-export const BoardServiceErrors = Schema.Union(
+export const BoardServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
@@ -50,5 +40,5 @@ export const BoardServiceErrors = Schema.Union(
   FailedToCreateBoardError,
   FailedToUpdateBoardError,
   FailedToDeleteBoardError,
-  BadRequestError
-);
+  BadRequestError,
+]);

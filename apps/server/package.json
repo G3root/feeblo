@@ -5,20 +5,20 @@
   "version": "1.0.0",
   "scripts": {
     "build": "dotenvx run -f ../../.env -- rolldown -c",
-    "dev": "dotenvx run -f ../../.env -- bun run --watch src/index.ts",
-    "start": "dotenvx run -f ../../.env -- bun run src/index.ts"
+    "dev": "dotenvx run -f ../../.env -- tsx watch src/index.ts",
+    "start": "dotenvx run -f ../../.env -- tsx src/index.ts"
   },
   "dependencies": {
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/utils": "workspace:*",
-    "effect": "catalog:",
-    "@effect/platform-bun": "catalog:",
-    "@effect/platform": "catalog:"
+    "@effect/platform-node": "catalog:",
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
-    "rolldown": "catalog:"
+    "rolldown": "catalog:",
+    "tsx": "catalog:"
   }
 }

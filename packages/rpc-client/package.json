@@ -9,8 +9,6 @@
     }
   },
   "dependencies": {
-    "@effect/platform": "catalog:",
-    "@effect/rpc": "catalog:",
     "@feeblo/domain": "workspace:*",
     "effect": "catalog:"
   },

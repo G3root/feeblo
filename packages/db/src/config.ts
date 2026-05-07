@@ -1,13 +1,13 @@
-import { Config, Effect } from "effect";
+import { Config, Context, Effect, Layer } from "effect";
 
-export class DatabaseConfig extends Effect.Service<DatabaseConfig>()(
+export class DatabaseConfig extends Context.Service<DatabaseConfig>()(
   "DatabaseConfig",
   {
-    effect: Effect.gen(function* () {
-      const url = yield* Config.redacted("DATABASE_URL");
+    make: Effect.gen(function* () {
+      const url = yield* Config.redacted("DATABASE_URL").asEffect();
       return { url } as const;
     }),
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

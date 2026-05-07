@@ -1,52 +1,54 @@
-import { Schema } from "effect";
+import { Schema as S } from "effect";
 
-export class Comment extends Schema.Class<Comment>("Comment")({
-  id: Schema.String,
-  content: Schema.String,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-  organizationId: Schema.String,
-  postId: Schema.String,
-  userId: Schema.String,
-  visibility: Schema.Literal("PUBLIC", "INTERNAL"),
-  parentCommentId: Schema.Union(Schema.String, Schema.Null),
-  memberId: Schema.Union(Schema.String, Schema.Null),
-  user: Schema.Struct({
-    name: Schema.String,
+export const Comment = S.Struct({
+  id: S.String,
+  content: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+  organizationId: S.String,
+  postId: S.String,
+  userId: S.String,
+  visibility: S.Literals(["PUBLIC", "INTERNAL"]),
+  parentCommentId: S.Union([S.String, S.Null]),
+  memberId: S.Union([S.String, S.Null]),
+  user: S.Struct({
+    name: S.String,
   }),
-}) {}
-
-export const CommentList = Schema.Struct({
-  organizationId: Schema.String,
-  postId: Schema.String,
 });
 
-export type TCommentList = Schema.Schema.Type<typeof CommentList>;
+export type TComment = S.Schema.Type<typeof Comment>;
 
-export const CommentCreate = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  postId: Schema.String,
-  content: Schema.String,
-  visibility: Schema.Literal("PUBLIC", "INTERNAL"),
-  parentCommentId: Schema.Union(Schema.String, Schema.Null),
+export const CommentList = S.Struct({
+  organizationId: S.String,
+  postId: S.String,
 });
 
-export type TCommentCreate = Schema.Schema.Type<typeof CommentCreate>;
+export type TCommentList = S.Schema.Type<typeof CommentList>;
 
-export const CommentDelete = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  postId: Schema.String,
+export const CommentCreate = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  postId: S.String,
+  content: S.String,
+  visibility: S.Literals(["PUBLIC", "INTERNAL"]),
+  parentCommentId: S.Union([S.String, S.Null]),
 });
 
-export type TCommentDelete = Schema.Schema.Type<typeof CommentDelete>;
+export type TCommentCreate = S.Schema.Type<typeof CommentCreate>;
 
-export const CommentUpdate = Schema.Struct({
-  id: Schema.String,
-  organizationId: Schema.String,
-  postId: Schema.String,
-  content: Schema.String,
+export const CommentDelete = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  postId: S.String,
 });
 
-export type TCommentUpdate = Schema.Schema.Type<typeof CommentUpdate>;
+export type TCommentDelete = S.Schema.Type<typeof CommentDelete>;
+
+export const CommentUpdate = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+  postId: S.String,
+  content: S.String,
+});
+
+export type TCommentUpdate = S.Schema.Type<typeof CommentUpdate>;

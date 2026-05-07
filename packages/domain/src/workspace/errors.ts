@@ -1,4 +1,3 @@
-import { HttpApiSchema } from "@effect/platform";
 import { Schema } from "effect";
 import { PolicyDeniedError } from "../policy";
 import {
@@ -7,21 +6,18 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class FailedToCreateWorkspaceError extends Schema.TaggedError<FailedToCreateWorkspaceError>()(
+export class FailedToCreateWorkspaceError extends Schema.TaggedErrorClass<FailedToCreateWorkspaceError>()(
   "FailedToCreateWorkspaceError",
   {
     message: Schema.optional(Schema.String),
   },
-  HttpApiSchema.annotations({
-    status: 500,
-    identifier: "FailedToCreateWorkspaceError",
-  })
+  { httpApiStatus: 500, identifier: "FailedToCreateWorkspaceError" }
 ) {}
 
-export const WorkspaceServiceErrors = Schema.Union(
+export const WorkspaceServiceErrors = Schema.Union([
   UnauthorizedError,
   BadRequestError,
   InternalServerError,
   PolicyDeniedError,
-  FailedToCreateWorkspaceError
-);
+  FailedToCreateWorkspaceError,
+]);

@@ -1,136 +1,143 @@
-import { DB } from "@feeblo/db";
-import { site as siteTable } from "@feeblo/db/schema/feedback";
+import { Database, schema } from "@feeblo/db";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Effect } from "effect";
+import { Context, Effect, Array as EffectArray, Layer } from "effect";
+
+interface findByOrganizationIdArgs {
+  organizationId: string;
+}
+interface findManyArgs {
+  limit: number;
+  organizationId?: string;
+  subdomain?: string;
+}
+
+interface findManyQuery {
+  limit: number;
+  whereClause: SQL | undefined;
+}
+
+interface updateArgs {
+  changelogVisibility: "PUBLIC" | "HIDDEN";
+  id: string;
+  name: string;
+  organizationId: string;
+  roadmapVisibility: "PUBLIC" | "HIDDEN";
+}
+
+interface updateHidePoweredByBrandingArgs {
+  hidePoweredBy: boolean;
+  id: string;
+  organizationId: string;
+}
 
 const makeSiteRepository = Effect.gen(function* () {
-  const db = yield* DB;
+  const db = yield* Database.Database;
 
   return {
-    findByOrganizationId: ({
-      organizationId,
-    }: {
-      organizationId: string;
-    }) =>
-      Effect.gen(function* () {
-        const [site] = yield* db
-          .select({
-            id: siteTable.id,
-            name: siteTable.name,
-            subdomain: siteTable.subdomain,
-            customDomain: siteTable.customDomain,
-            changelogVisibility: siteTable.changelogVisibility,
-            roadmapVisibility: siteTable.roadmapVisibility,
-            createdAt: siteTable.createdAt,
-            updatedAt: siteTable.updatedAt,
-            organizationId: siteTable.organizationId,
-            hidePoweredBy: siteTable.hidePoweredBy,
-          })
-          .from(siteTable)
-          .where(eq(siteTable.organizationId, organizationId))
-          .limit(1);
+    findByOrganizationId: (args: findByOrganizationIdArgs) =>
+      db
+        .makeQuery((execute, input: findByOrganizationIdArgs) =>
+          execute((client) =>
+            client
+              .select({
+                id: schema.site.id,
+                name: schema.site.name,
+                subdomain: schema.site.subdomain,
+                customDomain: schema.site.customDomain,
+                changelogVisibility: schema.site.changelogVisibility,
+                roadmapVisibility: schema.site.roadmapVisibility,
+                createdAt: schema.site.createdAt,
+                updatedAt: schema.site.updatedAt,
+                organizationId: schema.site.organizationId,
+                hidePoweredBy: schema.site.hidePoweredBy,
+              })
+              .from(schema.site)
+              .where(eq(schema.site.organizationId, input.organizationId))
+              .limit(1)
+          )
+        )(args)
+        .pipe(Effect.map(EffectArray.get(0))),
 
-        return site;
+    findMany: (findManyArgs: findManyArgs) => {
+      const where: SQL[] = [];
+      if (findManyArgs.organizationId) {
+        where.push(eq(schema.site.organizationId, findManyArgs.organizationId));
+      }
+      if (findManyArgs.subdomain) {
+        where.push(eq(schema.site.subdomain, findManyArgs.subdomain));
+      }
+
+      const whereClause = where.length > 1 ? and(...where) : where[0];
+
+      return db.makeQuery((execute, input: findManyQuery) =>
+        execute((client) =>
+          client
+            .select({
+              id: schema.site.id,
+              name: schema.site.name,
+              subdomain: schema.site.subdomain,
+              customDomain: schema.site.customDomain,
+              changelogVisibility: schema.site.changelogVisibility,
+              roadmapVisibility: schema.site.roadmapVisibility,
+              createdAt: schema.site.createdAt,
+              updatedAt: schema.site.updatedAt,
+              organizationId: schema.site.organizationId,
+              hidePoweredBy: schema.site.hidePoweredBy,
+            })
+            .from(schema.site)
+            .where(input.whereClause)
+            .limit(input.limit)
+        )
+      )({ whereClause, limit: findManyArgs.limit });
+    },
+    update: (args: updateArgs) =>
+      Effect.gen(function* () {
+        yield* db.makeQuery((execute, input: updateArgs) =>
+          execute((client) =>
+            client
+              .update(schema.site)
+              .set({
+                changelogVisibility: input.changelogVisibility,
+                updatedAt: new Date(),
+                roadmapVisibility: input.roadmapVisibility,
+                name: input.name,
+              })
+              .where(
+                and(
+                  eq(schema.site.id, input.id),
+                  eq(schema.site.organizationId, input.organizationId)
+                )
+              )
+          )
+        )(args);
       }),
-    findMany: ({
-      organizationId,
-      subdomain,
-      limit,
-    }: {
-      organizationId?: string;
-      subdomain?: string;
-      limit: number;
-    }) =>
+    updateHidePoweredByBranding: (args: updateHidePoweredByBrandingArgs) =>
       Effect.gen(function* () {
-        const where: SQL[] = [];
-        if (organizationId) {
-          where.push(eq(siteTable.organizationId, organizationId));
-        }
-        if (subdomain) {
-          where.push(eq(siteTable.subdomain, subdomain));
-        }
-
-        const whereClause = where.length > 1 ? and(...where) : where[0];
-
-        const sites = yield* db
-          .select({
-            id: siteTable.id,
-            name: siteTable.name,
-            subdomain: siteTable.subdomain,
-            customDomain: siteTable.customDomain,
-            changelogVisibility: siteTable.changelogVisibility,
-            roadmapVisibility: siteTable.roadmapVisibility,
-            createdAt: siteTable.createdAt,
-            updatedAt: siteTable.updatedAt,
-            organizationId: siteTable.organizationId,
-            hidePoweredBy: siteTable.hidePoweredBy,
-          })
-          .from(siteTable)
-          .where(whereClause)
-          .limit(limit);
-
-        return sites;
-      }),
-    update: ({
-      id,
-      organizationId,
-      changelogVisibility,
-      roadmapVisibility,
-      name,
-    }: {
-      id: string;
-      organizationId: string;
-      changelogVisibility: "PUBLIC" | "HIDDEN";
-      roadmapVisibility: "PUBLIC" | "HIDDEN";
-      name: string;
-    }) =>
-      Effect.gen(function* () {
-        yield* db
-          .update(siteTable)
-          .set({
-            changelogVisibility,
-            updatedAt: new Date(),
-            roadmapVisibility,
-            name,
-          })
-          .where(
-            and(
-              eq(siteTable.id, id),
-              eq(siteTable.organizationId, organizationId)
-            )
-          );
-      }),
-    updateHidePoweredByBranding: ({
-      id,
-      organizationId,
-      hidePoweredBy,
-    }: {
-      id: string;
-      organizationId: string;
-      hidePoweredBy: boolean;
-    }) =>
-      Effect.gen(function* () {
-        yield* db
-          .update(siteTable)
-          .set({
-            hidePoweredBy,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(siteTable.id, id),
-              eq(siteTable.organizationId, organizationId)
-            )
-          );
+        yield* db.makeQuery((execute, input: updateHidePoweredByBrandingArgs) =>
+          execute((client) =>
+            client
+              .update(schema.site)
+              .set({
+                hidePoweredBy: input.hidePoweredBy,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(
+                  eq(schema.site.id, input.id),
+                  eq(schema.site.organizationId, input.organizationId)
+                )
+              )
+          )
+        )(args);
       }),
   };
 });
 
-export class SiteRepository extends Effect.Service<SiteRepository>()(
+export class SiteRepository extends Context.Service<SiteRepository>()(
   "SiteRepository",
   {
-    effect: makeSiteRepository,
+    make: makeSiteRepository,
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }

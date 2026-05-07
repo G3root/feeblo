@@ -1,16 +1,18 @@
-import { Config, Effect } from "effect";
+import { Config, Context, Effect, Layer } from "effect";
 import { InternalServerError } from "../rpc-errors";
 
-export class VerificationOtpConfig extends Effect.Service<VerificationOtpConfig>()(
+export class VerificationOtpConfig extends Context.Service<VerificationOtpConfig>()(
   "VerificationOtpConfig",
   {
-    effect: Effect.gen(function* () {
-      const appUrl = yield* Config.string("VITE_APP_URL").pipe(
+    make: Effect.gen(function* () {
+      const appUrl = yield* Config.string("VITE_APP_URL").asEffect().pipe(
         Effect.mapError(
           () => new InternalServerError({ message: "Missing VITE_APP_URL" })
         )
       );
-      const secret = yield* Config.string("AUTH_ENCRYPTION_KEY").pipe(
+      const secret = yield* Config.string("AUTH_ENCRYPTION_KEY")
+        .asEffect()
+        .pipe(
         Effect.mapError(
           () =>
             new InternalServerError({ message: "Missing AUTH_ENCRYPTION_KEY" })
@@ -24,5 +26,5 @@ export class VerificationOtpConfig extends Effect.Service<VerificationOtpConfig>
     }),
   }
 ) {
-  static readonly layer = this.Default;
+  static readonly layer = Layer.effect(this, this.make);
 }
