@@ -158,11 +158,13 @@ jobs:
             ${{ steps.release-meta.outputs.tags }}
             ${{ steps.workflow-run-meta.outputs.tags }}
         run: |
+          image_ref="$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')"
+
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
-            tag_name="${tag#${IMAGE}:}"
+            tag_name="${tag#${image_ref}:}"
             docker buildx imagetools create \
               --tag "$tag" \
-              "${IMAGE}:${tag_name}-amd64" \
-              "${IMAGE}:${tag_name}-arm64"
+              "${image_ref}:${tag_name}-amd64" \
+              "${image_ref}:${tag_name}-arm64"
           done <<< "$TAGS"
