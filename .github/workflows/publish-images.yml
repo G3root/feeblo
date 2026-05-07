@@ -55,11 +55,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
+      - name: Extract release metadata
+        id: release-meta
+        if: ${{ github.event_name == 'release' }}
         uses: docker/metadata-action@v6
         with:
-          context: git
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
           flavor: |
             suffix=-${{ matrix.platform.arch }},onlatest=true
@@ -69,6 +69,19 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+
+      - name: Extract workflow run metadata
+        id: workflow-run-meta
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: docker/metadata-action@v6
+        with:
+          context: git
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
+          flavor: |
+            suffix=-${{ matrix.platform.arch }},onlatest=true
+          tags: |
+            type=sha,prefix=
+            type=raw,value=${{ github.event.workflow_run.head_branch }}
             type=raw,value=nightly,enable=${{ github.event.workflow_run.head_branch == 'main' }}
 
       - name: Build and push
@@ -78,8 +91,12 @@ jobs:
           file: apps/${{ matrix.service }}/Dockerfile
           platforms: ${{ matrix.platform.os }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ steps.release-meta.outputs.tags }}
+            ${{ steps.workflow-run-meta.outputs.tags }}
+          labels: |
+            ${{ steps.release-meta.outputs.labels }}
+            ${{ steps.workflow-run-meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.platform.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}-${{ matrix.platform.arch }}
           build-args: |
@@ -116,11 +133,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
+      - name: Extract release metadata
+        id: release-meta
+        if: ${{ github.event_name == 'release' }}
         uses: docker/metadata-action@v6
         with:
-          context: git
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
           tags: |
             type=sha,prefix=
@@ -128,12 +145,25 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+
+      - name: Extract workflow run metadata
+        id: workflow-run-meta
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: docker/metadata-action@v6
+        with:
+          context: git
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=${{ github.event.workflow_run.head_branch }}
             type=raw,value=nightly,enable=${{ github.event.workflow_run.head_branch == 'main' }}
 
       - name: Create multi-platform manifest
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
-          TAGS: ${{ steps.meta.outputs.tags }}
+          TAGS: |
+            ${{ steps.release-meta.outputs.tags }}
+            ${{ steps.workflow-run-meta.outputs.tags }}
         run: |
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
