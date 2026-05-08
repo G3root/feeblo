@@ -1,48 +1,56 @@
-FROM node:24 AS base
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim AS base
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PNPM_HOME/bin:$PATH
 RUN corepack enable
 
-FROM base AS turbo-cli
-RUN pnpm add -g turbo
 
-FROM turbo-cli AS builder
+FROM base AS prepare
+# Set working directory
 WORKDIR /app
+RUN pnpm add -g turbo
 COPY . .
 RUN turbo prune @feeblo/server --docker
 
-FROM base AS installer
+# Add lockfile and package.json's of isolated subworkspace
+FROM base AS builder
 WORKDIR /app
 
-COPY --from=builder /app/out/json/ .
+# First install dependencies (as they change less often)
+COPY --from=prepare /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 
-COPY --from=builder /app/out/full/ .
+# Build the project and its dependencies
+COPY --from=prepare /app/out/full/ .
 
-ARG PUBLIC_APP_URL=""
-ARG PUBLIC_API_URL=""
 ENV NODE_ENV=production
-ENV PUBLIC_APP_URL="${PUBLIC_APP_URL}"
-ENV PUBLIC_API_URL="${PUBLIC_API_URL}"
 
-WORKDIR /app/apps/server
-RUN pnpm exec rolldown -c
+RUN pnpm turbo build
 
-FROM base AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 
+ARG APP_RELEASE="dev"
 ARG PUBLIC_APP_URL=""
 ARG PUBLIC_API_URL=""
 
 ENV NODE_ENV=production
 ENV SERVER_PORT=8080
+ENV APP_RELEASE="${APP_RELEASE}"
 ENV PUBLIC_APP_URL="${PUBLIC_APP_URL}"
 ENV PUBLIC_API_URL="${PUBLIC_API_URL}"
 
-COPY --from=installer /app/apps/server/dist /app/apps/server/dist
+# Don't run production as root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 server
+USER server
 
-WORKDIR /app/apps/server
+
+COPY --from=builder --chown=server:nodejs /app/apps/server/dist ./dist
+COPY --from=builder --chown=server:nodejs /app/packages/db/src/migrations ./migrations
+
+
 EXPOSE 8080
 
 CMD ["sh", "-c", "export SERVER_PORT=${SERVER_PORT:-${PORT:-8080}}; exec node ./dist/index.js"]
