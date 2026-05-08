@@ -13,6 +13,7 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@feeblo/db-migrator": "workspace:*",
     "@effect/platform-node": "catalog:",
     "effect": "catalog:"
   },

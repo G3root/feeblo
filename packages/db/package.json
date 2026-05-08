@@ -31,7 +31,6 @@
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
-    "pg": "catalog:",
     "zod": "catalog:",
     "postgres": "catalog:"
   },

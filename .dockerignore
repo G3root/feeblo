@@ -20,3 +20,4 @@ build
 tmp
 temp
 *.tsbuildinfo
+out

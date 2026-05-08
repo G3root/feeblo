@@ -31,13 +31,13 @@ RUN pnpm turbo build
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 
-ARG APP_RELEASE="dev"
+ARG PUBLIC_APP_RELEASE="dev"
 ARG PUBLIC_APP_URL=""
 ARG PUBLIC_API_URL=""
 
 ENV NODE_ENV=production
 ENV SERVER_PORT=8080
-ENV APP_RELEASE="${APP_RELEASE}"
+ENV PUBLIC_APP_RELEASE="${PUBLIC_APP_RELEASE}"
 ENV PUBLIC_APP_URL="${PUBLIC_APP_URL}"
 ENV PUBLIC_API_URL="${PUBLIC_API_URL}"
 
@@ -49,8 +49,9 @@ USER server
 
 COPY --from=builder --chown=server:nodejs /app/apps/server/dist ./dist
 COPY --from=builder --chown=server:nodejs /app/packages/db/src/migrations ./migrations
+COPY --from=builder --chown=server:nodejs /app/packages/db-migrator/dist ./migrate
 
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "export SERVER_PORT=${SERVER_PORT:-${PORT:-8080}}; exec node ./dist/index.js"]
+CMD ["sh", "-c", "export SERVER_PORT=${SERVER_PORT:-${PORT:-8080}}; node ./migrate/index.js && exec node ./dist/index.js"]

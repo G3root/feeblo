@@ -5,6 +5,7 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
     apiUrl: env.PUBLIC_API_URL,
     appUrl: env.PUBLIC_APP_URL,
     appRootDomain: env.PUBLIC_APP_ROOT_DOMAIN,
+    appRelease: env.PUBLIC_APP_RELEASE ?? "unknown",
   };
 }
 

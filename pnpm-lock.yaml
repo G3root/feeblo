@@ -75,9 +75,6 @@ catalogs:
     effect:
       specifier: ^4.0.0-beta.60
       version: 4.0.0-beta.60
-    pg:
-      specifier: ^8.20.0
-      version: 8.20.0
     postgres:
       specifier: ^3.4.7
       version: 3.4.9
@@ -164,6 +161,9 @@ importers:
       '@feeblo/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@feeblo/db-migrator':
+        specifier: workspace:*
+        version: link:../../packages/db-migrator
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -461,9 +461,6 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.60
-      pg:
-        specifier: 'catalog:'
-        version: 8.20.0
       postgres:
         specifier: 'catalog:'
         version: 3.4.9
@@ -495,6 +492,25 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+
+  packages/db-migrator:
+    dependencies:
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(@cloudflare/workers-types@4.20260505.1)(@types/pg@8.20.0)(kysely@0.28.17)(pg@8.20.0)(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.9
+    devDependencies:
+      '@feeblo/config':
+        specifier: workspace:*
+        version: link:../config
+      rolldown:
+        specifier: 'catalog:'
+        version: 1.0.0-rc.16
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
 
   packages/domain:
     dependencies:

@@ -64,6 +64,10 @@ export default defineConfig({
         optional: false,
         min: 2,
       }),
+      PUBLIC_APP_RELEASE: envField.string({
+        context: "server",
+        access: "secret",
+      }),
     },
   },
 
