@@ -1,43 +1,58 @@
-FROM node:24 AS base
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim AS base
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PNPM_HOME/bin:$PATH
 RUN corepack enable
 
-FROM base AS turbo-cli
-RUN pnpm add -g turbo
 
-FROM turbo-cli AS builder
+FROM base AS prepare
+# Set working directory
 WORKDIR /app
+RUN pnpm add -g turbo
 COPY . .
 RUN turbo prune @feeblo/web --docker
 
-FROM base AS installer
+# Add lockfile and package.json's of isolated subworkspace
+FROM base AS builder
 WORKDIR /app
 
-COPY --from=builder /app/out/json/ .
-RUN pnpm install --frozen-lockfile
+# First install dependencies (as they change less often)
+COPY --from=prepare /app/out/json/ .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-COPY --from=builder /app/out/full/ .
+# Build the project and its dependencies
+COPY --from=prepare /app/out/full/ .
 
-ENV CI=true
 ENV NODE_ENV=production
 
-WORKDIR /app/apps/web
-RUN pnpm exec astro build
+RUN pnpm turbo build
 
-FROM base AS runner
+FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 
-ENV CI=true
+
+ARG APP_RELEASE="dev"
+ARG PUBLIC_APP_URL=""
+ARG PUBLIC_API_URL=""
+ARG PUBLIC_APP_ROOT_DOMAIN=""
+
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=4321
+ENV APP_RELEASE="${APP_RELEASE}"
+ENV PUBLIC_APP_URL="${PUBLIC_APP_URL}"
+ENV PUBLIC_API_URL="${PUBLIC_API_URL}"
+ENV PUBLIC_APP_ROOT_DOMAIN="${PUBLIC_APP_ROOT_DOMAIN}"
+ENV CLOUDFLARE_ADAPTER=false
 
-COPY --from=installer /app /app
+# Don't run production as root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 astro
+USER astro
 
-WORKDIR /app/apps/web
+COPY --from=builder --chown=astro:nodejs /app/apps/web/dist ./dist
+
 EXPOSE 4321
 
 CMD ["node", "./dist/server/entry.mjs"]
-

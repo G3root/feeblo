@@ -49,14 +49,20 @@ export default defineConfig({
       PUBLIC_API_URL: envField.string({
         context: "server",
         access: "secret",
+        optional: false,
+        min: 2,
       }),
       PUBLIC_APP_URL: envField.string({
         context: "server",
         access: "secret",
+        optional: false,
+        min: 2,
       }),
       PUBLIC_APP_ROOT_DOMAIN: envField.string({
         context: "server",
         access: "secret",
+        optional: false,
+        min: 2,
       }),
     },
   },

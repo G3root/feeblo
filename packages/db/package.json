@@ -17,6 +17,7 @@
     "db:generate": "dotenvx run -f ../../.env -- drizzle-kit generate",
     "db:studio": "dotenvx run -f ../../.env -- drizzle-kit studio",
     "db:migrate": "dotenvx run -f ../../.env -- drizzle-kit migrate",
+    "db:migrate:docker": "drizzle-kit migrate",
     "db:pull": "dotenvx run -f ../../.env -- drizzle-kit pull",
     "db:nuke": "dotenvx run -f ../../.env -- tsx nuke.ts",
     "db:seed": "dotenvx run -f ../../.env -- tsx seed.ts",
