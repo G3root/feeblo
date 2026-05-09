@@ -52,6 +52,10 @@ const HealthRouter = HttpRouter.use((router) =>
   router.add("GET", "/health", HttpServerResponse.text("OK"))
 );
 
+const RootRouter = HttpRouter.use((router) =>
+  router.add("GET", "/", HttpServerResponse.text("Hello world"))
+);
+
 const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
@@ -82,6 +86,7 @@ const program = Effect.gen(function* () {
   };
 
   const AllRoutes = Layer.mergeAll(
+    RootRouter,
     HealthRouter,
     RpcRoute,
     HttpRoute,
