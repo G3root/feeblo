@@ -20,7 +20,7 @@ env:
 
 jobs:
   build-and-push:
-    name: Build and Push ${{ matrix.service }} (${{ matrix.platform.arch }})
+    name: Build and Push ${{ matrix.service.path }} (${{ matrix.platform.arch }})
     if: ${{ github.event_name == 'release' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ${{ matrix.platform.runner }}
     timeout-minutes: 30
@@ -30,7 +30,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [server, web]
+        service:
+          - path: server
+            image: feeblo-server
+          - path: web
+            image: feeblo-web
         platform:
           - arch: amd64
             os: linux/amd64
@@ -60,7 +64,7 @@ jobs:
         if: ${{ github.event_name == 'release' }}
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           flavor: |
             suffix=-${{ matrix.platform.arch }},onlatest=true
           tags: |
@@ -75,7 +79,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' }}
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           flavor: |
             suffix=-${{ matrix.platform.arch }},onlatest=true
           tags: |
@@ -87,7 +91,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/${{ matrix.service }}/Dockerfile
+          file: apps/${{ matrix.service.path }}/Dockerfile
           platforms: ${{ matrix.platform.os }}
           push: true
           build-args: |
@@ -98,11 +102,11 @@ jobs:
           labels: |
             ${{ steps.release-meta.outputs.labels }}
             ${{ steps.workflow-run-meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.platform.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}-${{ matrix.platform.arch }}
+          cache-from: type=gha,scope=${{ matrix.service.path }}-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.path }}-${{ matrix.platform.arch }}
 
   merge-manifests:
-    name: Merge ${{ matrix.service }} Manifest
+    name: Merge ${{ matrix.service.path }} Manifest
     needs: build-and-push
     if: ${{ github.event_name == 'release' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
@@ -111,7 +115,11 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [server, web]
+        service:
+          - path: server
+            image: feeblo-server
+          - path: web
+            image: feeblo-web
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -134,7 +142,7 @@ jobs:
         if: ${{ github.event_name == 'release' }}
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           tags: |
             type=sha,prefix=
             type=ref,event=branch
@@ -147,7 +155,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' }}
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           tags: |
             type=sha,prefix=
             type=raw,value=${{ github.event.workflow_run.head_branch }}
@@ -155,7 +163,7 @@ jobs:
 
       - name: Create multi-platform manifest
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           TAGS: |
             ${{ steps.release-meta.outputs.tags }}
             ${{ steps.workflow-run-meta.outputs.tags }}
