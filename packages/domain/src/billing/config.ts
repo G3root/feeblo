@@ -7,7 +7,7 @@ const PolarModeConfig = Config.schema(
 
 export class PolarConfig extends Context.Service<PolarConfig>()("PolarConfig", {
   make: Effect.gen(function* () {
-    const appUrl = yield* Config.string("PUBLIC_APP_URL");
+    const appUrl = yield* Config.string("APP_URL");
     const accessToken = yield* Config.redacted("POLAR_ACCESS_TOKEN").pipe(
       Config.option
     );

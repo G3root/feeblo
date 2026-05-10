@@ -4,8 +4,8 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
   {
     make: Effect.gen(function* () {
-      const appUrl = yield* Config.string("PUBLIC_APP_URL");
-      const apiUrl = yield* Config.string("PUBLIC_API_URL");
+      const appUrl = yield* Config.string("APP_URL");
+      const apiUrl = yield* Config.string("API_URL");
 
       return {
         apiUrl,

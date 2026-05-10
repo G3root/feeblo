@@ -95,7 +95,7 @@ jobs:
           platforms: ${{ matrix.platform.os }}
           push: true
           build-args: |
-            PUBLIC_APP_RELEASE=${{ github.event.release.tag_name || github.event.workflow_run.head_sha || github.sha }}
+            APP_RELEASE=${{ github.event.release.tag_name || github.event.workflow_run.head_sha || github.sha }}
           tags: |
             ${{ steps.release-meta.outputs.tags }}
             ${{ steps.workflow-run-meta.outputs.tags }}

@@ -46,27 +46,25 @@ export default defineConfig({
 
   env: {
     schema: {
-      PUBLIC_API_URL: envField.string({
+      API_URL: envField.string({
         context: "server",
         access: "secret",
         optional: false,
-        min: 2,
       }),
-      PUBLIC_APP_URL: envField.string({
+      APP_URL: envField.string({
         context: "server",
         access: "secret",
         optional: false,
-        min: 2,
       }),
-      PUBLIC_APP_ROOT_DOMAIN: envField.string({
+      APP_ROOT_DOMAIN: envField.string({
         context: "server",
         access: "secret",
         optional: false,
-        min: 2,
       }),
-      PUBLIC_APP_RELEASE: envField.string({
+      APP_RELEASE: envField.string({
         context: "server",
         access: "secret",
+        optional: true,
       }),
     },
   },

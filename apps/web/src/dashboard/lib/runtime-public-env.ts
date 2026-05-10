@@ -2,10 +2,10 @@ type ProcessEnv = Record<string, string>;
 
 function parseRuntimePublicEnv(env: ProcessEnv) {
   return {
-    apiUrl: env.PUBLIC_API_URL,
-    appUrl: env.PUBLIC_APP_URL,
-    appRootDomain: env.PUBLIC_APP_ROOT_DOMAIN,
-    appRelease: env.PUBLIC_APP_RELEASE ?? "unknown",
+    apiUrl: env.API_URL,
+    appUrl: env.APP_URL,
+    appRootDomain: env.APP_ROOT_DOMAIN,
+    appRelease: env.APP_RELEASE ?? "unknown",
   };
 }
 
