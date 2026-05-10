@@ -21,5 +21,8 @@
       "persist": true,
       "head_sampling_rate": 1
     }
+  },
+  "secrets": {
+    "required": ["API_URL", "APP_URL", "APP_ROOT_DOMAIN"]
   }
 }
