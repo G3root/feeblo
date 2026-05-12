@@ -7,13 +7,14 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
+import { getSessionCookieName } from "../session-cookie";
 import { Auth, CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { MembershipPolicy } from "./policies";
 import { MembershipRepository } from "./repository";
 import { MembershipRpcs } from "./rpcs";
 
-const SESSION_COOKIE_KEY = "better-auth.session_token";
+const SESSION_COOKIE_KEY = getSessionCookieName();
 
 const toSessionHeaders = (token: string) =>
   new Headers({

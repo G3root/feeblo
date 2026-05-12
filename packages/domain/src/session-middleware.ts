@@ -1,9 +1,11 @@
+import { parseCookies } from "better-auth";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi";
 import { RpcMiddleware } from "effect/unstable/rpc";
 import { UnauthorizedError } from "./rpc-errors";
+import { getSessionCookieName } from "./session-cookie";
 
-const SESSION_COOKIE_KEY = "better-auth.session_token";
+const sessionCookie = getSessionCookieName();
 
 //TODO: infer session later
 export type Session = {
@@ -70,7 +72,7 @@ export class OptionalAuthMiddleware extends RpcMiddleware.Service<
   OptionalAuthMiddleware,
   { provides: OptionalCurrentSession }
 >()("@feeblo/api/OptionalAuthMiddleware", {
-  error: UnauthorizedError as never,
+  error: UnauthorizedError,
 }) {}
 
 function getValidatedSessionFromToken(
@@ -85,7 +87,7 @@ function getValidatedSessionFromToken(
       try: () =>
         auth.api.getSession({
           headers: new Headers({
-            cookie: `${SESSION_COOKIE_KEY}=${token}`,
+            cookie: `${sessionCookie}=${token}`,
           }),
         }),
       catch: () => new UnauthorizedError({ message: "Failed to get session" }),
@@ -103,11 +105,11 @@ function getSessionTokenFromCookieHeader(
   if (!cookieHeader) {
     return undefined;
   }
-  const match = cookieHeader.match(
-    new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_KEY}=([^;]*)`)
-  );
-  const value = match?.[1];
-  return value ? decodeURIComponent(value.trim()) : undefined;
+
+  const parsedCookie = parseCookies(cookieHeader);
+  const token = parsedCookie.get(sessionCookie);
+
+  return token;
 }
 
 export const AuthMiddlewareLive = Layer.effect(
@@ -162,7 +164,7 @@ export class HttpApiAuthMiddleware extends HttpApiMiddleware.Service<
   security: {
     cookie: HttpApiSecurity.apiKey({
       in: "cookie",
-      key: SESSION_COOKIE_KEY,
+      key: sessionCookie,
     }),
   },
 }) {}
