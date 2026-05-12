@@ -1,4 +1,4 @@
-import { parseCookies } from "better-auth";
+import { parseCookie } from "cookie-es";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi";
 import { RpcMiddleware } from "effect/unstable/rpc";
@@ -106,10 +106,11 @@ function getSessionTokenFromCookieHeader(
     return undefined;
   }
 
-  const parsedCookie = parseCookies(cookieHeader);
-  const token = parsedCookie.get(sessionCookie);
+  const parsedCookie = parseCookie(cookieHeader);
 
-  return token;
+  const value = parsedCookie?.[sessionCookie];
+
+  return value;
 }
 
 export const AuthMiddlewareLive = Layer.effect(
