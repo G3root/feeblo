@@ -45,6 +45,7 @@ export const initAuthHandler = () =>
       googleClientId,
       googleClientSecret,
       secret,
+      signUpEnabled,
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
@@ -65,6 +66,7 @@ export const initAuthHandler = () =>
 
         schema,
       }),
+
       baseURL: appUrl,
       secret: Redacted.value(secret),
       ...((githubClientId._tag === "Some" &&
@@ -78,6 +80,8 @@ export const initAuthHandler = () =>
                     github: {
                       clientId: githubClientId.value,
                       clientSecret: githubClientSecret.value,
+                      disableSignUp: !signUpEnabled,
+                      disableImplicitSignUp: !signUpEnabled,
                     },
                   }
                 : {}),
@@ -88,6 +92,8 @@ export const initAuthHandler = () =>
                       prompt: "select_account",
                       clientId: googleClientId.value,
                       clientSecret: googleClientSecret.value,
+                      disableSignUp: !signUpEnabled,
+                      disableImplicitSignUp: !signUpEnabled,
                     },
                   }
                 : {}),
@@ -111,7 +117,8 @@ export const initAuthHandler = () =>
         autoSignInAfterVerification: true,
       },
       emailAndPassword: {
-        enabled: true,
+        enabled: signUpEnabled,
+        disableSignUp: !signUpEnabled,
 
         async sendResetPassword(data) {
           const { createPasswordResetEmail } = await loadPasswordResetEmail();

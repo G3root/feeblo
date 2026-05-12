@@ -1,10 +1,9 @@
-import { TanStackDevtools } from "@tanstack/react-devtools";
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 
 const RootLayout = () => (
   <>
     <Outlet />
-    <TanStackDevtools
+    {/* <TanStackDevtools
       config={{
         position: "bottom-right",
       }}
@@ -17,7 +16,7 @@ const RootLayout = () => (
       //   TanStackQueryDevtools,
       //   formDevtoolsPlugin(),
       // ]}
-    />
+    /> */}
   </>
 );
 

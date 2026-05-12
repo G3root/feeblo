@@ -10,6 +10,9 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
     const googleClientId = yield* optionalString("GOOGLE_CLIENT_ID");
     const googleClientSecret = yield* optionalString("GOOGLE_CLIENT_SECRET");
+    const signUpEnabled = yield* Config.boolean("AUTH_SIGN_UP_ENABLED")
+      .pipe(Config.withDefault(true))
+      .asEffect();
 
     return {
       apiUrl,
@@ -19,6 +22,7 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
       googleClientId,
       googleClientSecret,
       secret,
+      signUpEnabled,
     } as const;
   }),
 }) {
