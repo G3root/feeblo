@@ -55,9 +55,13 @@
     "**/routeTree.gen.ts": true
   },
   "files.watcherExclude": {
-    "**/routeTree.gen.ts": true
+    "**/routeTree.gen.ts": true,
+    "repos/**": true
   },
   "search.exclude": {
-    "**/routeTree.gen.ts": true
-  }
+    "**/routeTree.gen.ts": true,
+    "repos/**": true
+  },
+
+  "js/ts.preferences.autoImportFileExcludePatterns": ["repos/**"]
 }

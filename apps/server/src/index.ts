@@ -10,10 +10,7 @@ import { Database } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
-import {
-  Auth,
-  HttpApiAuthMiddlewareLive,
-} from "@feeblo/domain/session-middleware";
+import { Auth } from "@feeblo/domain/session-middleware";
 import { Config, Effect, Layer } from "effect";
 import {
   HttpEffect,
@@ -111,7 +108,6 @@ const program = Effect.gen(function* () {
       maxParamLength: 500,
     },
   }).pipe(
-    Layer.provide(HttpApiAuthMiddlewareLive),
     Layer.provide(AuthLayer),
     Layer.provide(ServiceLayers),
     Layer.provide(NodeFileSystem.layer),

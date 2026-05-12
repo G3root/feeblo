@@ -8,8 +8,11 @@ import {
   InternalServerError,
   UnauthorizedError,
 } from "../rpc-errors";
-import { S3UploadService } from "../services/s3";
-import { CurrentSession } from "../session-middleware";
+import { S3UploadService, S3UploadServiceLive } from "../services/s3";
+import {
+  currentHttpApiSession,
+  HttpApiAuthMiddlewareLive,
+} from "../session-middleware";
 import { OrganizationRepository } from "./repository";
 
 const MAX_ORGANIZATION_LOGO_BYTES = 5 * 1024 * 1024;
@@ -27,7 +30,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
       "uploadOrganizationLogo",
       ({ payload: { file, organizationId } }) => {
         return Effect.gen(function* () {
-          const session = yield* CurrentSession;
+          const session = yield* currentHttpApiSession;
           const repository = yield* OrganizationRepository;
           const membership = yield* repository.findMemberRole({
             organizationId,
@@ -99,6 +102,14 @@ export const OrganizationApiLive = HttpApiBuilder.group(
 
           return uploaded;
         }).pipe(
+          Effect.provide([OrganizationRepository.layer, S3UploadServiceLive]),
+          Effect.catchTag("ConfigError", () =>
+            Effect.fail(
+              new InternalServerError({
+                message: "Upload storage is not configured",
+              })
+            )
+          ),
           Effect.catchTag("DatabaseError", () =>
             Effect.fail(
               new InternalServerError({
@@ -109,7 +120,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
         );
       }
     )
-).pipe(Layer.provide(OrganizationRepository.layer));
+).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
 
 function getFileExtension(contentType: string): string | null {
   switch (contentType) {

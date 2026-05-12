@@ -1,11 +1,14 @@
 import { Database, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
-import { S3UploadService } from "../services/s3";
-import { CurrentSession } from "../session-middleware";
+import { S3UploadService, S3UploadServiceLive } from "../services/s3";
+import {
+  currentHttpApiSession,
+  HttpApiAuthMiddlewareLive,
+} from "../session-middleware";
 
 const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -20,7 +23,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers.handle("uploadProfilePicture", ({ payload: { file } }) => {
       return Effect.gen(function* () {
-        const session = yield* CurrentSession;
+        const session = yield* currentHttpApiSession;
 
         if (!ALLOWED_CONTENT_TYPES.has(file.contentType)) {
           return yield* new BadRequestError({
@@ -75,6 +78,14 @@ export const ProfileApiLive = HttpApiBuilder.group(
 
         return uploaded;
       }).pipe(
+        Effect.provide(S3UploadServiceLive),
+        Effect.catchTag("ConfigError", () =>
+          Effect.fail(
+            new InternalServerError({
+              message: "Upload storage is not configured",
+            })
+          )
+        ),
         Effect.catchTag("DatabaseError", () =>
           Effect.fail(
             new InternalServerError({
@@ -84,7 +95,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
         )
       );
     })
-);
+).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
 
 function getFileExtension(contentType: string): string | null {
   switch (contentType) {

@@ -12,11 +12,7 @@ import {
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { Mailer } from "@feeblo/transactional/mailer";
 import { polar, webhooks } from "@polar-sh/better-auth";
-import {
-  type Auth as BetterAuth,
-  type BetterAuthOptions,
-  betterAuth,
-} from "better-auth";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import {
@@ -27,7 +23,7 @@ import {
   organization,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
-import { type Config, Effect, Layer, ManagedRuntime, Redacted } from "effect";
+import { Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { AuthConfig } from "./config";
 
 const loadPasswordResetEmail = () =>
@@ -39,11 +35,7 @@ const loadOrganizationInvitationEmail = () =>
 const loadVerificationOtpEmail = () =>
   import("@feeblo/transactional/templates/verification-otp");
 
-export const initAuthHandler: () => Effect.Effect<
-  BetterAuth,
-  Config.ConfigError,
-  Database.Database
-> = () =>
+export const initAuthHandler = () =>
   Effect.gen(function* () {
     const {
       appUrl,
@@ -378,7 +370,7 @@ export const initAuthHandler: () => Effect.Effect<
         }),
       ],
     } satisfies BetterAuthOptions;
-    return betterAuth<BetterAuthOptions>(config);
+    return betterAuth(config);
   }).pipe(
     Effect.provide(
       Layer.mergeAll(

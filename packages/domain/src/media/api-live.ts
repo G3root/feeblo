@@ -1,9 +1,12 @@
-import { Effect, FileSystem } from "effect";
+import { Effect, FileSystem, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
-import { S3UploadService } from "../services/s3";
-import { CurrentSession } from "../session-middleware";
+import { S3UploadService, S3UploadServiceLive } from "../services/s3";
+import {
+  currentHttpApiSession,
+  HttpApiAuthMiddlewareLive,
+} from "../session-middleware";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
@@ -21,7 +24,7 @@ export const MediaApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers.handle("uploadMedia", ({ payload: { file } }) =>
       Effect.gen(function* () {
-        const session = yield* CurrentSession;
+        const session = yield* currentHttpApiSession;
 
         const kind = getMediaKind(file.contentType);
         if (!kind) {
@@ -72,9 +75,18 @@ export const MediaApiLive = HttpApiBuilder.group(
           );
 
         return { ...uploaded, kind };
-      })
+      }).pipe(
+        Effect.provide(S3UploadServiceLive),
+        Effect.catchTag("ConfigError", () =>
+          Effect.fail(
+            new InternalServerError({
+              message: "Upload storage is not configured",
+            })
+          )
+        )
+      )
     )
-);
+).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
 
 function getMediaKind(contentType: string): MediaKind | null {
   if (CONTENT_TYPE_BY_KIND.image.has(contentType)) {

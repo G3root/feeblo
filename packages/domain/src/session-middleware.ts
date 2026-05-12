@@ -54,6 +54,10 @@ export class CurrentSession extends Context.Service<CurrentSession, Session>()(
   "@feeblo/domain/CurrentSession"
 ) {}
 
+export const currentHttpApiSession = Effect.context<never>().pipe(
+  Effect.map((context) => Context.getUnsafe(context, CurrentSession))
+);
+
 /** Session when authenticated; None when unauthenticated. Use for optional-auth routes (e.g. PostListPublic). */
 export class OptionalCurrentSession extends Context.Service<
   OptionalCurrentSession,
@@ -118,7 +122,7 @@ export const AuthMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const auth = yield* Auth;
 
-    return (effect, options) => {
+    return AuthMiddleware.of((effect, options) => {
       const cookieHeader =
         typeof options.headers?.cookie === "string"
           ? options.headers.cookie
@@ -130,7 +134,7 @@ export const AuthMiddlewareLive = Layer.effect(
           effect.pipe(Effect.provideService(CurrentSession, session))
         )
       );
-    };
+    });
   })
 );
 
@@ -139,7 +143,7 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const auth = yield* Auth;
 
-    return (effect, options) => {
+    return OptionalAuthMiddleware.of((effect, options) => {
       const cookieHeader =
         typeof options.headers?.cookie === "string"
           ? options.headers.cookie
@@ -153,7 +157,7 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
           effect.pipe(Effect.provideService(OptionalCurrentSession, session))
         )
       );
-    };
+    });
   })
 );
 

@@ -35,7 +35,9 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
         Effect.gen(function* () {
           return yield* repository.findManyPublished(args);
         }).pipe(
-          Policy.withPolicy(sitePolicy.canViewChangelog(args.organizationId)),
+          Policy.withPublicPolicy(
+            sitePolicy.canViewChangelog(args.organizationId)
+          ),
           withRemapDbErrors("Changelog", "select")
         ),
 
