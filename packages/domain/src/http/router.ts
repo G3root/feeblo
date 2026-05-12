@@ -1,0 +1,16 @@
+import { Layer } from "effect";
+import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { AuthApiLive } from "../auth/api-live";
+import { MediaApiLive } from "../media/api-live";
+import { OrganizationApiLive } from "../organization/api-live";
+import { ProfileApiLive } from "../profile/api-live";
+import { Api } from "./api";
+
+export const HttpRoute = HttpApiBuilder.layer(Api, {
+  openapiPath: "/docs/openapi.json",
+}).pipe(
+  Layer.provide(AuthApiLive),
+  Layer.provide(MediaApiLive),
+  Layer.provide(OrganizationApiLive),
+  Layer.provide(ProfileApiLive)
+);
