@@ -69,9 +69,9 @@ export class MailerConfig extends Context.Service<MailerConfig>()(
       const password = yield* Config.redacted("SMTP_PASSWORD")
         .pipe(Config.option)
         .asEffect();
-      const defaultFrom = yield* optionalString("MAILER_FROM").pipe(
+      const defaultFrom = yield* optionalString("SMTP_FROM_ADDRESS").pipe(
         Effect.map((value) =>
-          value._tag === "Some" ? value.value : "Feeblo <noreply@feeblo.com>"
+          value._tag === "Some" ? value.value : "hello@feeblo.com"
         )
       );
 
