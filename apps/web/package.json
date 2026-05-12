@@ -59,7 +59,6 @@
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "cmdk": "^1.1.1",
-    "cookie-es": "^3.1.1",
     "dotenv": "catalog:",
     "effect": "catalog:",
     "input-otp": "^1.4.2",

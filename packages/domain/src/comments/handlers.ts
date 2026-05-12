@@ -39,14 +39,12 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             withRemapDbErrors("Comment", "select")
           ),
       CommentListPublic: (args: TCommentList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.findManyPublic({
+        repository
+          .findManyPublic({
             organizationId: args.organizationId,
             postId: args.postId,
-          });
-        }).pipe(withRemapDbErrors("Comment", "select")),
+          })
+          .pipe(withRemapDbErrors("Comment", "select")),
       CommentCreate: (args: TCommentCreate) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;

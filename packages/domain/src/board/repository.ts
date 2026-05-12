@@ -154,8 +154,7 @@ const makeBoardRepository = Effect.gen(function* () {
       }),
 
     delete: ({ id, organizationId }: TBoardDelete) =>
-      Effect.gen(function* () {
-        yield* db.makeQuery((execute, input: TBoardDelete) =>
+      db.makeQuery((execute, input: TBoardDelete) =>
           execute((client) =>
             client
               .delete(schema.board)
@@ -166,8 +165,7 @@ const makeBoardRepository = Effect.gen(function* () {
                 )
               )
           )
-        )({ id, organizationId });
-      }),
+        )({ id, organizationId }).pipe(Effect.asVoid),
     update: (args: TBoardUpdate) =>
       Effect.gen(function* () {
         const { id, organizationId, ...rest } = args;

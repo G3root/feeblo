@@ -3,16 +3,16 @@ import { Config, Context, Effect, Layer } from "effect";
 
 export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
   make: Effect.gen(function* () {
-    const appUrl = yield* Config.string("APP_URL").asEffect();
-    const apiUrl = yield* Config.string("API_URL").asEffect();
-    const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY").asEffect();
+    const appUrl = yield* Config.string("APP_URL");
+    const apiUrl = yield* Config.string("API_URL");
+    const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
     const githubClientId = yield* optionalString("GITHUB_CLIENT_ID");
     const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
     const googleClientId = yield* optionalString("GOOGLE_CLIENT_ID");
     const googleClientSecret = yield* optionalString("GOOGLE_CLIENT_SECRET");
-    const signUpEnabled = yield* Config.boolean("AUTH_SIGN_UP_ENABLED")
-      .pipe(Config.withDefault(true))
-      .asEffect();
+    const signUpEnabled = yield* Config.boolean("AUTH_SIGN_UP_ENABLED").pipe(
+      Config.withDefault(true)
+    );
 
     return {
       apiUrl,

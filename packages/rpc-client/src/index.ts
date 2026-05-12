@@ -40,7 +40,7 @@ export const createRpcLive = (apiUrl: string) =>
 
 export const withRpc = <A, E, R>(
   cb: (rpc: RpcClientType) => Effect.Effect<A, E, R>
-) => Effect.flatMap(Rpc.asEffect(), cb);
+) => Effect.flatMap(Rpc, cb);
 
 export const createRuntimeLayer = (apiUrl: string) =>
   Layer.mergeAll(createRpcLive(apiUrl), FetchWithCredentials);

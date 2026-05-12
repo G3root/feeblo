@@ -50,6 +50,9 @@ export const initAuthHandler = () =>
     const polarService = yield* PolarService;
 
     const db = yield* Database.Database;
+    const context = yield* Effect.context<
+      Database.Database | AuthConfig | PolarService
+    >();
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
         PolarService.layer,
@@ -194,7 +197,7 @@ export const initAuthHandler = () =>
           : []),
 
         customSession(async ({ user, session }) => {
-          const memberships = await Effect.runPromise(
+          const memberships = await Effect.runPromiseWith(context)(
             db.execute((client) =>
               client
                 .select({
@@ -387,4 +390,4 @@ export const initAuthHandler = () =>
 export type Auth = Effect.Success<ReturnType<typeof initAuthHandler>>;
 export type Session = Auth["$Infer"]["Session"];
 
-export const auth = initAuthHandler();
+export const auth: ReturnType<typeof initAuthHandler> = initAuthHandler();

@@ -16,14 +16,12 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
 
     return {
       CommentReactionList: (args: TCommentReactionList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.list({
+        repository
+          .list({
             organizationId: args.organizationId,
             postId: args.postId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("CommentReaction", "select")
         ),
@@ -52,14 +50,12 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
           withRemapDbErrors("CommentReaction", "update")
         ),
       CommentReactionListPublic: (args: TCommentReactionList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.listPublic({
+        repository
+          .listPublic({
             organizationId: args.organizationId,
             postId: args.postId,
-          });
-        }).pipe(withRemapDbErrors("CommentReaction", "select")),
+          })
+          .pipe(withRemapDbErrors("CommentReaction", "select")),
       CommentReactionTogglePublic: (args: TCommentReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;

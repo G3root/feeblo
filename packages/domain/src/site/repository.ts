@@ -91,8 +91,7 @@ const makeSiteRepository = Effect.gen(function* () {
       )({ whereClause, limit: findManyArgs.limit });
     },
     update: (args: updateArgs) =>
-      Effect.gen(function* () {
-        yield* db.makeQuery((execute, input: updateArgs) =>
+      db.makeQuery((execute, input: updateArgs) =>
           execute((client) =>
             client
               .update(schema.site)
@@ -109,11 +108,9 @@ const makeSiteRepository = Effect.gen(function* () {
                 )
               )
           )
-        )(args);
-      }),
+        )(args).pipe(Effect.asVoid),
     updateHidePoweredByBranding: (args: updateHidePoweredByBrandingArgs) =>
-      Effect.gen(function* () {
-        yield* db.makeQuery((execute, input: updateHidePoweredByBrandingArgs) =>
+      db.makeQuery((execute, input: updateHidePoweredByBrandingArgs) =>
           execute((client) =>
             client
               .update(schema.site)
@@ -128,8 +125,7 @@ const makeSiteRepository = Effect.gen(function* () {
                 )
               )
           )
-        )(args);
-      }),
+        )(args).pipe(Effect.asVoid),
   };
 });
 

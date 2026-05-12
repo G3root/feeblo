@@ -3,71 +3,10 @@
 /** biome-ignore-all lint/complexity/noBannedTypes: <explanation> */
 // credits: https://github.com/CapSoftware/Cap/blob/main/packages/web-domain/src/Policy.ts
 
-import {
-  type Cause,
-  Context,
-  Data,
-  Effect,
-  type Option,
-  Result,
-  Schema,
-} from "effect";
+import { Context, Data, Effect, type Option, Schema } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
-import { dual } from "effect/Function";
 
 import { CurrentSession } from "./session-middleware";
-
-const findError = <E>(
-  self: Cause.Cause<E>
-): Result.Result<E, Cause.Cause<never>> => {
-  for (let i = 0; i < self.reasons.length; i++) {
-    const reason = self.reasons[i];
-    if (reason?._tag === "Fail") {
-      return Result.succeed(reason.error);
-    }
-  }
-  return Result.fail(self as Cause.Cause<never>);
-};
-
-const catch_: {
-  <E, B, E2, R2>(
-    f: (e: NoInfer<E>) => Effect.Effect<B, E2, R2>
-  ): <A, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | B, E2, R | R2>;
-  <A, E, R, B, E2, R2>(
-    self: Effect.Effect<A, E, R>,
-    f: (e: NoInfer<E>) => Effect.Effect<B, E2, R2>
-  ): Effect.Effect<A | B, E2, R | R2>;
-} = dual(
-  2,
-  <A, E, R, B, E2, R2>(
-    self: Effect.Effect<A, E, R>,
-    f: (a: NoInfer<E>) => Effect.Effect<B, E2, R2>
-  ): Effect.Effect<A | B, E2, R | R2> =>
-    Effect.catchCauseFilter(self, findError as any, (e: any) => f(e)) as any
-);
-
-const firstSuccessOf = <Eff extends Effect.Effect<any, any, any>>(
-  effects: Iterable<Eff>
-): Effect.Effect<
-  Effect.Success<Eff>,
-  Effect.Error<Eff>,
-  Effect.Services<Eff>
-> =>
-  Effect.suspend(() => {
-    const iterator = effects[Symbol.iterator]();
-    const state = iterator.next();
-    if (state.done) {
-      return Effect.die(new Error("Received an empty collection of effects"));
-    }
-    function loop(current: IteratorYieldResult<Eff>): Eff {
-      const next = iterator.next();
-      if (next.done) {
-        return current.value;
-      }
-      return catch_(current.value, (_) => loop(next)) as any;
-    }
-    return loop(state);
-  });
 
 export type Policy<E = never, R = never> = Effect.Effect<
   void,
@@ -95,7 +34,7 @@ export const policy = <E, R>(
     user: CurrentSession["Service"]
   ) => Effect.Effect<boolean, E | DenyAccess, R>
 ): Policy<E, R> =>
-  Effect.flatMap(CurrentSession.asEffect(), (user) =>
+  Effect.flatMap(CurrentSession, (user) =>
     Effect.flatMap(
       predicate(user).pipe(
         Effect.catchTag("DenyAccess", () => Effect.succeed(false))
@@ -114,7 +53,7 @@ export const publicPolicy = <E, R>(
   ) => Effect.Effect<boolean, E, R>
 ): PublicPolicy<E, R> =>
   Effect.gen(function* () {
-    const context = yield* Effect.context<never>();
+    const context = yield* Effect.context<CurrentSession>();
     const user = Context.getOption(context, CurrentSession);
 
     return yield* Effect.flatMap(predicate(user), (result) =>
@@ -160,7 +99,7 @@ export const all = <E, R>(
  */
 export const any = <E, R>(
   ...policies: NonEmptyReadonlyArray<Policy<E, R>>
-): Policy<E, R> => firstSuccessOf(policies);
+): Policy<E, R> => Effect.firstSuccessOf(policies);
 
 export const hasMembership = (organizationId: string): Policy =>
   policy((user) => Effect.succeed(isMember(user, organizationId)));

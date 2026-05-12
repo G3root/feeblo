@@ -62,17 +62,13 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
         }).pipe(withRemapDbErrors("Membership", "select"));
       },
       OrganizationMembersList: ({ organizationId }) =>
-        Effect.gen(function* () {
-          return yield* repository.findOrganizationMembers({ organizationId });
-        }).pipe(
+        repository.findOrganizationMembers({ organizationId }).pipe(
           Policy.withPolicy(Policy.hasMembership(organizationId)),
           withRemapDbErrors("Membership", "select")
         ),
       OrganizationInvitationsList: ({ organizationId }) =>
-        Effect.gen(function* () {
-          return yield* repository.findOrganizationInvitations({
-            organizationId,
-          });
+        repository.findOrganizationInvitations({
+          organizationId,
         }).pipe(
           Policy.withPolicy(Policy.hasMembership(organizationId)),
           withRemapDbErrors("Invitation", "select")
@@ -108,13 +104,13 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           )
         ),
       OrganizationUpdateMemberRole: ({ organizationId, memberId, role }) =>
-        Effect.gen(function* () {
-          yield* repository.updateMemberRole({
+        repository
+          .updateMemberRole({
             organizationId,
             memberId,
             role,
-          });
-        }).pipe(
+          })
+          .pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
@@ -126,14 +122,14 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
             )
           ),
           withRemapDbErrors("Membership", "update")
-        ),
+          ),
       OrganizationRemoveMember: ({ organizationId, memberId }) =>
-        Effect.gen(function* () {
-          yield* repository.deleteMember({
+        repository
+          .deleteMember({
             organizationId,
             memberId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(organizationId),
@@ -145,7 +141,7 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
             )
           ),
           withRemapDbErrors("Membership", "delete")
-        ),
+          ),
       OrganizationCancelInvitation: ({ organizationId, invitationId }) =>
         repository
           .cancelInvitation({ organizationId, invitationId })

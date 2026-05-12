@@ -16,14 +16,12 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
 
     return {
       PostReactionList: (args: TPostReactionList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.list({
+        repository
+          .list({
             postId: args.postId,
             organizationId: args.organizationId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("PostReaction", "select")
         ),
@@ -52,14 +50,12 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
           withRemapDbErrors("PostReaction", "update")
         ),
       PostReactionListPublic: (args: TPostReactionList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.listPublic({
+        repository
+          .listPublic({
             postId: args.postId,
             organizationId: args.organizationId,
-          });
-        }).pipe(withRemapDbErrors("PostReaction", "select")),
+          })
+          .pipe(withRemapDbErrors("PostReaction", "select")),
       PostReactionTogglePublic: (args: TPostReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;

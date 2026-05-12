@@ -21,13 +21,11 @@ export const PostStatusRpcHandlers = PostStatusRpcs.toLayer(
             withRemapDbErrors("PostStatus", "select")
           ),
       PostStatusListPublic: (args: TPostStatusList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.findMany({
+        repository
+          .findMany({
             organizationId: args.organizationId,
-          });
-        }).pipe(withRemapDbErrors("PostStatus", "select")),
+          })
+          .pipe(withRemapDbErrors("PostStatus", "select")),
     };
   })
 ).pipe(

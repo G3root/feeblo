@@ -29,21 +29,19 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             withRemapDbErrors("Board", "select")
           ),
       BoardListPublic: (args: TBoardList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.findMany({
+        repository
+          .findMany({
             organizationId: args.organizationId,
             visibility: "PUBLIC",
-          });
-        }).pipe(withRemapDbErrors("Board", "select")),
+          })
+          .pipe(withRemapDbErrors("Board", "select")),
       BoardDelete: (args: TBoardDelete) => {
-        return Effect.gen(function* () {
-          return yield* repository.delete({
+        return repository
+          .delete({
             id: args.id,
             organizationId: args.organizationId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
@@ -54,7 +52,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             )
           ),
           withRemapDbErrors("Board", "delete")
-        );
+          );
       },
       BoardCreate: (args: TBoardCreate) => {
         return Effect.gen(function* () {

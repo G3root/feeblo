@@ -5,7 +5,7 @@ const optionalBoolean = (name: string) =>
   optionalString(name).pipe(
     Effect.flatMap((value) => {
       if (value._tag === "None") {
-        return Effect.succeed(undefined);
+        return Effect.void;
       }
 
       if (value.value === "true") {
@@ -30,7 +30,7 @@ const optionalInteger = (name: string) =>
   optionalString(name).pipe(
     Effect.flatMap((value) => {
       if (value._tag === "None") {
-        return Effect.succeed(undefined);
+        return Effect.void;
       }
 
       const parsed = Number(value.value);
@@ -66,9 +66,9 @@ export class MailerConfig extends Context.Service<MailerConfig>()(
       );
       const service = yield* optionalString("SMTP_SERVICE");
       const username = yield* optionalString("SMTP_USERNAME");
-      const password = yield* Config.redacted("SMTP_PASSWORD")
-        .pipe(Config.option)
-        .asEffect();
+      const password = yield* Config.redacted("SMTP_PASSWORD").pipe(
+        Config.option
+      );
       const defaultFrom = yield* optionalString("SMTP_FROM_ADDRESS").pipe(
         Effect.map((value) =>
           value._tag === "Some" ? value.value : "hello@feeblo.com"

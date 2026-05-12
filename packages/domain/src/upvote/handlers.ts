@@ -16,12 +16,12 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
 
     return {
       UpvoteList: (args: TUpvoteList) =>
-        Effect.gen(function* () {
-          return yield* repository.list({
+        repository
+          .list({
             postId: args.postId,
             organizationId: args.organizationId,
-          });
-        }).pipe(
+          })
+          .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Upvote", "select")
         ),
@@ -47,14 +47,12 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
           withRemapDbErrors("Upvote", "update")
         ),
       UpvoteListPublic: (args: TUpvoteList) =>
-        Effect.gen(function* () {
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-          return yield* repository.list({
+        repository
+          .list({
             postId: args.postId,
             organizationId: args.organizationId,
-          });
-        }).pipe(withRemapDbErrors("Upvote", "select")),
+          })
+          .pipe(withRemapDbErrors("Upvote", "select")),
       UpvoteTogglePublic: (args: TUpvoteToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;

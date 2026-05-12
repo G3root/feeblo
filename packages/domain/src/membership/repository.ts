@@ -177,7 +177,7 @@ const makeMembershipRepository = Effect.gen(function* () {
               createdAt: schema.member.createdAt,
             })
         )
-      )(args),
+      )(args).pipe(Effect.asVoid),
 
     findMemberById: (args: TFindMemberById) =>
       db
@@ -209,10 +209,9 @@ const makeMembershipRepository = Effect.gen(function* () {
               )
             )
         )
-      )(args),
+      )(args).pipe(Effect.asVoid),
     cancelInvitation: ({ organizationId, invitationId }: TCancelInvitation) =>
-      Effect.gen(function* () {
-        yield* db.makeQuery((execute, input: TCancelInvitation) =>
+      db.makeQuery((execute, input: TCancelInvitation) =>
           execute((client) =>
             client
               .update(schema.invitation)
@@ -226,8 +225,7 @@ const makeMembershipRepository = Effect.gen(function* () {
                 )
               )
           )
-        )({ organizationId, invitationId });
-      }),
+        )({ organizationId, invitationId }).pipe(Effect.asVoid),
     findMemberByEmailInOrg: (args: TFindMemberByEmailInOrg) =>
       db
         .makeQuery((execute, input: TFindMemberByEmailInOrg) =>
