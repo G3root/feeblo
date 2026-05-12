@@ -32,9 +32,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
           ),
 
       ChangelogListPublic: (args: TChangelogList) =>
-        Effect.gen(function* () {
-          return yield* repository.findManyPublished(args);
-        }).pipe(
+        repository.findManyPublished(args).pipe(
           Policy.withPublicPolicy(
             sitePolicy.canViewChangelog(args.organizationId)
           ),

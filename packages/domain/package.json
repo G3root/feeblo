@@ -1,0 +1,115 @@
+{
+  "name": "@feeblo/domain",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./src/*": {
+      "default": "./src/*"
+    },
+    "./rpc-group": {
+      "default": "./src/rpc-group.ts"
+    },
+    "./rpc-router": {
+      "default": "./src/rpc-router.ts"
+    },
+    "./http/api": {
+      "default": "./src/http/api.ts"
+    },
+    "./http/router": {
+      "default": "./src/http/router.ts"
+    },
+    "./billing/service": {
+      "default": "./src/billing/service.ts"
+    },
+    "./billing/repository": {
+      "default": "./src/billing/repository.ts"
+    },
+    "./membership/repository": {
+      "default": "./src/membership/repository.ts"
+    },
+    "./workspace/repository": {
+      "default": "./src/workspace/repository.ts"
+    },
+    "./plan-entitlements": {
+      "default": "./src/plan-entitlements.ts"
+    },
+    "./session-middleware": {
+      "default": "./src/session-middleware.ts"
+    },
+    "./user/schema": {
+      "default": "./src/user/schema.ts"
+    },
+    "./user/rpcs": {
+      "default": "./src/user/rpcs.ts"
+    },
+    "./user/repository": {
+      "default": "./src/user/repository.ts"
+    },
+    "./user/handlers": {
+      "default": "./src/user/handlers.ts"
+    },
+    "./site/schema": {
+      "default": "./src/site/schema.ts"
+    },
+    "./auth/verification-otp/schema": {
+      "default": "./src/auth/verification-otp/schema.ts"
+    },
+    "./auth/verification-otp/api": {
+      "default": "./src/auth/verification-otp/api.ts"
+    },
+    "./auth/verification-otp/live": {
+      "default": "./src/auth/verification-otp/live.ts"
+    },
+    "./auth/verification-otp/utils": {
+      "default": "./src/auth/verification-otp/utils.ts"
+    },
+    "./auth/verification-otp": {
+      "default": "./src/auth/verification-otp/index.ts"
+    },
+    "./board/schema": {
+      "default": "./src/board/schema.ts"
+    },
+    "./post/schema": {
+      "default": "./src/post/schema.ts"
+    },
+    "./post-status/schema": {
+      "default": "./src/post-status/schema.ts"
+    },
+    "./comments/schema": {
+      "default": "./src/comments/schema.ts"
+    },
+    "./upvote/schema": {
+      "default": "./src/upvote/schema.ts"
+    },
+    "./changelog/schema": {
+      "default": "./src/changelog/schema.ts"
+    },
+    "./tag/schema": {
+      "default": "./src/tag/schema.ts"
+    },
+    "./organization/repository": {
+      "default": "./src/organization/repository.ts"
+    },
+    "./services/s3": {
+      "default": "./src/services/s3.ts"
+    }
+  },
+  "dependencies": {
+    "@effect-aws/client-s3": "catalog:",
+    "@effect-aws/s3": "catalog:",
+    "@feeblo/db": "workspace:*",
+    "@feeblo/utils": "workspace:*",
+    "@polar-sh/sdk": "catalog:",
+    "better-auth": "catalog:",
+    "cookie-es": "^3.1.1",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:",
+    "sanitize-html": "^2.17.1"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "@types/sanitize-html": "^2.16.1",
+    "typescript": "catalog:"
+  }
+}
