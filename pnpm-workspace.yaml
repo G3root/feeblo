@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+nodeLinker: hoisted
 allowBuilds:
   '@parcel/watcher': true
   esbuild: true
