@@ -17,6 +17,7 @@ import {
 import { Config, Effect, Layer } from "effect";
 import {
   HttpEffect,
+  HttpMiddleware,
   HttpRouter,
   HttpServerRequest,
   HttpServerResponse,
@@ -94,11 +95,14 @@ const program = Effect.gen(function* () {
     DocsRoute
   ).pipe(
     Layer.provide(
-      HttpRouter.cors({
-        allowedOrigins: isAllowedOrigin as unknown as readonly string[],
-        allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        credentials: true,
-      })
+      HttpRouter.middleware(
+        HttpMiddleware.cors({
+          allowedOrigins: isAllowedOrigin,
+          allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+          credentials: true,
+        }),
+        { global: true }
+      )
     )
   );
 
