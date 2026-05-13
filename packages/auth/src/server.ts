@@ -14,7 +14,7 @@ import { Mailer } from "@feeblo/transactional/mailer";
 import { polar, webhooks } from "@polar-sh/better-auth";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import {
   admin,
   captcha,
@@ -24,9 +24,9 @@ import {
   organization,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
-import { Effect, Layer, ManagedRuntime, Redacted } from "effect";
+import { Effect, Layer, ManagedRuntime, Option, Redacted } from "effect";
 import { AuthConfig } from "./config";
-import { getTrustedOrigins } from "./utils";
+import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
 
 const loadPasswordResetEmail = () =>
   import("@feeblo/transactional/templates/password-reset");
@@ -48,6 +48,7 @@ export const initAuthHandler = () =>
       secret,
       signUpEnabled,
       turnstileKey,
+      allowedEmails,
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
@@ -384,6 +385,34 @@ export const initAuthHandler = () =>
           },
         }),
       ],
+
+      hooks: {
+        // biome-ignore lint/suspicious/useAwait: <explanation>
+        before: createAuthMiddleware(async (ctx) => {
+          if (
+            (ctx.path.startsWith("/sign-in") ||
+              ctx.path.startsWith("/sign-up") ||
+              ctx.path.startsWith("/email-otp")) &&
+            ctx.body?.email &&
+            typeof ctx.body.email === "string"
+          ) {
+            if (isEmailBlocked(ctx.body.email, Option.getOrUndefined(allowedEmails))) {
+              throw new APIError("BAD_REQUEST", {
+                code: "EMAIL_BLOCKED",
+                message:
+                  "This email address is not allowed. Please use a different email or contact support.",
+              });
+            }
+            if (isTemporaryEmail(ctx.body.email)) {
+              throw new APIError("BAD_REQUEST", {
+                code: "TEMPORARY_EMAIL_NOT_ALLOWED",
+                message:
+                  "Temporary email addresses are not allowed. Please use a different email.",
+              });
+            }
+          }
+        }),
+      },
     } satisfies BetterAuthOptions;
     return betterAuth(config);
   }).pipe(
