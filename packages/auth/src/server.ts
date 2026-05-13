@@ -25,6 +25,7 @@ import {
 import { eq } from "drizzle-orm";
 import { Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { AuthConfig } from "./config";
+import { getTrustedOrigins } from "./utils";
 
 const loadPasswordResetEmail = () =>
   import("@feeblo/transactional/templates/password-reset");
@@ -39,7 +40,6 @@ export const initAuthHandler = () =>
   Effect.gen(function* () {
     const {
       appUrl,
-      apiUrl,
       githubClientId,
       githubClientSecret,
       googleClientId,
@@ -49,6 +49,7 @@ export const initAuthHandler = () =>
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
+    const trustedOrigins = yield* getTrustedOrigins;
     const db = yield* Database.Database;
     const context = yield* Effect.context<
       Database.Database | AuthConfig | PolarService
@@ -106,14 +107,13 @@ export const initAuthHandler = () =>
       telemetry: {
         enabled: false,
       },
-      trustedOrigins: [appUrl, apiUrl, "*.localhost:3001"],
+      trustedOrigins,
 
       advanced: {
         defaultCookieAttributes: {
           secure: true,
           httpOnly: true,
           sameSite: "none", // Allows CORS-based cookie sharing across subdomains
-          partitioned: true, // New browser standards will mandate this for foreign cookies
         },
       },
       emailVerification: {
