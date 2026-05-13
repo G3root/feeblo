@@ -6,6 +6,7 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
     appUrl: env.APP_URL,
     appRootDomain: env.APP_ROOT_DOMAIN,
     appRelease: env.APP_RELEASE ?? "unknown",
+    turnstileSiteKey: env.TURNSTILE_SITE_KEY,
   };
 }
 

@@ -1,6 +1,7 @@
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useRef, useState } from "react";
 import { z } from "zod";
-import { toastManager } from "~/components/ui/toast";
 import { AuthShell } from "~/features/auth/components/auth-shell";
 import { SocialAuthButtons } from "~/features/auth/components/social-auth-buttons";
 import {
@@ -9,6 +10,7 @@ import {
 } from "~/features/auth/lib/auth-flows";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
+import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
 import {
   EmailSchema,
   NameSchema,
@@ -25,6 +27,9 @@ export const Route = createFileRoute("/sign-up")({
   component: RouteComponent,
 });
 
+const turnstileSiteKey = getRuntimePublicEnv().turnstileSiteKey;
+const isTurnstileEnabled = !!turnstileSiteKey;
+
 const FormSchema = z
   .object({
     name: NameSchema,
@@ -35,6 +40,8 @@ const FormSchema = z
 function RouteComponent() {
   const navigate = useNavigate({ from: "/sign-up" });
   const search = Route.useSearch();
+  const turnstileRef = useRef<TurnstileInstance>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const form = useAppForm({
     defaultValues: {
@@ -47,34 +54,97 @@ function RouteComponent() {
       onSubmit: FormSchema,
     },
     onSubmit: async ({ value }) => {
-      const response = await authClient.signUp.email({
-        email: value.email,
-        name: value.name,
-        password: value.password,
-        callbackURL: getSafeCallbackURL(search.redirectTo),
-      });
+      if (isTurnstileEnabled && !turnstileToken) {
+        return {
+          email: {
+            message: "Please complete the security verification",
+          },
+        };
+      }
 
-      if (response.error) {
-        toastManager.add({
-          title: response.error.message,
-          type: "error",
+      try {
+        const response = await authClient.signUp.email({
+          email: value.email,
+          name: value.name,
+          password: value.password,
+          callbackURL: getSafeCallbackURL(search.redirectTo),
+          fetchOptions: turnstileToken
+            ? {
+                headers: {
+                  "x-captcha-response": turnstileToken,
+                },
+              }
+            : undefined,
         });
-        return;
+
+        const email = response.data?.user?.email ?? value.email;
+
+        if (response.error) {
+          switch (response.error.code) {
+            case "EMAIL_NOT_VERIFIED": {
+              const isVerificationReady =
+                await initializeEmailVerification(email);
+              if (!isVerificationReady) {
+                return;
+              }
+
+              navigate({
+                to: "/email-verify",
+                search: {
+                  redirectTo: search.redirectTo,
+                },
+              });
+              break;
+            }
+            case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL": {
+              return {
+                email: {
+                  message: "A user with that email already exists",
+                },
+              };
+            }
+            case "EMAIL_BLOCKED": {
+              return {
+                email: {
+                  message: "Email is blocked.",
+                },
+              };
+            }
+            case "TEMPORARY_EMAIL_NOT_ALLOWED": {
+              return {
+                email: {
+                  message: "Temporary email addresses are not allowed.",
+                },
+              };
+            }
+            default:
+              return {
+                email: {
+                  message: response.error.message,
+                },
+              };
+          }
+        }
+
+        navigate({
+          to: "/$organizationId/feedback",
+          params: {
+            organizationId: "",
+          },
+        });
+      } catch (error) {
+        return {
+          email: {
+            message:
+              error instanceof Error ? error.message : "Something went wrong",
+          },
+        };
+      } finally {
+        if (isTurnstileEnabled) {
+          setTurnstileToken(null);
+          turnstileRef.current?.reset();
+        }
       }
-
-      const email = response.data?.user?.email ?? value.email;
-
-      const isVerificationReady = await initializeEmailVerification(email);
-      if (!isVerificationReady) {
-        return;
-      }
-
-      navigate({
-        to: "/email-verify",
-        search: {
-          redirectTo: search.redirectTo,
-        },
-      });
     },
   });
   return (
@@ -122,8 +192,32 @@ function RouteComponent() {
           name="confirmPassword"
         />
 
+        {turnstileSiteKey ? (
+          <Turnstile
+            onError={() => {
+              setTurnstileToken(null);
+            }}
+            onExpire={() => {
+              setTurnstileToken(null);
+              turnstileRef.current?.reset();
+            }}
+            onSuccess={(token) => {
+              setTurnstileToken(token);
+            }}
+            options={{
+              size: "flexible",
+            }}
+            ref={turnstileRef}
+            siteKey={turnstileSiteKey}
+          />
+        ) : null}
+
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Sign up" />
+          <form.SubscribeButton
+            className="w-full"
+            disabled={isTurnstileEnabled && !turnstileToken}
+            label="Sign up"
+          />
         </form.AppForm>
       </form>
 

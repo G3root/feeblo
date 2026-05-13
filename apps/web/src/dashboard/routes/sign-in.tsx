@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { toastManager } from "~/components/ui/toast";
 import { AuthShell } from "~/features/auth/components/auth-shell";
 import { SocialAuthButtons } from "~/features/auth/components/social-auth-buttons";
 import {
@@ -39,37 +38,61 @@ function RouteComponent() {
       onSubmit: FormSchema,
     },
     onSubmit: async ({ value }) => {
-      const response = await authClient.signIn.email({
-        email: value.email,
-        password: value.password,
-        callbackURL: getSafeCallbackURL(search.redirectTo),
-      });
-
-      if (!response.error) {
-        return;
-      }
-
-      if (response.error.code === "EMAIL_NOT_VERIFIED") {
-        const isVerificationReady = await initializeEmailVerification(
-          value.email
-        );
-        if (!isVerificationReady) {
-          return;
-        }
-
-        navigate({
-          to: "/email-verify",
-          search: {
-            redirectTo: search.redirectTo,
-          },
+      try {
+        const response = await authClient.signIn.email({
+          email: value.email,
+          password: value.password,
+          callbackURL: getSafeCallbackURL(search.redirectTo),
         });
-        return;
-      }
 
-      toastManager.add({
-        title: response.error.message,
-        type: "error",
-      });
+        if (response.error) {
+          switch (response.error.code) {
+            case "EMAIL_NOT_VERIFIED": {
+              const isVerificationReady = await initializeEmailVerification(
+                value.email
+              );
+              if (!isVerificationReady) {
+                return;
+              }
+              navigate({
+                to: "/email-verify",
+                search: {
+                  redirectTo: search.redirectTo,
+                },
+              });
+              break;
+            }
+            case "INVALID_EMAIL_OR_PASSWORD": {
+              return {
+                password: {
+                  message: "Invalid email or password",
+                },
+              };
+            }
+            case "EMAIL_BLOCKED": {
+              return {
+                email: {
+                  message: "Email is blocked.",
+                },
+              };
+            }
+
+            default:
+              return {
+                email: {
+                  message: response.error.message,
+                },
+              };
+          }
+        }
+      } catch (error) {
+        return {
+          email: {
+            message:
+              error instanceof Error ? error.message : "Something went wrong",
+          },
+        };
+      }
     },
   });
 

@@ -17,6 +17,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import {
   admin,
+  captcha,
   customSession,
   emailOTP,
   lastLoginMethod,
@@ -46,6 +47,7 @@ export const initAuthHandler = () =>
       googleClientSecret,
       secret,
       signUpEnabled,
+      turnstileKey,
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
@@ -192,6 +194,16 @@ export const initAuthHandler = () =>
                     },
                   }),
                 ],
+              }),
+            ]
+          : []),
+
+        ...(turnstileKey._tag === "Some"
+          ? [
+              captcha({
+                provider: "cloudflare-turnstile",
+                secretKey: turnstileKey.value,
+                endpoints: ["/sign-up/email"],
               }),
             ]
           : []),
