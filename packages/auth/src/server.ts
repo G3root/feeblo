@@ -41,6 +41,7 @@ export const initAuthHandler = () =>
   Effect.gen(function* () {
     const {
       appUrl,
+      apiUrl,
       githubClientId,
       githubClientSecret,
       googleClientId,
@@ -74,7 +75,7 @@ export const initAuthHandler = () =>
         schema,
       }),
 
-      baseURL: appUrl,
+      baseURL: apiUrl,
       secret: Redacted.value(secret),
       ...((githubClientId._tag === "Some" &&
         githubClientSecret._tag === "Some") ||
