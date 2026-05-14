@@ -66,6 +66,7 @@ const program = Effect.gen(function* () {
       const originHost = new URL(origin).hostname;
       const appHost = new URL(config.appUrl).hostname;
       const apiHost = new URL(config.apiUrl).hostname;
+      const appRootDomain = config.appRootDomain;
 
       if (originHost === apiHost) {
         return true;
@@ -73,7 +74,7 @@ const program = Effect.gen(function* () {
       if (originHost === appHost) {
         return true;
       }
-      if (originHost.endsWith(`.${appHost}`)) {
+      if (originHost.endsWith(`.${appRootDomain}`)) {
         return true;
       }
 
