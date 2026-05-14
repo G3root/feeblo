@@ -10,7 +10,7 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
     const googleClientId = yield* optionalString("GOOGLE_CLIENT_ID");
     const googleClientSecret = yield* optionalString("GOOGLE_CLIENT_SECRET");
-    const trustedOrigins = yield* Config.string("AUTH_TRUSTED_ORIGINS");
+    const trustedOrigins = yield* optionalString("AUTH_TRUSTED_ORIGINS");
     const turnstileKey = yield* optionalString("TURNSTILE_SECRET_KEY");
     const allowedEmails = yield* optionalString("ALLOWED_EMAILS");
     const signUpEnabled = yield* Config.boolean("AUTH_SIGN_UP_ENABLED").pipe(

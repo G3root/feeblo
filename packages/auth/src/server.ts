@@ -396,7 +396,12 @@ export const initAuthHandler = () =>
             ctx.body?.email &&
             typeof ctx.body.email === "string"
           ) {
-            if (isEmailBlocked(ctx.body.email, Option.getOrUndefined(allowedEmails))) {
+            if (
+              isEmailBlocked(
+                ctx.body.email,
+                Option.getOrUndefined(allowedEmails)
+              )
+            ) {
               throw new APIError("BAD_REQUEST", {
                 code: "EMAIL_BLOCKED",
                 message:
