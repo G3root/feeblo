@@ -38,6 +38,10 @@ function RouteComponent() {
       onSubmit: FormSchema,
     },
     onSubmit: async ({ value }) => {
+      form.setErrorMap({
+        onSubmit: undefined,
+      });
+
       try {
         const response = await authClient.signIn.email({
           email: value.email,
@@ -63,35 +67,54 @@ function RouteComponent() {
               break;
             }
             case "INVALID_EMAIL_OR_PASSWORD": {
-              return {
-                password: {
-                  message: "Invalid email or password",
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    password: {
+                      message: "Invalid email or password",
+                    },
+                  },
                 },
-              };
+              });
+              return;
             }
             case "EMAIL_BLOCKED": {
-              return {
-                email: {
-                  message: "Email is blocked.",
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: "Email is blocked.",
+                    },
+                  },
                 },
-              };
+              });
+              return;
             }
 
             default:
-              return {
-                email: {
-                  message: response.error.message,
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: response.error.message,
+                    },
+                  },
                 },
-              };
+              });
+              return;
           }
         }
       } catch (error) {
-        return {
-          email: {
-            message:
-              error instanceof Error ? error.message : "Something went wrong",
+        form.setErrorMap({
+          onSubmit: {
+            fields: {
+              email: {
+                message:
+                  error instanceof Error ? error.message : "Something went wrong",
+              },
+            },
           },
-        };
+        });
       }
     },
   });

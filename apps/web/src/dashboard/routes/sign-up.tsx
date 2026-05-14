@@ -54,12 +54,21 @@ function RouteComponent() {
       onSubmit: FormSchema,
     },
     onSubmit: async ({ value }) => {
+      form.setErrorMap({
+        onSubmit: undefined,
+      });
+
       if (isTurnstileEnabled && !turnstileToken) {
-        return {
-          email: {
-            message: "Please complete the security verification",
+        form.setErrorMap({
+          onSubmit: {
+            fields: {
+              email: {
+                message: "Please complete the security verification",
+              },
+            },
           },
-        };
+        });
+        return;
       }
 
       try {
@@ -97,32 +106,52 @@ function RouteComponent() {
               break;
             }
             case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL": {
-              return {
-                email: {
-                  message: "A user with that email already exists",
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: "A user with that email already exists",
+                    },
+                  },
                 },
-              };
+              });
+              return;
             }
             case "EMAIL_BLOCKED": {
-              return {
-                email: {
-                  message: "Email is blocked.",
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: "Email is blocked.",
+                    },
+                  },
                 },
-              };
+              });
+              return;
             }
             case "TEMPORARY_EMAIL_NOT_ALLOWED": {
-              return {
-                email: {
-                  message: "Temporary email addresses are not allowed.",
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: "Temporary email addresses are not allowed.",
+                    },
+                  },
                 },
-              };
+              });
+              return;
             }
             default:
-              return {
-                email: {
-                  message: response.error.message,
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: response.error.message,
+                    },
+                  },
                 },
-              };
+              });
+              return;
           }
         }
 
@@ -133,12 +162,16 @@ function RouteComponent() {
           },
         });
       } catch (error) {
-        return {
-          email: {
-            message:
-              error instanceof Error ? error.message : "Something went wrong",
+        form.setErrorMap({
+          onSubmit: {
+            fields: {
+              email: {
+                message:
+                  error instanceof Error ? error.message : "Something went wrong",
+              },
+            },
           },
-        };
+        });
       } finally {
         if (isTurnstileEnabled) {
           setTurnstileToken(null);
