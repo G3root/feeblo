@@ -71,9 +71,9 @@ export const ProfileApiLive = HttpApiBuilder.group(
 
         yield* db.execute((client) =>
           client
-            .update(schema.user)
+            .update(schema.userTable)
             .set({ image: uploaded.url })
-            .where(eq(schema.user.id, session.user.id))
+            .where(eq(schema.userTable.id, session.user.id))
         );
 
         return uploaded;
