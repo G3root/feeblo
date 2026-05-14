@@ -7,18 +7,18 @@ import { Data, Effect } from "effect";
 import { Database } from "./src";
 import { nukeDatabase } from "./src/nuke";
 import {
-  board,
-  comment,
-  commentReaction,
+  boardTable,
+  commentReactionTable,
+  commentTable,
   DEFAULT_POST_STATUSES,
-  member,
+  memberTable,
   organizationTable,
-  post,
-  postReaction,
-  postStatus,
-  site,
-  upvote,
-  user,
+  postReactionTable,
+  postStatusTable,
+  postTable,
+  siteTable,
+  upvoteTable,
+  userTable,
 } from "./src/schema";
 
 const TEST_USER = {
@@ -70,12 +70,12 @@ const ensureUser = ({
     let [existingUser] = yield* dbService.execute((db) =>
       db
         .select({
-          id: user.id,
-          email: user.email,
-          emailVerified: user.emailVerified,
+          id: userTable.id,
+          email: userTable.email,
+          emailVerified: userTable.emailVerified,
         })
-        .from(user)
-        .where(eq(user.email, email))
+        .from(userTable)
+        .where(eq(userTable.email, email))
         .limit(1)
     );
 
@@ -104,12 +104,12 @@ const ensureUser = ({
       [existingUser] = yield* Effect.tryPromise(() =>
         db
           .select({
-            id: user.id,
-            email: user.email,
-            emailVerified: user.emailVerified,
+            id: userTable.id,
+            email: userTable.email,
+            emailVerified: userTable.emailVerified,
           })
-          .from(user)
-          .where(eq(user.email, email))
+          .from(userTable)
+          .where(eq(userTable.email, email))
           .limit(1)
       );
     }
@@ -123,9 +123,9 @@ const ensureUser = ({
     if (!existingUser.emailVerified) {
       yield* Effect.tryPromise(() =>
         db
-          .update(user)
+          .update(userTable)
           .set({ emailVerified: true })
-          .where(eq(user.id, existingUser.id))
+          .where(eq(userTable.id, existingUser.id))
       );
     }
 
@@ -175,17 +175,20 @@ const ensureOrganization = (userId: string) =>
 
     const [existingOwnerMembership] = yield* Effect.tryPromise(() =>
       db
-        .select({ id: member.id })
-        .from(member)
+        .select({ id: memberTable.id })
+        .from(memberTable)
         .where(
-          and(eq(member.organizationId, org.id), eq(member.userId, userId))
+          and(
+            eq(memberTable.organizationId, org.id),
+            eq(memberTable.userId, userId)
+          )
         )
         .limit(1)
     );
 
     if (!existingOwnerMembership) {
       yield* Effect.tryPromise(() =>
-        db.insert(member).values({
+        db.insert(memberTable).values({
           id: makeId("mem"),
           organizationId: org.id,
           userId,
@@ -197,16 +200,16 @@ const ensureOrganization = (userId: string) =>
 
     const existingPostStatuses = yield* Effect.tryPromise(() =>
       db
-        .select({ id: postStatus.id })
-        .from(postStatus)
-        .where(eq(postStatus.organizationId, org.id))
+        .select({ id: postStatusTable.id })
+        .from(postStatusTable)
+        .where(eq(postStatusTable.organizationId, org.id))
         .limit(1)
     );
 
     if (existingPostStatuses.length === 0) {
       for (const postStatusDefinition of DEFAULT_POST_STATUSES) {
         yield* Effect.tryPromise(() =>
-          db.insert(postStatus).values({
+          db.insert(postStatusTable).values({
             id: makeId("pss"),
             organizationId: org.id,
             type: postStatusDefinition.type,
@@ -236,16 +239,16 @@ const ensureSite = ({
 
     let [existing] = yield* Effect.tryPromise(() =>
       db
-        .select({ id: site.id, subdomain: site.subdomain })
-        .from(site)
-        .where(eq(site.organizationId, organizationId))
+        .select({ id: siteTable.id, subdomain: siteTable.subdomain })
+        .from(siteTable)
+        .where(eq(siteTable.organizationId, organizationId))
         .limit(1)
     );
 
     if (!existing) {
       [existing] = yield* Effect.tryPromise(() =>
         db
-          .insert(site)
+          .insert(siteTable)
           .values({
             id: makeId("ste"),
             name,
@@ -254,7 +257,7 @@ const ensureSite = ({
             createdAt: new Date(),
             updatedAt: new Date(),
           })
-          .returning({ id: site.id, subdomain: site.subdomain })
+          .returning({ id: siteTable.id, subdomain: siteTable.subdomain })
       );
     }
 
@@ -274,7 +277,7 @@ const ensureMember = ({
 }: {
   organizationId: string;
   userId: string;
-  role: NonNullable<typeof member.$inferInsert.role>;
+  role: NonNullable<typeof memberTable.$inferInsert.role>;
 }) =>
   Effect.gen(function* () {
     const dbService = yield* Database.Database;
@@ -282,12 +285,12 @@ const ensureMember = ({
 
     let [existing] = yield* Effect.tryPromise(() =>
       db
-        .select({ id: member.id, role: member.role })
-        .from(member)
+        .select({ id: memberTable.id, role: memberTable.role })
+        .from(memberTable)
         .where(
           and(
-            eq(member.organizationId, organizationId),
-            eq(member.userId, userId)
+            eq(memberTable.organizationId, organizationId),
+            eq(memberTable.userId, userId)
           )
         )
         .limit(1)
@@ -296,7 +299,7 @@ const ensureMember = ({
     if (!existing) {
       [existing] = yield* Effect.tryPromise(() =>
         db
-          .insert(member)
+          .insert(memberTable)
           .values({
             id: makeId("mem"),
             organizationId,
@@ -304,7 +307,7 @@ const ensureMember = ({
             role,
             createdAt: new Date(),
           })
-          .returning({ id: member.id, role: member.role })
+          .returning({ id: memberTable.id, role: memberTable.role })
       );
     }
 
@@ -324,15 +327,15 @@ const ensureBoards = ({
 
     let boards = yield* Effect.tryPromise(() =>
       db
-        .select({ id: board.id, name: board.name })
-        .from(board)
-        .where(eq(board.organizationId, organizationId))
+        .select({ id: boardTable.id, name: boardTable.name })
+        .from(boardTable)
+        .where(eq(boardTable.organizationId, organizationId))
     );
 
     if (boards.length === 0) {
       for (const name of names) {
         yield* Effect.tryPromise(() =>
-          db.insert(board).values({
+          db.insert(boardTable).values({
             id: makeId("brd"),
             name,
             slug: slugify(name),
@@ -346,9 +349,9 @@ const ensureBoards = ({
 
       boards = yield* Effect.tryPromise(() =>
         db
-          .select({ id: board.id, name: board.name })
-          .from(board)
-          .where(eq(board.organizationId, organizationId))
+          .select({ id: boardTable.id, name: boardTable.name })
+          .from(boardTable)
+          .where(eq(boardTable.organizationId, organizationId))
       );
     }
 
@@ -374,16 +377,16 @@ const ensurePosts = ({
     const now = new Date();
     const postStatuses = yield* Effect.tryPromise(() =>
       db
-        .select({ id: postStatus.id, type: postStatus.type })
-        .from(postStatus)
-        .where(eq(postStatus.organizationId, organizationId))
+        .select({ id: postStatusTable.id, type: postStatusTable.type })
+        .from(postStatusTable)
+        .where(eq(postStatusTable.organizationId, organizationId))
     );
 
     const [existing] = yield* Effect.tryPromise(() =>
       db
-        .select({ id: post.id })
-        .from(post)
-        .where(eq(post.organizationId, organizationId))
+        .select({ id: postTable.id })
+        .from(postTable)
+        .where(eq(postTable.organizationId, organizationId))
         .limit(1)
     );
 
@@ -412,7 +415,7 @@ const ensurePosts = ({
         const lockedAt = i % 13 === 0 ? now : null;
 
         yield* Effect.tryPromise(() =>
-          db.insert(post).values({
+          db.insert(postTable).values({
             id: makeId("pst"),
             title,
             slug: slugify(`${title}-${i + 1}`),
@@ -436,9 +439,9 @@ const ensurePosts = ({
 
     return yield* Effect.tryPromise(() =>
       db
-        .select({ id: post.id, title: post.title })
-        .from(post)
-        .where(eq(post.organizationId, organizationId))
+        .select({ id: postTable.id, title: postTable.title })
+        .from(postTable)
+        .where(eq(postTable.organizationId, organizationId))
     );
   });
 
@@ -463,12 +466,12 @@ const seedEngagement = ({
       actorIds.length > 0
         ? yield* Effect.tryPromise(() =>
             db
-              .select({ userId: member.userId, memberId: member.id })
-              .from(member)
+              .select({ userId: memberTable.userId, memberId: memberTable.id })
+              .from(memberTable)
               .where(
                 and(
-                  eq(member.organizationId, organizationId),
-                  inArray(member.userId, actorIds)
+                  eq(memberTable.organizationId, organizationId),
+                  inArray(memberTable.userId, actorIds)
                 )
               )
           )
@@ -480,9 +483,9 @@ const seedEngagement = ({
 
     const [existingComment] = yield* Effect.tryPromise(() =>
       db
-        .select({ id: comment.id })
-        .from(comment)
-        .where(eq(comment.organizationId, organizationId))
+        .select({ id: commentTable.id })
+        .from(commentTable)
+        .where(eq(commentTable.organizationId, organizationId))
         .limit(1)
     );
 
@@ -512,7 +515,7 @@ const seedEngagement = ({
         const commentId = makeId("cmt");
 
         yield* Effect.tryPromise(() =>
-          db.insert(comment).values({
+          db.insert(commentTable).values({
             id: commentId,
             content: faker.lorem.sentences({ min: 1, max: 3 }),
             organizationId,
@@ -535,17 +538,20 @@ const seedEngagement = ({
       for (const upvoterId of upvoters) {
         const [existing] = yield* Effect.tryPromise(() =>
           db
-            .select({ id: upvote.id })
-            .from(upvote)
+            .select({ id: upvoteTable.id })
+            .from(upvoteTable)
             .where(
-              and(eq(upvote.userId, upvoterId), eq(upvote.postId, postItem.id))
+              and(
+                eq(upvoteTable.userId, upvoterId),
+                eq(upvoteTable.postId, postItem.id)
+              )
             )
             .limit(1)
         );
 
         if (!existing) {
           yield* Effect.tryPromise(() =>
-            db.insert(upvote).values({
+            db.insert(upvoteTable).values({
               id: makeId("upv"),
               userId: upvoterId,
               memberId: memberIdByUserId.get(upvoterId) ?? null,
@@ -565,13 +571,13 @@ const seedEngagement = ({
 
         const [existing] = yield* Effect.tryPromise(() =>
           db
-            .select({ id: postReaction.id })
-            .from(postReaction)
+            .select({ id: postReactionTable.id })
+            .from(postReactionTable)
             .where(
               and(
-                eq(postReaction.userId, reactorId),
-                eq(postReaction.postId, postItem.id),
-                eq(postReaction.emoji, emoji)
+                eq(postReactionTable.userId, reactorId),
+                eq(postReactionTable.postId, postItem.id),
+                eq(postReactionTable.emoji, emoji)
               )
             )
             .limit(1)
@@ -579,7 +585,7 @@ const seedEngagement = ({
 
         if (!existing) {
           yield* Effect.tryPromise(() =>
-            db.insert(postReaction).values({
+            db.insert(postReactionTable).values({
               id: makeId("rct"),
               userId: reactorId,
               memberId: memberIdByUserId.get(reactorId) ?? null,
@@ -607,13 +613,13 @@ const seedEngagement = ({
 
         const [existing] = yield* Effect.tryPromise(() =>
           db
-            .select({ id: commentReaction.id })
-            .from(commentReaction)
+            .select({ id: commentReactionTable.id })
+            .from(commentReactionTable)
             .where(
               and(
-                eq(commentReaction.userId, reactorId),
-                eq(commentReaction.commentId, item.id),
-                eq(commentReaction.emoji, emoji)
+                eq(commentReactionTable.userId, reactorId),
+                eq(commentReactionTable.commentId, item.id),
+                eq(commentReactionTable.emoji, emoji)
               )
             )
             .limit(1)
@@ -621,7 +627,7 @@ const seedEngagement = ({
 
         if (!existing) {
           yield* Effect.tryPromise(() =>
-            db.insert(commentReaction).values({
+            db.insert(commentReactionTable).values({
               id: makeId("crt"),
               userId: reactorId,
               memberId: memberIdByUserId.get(reactorId) ?? null,

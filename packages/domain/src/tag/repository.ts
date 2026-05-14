@@ -80,16 +80,16 @@ const makeTagRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.tag.id,
-              name: schema.tag.name,
-              slug: schema.tag.slug,
-              type: schema.tag.type,
-              organizationId: schema.tag.organizationId,
-              createdAt: schema.tag.createdAt,
-              updatedAt: schema.tag.updatedAt,
+              id: schema.tagTable.id,
+              name: schema.tagTable.name,
+              slug: schema.tagTable.slug,
+              type: schema.tagTable.type,
+              organizationId: schema.tagTable.organizationId,
+              createdAt: schema.tagTable.createdAt,
+              updatedAt: schema.tagTable.updatedAt,
             })
-            .from(schema.tag)
-            .where(eq(schema.tag.organizationId, input.organizationId))
+            .from(schema.tagTable)
+            .where(eq(schema.tagTable.organizationId, input.organizationId))
         )
       )({ organizationId }),
 
@@ -104,7 +104,7 @@ const makeTagRepository = Effect.gen(function* () {
       db
         .makeQuery((execute, input: TTagCreate) =>
           execute((client) =>
-            client.insert(schema.tag).values({
+            client.insert(schema.tagTable).values({
               id: input.id,
               name: input.name,
               slug: slugify(input.name),
@@ -130,7 +130,7 @@ const makeTagRepository = Effect.gen(function* () {
         .makeQuery((execute, input: TTagUpdate) =>
           execute((client) =>
             client
-              .update(schema.tag)
+              .update(schema.tagTable)
               .set({
                 name: input.name,
                 slug: slugify(input.name),
@@ -139,8 +139,8 @@ const makeTagRepository = Effect.gen(function* () {
               })
               .where(
                 and(
-                  eq(schema.tag.id, input.id),
-                  eq(schema.tag.organizationId, input.organizationId)
+                  eq(schema.tagTable.id, input.id),
+                  eq(schema.tagTable.organizationId, input.organizationId)
                 )
               )
           )
@@ -152,11 +152,11 @@ const makeTagRepository = Effect.gen(function* () {
         .makeQuery((execute, input: TTagDelete) =>
           execute((client) =>
             client
-              .delete(schema.tag)
+              .delete(schema.tagTable)
               .where(
                 and(
-                  eq(schema.tag.id, input.id),
-                  eq(schema.tag.organizationId, input.organizationId)
+                  eq(schema.tagTable.id, input.id),
+                  eq(schema.tagTable.organizationId, input.organizationId)
                 )
               )
           )
@@ -168,15 +168,15 @@ const makeTagRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.postTag.id,
-              postId: schema.postTag.postId,
-              tagId: schema.postTag.tagId,
-              organizationId: schema.postTag.organizationId,
-              createdAt: schema.postTag.createdAt,
-              updatedAt: schema.postTag.updatedAt,
+              id: schema.postTagTable.id,
+              postId: schema.postTagTable.postId,
+              tagId: schema.postTagTable.tagId,
+              organizationId: schema.postTagTable.organizationId,
+              createdAt: schema.postTagTable.createdAt,
+              updatedAt: schema.postTagTable.updatedAt,
             })
-            .from(schema.postTag)
-            .where(eq(schema.postTag.organizationId, input.organizationId))
+            .from(schema.postTagTable)
+            .where(eq(schema.postTagTable.organizationId, input.organizationId))
         )
       )({ organizationId }),
 
@@ -185,15 +185,17 @@ const makeTagRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.changelogTag.id,
-              changelogId: schema.changelogTag.changelogId,
-              tagId: schema.changelogTag.tagId,
-              organizationId: schema.changelogTag.organizationId,
-              createdAt: schema.changelogTag.createdAt,
-              updatedAt: schema.changelogTag.updatedAt,
+              id: schema.changelogTagTable.id,
+              changelogId: schema.changelogTagTable.changelogId,
+              tagId: schema.changelogTagTable.tagId,
+              organizationId: schema.changelogTagTable.organizationId,
+              createdAt: schema.changelogTagTable.createdAt,
+              updatedAt: schema.changelogTagTable.updatedAt,
             })
-            .from(schema.changelogTag)
-            .where(eq(schema.changelogTag.organizationId, input.organizationId))
+            .from(schema.changelogTagTable)
+            .where(
+              eq(schema.changelogTagTable.organizationId, input.organizationId)
+            )
         )
       )({ organizationId }),
 
@@ -202,11 +204,11 @@ const makeTagRepository = Effect.gen(function* () {
         yield* db.makeQuery((execute, input: TDeletePostTags) =>
           execute((client) =>
             client
-              .delete(schema.postTag)
+              .delete(schema.postTagTable)
               .where(
                 and(
-                  eq(schema.postTag.postId, input.postId),
-                  eq(schema.postTag.organizationId, input.organizationId)
+                  eq(schema.postTagTable.postId, input.postId),
+                  eq(schema.postTagTable.organizationId, input.organizationId)
                 )
               )
           )
@@ -230,7 +232,9 @@ const makeTagRepository = Effect.gen(function* () {
         );
 
         yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
-          execute((client) => client.insert(schema.postTag).values(input.rows))
+          execute((client) =>
+            client.insert(schema.postTagTable).values(input.rows)
+          )
         )({ rows });
       }).pipe(Effect.asVoid),
 
@@ -243,11 +247,14 @@ const makeTagRepository = Effect.gen(function* () {
         yield* db.makeQuery((execute, input: TDeleteChangelogTags) =>
           execute((client) =>
             client
-              .delete(schema.changelogTag)
+              .delete(schema.changelogTagTable)
               .where(
                 and(
-                  eq(schema.changelogTag.changelogId, input.changelogId),
-                  eq(schema.changelogTag.organizationId, input.organizationId)
+                  eq(schema.changelogTagTable.changelogId, input.changelogId),
+                  eq(
+                    schema.changelogTagTable.organizationId,
+                    input.organizationId
+                  )
                 )
               )
           )
@@ -272,7 +279,7 @@ const makeTagRepository = Effect.gen(function* () {
 
         yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
           execute((client) =>
-            client.insert(schema.changelogTag).values(input.rows)
+            client.insert(schema.changelogTagTable).values(input.rows)
           )
         )({ rows });
       }).pipe(Effect.asVoid),
@@ -288,13 +295,15 @@ const makeTagRepository = Effect.gen(function* () {
             .makeQuery((execute, input: TCountExistingTags) =>
               execute((client) =>
                 client
-                  .select({ id: schema.tag.id })
-                  .from(schema.tag)
+                  .select({ id: schema.tagTable.id })
+                  .from(schema.tagTable)
                   .where(
                     and(
-                      eq(schema.tag.organizationId, input.organizationId),
-                      ...(input.type ? [eq(schema.tag.type, input.type)] : []),
-                      inArray(schema.tag.id, input.tagIds)
+                      eq(schema.tagTable.organizationId, input.organizationId),
+                      ...(input.type
+                        ? [eq(schema.tagTable.type, input.type)]
+                        : []),
+                      inArray(schema.tagTable.id, input.tagIds)
                     )
                   )
               )
@@ -310,12 +319,12 @@ const makeTagRepository = Effect.gen(function* () {
         .makeQuery((execute, input: THasPost) =>
           execute((client) =>
             client
-              .select({ id: schema.post.id })
-              .from(schema.post)
+              .select({ id: schema.postTable.id })
+              .from(schema.postTable)
               .where(
                 and(
-                  eq(schema.post.id, input.postId),
-                  eq(schema.post.organizationId, input.organizationId)
+                  eq(schema.postTable.id, input.postId),
+                  eq(schema.postTable.organizationId, input.organizationId)
                 )
               )
           )
@@ -327,12 +336,12 @@ const makeTagRepository = Effect.gen(function* () {
         .makeQuery((execute, input: THasChangelog) =>
           execute((client) =>
             client
-              .select({ id: schema.changelog.id })
-              .from(schema.changelog)
+              .select({ id: schema.changelogTable.id })
+              .from(schema.changelogTable)
               .where(
                 and(
-                  eq(schema.changelog.id, input.changelogId),
-                  eq(schema.changelog.organizationId, input.organizationId)
+                  eq(schema.changelogTable.id, input.changelogId),
+                  eq(schema.changelogTable.organizationId, input.organizationId)
                 )
               )
           )
@@ -345,14 +354,14 @@ const makeTagRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                id: schema.tag.id,
-                creatorId: schema.tag.creatorId,
+                id: schema.tagTable.id,
+                creatorId: schema.tagTable.creatorId,
               })
-              .from(schema.tag)
+              .from(schema.tagTable)
               .where(
                 and(
-                  eq(schema.tag.id, input.id),
-                  eq(schema.tag.organizationId, input.organizationId)
+                  eq(schema.tagTable.id, input.id),
+                  eq(schema.tagTable.organizationId, input.organizationId)
                 )
               )
               .limit(1)

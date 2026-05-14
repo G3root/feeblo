@@ -29,13 +29,16 @@ const makeChangelogRepository = Effect.gen(function* () {
         .makeQuery((execute, input: TFindByCreatorId) =>
           execute((client) =>
             client
-              .select({ id: schema.changelog.id })
-              .from(schema.changelog)
+              .select({ id: schema.changelogTable.id })
+              .from(schema.changelogTable)
               .where(
                 and(
-                  eq(schema.changelog.id, input.id),
-                  eq(schema.changelog.organizationId, input.organizationId),
-                  eq(schema.changelog.creatorMemberId, input.memberId)
+                  eq(schema.changelogTable.id, input.id),
+                  eq(
+                    schema.changelogTable.organizationId,
+                    input.organizationId
+                  ),
+                  eq(schema.changelogTable.creatorMemberId, input.memberId)
                 )
               )
           )
@@ -47,29 +50,31 @@ const makeChangelogRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.changelog.id,
-              title: schema.changelog.title,
-              slug: schema.changelog.slug,
-              content: schema.changelog.content,
-              status: schema.changelog.status,
-              scheduledAt: schema.changelog.scheduledAt,
-              publishedAt: schema.changelog.publishedAt,
-              organizationId: schema.changelog.organizationId,
-              creatorMemberId: schema.changelog.creatorMemberId,
-              creatorId: schema.changelog.creatorId,
-              createdAt: schema.changelog.createdAt,
-              updatedAt: schema.changelog.updatedAt,
+              id: schema.changelogTable.id,
+              title: schema.changelogTable.title,
+              slug: schema.changelogTable.slug,
+              content: schema.changelogTable.content,
+              status: schema.changelogTable.status,
+              scheduledAt: schema.changelogTable.scheduledAt,
+              publishedAt: schema.changelogTable.publishedAt,
+              organizationId: schema.changelogTable.organizationId,
+              creatorMemberId: schema.changelogTable.creatorMemberId,
+              creatorId: schema.changelogTable.creatorId,
+              createdAt: schema.changelogTable.createdAt,
+              updatedAt: schema.changelogTable.updatedAt,
               user: {
-                name: sql<string | null>`${schema.user.name}`,
-                image: sql<string | null>`${schema.user.image}`,
+                name: sql<string | null>`${schema.userTable.name}`,
+                image: sql<string | null>`${schema.userTable.image}`,
               },
             })
-            .from(schema.changelog)
+            .from(schema.changelogTable)
             .leftJoin(
-              schema.user,
-              eq(schema.user.id, schema.changelog.creatorId)
+              schema.userTable,
+              eq(schema.userTable.id, schema.changelogTable.creatorId)
             )
-            .where(eq(schema.changelog.organizationId, input.organizationId))
+            .where(
+              eq(schema.changelogTable.organizationId, input.organizationId)
+            )
         )
       )({ organizationId }),
 
@@ -78,32 +83,32 @@ const makeChangelogRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.changelog.id,
-              title: schema.changelog.title,
-              slug: schema.changelog.slug,
-              content: schema.changelog.content,
-              status: schema.changelog.status,
-              scheduledAt: schema.changelog.scheduledAt,
-              publishedAt: schema.changelog.publishedAt,
-              organizationId: schema.changelog.organizationId,
-              creatorMemberId: schema.changelog.creatorMemberId,
-              creatorId: schema.changelog.creatorId,
-              createdAt: schema.changelog.createdAt,
-              updatedAt: schema.changelog.updatedAt,
+              id: schema.changelogTable.id,
+              title: schema.changelogTable.title,
+              slug: schema.changelogTable.slug,
+              content: schema.changelogTable.content,
+              status: schema.changelogTable.status,
+              scheduledAt: schema.changelogTable.scheduledAt,
+              publishedAt: schema.changelogTable.publishedAt,
+              organizationId: schema.changelogTable.organizationId,
+              creatorMemberId: schema.changelogTable.creatorMemberId,
+              creatorId: schema.changelogTable.creatorId,
+              createdAt: schema.changelogTable.createdAt,
+              updatedAt: schema.changelogTable.updatedAt,
               user: {
-                name: sql<string | null>`${schema.user.name}`,
-                image: sql<string | null>`${schema.user.image}`,
+                name: sql<string | null>`${schema.userTable.name}`,
+                image: sql<string | null>`${schema.userTable.image}`,
               },
             })
-            .from(schema.changelog)
+            .from(schema.changelogTable)
             .leftJoin(
-              schema.user,
-              eq(schema.user.id, schema.changelog.creatorId)
+              schema.userTable,
+              eq(schema.userTable.id, schema.changelogTable.creatorId)
             )
             .where(
               and(
-                eq(schema.changelog.organizationId, input.organizationId),
-                eq(schema.changelog.status, "published")
+                eq(schema.changelogTable.organizationId, input.organizationId),
+                eq(schema.changelogTable.status, "published")
               )
             )
         )
@@ -124,7 +129,7 @@ const makeChangelogRepository = Effect.gen(function* () {
       db
         .makeQuery((execute, input: TChangelogCreateInternal) =>
           execute((client) =>
-            client.insert(schema.changelog).values({
+            client.insert(schema.changelogTable).values({
               id: input.id,
               title: input.title,
               slug: input.slug || slugify(input.title),
@@ -169,7 +174,7 @@ const makeChangelogRepository = Effect.gen(function* () {
         .makeQuery((execute, input: TChangelogUpdate) =>
           execute((client) =>
             client
-              .update(schema.changelog)
+              .update(schema.changelogTable)
               .set({
                 title,
                 slug: slug || slugify(title),
@@ -181,8 +186,8 @@ const makeChangelogRepository = Effect.gen(function* () {
               })
               .where(
                 and(
-                  eq(schema.changelog.id, input.id),
-                  eq(schema.changelog.organizationId, input.organizationId)
+                  eq(schema.changelogTable.id, input.id),
+                  eq(schema.changelogTable.organizationId, input.organizationId)
                 )
               )
           )
@@ -203,11 +208,11 @@ const makeChangelogRepository = Effect.gen(function* () {
         .makeQuery((execute, input: TChangelogDelete) =>
           execute((client) =>
             client
-              .delete(schema.changelog)
+              .delete(schema.changelogTable)
               .where(
                 and(
-                  eq(schema.changelog.id, input.id),
-                  eq(schema.changelog.organizationId, input.organizationId)
+                  eq(schema.changelogTable.id, input.id),
+                  eq(schema.changelogTable.organizationId, input.organizationId)
                 )
               )
           )

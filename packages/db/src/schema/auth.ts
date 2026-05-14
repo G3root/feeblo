@@ -10,7 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
+export const userTable = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
@@ -31,7 +31,7 @@ export const user = pgTable("user", {
   lastLoginMethod: text("last_login_method"),
 });
 
-export const session = pgTable(
+export const sessionTable = pgTable(
   "session",
   {
     id: text("id").primaryKey(),
@@ -47,14 +47,14 @@ export const session = pgTable(
     userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => userTable.id, { onDelete: "cascade" }),
     impersonatedBy: text("impersonated_by"),
     activeOrganizationId: text("active_organization_id"),
   },
   (table) => [index("session_userId_idx").on(table.userId)]
 );
 
-export const account = pgTable(
+export const accountTable = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
@@ -62,7 +62,7 @@ export const account = pgTable(
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => userTable.id, { onDelete: "cascade" }),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
@@ -84,7 +84,7 @@ export const account = pgTable(
   (table) => [index("account_userId_idx").on(table.userId)]
 );
 
-export const verification = pgTable(
+export const verificationTable = pgTable(
   "verification",
   {
     id: text("id").primaryKey(),
@@ -102,7 +102,7 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)]
 );
 
-export const twoFactor = pgTable(
+export const twoFactorTable = pgTable(
   "two_factor",
   {
     id: text("id").primaryKey(),
@@ -110,7 +110,7 @@ export const twoFactor = pgTable(
     backupCodes: text("backup_codes").notNull(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => userTable.id, { onDelete: "cascade" }),
   },
   (table) => [
     index("twoFactor_secret_idx").on(table.secret),
@@ -131,7 +131,7 @@ export const organizationTable = pgTable(
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]
 );
 
-export const member = pgTable(
+export const memberTable = pgTable(
   "member",
   {
     id: text("id").primaryKey(),
@@ -140,7 +140,7 @@ export const member = pgTable(
       .references(() => organizationTable.id, { onDelete: "cascade" }),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => userTable.id, { onDelete: "cascade" }),
     role: text("role")
       .default("member")
       .$type<"member" | "owner" | "admin">()
@@ -157,7 +157,7 @@ export const member = pgTable(
   ]
 );
 
-export const invitation = pgTable(
+export const invitationTable = pgTable(
   "invitation",
   {
     id: text("id").primaryKey(),
@@ -173,7 +173,7 @@ export const invitation = pgTable(
       .notNull(),
     inviterId: text("inviter_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => userTable.id, { onDelete: "cascade" }),
   },
   (table) => [
     index("invitation_organizationId_idx").on(table.organizationId),

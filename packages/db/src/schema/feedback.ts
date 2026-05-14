@@ -12,7 +12,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { member, organizationTable, user } from "./auth";
+import { memberTable, organizationTable, userTable } from "./auth";
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PUBLIC",
@@ -69,7 +69,7 @@ export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
 
 export const tagTypeEnum = pgEnum("tag_type", ["FEEDBACK", "CHANGELOG"]);
 
-export const board = pgTable(
+export const boardTable = pgTable(
   "board",
   {
     id: text("id").primaryKey(),
@@ -79,12 +79,15 @@ export const board = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    creatorId: text("creator_id").references(() => user.id, {
+    creatorId: text("creator_id").references(() => userTable.id, {
       onDelete: "set null",
     }),
-    creatorMemberId: text("creator_member_id").references(() => member.id, {
-      onDelete: "set null",
-    }),
+    creatorMemberId: text("creator_member_id").references(
+      () => memberTable.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -98,7 +101,7 @@ export const board = pgTable(
   ]
 );
 
-export const tag = pgTable(
+export const tagTable = pgTable(
   "tag",
   {
     id: text("id").primaryKey(),
@@ -108,12 +111,15 @@ export const tag = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    creatorId: text("creator_id").references(() => user.id, {
+    creatorId: text("creator_id").references(() => userTable.id, {
       onDelete: "set null",
     }),
-    creatorMemberId: text("creator_member_id").references(() => member.id, {
-      onDelete: "set null",
-    }),
+    creatorMemberId: text("creator_member_id").references(
+      () => memberTable.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -136,7 +142,7 @@ export const tag = pgTable(
   ]
 );
 
-export const postStatus = pgTable(
+export const postStatusTable = pgTable(
   "post_status",
   {
     id: text("id").primaryKey(),
@@ -166,16 +172,16 @@ export const postStatus = pgTable(
   ]
 );
 
-export const postTag = pgTable(
+export const postTagTable = pgTable(
   "post_tag",
   {
     id: text("id").primaryKey(),
     postId: text("post_id")
       .notNull()
-      .references(() => post.id, { onDelete: "cascade" }),
+      .references(() => postTable.id, { onDelete: "cascade" }),
     tagId: text("tag_id")
       .notNull()
-      .references(() => tag.id, { onDelete: "cascade" }),
+      .references(() => tagTable.id, { onDelete: "cascade" }),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -194,16 +200,16 @@ export const postTag = pgTable(
   ]
 );
 
-export const changelogTag = pgTable(
+export const changelogTagTable = pgTable(
   "changelog_tag",
   {
     id: text("id").primaryKey(),
     changelogId: text("changelog_id")
       .notNull()
-      .references(() => changelog.id, { onDelete: "cascade" }),
+      .references(() => changelogTable.id, { onDelete: "cascade" }),
     tagId: text("tag_id")
       .notNull()
-      .references(() => tag.id, { onDelete: "cascade" }),
+      .references(() => tagTable.id, { onDelete: "cascade" }),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -225,7 +231,7 @@ export const changelogTag = pgTable(
   ]
 );
 
-export const post = pgTable(
+export const postTable = pgTable(
   "post",
   {
     id: text("id").primaryKey(),
@@ -235,19 +241,22 @@ export const post = pgTable(
     excerpt: text("excerpt").notNull().default(""),
     boardId: text("board_id")
       .notNull()
-      .references(() => board.id, { onDelete: "cascade" }),
+      .references(() => boardTable.id, { onDelete: "cascade" }),
     statusId: text("status_schema_id")
       .notNull()
-      .references(() => postStatus.id, { onDelete: "restrict" }),
+      .references(() => postStatusTable.id, { onDelete: "restrict" }),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    creatorId: text("creator_id").references(() => user.id, {
+    creatorId: text("creator_id").references(() => userTable.id, {
       onDelete: "set null",
     }),
-    creatorMemberId: text("creator_member_id").references(() => member.id, {
-      onDelete: "set null",
-    }),
+    creatorMemberId: text("creator_member_id").references(
+      () => memberTable.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     mergedIntoPostId: text("merged_into_post_id"),
@@ -290,19 +299,19 @@ export const post = pgTable(
   ]
 );
 
-export const upvote = pgTable(
+export const upvoteTable = pgTable(
   "upvote",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    memberId: text("member_id").references(() => member.id, {
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
     postId: text("post_id")
       .notNull()
-      .references(() => post.id, { onDelete: "cascade" }),
+      .references(() => postTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -317,19 +326,19 @@ export const upvote = pgTable(
   ]
 );
 
-export const postReaction = pgTable(
+export const postReactionTable = pgTable(
   "post_reaction",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    memberId: text("member_id").references(() => member.id, {
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
     postId: text("post_id")
       .notNull()
-      .references(() => post.id, { onDelete: "cascade" }),
+      .references(() => postTable.id, { onDelete: "cascade" }),
     emoji: text("emoji").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -348,7 +357,7 @@ export const postReaction = pgTable(
   ]
 );
 
-export const comment = pgTable("comment", {
+export const commentTable = pgTable("comment", {
   id: text("id").primaryKey(),
   content: text("content").notNull(),
   organizationId: text("organization_id")
@@ -356,11 +365,11 @@ export const comment = pgTable("comment", {
     .references(() => organizationTable.id, { onDelete: "cascade" }),
   postId: text("post_id")
     .notNull()
-    .references(() => post.id, { onDelete: "cascade" }),
+    .references(() => postTable.id, { onDelete: "cascade" }),
   userId: text("user_id")
     .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  memberId: text("member_id").references(() => member.id, {
+    .references(() => userTable.id, { onDelete: "cascade" }),
+  memberId: text("member_id").references(() => memberTable.id, {
     onDelete: "set null",
   }),
   visibility: postCommentVisibilityEnum("visibility")
@@ -374,26 +383,26 @@ export const comment = pgTable("comment", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   parentCommentId: text("parent_comment_id").references(
-    (): AnyPgColumn => comment.id,
+    (): AnyPgColumn => commentTable.id,
     {
       onDelete: "cascade",
     }
   ),
 });
 
-export const commentReaction = pgTable(
+export const commentReactionTable = pgTable(
   "comment_reaction",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    memberId: text("member_id").references(() => member.id, {
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
     commentId: text("comment_id")
       .notNull()
-      .references(() => comment.id, { onDelete: "cascade" }),
+      .references(() => commentTable.id, { onDelete: "cascade" }),
     emoji: text("emoji").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -412,7 +421,7 @@ export const commentReaction = pgTable(
   ]
 );
 
-export const site = pgTable(
+export const siteTable = pgTable(
   "site",
   {
     id: text("id").primaryKey(),
@@ -437,7 +446,7 @@ export const site = pgTable(
   (table) => [uniqueIndex("site_organizationId_uidx").on(table.organizationId)]
 );
 
-export const changelog = pgTable(
+export const changelogTable = pgTable(
   "changelog",
   {
     id: text("id").primaryKey(),
@@ -450,12 +459,15 @@ export const changelog = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    creatorId: text("creator_id").references(() => user.id, {
+    creatorId: text("creator_id").references(() => userTable.id, {
       onDelete: "set null",
     }),
-    creatorMemberId: text("creator_member_id").references(() => member.id, {
-      onDelete: "set null",
-    }),
+    creatorMemberId: text("creator_member_id").references(
+      () => memberTable.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -472,4 +484,4 @@ export const changelog = pgTable(
   ]
 );
 
-export type InsertComment = typeof comment.$inferInsert;
+export type InsertComment = typeof commentTable.$inferInsert;

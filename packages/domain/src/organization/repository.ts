@@ -34,12 +34,15 @@ const makeOrganizationRepository = Effect.gen(function* () {
                   logo: schema.organizationTable.logo,
                   createdAt: schema.organizationTable.createdAt,
                 })
-                .from(schema.member)
+                .from(schema.memberTable)
                 .innerJoin(
                   schema.organizationTable,
-                  eq(schema.member.organizationId, schema.organizationTable.id)
+                  eq(
+                    schema.memberTable.organizationId,
+                    schema.organizationTable.id
+                  )
                 )
-                .where(eq(schema.member.userId, input.userId))
+                .where(eq(schema.memberTable.userId, input.userId))
             )
         )({ userId });
 
@@ -76,13 +79,13 @@ const makeOrganizationRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                role: schema.member.role,
+                role: schema.memberTable.role,
               })
-              .from(schema.member)
+              .from(schema.memberTable)
               .where(
                 and(
-                  eq(schema.member.organizationId, input.organizationId),
-                  eq(schema.member.userId, input.userId)
+                  eq(schema.memberTable.organizationId, input.organizationId),
+                  eq(schema.memberTable.userId, input.userId)
                 )
               )
           )

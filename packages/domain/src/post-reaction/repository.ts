@@ -41,12 +41,12 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TPostReactionList) =>
             execute((client) =>
               client
-                .select({ id: schema.post.id })
-                .from(schema.post)
+                .select({ id: schema.postTable.id })
+                .from(schema.postTable)
                 .where(
                   and(
-                    eq(schema.post.id, input.postId),
-                    eq(schema.post.organizationId, input.organizationId)
+                    eq(schema.postTable.id, input.postId),
+                    eq(schema.postTable.organizationId, input.organizationId)
                   )
                 )
                 .limit(1)
@@ -62,24 +62,24 @@ const makePostReactionRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                id: schema.postReaction.id,
-                postId: schema.postReaction.postId,
-                organizationId: schema.post.organizationId,
-                userId: schema.postReaction.userId,
-                memberId: schema.postReaction.memberId,
-                emoji: schema.postReaction.emoji,
-                createdAt: schema.postReaction.createdAt,
-                updatedAt: schema.postReaction.updatedAt,
+                id: schema.postReactionTable.id,
+                postId: schema.postReactionTable.postId,
+                organizationId: schema.postTable.organizationId,
+                userId: schema.postReactionTable.userId,
+                memberId: schema.postReactionTable.memberId,
+                emoji: schema.postReactionTable.emoji,
+                createdAt: schema.postReactionTable.createdAt,
+                updatedAt: schema.postReactionTable.updatedAt,
               })
-              .from(schema.postReaction)
+              .from(schema.postReactionTable)
               .innerJoin(
-                schema.post,
-                eq(schema.post.id, schema.postReaction.postId)
+                schema.postTable,
+                eq(schema.postTable.id, schema.postReactionTable.postId)
               )
               .where(
                 and(
-                  eq(schema.post.organizationId, input.organizationId),
-                  eq(schema.postReaction.postId, input.postId)
+                  eq(schema.postTable.organizationId, input.organizationId),
+                  eq(schema.postReactionTable.postId, input.postId)
                 )
               )
           )
@@ -92,17 +92,17 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TPostReactionList) =>
             execute((client) =>
               client
-                .select({ id: schema.post.id })
-                .from(schema.post)
+                .select({ id: schema.postTable.id })
+                .from(schema.postTable)
                 .innerJoin(
-                  schema.board,
-                  eq(schema.board.id, schema.post.boardId)
+                  schema.boardTable,
+                  eq(schema.boardTable.id, schema.postTable.boardId)
                 )
                 .where(
                   and(
-                    eq(schema.post.id, input.postId),
-                    eq(schema.post.organizationId, input.organizationId),
-                    eq(schema.board.visibility, "PUBLIC")
+                    eq(schema.postTable.id, input.postId),
+                    eq(schema.postTable.organizationId, input.organizationId),
+                    eq(schema.boardTable.visibility, "PUBLIC")
                   )
                 )
                 .limit(1)
@@ -118,24 +118,24 @@ const makePostReactionRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                id: schema.postReaction.id,
-                postId: schema.postReaction.postId,
-                organizationId: schema.post.organizationId,
-                userId: schema.postReaction.userId,
-                memberId: schema.postReaction.memberId,
-                emoji: schema.postReaction.emoji,
-                createdAt: schema.postReaction.createdAt,
-                updatedAt: schema.postReaction.updatedAt,
+                id: schema.postReactionTable.id,
+                postId: schema.postReactionTable.postId,
+                organizationId: schema.postTable.organizationId,
+                userId: schema.postReactionTable.userId,
+                memberId: schema.postReactionTable.memberId,
+                emoji: schema.postReactionTable.emoji,
+                createdAt: schema.postReactionTable.createdAt,
+                updatedAt: schema.postReactionTable.updatedAt,
               })
-              .from(schema.postReaction)
+              .from(schema.postReactionTable)
               .innerJoin(
-                schema.post,
-                eq(schema.post.id, schema.postReaction.postId)
+                schema.postTable,
+                eq(schema.postTable.id, schema.postReactionTable.postId)
               )
               .where(
                 and(
-                  eq(schema.post.organizationId, input.organizationId),
-                  eq(schema.postReaction.postId, input.postId)
+                  eq(schema.postTable.organizationId, input.organizationId),
+                  eq(schema.postReactionTable.postId, input.postId)
                 )
               )
           )
@@ -148,12 +148,12 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TPostReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.post.id })
-                .from(schema.post)
+                .select({ id: schema.postTable.id })
+                .from(schema.postTable)
                 .where(
                   and(
-                    eq(schema.post.id, input.postId),
-                    eq(schema.post.organizationId, input.organizationId)
+                    eq(schema.postTable.id, input.postId),
+                    eq(schema.postTable.organizationId, input.organizationId)
                   )
                 )
                 .limit(1)
@@ -169,13 +169,13 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TPostReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.postReaction.id })
-                .from(schema.postReaction)
+                .select({ id: schema.postReactionTable.id })
+                .from(schema.postReactionTable)
                 .where(
                   and(
-                    eq(schema.postReaction.postId, input.postId),
-                    eq(schema.postReaction.userId, input.userId),
-                    eq(schema.postReaction.emoji, input.emoji)
+                    eq(schema.postReactionTable.postId, input.postId),
+                    eq(schema.postReactionTable.userId, input.userId),
+                    eq(schema.postReactionTable.emoji, input.emoji)
                   )
                 )
                 .limit(1)
@@ -187,8 +187,8 @@ const makePostReactionRepository = Effect.gen(function* () {
           yield* db.makeQuery((execute, input: TDeletePostReaction) =>
             execute((client) =>
               client
-                .delete(schema.postReaction)
-                .where(eq(schema.postReaction.id, input.id))
+                .delete(schema.postReactionTable)
+                .where(eq(schema.postReactionTable.id, input.id))
             )
           )({ id: existingReaction.value.id });
 
@@ -199,12 +199,12 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TFindMember) =>
             execute((client) =>
               client
-                .select({ id: schema.member.id })
-                .from(schema.member)
+                .select({ id: schema.memberTable.id })
+                .from(schema.memberTable)
                 .where(
                   and(
-                    eq(schema.member.organizationId, input.organizationId),
-                    eq(schema.member.userId, input.userId)
+                    eq(schema.memberTable.organizationId, input.organizationId),
+                    eq(schema.memberTable.userId, input.userId)
                   )
                 )
                 .limit(1)
@@ -214,7 +214,7 @@ const makePostReactionRepository = Effect.gen(function* () {
 
         yield* db.makeQuery((execute, input: TCreatePostReaction) =>
           execute((client) =>
-            client.insert(schema.postReaction).values({
+            client.insert(schema.postReactionTable).values({
               id: generateId("postReaction"),
               postId: input.postId,
               userId: input.userId,
@@ -246,17 +246,17 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TPostReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.post.id })
-                .from(schema.post)
+                .select({ id: schema.postTable.id })
+                .from(schema.postTable)
                 .innerJoin(
-                  schema.board,
-                  eq(schema.board.id, schema.post.boardId)
+                  schema.boardTable,
+                  eq(schema.boardTable.id, schema.postTable.boardId)
                 )
                 .where(
                   and(
-                    eq(schema.post.id, input.postId),
-                    eq(schema.post.organizationId, input.organizationId),
-                    eq(schema.board.visibility, "PUBLIC")
+                    eq(schema.postTable.id, input.postId),
+                    eq(schema.postTable.organizationId, input.organizationId),
+                    eq(schema.boardTable.visibility, "PUBLIC")
                   )
                 )
                 .limit(1)
@@ -272,13 +272,13 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TPostReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.postReaction.id })
-                .from(schema.postReaction)
+                .select({ id: schema.postReactionTable.id })
+                .from(schema.postReactionTable)
                 .where(
                   and(
-                    eq(schema.postReaction.postId, input.postId),
-                    eq(schema.postReaction.userId, input.userId),
-                    eq(schema.postReaction.emoji, input.emoji)
+                    eq(schema.postReactionTable.postId, input.postId),
+                    eq(schema.postReactionTable.userId, input.userId),
+                    eq(schema.postReactionTable.emoji, input.emoji)
                   )
                 )
                 .limit(1)
@@ -290,8 +290,8 @@ const makePostReactionRepository = Effect.gen(function* () {
           yield* db.makeQuery((execute, input: TDeletePostReaction) =>
             execute((client) =>
               client
-                .delete(schema.postReaction)
-                .where(eq(schema.postReaction.id, input.id))
+                .delete(schema.postReactionTable)
+                .where(eq(schema.postReactionTable.id, input.id))
             )
           )({ id: existingReaction.value.id });
 
@@ -302,12 +302,12 @@ const makePostReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TFindMember) =>
             execute((client) =>
               client
-                .select({ id: schema.member.id })
-                .from(schema.member)
+                .select({ id: schema.memberTable.id })
+                .from(schema.memberTable)
                 .where(
                   and(
-                    eq(schema.member.organizationId, input.organizationId),
-                    eq(schema.member.userId, input.userId)
+                    eq(schema.memberTable.organizationId, input.organizationId),
+                    eq(schema.memberTable.userId, input.userId)
                   )
                 )
                 .limit(1)
@@ -317,7 +317,7 @@ const makePostReactionRepository = Effect.gen(function* () {
 
         yield* db.makeQuery((execute, input: TCreatePostReaction) =>
           execute((client) =>
-            client.insert(schema.postReaction).values({
+            client.insert(schema.postReactionTable).values({
               id: generateId("postReaction"),
               postId: input.postId,
               userId: input.userId,

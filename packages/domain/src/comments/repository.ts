@@ -46,32 +46,35 @@ const makeCommentRepository = Effect.gen(function* () {
     findMany: ({ organizationId, postId, visibility }: FindManyComments) => {
       const where: SQL[] = [];
       if (visibility) {
-        where.push(eq(schema.comment.visibility, visibility));
+        where.push(eq(schema.commentTable.visibility, visibility));
       }
 
-      where.push(eq(schema.comment.organizationId, organizationId));
-      where.push(eq(schema.comment.postId, postId));
+      where.push(eq(schema.commentTable.organizationId, organizationId));
+      where.push(eq(schema.commentTable.postId, postId));
 
       return db.makeQuery((execute, input: FindManyWhere) =>
         execute((client) =>
           client
             .select({
-              id: schema.comment.id,
-              content: schema.comment.content,
-              createdAt: schema.comment.createdAt,
-              updatedAt: schema.comment.updatedAt,
-              organizationId: schema.comment.organizationId,
-              postId: schema.comment.postId,
-              userId: schema.comment.userId,
-              visibility: schema.comment.visibility,
-              parentCommentId: schema.comment.parentCommentId,
-              memberId: schema.comment.memberId,
+              id: schema.commentTable.id,
+              content: schema.commentTable.content,
+              createdAt: schema.commentTable.createdAt,
+              updatedAt: schema.commentTable.updatedAt,
+              organizationId: schema.commentTable.organizationId,
+              postId: schema.commentTable.postId,
+              userId: schema.commentTable.userId,
+              visibility: schema.commentTable.visibility,
+              parentCommentId: schema.commentTable.parentCommentId,
+              memberId: schema.commentTable.memberId,
               user: {
-                name: schema.user.name,
+                name: schema.userTable.name,
               },
             })
-            .from(schema.comment)
-            .innerJoin(schema.user, eq(schema.comment.userId, schema.user.id))
+            .from(schema.commentTable)
+            .innerJoin(
+              schema.userTable,
+              eq(schema.commentTable.userId, schema.userTable.id)
+            )
             .where(and(...input.where))
         )
       )({ where });
@@ -81,30 +84,39 @@ const makeCommentRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.comment.id,
-              content: schema.comment.content,
-              createdAt: schema.comment.createdAt,
-              updatedAt: schema.comment.updatedAt,
-              organizationId: schema.comment.organizationId,
-              postId: schema.comment.postId,
-              userId: schema.comment.userId,
-              visibility: schema.comment.visibility,
-              parentCommentId: schema.comment.parentCommentId,
-              memberId: schema.comment.memberId,
+              id: schema.commentTable.id,
+              content: schema.commentTable.content,
+              createdAt: schema.commentTable.createdAt,
+              updatedAt: schema.commentTable.updatedAt,
+              organizationId: schema.commentTable.organizationId,
+              postId: schema.commentTable.postId,
+              userId: schema.commentTable.userId,
+              visibility: schema.commentTable.visibility,
+              parentCommentId: schema.commentTable.parentCommentId,
+              memberId: schema.commentTable.memberId,
               user: {
-                name: schema.user.name,
+                name: schema.userTable.name,
               },
             })
-            .from(schema.comment)
-            .innerJoin(schema.user, eq(schema.comment.userId, schema.user.id))
-            .innerJoin(schema.post, eq(schema.post.id, schema.comment.postId))
-            .innerJoin(schema.board, eq(schema.board.id, schema.post.boardId))
+            .from(schema.commentTable)
+            .innerJoin(
+              schema.userTable,
+              eq(schema.commentTable.userId, schema.userTable.id)
+            )
+            .innerJoin(
+              schema.postTable,
+              eq(schema.postTable.id, schema.commentTable.postId)
+            )
+            .innerJoin(
+              schema.boardTable,
+              eq(schema.boardTable.id, schema.postTable.boardId)
+            )
             .where(
               and(
-                eq(schema.comment.organizationId, input.organizationId),
-                eq(schema.comment.postId, input.postId),
-                eq(schema.comment.visibility, "PUBLIC"),
-                eq(schema.board.visibility, "PUBLIC")
+                eq(schema.commentTable.organizationId, input.organizationId),
+                eq(schema.commentTable.postId, input.postId),
+                eq(schema.commentTable.visibility, "PUBLIC"),
+                eq(schema.boardTable.visibility, "PUBLIC")
               )
             )
         )
@@ -114,7 +126,7 @@ const makeCommentRepository = Effect.gen(function* () {
         .makeQuery((execute, input: InsertComment) =>
           execute((client) =>
             client
-              .insert(schema.comment)
+              .insert(schema.commentTable)
               .values({
                 ...input,
                 createdAt: new Date(),
@@ -129,17 +141,17 @@ const makeCommentRepository = Effect.gen(function* () {
         .makeQuery((execute, input: DeleteComment) =>
           execute((client) =>
             client
-              .delete(schema.comment)
+              .delete(schema.commentTable)
               .where(
                 and(
-                  eq(schema.comment.id, input.id),
-                  eq(schema.comment.organizationId, input.organizationId),
-                  eq(schema.comment.postId, input.postId),
-                  eq(schema.comment.userId, input.userId)
+                  eq(schema.commentTable.id, input.id),
+                  eq(schema.commentTable.organizationId, input.organizationId),
+                  eq(schema.commentTable.postId, input.postId),
+                  eq(schema.commentTable.userId, input.userId)
                 )
               )
               .returning({
-                id: schema.comment.id,
+                id: schema.commentTable.id,
               })
           )
         )(args)
@@ -149,17 +161,17 @@ const makeCommentRepository = Effect.gen(function* () {
         .makeQuery((execute, input: UpdateComment) =>
           execute((client) =>
             client
-              .update(schema.comment)
+              .update(schema.commentTable)
               .set({
                 content: input.content,
                 updatedAt: new Date(),
               })
               .where(
                 and(
-                  eq(schema.comment.id, input.id),
-                  eq(schema.comment.organizationId, input.organizationId),
-                  eq(schema.comment.postId, input.postId),
-                  eq(schema.comment.userId, input.userId)
+                  eq(schema.commentTable.id, input.id),
+                  eq(schema.commentTable.organizationId, input.organizationId),
+                  eq(schema.commentTable.postId, input.postId),
+                  eq(schema.commentTable.userId, input.userId)
                 )
               )
               .returning()
@@ -172,16 +184,16 @@ const makeCommentRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                id: schema.comment.id,
+                id: schema.commentTable.id,
               })
-              .from(schema.comment)
+              .from(schema.commentTable)
               .where(
                 and(
-                  eq(schema.comment.id, input.id),
-                  eq(schema.comment.organizationId, input.organizationId),
-                  eq(schema.comment.postId, input.postId),
+                  eq(schema.commentTable.id, input.id),
+                  eq(schema.commentTable.organizationId, input.organizationId),
+                  eq(schema.commentTable.postId, input.postId),
                   ...(input.userId
-                    ? [eq(schema.comment.userId, input.userId)]
+                    ? [eq(schema.commentTable.userId, input.userId)]
                     : [])
                 )
               )

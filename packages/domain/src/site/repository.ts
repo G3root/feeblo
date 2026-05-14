@@ -40,19 +40,19 @@ const makeSiteRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                id: schema.site.id,
-                name: schema.site.name,
-                subdomain: schema.site.subdomain,
-                customDomain: schema.site.customDomain,
-                changelogVisibility: schema.site.changelogVisibility,
-                roadmapVisibility: schema.site.roadmapVisibility,
-                createdAt: schema.site.createdAt,
-                updatedAt: schema.site.updatedAt,
-                organizationId: schema.site.organizationId,
-                hidePoweredBy: schema.site.hidePoweredBy,
+                id: schema.siteTable.id,
+                name: schema.siteTable.name,
+                subdomain: schema.siteTable.subdomain,
+                customDomain: schema.siteTable.customDomain,
+                changelogVisibility: schema.siteTable.changelogVisibility,
+                roadmapVisibility: schema.siteTable.roadmapVisibility,
+                createdAt: schema.siteTable.createdAt,
+                updatedAt: schema.siteTable.updatedAt,
+                organizationId: schema.siteTable.organizationId,
+                hidePoweredBy: schema.siteTable.hidePoweredBy,
               })
-              .from(schema.site)
-              .where(eq(schema.site.organizationId, input.organizationId))
+              .from(schema.siteTable)
+              .where(eq(schema.siteTable.organizationId, input.organizationId))
               .limit(1)
           )
         )(args)
@@ -61,10 +61,12 @@ const makeSiteRepository = Effect.gen(function* () {
     findMany: (findManyArgs: findManyArgs) => {
       const where: SQL[] = [];
       if (findManyArgs.organizationId) {
-        where.push(eq(schema.site.organizationId, findManyArgs.organizationId));
+        where.push(
+          eq(schema.siteTable.organizationId, findManyArgs.organizationId)
+        );
       }
       if (findManyArgs.subdomain) {
-        where.push(eq(schema.site.subdomain, findManyArgs.subdomain));
+        where.push(eq(schema.siteTable.subdomain, findManyArgs.subdomain));
       }
 
       const whereClause = where.length > 1 ? and(...where) : where[0];
@@ -73,28 +75,29 @@ const makeSiteRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.site.id,
-              name: schema.site.name,
-              subdomain: schema.site.subdomain,
-              customDomain: schema.site.customDomain,
-              changelogVisibility: schema.site.changelogVisibility,
-              roadmapVisibility: schema.site.roadmapVisibility,
-              createdAt: schema.site.createdAt,
-              updatedAt: schema.site.updatedAt,
-              organizationId: schema.site.organizationId,
-              hidePoweredBy: schema.site.hidePoweredBy,
+              id: schema.siteTable.id,
+              name: schema.siteTable.name,
+              subdomain: schema.siteTable.subdomain,
+              customDomain: schema.siteTable.customDomain,
+              changelogVisibility: schema.siteTable.changelogVisibility,
+              roadmapVisibility: schema.siteTable.roadmapVisibility,
+              createdAt: schema.siteTable.createdAt,
+              updatedAt: schema.siteTable.updatedAt,
+              organizationId: schema.siteTable.organizationId,
+              hidePoweredBy: schema.siteTable.hidePoweredBy,
             })
-            .from(schema.site)
+            .from(schema.siteTable)
             .where(input.whereClause)
             .limit(input.limit)
         )
       )({ whereClause, limit: findManyArgs.limit });
     },
     update: (args: updateArgs) =>
-      db.makeQuery((execute, input: updateArgs) =>
+      db
+        .makeQuery((execute, input: updateArgs) =>
           execute((client) =>
             client
-              .update(schema.site)
+              .update(schema.siteTable)
               .set({
                 changelogVisibility: input.changelogVisibility,
                 updatedAt: new Date(),
@@ -103,29 +106,32 @@ const makeSiteRepository = Effect.gen(function* () {
               })
               .where(
                 and(
-                  eq(schema.site.id, input.id),
-                  eq(schema.site.organizationId, input.organizationId)
+                  eq(schema.siteTable.id, input.id),
+                  eq(schema.siteTable.organizationId, input.organizationId)
                 )
               )
           )
-        )(args).pipe(Effect.asVoid),
+        )(args)
+        .pipe(Effect.asVoid),
     updateHidePoweredByBranding: (args: updateHidePoweredByBrandingArgs) =>
-      db.makeQuery((execute, input: updateHidePoweredByBrandingArgs) =>
+      db
+        .makeQuery((execute, input: updateHidePoweredByBrandingArgs) =>
           execute((client) =>
             client
-              .update(schema.site)
+              .update(schema.siteTable)
               .set({
                 hidePoweredBy: input.hidePoweredBy,
                 updatedAt: new Date(),
               })
               .where(
                 and(
-                  eq(schema.site.id, input.id),
-                  eq(schema.site.organizationId, input.organizationId)
+                  eq(schema.siteTable.id, input.id),
+                  eq(schema.siteTable.organizationId, input.organizationId)
                 )
               )
           )
-        )(args).pipe(Effect.asVoid),
+        )(args)
+        .pipe(Effect.asVoid),
   };
 });
 

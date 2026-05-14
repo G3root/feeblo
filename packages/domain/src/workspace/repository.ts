@@ -71,7 +71,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
 
         yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
           execute((client) =>
-            client.insert(schema.member).values({
+            client.insert(schema.memberTable).values({
               id: generateId("member"),
               organizationId,
               role: "owner",
@@ -84,7 +84,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         for (const postStatus of schema.DEFAULT_POST_STATUSES) {
           yield* db.makeQuery((execute, input: CreatePostStatusArgs) =>
             execute((client) =>
-              client.insert(schema.postStatus).values({
+              client.insert(schema.postStatusTable).values({
                 id: generateId("postStatus"),
                 organizationId: input.organizationId,
                 type: input.postStatus.type,
@@ -107,7 +107,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         for (const boardName of defaultBoards) {
           yield* db.makeQuery((execute, input: CreateBoardArgs) =>
             execute((client) =>
-              client.insert(schema.board).values({
+              client.insert(schema.boardTable).values({
                 id: generateId("board"),
                 name: input.boardName,
                 slug: slugify(input.boardName),
@@ -128,7 +128,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
 
         yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
           execute((client) =>
-            client.insert(schema.site).values({
+            client.insert(schema.siteTable).values({
               id: generateId("site"),
               organizationId,
               createdAt: new Date(),

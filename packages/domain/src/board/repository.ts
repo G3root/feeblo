@@ -62,13 +62,13 @@ const makeBoardRepository = Effect.gen(function* () {
         .makeQuery((execute, input: TBoardFindById) =>
           execute((client) =>
             client
-              .select({ id: schema.board.id })
-              .from(schema.board)
+              .select({ id: schema.boardTable.id })
+              .from(schema.boardTable)
               .where(
                 and(
-                  eq(schema.board.id, input.id),
-                  eq(schema.board.organizationId, input.organizationId),
-                  eq(schema.board.creatorMemberId, input.memberId)
+                  eq(schema.boardTable.id, input.id),
+                  eq(schema.boardTable.organizationId, input.organizationId),
+                  eq(schema.boardTable.creatorMemberId, input.memberId)
                 )
               )
           )
@@ -80,14 +80,14 @@ const makeBoardRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                id: schema.board.id,
-                visibility: schema.board.visibility,
+                id: schema.boardTable.id,
+                visibility: schema.boardTable.visibility,
               })
-              .from(schema.board)
+              .from(schema.boardTable)
               .where(
                 and(
-                  eq(schema.board.id, input.id),
-                  eq(schema.board.organizationId, input.organizationId)
+                  eq(schema.boardTable.id, input.id),
+                  eq(schema.boardTable.organizationId, input.organizationId)
                 )
               )
           )
@@ -97,7 +97,7 @@ const makeBoardRepository = Effect.gen(function* () {
       db.makeQuery((execute, input: TBoardCreate) =>
         execute((client) =>
           client
-            .insert(schema.board)
+            .insert(schema.boardTable)
             .values({
               ...input,
               slug: slugify(input.name),
@@ -111,10 +111,10 @@ const makeBoardRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const where: SQL[] = [];
         if (visibility) {
-          where.push(eq(schema.board.visibility, visibility));
+          where.push(eq(schema.boardTable.visibility, visibility));
         }
 
-        where.push(eq(schema.board.organizationId, organizationId));
+        where.push(eq(schema.boardTable.organizationId, organizationId));
 
         const whereClause = where.length > 1 ? and(...where) : where[0];
 
@@ -123,15 +123,15 @@ const makeBoardRepository = Effect.gen(function* () {
             execute((client) =>
               client
                 .select({
-                  id: schema.board.id,
-                  name: schema.board.name,
-                  slug: schema.board.slug,
-                  visibility: schema.board.visibility,
-                  createdAt: schema.board.createdAt,
-                  updatedAt: schema.board.updatedAt,
-                  organizationId: schema.board.organizationId,
+                  id: schema.boardTable.id,
+                  name: schema.boardTable.name,
+                  slug: schema.boardTable.slug,
+                  visibility: schema.boardTable.visibility,
+                  createdAt: schema.boardTable.createdAt,
+                  updatedAt: schema.boardTable.updatedAt,
+                  organizationId: schema.boardTable.organizationId,
                 })
-                .from(schema.board)
+                .from(schema.boardTable)
                 .where(input.whereClause)
             )
         )({ whereClause });
@@ -144,9 +144,11 @@ const makeBoardRepository = Effect.gen(function* () {
           (execute, input: TBoardCountByOrganizationId) =>
             execute((client) =>
               client
-                .select({ id: schema.board.id })
-                .from(schema.board)
-                .where(eq(schema.board.organizationId, input.organizationId))
+                .select({ id: schema.boardTable.id })
+                .from(schema.boardTable)
+                .where(
+                  eq(schema.boardTable.organizationId, input.organizationId)
+                )
             )
         )({ organizationId });
 
@@ -154,18 +156,20 @@ const makeBoardRepository = Effect.gen(function* () {
       }),
 
     delete: ({ id, organizationId }: TBoardDelete) =>
-      db.makeQuery((execute, input: TBoardDelete) =>
+      db
+        .makeQuery((execute, input: TBoardDelete) =>
           execute((client) =>
             client
-              .delete(schema.board)
+              .delete(schema.boardTable)
               .where(
                 and(
-                  eq(schema.board.id, input.id),
-                  eq(schema.board.organizationId, input.organizationId)
+                  eq(schema.boardTable.id, input.id),
+                  eq(schema.boardTable.organizationId, input.organizationId)
                 )
               )
           )
-        )({ id, organizationId }).pipe(Effect.asVoid),
+        )({ id, organizationId })
+        .pipe(Effect.asVoid),
     update: (args: TBoardUpdate) =>
       Effect.gen(function* () {
         const { id, organizationId, ...rest } = args;
@@ -174,7 +178,7 @@ const makeBoardRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TBoardUpdateInput) =>
             execute((client) =>
               client
-                .update(schema.board)
+                .update(schema.boardTable)
                 .set({
                   ...input,
                   ...(input.name && { slug: slugify(input.name) }),
@@ -182,8 +186,8 @@ const makeBoardRepository = Effect.gen(function* () {
                 })
                 .where(
                   and(
-                    eq(schema.board.id, input.id),
-                    eq(schema.board.organizationId, input.organizationId)
+                    eq(schema.boardTable.id, input.id),
+                    eq(schema.boardTable.organizationId, input.organizationId)
                   )
                 )
                 .returning()

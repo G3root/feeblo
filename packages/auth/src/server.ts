@@ -74,7 +74,16 @@ export const initAuthHandler = () =>
       database: drizzleAdapter(db.db, {
         provider: "pg",
 
-        schema,
+        schema: {
+          user: schema.userTable,
+          session: schema.sessionTable,
+          account: schema.accountTable,
+          verification: schema.verificationTable,
+          organization: schema.organizationTable,
+          member: schema.memberTable,
+          invitation: schema.invitationTable,
+          twoFactor: schema.twoFactorTable,
+        },
       }),
 
       baseURL: apiUrl,
@@ -221,13 +230,13 @@ export const initAuthHandler = () =>
             db.execute((client) =>
               client
                 .select({
-                  userId: schema.member.userId,
-                  organizationId: schema.member.organizationId,
-                  role: schema.member.role,
-                  membershipId: schema.member.id,
+                  userId: schema.memberTable.userId,
+                  organizationId: schema.memberTable.organizationId,
+                  role: schema.memberTable.role,
+                  membershipId: schema.memberTable.id,
                 })
-                .from(schema.member)
-                .where(eq(schema.member.userId, session.userId))
+                .from(schema.memberTable)
+                .where(eq(schema.memberTable.userId, session.userId))
             )
           );
 

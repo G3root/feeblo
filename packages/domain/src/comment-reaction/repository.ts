@@ -33,25 +33,25 @@ const makeCommentReactionRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.commentReaction.id,
-              commentId: schema.commentReaction.commentId,
-              postId: schema.comment.postId,
-              organizationId: schema.comment.organizationId,
-              userId: schema.commentReaction.userId,
-              memberId: schema.commentReaction.memberId,
-              emoji: schema.commentReaction.emoji,
-              createdAt: schema.commentReaction.createdAt,
-              updatedAt: schema.commentReaction.updatedAt,
+              id: schema.commentReactionTable.id,
+              commentId: schema.commentReactionTable.commentId,
+              postId: schema.commentTable.postId,
+              organizationId: schema.commentTable.organizationId,
+              userId: schema.commentReactionTable.userId,
+              memberId: schema.commentReactionTable.memberId,
+              emoji: schema.commentReactionTable.emoji,
+              createdAt: schema.commentReactionTable.createdAt,
+              updatedAt: schema.commentReactionTable.updatedAt,
             })
-            .from(schema.commentReaction)
+            .from(schema.commentReactionTable)
             .innerJoin(
-              schema.comment,
-              eq(schema.comment.id, schema.commentReaction.commentId)
+              schema.commentTable,
+              eq(schema.commentTable.id, schema.commentReactionTable.commentId)
             )
             .where(
               and(
-                eq(schema.comment.organizationId, input.organizationId),
-                eq(schema.comment.postId, input.postId)
+                eq(schema.commentTable.organizationId, input.organizationId),
+                eq(schema.commentTable.postId, input.postId)
               )
             )
         )
@@ -62,28 +62,34 @@ const makeCommentReactionRepository = Effect.gen(function* () {
         execute((client) =>
           client
             .select({
-              id: schema.commentReaction.id,
-              commentId: schema.commentReaction.commentId,
-              postId: schema.comment.postId,
-              organizationId: schema.comment.organizationId,
-              userId: schema.commentReaction.userId,
-              memberId: schema.commentReaction.memberId,
-              emoji: schema.commentReaction.emoji,
-              createdAt: schema.commentReaction.createdAt,
-              updatedAt: schema.commentReaction.updatedAt,
+              id: schema.commentReactionTable.id,
+              commentId: schema.commentReactionTable.commentId,
+              postId: schema.commentTable.postId,
+              organizationId: schema.commentTable.organizationId,
+              userId: schema.commentReactionTable.userId,
+              memberId: schema.commentReactionTable.memberId,
+              emoji: schema.commentReactionTable.emoji,
+              createdAt: schema.commentReactionTable.createdAt,
+              updatedAt: schema.commentReactionTable.updatedAt,
             })
-            .from(schema.commentReaction)
+            .from(schema.commentReactionTable)
             .innerJoin(
-              schema.comment,
-              eq(schema.comment.id, schema.commentReaction.commentId)
+              schema.commentTable,
+              eq(schema.commentTable.id, schema.commentReactionTable.commentId)
             )
-            .innerJoin(schema.post, eq(schema.post.id, schema.comment.postId))
-            .innerJoin(schema.board, eq(schema.board.id, schema.post.boardId))
+            .innerJoin(
+              schema.postTable,
+              eq(schema.postTable.id, schema.commentTable.postId)
+            )
+            .innerJoin(
+              schema.boardTable,
+              eq(schema.boardTable.id, schema.postTable.boardId)
+            )
             .where(
               and(
-                eq(schema.comment.organizationId, input.organizationId),
-                eq(schema.comment.postId, input.postId),
-                eq(schema.board.visibility, "PUBLIC")
+                eq(schema.commentTable.organizationId, input.organizationId),
+                eq(schema.commentTable.postId, input.postId),
+                eq(schema.boardTable.visibility, "PUBLIC")
               )
             )
         )
@@ -95,13 +101,16 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TCommentReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.comment.id })
-                .from(schema.comment)
+                .select({ id: schema.commentTable.id })
+                .from(schema.commentTable)
                 .where(
                   and(
-                    eq(schema.comment.id, input.commentId),
-                    eq(schema.comment.organizationId, input.organizationId),
-                    eq(schema.comment.postId, input.postId)
+                    eq(schema.commentTable.id, input.commentId),
+                    eq(
+                      schema.commentTable.organizationId,
+                      input.organizationId
+                    ),
+                    eq(schema.commentTable.postId, input.postId)
                   )
                 )
                 .limit(1)
@@ -117,13 +126,13 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TCommentReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.commentReaction.id })
-                .from(schema.commentReaction)
+                .select({ id: schema.commentReactionTable.id })
+                .from(schema.commentReactionTable)
                 .where(
                   and(
-                    eq(schema.commentReaction.commentId, input.commentId),
-                    eq(schema.commentReaction.userId, input.userId),
-                    eq(schema.commentReaction.emoji, input.emoji)
+                    eq(schema.commentReactionTable.commentId, input.commentId),
+                    eq(schema.commentReactionTable.userId, input.userId),
+                    eq(schema.commentReactionTable.emoji, input.emoji)
                   )
                 )
                 .limit(1)
@@ -135,8 +144,8 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           yield* db.makeQuery((execute, input: TDeleteCommentReaction) =>
             execute((client) =>
               client
-                .delete(schema.commentReaction)
-                .where(eq(schema.commentReaction.id, input.id))
+                .delete(schema.commentReactionTable)
+                .where(eq(schema.commentReactionTable.id, input.id))
             )
           )({ id: existingReaction.value.id });
           return { reacted: false, emoji: null };
@@ -146,12 +155,12 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TCommentReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.member.id })
-                .from(schema.member)
+                .select({ id: schema.memberTable.id })
+                .from(schema.memberTable)
                 .where(
                   and(
-                    eq(schema.member.organizationId, input.organizationId),
-                    eq(schema.member.userId, input.userId)
+                    eq(schema.memberTable.organizationId, input.organizationId),
+                    eq(schema.memberTable.userId, input.userId)
                   )
                 )
                 .limit(1)
@@ -161,7 +170,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
 
         yield* db.makeQuery((execute, input: TCommentReactionCreate) =>
           execute((client) =>
-            client.insert(schema.commentReaction).values({
+            client.insert(schema.commentReactionTable).values({
               id: generateId("commentReaction"),
               commentId: input.commentId,
               userId: input.userId,
@@ -183,22 +192,25 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TCommentReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.comment.id })
-                .from(schema.comment)
+                .select({ id: schema.commentTable.id })
+                .from(schema.commentTable)
                 .innerJoin(
-                  schema.post,
-                  eq(schema.post.id, schema.comment.postId)
+                  schema.postTable,
+                  eq(schema.postTable.id, schema.commentTable.postId)
                 )
                 .innerJoin(
-                  schema.board,
-                  eq(schema.board.id, schema.post.boardId)
+                  schema.boardTable,
+                  eq(schema.boardTable.id, schema.postTable.boardId)
                 )
                 .where(
                   and(
-                    eq(schema.comment.id, input.commentId),
-                    eq(schema.comment.organizationId, input.organizationId),
-                    eq(schema.comment.postId, input.postId),
-                    eq(schema.board.visibility, "PUBLIC")
+                    eq(schema.commentTable.id, input.commentId),
+                    eq(
+                      schema.commentTable.organizationId,
+                      input.organizationId
+                    ),
+                    eq(schema.commentTable.postId, input.postId),
+                    eq(schema.boardTable.visibility, "PUBLIC")
                   )
                 )
                 .limit(1)
@@ -214,13 +226,13 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .makeQuery((execute, input: TCommentReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.commentReaction.id })
-                .from(schema.commentReaction)
+                .select({ id: schema.commentReactionTable.id })
+                .from(schema.commentReactionTable)
                 .where(
                   and(
-                    eq(schema.commentReaction.commentId, input.commentId),
-                    eq(schema.commentReaction.userId, input.userId),
-                    eq(schema.commentReaction.emoji, input.emoji)
+                    eq(schema.commentReactionTable.commentId, input.commentId),
+                    eq(schema.commentReactionTable.userId, input.userId),
+                    eq(schema.commentReactionTable.emoji, input.emoji)
                   )
                 )
                 .limit(1)
@@ -232,8 +244,8 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           yield* db.makeQuery((execute, input: TDeleteCommentReaction) =>
             execute((client) =>
               client
-                .delete(schema.commentReaction)
-                .where(eq(schema.commentReaction.id, input.id))
+                .delete(schema.commentReactionTable)
+                .where(eq(schema.commentReactionTable.id, input.id))
             )
           )({ id: existingReaction.value.id });
           return { reacted: false, emoji: null };
@@ -243,12 +255,12 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           (execute, input: TCommentReactionToggle) =>
             execute((client) =>
               client
-                .select({ id: schema.member.id })
-                .from(schema.member)
+                .select({ id: schema.memberTable.id })
+                .from(schema.memberTable)
                 .where(
                   and(
-                    eq(schema.member.organizationId, input.organizationId),
-                    eq(schema.member.userId, input.userId)
+                    eq(schema.memberTable.organizationId, input.organizationId),
+                    eq(schema.memberTable.userId, input.userId)
                   )
                 )
                 .limit(1)
@@ -257,7 +269,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
 
         yield* db.makeQuery((execute, input: TCommentReactionCreate) =>
           execute((client) =>
-            client.insert(schema.commentReaction).values({
+            client.insert(schema.commentReactionTable).values({
               id: generateId("commentReaction"),
               commentId: input.commentId,
               userId: input.userId,

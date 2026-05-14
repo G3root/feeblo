@@ -16,16 +16,18 @@ const makePostStatusRepository = Effect.gen(function* () {
           execute((client) =>
             client
               .select({
-                id: schema.postStatus.id,
-                type: schema.postStatus.type,
-                orderIndex: schema.postStatus.orderIndex,
-                organizationId: schema.postStatus.organizationId,
-                createdAt: schema.postStatus.createdAt,
-                updatedAt: schema.postStatus.updatedAt,
+                id: schema.postStatusTable.id,
+                type: schema.postStatusTable.type,
+                orderIndex: schema.postStatusTable.orderIndex,
+                organizationId: schema.postStatusTable.organizationId,
+                createdAt: schema.postStatusTable.createdAt,
+                updatedAt: schema.postStatusTable.updatedAt,
               })
-              .from(schema.postStatus)
-              .where(eq(schema.postStatus.organizationId, input.organizationId))
-              .orderBy(asc(schema.postStatus.orderIndex))
+              .from(schema.postStatusTable)
+              .where(
+                eq(schema.postStatusTable.organizationId, input.organizationId)
+              )
+              .orderBy(asc(schema.postStatusTable.orderIndex))
           )
         )({ organizationId });
 
