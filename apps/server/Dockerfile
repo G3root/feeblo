@@ -34,12 +34,14 @@ WORKDIR /app
 ARG APP_RELEASE="dev"
 ARG APP_URL=""
 ARG API_URL=""
+ARG APP_ROOT_DOMAIN=""
 
 ENV NODE_ENV=production
 ENV SERVER_PORT=8080
 ENV APP_RELEASE="${APP_RELEASE}"
 ENV APP_URL="${APP_URL}"
 ENV API_URL="${API_URL}"
+ENV APP_ROOT_DOMAIN="${APP_ROOT_DOMAIN}"
 
 # Don't run production as root
 RUN addgroup --system --gid 1001 nodejs

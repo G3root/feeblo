@@ -6,10 +6,12 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
     make: Effect.gen(function* () {
       const appUrl = yield* Config.string("APP_URL");
       const apiUrl = yield* Config.string("API_URL");
+      const appRootDomain = yield* Config.string("APP_ROOT_DOMAIN");
 
       return {
         apiUrl,
         appUrl,
+        appRootDomain,
       } as const;
     }),
   }
