@@ -50,6 +50,8 @@ export const initAuthHandler = () =>
       signUpEnabled,
       turnstileKey,
       allowedEmails,
+      nodeEnv,
+      appRootDomain,
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
@@ -114,6 +116,10 @@ export const initAuthHandler = () =>
       trustedOrigins,
 
       advanced: {
+        crossSubDomainCookies: {
+          enabled: nodeEnv === "production",
+          domain: appRootDomain,
+        },
         defaultCookieAttributes: {
           secure: true,
           httpOnly: true,

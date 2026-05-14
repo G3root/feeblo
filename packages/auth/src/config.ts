@@ -5,6 +5,7 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
   make: Effect.gen(function* () {
     const appUrl = yield* Config.string("APP_URL");
     const apiUrl = yield* Config.string("API_URL");
+    const appRootDomain = yield* Config.string("APP_ROOT_DOMAIN");
     const secret = yield* Config.redacted("AUTH_ENCRYPTION_KEY");
     const githubClientId = yield* optionalString("GITHUB_CLIENT_ID");
     const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
@@ -13,6 +14,9 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const trustedOrigins = yield* optionalString("AUTH_TRUSTED_ORIGINS");
     const turnstileKey = yield* optionalString("TURNSTILE_SECRET_KEY");
     const allowedEmails = yield* optionalString("ALLOWED_EMAILS");
+    const nodeEnv = yield* Config.string("NODE_ENV").pipe(
+      Config.withDefault("development")
+    );
     const signUpEnabled = yield* Config.boolean("AUTH_SIGN_UP_ENABLED").pipe(
       Config.withDefault(true)
     );
@@ -29,6 +33,8 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
       trustedOrigins,
       turnstileKey,
       allowedEmails,
+      nodeEnv,
+      appRootDomain,
     } as const;
   }),
 }) {
