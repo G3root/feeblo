@@ -12,6 +12,7 @@ export function getPublicEnvServer() {
 
 export function getServerRuntimePublicEnv() {
   const env = getPublicEnvServer();
+
   return {
     apiUrl: env.API_URL,
     appUrl: env.APP_URL,
