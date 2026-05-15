@@ -1,6 +1,9 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { siteCollection } from "~/lib/collections";
+import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
 import { useOrganizationId } from "./use-organization-id";
+
+const { appRootDomain } = getRuntimePublicEnv();
 
 export const useSite = () => {
   const organizationId = useOrganizationId();
@@ -19,7 +22,7 @@ export const useSite = () => {
 
 const getSiteUrl = (subdomain: string) => {
   return subdomain
-    ? `${location.protocol}//${subdomain}.${location.host}`
+    ? `${location.protocol}//${subdomain}.${appRootDomain}`
     : undefined;
 };
 
