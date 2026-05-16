@@ -8,7 +8,8 @@
     "./url": "./src/url.ts",
     "./crypto": "./src/crypto.ts",
     "./html": "./src/html.ts",
-    "./effect-ids": "./src/effect-ids.ts"
+    "./effect-ids": "./src/effect-ids.ts",
+    "./media": "./src/media.ts"
   },
   "dependencies": {
     "@better-auth/utils": "catalog:",

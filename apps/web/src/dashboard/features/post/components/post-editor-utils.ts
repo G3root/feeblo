@@ -1,16 +1,11 @@
 import {
+  EDITOR_MAX_IMAGE_UPLOAD_BYTES,
+  EDITOR_SUPPORTED_IMAGE_TYPES,
+} from "@feeblo/utils/media";
+import {
   editorMediaUploadEndpoint,
   uploadedEditorMediaSchema,
 } from "~/lib/auth-client";
-
-const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
-
-export const SUPPORTED_IMAGE_TYPES = new Set([
-  "image/gif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
 
 export function isRichTextContentEmpty(content: string) {
   const trimmed = content.trim();
@@ -38,11 +33,11 @@ export function isRichTextContentEmpty(content: string) {
 export async function uploadPostEditorImage(
   file: File
 ): Promise<{ url: string }> {
-  if (!SUPPORTED_IMAGE_TYPES.has(file.type)) {
+  if (!EDITOR_SUPPORTED_IMAGE_TYPES.has(file.type)) {
     throw new Error("Unsupported file type. Use PNG, JPEG, WEBP, or GIF");
   }
 
-  if (file.size === 0 || file.size > MAX_IMAGE_UPLOAD_BYTES) {
+  if (file.size === 0 || file.size > EDITOR_MAX_IMAGE_UPLOAD_BYTES) {
     throw new Error("Image must be between 1B and 10MB");
   }
 
