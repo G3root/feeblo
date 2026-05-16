@@ -7,11 +7,15 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const appUrl = yield* Config.string("APP_URL");
       const apiUrl = yield* Config.string("API_URL");
       const appRootDomain = yield* Config.string("APP_ROOT_DOMAIN");
+      const nodeEnv = yield* Config.string("NODE_ENV").pipe(
+        Config.withDefault("development")
+      );
 
       return {
         apiUrl,
         appUrl,
         appRootDomain,
+        nodeEnv,
       } as const;
     }),
   }

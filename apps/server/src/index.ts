@@ -57,6 +57,9 @@ const RootRouter = HttpRouter.use((router) =>
 const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
+  const isLocalDevHost = (host: string): boolean =>
+    host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
+
   const isAllowedOrigin = (origin: string | undefined): boolean => {
     if (!origin) {
       return true;
@@ -66,7 +69,9 @@ const program = Effect.gen(function* () {
       const originHost = new URL(origin).hostname;
       const appHost = new URL(config.appUrl).hostname;
       const apiHost = new URL(config.apiUrl).hostname;
-      const appRootDomain = config.appRootDomain;
+      const appRootDomainHost = config.appRootDomain.includes(":")
+        ? config.appRootDomain?.split(":")[0]
+        : config.appRootDomain;
 
       if (originHost === apiHost) {
         return true;
@@ -74,7 +79,16 @@ const program = Effect.gen(function* () {
       if (originHost === appHost) {
         return true;
       }
-      if (originHost.endsWith(`.${appRootDomain}`)) {
+
+      if (
+        config.nodeEnv === "development" &&
+        isLocalDevHost(originHost) &&
+        isLocalDevHost(appRootDomainHost ?? "")
+      ) {
+        return true;
+      }
+
+      if (originHost.endsWith(`.${appRootDomainHost}`)) {
         return true;
       }
 
