@@ -1,14 +1,14 @@
-import type { Attrs } from '@tiptap/pm/model';
-import { useEffect } from 'react';
+import type { Attrs } from "@tiptap/pm/model";
+import { useEffect } from "react";
 
-const EVENT_PREFIX = '@react-email/editor:';
+const EVENT_PREFIX = "@feeblo/editor:";
 
 /**
  * Base event map interface for the editor event bus.
  *
  * Components extend this via TypeScript module augmentation:
  * ```ts
- * declare module '@react-email/editor' {
+ * declare module '@feeblo/editor' {
  *   interface EditorEventMap {
  *     'my-component:custom-event': { data: string };
  *   }
@@ -16,8 +16,8 @@ const EVENT_PREFIX = '@react-email/editor:';
  * ```
  */
 export interface EditorEventMap {
-  'bubble-menu:add-link': undefined;
-  'node-clicked': NodeClickedEvent;
+  "bubble-menu:add-link": undefined;
+  "node-clicked": NodeClickedEvent;
 }
 
 export type NodeClickedEvent = {
@@ -29,7 +29,7 @@ export type NodeClickedEvent = {
 export type EditorEventName = keyof EditorEventMap;
 
 export type EditorEventHandler<T extends EditorEventName> = (
-  payload: EditorEventMap[T],
+  payload: EditorEventMap[T]
 ) => void | Promise<void>;
 
 export interface EditorEventSubscription {
@@ -44,7 +44,7 @@ class EditorEventBus {
   dispatch<T extends EditorEventName>(
     eventName: T,
     payload: EditorEventMap[T],
-    options?: { target?: EventTarget },
+    options?: { target?: EventTarget }
   ): void {
     const target = options?.target ?? window;
     const prefixedEventName = this.prefixEventName(eventName);
@@ -59,7 +59,7 @@ class EditorEventBus {
   on<T extends EditorEventName>(
     eventName: T,
     handler: EditorEventHandler<T>,
-    options?: AddEventListenerOptions & { target?: EventTarget },
+    options?: AddEventListenerOptions & { target?: EventTarget }
   ): EditorEventSubscription {
     const target = options?.target ?? window;
     const prefixedEventName = this.prefixEventName(eventName);
@@ -73,7 +73,7 @@ class EditorEventBus {
         result.catch((error) => {
           console.error(
             `Error in async event handler for ${prefixedEventName}:`,
-            { event: customEvent.detail, error },
+            { event: customEvent.detail, error }
           );
         });
       }
@@ -97,7 +97,7 @@ export const editorEventBus = new EditorEventBus();
 export function useEditorEvent<T extends EditorEventName>(
   eventName: T,
   handler: EditorEventHandler<T>,
-  options?: AddEventListenerOptions & { target?: EventTarget },
+  options?: AddEventListenerOptions & { target?: EventTarget }
 ) {
   useEffect(() => {
     const subscription = editorEventBus.on(eventName, handler, options);

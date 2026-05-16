@@ -1,10 +1,12 @@
-import type { Editor } from '@tiptap/core';
-import { getColumnsDepth, MAX_COLUMNS_DEPTH } from '../../extensions/columns';
+import type { Editor } from "@tiptap/core";
+import { getColumnsDepth, MAX_COLUMNS_DEPTH } from "../../extensions/columns";
 
 export function isInsideNode(editor: Editor, type: string): boolean {
   const { $from } = editor.state.selection;
   for (let d = $from.depth; d > 0; d--) {
-    if ($from.node(d).type.name === type) return true;
+    if ($from.node(d).type.name === type) {
+      return true;
+    }
   }
   return false;
 }
@@ -16,7 +18,7 @@ export function isAtMaxColumnsDepth(editor: Editor): boolean {
 
 export function updateScrollView(
   container: HTMLElement,
-  item: HTMLElement,
+  item: HTMLElement
 ): void {
   const containerRect = container.getBoundingClientRect();
   const itemRect = item.getBoundingClientRect();
