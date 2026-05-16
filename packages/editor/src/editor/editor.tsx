@@ -1,20 +1,3 @@
-// import "./editor.css";
-import {
-  BubbleMenu,
-  BubbleMenuAlignCenter,
-  BubbleMenuAlignLeft,
-  BubbleMenuAlignRight,
-  BubbleMenuBold,
-  BubbleMenuCode,
-  BubbleMenuItalic,
-  BubbleMenuItemGroup,
-  BubbleMenuStrike,
-  BubbleMenuUnderline,
-  BubbleMenuUppercase,
-  SlashCommand,
-  type SlashCommandItem,
-  TableIcon,
-} from "@react-email/editor/ui";
 import { Link } from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import {
@@ -47,6 +30,20 @@ import { createPasteHandler } from "../core/create-paste-handler";
 import { imageSlashCommand } from "../plugins";
 import { createImageExtension } from "../plugins/image/extension";
 import {
+  BubbleMenu,
+  BubbleMenuAlignCenter,
+  BubbleMenuAlignLeft,
+  BubbleMenuAlignRight,
+  BubbleMenuBold,
+  BubbleMenuCode,
+  BubbleMenuItalic,
+  BubbleMenuItemGroup,
+  BubbleMenuStrike,
+  BubbleMenuUnderline,
+  BubbleMenuUppercase,
+} from "../ui/bubble-menu";
+import { TableIcon } from "../ui/icons";
+import {
   BULLET_LIST,
   CODE,
   H1,
@@ -56,6 +53,8 @@ import {
   QUOTE,
   TEXT,
 } from "../ui/slash-command/commands";
+import { SlashCommandRoot as SlashCommand } from "../ui/slash-command/root";
+import type { SlashCommandItem } from "../ui/slash-command/types";
 
 export interface EmailEditorRef {
   editor: TipTapEditor | null;
