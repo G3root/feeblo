@@ -1,7 +1,9 @@
+import type { ReactionEmoji } from "@feeblo/utils/reaction";
+
 export function getPostReactionCollectionKey(reaction: {
   postId: string;
   userId: string;
-  emoji: string;
+  emoji: ReactionEmoji;
 }) {
   return `${reaction.postId}:${reaction.userId}:${reaction.emoji}`;
 }
@@ -9,7 +11,7 @@ export function getPostReactionCollectionKey(reaction: {
 export function getCommentReactionCollectionKey(reaction: {
   commentId: string;
   userId: string;
-  emoji: string;
+  emoji: ReactionEmoji;
 }) {
   return `${reaction.commentId}:${reaction.userId}:${reaction.emoji}`;
 }

@@ -1,3 +1,4 @@
+import { ReactionEmojiSchema } from "@feeblo/utils/reaction";
 import { Schema as S } from "effect";
 
 export const PostReaction = S.Struct({
@@ -6,7 +7,7 @@ export const PostReaction = S.Struct({
   organizationId: S.String,
   userId: S.String,
   memberId: S.Union([S.String, S.Null]),
-  emoji: S.String,
+  emoji: ReactionEmojiSchema,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });
@@ -23,7 +24,7 @@ export type TPostReactionList = S.Schema.Type<typeof PostReactionList>;
 export const PostReactionToggle = S.Struct({
   organizationId: S.String,
   postId: S.String,
-  emoji: S.String,
+  emoji: ReactionEmojiSchema,
 });
 
 export type TPostReactionToggle = S.Schema.Type<typeof PostReactionToggle>;

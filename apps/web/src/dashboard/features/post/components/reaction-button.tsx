@@ -1,3 +1,8 @@
+import {
+  REACTION_EMOJIS,
+  type ReactionCounts,
+  type ReactionEmoji,
+} from "@feeblo/utils/reaction";
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
@@ -8,23 +13,21 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 
-const REACTION_EMOJIS = ["👍", "❤️", "🔥", "😂", "🎯"] as const;
-
 type ReactionButtonProps = {
   disabled?: boolean;
-  isSelected: (emoji: string) => boolean;
+  isSelected: (emoji: ReactionEmoji) => boolean;
   isToggling: boolean;
-  onToggleReaction: (emoji: string) => Promise<void>;
-  reactionCounts: Record<string, number>;
+  onToggleReaction: (emoji: ReactionEmoji) => Promise<void>;
+  reactionCounts: ReactionCounts;
   showCount?: boolean;
 };
 
 type ReactionListProps = {
   disabled?: boolean;
-  isSelected: (emoji: string) => boolean;
+  isSelected: (emoji: ReactionEmoji) => boolean;
   isToggling: boolean;
-  onToggleReaction: (emoji: string) => Promise<void>;
-  reactionCounts: Record<string, number>;
+  onToggleReaction: (emoji: ReactionEmoji) => Promise<void>;
+  reactionCounts: ReactionCounts;
 };
 
 export function ReactionButton({
@@ -113,7 +116,7 @@ function ReactionPill({
 }: {
   count: number;
   disabled?: boolean;
-  emoji: string;
+  emoji: ReactionEmoji;
   onClick?: () => void;
   selected: boolean;
   showCount?: boolean;

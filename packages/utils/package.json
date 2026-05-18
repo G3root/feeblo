@@ -9,7 +9,8 @@
     "./crypto": "./src/crypto.ts",
     "./html": "./src/html.ts",
     "./effect-ids": "./src/effect-ids.ts",
-    "./media": "./src/media.ts"
+    "./media": "./src/media.ts",
+    "./reaction": "./src/reaction.ts"
   },
   "dependencies": {
     "@better-auth/utils": "catalog:",

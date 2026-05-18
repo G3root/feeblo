@@ -1,3 +1,4 @@
+import type { ReactionCounts, ReactionEmoji } from "@feeblo/utils/reaction";
 import { useMemo, useState } from "react";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
@@ -8,7 +9,7 @@ export type PostReaction = {
   organizationId: string;
   postId: string;
   userId: string;
-  emoji: string;
+  emoji: ReactionEmoji;
 };
 
 export function PostReactionSection({
@@ -18,7 +19,7 @@ export function PostReactionSection({
 }: {
   disabled?: boolean;
   handleToggleReaction: (
-    emoji: string,
+    emoji: ReactionEmoji,
     existingUserEmojiReaction: PostReaction | undefined
   ) => Promise<void>;
   postReactions: PostReaction[];
@@ -33,13 +34,13 @@ export function PostReactionSection({
         acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
         return acc;
       },
-      {} as Record<string, number>
+      {} as ReactionCounts
     );
   }, [postReactions]);
 
   const userReactionSet = useMemo(() => {
     if (!currentUserId) {
-      return new Set<string>();
+      return new Set<ReactionEmoji>();
     }
 
     return new Set(
@@ -49,7 +50,7 @@ export function PostReactionSection({
     );
   }, [postReactions, currentUserId]);
 
-  const handleToggleReaction = async (emoji: string) => {
+  const handleToggleReaction = async (emoji: ReactionEmoji) => {
     if (disabled) {
       return;
     }

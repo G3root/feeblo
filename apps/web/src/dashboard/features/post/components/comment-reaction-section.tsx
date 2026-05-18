@@ -1,3 +1,4 @@
+import type { ReactionCounts, ReactionEmoji } from "@feeblo/utils/reaction";
 import { createContext, type ReactNode, use, useMemo, useState } from "react";
 import { toastManager } from "~/components/ui/toast";
 import { authClient } from "~/lib/auth-client";
@@ -9,12 +10,12 @@ export type CommentReaction = {
   postId: string;
   organizationId: string;
   userId: string;
-  emoji: string;
+  emoji: ReactionEmoji;
 };
 
 export type CommentReactionToggleInput = {
   commentId: string;
-  emoji: string;
+  emoji: ReactionEmoji;
   existingReaction?: CommentReaction;
   organizationId: string;
   postId: string;
@@ -38,10 +39,10 @@ type CommentReactionContextValue = {
   commentId: string;
   currentUserId?: string;
   disabled: boolean;
-  handleToggleReaction: (emoji: string) => Promise<void>;
-  isSelected: (emoji: string) => boolean;
+  handleToggleReaction: (emoji: ReactionEmoji) => Promise<void>;
+  isSelected: (emoji: ReactionEmoji) => boolean;
   isToggling: boolean;
-  reactionCounts: Record<string, number>;
+  reactionCounts: ReactionCounts;
 };
 
 const CommentReactionContext =
@@ -84,13 +85,13 @@ function CommentReactionRoot({
         acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
         return acc;
       },
-      {} as Record<string, number>
+      {} as ReactionCounts
     );
   }, [reactionsForComment]);
 
   const userReactionSet = useMemo(() => {
     if (!currentUserId) {
-      return new Set<string>();
+      return new Set<ReactionEmoji>();
     }
 
     return new Set(
@@ -100,7 +101,7 @@ function CommentReactionRoot({
     );
   }, [currentUserId, reactionsForComment]);
 
-  const handleToggleReaction = async (emoji: string) => {
+  const handleToggleReaction = async (emoji: ReactionEmoji) => {
     if (disabled) {
       toastManager.add({
         title: "This post is locked",

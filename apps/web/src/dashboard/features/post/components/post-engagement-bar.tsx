@@ -1,4 +1,5 @@
 import { generateId } from "@feeblo/utils/id";
+import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
@@ -113,7 +114,7 @@ export function PostDetailsEngagementBar({
     await tx.isPersisted.promise;
   };
   const handleToggleReaction = async (
-    emoji: string,
+    emoji: ReactionEmoji,
     existingUserEmojiReaction: PostReaction | undefined
   ) => {
     if (disabled) {

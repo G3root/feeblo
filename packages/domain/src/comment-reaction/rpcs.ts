@@ -1,3 +1,4 @@
+import { ReactionEmojiSchema } from "@feeblo/utils/reaction";
 import { Schema } from "effect";
 import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { AuthMiddleware } from "../session-middleware";
@@ -18,7 +19,7 @@ export class CommentReactionRpcs extends RpcGroup.make(
     payload: CommentReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
-      emoji: Schema.Union([Schema.String, Schema.Null]),
+      emoji: Schema.Union([ReactionEmojiSchema, Schema.Null]),
     }),
     error: CommentReactionServiceErrors,
   }).middleware(AuthMiddleware),
@@ -31,7 +32,7 @@ export class CommentReactionRpcs extends RpcGroup.make(
     payload: CommentReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
-      emoji: Schema.Union([Schema.String, Schema.Null]),
+      emoji: Schema.Union([ReactionEmojiSchema, Schema.Null]),
     }),
     error: CommentReactionServiceErrors,
   }).middleware(AuthMiddleware)

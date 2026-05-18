@@ -1,5 +1,6 @@
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { generateId } from "@feeblo/utils/id";
+import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { Comment01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -754,7 +755,7 @@ function PostReactionBar({
   );
 
   const handleToggleReaction = async (
-    emoji: string,
+    emoji: ReactionEmoji,
     existingUserEmojiReaction: PostReaction | undefined
   ) => {
     if (disabled) {
