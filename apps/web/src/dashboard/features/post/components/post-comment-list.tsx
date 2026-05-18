@@ -2,15 +2,15 @@ import type { Comment } from "@feeblo/domain/comments/schema";
 import { Delete02Icon, Ellipsis } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, type ReactNode, use } from "react";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
+import { Badge } from "@feeblo/ui/badge";
+import { Button } from "@feeblo/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+} from "@feeblo/ui/dropdown-menu";
 import {
   Item,
   ItemActions,
@@ -19,9 +19,9 @@ import {
   ItemHeader,
   ItemMedia,
   ItemTitle,
-} from "~/components/ui/item";
-import { Skeleton } from "~/components/ui/skeleton";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/item";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import {

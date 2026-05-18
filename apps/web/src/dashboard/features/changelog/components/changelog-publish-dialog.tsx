@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
   DialogDescription,
@@ -7,11 +7,11 @@ import {
   DialogHeader,
   DialogPopup,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/dialog";
+import { Input } from "@feeblo/ui/input";
+import { Label } from "@feeblo/ui/label";
+import { RadioGroup, RadioGroupItem } from "@feeblo/ui/radio-group";
+import { toastManager } from "@feeblo/ui/toast";
 import type { ChangelogStatus } from "../constants";
 import {
   publishChangelogSchema,

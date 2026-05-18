@@ -8,7 +8,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
+} from "@feeblo/ui/alert-dialog";
 import {
   useChangelogDeleteDialogContext,
   useChangelogMoveToDraftDialogContext,

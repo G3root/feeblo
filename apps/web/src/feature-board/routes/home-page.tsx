@@ -3,21 +3,21 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "@feeblo/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
+} from "@feeblo/ui/empty";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@feeblo/ui/select";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import {

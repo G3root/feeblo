@@ -5,7 +5,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "~/components/ui/card";
+} from "@feeblo/ui/card";
 
 export function BoardNotFound({
   organizationId,

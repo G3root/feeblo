@@ -7,7 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +19,8 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { useTheme } from "~/components/ui/theme-provider";
+} from "@feeblo/ui/dropdown-menu";
+import { useTheme } from "@feeblo/ui/theme-provider";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { authClient } from "~/lib/auth-client";
 import {
@@ -28,7 +28,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "../ui/sidebar";
+} from "@feeblo/ui/sidebar";
 
 export function NavUser() {
   const { isMobile } = useSidebar();

@@ -6,12 +6,12 @@ import {
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "~/components/ui/popover";
+} from "@feeblo/ui/popover";
 
 type ReactionButtonProps = {
   disabled?: boolean;

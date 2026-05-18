@@ -7,20 +7,20 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
-import { Button } from "~/components/ui/button";
-import { DebouncedInputGroupInput } from "~/components/ui/debounced-input";
+import { Button } from "@feeblo/ui/button";
+import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupText,
-} from "~/components/ui/input-group";
+} from "@feeblo/ui/input-group";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "~/components/ui/popover";
-import { toggleVariants } from "~/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
+} from "@feeblo/ui/popover";
+import { toggleVariants } from "@feeblo/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
 import { cn } from "~/lib/utils";
 import { useBoardStore } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";

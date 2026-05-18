@@ -4,7 +4,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "~/components/ui/card";
+} from "@feeblo/ui/card";
 
 export const Route = createFileRoute("/$organizationId/_dashboard-layout/")({
   component: RouteComponent,

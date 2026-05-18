@@ -1,11 +1,11 @@
-import { Badge } from "~/components/ui/badge";
+import { Badge } from "@feeblo/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@feeblo/ui/select";
 import {
   CHANGELOG_STATUSES,
   CHANGELOG_STATUS_LABELS,

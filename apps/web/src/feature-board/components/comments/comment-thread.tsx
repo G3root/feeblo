@@ -1,7 +1,7 @@
 import type { Comment } from "@feeblo/domain/comments/schema";
 import { useState } from "react";
-import { Avatar, AvatarFallback } from "~/components/ui/avatar";
-import { Button } from "~/components/ui/button";
+import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
+import { Button } from "@feeblo/ui/button";
 import {
   Item,
   ItemContent,
@@ -9,7 +9,7 @@ import {
   ItemHeader,
   ItemMedia,
   ItemTitle,
-} from "~/components/ui/item";
+} from "@feeblo/ui/item";
 import { formatDate, getInitials } from "../../lib/utils";
 import { CommentComposer } from "./comment-composer";
 

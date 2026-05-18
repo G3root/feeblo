@@ -1,10 +1,10 @@
 import { AppSidebar } from "~/components/common/app-sidebar";
-import { ScrollArea } from "~/components/ui/scroll-area";
+import { ScrollArea } from "@feeblo/ui/scroll-area";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "~/components/ui/sidebar";
+} from "@feeblo/ui/sidebar";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";
 import { CreateBoardDialog } from "~/features/board/components/create-board-dialog";
 import { DeleteBoardDialog } from "~/features/board/components/delete-board-dialog";

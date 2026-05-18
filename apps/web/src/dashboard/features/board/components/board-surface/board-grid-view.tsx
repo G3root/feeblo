@@ -1,7 +1,7 @@
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { useCallback, useRef, useState } from "react";
-import { toastManager } from "~/components/ui/toast";
+import { toastManager } from "@feeblo/ui/toast";
 import { postCollection } from "~/lib/collections";
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
 import { BoardGridPostCard } from "./board-grid-post-card";

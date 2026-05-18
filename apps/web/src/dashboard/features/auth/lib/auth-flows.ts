@@ -1,4 +1,4 @@
-import { toastManager } from "~/components/ui/toast";
+import { toastManager } from "@feeblo/ui/toast";
 import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
 
 export type SocialProvider = "github" | "google";

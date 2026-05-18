@@ -2,9 +2,9 @@ import { ArrowDown01Icon, MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useRef, useState } from "react";
 import { z } from "zod";
-import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
-import { Button } from "~/components/ui/button";
-import { ButtonGroup } from "~/components/ui/button-group";
+import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
+import { Button } from "@feeblo/ui/button";
+import { ButtonGroup } from "@feeblo/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +13,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { Editor, type EmailEditorRef } from "~/components/ui/editor";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/dropdown-menu";
+import { Editor, type EmailEditorRef } from "@feeblo/ui/editor";
+import { toastManager } from "@feeblo/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
 import { isRichTextContentEmpty } from "./post-editor-utils";

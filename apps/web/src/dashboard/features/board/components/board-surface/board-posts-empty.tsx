@@ -1,12 +1,12 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
+} from "@feeblo/ui/empty";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
 

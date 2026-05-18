@@ -1,8 +1,8 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
-import { Input } from "~/components/ui/input";
-import { toastManager } from "~/components/ui/toast";
+import { Input } from "@feeblo/ui/input";
+import { toastManager } from "@feeblo/ui/toast";
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";

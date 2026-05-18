@@ -4,7 +4,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@feeblo/ui/select";
 import { cn } from "../../lib/utils";
 
 export type BoardOption = {

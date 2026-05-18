@@ -8,13 +8,13 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+} from "@feeblo/ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -22,11 +22,11 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "~/components/ui/empty";
+} from "@feeblo/ui/empty";
 import {
   SkeletonLoader,
   SkeletonWrapper,
-} from "~/components/ui/skeleton-loader";
+} from "@feeblo/ui/skeleton-loader";
 import {
   Table,
   TableBody,
@@ -34,7 +34,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "~/components/ui/table";
+} from "@feeblo/ui/table";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { tagCollection } from "~/lib/collections";
 import { cn } from "~/lib/utils";

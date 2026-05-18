@@ -4,7 +4,7 @@ import { slugify } from "@feeblo/utils/url";
 import { useStore } from "@nanostores/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useRef, useState } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
   DialogDescription,
@@ -12,9 +12,9 @@ import {
   DialogPanel,
   DialogPopup,
   DialogTitle,
-} from "~/components/ui/dialog";
-import type { EmailEditorRef } from "~/components/ui/editor";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/dialog";
+import type { EmailEditorRef } from "@feeblo/ui/editor";
+import { toastManager } from "@feeblo/ui/toast";
 import { PostCreateLayout } from "~/features/post/components/post-create-dialog-layout";
 import {
   PostBoardField,

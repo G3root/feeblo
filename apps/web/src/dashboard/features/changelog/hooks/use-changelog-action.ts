@@ -2,7 +2,7 @@ import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
-import { toastManager } from "~/components/ui/toast";
+import { toastManager } from "@feeblo/ui/toast";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasMembership, usePolicy } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";

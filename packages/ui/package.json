@@ -1,0 +1,33 @@
+{
+  "name": "@feeblo/ui",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./editor": "./src/editor/index.tsx",
+    "./*": "./src/*.tsx"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.3.0",
+    "@feeblo/editor": "workspace:*",
+    "@hugeicons/core-free-icons": "^4.1.1",
+    "@hugeicons/react": "^1.1.6",
+    "@tanstack/react-form": "^1.28.6",
+    "@tanstack/react-pacer": "^0.20.0",
+    "@tanstack/react-store": "^0.11.0",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
+    "cmdk": "^1.1.1",
+    "input-otp": "^1.4.2",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwind-merge": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "typescript": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:"
+  }
+}

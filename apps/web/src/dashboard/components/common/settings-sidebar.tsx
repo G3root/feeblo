@@ -23,7 +23,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-} from "~/components/ui/sidebar";
+} from "@feeblo/ui/sidebar";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 const settingsItems = [

@@ -8,9 +8,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { Button } from "~/components/ui/button";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
+import { toastManager } from "@feeblo/ui/toast";
 import {
   useBoardStore,
   useSelectedPostIds,

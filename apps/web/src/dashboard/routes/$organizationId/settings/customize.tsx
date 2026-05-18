@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
-import { Input } from "~/components/ui/input";
-import { Switch } from "~/components/ui/switch";
-import { toastManager } from "~/components/ui/toast";
+import { Input } from "@feeblo/ui/input";
+import { Switch } from "@feeblo/ui/switch";
+import { toastManager } from "@feeblo/ui/toast";
 import { isPaidPlan } from "~/features/billing/lib/plans";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";

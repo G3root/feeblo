@@ -1,4 +1,4 @@
-import { toastManager } from "~/components/ui/toast";
+import { toastManager } from "@feeblo/ui/toast";
 import { fetchRpc } from "~/lib/runtime";
 
 export async function startBillingCheckout({

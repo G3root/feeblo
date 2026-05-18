@@ -5,7 +5,7 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
+} from "@feeblo/ui/empty";
 import { BoardListCard } from "../components/feedback/board-list-card";
 import {
   FeedbackCard,

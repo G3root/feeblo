@@ -1,13 +1,13 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import { buttonVariants } from "~/components/ui/button";
+import { buttonVariants } from "@feeblo/ui/button";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
+} from "@feeblo/ui/empty";
 import { cn } from "~/lib/utils";
 import {
   ChangelogPageLayout,

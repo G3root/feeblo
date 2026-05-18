@@ -1,9 +1,9 @@
 import type { PostStatus } from "@feeblo/domain/post-status/schema";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
-import { Editor, type EditorProps } from "~/components/ui/editor";
-import { Label } from "~/components/ui/label";
-import { Switch } from "~/components/ui/switch";
+import { Editor, type EditorProps } from "@feeblo/ui/editor";
+import { Label } from "@feeblo/ui/label";
+import { Switch } from "@feeblo/ui/switch";
 import { withForm } from "~/hooks/form";
 import { PostBoardSelect } from "./post-board-select";
 import {

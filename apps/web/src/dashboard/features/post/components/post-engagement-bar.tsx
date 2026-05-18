@@ -4,8 +4,8 @@ import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import { toastManager } from "~/components/ui/toast";
+import { Button } from "@feeblo/ui/button";
+import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { postReactionCollection, upvoteCollection } from "~/lib/collections";
 import {

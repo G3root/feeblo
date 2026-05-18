@@ -4,13 +4,13 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "~/components/ui/field";
+} from "@feeblo/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   InputGroupText,
-} from "~/components/ui/input-group";
+} from "@feeblo/ui/input-group";
 import { withForm } from "~/hooks/form";
 import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
 import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";

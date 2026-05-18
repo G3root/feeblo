@@ -2,8 +2,8 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Badge } from "@feeblo/ui/badge";
+import { Button } from "@feeblo/ui/button";
 import {
   Card,
   CardContent,
@@ -11,9 +11,9 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "~/components/ui/card";
-import { Separator } from "~/components/ui/separator";
-import { Skeleton } from "~/components/ui/skeleton";
+} from "@feeblo/ui/card";
+import { Separator } from "@feeblo/ui/separator";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import {
   startBillingCheckout,

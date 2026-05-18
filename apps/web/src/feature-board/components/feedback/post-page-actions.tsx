@@ -15,14 +15,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { Button, buttonVariants } from "~/components/ui/button";
+} from "@feeblo/ui/alert-dialog";
+import { Button, buttonVariants } from "@feeblo/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+} from "@feeblo/ui/dropdown-menu";
 import { cn } from "~/lib/utils";
 
 type PostPageActionsProps = {

@@ -1,8 +1,8 @@
 import { createFormHook } from "@tanstack/react-form";
-import { Button } from "~/components/ui/button";
-import { TextField } from "~/components/ui/text-field.tsx";
-import { TextareaField } from "~/components/ui/textarea-field.tsx";
-import { fieldContext, formContext, useFormContext } from "./form-context";
+import { Button } from "@feeblo/ui/button";
+import { TextField } from "@feeblo/ui/text-field";
+import { TextareaField } from "@feeblo/ui/textarea-field";
+import { fieldContext, formContext, useFormContext } from "@feeblo/ui/form-context";
 
 interface SubscribeButtonProps extends React.ComponentProps<typeof Button> {
   label: string;

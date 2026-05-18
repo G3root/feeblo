@@ -8,8 +8,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { createContext, type ReactNode, useContext } from "react";
-import { Button } from "~/components/ui/button";
-import { ButtonGroup, ButtonGroupText } from "~/components/ui/button-group";
+import { Button } from "@feeblo/ui/button";
+import { ButtonGroup, ButtonGroupText } from "@feeblo/ui/button-group";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -21,7 +21,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+} from "@feeblo/ui/dropdown-menu";
 import { postStatusCollection, tagCollection } from "~/lib/collections";
 import { cn } from "~/lib/utils";
 import {

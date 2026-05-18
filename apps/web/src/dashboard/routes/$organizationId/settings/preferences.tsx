@@ -5,8 +5,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
-import { useTheme } from "~/components/ui/theme-provider";
+} from "@feeblo/ui/select";
+import { useTheme } from "@feeblo/ui/theme-provider";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 

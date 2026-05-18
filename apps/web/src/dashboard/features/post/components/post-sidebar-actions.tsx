@@ -17,14 +17,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { Button } from "~/components/ui/button";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
+import { toastManager } from "@feeblo/ui/toast";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "~/components/ui/tooltip";
+} from "@feeblo/ui/tooltip";
 import { usePostDeleteDialogContext } from "~/features/post/dialog-stores";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { postCollection } from "~/lib/collections";

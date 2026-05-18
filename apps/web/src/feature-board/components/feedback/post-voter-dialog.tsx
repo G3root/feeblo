@@ -6,8 +6,8 @@ import {
   AvatarGroup,
   AvatarGroupCount,
   AvatarImage,
-} from "~/components/ui/avatar";
-import { Button } from "~/components/ui/button";
+} from "@feeblo/ui/avatar";
+import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,7 @@ import {
   DialogPanel,
   DialogTitle,
   DialogTrigger,
-} from "~/components/ui/dialog";
+} from "@feeblo/ui/dialog";
 import { getInitials } from "../../lib/utils";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";

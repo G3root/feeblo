@@ -1,14 +1,14 @@
 import { and, eq, ilike, inArray, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
-import { SkeletonLoader } from "~/components/ui/skeleton-loader";
+} from "@feeblo/ui/empty";
+import { SkeletonLoader } from "@feeblo/ui/skeleton-loader";
 import type { ChangelogStatus } from "~/features/changelog/constants";
 import { changelogCollection } from "~/lib/collections";
 import { useChangelogAction } from "../hooks/use-changelog-action";

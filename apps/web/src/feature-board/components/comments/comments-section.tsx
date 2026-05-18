@@ -1,12 +1,12 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemTitle,
-} from "~/components/ui/item";
+} from "@feeblo/ui/item";
 import { authClient } from "~/lib/auth-client";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";

@@ -8,20 +8,20 @@ import {
   FieldDescription as BaseFieldDescription,
   FieldLabel as BaseFieldLabel,
   FieldGroup,
-} from "~/components/ui/field";
+} from "@feeblo/ui/field";
 import {
   Item as BaseItem,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemTitle,
-} from "~/components/ui/item";
-import { Separator } from "~/components/ui/separator";
+} from "@feeblo/ui/item";
+import { Separator } from "@feeblo/ui/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "~/components/ui/tooltip";
+} from "@feeblo/ui/tooltip";
 import { cn } from "~/lib/utils";
 
 function Root({ children }: { children: React.ReactNode }) {

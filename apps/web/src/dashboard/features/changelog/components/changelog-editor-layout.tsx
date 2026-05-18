@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { Separator } from "~/components/ui/separator";
+import { Separator } from "@feeblo/ui/separator";
 import { cn } from "~/lib/utils";
 
 type ChangelogEditorRootProps = {

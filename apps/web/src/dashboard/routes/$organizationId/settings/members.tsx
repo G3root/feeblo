@@ -4,7 +4,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Empty,
   EmptyContent,
@@ -12,24 +12,24 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "~/components/ui/empty";
+} from "@feeblo/ui/empty";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-} from "~/components/ui/input-group";
+} from "@feeblo/ui/input-group";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@feeblo/ui/select";
 import {
   SkeletonLoader,
   SkeletonWrapper,
-} from "~/components/ui/skeleton-loader";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/skeleton-loader";
+import { toastManager } from "@feeblo/ui/toast";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
 import { useAppForm } from "~/hooks/form";

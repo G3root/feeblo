@@ -4,17 +4,17 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Suspense } from "react";
-import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
+import { Button } from "@feeblo/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/empty";
+import { toastManager } from "@feeblo/ui/toast";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";

@@ -4,8 +4,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { Suspense, useState } from "react";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Badge } from "@feeblo/ui/badge";
+import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -14,23 +14,23 @@ import {
   DialogHeader,
   DialogPanel,
   DialogTitle,
-} from "~/components/ui/dialog";
+} from "@feeblo/ui/dialog";
 import {
   Field,
   FieldContent,
   FieldDescription,
   FieldLabel,
   FieldTitle,
-} from "~/components/ui/field";
+} from "@feeblo/ui/field";
 import {
   Item,
   ItemContent,
   ItemGroup,
   ItemMedia,
   ItemTitle,
-} from "~/components/ui/item";
-import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
-import { Skeleton } from "~/components/ui/skeleton";
+} from "@feeblo/ui/item";
+import { RadioGroup, RadioGroupItem } from "@feeblo/ui/radio-group";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {

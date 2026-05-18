@@ -2,9 +2,9 @@ import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { z } from "zod";
-import { Separator } from "~/components/ui/separator";
-import { Skeleton } from "~/components/ui/skeleton";
-import { toastManager } from "~/components/ui/toast";
+import { Separator } from "@feeblo/ui/separator";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { toastManager } from "@feeblo/ui/toast";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,

@@ -7,14 +7,14 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, use } from "react";
 import { z } from "zod";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/dropdown-menu";
+import { toastManager } from "@feeblo/ui/toast";
 import { PostContentEditor } from "~/features/post/components/post-content";
 import { PostTitleInput } from "~/features/post/components/post-title-input";
 import { useAppForm } from "~/hooks/form";

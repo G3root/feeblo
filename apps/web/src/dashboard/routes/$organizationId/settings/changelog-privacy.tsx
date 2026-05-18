@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useTransition } from "react";
-import { Switch } from "~/components/ui/switch";
-import { toastManager } from "~/components/ui/toast";
+import { Switch } from "@feeblo/ui/switch";
+import { toastManager } from "@feeblo/ui/toast";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useSite } from "~/hooks/use-site";

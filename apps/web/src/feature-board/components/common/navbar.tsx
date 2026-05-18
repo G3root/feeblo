@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import { useSite } from "../../providers/site-provider";

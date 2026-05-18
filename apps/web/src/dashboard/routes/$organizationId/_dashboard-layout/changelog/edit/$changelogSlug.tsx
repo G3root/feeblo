@@ -1,17 +1,17 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Empty,
   EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
+} from "@feeblo/ui/empty";
 import {
   SkeletonLoader,
   SkeletonWrapper,
-} from "~/components/ui/skeleton-loader";
+} from "@feeblo/ui/skeleton-loader";
 import {
   ChangelogEditorBackLink,
   ChangelogEditorContentField,

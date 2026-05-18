@@ -9,8 +9,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/alert-dialog";
+import { toastManager } from "@feeblo/ui/toast";
 import { postCollection } from "~/lib/collections";
 import { usePostDeleteDialogContext } from "../dialog-stores";
 

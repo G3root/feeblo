@@ -1,8 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
-import { ThemeProvider } from "./components/ui/theme-provider";
-import { AnchoredToastProvider, ToastProvider } from "./components/ui/toast";
-import { TooltipProvider } from "./components/ui/tooltip";
+import { ThemeProvider } from "@feeblo/ui/theme-provider";
+import { AnchoredToastProvider, ToastProvider } from "@feeblo/ui/toast";
+import { TooltipProvider } from "@feeblo/ui/tooltip";
 import { getContext } from "./integrations/tanstack-query/root-provider";
 import { RuntimeProvider } from "./lib/runtime/runtime-provider";
 // Import the generated route tree

@@ -1,6 +1,6 @@
 import { generateId } from "@feeblo/utils/id";
 import { createOptimisticAction } from "@tanstack/react-db";
-import { toastManager } from "~/components/ui/toast";
+import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { getUpvoteCollectionKey } from "~/lib/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";

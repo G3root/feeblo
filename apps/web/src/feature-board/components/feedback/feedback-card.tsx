@@ -7,8 +7,8 @@ import {
   truncate,
 } from "src/feature-board/lib/utils";
 import { Link } from "wouter";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { Skeleton } from "~/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "~/lib/utils";
 
 type FeedbackPost = {

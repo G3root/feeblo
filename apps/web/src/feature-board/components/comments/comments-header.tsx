@@ -1,4 +1,4 @@
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 
 export function CommentsHeader({ totalComments }: { totalComments: number }) {
   return (

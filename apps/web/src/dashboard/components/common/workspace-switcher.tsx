@@ -7,16 +7,16 @@ import {
   organizationCollection,
   workspacePlanCollection,
 } from "~/lib/collections";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
-import { SkeletonLoader, SkeletonWrapper } from "../ui/skeleton-loader";
+} from "@feeblo/ui/dropdown-menu";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@feeblo/ui/sidebar";
+import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 
 export function WorkspaceSwitcher() {
   const navigate = useNavigate();

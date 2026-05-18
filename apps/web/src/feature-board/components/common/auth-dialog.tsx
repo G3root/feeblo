@@ -5,7 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useStore } from "@nanostores/react";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,20 +13,20 @@ import {
   DialogHeader,
   DialogPanel,
   DialogTitle,
-} from "~/components/ui/dialog";
+} from "@feeblo/ui/dialog";
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
-} from "~/components/ui/field";
+} from "@feeblo/ui/field";
 import {
   InputOTP,
   InputOTPGroup,
   InputOTPSeparator,
   InputOTPSlot,
-} from "~/components/ui/input-otp";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/input-otp";
+import { toastManager } from "@feeblo/ui/toast";
 import { SocialAuthButtons } from "~/features/auth/components/social-auth-buttons";
 import { useAppForm } from "~/hooks/form";
 import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";

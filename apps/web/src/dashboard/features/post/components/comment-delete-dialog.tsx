@@ -8,8 +8,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/alert-dialog";
+import { toastManager } from "@feeblo/ui/toast";
 import { commentCollection } from "~/lib/collections";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
 

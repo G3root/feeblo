@@ -5,8 +5,8 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "~/components/ui/empty";
-import { Separator } from "~/components/ui/separator";
+} from "@feeblo/ui/empty";
+import { Separator } from "@feeblo/ui/separator";
 import {
   ChangelogPageLayout,
   ChangelogTimeline,

@@ -4,8 +4,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
 import { useRef } from "react";
 import { z } from "zod";
-import { Button } from "~/components/ui/button";
-import { Editor, type EmailEditorRef } from "~/components/ui/editor";
+import { Button } from "@feeblo/ui/button";
+import { Editor, type EmailEditorRef } from "@feeblo/ui/editor";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,

@@ -1,6 +1,6 @@
 import type { PostStatus } from "@feeblo/domain/post-status/schema";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@feeblo/ui/button";
 import {
   Combobox,
   ComboboxContent,
@@ -10,7 +10,7 @@ import {
   ComboboxList,
   ComboboxTrigger,
   ComboboxValue,
-} from "~/components/ui/combobox";
+} from "@feeblo/ui/combobox";
 import {
   BOARD_LANE_COLOR_MAP,
   BoardIconMap,

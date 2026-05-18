@@ -9,8 +9,8 @@ import {
   Accordion,
   AccordionContent,
   AccordionTrigger,
-} from "~/components/ui/accordion";
-import { Button } from "~/components/ui/button";
+} from "@feeblo/ui/accordion";
+import { Button } from "@feeblo/ui/button";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
 import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
