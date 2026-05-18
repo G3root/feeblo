@@ -27,6 +27,7 @@ import {
   useRef,
 } from "react";
 import { createPasteHandler } from "../core/create-paste-handler";
+import { FocusScopes } from "../extensions/focus-scopes";
 import { imageSlashCommand } from "../plugins";
 import { createImageExtension } from "../plugins/image/extension";
 import {
@@ -197,6 +198,7 @@ export function Editor({
         link: false,
         underline: false,
       }),
+      FocusScopes,
       Underline,
       Link.configure({
         openOnClick: false,
