@@ -1,7 +1,18 @@
 import { Database, schema } from "@feeblo/db";
 import { generateId } from "@feeblo/utils/id";
+import {
+  ReactionEmojiSchema,
+  type ReactionEmoji,
+} from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import {
+  Context,
+  Effect,
+  Array as EffectArray,
+  Layer,
+  Option,
+  Schema,
+} from "effect";
 
 interface TPostReactionList {
   organizationId: string;
@@ -9,7 +20,7 @@ interface TPostReactionList {
 }
 
 interface TPostReactionToggle {
-  emoji: string;
+  emoji: ReactionEmoji;
   organizationId: string;
   postId: string;
   userId: string;
@@ -25,11 +36,13 @@ interface TFindMember {
 }
 
 interface TCreatePostReaction {
-  emoji: string;
+  emoji: ReactionEmoji;
   memberId: string | null;
   postId: string;
   userId: string;
 }
+
+const decodeReactionEmoji = Schema.decodeUnknownSync(ReactionEmojiSchema);
 
 const makePostReactionRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
@@ -58,7 +71,7 @@ const makePostReactionRepository = Effect.gen(function* () {
           return [];
         }
 
-        return yield* db.makeQuery((execute, input: TPostReactionList) =>
+        const reactions = yield* db.makeQuery((execute, input: TPostReactionList) =>
           execute((client) =>
             client
               .select({
@@ -84,6 +97,11 @@ const makePostReactionRepository = Effect.gen(function* () {
               )
           )
         )({ postId, organizationId });
+
+        return reactions.map((reaction) => ({
+          ...reaction,
+          emoji: decodeReactionEmoji(reaction.emoji),
+        }));
       }),
 
     listPublic: ({ postId, organizationId }: TPostReactionList) =>
@@ -114,7 +132,7 @@ const makePostReactionRepository = Effect.gen(function* () {
           return [];
         }
 
-        return yield* db.makeQuery((execute, input: TPostReactionList) =>
+        const reactions = yield* db.makeQuery((execute, input: TPostReactionList) =>
           execute((client) =>
             client
               .select({
@@ -140,6 +158,11 @@ const makePostReactionRepository = Effect.gen(function* () {
               )
           )
         )({ postId, organizationId });
+
+        return reactions.map((reaction) => ({
+          ...reaction,
+          emoji: decodeReactionEmoji(reaction.emoji),
+        }));
       }),
 
     toggle: ({ organizationId, postId, userId, emoji }: TPostReactionToggle) =>

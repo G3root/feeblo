@@ -1,7 +1,18 @@
 import { Database, schema } from "@feeblo/db";
 import { generateId } from "@feeblo/utils/id";
+import {
+  ReactionEmojiSchema,
+  type ReactionEmoji,
+} from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import {
+  Context,
+  Effect,
+  Array as EffectArray,
+  Layer,
+  Option,
+  Schema,
+} from "effect";
 
 interface TCommentReactionList {
   organizationId: string;
@@ -10,7 +21,7 @@ interface TCommentReactionList {
 
 interface TCommentReactionToggle {
   commentId: string;
-  emoji: string;
+  emoji: ReactionEmoji;
   organizationId: string;
   postId: string;
   userId: string;
@@ -24,12 +35,15 @@ interface TCommentReactionCreate extends TCommentReactionToggle {
   memberId: string | null;
 }
 
+const decodeReactionEmoji = Schema.decodeUnknownSync(ReactionEmojiSchema);
+
 const makeCommentReactionRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
   return {
     list: (args: TCommentReactionList) =>
-      db.makeQuery((execute, input: TCommentReactionList) =>
+      db
+        .makeQuery((execute, input: TCommentReactionList) =>
         execute((client) =>
           client
             .select({
@@ -55,10 +69,19 @@ const makeCommentReactionRepository = Effect.gen(function* () {
               )
             )
         )
-      )(args),
+        )(args)
+        .pipe(
+          Effect.map((reactions) =>
+            reactions.map((reaction) => ({
+              ...reaction,
+              emoji: decodeReactionEmoji(reaction.emoji),
+            }))
+          )
+        ),
 
     listPublic: (args: TCommentReactionList) =>
-      db.makeQuery((execute, input: TCommentReactionList) =>
+      db
+        .makeQuery((execute, input: TCommentReactionList) =>
         execute((client) =>
           client
             .select({
@@ -93,7 +116,15 @@ const makeCommentReactionRepository = Effect.gen(function* () {
               )
             )
         )
-      )(args),
+        )(args)
+        .pipe(
+          Effect.map((reactions) =>
+            reactions.map((reaction) => ({
+              ...reaction,
+              emoji: decodeReactionEmoji(reaction.emoji),
+            }))
+          )
+        ),
 
     toggle: (args: TCommentReactionToggle) =>
       Effect.gen(function* () {
