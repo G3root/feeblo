@@ -28,10 +28,26 @@ export default defineConfig({
   ],
 
   vite: {
-    ssr: {
-      noExternal: [/^@feeblo\//],
-    },
     plugins: [
+      {
+        name: "fix-hugeicons-pure-annotations",
+        enforce: "pre",
+        transform(code, id) {
+          if (
+            !(
+              id.includes("/@hugeicons/core-free-icons/") &&
+              code.includes("/*#__PURE__*/")
+            )
+          ) {
+            return null;
+          }
+
+          return {
+            code: code.replaceAll("/*#__PURE__*/ ", ""),
+            map: null,
+          };
+        },
+      },
       tailwindcss(),
       tanstackRouter({
         target: "react",
@@ -42,6 +58,28 @@ export default defineConfig({
         autoCodeSplitting: true,
       }),
     ],
+    ssr: {
+      noExternal: [/^@feeblo\//],
+    },
+    build: {
+      chunkSizeWarningLimit: 750,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              // if (id.includes("/@hugeicons")) {
+              //   return "hugeicons-vendor";
+              // }
+
+              // biome-ignore lint/style/useCollapsedIf: <explanation>
+              if (id.includes("/effect/")) {
+                return "effect-runtime-vendor";
+              }
+            }
+          },
+        },
+      },
+    },
   },
 
   env: {
