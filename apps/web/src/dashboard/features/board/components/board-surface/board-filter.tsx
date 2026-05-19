@@ -22,12 +22,9 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
-import { postStatusCollection, tagCollection } from "~/lib/collections";
 import { cn } from "~/lib/utils";
-import {
-  type BoardPostStatus,
-  getBoardStatusLabel,
-} from "../../constants";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
 import {
   type BoardStatusOperator,
   type BoardTagOperator,
@@ -98,6 +95,7 @@ function BoardFilterRoot({
   organizationId: string;
 }) {
   const store = useBoardStore();
+  const { postStatusCollection, tagCollection } = useDashboardCollections();
   const filters = useBoardFilterState();
   const { data: postStatuses } = useLiveSuspenseQuery(
     (q) =>

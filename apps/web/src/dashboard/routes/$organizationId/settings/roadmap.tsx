@@ -5,7 +5,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useSite } from "~/hooks/use-site";
-import { siteCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId/settings/roadmap")({
   component: RouteComponent,
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/$organizationId/settings/roadmap")({
 
 function RouteComponent() {
   const site = useSite();
+  const { siteCollection } = useDashboardCollections();
   const [isPending, startTransition] = useTransition();
 
   const handleCheckedChange = (checked: boolean) => {

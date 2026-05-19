@@ -22,11 +22,7 @@ export function getChangelogStatusLabel(status: ChangelogStatus) {
   return CHANGELOG_STATUS_LABELS[status];
 }
 
-export function ChangelogStatusBadge({
-  status,
-}: {
-  status: ChangelogStatus;
-}) {
+export function ChangelogStatusBadge({ status }: { status: ChangelogStatus }) {
   return (
     <Badge className={CHANGELOG_STATUS_STYLES[status]} variant="outline">
       {getChangelogStatusLabel(status)}

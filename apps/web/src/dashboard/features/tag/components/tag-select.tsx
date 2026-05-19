@@ -13,11 +13,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@feeblo/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@feeblo/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
 import { useTagCreateDialogContext } from "../dialog-stores";
 
 export interface TagSelectOption {

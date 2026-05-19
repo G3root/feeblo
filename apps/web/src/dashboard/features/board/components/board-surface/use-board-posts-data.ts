@@ -7,12 +7,7 @@ import {
   not,
   useLiveQuery,
 } from "@tanstack/react-db";
-import {
-  boardCollection,
-  postCollection,
-  postStatusCollection,
-  postTagCollection,
-} from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { BoardPostStatus } from "../../constants";
 import type {
   BoardPostStatusFilter,
@@ -42,6 +37,12 @@ export function useBoardPostsData({
   tagIds,
   tagOperator,
 }: UseBoardPostsDataOptions) {
+  const {
+    boardCollection,
+    postCollection,
+    postStatusCollection,
+    postTagCollection,
+  } = useDashboardCollections();
   const normalizedSearch = search.trim();
   const statusesKey = statuses.join(",");
   const tagIdsKey = tagIds.join(",");

@@ -1,9 +1,6 @@
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "~/lib/utils";
-import {
-  BOARD_LANE_COLOR_MAP,
-  BoardIconMap,
-} from "../../board/constants";
+import { BOARD_LANE_COLOR_MAP, BoardIconMap } from "../../board/constants";
 import type { RoadmapStatus } from "./types";
 
 export function RoadmapStatusIcon({ status }: { status: RoadmapStatus }) {

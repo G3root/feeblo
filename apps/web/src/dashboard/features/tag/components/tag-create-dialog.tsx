@@ -11,7 +11,7 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { tagCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useTagCreateDialogContext } from "../dialog-stores";
 
 type TagType = "FEEDBACK" | "CHANGELOG";
@@ -39,6 +39,7 @@ export function TagCreateDialog() {
 
 function TagCreateForm() {
   const organizationId = useOrganizationId();
+  const { tagCollection } = useDashboardCollections();
   const store = useTagCreateDialogContext();
   const type = store.get().context.data.type as TagType;
 

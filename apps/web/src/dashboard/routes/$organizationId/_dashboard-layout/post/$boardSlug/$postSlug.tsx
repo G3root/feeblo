@@ -38,17 +38,9 @@ import {
   usePolicy,
 } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
-import {
-  boardCollection,
-  commentCollection,
-  commentReactionCollection,
-  postCollection,
-  postStatusCollection,
-  postTagCollection,
-  tagCollection,
-} from "~/lib/collections";
 import { getCommentReactionCollectionKey } from "~/lib/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
@@ -59,6 +51,15 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
+  const {
+    boardCollection,
+    commentCollection,
+    commentReactionCollection,
+    postCollection,
+    postStatusCollection,
+    postTagCollection,
+    tagCollection,
+  } = useDashboardCollections();
   const { data: session } = authClient.useSession();
   const navigate = useNavigate();
 

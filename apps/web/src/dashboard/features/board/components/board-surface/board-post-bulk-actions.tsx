@@ -17,9 +17,9 @@ import {
   useSelectedPosts,
 } from "~/features/board/state/board-store-context";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { postCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 import { cn } from "~/lib/utils";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function BoardPostBulkActions() {
   const selectedPostIds = useSelectedPostIds();
@@ -61,6 +61,7 @@ export function BoardPostBulkActions() {
 
 function BulkDeleteAlert() {
   const store = useBoardStore();
+  const { postCollection } = useDashboardCollections();
   const selectedPostIds = useSelectedPostIds();
   const selectedPosts = useSelectedPosts();
   const open = useSelector(store, (state) => state.context.bulkDeleteOpen);

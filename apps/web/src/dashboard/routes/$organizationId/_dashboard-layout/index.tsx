@@ -1,10 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@feeblo/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@feeblo/ui/card";
 
 export const Route = createFileRoute("/$organizationId/_dashboard-layout/")({
   component: RouteComponent,

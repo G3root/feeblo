@@ -10,5 +10,7 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId } = Route.useParams();
 
-  return <ChangelogIndex organizationId={organizationId} statuses={["draft"]} />;
+  return (
+    <ChangelogIndex organizationId={organizationId} statuses={["draft"]} />
+  );
 }

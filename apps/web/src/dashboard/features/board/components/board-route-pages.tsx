@@ -3,7 +3,7 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { BoardNotFound } from "~/features/board/components/board-not-found";
 import { BoardSurface } from "~/features/board/components/board-surface";
 import type { BoardView } from "~/features/board/state/board-store-context";
-import { boardCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 type OrganizationPageProps = {
   initialView: BoardView;
@@ -32,6 +32,7 @@ function BoardFeedbackPage({
   initialView,
   organizationId,
 }: BoardPageProps) {
+  const { boardCollection } = useDashboardCollections();
   const { data: board } = useLiveSuspenseQuery(
     (q) =>
       q

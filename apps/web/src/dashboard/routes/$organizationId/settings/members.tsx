@@ -25,10 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
-import {
-  SkeletonLoader,
-  SkeletonWrapper,
-} from "@feeblo/ui/skeleton-loader";
+import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toastManager } from "@feeblo/ui/toast";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
@@ -36,8 +33,8 @@ import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasOwnerOrAdminRole, PolicyGuard } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
-import { invitationsCollection, membersCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId/settings/members")({
   component: MembersSettingsPage,
@@ -86,6 +83,7 @@ function MembersSettingsPage() {
 
 function MembersSection() {
   const organizationId = useOrganizationId();
+  const { membersCollection } = useDashboardCollections();
   const { data: session } = authClient.useSession();
   const [search, setSearch] = React.useState("");
 
@@ -240,6 +238,7 @@ function MembersSection() {
 
 function InvitationsSection() {
   const organizationId = useOrganizationId();
+  const { invitationsCollection } = useDashboardCollections();
   const [search, setSearch] = React.useState("");
 
   const invitationsQuery = useLiveQuery(
@@ -435,6 +434,8 @@ function MemberListItem({
   organizationId: string;
   role: "owner" | "admin" | "member";
 }) {
+  const { membersCollection } = useDashboardCollections();
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0">
@@ -549,6 +550,8 @@ function InvitationListItem({
   organizationId: string;
   role: string;
 }) {
+  const { invitationsCollection } = useDashboardCollections();
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
       <div className="space-y-1">
@@ -621,6 +624,8 @@ const InviteMemberFormSchema = z.object({
 
 function InviteMemberForm() {
   const organizationId = useOrganizationId();
+  const { invitationsCollection, membersCollection } =
+    useDashboardCollections();
   const form = useAppForm({
     defaultValues: {
       email: "",

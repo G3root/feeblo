@@ -10,11 +10,12 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
-import { commentCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useCommentDeleteDialogContext } from "../dialog-stores";
 
 export function CommentDeleteDialog() {
   const store = useCommentDeleteDialogContext();
+  const { commentCollection } = useDashboardCollections();
   const open = useSelector(store, (state) => state.context.open);
   return (
     <AlertDialog

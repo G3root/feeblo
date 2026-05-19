@@ -1,11 +1,7 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import {
-  createCollection,
-  parseLoadSubsetOptions,
-  parseWhereExpression,
-} from "@tanstack/react-db";
+import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
+import type { QueryClient } from "@tanstack/react-query";
 import { Duration } from "effect";
-import * as TanstackQuery from "~/integrations/tanstack-query/root-provider";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
@@ -13,1171 +9,813 @@ import {
 } from "~/lib/reaction-keys";
 import { fetchRpc } from "./runtime";
 
-export const postCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseWhereExpression(opts.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          lt: (field, value) => ({ [`${field.join(".")}_lt`]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
+type DashboardCollectionScope = {
+  organizationId: string;
+  queryClient: QueryClient;
+};
+
+export function createDashboardCollections({
+  organizationId,
+  queryClient,
+}: DashboardCollectionScope) {
+  const postCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`post-${organizationId}`],
+      queryFn: async (ctx) => {
+        const boardId: string | null = null;
 
-      const cacheKey = ["post"];
-
-      if (parsed) {
-        // biome-ignore lint/style/useCollapsedIf: <explanation>
-        if (parsed?.organizationId) {
-          cacheKey.push(`organizationId-${parsed.organizationId}`);
-        }
-        // if (parsed?.boardId) {
-        //   cacheKey.push(`boardId-${parsed.boardId}`);
-        // }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          lt: (field, value) => ({ [`${field.join(".")}_lt`]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
-
-      const boardId: string | null = null;
-      let organizationId: string | null = null;
-
-      if (parsed) {
-        // if (parsed.boardId) {
-        //   boardId = parsed.boardId;
-        // }
-        // biome-ignore lint/style/useCollapsedIf: <explanation>
-        if (parsed.organizationId) {
-          organizationId = parsed.organizationId;
-        }
-      }
-
-      // if (!boardId) {
-      //   return [];
-      // }
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostList({ boardId, organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedPost } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostUpdate({
-          id: updatedPost.id,
-          statusId: updatedPost.statusId,
-          content: updatedPost.content,
-          title: updatedPost.title,
-          boardId: updatedPost.boardId,
-          organizationId: updatedPost.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedPost } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostDelete({
-          id: deletedPost.id,
-          boardId: deletedPost.boardId,
-          organizationId: deletedPost.organizationId,
-        })
-      );
-    },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newPost } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.PostCreate({
-          id: newPost.id,
-          boardId: newPost.boardId,
-          organizationId: newPost.organizationId,
-          title: newPost.title,
-          content: newPost.content,
-          statusId: newPost.statusId,
-        })
-      );
-    },
-  })
-);
-
-export const postStatusCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseWhereExpression(opts.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-          or: (...filters) => Object.assign({}, ...filters),
-          not: () => ({}),
-          inArray: () => ({}),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
-      const cacheKey = ["post-status"];
-
-      if (parsed?.organizationId) {
-        cacheKey.push(`organizationId-${parsed.organizationId}`);
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-          or: (...filters) => Object.assign({}, ...filters),
-          not: () => ({}),
-          inArray: () => ({}),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
-      const organizationId = parsed?.organizationId;
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostStatusList({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const changelogCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseWhereExpression(opts.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-          inArray: () => ({}),
-          ilike: () => ({}),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
-      const cacheKey = ["changelog"];
-
-      if (parsed?.organizationId) {
-        cacheKey.push(`organizationId-${parsed.organizationId}`);
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseWhereExpression(ctx.meta?.loadSubsetOptions?.where, {
-        handlers: {
-          eq: (field, value) => ({ [field.join(".")]: value }),
-          and: (...filters) => Object.assign({}, ...filters),
-          inArray: () => ({}),
-          ilike: () => ({}),
-        },
-        onUnknownOperator: () => {
-          return null;
-        },
-      });
-      const organizationId = parsed?.organizationId;
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogList({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedChangelog } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.ChangelogUpdate({
-          id: updatedChangelog.id,
-          title: updatedChangelog.title,
-          slug: updatedChangelog.slug,
-          content: updatedChangelog.content,
-          status: updatedChangelog.status,
-          scheduledAt: updatedChangelog.scheduledAt,
-          publishedAt: updatedChangelog.publishedAt,
-          organizationId: updatedChangelog.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedChangelog } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.ChangelogDelete({
-          id: deletedChangelog.id,
-          organizationId: deletedChangelog.organizationId,
-        })
-      );
-    },
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newChangelog } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.ChangelogCreate({
-          id: newChangelog.id,
-          title: newChangelog.title,
-          slug: newChangelog.slug,
-          content: newChangelog.content,
-          status: newChangelog.status,
-          scheduledAt: newChangelog.scheduledAt,
-          publishedAt: newChangelog.publishedAt,
-          organizationId: newChangelog.organizationId,
-        })
-      );
-    },
-  })
-);
-
-export const boardCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["board"];
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    refetchInterval: Duration.toMillis(Duration.minutes(5)),
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-      } = {};
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
-          const fieldName = field.join(".");
-
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
-          }
-        }
-      }
-
-      const organizationId = filters.organizationId;
-
-      if (!organizationId) {
-        throw new Error("organizationId is required");
-      }
-
-      const data = await fetchRpc((rpc) => rpc.BoardList({ organizationId }), {
-        signal: ctx.signal,
-      });
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newBoard } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.BoardCreate({
-            id: newBoard.id,
-            name: newBoard.name,
-            visibility: newBoard.visibility,
-            organizationId: newBoard.organizationId,
-          }),
-        {}
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-
-      const { original: deletedBoard } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.BoardDelete({
-            id: deletedBoard.id,
-            organizationId: deletedBoard.organizationId,
-          }),
-        {}
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedBoard } = mutation;
-
-      await fetchRpc(
-        (rpc) =>
-          rpc.BoardUpdate({
-            id: updatedBoard.id,
-            name: updatedBoard.name,
-            visibility: updatedBoard.visibility,
-            organizationId: updatedBoard.organizationId,
-          }),
-        {}
-      );
-    },
-  })
-);
-
-export const tagCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["tag"];
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
-          const fieldName = field.join(".");
-
-          if (fieldName === "organizationId") {
-            organizationId = value as string;
-          }
-        }
-      }
-
-      if (!organizationId) {
-        throw new Error("organizationId is required");
-      }
-
-      const data = await fetchRpc((rpc) => rpc.TagList({ organizationId }), {
-        signal: ctx.signal,
-      });
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newTag } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.TagCreate({
-          id: newTag.id,
-          name: newTag.name,
-          type: newTag.type,
-          organizationId: newTag.organizationId,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedTag } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.TagUpdate({
-          id: updatedTag.id,
-          name: updatedTag.name,
-          type: updatedTag.type,
-          organizationId: updatedTag.organizationId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedTag } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.TagDelete({
-          id: deletedTag.id,
-          organizationId: deletedTag.organizationId,
-        })
-      );
-    },
-  })
-);
-
-export const postTagCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["post-tag"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-      let postId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator !== "eq") {
-          continue;
-        }
-
-        if (field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-
-        if (field.join(".") === "postId") {
-          postId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.PostTagList({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return postId
-        ? data.filter((entry) => entry.postId === postId)
-        : [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const changelogTagCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["changelog-tag"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-        if (fieldName === "changelogId") {
-          cacheKey.push(`changelogId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-      let changelogId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator !== "eq") {
-          continue;
-        }
-
-        if (field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-
-        if (field.join(".") === "changelogId") {
-          changelogId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.ChangelogTagList({ organizationId }),
-        {
-          signal: ctx.signal,
-        }
-      );
-
-      return changelogId
-        ? data.filter((entry) => entry.changelogId === changelogId)
-        : [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const membershipCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: ["membership"],
-    staleTime: Duration.toMillis(Duration.minutes(10)),
-    queryFn: async (args) =>
-      fetchRpc((rpc) => rpc.MembershipList(), { signal: args.signal }).then(
-        (data) => [...data]
-      ),
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-  })
-);
-
-export const organizationCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: ["organizations"],
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const data = await fetchRpc((rpc) => rpc.OrganizationList(), {
-        signal: ctx.signal,
-      });
-
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedOrganization } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.OrganizationUpdate({
-          organizationId: updatedOrganization.id,
-          name: updatedOrganization.name,
-          logo: updatedOrganization.logo,
-        })
-      );
-    },
-  })
-);
-
-export const membersCollection = createCollection(
-  queryCollectionOptions({
-    staleTime: Duration.toMillis(Duration.minutes(20)),
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["members"];
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-      }
-
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq" && field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc((rpc) =>
-        rpc.OrganizationMembersList({ organizationId })
-      );
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedMember } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.OrganizationRemoveMember({
-          memberId: deletedMember.id,
-          organizationId: deletedMember.organizationId,
-        })
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedMember } = mutation;
-
-      await fetchRpc((rpc) =>
-        rpc.OrganizationUpdateMemberRole({
-          memberId: updatedMember.id,
-          organizationId: updatedMember.organizationId,
-          role: updatedMember.role,
-        })
-      );
-    },
-  })
-);
-
-export const invitationsCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["invitations"];
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-      }
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq" && field.join(".") === "organizationId") {
-          organizationId = value as string;
-        }
-      }
-
-      if (!organizationId) {
-        return [];
-      }
-
-      const data = await fetchRpc((rpc) =>
-        rpc.OrganizationInvitationsList({ organizationId })
-      );
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedInvitation } = mutation;
-      await fetchRpc((rpc) =>
-        rpc.OrganizationCancelInvitation({
-          invitationId: deletedInvitation.id,
-          organizationId: deletedInvitation.organizationId,
-        })
-      );
-    },
-  })
-);
-
-export const commentCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["comment"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-        postId?: string;
-      } = {};
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
-          const fieldName = field.join(".");
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
-          }
-          if (fieldName === "postId") {
-            filters.postId = value as string;
-          }
-        }
-      }
-      const organizationId = filters?.organizationId;
-      const postId = filters?.postId;
-      if (!organizationId) {
-        return [];
-      }
-      if (!postId) {
-        return [];
-      }
-      try {
         const data = await fetchRpc(
-          (rpc) => rpc.CommentList({ organizationId, postId }),
-          { signal: ctx.signal }
+          (rpc) => rpc.PostList({ boardId, organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedPost } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostUpdate({
+            id: updatedPost.id,
+            statusId: updatedPost.statusId,
+            content: updatedPost.content,
+            title: updatedPost.title,
+            boardId: updatedPost.boardId,
+            organizationId: updatedPost.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedPost } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostDelete({
+            id: deletedPost.id,
+            boardId: deletedPost.boardId,
+            organizationId: deletedPost.organizationId,
+          })
+        );
+      },
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newPost } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostCreate({
+            id: newPost.id,
+            boardId: newPost.boardId,
+            organizationId: newPost.organizationId,
+            title: newPost.title,
+            content: newPost.content,
+            statusId: newPost.statusId,
+          })
+        );
+      },
+    })
+  );
+
+  const postStatusCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`post-status-${organizationId}`],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.PostStatusList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const changelogCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`changelog-${organizationId}`],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedChangelog } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ChangelogUpdate({
+            id: updatedChangelog.id,
+            title: updatedChangelog.title,
+            slug: updatedChangelog.slug,
+            content: updatedChangelog.content,
+            status: updatedChangelog.status,
+            scheduledAt: updatedChangelog.scheduledAt,
+            publishedAt: updatedChangelog.publishedAt,
+            organizationId: updatedChangelog.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedChangelog } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ChangelogDelete({
+            id: deletedChangelog.id,
+            organizationId: deletedChangelog.organizationId,
+          })
+        );
+      },
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newChangelog } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.ChangelogCreate({
+            id: newChangelog.id,
+            title: newChangelog.title,
+            slug: newChangelog.slug,
+            content: newChangelog.content,
+            status: newChangelog.status,
+            scheduledAt: newChangelog.scheduledAt,
+            publishedAt: newChangelog.publishedAt,
+            organizationId: newChangelog.organizationId,
+          })
+        );
+      },
+    })
+  );
+
+  const boardCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`board-${organizationId}`],
+      refetchInterval: Duration.toMillis(Duration.minutes(5)),
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.BoardList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
         );
         return [...data];
-      } catch (_error) {
-        return [];
-      }
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newComment } = mutation;
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newBoard } = mutation;
 
-      await fetchRpc(
-        (rpc) =>
-          rpc.CommentCreate({
-            organizationId: newComment.organizationId,
-            visibility: newComment.visibility,
-            content: newComment.content,
-            postId: newComment.postId,
-            parentCommentId: newComment.parentCommentId,
-            id: newComment.id,
-          }),
-        {}
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedComment } = mutation;
+        await fetchRpc(
+          (rpc) =>
+            rpc.BoardCreate({
+              id: newBoard.id,
+              name: newBoard.name,
+              visibility: newBoard.visibility,
+              organizationId: newBoard.organizationId,
+            }),
+          {}
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
 
-      await fetchRpc(
-        (rpc) =>
-          rpc.CommentDelete({
-            id: deletedComment.id,
-            organizationId: deletedComment.organizationId,
-            postId: deletedComment.postId,
-          }),
-        {}
-      );
-    },
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedComment } = mutation;
+        const { original: deletedBoard } = mutation;
 
-      await fetchRpc(
-        (rpc) =>
-          rpc.CommentUpdate({
-            id: updatedComment.id,
-            organizationId: updatedComment.organizationId,
-            postId: updatedComment.postId,
-            content: updatedComment.content,
-          }),
-        {}
-      );
-    },
-  })
-);
+        await fetchRpc(
+          (rpc) =>
+            rpc.BoardDelete({
+              id: deletedBoard.id,
+              organizationId: deletedBoard.organizationId,
+            }),
+          {}
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedBoard } = mutation;
 
-export const commentReactionCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["commentReaction"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
-        }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-        postId?: string;
-      } = {};
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
-          const fieldName = field.join(".");
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
+        await fetchRpc(
+          (rpc) =>
+            rpc.BoardUpdate({
+              id: updatedBoard.id,
+              name: updatedBoard.name,
+              visibility: updatedBoard.visibility,
+              organizationId: updatedBoard.organizationId,
+            }),
+          {}
+        );
+      },
+    })
+  );
+
+  const tagCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`tag-${organizationId}`],
+
+      queryFn: async (ctx) => {
+        const data = await fetchRpc((rpc) => rpc.TagList({ organizationId }), {
+          signal: ctx.signal,
+        });
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newTag } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.TagCreate({
+            id: newTag.id,
+            name: newTag.name,
+            type: newTag.type,
+            organizationId: newTag.organizationId,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedTag } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.TagUpdate({
+            id: updatedTag.id,
+            name: updatedTag.name,
+            type: updatedTag.type,
+            organizationId: updatedTag.organizationId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedTag } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.TagDelete({
+            id: deletedTag.id,
+            organizationId: deletedTag.organizationId,
+          })
+        );
+      },
+    })
+  );
+
+  const postTagCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`post-tag-${organizationId}`],
+
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.PostTagList({ organizationId }),
+          {
+            signal: ctx.signal,
           }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const changelogTagCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`changelog-tag-${organizationId}`],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.ChangelogTagList({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const membershipCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: ["membership"],
+      staleTime: Duration.toMillis(Duration.minutes(10)),
+      queryFn: async (args) =>
+        fetchRpc((rpc) => rpc.MembershipList(), { signal: args.signal }).then(
+          (data) => [...data]
+        ),
+      queryClient,
+      getKey: (item) => item.id,
+    })
+  );
+
+  const organizationCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: ["organizations"],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc((rpc) => rpc.OrganizationList(), {
+          signal: ctx.signal,
+        });
+
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedOrganization } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.OrganizationUpdate({
+            organizationId: updatedOrganization.id,
+            name: updatedOrganization.name,
+            logo: updatedOrganization.logo,
+          })
+        );
+      },
+    })
+  );
+
+  const membersCollection = createCollection(
+    queryCollectionOptions({
+      staleTime: Duration.toMillis(Duration.minutes(20)),
+      queryKey: [`members-${organizationId}`],
+      queryFn: async () => {
+        const data = await fetchRpc((rpc) =>
+          rpc.OrganizationMembersList({ organizationId })
+        );
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedMember } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.OrganizationRemoveMember({
+            memberId: deletedMember.id,
+            organizationId: deletedMember.organizationId,
+          })
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedMember } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.OrganizationUpdateMemberRole({
+            memberId: updatedMember.id,
+            organizationId: updatedMember.organizationId,
+            role: updatedMember.role,
+          })
+        );
+      },
+    })
+  );
+
+  const invitationsCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`invitations-${organizationId}`],
+
+      queryFn: async () => {
+        const data = await fetchRpc((rpc) =>
+          rpc.OrganizationInvitationsList({ organizationId })
+        );
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedInvitation } = mutation;
+        await fetchRpc((rpc) =>
+          rpc.OrganizationCancelInvitation({
+            invitationId: deletedInvitation.id,
+            organizationId: deletedInvitation.organizationId,
+          })
+        );
+      },
+    })
+  );
+
+  const commentCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const cacheKey = [`comment-${organizationId}`];
+        for (const { field, value } of parsed.filters) {
+          const fieldName = field.join(".");
+
           if (fieldName === "postId") {
-            filters.postId = value as string;
+            cacheKey.push(`postId-${value}`);
           }
         }
-      }
+        return cacheKey;
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const filters: {
+          postId?: string;
+        } = {};
+        for (const { field, operator, value } of parsed.filters) {
+          if (operator === "eq") {
+            const fieldName = field.join(".");
 
-      const organizationId = filters.organizationId;
-      const postId = filters.postId;
-      if (!organizationId) {
-        return [];
-      }
-      if (!postId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.CommentReactionList({ organizationId, postId }),
-        {
-          signal: ctx.signal,
+            if (fieldName === "postId") {
+              filters.postId = value as string;
+            }
+          }
         }
-      );
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: getCommentReactionCollectionKey,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newCommentReaction } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.CommentReactionToggle({
-          organizationId: newCommentReaction.organizationId,
-          postId: newCommentReaction.postId,
-          commentId: newCommentReaction.commentId,
-          emoji: newCommentReaction.emoji,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedCommentReaction } = mutation;
+        const postId = filters?.postId;
 
-      await fetchRpc((rpc) =>
-        rpc.CommentReactionToggle({
-          organizationId: deletedCommentReaction.organizationId,
-          postId: deletedCommentReaction.postId,
-          commentId: deletedCommentReaction.commentId,
-          emoji: deletedCommentReaction.emoji,
-        })
-      );
-    },
-  })
-);
-
-export const upvoteCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["upvote"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
+        if (!postId) {
+          return [];
         }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
+        try {
+          const data = await fetchRpc(
+            (rpc) => rpc.CommentList({ organizationId, postId }),
+            { signal: ctx.signal }
+          );
+          return [...data];
+        } catch (_error) {
+          return [];
         }
-      }
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newComment } = mutation;
 
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-        postId?: string;
-      } = {};
+        await fetchRpc(
+          (rpc) =>
+            rpc.CommentCreate({
+              organizationId: newComment.organizationId,
+              visibility: newComment.visibility,
+              content: newComment.content,
+              postId: newComment.postId,
+              parentCommentId: newComment.parentCommentId,
+              id: newComment.id,
+            }),
+          {}
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedComment } = mutation;
 
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
+        await fetchRpc(
+          (rpc) =>
+            rpc.CommentDelete({
+              id: deletedComment.id,
+              organizationId: deletedComment.organizationId,
+              postId: deletedComment.postId,
+            }),
+          {}
+        );
+      },
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedComment } = mutation;
+
+        await fetchRpc(
+          (rpc) =>
+            rpc.CommentUpdate({
+              id: updatedComment.id,
+              organizationId: updatedComment.organizationId,
+              postId: updatedComment.postId,
+              content: updatedComment.content,
+            }),
+          {}
+        );
+      },
+    })
+  );
+
+  const commentReactionCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const cacheKey = [`commentReaction-${organizationId}`];
+        for (const { field, value } of parsed.filters) {
           const fieldName = field.join(".");
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
-          }
           if (fieldName === "postId") {
-            filters.postId = value as string;
+            cacheKey.push(`postId-${value}`);
           }
         }
-      }
+        return cacheKey;
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const filters: {
+          postId?: string;
+        } = {};
+        for (const { field, operator, value } of parsed.filters) {
+          if (operator === "eq") {
+            const fieldName = field.join(".");
 
-      const organizationId = filters.organizationId;
-      const postId = filters.postId;
-      if (!organizationId) {
-        return [];
-      }
-      if (!postId) {
-        return [];
-      }
-
-      const data = await fetchRpc(
-        (rpc) => rpc.UpvoteList({ organizationId, postId }),
-        {
-          signal: ctx.signal,
+            if (fieldName === "postId") {
+              filters.postId = value as string;
+            }
+          }
         }
-      );
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: getUpvoteCollectionKey,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newUpvote } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.UpvoteToggle({
-          organizationId: newUpvote.organizationId,
-          postId: newUpvote.postId,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedUpvote } = mutation;
+        const postId = filters.postId;
 
-      await fetchRpc((rpc) =>
-        rpc.UpvoteToggle({
-          organizationId: deletedUpvote.organizationId,
-          postId: deletedUpvote.postId,
-        })
-      );
-    },
-  })
-);
-
-export const postReactionCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["postReaction"];
-      for (const { field, value } of parsed.filters) {
-        const fieldName = field.join(".");
-        if (fieldName === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
+        if (!postId) {
+          return [];
         }
-        if (fieldName === "postId") {
-          cacheKey.push(`postId-${value}`);
-        }
-      }
 
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-        postId?: string;
-      } = {};
+        const data = await fetchRpc(
+          (rpc) => rpc.CommentReactionList({ organizationId, postId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+      },
+      queryClient,
+      getKey: getCommentReactionCollectionKey,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newCommentReaction } = mutation;
 
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionToggle({
+            organizationId: newCommentReaction.organizationId,
+            postId: newCommentReaction.postId,
+            commentId: newCommentReaction.commentId,
+            emoji: newCommentReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedCommentReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CommentReactionToggle({
+            organizationId: deletedCommentReaction.organizationId,
+            postId: deletedCommentReaction.postId,
+            commentId: deletedCommentReaction.commentId,
+            emoji: deletedCommentReaction.emoji,
+          })
+        );
+      },
+    })
+  );
+
+  const upvoteCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const cacheKey = [`upvote-${organizationId}`];
+        for (const { field, value } of parsed.filters) {
           const fieldName = field.join(".");
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
-          }
+
           if (fieldName === "postId") {
-            filters.postId = value as string;
+            cacheKey.push(`postId-${value}`);
           }
         }
-      }
 
-      const organizationId = filters.organizationId;
-      const postId = filters.postId;
-      if (!organizationId) {
-        return [];
-      }
-      if (!postId) {
-        return [];
-      }
+        return cacheKey;
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const filters: {
+          postId?: string;
+        } = {};
 
-      const data = await fetchRpc(
-        (rpc) => rpc.PostReactionList({ organizationId, postId }),
-        {
-          signal: ctx.signal,
+        for (const { field, operator, value } of parsed.filters) {
+          if (operator === "eq") {
+            const fieldName = field.join(".");
+
+            if (fieldName === "postId") {
+              filters.postId = value as string;
+            }
+          }
         }
-      );
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: getPostReactionCollectionKey,
-    onInsert: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: newPostReaction } = mutation;
 
-      await fetchRpc((rpc) =>
-        rpc.PostReactionToggle({
-          organizationId: newPostReaction.organizationId,
-          postId: newPostReaction.postId,
-          emoji: newPostReaction.emoji,
-        })
-      );
-    },
-    onDelete: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { original: deletedPostReaction } = mutation;
+        const postId = filters.postId;
 
-      await fetchRpc((rpc) =>
-        rpc.PostReactionToggle({
-          organizationId: deletedPostReaction.organizationId,
-          postId: deletedPostReaction.postId,
-          emoji: deletedPostReaction.emoji,
-        })
-      );
-    },
-  })
-);
-
-export const siteCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["site"];
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
+        if (!postId) {
+          return [];
         }
-      }
 
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (args) => {
-      const parsed = parseLoadSubsetOptions(args.meta?.loadSubsetOptions);
-      const filters: {
-        organizationId?: string;
-      } = {};
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq") {
+        const data = await fetchRpc(
+          (rpc) => rpc.UpvoteList({ organizationId, postId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+      },
+      queryClient,
+      getKey: getUpvoteCollectionKey,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteToggle({
+            organizationId: newUpvote.organizationId,
+            postId: newUpvote.postId,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedUpvote } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpvoteToggle({
+            organizationId: deletedUpvote.organizationId,
+            postId: deletedUpvote.postId,
+          })
+        );
+      },
+    })
+  );
+
+  const postReactionCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: (opts) => {
+        const parsed = parseLoadSubsetOptions(opts);
+        const cacheKey = [`postReaction-${organizationId}`];
+        for (const { field, value } of parsed.filters) {
           const fieldName = field.join(".");
-          if (fieldName === "organizationId") {
-            filters.organizationId = value as string;
+          if (fieldName === "postId") {
+            cacheKey.push(`postId-${value}`);
           }
         }
-      }
-      const organizationId = filters?.organizationId;
 
-      if (!organizationId) {
-        return [];
-      }
-      const data = await fetchRpc((rpc) => rpc.SiteList({ organizationId }), {
-        signal: args.signal,
-      });
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    refetchInterval: Duration.toMillis(Duration.minutes(30)),
-    onUpdate: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedSite } = mutation;
+        return cacheKey;
+      },
+      syncMode: "on-demand",
+      queryFn: async (ctx) => {
+        const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+        const filters: {
+          postId?: string;
+        } = {};
 
-      await fetchRpc((rpc) =>
-        rpc.SiteUpdate({
-          id: updatedSite.id,
-          organizationId: updatedSite.organizationId,
-          changelogVisibility: updatedSite.changelogVisibility,
-          roadmapVisibility: updatedSite.roadmapVisibility,
-          name: updatedSite.name,
-        })
-      );
-    },
-  })
-);
-
-export const workspaceProductCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: ["workspace-product"],
-
-    queryFn: async (ctx) => {
-      const data = await fetchRpc((rpc) => rpc.WorkspaceProductList(), {
-        signal: ctx.signal,
-      });
-      return [...data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.id,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-);
-
-export const workspacePlanCollection = createCollection(
-  queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const cacheKey = ["workspace-plan"];
-      for (const { field, value } of parsed.filters) {
-        if (field.join(".") === "organizationId") {
-          cacheKey.push(`organizationId-${value}`);
+        for (const { field, operator, value } of parsed.filters) {
+          if (operator === "eq") {
+            const fieldName = field.join(".");
+            if (fieldName === "postId") {
+              filters.postId = value as string;
+            }
+          }
         }
-      }
-      return cacheKey;
-    },
-    syncMode: "on-demand",
-    queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      let organizationId: string | undefined;
-      for (const { field, operator, value } of parsed.filters) {
-        if (operator === "eq" && field.join(".") === "organizationId") {
-          organizationId = value as string;
+
+        const postId = filters.postId;
+
+        if (!postId) {
+          return [];
         }
-      }
-      if (!organizationId) {
-        return [];
-      }
-      const data = await fetchRpc(
-        (rpc) => rpc.WorkspacePlanGet({ organizationId }),
-        {
+
+        const data = await fetchRpc(
+          (rpc) => rpc.PostReactionList({ organizationId, postId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [...data];
+      },
+      queryClient,
+      getKey: getPostReactionCollectionKey,
+      onInsert: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: newPostReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostReactionToggle({
+            organizationId: newPostReaction.organizationId,
+            postId: newPostReaction.postId,
+            emoji: newPostReaction.emoji,
+          })
+        );
+      },
+      onDelete: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: deletedPostReaction } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.PostReactionToggle({
+            organizationId: deletedPostReaction.organizationId,
+            postId: deletedPostReaction.postId,
+            emoji: deletedPostReaction.emoji,
+          })
+        );
+      },
+    })
+  );
+
+  const siteCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`site-${organizationId}`],
+      queryFn: async (args) => {
+        const data = await fetchRpc((rpc) => rpc.SiteList({ organizationId }), {
+          signal: args.signal,
+        });
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      refetchInterval: Duration.toMillis(Duration.minutes(30)),
+      onUpdate: async ({ transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: updatedSite } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.SiteUpdate({
+            id: updatedSite.id,
+            organizationId: updatedSite.organizationId,
+            changelogVisibility: updatedSite.changelogVisibility,
+            roadmapVisibility: updatedSite.roadmapVisibility,
+            name: updatedSite.name,
+          })
+        );
+      },
+    })
+  );
+
+  const workspaceProductCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: ["workspace-product"],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc((rpc) => rpc.WorkspaceProductList(), {
           signal: ctx.signal,
-        }
-      );
-      return [data];
-    },
-    queryClient: TanstackQuery.getContext().queryClient,
-    getKey: (item) => item.organizationId,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-);
+        });
+        return [...data];
+      },
+      queryClient,
+      getKey: (item) => item.id,
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  );
+
+  const workspacePlanCollection = createCollection(
+    queryCollectionOptions({
+      queryKey: [`workspace-plan-${organizationId}`],
+      queryFn: async (ctx) => {
+        const data = await fetchRpc(
+          (rpc) => rpc.WorkspacePlanGet({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [data];
+      },
+      queryClient,
+      getKey: (item) => item.organizationId,
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  );
+
+  return {
+    boardCollection,
+    changelogCollection,
+    changelogTagCollection,
+    commentCollection,
+    commentReactionCollection,
+    invitationsCollection,
+    membersCollection,
+    membershipCollection,
+    organizationCollection,
+    postCollection,
+    postReactionCollection,
+    postStatusCollection,
+    postTagCollection,
+    siteCollection,
+    tagCollection,
+    upvoteCollection,
+    workspacePlanCollection,
+    workspaceProductCollection,
+  };
+}
+
+export type DashboardCollections = ReturnType<
+  typeof createDashboardCollections
+>;

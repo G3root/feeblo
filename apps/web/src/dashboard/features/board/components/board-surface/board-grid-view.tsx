@@ -2,7 +2,7 @@ import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { useCallback, useRef, useState } from "react";
 import { toastManager } from "@feeblo/ui/toast";
-import { postCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
 import { BoardGridPostCard } from "./board-grid-post-card";
 import type { BoardPostLane } from "./types";
@@ -25,6 +25,7 @@ export function BoardGridView({
   boardId?: string;
   groupedPosts: BoardPostLane[];
 }) {
+  const { postCollection } = useDashboardCollections();
   const [items, setItems] = useState(groupedPosts);
   const [previousGroupedPosts, setPreviousGroupedPosts] =
     useState(groupedPosts);
@@ -136,11 +137,16 @@ export function BoardGridView({
       }
 
       const sourceStatusId =
-        dragState?.sourceStatusId ?? (source.data?.statusId as string | undefined);
+        dragState?.sourceStatusId ??
+        (source.data?.statusId as string | undefined);
       const targetStatusId =
-        dragState?.targetStatusId ?? (target?.data?.statusId as string | undefined);
+        dragState?.targetStatusId ??
+        (target?.data?.statusId as string | undefined);
 
-      if (!(sourceStatusId && targetStatusId) || sourceStatusId === targetStatusId) {
+      if (
+        !(sourceStatusId && targetStatusId) ||
+        sourceStatusId === targetStatusId
+      ) {
         setItems(snapshot.current);
         return;
       }

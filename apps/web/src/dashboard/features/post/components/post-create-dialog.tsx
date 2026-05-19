@@ -20,12 +20,7 @@ import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasMembership, usePolicy } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
-import {
-  boardCollection,
-  membersCollection,
-  postCollection,
-  postStatusCollection,
-} from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { usePostCreateDialogContext } from "../dialog-stores";
 import { PostCreateLayout } from "./post-create-dialog-layout";
 import {
@@ -64,6 +59,12 @@ export function PostCreateDialog() {
 function PostCreateForm() {
   const store = usePostCreateDialogContext();
   const organizationId = useOrganizationId();
+  const {
+    boardCollection,
+    membersCollection,
+    postCollection,
+    postStatusCollection,
+  } = useDashboardCollections();
   const { data: session } = authClient.useSession();
   const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
 

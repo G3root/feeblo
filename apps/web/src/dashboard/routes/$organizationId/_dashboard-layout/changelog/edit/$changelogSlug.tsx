@@ -8,10 +8,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import {
-  SkeletonLoader,
-  SkeletonWrapper,
-} from "@feeblo/ui/skeleton-loader";
+import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import {
   ChangelogEditorBackLink,
   ChangelogEditorContentField,
@@ -31,7 +28,7 @@ import {
   ChangelogDeleteDialogProvider,
   ChangelogMoveToDraftDialogProvider,
 } from "~/features/changelog/dialog-stores";
-import { changelogCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
@@ -41,6 +38,7 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId, changelogSlug } = Route.useParams();
+  const { changelogCollection } = useDashboardCollections();
 
   const changelogQuery = useLiveQuery(
     (q) =>

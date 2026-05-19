@@ -14,5 +14,7 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId, boardSlug } = Route.useParams();
 
-  return <ActiveBoardPage boardSlug={boardSlug} organizationId={organizationId} />;
+  return (
+    <ActiveBoardPage boardSlug={boardSlug} organizationId={organizationId} />
+  );
 }

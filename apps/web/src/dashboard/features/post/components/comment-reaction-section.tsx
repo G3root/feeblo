@@ -80,13 +80,10 @@ function CommentReactionRoot({
   );
 
   const reactionCounts = useMemo(() => {
-    return reactionsForComment.reduce(
-      (acc, reaction) => {
-        acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
-        return acc;
-      },
-      {} as ReactionCounts
-    );
+    return reactionsForComment.reduce((acc, reaction) => {
+      acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
+      return acc;
+    }, {} as ReactionCounts);
   }, [reactionsForComment]);
 
   const userReactionSet = useMemo(() => {
@@ -163,8 +160,13 @@ function CommentReactionContent({ children }: { children: ReactNode }) {
 }
 
 function CommentReactionListContent() {
-  const { disabled, handleToggleReaction, isSelected, isToggling, reactionCounts } =
-    useCommentReactionSection();
+  const {
+    disabled,
+    handleToggleReaction,
+    isSelected,
+    isToggling,
+    reactionCounts,
+  } = useCommentReactionSection();
 
   return (
     <ReactionList
@@ -178,8 +180,13 @@ function CommentReactionListContent() {
 }
 
 function CommentReactionButtonContent() {
-  const { disabled, handleToggleReaction, isSelected, isToggling, reactionCounts } =
-    useCommentReactionSection();
+  const {
+    disabled,
+    handleToggleReaction,
+    isSelected,
+    isToggling,
+    reactionCounts,
+  } = useCommentReactionSection();
 
   return (
     <ReactionButton

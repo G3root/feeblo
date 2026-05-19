@@ -6,12 +6,13 @@ import { toastManager } from "@feeblo/ui/toast";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasMembership, usePolicy } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
-import { changelogCollection, membersCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
 
 export const useChangelogAction = () => {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
+  const { changelogCollection, membersCollection } = useDashboardCollections();
   const { data: session } = authClient.useSession();
   const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
 

@@ -10,11 +10,12 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
-import { tagCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useTagDeleteDialogContext } from "../dialog-stores";
 
 export function TagDeleteDialog() {
   const store = useTagDeleteDialogContext();
+  const { tagCollection } = useDashboardCollections();
   const open = useSelector(store, (state) => state.context.open);
 
   return (

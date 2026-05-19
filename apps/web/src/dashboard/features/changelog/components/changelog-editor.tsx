@@ -24,7 +24,7 @@ import {
   isUser,
   usePolicy,
 } from "~/hooks/use-policy";
-import { changelogCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
 import {
   useChangelogDeleteDialogContext,
@@ -77,6 +77,8 @@ function useChangelogEditorForm({
   changelog: TChangelogEditorRecord;
   organizationId: string;
 }) {
+  const { changelogCollection } = useDashboardCollections();
+
   return useAppForm({
     formId: `${changelog.id}:${changelog.updatedAt.getTime()}`,
     defaultValues: {
@@ -154,6 +156,7 @@ export function ChangelogEditorProvider({
   organizationId,
 }: ChangelogEditorProviderProps) {
   const navigate = useNavigate();
+  const { changelogCollection } = useDashboardCollections();
   const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
   const { allowed: isOwner } = usePolicy(
     allPolicy(hasMembership(organizationId), isUser(changelog.creatorId ?? ""))

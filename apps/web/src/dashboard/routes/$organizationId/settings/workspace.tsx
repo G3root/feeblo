@@ -9,10 +9,7 @@ import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { organizationLogoUploadEndpoint } from "~/lib/auth-client";
-import {
-  membershipCollection,
-  organizationCollection,
-} from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId/settings/workspace")({
   component: WorkspaceSettingsPage,
@@ -36,6 +33,8 @@ function WorkspaceSettingsPage() {
 
 function WorkspaceDetailsSection() {
   const organizationId = useOrganizationId();
+  const { membershipCollection, organizationCollection } =
+    useDashboardCollections();
   const { allowed: canManageOrganization, isPending: isPolicyPending } =
     usePolicy(hasOwnerOrAdminRole(organizationId));
   const organizationQuery = useLiveQuery(
@@ -106,6 +105,7 @@ function WorkspaceNameField({
   initialName: string;
   organizationId: string;
 }) {
+  const { organizationCollection } = useDashboardCollections();
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -175,6 +175,7 @@ function WorkspaceLogoButton({
   name: string;
   organizationId: string;
 }) {
+  const { organizationCollection } = useDashboardCollections();
   async function uploadWorkspaceLogo(file: File) {
     if (!canEdit) {
       return;

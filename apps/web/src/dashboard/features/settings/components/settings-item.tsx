@@ -17,11 +17,7 @@ import {
   ItemTitle,
 } from "@feeblo/ui/item";
 import { Separator } from "@feeblo/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@feeblo/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { cn } from "~/lib/utils";
 
 function Root({ children }: { children: React.ReactNode }) {

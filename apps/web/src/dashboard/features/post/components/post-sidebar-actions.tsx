@@ -20,15 +20,11 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@feeblo/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { usePostDeleteDialogContext } from "~/features/post/dialog-stores";
 import { getPublicSiteUrl } from "~/hooks/use-site";
-import { postCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 type DialogAction = "lock" | null;
 type PostAdminAction = "lock";
@@ -90,6 +86,7 @@ function PostAdminActionButtons({
   organizationId: string;
   postId: string;
 }) {
+  const { postCollection } = useDashboardCollections();
   const postDialogStore = usePostDeleteDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
   const [pendingAction, setPendingAction] = useState<PostAdminAction | null>(
@@ -131,8 +128,7 @@ function PostAdminActionButtons({
       });
 
       toastManager.add({
-        title:
-          isLocked ? "Post unlocked" : "Post locked",
+        title: isLocked ? "Post unlocked" : "Post locked",
         type: "success",
       });
 

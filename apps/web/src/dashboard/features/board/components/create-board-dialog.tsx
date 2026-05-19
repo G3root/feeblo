@@ -12,7 +12,7 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { boardCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useCreateBoardDialogContext } from "../dialog-stores";
 
 export function CreateBoardDialog() {
@@ -39,6 +39,7 @@ export function CreateBoardDialog() {
 
 function CreateBoardForm() {
   const organizationId = useOrganizationId();
+  const { boardCollection } = useDashboardCollections();
   const store = useCreateBoardDialogContext();
   const form = useAppForm({
     defaultValues: {

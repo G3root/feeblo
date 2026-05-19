@@ -21,7 +21,10 @@ function Root({ children, className, ...props }: PostCreateRootProps) {
 
 function Main({ children, className, ...props }: PostCreateDivProps) {
   return (
-    <div className={cn("flex h-full flex-1 flex-col gap-2", className)} {...props}>
+    <div
+      className={cn("flex h-full flex-1 flex-col gap-2", className)}
+      {...props}
+    >
       {children}
     </div>
   );
@@ -60,7 +63,10 @@ function PropertyList({ children, className, ...props }: PostCreateDivProps) {
 function Actions({ children, className, ...props }: PostCreateDivProps) {
   return (
     <div
-      className={cn("mt-auto flex items-center justify-between pt-4", className)}
+      className={cn(
+        "mt-auto flex items-center justify-between pt-4",
+        className
+      )}
       {...props}
     >
       {children}

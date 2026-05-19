@@ -1,8 +1,4 @@
-export const CHANGELOG_STATUSES = [
-  "draft",
-  "scheduled",
-  "published",
-] as const;
+export const CHANGELOG_STATUSES = ["draft", "scheduled", "published"] as const;
 
 export type ChangelogStatus = (typeof CHANGELOG_STATUSES)[number];
 

@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  ChangelogIndex,
-} from "~/features/changelog/components/changelog-index";
+import { ChangelogIndex } from "~/features/changelog/components/changelog-index";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/changelog/"

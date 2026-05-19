@@ -43,11 +43,7 @@ export function StatusSelect({
 }: {
   currentStatusId: string;
   statuses: Array<Pick<PostStatus, "id" | "type">>;
-  onValueChange: (
-    status:
-      | Pick<PostStatus, "id" | "type">
-      | null
-  ) => void;
+  onValueChange: (status: Pick<PostStatus, "id" | "type"> | null) => void;
 }) {
   const items = statuses.map((postStatus) => ({
     label: getBoardStatusLabel(postStatus.type),

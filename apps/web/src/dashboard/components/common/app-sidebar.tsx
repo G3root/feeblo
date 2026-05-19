@@ -38,7 +38,7 @@ import {
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { getPublicSiteUrl } from "~/hooks/use-site";
-import { boardCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -194,6 +194,7 @@ function CreateBoardButton() {
 
 function BoardList() {
   const organizationId = useOrganizationId();
+  const { boardCollection } = useDashboardCollections();
 
   const boardQuery = useLiveQuery(
     (q) =>

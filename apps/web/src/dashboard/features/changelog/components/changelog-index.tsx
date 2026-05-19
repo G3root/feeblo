@@ -10,7 +10,7 @@ import {
 } from "@feeblo/ui/empty";
 import { SkeletonLoader } from "@feeblo/ui/skeleton-loader";
 import type { ChangelogStatus } from "~/features/changelog/constants";
-import { changelogCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useChangelogAction } from "../hooks/use-changelog-action";
 import {
   ChangelogStoreProvider,
@@ -47,6 +47,7 @@ export function ChangelogIndex({
 }
 
 function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
+  const { changelogCollection } = useDashboardCollections();
   const { createChangeLog, canCreate } = useChangelogAction();
   const store = useChangelogStore();
   const search = useSelector(store, (s) => s.context.filters.search);

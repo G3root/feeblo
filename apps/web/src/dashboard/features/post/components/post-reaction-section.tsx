@@ -29,13 +29,10 @@ export function PostReactionSection({
   const currentUserId = session?.user?.id;
 
   const reactionCounts = useMemo(() => {
-    return postReactions.reduce(
-      (acc, reaction) => {
-        acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
-        return acc;
-      },
-      {} as ReactionCounts
-    );
+    return postReactions.reduce((acc, reaction) => {
+      acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
+      return acc;
+    }, {} as ReactionCounts);
   }, [postReactions]);
 
   const userReactionSet = useMemo(() => {

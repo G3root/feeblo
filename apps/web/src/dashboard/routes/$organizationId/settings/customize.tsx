@@ -10,8 +10,8 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
 import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { useSite } from "~/hooks/use-site";
-import { siteCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId/settings/customize")({
   component: RouteComponent,
@@ -55,6 +55,7 @@ function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const site = useSite();
+  const { siteCollection } = useDashboardCollections();
 
   const initialName = site?.name;
 
@@ -120,6 +121,7 @@ function HidePoweredByBranding({
 }) {
   const id = useId();
   const site = useSite();
+  const { siteCollection } = useDashboardCollections();
 
   async function handleChange(value: boolean) {
     if (!(canEdit && site)) {

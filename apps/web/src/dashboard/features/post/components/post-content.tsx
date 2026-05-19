@@ -12,8 +12,8 @@ import {
   isUser,
   usePolicy,
 } from "~/hooks/use-policy";
-import { postCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { uploadPostEditorImage } from "./post-editor-utils";
 
 const UpdatedPostSchema = z.object({
@@ -87,6 +87,7 @@ export function PostEditableContent({
   postCreatorId: string | null;
   postId: string;
 }) {
+  const { postCollection } = useDashboardCollections();
   const { allowed: isOwner } = usePolicy(
     anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
   );

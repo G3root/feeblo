@@ -23,10 +23,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import {
-  SkeletonLoader,
-  SkeletonWrapper,
-} from "@feeblo/ui/skeleton-loader";
+import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import {
   Table,
   TableBody,
@@ -36,8 +33,8 @@ import {
   TableRow,
 } from "@feeblo/ui/table";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { tagCollection } from "~/lib/collections";
 import { cn } from "~/lib/utils";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import {
   useTagCreateDialogContext,
   useTagDeleteDialogContext,
@@ -56,6 +53,7 @@ type TagSettingsTableProps = {
 export function TagSettingsTable(props: TagSettingsTableProps) {
   const { emptyDescription, emptyTitle, type } = props;
   const organizationId = useOrganizationId();
+  const { tagCollection } = useDashboardCollections();
   const createDialogStore = useTagCreateDialogContext();
   const editDialogStore = useTagEditDialogContext();
   const deleteDialogStore = useTagDeleteDialogContext();

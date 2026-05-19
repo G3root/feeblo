@@ -3,10 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  organizationCollection,
-  workspacePlanCollection,
-} from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import {
   DropdownMenu,
@@ -15,12 +12,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@feeblo/ui/sidebar";
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 
 export function WorkspaceSwitcher() {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
+  const { organizationCollection } = useDashboardCollections();
   const organizationsQuery = useLiveQuery(
     (q) =>
       q
@@ -100,6 +102,7 @@ export function WorkspaceSwitcher() {
 
 function WorkspacePlan() {
   const organizationId = useOrganizationId();
+  const { workspacePlanCollection } = useDashboardCollections();
   const workspacePlan = useLiveQuery(
     (q) =>
       q

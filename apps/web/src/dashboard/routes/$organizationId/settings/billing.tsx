@@ -31,7 +31,7 @@ import {
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
-import { workspaceProductCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
   component: BillingSettingsPage,
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/$organizationId/settings/billing")({
 
 function BillingSettingsPage() {
   const organizationId = useOrganizationId();
+  const { workspaceProductCollection } = useDashboardCollections();
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
   const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);

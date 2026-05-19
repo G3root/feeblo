@@ -15,7 +15,7 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { boardCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useRenameBoardDialogContext } from "../dialog-stores";
 
 export function RenameBoardDialog() {
@@ -56,6 +56,7 @@ function RenameBoardFormSkeleton() {
 
 function RenameBoardForm() {
   const organizationId = useOrganizationId();
+  const { boardCollection } = useDashboardCollections();
   const store = useRenameBoardDialogContext();
   const boardId = useSelector(store, (state) => state.context.data.boardId);
   const navigate = useNavigate();

@@ -11,11 +11,12 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
-import { postCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { usePostDeleteDialogContext } from "../dialog-stores";
 
 export function PostDeleteDialog() {
   const store = usePostDeleteDialogContext();
+  const { postCollection } = useDashboardCollections();
   const open = useSelector(store, (state) => state.context.open);
   const navigate = useNavigate();
   return (

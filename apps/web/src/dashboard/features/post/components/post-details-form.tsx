@@ -11,8 +11,8 @@ import {
   isUser,
   usePolicy,
 } from "~/hooks/use-policy";
-import { postCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { PostCommentComposer } from "./post-comment-composer";
 import { PostCommentList, PostCommentListSkeleton } from "./post-comment-list";
 import { PostEditableContent } from "./post-content";
@@ -51,6 +51,7 @@ function PostDetailsHeader({
   postId: string;
   postCreatorId: string | null;
 }) {
+  const { postCollection } = useDashboardCollections();
   const { allowed: isOwner } = usePolicy(
     anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
   );

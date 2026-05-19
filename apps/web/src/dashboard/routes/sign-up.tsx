@@ -167,7 +167,9 @@ function RouteComponent() {
             fields: {
               email: {
                 message:
-                  error instanceof Error ? error.message : "Something went wrong",
+                  error instanceof Error
+                    ? error.message
+                    : "Something went wrong",
               },
             },
           },

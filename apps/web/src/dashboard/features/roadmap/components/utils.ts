@@ -1,4 +1,8 @@
-import type { RoadmapLane, RoadmapPost, RoadmapStatusDefinition } from "./types";
+import type {
+  RoadmapLane,
+  RoadmapPost,
+  RoadmapStatusDefinition,
+} from "./types";
 
 export function formatRoadmapPostDate(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);

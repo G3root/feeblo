@@ -33,10 +33,7 @@ import { RadioGroup, RadioGroupItem } from "@feeblo/ui/radio-group";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import {
-  workspacePlanCollection,
-  workspaceProductCollection,
-} from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useUpgradePlanDialogContext } from "../dialog-stores";
 import { startBillingCheckout, startBillingPortal } from "../lib/checkout";
 import {
@@ -85,6 +82,8 @@ export function UpgradePlanDialog() {
 
 function UpgradePlanDialogContent() {
   const organizationId = useOrganizationId();
+  const { workspacePlanCollection, workspaceProductCollection } =
+    useDashboardCollections();
 
   const { data: products } = useLiveSuspenseQuery((q) =>
     q.from({ product: workspaceProductCollection })

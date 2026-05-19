@@ -14,7 +14,7 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { tagCollection } from "~/lib/collections";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useTagEditDialogContext } from "../dialog-stores";
 
 export function TagRenameDialog() {
@@ -56,6 +56,7 @@ function TagRenameFormSkeleton() {
 
 function TagRenameForm() {
   const organizationId = useOrganizationId();
+  const { tagCollection } = useDashboardCollections();
   const store = useTagEditDialogContext();
   const tagId = useSelector(store, (state) => state.context.data.tagId);
 
@@ -64,10 +65,7 @@ function TagRenameForm() {
       q
         .from({ tag: tagCollection })
         .where((tag) =>
-          and(
-            eq(tag.tag.id, tagId),
-            eq(tag.tag.organizationId, organizationId)
-          )
+          and(eq(tag.tag.id, tagId), eq(tag.tag.organizationId, organizationId))
         )
         .orderBy((tag) => tag.tag.createdAt, "desc")
         .limit(1),
