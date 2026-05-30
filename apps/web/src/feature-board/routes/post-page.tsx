@@ -14,18 +14,18 @@ import {
 import { type ReactNode, Suspense } from "react";
 import { useLocation } from "wouter";
 import { z } from "zod";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
+import { Badge } from "@feeblo/ui/badge";
+import { Button } from "@feeblo/ui/button";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "~/components/ui/empty";
-import { Skeleton } from "~/components/ui/skeleton";
-import { toastManager } from "~/components/ui/toast";
+} from "@feeblo/ui/empty";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { toastManager } from "@feeblo/ui/toast";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import {
   PostCommentComposer,

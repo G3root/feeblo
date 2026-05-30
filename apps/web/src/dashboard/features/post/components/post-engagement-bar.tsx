@@ -4,15 +4,15 @@ import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
 import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import { toastManager } from "~/components/ui/toast";
+import { Button } from "@feeblo/ui/button";
+import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "~/lib/auth-client";
-import { postReactionCollection, upvoteCollection } from "~/lib/collections";
 import {
   getPostReactionCollectionKey,
   getUpvoteCollectionKey,
 } from "~/lib/reaction-keys";
 import { cn } from "~/lib/utils";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import {
   type PostReaction,
   PostReactionSection,
@@ -33,6 +33,8 @@ export function PostDetailsEngagementBar({
   organizationId: string;
   postId: string;
 }) {
+  const { postReactionCollection, upvoteCollection } =
+    useDashboardCollections();
   const { data: session } = authClient.useSession();
   const { data: upvotes } = useLiveSuspenseQuery(
     (q) =>
@@ -78,8 +80,9 @@ export function PostDetailsEngagementBar({
       return;
     }
 
-    const memberships = (session as { memberships?: SessionMembership[] } | null)
-      ?.memberships;
+    const memberships = (
+      session as { memberships?: SessionMembership[] } | null
+    )?.memberships;
     const isMember = memberships?.find(
       (membership: SessionMembership) =>
         membership.userId === currentUserId &&
@@ -122,8 +125,9 @@ export function PostDetailsEngagementBar({
     }
 
     const currentUserId = session?.user?.id;
-    const memberships = (session as { memberships?: SessionMembership[] } | null)
-      ?.memberships;
+    const memberships = (
+      session as { memberships?: SessionMembership[] } | null
+    )?.memberships;
     if (!currentUserId) {
       toastManager.add({ title: "Sign in to react", type: "error" });
       return;

@@ -1,0 +1,143 @@
+import { slugify } from "@feeblo/utils/url";
+import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { useNavigate } from "@tanstack/react-router";
+import { useSelector } from "@xstate/store-react";
+import { Suspense } from "react";
+import { z } from "zod";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@feeblo/ui/sheet";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { toastManager } from "@feeblo/ui/toast";
+import { useAppForm } from "~/hooks/form";
+import { useOrganizationId } from "~/hooks/use-organization-id";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { useRenameBoardDialogContext } from "../dialog-stores";
+
+export function RenameBoardDialog() {
+  const store = useRenameBoardDialogContext();
+
+  const open = useSelector(store, (state) => state.context.open);
+
+  return (
+    <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>Rename Board</SheetTitle>
+          <SheetDescription>Rename the board to a new name.</SheetDescription>
+        </SheetHeader>
+        <div className="p-4">
+          {open ? (
+            <Suspense fallback={<RenameBoardFormSkeleton />}>
+              <RenameBoardForm />
+            </Suspense>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function RenameBoardFormSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-12" />
+        <Skeleton className="h-10 w-full rounded-md" />
+      </div>
+      <Skeleton className="h-10 w-full rounded-md" />
+    </div>
+  );
+}
+
+function RenameBoardForm() {
+  const organizationId = useOrganizationId();
+  const { boardCollection } = useDashboardCollections();
+  const store = useRenameBoardDialogContext();
+  const boardId = useSelector(store, (state) => state.context.data.boardId);
+  const navigate = useNavigate();
+
+  const { data } = useLiveSuspenseQuery(
+    (q) =>
+      q
+        .from({ board: boardCollection })
+        .where((board) =>
+          and(
+            eq(board.board.id, boardId),
+            eq(board.board.organizationId, organizationId)
+          )
+        )
+        .orderBy((board) => board.board.createdAt, "desc")
+        .limit(1),
+    [boardId]
+  );
+
+  const board = data[0];
+
+  const form = useAppForm({
+    defaultValues: {
+      name: board.name,
+      visibility: board.visibility,
+    },
+    validators: {
+      onSubmit: z.object({
+        name: z.string(),
+        visibility: z.enum(["PUBLIC", "PRIVATE"]),
+      }),
+    },
+    onSubmit: async (data) => {
+      try {
+        const boardSlug = slugify(data.value.name);
+        const tx = boardCollection.update(boardId, (draft) => {
+          draft.name = data.value.name;
+          draft.visibility = data.value.visibility;
+          draft.slug = boardSlug;
+        });
+        await tx.isPersisted.promise;
+        toastManager.add({
+          title: "Board renamed successfully",
+          type: "success",
+        });
+        store.send({ type: "toggle" });
+
+        navigate({
+          to: "/$organizationId/board/$boardSlug",
+          params: {
+            organizationId,
+            boardSlug,
+          },
+        });
+      } catch (_error) {
+        toastManager.add({
+          title: "Failed to rename board",
+          type: "error",
+        });
+      }
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+    >
+      <form.AppField
+        children={(field) => <field.TextField label="Name" />}
+        name="name"
+      />
+
+      <div className="fixed right-2 bottom-8 w-full sm:max-w-[370px]">
+        <form.AppForm>
+          <form.SubscribeButton className="w-full" label="Save" />
+        </form.AppForm>
+      </div>
+    </form>
+  );
+}

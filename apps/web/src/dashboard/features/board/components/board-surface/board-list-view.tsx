@@ -1,0 +1,113 @@
+import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionTrigger,
+} from "@feeblo/ui/accordion";
+import { Button } from "@feeblo/ui/button";
+import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
+import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
+import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
+import { BoardPostRowItem } from "./board-post-row-item";
+import { StatusIcon } from "./status-icon";
+import type { BoardPostLane } from "./types";
+
+export function BoardListView({
+  organizationId,
+  boardId,
+  groupedPosts,
+}: {
+  organizationId: string;
+  boardId?: string;
+  groupedPosts: BoardPostLane[];
+}) {
+  return (
+    <section>
+      <Accordion
+        className="w-full gap-2 rounded-none border-none p-3"
+        defaultValue={groupedPosts.map((lane) => lane.statusId)}
+        multiple
+      >
+        {groupedPosts.map((lane) => (
+          <AccordionPrimitive.Item key={lane.statusId} value={lane.statusId}>
+            <div className="relative">
+              <AccordionTrigger className="rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden">
+                <div className="flex items-center gap-2">
+                  <HugeiconsIcon
+                    className="size-4 text-muted-foreground group-aria-expanded/accordion-trigger:hidden"
+                    icon={ArrowDown01Icon}
+                    strokeWidth={2}
+                  />
+                  <HugeiconsIcon
+                    className="hidden size-4 text-muted-foreground group-aria-expanded/accordion-trigger:inline"
+                    icon={ArrowUp01Icon}
+                    strokeWidth={2}
+                  />
+                  <StatusIcon status={lane.status} />
+                  <h3 className="font-medium text-sm">
+                    {getBoardStatusLabel(lane.status)}
+                  </h3>
+                  <span className="text-muted-foreground text-xs">
+                    {lane.posts.length}
+                  </span>
+                </div>
+              </AccordionTrigger>
+
+              <PolicyGuard policy={hasMembership(organizationId)}>
+                <AddPostButton
+                  boardId={boardId}
+                  status={lane.status}
+                  statusId={lane.statusId}
+                />
+              </PolicyGuard>
+            </div>
+            <AccordionContent className="h-auto pb-0" panelClassName="px-0">
+              {lane.posts.map((post) => (
+                <BoardPostRowItem
+                  key={post.id}
+                  organizationId={organizationId}
+                  post={post}
+                />
+              ))}
+            </AccordionContent>
+          </AccordionPrimitive.Item>
+        ))}
+      </Accordion>
+    </section>
+  );
+}
+
+function AddPostButton({
+  boardId,
+  status,
+  statusId,
+}: {
+  boardId?: string;
+  status: BoardPostStatus;
+  statusId: string;
+}) {
+  const store = usePostCreateDialogContext();
+
+  return (
+    <Button
+      aria-label={`Add post to ${getBoardStatusLabel(status)}`}
+      className="absolute top-1/2 right-6 -translate-y-1/2"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        store.send({ type: "toggle", data: { boardId, status, statusId } });
+      }}
+      size="icon-sm"
+      type="button"
+      variant="ghost"
+    >
+      <HugeiconsIcon icon={Add01Icon} />
+    </Button>
+  );
+}

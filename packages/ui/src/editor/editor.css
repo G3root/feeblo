@@ -1,0 +1,1048 @@
+/* Adapted from:
+ * https://github.com/resend/react-email/blob/canary/packages/editor/src/ui/themes/default.css
+ *
+ * The package source theme uses @import to pull in layout CSS at build time.
+ * This local copy keeps the resolved content inline and maps the visual tokens
+ * to the app's shadcn variables.
+ */
+
+/* Layer 0: layout (inlined at build time via postcss-import) */
+
+/* Minimal functional styles for BubbleMenu compound components.
+ * This file handles layout and positioning only - no visual design.
+ * Import this optionally: import '@react-email/editor/styles/bubble-menu.css';
+ */
+
+[data-re-bubble-menu] {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+[data-re-bubble-menu-group] {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0 0.125rem;
+  border: none;
+  border-left: 1px solid var(--re-border);
+  margin: 0;
+  min-width: 0;
+}
+
+[data-re-bubble-menu-group]:last-child {
+  padding-right: 0;
+}
+
+[data-re-bubble-menu-separator] {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.25rem 0;
+}
+
+[data-re-bubble-menu-item] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.375rem;
+  margin: 0.125rem 0;
+}
+
+[data-re-bubble-menu-item] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+[data-re-node-selector] {
+  position: relative;
+}
+
+[data-re-node-selector-trigger] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  border: none;
+  background: none;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.5rem;
+}
+
+[data-re-node-selector-trigger] svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  opacity: 0.5;
+}
+
+[data-re-node-selector-content] {
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+}
+
+[data-re-node-selector-item] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  width: 100%;
+  text-align: left;
+}
+
+[data-re-node-selector-item] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+[data-re-link-selector] {
+  display: flex;
+  position: relative;
+}
+
+[data-re-link-selector-trigger] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.375rem;
+}
+
+[data-re-link-selector-trigger] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+[data-re-link-selector-form] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  width: max-content;
+  min-width: 16rem;
+  padding: 0.25rem;
+}
+
+[data-re-link-selector-input] {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.8125rem;
+  padding: 0.25rem;
+  background: transparent;
+}
+
+[data-re-link-selector-apply],
+[data-re-link-selector-unlink] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.25rem;
+}
+
+[data-re-link-selector-apply] svg,
+[data-re-link-selector-unlink] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Button bubble menu */
+
+[data-re-btn-bm-toolbar] {
+  display: flex;
+  align-items: center;
+}
+
+[data-re-btn-bm-item] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.375rem;
+}
+
+[data-re-btn-bm-item] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+[data-re-btn-bm-form] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 16rem;
+  padding: 0.25rem;
+}
+
+[data-re-btn-bm-input] {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.8125rem;
+  padding: 0.25rem;
+  background: transparent;
+}
+
+[data-re-btn-bm-apply],
+[data-re-btn-bm-unlink] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.25rem;
+}
+
+[data-re-btn-bm-apply] svg,
+[data-re-btn-bm-unlink] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Link bubble menu */
+
+[data-re-link-bm-toolbar] {
+  display: flex;
+  align-items: center;
+}
+
+[data-re-link-bm-item] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.375rem;
+}
+
+[data-re-link-bm-item] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+a[data-re-link-bm-item] {
+  text-decoration: none;
+  color: inherit;
+}
+
+[data-re-link-bm-form] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 16rem;
+  padding: 0.25rem;
+}
+
+[data-re-link-bm-input] {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.8125rem;
+  padding: 0.25rem;
+  background: transparent;
+}
+
+[data-re-link-bm-apply],
+[data-re-link-bm-unlink] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.25rem;
+}
+
+[data-re-link-bm-apply] svg,
+[data-re-link-bm-unlink] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Image bubble menu */
+
+[data-re-img-bm-toolbar] {
+  display: flex;
+  align-items: center;
+}
+
+[data-re-img-bm-item] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.375rem;
+  margin: 0.125rem 0;
+}
+
+[data-re-img-bm-item] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+[data-re-img-bm-form] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 16rem;
+  padding: 0.25rem;
+}
+
+[data-re-img-bm-input] {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.8125rem;
+  padding: 0.25rem;
+  background: transparent;
+}
+
+[data-re-img-bm-apply],
+[data-re-img-bm-unlink] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0.25rem;
+}
+
+[data-re-img-bm-apply] svg,
+[data-re-img-bm-unlink] svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+/* Minimal functional styles for SlashCommand components.
+ * Layout and positioning only - no visual design.
+ * Import optionally: import '@react-email/editor/styles/slash-command.css';
+ */
+
+[data-re-slash-command] {
+  max-height: 330px;
+  width: 256px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-re-slash-command-scroll] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+[data-re-slash-command-item] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-align: left;
+}
+
+[data-re-slash-command-item] svg {
+  flex-shrink: 0;
+}
+
+[data-re-slash-command-category] {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 0.5rem 0.25rem;
+}
+
+[data-re-slash-command-empty] {
+  padding: 0.75rem 0.5rem;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* Minimal functional styles for Inspector compound components.
+ * This file handles layout only - no visual design.
+ * Import this optionally: import '@react-email/editor/styles/inspector.css';
+ */
+
+[data-re-inspector-field] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+[data-re-inspector-field] > label {
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 0;
+  width: 40%;
+}
+
+[data-re-inspector-select],
+[data-re-inspector-number],
+[data-re-inspector-color-control] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  border: 1px solid var(--re-border, #e5e5e5);
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+  height: 1.6rem;
+  outline: none;
+}
+
+[data-re-inspector-number]:focus-within,
+[data-re-inspector-color-control]:focus-within {
+  border-color: var(--re-text-muted, #6b6b6b);
+}
+
+[data-re-inspector-unit],
+[data-re-inspector-color-trigger] {
+  margin-left: 0.2rem;
+  width: 1rem;
+  height: 1rem;
+  aspect-ratio: 1 / 2;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+[data-re-inspector-color-trigger]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+[data-re-inspector-color-trigger]::-webkit-color-swatch {
+  border: none;
+  border-radius: inherit;
+}
+
+[data-re-inspector-color-trigger]::-moz-color-swatch {
+  border: none;
+  border-radius: inherit;
+}
+
+[data-re-inspector-input],
+[data-re-inspector-color-hex] {
+  max-width: 3.5rem;
+  font-size: 0.75rem;
+  font-family: monospace;
+  padding: 0.25rem 0.375rem;
+  color: inherit;
+  outline: none;
+}
+
+[data-re-inspector-number]:has(+ [data-re-inspector-toggle-group])
+  [data-re-inspector-input] {
+  max-width: 2.3rem;
+}
+
+/* ----------------------------------------------------------------
+ * Toggle group
+ * ---------------------------------------------------------------- */
+
+[data-re-inspector-toggle-group] {
+  display: inline-flex;
+  border: 1px solid var(--re-border, #e5e5e5);
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+[data-re-inspector-toggle-item] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.375rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+[data-re-inspector-toggle-item] + [data-re-inspector-toggle-item] {
+  border-left: 1px solid var(--re-border, #e5e5e5);
+}
+
+[data-re-inspector-toggle-item][data-active] {
+  background: var(--re-bg-active, #f0f0f0);
+}
+
+/* ----------------------------------------------------------------
+ * Tooltip
+ * ---------------------------------------------------------------- */
+
+[data-re-inspector-tooltip] {
+  position: relative;
+  display: inline-flex;
+}
+
+[data-re-inspector-tooltip-content] {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  background: var(--re-tooltip-bg, #1a1a1a);
+  color: var(--re-tooltip-text, #fff);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  margin-bottom: 0.25rem;
+}
+
+[data-re-inspector-tooltip]:hover [data-re-inspector-tooltip-content] {
+  display: block;
+}
+
+/* ----------------------------------------------------------------
+ * Buttons
+ * ---------------------------------------------------------------- */
+
+[data-re-inspector-button] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--re-border, #e5e5e5);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+[data-re-inspector-button]:hover {
+  background: var(--re-bg-hover, #f5f5f5);
+}
+
+[data-re-inspector-icon-button] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 0.25rem;
+}
+
+[data-re-inspector-icon-button]:hover {
+  background: var(--re-bg-hover, #f5f5f5);
+}
+
+/* ----------------------------------------------------------------
+ * Label & Text
+ * ---------------------------------------------------------------- */
+
+[data-re-inspector-label] {
+  font-size: 0.75rem;
+  color: var(--re-text-muted, #6b6b6b);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 4rem;
+}
+
+[data-re-inspector-text][data-color="muted"] {
+  color: var(--re-text-muted, #6b6b6b);
+}
+
+/* ----------------------------------------------------------------
+ * Prop row
+ * ---------------------------------------------------------------- */
+
+[data-re-inspector-prop-row] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  width: 100%;
+}
+
+/* ----------------------------------------------------------------
+ * Section
+ * ---------------------------------------------------------------- */
+
+[data-re-inspector-section] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--re-border, #e5e5e5);
+  padding: 1rem 0;
+}
+
+[data-re-inspector-section]:last-child {
+  border-bottom: none;
+}
+
+[data-re-inspector-section-header] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+[data-re-inspector-section-toggle] {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+[data-re-inspector-section-body] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ----------------------------------------------------------------
+ * Breadcrumb
+ * ---------------------------------------------------------------- */
+
+[data-re-inspector-breadcrumb-list] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.75rem;
+}
+
+[data-re-inspector-breadcrumb-item] {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+[data-re-inspector-breadcrumb-separator] {
+  color: var(--re-text-muted, #6b6b6b);
+}
+
+[data-re-inspector-breadcrumb-button] {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--re-text, #1c1c1c);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: default;
+}
+
+[data-re-inspector-breadcrumb-button][data-clickable] {
+  cursor: pointer;
+}
+
+[data-re-inspector-breadcrumb-button][data-clickable]:hover {
+  text-decoration: underline;
+}
+
+[data-re-inspector-breadcrumb-ellipsis] {
+  color: var(--re-text-muted, #6b6b6b);
+  font-size: 0.75rem;
+}
+
+/* ----------------------------------------------------------------
+ * CSS custom properties — light defaults
+ * ---------------------------------------------------------------- */
+
+:root {
+  --re-bg: var(--popover);
+  --re-bg-active: var(--accent);
+  --re-border: var(--border);
+  --re-text: var(--popover-foreground);
+  --re-text-muted: var(--muted-foreground);
+  --re-hover: var(--accent);
+  --re-active: var(--accent);
+  --re-pressed: var(--accent);
+  --re-separator: var(--border);
+  --re-radius: var(--radius, 0.625rem);
+  --re-radius-sm: calc(var(--re-radius) - 0.125rem);
+  --re-shadow:
+    0 18px 36px -20px rgb(0 0 0 / 0.18), 0 10px 18px -14px rgb(0 0 0 / 0.1);
+  --re-danger: var(--destructive);
+  --re-danger-hover: var(--accent);
+  --re-tooltip-bg: var(--foreground);
+  --re-tooltip-text: var(--background);
+}
+
+/* ----------------------------------------------------------------
+ * Root containers
+ * ---------------------------------------------------------------- */
+
+[data-re-bubble-menu] {
+  background: var(--re-bg);
+  border: 1px solid var(--re-border);
+  border-radius: var(--re-radius);
+  box-shadow: var(--re-shadow);
+  z-index: 50;
+  padding: 0 0.125rem;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  line-height: 1;
+}
+
+/* ----------------------------------------------------------------
+ * Item buttons (all bubble menus)
+ * ---------------------------------------------------------------- */
+
+[data-re-bubble-menu-item],
+[data-re-link-bm-item],
+[data-re-btn-bm-item],
+[data-re-img-bm-item] {
+  color: var(--re-text-muted);
+  border-radius: var(--re-radius-sm);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+[data-re-bubble-menu-item]:hover,
+[data-re-link-bm-item]:hover,
+[data-re-btn-bm-item]:hover,
+[data-re-img-bm-item]:hover {
+  background: var(--re-hover);
+  color: var(--re-text);
+}
+
+[data-re-bubble-menu-item]:active,
+[data-re-link-bm-item]:active,
+[data-re-btn-bm-item]:active,
+[data-re-img-bm-item]:active {
+  background: var(--re-active);
+}
+
+/* Active / pressed state */
+
+[data-re-bubble-menu-item][data-active],
+[data-re-bubble-menu-item][aria-pressed="true"] {
+  background: var(--re-pressed);
+  color: var(--re-text);
+}
+
+/* ----------------------------------------------------------------
+ * Separator (text bubble menu)
+ * ---------------------------------------------------------------- */
+
+[data-re-bubble-menu-separator] {
+  background: var(--re-separator);
+}
+
+/* ----------------------------------------------------------------
+ * Node Selector
+ * ---------------------------------------------------------------- */
+
+[data-re-node-selector-trigger] {
+  color: var(--re-text);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+  font-weight: 500;
+}
+
+[data-re-node-selector-trigger]:hover {
+  background: var(--re-hover);
+}
+
+[data-re-node-selector-trigger]:active {
+  background: var(--re-active);
+}
+
+[data-re-node-selector-content] {
+  background: var(--re-bg);
+  border: 1px solid var(--re-border);
+  border-radius: var(--re-radius);
+  box-shadow: var(--re-shadow);
+  padding: 0.25rem;
+  margin-top: 0.25rem;
+  z-index: 50;
+}
+
+[data-re-node-selector-item] {
+  color: var(--re-text-muted);
+  border-radius: var(--re-radius-sm);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+[data-re-node-selector-item]:hover {
+  background: var(--re-hover);
+  color: var(--re-text);
+}
+
+[data-re-node-selector-item][data-active] {
+  color: var(--re-text);
+}
+
+/* ----------------------------------------------------------------
+ * Link Selector (text bubble menu)
+ * ---------------------------------------------------------------- */
+
+[data-re-link-selector-trigger] {
+  color: var(--re-text-muted);
+  border-radius: var(--re-radius-sm);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+[data-re-link-selector-trigger]:hover {
+  background: var(--re-hover);
+  color: var(--re-text);
+}
+
+[data-re-link-selector-trigger][aria-pressed="true"] {
+  background: var(--re-pressed);
+}
+
+[data-re-link-selector-form] {
+  background: var(--re-bg);
+  border: 1px solid var(--re-border);
+  border-radius: var(--re-radius);
+  box-shadow: var(--re-shadow);
+  padding: 0.25rem;
+}
+
+[data-re-link-selector-input] {
+  color: var(--re-text);
+}
+
+[data-re-link-selector-input]::placeholder {
+  color: var(--re-text-muted);
+}
+
+[data-re-link-selector-apply] {
+  color: var(--re-text);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+}
+
+[data-re-link-selector-apply]:hover {
+  background: var(--re-hover);
+}
+
+[data-re-link-selector-unlink] {
+  color: var(--re-danger);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+}
+
+[data-re-link-selector-unlink]:hover {
+  background: var(--re-danger-hover);
+}
+
+/* ----------------------------------------------------------------
+ * Link Bubble Menu Form
+ * ---------------------------------------------------------------- */
+
+[data-re-link-bm-form] {
+  background: var(--re-bg);
+  padding: 0.25rem;
+}
+
+[data-re-link-bm-input] {
+  color: var(--re-text);
+}
+
+[data-re-link-bm-input]::placeholder {
+  color: var(--re-text-muted);
+}
+
+[data-re-link-bm-apply] {
+  color: var(--re-text);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+}
+
+[data-re-link-bm-apply]:hover {
+  background: var(--re-hover);
+}
+
+[data-re-link-bm-unlink] {
+  color: var(--re-danger);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+}
+
+[data-re-link-bm-unlink]:hover {
+  background: var(--re-danger-hover);
+}
+
+/* ----------------------------------------------------------------
+ * Button Bubble Menu Form
+ * ---------------------------------------------------------------- */
+
+[data-re-btn-bm-form] {
+  background: var(--re-bg);
+  padding: 0.25rem;
+}
+
+[data-re-btn-bm-input] {
+  color: var(--re-text);
+}
+
+[data-re-btn-bm-input]::placeholder {
+  color: var(--re-text-muted);
+}
+
+[data-re-btn-bm-apply] {
+  color: var(--re-text);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+}
+
+[data-re-btn-bm-apply]:hover {
+  background: var(--re-hover);
+}
+
+[data-re-btn-bm-unlink] {
+  color: var(--re-danger);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+}
+
+[data-re-btn-bm-unlink]:hover {
+  background: var(--re-danger-hover);
+}
+
+/* ----------------------------------------------------------------
+ * Slash Command
+ * ---------------------------------------------------------------- */
+
+[data-re-slash-command] {
+  background: var(--re-bg);
+  border: 1px solid var(--re-border);
+  border-radius: var(--re-radius);
+  box-shadow: var(--re-shadow);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+[data-re-slash-command-item] {
+  color: var(--re-text);
+  border-radius: var(--re-radius-sm);
+  transition: background-color 0.15s;
+}
+
+[data-re-slash-command-item]:hover {
+  background: var(--re-hover);
+}
+
+[data-re-slash-command-item][data-selected] {
+  background: var(--re-hover);
+}
+
+[data-re-slash-command-item]:active {
+  background: var(--re-active);
+}
+
+[data-re-slash-command-item] svg {
+  color: var(--re-text-muted);
+}
+
+[data-re-slash-command-category] {
+  color: var(--re-text-muted);
+}
+
+[data-re-slash-command-empty] {
+  color: var(--re-text-muted);
+}
+
+/* ----------------------------------------------------------------
+ * Editor content — alignment attribute
+ * ---------------------------------------------------------------- */
+
+.tiptap [alignment="left"] {
+  text-align: left;
+}
+
+.tiptap [alignment="center"] {
+  text-align: center;
+}
+
+.tiptap [alignment="right"] {
+  text-align: right;
+}
+
+.tiptap [alignment="justify"] {
+  text-align: justify;
+}
+
+/* ----------------------------------------------------------------
+ * Editor content — columns
+ * ---------------------------------------------------------------- */
+
+.tiptap .node-columns {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.tiptap .node-column {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ----------------------------------------------------------------
+ * Editor content — base typography
+ * ---------------------------------------------------------------- */
+
+.tiptap {
+  outline: none;
+  color: var(--re-text);
+}
+
+.tiptap p.is-empty::before {
+  opacity: 0.3;
+  float: left;
+  content: attr(data-placeholder);
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap .node-placeholder::before {
+  color: var(--re-text-muted);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

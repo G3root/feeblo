@@ -1,6 +1,6 @@
 import type { ReactionCounts, ReactionEmoji } from "@feeblo/utils/reaction";
 import { useMemo, useState } from "react";
-import { toastManager } from "~/components/ui/toast";
+import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { ReactionButton, ReactionList } from "./reaction-button";
 
@@ -29,13 +29,10 @@ export function PostReactionSection({
   const currentUserId = session?.user?.id;
 
   const reactionCounts = useMemo(() => {
-    return postReactions.reduce(
-      (acc, reaction) => {
-        acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
-        return acc;
-      },
-      {} as ReactionCounts
-    );
+    return postReactions.reduce((acc, reaction) => {
+      acc[reaction.emoji] = (acc[reaction.emoji] ?? 0) + 1;
+      return acc;
+    }, {} as ReactionCounts);
   }, [postReactions]);
 
   const userReactionSet = useMemo(() => {
