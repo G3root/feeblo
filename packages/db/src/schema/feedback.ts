@@ -279,11 +279,6 @@ export const postTable = pgTable(
       table.boardId,
       table.slug
     ),
-    foreignKey({
-      name: "post_merged_into_same_organization_fk",
-      columns: [table.mergedIntoPostId, table.organizationId],
-      foreignColumns: [table.id, table.organizationId],
-    }).onDelete("restrict"),
     check(
       "post_merge_requires_target_and_timestamp_chk",
       sql`(${table.mergedIntoPostId} is null and ${table.mergedAt} is null) or (${table.mergedIntoPostId} is not null and ${table.mergedAt} is not null)`
@@ -298,6 +293,13 @@ export const postTable = pgTable(
     ),
   ]
 );
+
+// ✅ Self-referential FK defined AFTER the table exists
+export const postSelfRefRelations = foreignKey({
+  name: "post_merged_into_same_organization_fk",
+  columns: [postTable.mergedIntoPostId, postTable.organizationId],
+  foreignColumns: [postTable.id, postTable.organizationId],
+}).onDelete("restrict");
 
 export const upvoteTable = pgTable(
   "upvote",
