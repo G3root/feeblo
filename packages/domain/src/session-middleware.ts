@@ -87,6 +87,7 @@ function getValidatedSessionFromToken(
     if (!token) {
       return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
+    const startedAt = Date.now();
     const session = yield* Effect.tryPromise({
       try: () =>
         auth.api.getSession({
@@ -96,9 +97,18 @@ function getValidatedSessionFromToken(
         }),
       catch: () => new UnauthorizedError({ message: "Failed to get session" }),
     });
+    const durationMs = Date.now() - startedAt;
     if (!session) {
       return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
+    yield* Effect.logInfo("[perf] Auth session resolved").pipe(
+      Effect.annotateLogs({
+        durationMs,
+        membershipCount: session.memberships.length,
+        organizationCount: session.organizations.length,
+        userId: session.session.userId,
+      })
+    );
     return session;
   });
 }
