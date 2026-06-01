@@ -24,7 +24,11 @@ function MainLayout({ children }: { children: ReactNode }) {
   return (
     <FeedbackBrowseLayout>
       <FeedbackBrowseLayoutContent fullWidth>
-        <FeedbackBrowseLayoutMain>{children}</FeedbackBrowseLayoutMain>
+        <FeedbackBrowseLayoutMain>
+          <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            {children}
+          </div>
+        </FeedbackBrowseLayoutMain>
       </FeedbackBrowseLayoutContent>
     </FeedbackBrowseLayout>
   );
@@ -156,10 +160,12 @@ export function RoadmapPage() {
       </h2>
 
       {statusLoading || boardLoading || postLoading ? (
-        <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
-          {["planned", "progress", "completed"].map((key) => (
-            <div className="h-96 w-80 rounded-lg bg-muted/30" key={key} />
-          ))}
+        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3">
+          <div className="grid h-full min-w-max auto-cols-max grid-flow-col gap-4">
+            {["planned", "progress", "completed"].map((key) => (
+              <div className="h-full w-80 rounded-lg bg-muted/30" key={key} />
+            ))}
+          </div>
         </div>
       ) : (
         <RoadmapGrid
