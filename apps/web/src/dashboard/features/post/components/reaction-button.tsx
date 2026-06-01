@@ -1,4 +1,7 @@
+import { Button } from "@feeblo/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
 import {
+  getReactionEmoji,
   REACTION_EMOJIS,
   type ReactionCounts,
   type ReactionEmoji,
@@ -6,8 +9,6 @@ import {
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { Button } from "@feeblo/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
 
 type ReactionButtonProps = {
   disabled?: boolean;
@@ -126,7 +127,7 @@ function ReactionPill({
       type="button"
       variant={selected ? "secondary" : "ghost"}
     >
-      <span>{emoji}</span>
+      <span>{getReactionEmoji(emoji)}</span>
       {showCount && <span>{count}</span>}
     </Button>
   );

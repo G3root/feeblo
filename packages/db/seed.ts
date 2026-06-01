@@ -38,7 +38,16 @@ const TEAM_USERS = [
 const MAIN_POST_COUNT = 40;
 const EXTERNAL_POST_COUNT = 12;
 
-const REACTIONS = ["👍", "❤️", "🔥", "😂", "🎯"];
+const REACTIONS = [
+  "thumbs_up",
+  "thumbs_down",
+  "grinning_face_with_smiling_eyes",
+  "party_popper",
+  "fire",
+  "eyes",
+  "red_heart",
+  "rocket",
+] as const;
 
 class SeedDataError extends Data.TaggedError("SeedDataError")<{
   readonly message: string;
@@ -567,7 +576,7 @@ const seedEngagement = ({
       );
 
       for (const reactorId of reactors) {
-        const emoji = faker.helpers.arrayElement(REACTIONS) ?? "👍";
+        const emoji = faker.helpers.arrayElement(REACTIONS) ?? "thumbs_up";
 
         const [existing] = yield* Effect.tryPromise(() =>
           db
@@ -609,7 +618,7 @@ const seedEngagement = ({
           continue;
         }
 
-        const emoji = faker.helpers.arrayElement(REACTIONS) ?? "👍";
+        const emoji = faker.helpers.arrayElement(REACTIONS) ?? "thumbs_up";
 
         const [existing] = yield* Effect.tryPromise(() =>
           db

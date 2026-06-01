@@ -1,18 +1,8 @@
 import { Database, schema } from "@feeblo/db";
 import { generateId } from "@feeblo/utils/id";
-import {
-  ReactionEmojiSchema,
-  type ReactionEmoji,
-} from "@feeblo/utils/reaction";
+import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
-import {
-  Context,
-  Effect,
-  Array as EffectArray,
-  Layer,
-  Option,
-  Schema,
-} from "effect";
+import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
 interface TPostReactionList {
   organizationId: string;
@@ -42,8 +32,6 @@ interface TCreatePostReaction {
   userId: string;
 }
 
-const decodeReactionEmoji = Schema.decodeUnknownSync(ReactionEmojiSchema);
-
 const makePostReactionRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
@@ -71,36 +59,37 @@ const makePostReactionRepository = Effect.gen(function* () {
           return [];
         }
 
-        const reactions = yield* db.makeQuery((execute, input: TPostReactionList) =>
-          execute((client) =>
-            client
-              .select({
-                id: schema.postReactionTable.id,
-                postId: schema.postReactionTable.postId,
-                organizationId: schema.postTable.organizationId,
-                userId: schema.postReactionTable.userId,
-                memberId: schema.postReactionTable.memberId,
-                emoji: schema.postReactionTable.emoji,
-                createdAt: schema.postReactionTable.createdAt,
-                updatedAt: schema.postReactionTable.updatedAt,
-              })
-              .from(schema.postReactionTable)
-              .innerJoin(
-                schema.postTable,
-                eq(schema.postTable.id, schema.postReactionTable.postId)
-              )
-              .where(
-                and(
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  eq(schema.postReactionTable.postId, input.postId)
+        const reactions = yield* db.makeQuery(
+          (execute, input: TPostReactionList) =>
+            execute((client) =>
+              client
+                .select({
+                  id: schema.postReactionTable.id,
+                  postId: schema.postReactionTable.postId,
+                  organizationId: schema.postTable.organizationId,
+                  userId: schema.postReactionTable.userId,
+                  memberId: schema.postReactionTable.memberId,
+                  emoji: schema.postReactionTable.emoji,
+                  createdAt: schema.postReactionTable.createdAt,
+                  updatedAt: schema.postReactionTable.updatedAt,
+                })
+                .from(schema.postReactionTable)
+                .innerJoin(
+                  schema.postTable,
+                  eq(schema.postTable.id, schema.postReactionTable.postId)
                 )
-              )
-          )
+                .where(
+                  and(
+                    eq(schema.postTable.organizationId, input.organizationId),
+                    eq(schema.postReactionTable.postId, input.postId)
+                  )
+                )
+            )
         )({ postId, organizationId });
 
         return reactions.map((reaction) => ({
           ...reaction,
-          emoji: decodeReactionEmoji(reaction.emoji),
+          emoji: reaction.emoji,
         }));
       }),
 
@@ -132,36 +121,37 @@ const makePostReactionRepository = Effect.gen(function* () {
           return [];
         }
 
-        const reactions = yield* db.makeQuery((execute, input: TPostReactionList) =>
-          execute((client) =>
-            client
-              .select({
-                id: schema.postReactionTable.id,
-                postId: schema.postReactionTable.postId,
-                organizationId: schema.postTable.organizationId,
-                userId: schema.postReactionTable.userId,
-                memberId: schema.postReactionTable.memberId,
-                emoji: schema.postReactionTable.emoji,
-                createdAt: schema.postReactionTable.createdAt,
-                updatedAt: schema.postReactionTable.updatedAt,
-              })
-              .from(schema.postReactionTable)
-              .innerJoin(
-                schema.postTable,
-                eq(schema.postTable.id, schema.postReactionTable.postId)
-              )
-              .where(
-                and(
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  eq(schema.postReactionTable.postId, input.postId)
+        const reactions = yield* db.makeQuery(
+          (execute, input: TPostReactionList) =>
+            execute((client) =>
+              client
+                .select({
+                  id: schema.postReactionTable.id,
+                  postId: schema.postReactionTable.postId,
+                  organizationId: schema.postTable.organizationId,
+                  userId: schema.postReactionTable.userId,
+                  memberId: schema.postReactionTable.memberId,
+                  emoji: schema.postReactionTable.emoji,
+                  createdAt: schema.postReactionTable.createdAt,
+                  updatedAt: schema.postReactionTable.updatedAt,
+                })
+                .from(schema.postReactionTable)
+                .innerJoin(
+                  schema.postTable,
+                  eq(schema.postTable.id, schema.postReactionTable.postId)
                 )
-              )
-          )
+                .where(
+                  and(
+                    eq(schema.postTable.organizationId, input.organizationId),
+                    eq(schema.postReactionTable.postId, input.postId)
+                  )
+                )
+            )
         )({ postId, organizationId });
 
         return reactions.map((reaction) => ({
           ...reaction,
-          emoji: decodeReactionEmoji(reaction.emoji),
+          emoji: reaction.emoji,
         }));
       }),
 

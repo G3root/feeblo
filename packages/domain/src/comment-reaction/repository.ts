@@ -1,18 +1,8 @@
 import { Database, schema } from "@feeblo/db";
 import { generateId } from "@feeblo/utils/id";
-import {
-  ReactionEmojiSchema,
-  type ReactionEmoji,
-} from "@feeblo/utils/reaction";
+import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
-import {
-  Context,
-  Effect,
-  Array as EffectArray,
-  Layer,
-  Option,
-  Schema,
-} from "effect";
+import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
 interface TCommentReactionList {
   organizationId: string;
@@ -35,8 +25,6 @@ interface TCommentReactionCreate extends TCommentReactionToggle {
   memberId: string | null;
 }
 
-const decodeReactionEmoji = Schema.decodeUnknownSync(ReactionEmojiSchema);
-
 const makeCommentReactionRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
@@ -44,37 +32,40 @@ const makeCommentReactionRepository = Effect.gen(function* () {
     list: (args: TCommentReactionList) =>
       db
         .makeQuery((execute, input: TCommentReactionList) =>
-        execute((client) =>
-          client
-            .select({
-              id: schema.commentReactionTable.id,
-              commentId: schema.commentReactionTable.commentId,
-              postId: schema.commentTable.postId,
-              organizationId: schema.commentTable.organizationId,
-              userId: schema.commentReactionTable.userId,
-              memberId: schema.commentReactionTable.memberId,
-              emoji: schema.commentReactionTable.emoji,
-              createdAt: schema.commentReactionTable.createdAt,
-              updatedAt: schema.commentReactionTable.updatedAt,
-            })
-            .from(schema.commentReactionTable)
-            .innerJoin(
-              schema.commentTable,
-              eq(schema.commentTable.id, schema.commentReactionTable.commentId)
-            )
-            .where(
-              and(
-                eq(schema.commentTable.organizationId, input.organizationId),
-                eq(schema.commentTable.postId, input.postId)
+          execute((client) =>
+            client
+              .select({
+                id: schema.commentReactionTable.id,
+                commentId: schema.commentReactionTable.commentId,
+                postId: schema.commentTable.postId,
+                organizationId: schema.commentTable.organizationId,
+                userId: schema.commentReactionTable.userId,
+                memberId: schema.commentReactionTable.memberId,
+                emoji: schema.commentReactionTable.emoji,
+                createdAt: schema.commentReactionTable.createdAt,
+                updatedAt: schema.commentReactionTable.updatedAt,
+              })
+              .from(schema.commentReactionTable)
+              .innerJoin(
+                schema.commentTable,
+                eq(
+                  schema.commentTable.id,
+                  schema.commentReactionTable.commentId
+                )
               )
-            )
-        )
+              .where(
+                and(
+                  eq(schema.commentTable.organizationId, input.organizationId),
+                  eq(schema.commentTable.postId, input.postId)
+                )
+              )
+          )
         )(args)
         .pipe(
           Effect.map((reactions) =>
             reactions.map((reaction) => ({
               ...reaction,
-              emoji: decodeReactionEmoji(reaction.emoji),
+              emoji: reaction.emoji,
             }))
           )
         ),
@@ -82,46 +73,49 @@ const makeCommentReactionRepository = Effect.gen(function* () {
     listPublic: (args: TCommentReactionList) =>
       db
         .makeQuery((execute, input: TCommentReactionList) =>
-        execute((client) =>
-          client
-            .select({
-              id: schema.commentReactionTable.id,
-              commentId: schema.commentReactionTable.commentId,
-              postId: schema.commentTable.postId,
-              organizationId: schema.commentTable.organizationId,
-              userId: schema.commentReactionTable.userId,
-              memberId: schema.commentReactionTable.memberId,
-              emoji: schema.commentReactionTable.emoji,
-              createdAt: schema.commentReactionTable.createdAt,
-              updatedAt: schema.commentReactionTable.updatedAt,
-            })
-            .from(schema.commentReactionTable)
-            .innerJoin(
-              schema.commentTable,
-              eq(schema.commentTable.id, schema.commentReactionTable.commentId)
-            )
-            .innerJoin(
-              schema.postTable,
-              eq(schema.postTable.id, schema.commentTable.postId)
-            )
-            .innerJoin(
-              schema.boardTable,
-              eq(schema.boardTable.id, schema.postTable.boardId)
-            )
-            .where(
-              and(
-                eq(schema.commentTable.organizationId, input.organizationId),
-                eq(schema.commentTable.postId, input.postId),
-                eq(schema.boardTable.visibility, "PUBLIC")
+          execute((client) =>
+            client
+              .select({
+                id: schema.commentReactionTable.id,
+                commentId: schema.commentReactionTable.commentId,
+                postId: schema.commentTable.postId,
+                organizationId: schema.commentTable.organizationId,
+                userId: schema.commentReactionTable.userId,
+                memberId: schema.commentReactionTable.memberId,
+                emoji: schema.commentReactionTable.emoji,
+                createdAt: schema.commentReactionTable.createdAt,
+                updatedAt: schema.commentReactionTable.updatedAt,
+              })
+              .from(schema.commentReactionTable)
+              .innerJoin(
+                schema.commentTable,
+                eq(
+                  schema.commentTable.id,
+                  schema.commentReactionTable.commentId
+                )
               )
-            )
-        )
+              .innerJoin(
+                schema.postTable,
+                eq(schema.postTable.id, schema.commentTable.postId)
+              )
+              .innerJoin(
+                schema.boardTable,
+                eq(schema.boardTable.id, schema.postTable.boardId)
+              )
+              .where(
+                and(
+                  eq(schema.commentTable.organizationId, input.organizationId),
+                  eq(schema.commentTable.postId, input.postId),
+                  eq(schema.boardTable.visibility, "PUBLIC")
+                )
+              )
+          )
         )(args)
         .pipe(
           Effect.map((reactions) =>
             reactions.map((reaction) => ({
               ...reaction,
-              emoji: decodeReactionEmoji(reaction.emoji),
+              emoji: reaction.emoji,
             }))
           )
         ),
