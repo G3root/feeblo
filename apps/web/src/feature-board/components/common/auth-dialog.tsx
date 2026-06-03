@@ -1,10 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: Keeps the auth action ordering compact. */
 /** biome-ignore-all lint/style/useDefaultSwitchClause: DialogStep is an exhaustive union. */
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useStore } from "@nanostores/react";
-import { useCallback, useEffect, useState } from "react";
-import { z } from "zod";
+
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -27,7 +23,13 @@ import {
   InputOTPSlot,
 } from "@feeblo/ui/input-otp";
 import { toastManager } from "@feeblo/ui/toast";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useStore } from "@nanostores/react";
+import { useCallback, useEffect, useState } from "react";
+import { z } from "zod";
 import { SocialAuthButtons } from "~/features/auth/components/social-auth-buttons";
+import { getSafeCallbackURL } from "~/features/auth/lib/auth-flows";
 import { useAppForm } from "~/hooks/form";
 import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
 import {
@@ -327,7 +329,7 @@ function SignInForm({
       const response = await authClient.signIn.email({
         email,
         password: value.password,
-        callbackURL: "/",
+        callbackURL: getSafeCallbackURL(),
       });
 
       if (!response.error) {
@@ -386,7 +388,7 @@ function SignUpForm({ onVerify }: { onVerify: (email: string) => void }) {
         email,
         name: value.name,
         password: value.password,
-        callbackURL: "/",
+        callbackURL: getSafeCallbackURL(),
       });
 
       if (response.error) {

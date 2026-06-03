@@ -1,10 +1,22 @@
 import { toastManager } from "@feeblo/ui/toast";
 import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
+import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
 
 export type SocialProvider = "github" | "google";
 
-export const getSafeCallbackURL = (redirectTo?: string) =>
-  redirectTo?.startsWith("/") ? redirectTo : "/";
+export const getSafeCallbackURL = (redirectTo?: string) => {
+  const safePath = redirectTo?.startsWith("/") ? redirectTo : "/";
+  const currentOrigin =
+    typeof window !== "undefined" ? window.location.origin : undefined;
+  const appUrl = getRuntimePublicEnv().appUrl;
+  const callbackBase = currentOrigin ?? appUrl;
+
+  if (!callbackBase) {
+    return safePath;
+  }
+
+  return new URL(safePath, callbackBase).toString();
+};
 
 export async function initializeEmailVerification(email: string) {
   const response = await fetch(verificationOtpEndpoint, {
