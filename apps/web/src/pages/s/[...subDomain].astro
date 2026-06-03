@@ -1,0 +1,39 @@
+---
+import { fetchRpcServer } from "~/lib/runtime-server";
+import { PublicBoardApp } from "../../feature-board";
+import PublicBoardLayout from "../../layouts/PublicBoardLayout.astro";
+
+export const prerender = false;
+
+const { subdomain } = Astro.locals;
+
+if (!subdomain) {
+  throw new Error("Subdomain is required");
+}
+
+let siteData;
+
+try {
+  siteData = await fetchRpcServer(
+    (rpc) => rpc.SiteListBySubdomain({ subdomain }),
+    {
+      signal: AbortSignal.timeout(10000),
+    },
+  );
+} catch (error) {
+  console.error("Failed to fetch site data:", error);
+  return new Response("Site not found", { status: 404 });
+}
+
+if (siteData.length === 0) {
+  return new Response("Site not found", { status: 404 });
+}
+
+const site = siteData[0];
+---
+
+<PublicBoardLayout title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}>
+  <main>
+    <PublicBoardApp client:only="react" site={site} />
+  </main>
+</PublicBoardLayout>
