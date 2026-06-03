@@ -71,50 +71,18 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           );
       },
       PostUpdate: (args: TPostUpdate) => {
-        return Effect.gen(function* () {
-          const sanitizeStartedAt = Date.now();
-          const sanitizedContent = sanitizeRichText(args.content);
-          const sanitizeDurationMs = Date.now() - sanitizeStartedAt;
-
-          yield* Effect.logInfo("[perf] PostUpdate sanitize complete").pipe(
-            Effect.annotateLogs({
-              boardId: args.boardId,
-              organizationId: args.organizationId,
-              postId: args.id,
-              sanitizeDurationMs,
-            })
+        return repository
+          .update({ ...args, content: sanitizeRichText(args.content) })
+          .pipe(
+            Policy.withPolicy(
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
+            ),
+            withRemapDbErrors("Post", "update")
           );
-
-          const policyStartedAt = Date.now();
-          yield* postPolicy.isOwner({
-            organizationId: args.organizationId,
-            postId: args.id,
-            boardId: args.boardId,
-          });
-          const policyDurationMs = Date.now() - policyStartedAt;
-
-          yield* Effect.logInfo("[perf] PostUpdate policy complete").pipe(
-            Effect.annotateLogs({
-              boardId: args.boardId,
-              organizationId: args.organizationId,
-              policyDurationMs,
-              postId: args.id,
-            })
-          );
-
-          const updateStartedAt = Date.now();
-          yield* repository.update({ ...args, content: sanitizedContent });
-          const updateDurationMs = Date.now() - updateStartedAt;
-
-          yield* Effect.logInfo("[perf] PostUpdate db update complete").pipe(
-            Effect.annotateLogs({
-              boardId: args.boardId,
-              organizationId: args.organizationId,
-              postId: args.id,
-              updateDurationMs,
-            })
-          );
-        }).pipe(withRemapDbErrors("Post", "update"));
       },
       PostCreate: (args: TPostCreate) => {
         return Effect.gen(function* () {
