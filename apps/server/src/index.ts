@@ -11,7 +11,7 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
-import { Config, Duration, Effect, Layer } from "effect";
+import { Config, Effect, Layer } from "effect";
 import {
   HttpEffect,
   HttpMiddleware,
@@ -21,6 +21,7 @@ import {
 } from "effect/unstable/http";
 import { HttpApiScalar } from "effect/unstable/httpapi";
 import { ServerConfig } from "./config";
+import { corsVaryFix } from "./middlewares/cors-vary";
 
 const ServiceLayers = Database.Database.Client;
 const AuthLayer = Layer.effect(Auth, initAuthHandler());
@@ -56,7 +57,6 @@ const RootRouter = HttpRouter.use((router) =>
 
 const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
-  const corsPreflightMaxAge = Duration.days(1);
 
   const isLocalDevHost = (host: string): boolean =>
     host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
@@ -113,11 +113,12 @@ const program = Effect.gen(function* () {
           allowedOrigins: isAllowedOrigin,
           allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
           credentials: true,
-          maxAge: Math.ceil(Duration.toSeconds(corsPreflightMaxAge)),
+          maxAge: 86_400,
         }),
         { global: true }
       )
-    )
+    ),
+    Layer.provide(corsVaryFix)
   );
 
   const server = HttpRouter.serve(AllRoutes, {
