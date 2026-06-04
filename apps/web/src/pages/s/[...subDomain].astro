@@ -11,6 +11,10 @@ if (!subdomain) {
   throw new Error("Subdomain is required");
 }
 
+Astro.locals.log.set({
+  site: { subdomain },
+});
+
 let siteData;
 
 try {
@@ -21,15 +25,24 @@ try {
     },
   );
 } catch (error) {
-  console.error("Failed to fetch site data:", error);
+  Astro.locals.log.error(
+    error instanceof Error ? error : new Error(String(error)),
+    { site: { subdomain } },
+  );
   return new Response("Site not found", { status: 404 });
 }
 
 if (siteData.length === 0) {
+  Astro.locals.log.set({
+    site: { subdomain, lookupStatus: "not_found" },
+  });
   return new Response("Site not found", { status: 404 });
 }
 
 const site = siteData[0];
+Astro.locals.log.set({
+  site: { id: site.id, subdomain },
+});
 ---
 
 <PublicBoardLayout title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}>
