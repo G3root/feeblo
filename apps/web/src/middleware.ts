@@ -2,7 +2,6 @@
 import { sequence } from "astro:middleware";
 import { extractSubdomain, RESERVED_SUBDOMAINS } from "@feeblo/utils/url";
 import type { APIContext, MiddlewareNext } from "astro";
-import { createRequestLogger, initLogger } from "evlog";
 import { authClient } from "~/lib/server-auth-client";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
 
@@ -24,19 +23,11 @@ const DASHBOARD_NON_ORG_PATHS = new Set([
 
 const RESERVED_SUBDOMAIN_SET = new Set(RESERVED_SUBDOMAINS);
 
-initLogger({
-  env: { service: "my-app" },
-});
-
 function normalizePathname(pathname: string) {
   if (pathname.length > 1 && pathname.endsWith("/")) {
     return pathname.slice(0, -1);
   }
   return pathname;
-}
-
-function getWaitUntil(context: APIContext) {
-  return context.locals.cfContext?.waitUntil.bind(context.locals.cfContext);
 }
 
 function resolveSubdomain(context: APIContext) {
@@ -68,33 +59,9 @@ function stripLeadingSegment(pathname: string, segment: string) {
   return pathname.slice(segment.length + 1);
 }
 
-async function requestLoggerMiddleware(
-  context: APIContext,
-  next: MiddlewareNext
-) {
-  const log = createRequestLogger({
-    method: context.request.method,
-    path: context.url.pathname,
-    waitUntil: getWaitUntil(context),
-  });
-
-  context.locals.log = log;
-
-  try {
-    const response = await next();
-    log.emit({ status: response.status });
-    return response;
-  } catch (error) {
-    log.error(error instanceof Error ? error : new Error(String(error)));
-    log.emit({ status: 500 });
-    throw error;
-  }
-}
-
 function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   const subdomain = resolveSubdomain(context);
   context.locals.subdomain = subdomain;
-  context.locals.log.set({ subdomain });
   const targetPathPrefix = getTargetPathPrefix(subdomain);
   const pathname = normalizePathname(context.url.pathname);
 
@@ -114,13 +81,6 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
   context.locals.user = data?.user ?? null;
   context.locals.session = data?.session ?? null;
   context.locals.organizations = data?.organizations ?? null;
-  context.locals.log.set({
-    auth: {
-      authenticated: Boolean(data?.session),
-      organizationCount: data?.organizations?.length ?? 0,
-      userId: data?.user?.id ?? null,
-    },
-  });
 
   return next();
 }
@@ -215,7 +175,6 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
 }
 
 export const onRequest = sequence(
-  requestLoggerMiddleware,
   authMiddleware,
   subdomainMiddleware,
   dashboardAuthRedirectMiddleware,
