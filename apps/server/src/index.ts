@@ -11,7 +11,7 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
-import { Config, Effect, Layer } from "effect";
+import { Config, Duration, Effect, Layer } from "effect";
 import {
   HttpEffect,
   HttpMiddleware,
@@ -56,6 +56,7 @@ const RootRouter = HttpRouter.use((router) =>
 
 const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
+  const corsPreflightMaxAge = Duration.days(1);
 
   const isLocalDevHost = (host: string): boolean =>
     host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
@@ -112,6 +113,7 @@ const program = Effect.gen(function* () {
           allowedOrigins: isAllowedOrigin,
           allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
           credentials: true,
+          maxAge: Math.ceil(Duration.toSeconds(corsPreflightMaxAge)),
         }),
         { global: true }
       )
