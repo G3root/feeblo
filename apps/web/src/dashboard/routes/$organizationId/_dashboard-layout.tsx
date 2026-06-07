@@ -3,6 +3,7 @@ import { DashboardLayout } from "~/layouts/dashboard-layout.tsx";
 import {
   boardCollection,
   organizationCollection,
+  postCollection,
   siteCollection,
   workspacePlanCollection,
 } from "~/lib/collections";
@@ -14,7 +15,9 @@ export const Route = createFileRoute("/$organizationId/_dashboard-layout")({
       boardCollection.preload(),
       siteCollection.preload(),
       workspacePlanCollection.preload(),
+      postCollection.preload(),
     ]);
+    return null;
   },
   component: DashboardLayoutComponent,
 });
