@@ -1,6 +1,5 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { authClient, authStateCollection } from "~/lib/auth-client";
-import { DashboardCollectionsProvider } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId")({
   component: OrganizationLayoutRoute,
@@ -9,7 +8,7 @@ export const Route = createFileRoute("/$organizationId")({
       authStateCollection.get("auth") &&
       authStateCollection.get("auth")?.session.expiresAt > new Date()
     ) {
-      // biome-ignore lint/style/noNonNullAssertion: <explanation>
+      // biome-ignore lint/style/noNonNullAssertion: auth is checked above
       return authStateCollection.get("auth")!;
     }
     const result = await authClient.getSession();
@@ -22,11 +21,5 @@ export const Route = createFileRoute("/$organizationId")({
 });
 
 function OrganizationLayoutRoute() {
-  const { organizationId } = Route.useParams();
-
-  return (
-    <DashboardCollectionsProvider organizationId={organizationId}>
-      <Outlet />
-    </DashboardCollectionsProvider>
-  );
+  return <Outlet />;
 }
