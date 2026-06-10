@@ -32,7 +32,10 @@ if (siteData.length === 0) {
 const site = siteData[0];
 ---
 
-<PublicBoardLayout title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}>
+<PublicBoardLayout
+  organizationId={site.organizationId}
+  title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}
+>
   <main>
     <PublicBoardApp client:only="react" site={site} />
   </main>
