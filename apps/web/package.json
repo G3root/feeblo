@@ -12,8 +12,8 @@
     "generate-types": "wrangler types"
   },
   "dependencies": {
-    "@astrojs/node": "10.0.5",
-    "@astrojs/react": "5.0.3",
+    "@astrojs/node": "10.1.4",
+    "@astrojs/react": "5.0.7",
     "@base-ui/react": "catalog:",
     "@dnd-kit/abstract": "^0.4.0",
     "@dnd-kit/dom": "^0.4.0",
@@ -40,7 +40,7 @@
     "@xstate/store": "^3.17.1",
     "@xstate/store-react": "^1.0.1",
 
-    "astro": "6.1.8",
+    "astro": "6.4.5",
     "better-auth": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
@@ -54,11 +54,11 @@
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:",
     "wouter": "^3.7.1",
-    "wrangler": "^4.84.1",
+    "wrangler": "^4.99.0",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@astrojs/cloudflare": "^13.1.10",
+    "@astrojs/cloudflare": "^13.7.0",
     "@cloudflare/workers-types": "catalog:",
     "@feeblo/config": "workspace:*",
     "@tailwindcss/typography": "^0.5.19",
