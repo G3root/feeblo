@@ -1,5 +1,5 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { Link } from "wouter";
+import { createLazyRoute, Link } from "@tanstack/react-router";
 import {
   Empty,
   EmptyDescription,
@@ -17,6 +17,11 @@ import {
 } from "../components/changelog/changelog-layout";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
+
+//@ts-expect-error
+export const Route = createLazyRoute("/changelog")({
+  component: ChangelogPage,
+});
 
 export function ChangelogPage() {
   const site = useSite();
@@ -89,7 +94,7 @@ export function ChangelogPage() {
                   <header>
                     <Link
                       className="block w-fit transition-opacity hover:opacity-80"
-                      href={`/changelog/${item.slug}`}
+                      to={`/changelog/${item.slug}`}
                     >
                       <h3 className="font-semibold text-2xl tracking-tight sm:text-3xl">
                         {item.title}

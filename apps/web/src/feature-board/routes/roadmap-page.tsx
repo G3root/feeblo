@@ -1,12 +1,12 @@
-import { eq, useLiveQuery } from "@tanstack/react-db";
-import type { ReactNode } from "react";
-import { useLocation } from "wouter";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { eq, useLiveQuery } from "@tanstack/react-db";
+import { createLazyRoute, useNavigate } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import {
   groupRoadmapPostsByStatus,
   PublicRoadmapIssueCard,
@@ -34,9 +34,14 @@ function MainLayout({ children }: { children: ReactNode }) {
   );
 }
 
-export function RoadmapPage() {
+//@ts-expect-error
+export const Route = createLazyRoute("/roadmap")({
+  component: RoadmapPage,
+});
+
+function RoadmapPage() {
   const site = useSite();
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
   const {
     publicBoardCollection,
     publicPostCollection,
@@ -175,7 +180,7 @@ export function RoadmapPage() {
             <PublicRoadmapIssueCard
               boardName={post.boardName}
               key={post.id}
-              onClick={() => navigate(`/p/${post.slug}`)}
+              onClick={() => navigate({ to: `/p/${post.slug}` })}
               status={post.status}
               title={post.title}
               updatedAt={post.updatedAt}

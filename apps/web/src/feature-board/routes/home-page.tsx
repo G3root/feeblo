@@ -1,8 +1,3 @@
-import { ChatFeedback01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
-import type { ReactNode } from "react";
-import { useMemo } from "react";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
@@ -18,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
+import { ChatFeedback01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
+import { createLazyRoute } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import {
@@ -95,7 +96,12 @@ function FilterSection({
   );
 }
 
-export function HomePage() {
+//@ts-expect-error
+export const Route = createLazyRoute("/")({
+  component: HomePage,
+});
+
+function HomePage() {
   const { data: session } = authClient.useSession();
   const site = useSite();
   const {

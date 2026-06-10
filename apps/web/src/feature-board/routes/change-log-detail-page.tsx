@@ -1,6 +1,6 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
+import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
 import { buttonVariants } from "@feeblo/ui/button";
 import {
   Empty,
@@ -19,12 +19,14 @@ import {
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
-export function ChangeLogDetailPage({
-  changelogSlug,
-}: {
-  changelogSlug: string;
-}) {
+//@ts-expect-error
+export const Route = createLazyRoute("/changelog/$changelogSlug")({
+  component: ChangeLogDetailPage,
+});
+
+export function ChangeLogDetailPage() {
   const site = useSite();
+  const { changelogSlug } = useParams({ from: "/changelog/$changelogSlug" });
   const { publicChangelogCollection } = usePublicCollections();
   const {
     data: changelog,
@@ -87,7 +89,7 @@ export function ChangeLogDetailPage({
               buttonVariants({ size: "sm", variant: "ghost" }),
               "w-fit"
             )}
-            href="/changelog"
+            to="/changelog"
           >
             <ArrowLeft />
             Back

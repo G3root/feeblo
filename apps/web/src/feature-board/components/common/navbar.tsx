@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Button } from "@feeblo/ui/button";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
@@ -50,8 +50,8 @@ export function Navbar() {
 }
 
 function NavTab({ href, label }: { href: string; label: string }) {
-  const [location] = useLocation();
-  const isActive = location === href;
+  const { pathname } = useLocation();
+  const isActive = pathname === href;
 
   return (
     <Link
@@ -59,7 +59,7 @@ function NavTab({ href, label }: { href: string; label: string }) {
         "relative flex items-center px-1.5 text-sm transition-colors hover:text-foreground",
         isActive ? "text-foreground" : "text-muted-foreground"
       )}
-      href={href}
+      to={href}
     >
       <span>{label}</span>
       {isActive ? (

@@ -1,73 +1,67 @@
-import { lazy, Suspense } from "react";
-import { Route, Switch } from "wouter";
-import { useSite } from "../providers/site-provider";
+import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
+import { PublicBoardShell } from "../components/layout/public-board-shell";
+import { NotFoundPage } from "../routes/not-found-page";
 
-const BoardPage = lazy(() =>
-  import("../routes/board-page").then((mod) => ({ default: mod.BoardPage }))
-);
-const ChangeLogDetailPage = lazy(() =>
-  import("../routes/change-log-detail-page").then((mod) => ({
-    default: mod.ChangeLogDetailPage,
-  }))
-);
-const ChangelogPage = lazy(() =>
-  import("../routes/change-log-page").then((mod) => ({
-    default: mod.ChangelogPage,
-  }))
-);
-const HomePage = lazy(() =>
-  import("../routes/home-page").then((mod) => ({ default: mod.HomePage }))
-);
-const NotFoundPage = lazy(() =>
-  import("../routes/not-found-page").then((mod) => ({
-    default: mod.NotFoundPage,
-  }))
-);
-const PostPage = lazy(() =>
-  import("../routes/post-page").then((mod) => ({ default: mod.PostPage }))
-);
-const RoadmapPage = lazy(() =>
-  import("../routes/roadmap-page").then((mod) => ({
-    default: mod.RoadmapPage,
-  }))
-);
+const rootRoute = createRootRoute({
+  component: () => (
+    <PublicBoardShell>
+      <Outlet />
+    </PublicBoardShell>
+  ),
+});
 
-export function PublicBoardRoutes() {
-  const site = useSite();
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  validateSearch: (search: Record<string, unknown>) => ({
+    board:
+      typeof search.board === "string" ? search.board : (undefined as unknown),
+    sort:
+      typeof search.sort === "string" ? search.sort : (undefined as unknown),
+    status:
+      typeof search.status === "string"
+        ? search.status
+        : (undefined as unknown),
+  }),
+}).lazy(() => import("../routes/home-page").then((d) => d.Route));
 
-  return (
-    <Suspense fallback={null}>
-      <Switch>
-        <Route path="/">
-          <HomePage />
-        </Route>
-        {site.roadmapVisibility === "PUBLIC" ? (
-          <Route path="/roadmap">
-            <RoadmapPage />
-          </Route>
-        ) : null}
-        <Route path="/b/:boardSlug">
-          {(params) => <BoardPage boardSlug={params.boardSlug} />}
-        </Route>
-        <Route path="/p/:slug">
-          {(params) => <PostPage slug={params.slug} />}
-        </Route>
-        {site.changelogVisibility === "PUBLIC" ? (
-          <Route path="/changelog">
-            <ChangelogPage />
-          </Route>
-        ) : null}
-        {site.changelogVisibility === "PUBLIC" ? (
-          <Route path="/changelog/:changelogSlug">
-            {(params) => (
-              <ChangeLogDetailPage changelogSlug={params.changelogSlug} />
-            )}
-          </Route>
-        ) : null}
-        <Route>
-          <NotFoundPage />
-        </Route>
-      </Switch>
-    </Suspense>
-  );
-}
+const roadmapRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/roadmap",
+}).lazy(() => import("../routes/roadmap-page").then((d) => d.Route));
+
+const boardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/b/$boardSlug",
+}).lazy(() => import("../routes/board-page").then((d) => d.Route));
+
+const postRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$slug",
+}).lazy(() => import("../routes/post-page").then((d) => d.Route));
+
+const changelogRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/changelog",
+}).lazy(() => import("../routes/change-log-page").then((d) => d.Route));
+
+const changelogDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/changelog/$changelogSlug",
+}).lazy(() => import("../routes/change-log-detail-page").then((d) => d.Route));
+
+const notFoundRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "*",
+  component: () => <NotFoundPage />,
+});
+
+export const routeTree = rootRoute.addChildren([
+  homeRoute,
+  roadmapRoute,
+  boardRoute,
+  postRoute,
+  changelogRoute,
+  changelogDetailRoute,
+  notFoundRoute,
+]);

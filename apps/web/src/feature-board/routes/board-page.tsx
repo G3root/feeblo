@@ -1,11 +1,12 @@
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import type { ReactNode } from "react";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { createLazyRoute, useParams } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { BoardListCard } from "../components/feedback/board-list-card";
 import {
   FeedbackCard,
@@ -45,9 +46,14 @@ function ListHeader({ count, title }: { count?: number; title: string }) {
     </div>
   );
 }
+//@ts-expect-error
+export const Route = createLazyRoute("/b/$boardSlug")({
+  component: BoardPage,
+});
 
-export function BoardPage({ boardSlug }: { boardSlug: string }) {
+export function BoardPage() {
   const site = useSite();
+  const { boardSlug } = useParams({ from: "/b/$boardSlug" });
   const {
     publicBoardCollection,
     publicPostCollection,

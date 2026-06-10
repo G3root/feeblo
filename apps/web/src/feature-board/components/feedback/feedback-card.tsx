@@ -6,7 +6,7 @@ import {
   getInitials,
   truncate,
 } from "src/feature-board/lib/utils";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "~/lib/utils";
@@ -89,7 +89,7 @@ export function FeedbackCard({
   return (
     <Link
       className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
-      href={`/p/${post.slug}`}
+      to={`/p/${post.slug}`}
     >
       <button
         className={cn(

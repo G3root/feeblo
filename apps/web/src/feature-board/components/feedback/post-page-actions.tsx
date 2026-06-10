@@ -5,7 +5,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,7 +75,7 @@ export function PostPageActions({ canDelete, onDelete }: PostPageActionsProps) {
           className={cn(
             buttonVariants({ size: "icon-sm", variant: "outline" })
           )}
-          href="/"
+          to="/"
         >
           <HugeiconsIcon icon={ArrowLeft01Icon} />
         </Link>

@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link } from "@tanstack/react-router";
 import { buttonVariants } from "@feeblo/ui/button";
 import {
   Empty,
@@ -17,7 +17,7 @@ export function NotFoundPage() {
             The public board route you requested does not exist.
           </EmptyDescription>
         </EmptyHeader>
-        <Link className={buttonVariants({ variant: "outline" })} href="/">
+        <Link className={buttonVariants({ variant: "outline" })} to="/">
           Back to feedback
         </Link>
       </Empty>

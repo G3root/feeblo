@@ -12,7 +12,7 @@ import {
   usePacedMutations,
 } from "@tanstack/react-db";
 import { type ReactNode, Suspense } from "react";
-import { useLocation } from "wouter";
+import { createLazyRoute, useNavigate, useParams } from "@tanstack/react-router";
 import { z } from "zod";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
@@ -119,10 +119,16 @@ type SessionMembership = {
   userId: string;
 };
 
-export function PostPage({ slug }: { slug: string }) {
+//@ts-expect-error
+export const Route = createLazyRoute("/p/$slug")({
+  component: PostPage,
+});
+
+export function PostPage() {
   const site = useSite();
   const { data: session } = authClient.useSession();
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
+  const { slug } = useParams({ from: "/p/$slug" });
   const {
     publicBoardCollection,
     publicCommentCollection,
@@ -396,7 +402,7 @@ export function PostPage({ slug }: { slug: string }) {
     try {
       const tx = publicPostCollection.delete(postId);
       await tx.isPersisted.promise;
-      navigate("/");
+      navigate({ to: "/" });
     } catch (_error) {
       toastManager.add({
         title: "Failed to delete post",
