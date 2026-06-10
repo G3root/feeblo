@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { sequence } from "astro:middleware";
-import { extractSubdomain, RESERVED_SUBDOMAINS } from "@feeblo/utils/url";
+import { extractSubdomain } from "@feeblo/utils/url";
 import type { APIContext, MiddlewareNext } from "astro";
 import { authClient } from "~/lib/server-auth-client";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
@@ -11,6 +11,7 @@ const AUTH_EMAIL_VERIFY_PATH = "/email-verify";
 const REGISTER_PATH = "/register";
 const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
+const EMBED_PATH = "/e";
 const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_SIGN_IN_PATH,
   AUTH_SIGN_UP_PATH,
@@ -20,8 +21,6 @@ const DASHBOARD_NON_ORG_PATHS = new Set([
   ...DASHBOARD_AUTH_PATHS,
   REGISTER_PATH,
 ]);
-
-const RESERVED_SUBDOMAIN_SET = new Set(RESERVED_SUBDOMAINS);
 
 function normalizePathname(pathname: string) {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -38,11 +37,11 @@ function resolveSubdomain(context: APIContext) {
 }
 
 function getTargetPathPrefix(subdomain: string | null) {
-  if (subdomain && !RESERVED_SUBDOMAIN_SET.has(subdomain)) {
-    return PUBLIC_BOARD_PATH;
+  if (!subdomain || (subdomain && subdomain.toLowerCase() === "app")) {
+    return DASHBOARD_PATH;
   }
 
-  return DASHBOARD_PATH;
+  return PUBLIC_BOARD_PATH;
 }
 
 function hasPathPrefix(pathname: string, prefix: string) {
