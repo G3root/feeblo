@@ -1,13 +1,3 @@
-import {
-  Cancel01Icon,
-  DashedLineCircleIcon,
-  FilterMailIcon,
-  Tag01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { useSelector } from "@xstate/store-react";
-import { createContext, type ReactNode, useContext } from "react";
 import { Button } from "@feeblo/ui/button";
 import { ButtonGroup, ButtonGroupText } from "@feeblo/ui/button-group";
 import {
@@ -22,6 +12,16 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
+import {
+  Cancel01Icon,
+  DashedLineCircleIcon,
+  FilterMailIcon,
+  Tag01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { useSelector } from "@xstate/store-react";
+import { createContext, type ReactNode, useContext } from "react";
 import { cn } from "~/lib/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
@@ -97,7 +97,7 @@ function BoardFilterRoot({
   const store = useBoardStore();
   const { postStatusCollection, tagCollection } = useDashboardCollections();
   const filters = useBoardFilterState();
-  const { data: postStatuses } = useLiveSuspenseQuery(
+  const { data: postStatuses } = useLiveQuery(
     (q) =>
       q
         .from({ postStatus: postStatusCollection })
@@ -110,7 +110,7 @@ function BoardFilterRoot({
         })),
     [organizationId]
   );
-  const { data: tags } = useLiveSuspenseQuery(
+  const { data: tags } = useLiveQuery(
     (q) => {
       return q
         .from({ tags: tagCollection })
