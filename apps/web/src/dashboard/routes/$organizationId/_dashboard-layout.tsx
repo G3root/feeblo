@@ -4,7 +4,10 @@ import {
   boardCollection,
   organizationCollection,
   postCollection,
+  postStatusCollection,
+  postTagCollection,
   siteCollection,
+  tagCollection,
   workspacePlanCollection,
 } from "~/lib/collections";
 
@@ -16,6 +19,9 @@ export const Route = createFileRoute("/$organizationId/_dashboard-layout")({
       siteCollection.preload(),
       workspacePlanCollection.preload(),
       postCollection.preload(),
+      postStatusCollection.preload(),
+      tagCollection.preload(),
+      postTagCollection.preload(),
     ]);
     return null;
   },

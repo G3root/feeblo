@@ -1,5 +1,4 @@
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { Skeleton } from "@feeblo/ui/skeleton";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { BoardNotFound } from "~/features/board/components/board-not-found";
 import { BoardSurface } from "~/features/board/components/board-surface";
 import type { BoardView } from "~/features/board/state/board-store-context";
@@ -33,7 +32,7 @@ function BoardFeedbackPage({
   organizationId,
 }: BoardPageProps) {
   const { boardCollection } = useDashboardCollections();
-  const { data: board } = useLiveSuspenseQuery(
+  const { data: board } = useLiveQuery(
     (q) =>
       q
         .from({ board: boardCollection })
@@ -147,29 +146,6 @@ export function BacklogBoardPage({
       initialView={backlogFeedbackView}
       organizationId={organizationId}
     />
-  );
-}
-
-export function BoardFeedbackRoutePending() {
-  return (
-    <div className="mx-auto w-full">
-      <section className="overflow-hidden text-card-foreground">
-        <div className="space-y-6 border-b px-4 py-6 lg:px-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-            <Skeleton className="h-9 w-28 rounded-md" />
-          </div>
-        </div>
-        <div className="space-y-3 px-4 py-4 lg:px-6">
-          <Skeleton className="h-11 w-full rounded-none" />
-          <Skeleton className="h-11 w-full rounded-none" />
-          <Skeleton className="h-11 w-full rounded-none" />
-        </div>
-      </section>
-    </div>
   );
 }
 

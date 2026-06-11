@@ -1,9 +1,5 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { useSelector } from "@xstate/store-react";
-import { Suspense, useState } from "react";
+
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -30,7 +26,11 @@ import {
   ItemTitle,
 } from "@feeblo/ui/item";
 import { RadioGroup, RadioGroupItem } from "@feeblo/ui/radio-group";
-import { Skeleton } from "@feeblo/ui/skeleton";
+import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { eq, useLiveQuery } from "@tanstack/react-db";
+import { useSelector } from "@xstate/store-react";
+import { useState } from "react";
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -71,25 +71,22 @@ export function UpgradePlanDialog() {
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={isOpen}>
-      {isOpen ? (
-        <Suspense fallback={<UpgradePlanDialogSkeleton />}>
-          <UpgradePlanDialogContent />
-        </Suspense>
-      ) : null}
+      {isOpen ? <UpgradePlanDialogContent /> : null}
     </Dialog>
   );
 }
 
+// TODO: add loading states for products and plans
 function UpgradePlanDialogContent() {
   const organizationId = useOrganizationId();
   const { workspacePlanCollection, workspaceProductCollection } =
     useDashboardCollections();
 
-  const { data: products } = useLiveSuspenseQuery((q) =>
+  const { data: products } = useLiveQuery((q) =>
     q.from({ product: workspaceProductCollection })
   );
 
-  const { data: workspacePlans } = useLiveSuspenseQuery((q) =>
+  const { data: workspacePlans } = useLiveQuery((q) =>
     q
       .from({ plan: workspacePlanCollection })
       .where(({ plan }) => eq(plan.organizationId, organizationId))
@@ -98,7 +95,7 @@ function UpgradePlanDialogContent() {
   const currentPlanType =
     (workspacePlans[0] as WorkspacePlan | undefined)?.plan ?? "free";
   const { plans: rawPlans } = buildPlanCards(
-    products as WorkspaceProduct[],
+    (products as WorkspaceProduct[]) ?? [],
     currentPlanType
   );
   const plans: PlanView[] = rawPlans.map((plan) => ({
@@ -154,7 +151,7 @@ function UpgradePlanDialogContent() {
                 }
                 value={selectedPlanType}
               >
-                {plans.map((plan) => {
+                {plans?.map((plan) => {
                   const isCurrent = plan.planType === currentPlanType;
                   const selectedProduct =
                     selectedInterval === "year" ? plan.year : plan.month;
@@ -226,41 +223,6 @@ function UpgradePlanDialogContent() {
                 </Item>
               ))}
             </ItemGroup>
-          </aside>
-        </div>
-      </DialogPanel>
-    </DialogContent>
-  );
-}
-
-function UpgradePlanDialogSkeleton() {
-  return (
-    <DialogContent className="max-w-5xl">
-      <DialogPanel scrollFade={false}>
-        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-          <div className="flex flex-col border-border bg-background lg:border-r">
-            <DialogHeader className="gap-4 px-6 pt-6 pb-5">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-9 w-9 rounded-xl" />
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-36" />
-                  <Skeleton className="h-4 w-56" />
-                </div>
-              </div>
-            </DialogHeader>
-            <div className="space-y-4 px-6 pb-6">
-              <Skeleton className="h-10 w-44 rounded-full" />
-              <Skeleton className="h-20 w-full rounded-xl" />
-              <Skeleton className="h-20 w-full rounded-xl" />
-              <Skeleton className="h-20 w-full rounded-xl" />
-              <Skeleton className="h-11 w-full rounded-md" />
-            </div>
-          </div>
-          <aside className="space-y-4 bg-muted/20 px-6 py-6">
-            <Skeleton className="h-8 w-32" />
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-24 w-full rounded-xl" />
-            <Skeleton className="h-24 w-full rounded-xl" />
           </aside>
         </div>
       </DialogPanel>

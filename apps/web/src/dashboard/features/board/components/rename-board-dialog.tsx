@@ -1,9 +1,3 @@
-import { slugify } from "@feeblo/utils/url";
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { useNavigate } from "@tanstack/react-router";
-import { useSelector } from "@xstate/store-react";
-import { Suspense } from "react";
-import { z } from "zod";
 import {
   Sheet,
   SheetContent,
@@ -11,8 +5,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@feeblo/ui/sheet";
-import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
+import { slugify } from "@feeblo/utils/url";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { useNavigate } from "@tanstack/react-router";
+import { useSelector } from "@xstate/store-react";
+import { z } from "zod";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -30,27 +28,9 @@ export function RenameBoardDialog() {
           <SheetTitle>Rename Board</SheetTitle>
           <SheetDescription>Rename the board to a new name.</SheetDescription>
         </SheetHeader>
-        <div className="p-4">
-          {open ? (
-            <Suspense fallback={<RenameBoardFormSkeleton />}>
-              <RenameBoardForm />
-            </Suspense>
-          ) : null}
-        </div>
+        <div className="p-4">{open ? <RenameBoardForm /> : null}</div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function RenameBoardFormSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-12" />
-        <Skeleton className="h-10 w-full rounded-md" />
-      </div>
-      <Skeleton className="h-10 w-full rounded-md" />
-    </div>
   );
 }
 
@@ -61,7 +41,7 @@ function RenameBoardForm() {
   const boardId = useSelector(store, (state) => state.context.data.boardId);
   const navigate = useNavigate();
 
-  const { data } = useLiveSuspenseQuery(
+  const { data } = useLiveQuery(
     (q) =>
       q
         .from({ board: boardCollection })
