@@ -1,0 +1,41 @@
+---
+interface Props {
+  organizationId?: string;
+}
+
+const { organizationId } = Astro.props;
+
+import { getPublicEnvServer } from "../dashboard/lib/server-runtime-public-env";
+
+const publicEnv = getPublicEnvServer();
+---
+
+<script is:inline define:vars={{ publicEnv, organizationId }}>
+  window.global = window.global || {};
+  window.global.__ENV = {
+    ...publicEnv,
+    ...(organizationId ? { organizationId } : {}),
+  };
+</script>
+
+<script is:inline>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme") || "auto";
+      var v = ["light", "dark", "auto"].includes(t) ? t : "auto";
+      if (v === "auto") {
+        var a = matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+        document.documentElement.classList.add(a, "auto");
+      } else {
+        document.documentElement.classList.add(v);
+      }
+    } catch (e) {
+      var a = matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+      document.documentElement.classList.add(a, "auto");
+    }
+  })();
+</script>

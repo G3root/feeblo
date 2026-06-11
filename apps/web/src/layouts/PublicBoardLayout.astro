@@ -1,6 +1,7 @@
 ---
 import "../feature-board/styles/index.css";
 import CommonHead from "./CommonHead.astro";
+import CommonScripts from "./CommonScripts.astro";
 
 interface Props {
   organizationId: string;
@@ -12,7 +13,8 @@ const { title = "feeblo", organizationId } = Astro.props;
 
 <!doctype html>
 <html lang="en">
-  <CommonHead title={title} organizationId={organizationId} />
+  <CommonHead title={title} />
+  <CommonScripts organizationId={organizationId} />
   <body>
     <slot />
   </body>

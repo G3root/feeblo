@@ -1,0 +1,21 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+}
+
+const { title = "feeblo" } = Astro.props;
+
+import CommonHead from "./CommonHead.astro";
+import CommonScripts from "./CommonScripts.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <CommonHead title={title} />
+  <CommonScripts />
+  <body>
+    <slot />
+  </body>
+</html>
