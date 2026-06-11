@@ -1,11 +1,11 @@
+import { Button } from "@feeblo/ui/button";
+import { toastManager } from "@feeblo/ui/toast";
 import { generateId } from "@feeblo/utils/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
-import { Button } from "@feeblo/ui/button";
-import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import {
   getPostReactionCollectionKey,
@@ -36,22 +36,29 @@ export function PostDetailsEngagementBar({
   const { postReactionCollection, upvoteCollection } =
     useDashboardCollections();
   const { data: session } = authClient.useSession();
-  const { data: upvotes } = useLiveSuspenseQuery(
-    (q) =>
-      q
+  const { data: upvotes } = useLiveQuery(
+    (q) => {
+      if (!postId) {
+        return undefined;
+      }
+      return q
         .from({ upvote: upvoteCollection })
         .where(({ upvote }) =>
           and(
             eq(upvote.organizationId, organizationId),
             eq(upvote.postId, postId)
           )
-        ),
+        );
+    },
     [organizationId, postId]
   );
 
-  const { data: postReactions } = useLiveSuspenseQuery(
-    (q) =>
-      q
+  const { data: postReactions } = useLiveQuery(
+    (q) => {
+      if (!postId) {
+        return undefined;
+      }
+      return q
         .from({ postReaction: postReactionCollection })
         .where(({ postReaction }) =>
           and(
@@ -60,17 +67,18 @@ export function PostDetailsEngagementBar({
           )
         )
         .orderBy((postReaction) => postReaction.postReaction.emoji, "asc")
-        .orderBy((postReaction) => postReaction.postReaction.createdAt, "asc"),
+        .orderBy((postReaction) => postReaction.postReaction.createdAt, "asc");
+    },
     [organizationId, postId]
   );
 
   const hasCurrentUserUpvoted =
     session?.user?.id != null
-      ? upvotes.some((upvote) => upvote.userId === session.user.id)
+      ? upvotes?.some((upvote) => upvote.userId === session.user.id)
       : false;
 
   const handleToggleUpvote = async () => {
-    if (disabled) {
+    if (disabled || !upvotes) {
       return;
     }
 
@@ -163,14 +171,14 @@ export function PostDetailsEngagementBar({
       <PostReactionSection
         disabled={disabled}
         handleToggleReaction={handleToggleReaction}
-        postReactions={postReactions}
+        postReactions={postReactions ?? []}
       />
 
       <PostUpvoteButton
         disabled={disabled}
         handleToggleUpvote={handleToggleUpvote}
-        isUpvoted={hasCurrentUserUpvoted}
-        upvoteCount={upvotes.length}
+        isUpvoted={hasCurrentUserUpvoted ?? false}
+        upvoteCount={upvotes?.length ?? 0}
         variant="default"
       />
     </>
