@@ -1,4 +1,5 @@
 import { Button } from "@feeblo/ui/button";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import { generateId } from "@feeblo/utils/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
@@ -36,7 +37,7 @@ export function PostDetailsEngagementBar({
   const { postReactionCollection, upvoteCollection } =
     useDashboardCollections();
   const { data: session } = authClient.useSession();
-  const { data: upvotes } = useLiveQuery(
+  const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
     (q) => {
       if (!postId) {
         return undefined;
@@ -53,24 +54,28 @@ export function PostDetailsEngagementBar({
     [organizationId, postId]
   );
 
-  const { data: postReactions } = useLiveQuery(
-    (q) => {
-      if (!postId) {
-        return undefined;
-      }
-      return q
-        .from({ postReaction: postReactionCollection })
-        .where(({ postReaction }) =>
-          and(
-            eq(postReaction.organizationId, organizationId),
-            eq(postReaction.postId, postId)
+  const { data: postReactions, isLoading: isPostReactionsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!postId) {
+          return undefined;
+        }
+        return q
+          .from({ postReaction: postReactionCollection })
+          .where(({ postReaction }) =>
+            and(
+              eq(postReaction.organizationId, organizationId),
+              eq(postReaction.postId, postId)
+            )
           )
-        )
-        .orderBy((postReaction) => postReaction.postReaction.emoji, "asc")
-        .orderBy((postReaction) => postReaction.postReaction.createdAt, "asc");
-    },
-    [organizationId, postId]
-  );
+          .orderBy((postReaction) => postReaction.postReaction.emoji, "asc")
+          .orderBy(
+            (postReaction) => postReaction.postReaction.createdAt,
+            "asc"
+          );
+      },
+      [organizationId, postId]
+    );
 
   const hasCurrentUserUpvoted =
     session?.user?.id != null
@@ -166,6 +171,12 @@ export function PostDetailsEngagementBar({
     await tx.isPersisted.promise;
   };
 
+  const isLoading = isUpvotesLoading || isPostReactionsLoading;
+
+  if (isLoading) {
+    return <PostDetailsEngagementBarSkeleton />;
+  }
+
   return (
     <>
       <PostReactionSection
@@ -182,6 +193,17 @@ export function PostDetailsEngagementBar({
         variant="default"
       />
     </>
+  );
+}
+
+export function PostDetailsEngagementBarSkeleton() {
+  return (
+    <div className="flex items-center gap-2">
+      <Skeleton className="h-8 w-16 rounded-full" />
+      <Skeleton className="h-8 w-20 rounded-full" />
+      <Skeleton className="h-8 w-24 rounded-full" />
+      <Skeleton className="h-8 w-16 rounded-full" />
+    </div>
   );
 }
 

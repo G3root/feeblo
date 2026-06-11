@@ -1,9 +1,3 @@
-import { generateId } from "@feeblo/utils/id";
-import { CircleLockIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Suspense } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
@@ -15,13 +9,15 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { toastManager } from "@feeblo/ui/toast";
+import { generateId } from "@feeblo/utils/id";
+import { CircleLockIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import { PostBoardSelect } from "~/features/post/components/post-board-select";
-import {
-  PostDetails,
-  PostDetailsFormSkeleton,
-} from "~/features/post/components/post-details-form";
+import { PostDetails } from "~/features/post/components/post-details-form";
 import { StatusSelect } from "~/features/post/components/post-properties";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
@@ -38,6 +34,13 @@ import {
   usePolicy,
 } from "~/hooks/use-policy";
 import { authClient } from "~/lib/auth-client";
+import {
+  boardCollection,
+  postCollection,
+  postStatusCollection,
+  postTagCollection,
+  tagCollection,
+} from "~/lib/collections";
 import { getCommentReactionCollectionKey } from "~/lib/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -46,7 +49,15 @@ export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 )({
   component: RouteComponent,
-  pendingComponent: PostDetailsRoutePending,
+  beforeLoad: async () => {
+    await Promise.all([
+      boardCollection.preload(),
+      postCollection.preload(),
+      postStatusCollection.preload(),
+      postTagCollection.preload(),
+      tagCollection.preload(),
+    ]);
+  },
 });
 
 function RouteComponent() {
@@ -63,7 +74,7 @@ function RouteComponent() {
   const { data: session } = authClient.useSession();
   const navigate = useNavigate();
 
-  const { data: board } = useLiveSuspenseQuery(
+  const { data: board } = useLiveQuery(
     (q) => {
       return q
         .from({ board: boardCollection })
@@ -78,23 +89,30 @@ function RouteComponent() {
     [boardSlug, organizationId]
   );
 
-  const { data: post } = useLiveSuspenseQuery(
+  const boardId = board?.id;
+
+  const { data: post } = useLiveQuery(
     (q) => {
+      if (!boardId) {
+        return undefined;
+      }
       return q
         .from({ post: postCollection })
         .where(({ post }) =>
           and(
             eq(post.slug, postSlug),
             eq(post.organizationId, organizationId),
-            eq(post.boardId, board?.id)
+            eq(post.boardId, boardId)
           )
         )
         .findOne();
     },
-    [postSlug, organizationId, board?.id]
+    [postSlug, organizationId, boardId]
   );
 
-  const { data: allBoards } = useLiveSuspenseQuery(
+  const postId = post?.id;
+
+  const { data: allBoards } = useLiveQuery(
     (q) => {
       return q
         .from({ board: boardCollection })
@@ -102,7 +120,7 @@ function RouteComponent() {
     },
     [organizationId]
   );
-  const { data: postStatuses } = useLiveSuspenseQuery(
+  const { data: postStatuses } = useLiveQuery(
     (q) =>
       q
         .from({ postStatus: postStatusCollection })
@@ -112,7 +130,7 @@ function RouteComponent() {
     [organizationId]
   );
 
-  const { data: tags } = useLiveSuspenseQuery(
+  const { data: tags } = useLiveQuery(
     (q) => {
       return q
         .from({ tags: tagCollection })
@@ -131,15 +149,15 @@ function RouteComponent() {
     [organizationId]
   );
 
-  const { data: postTags } = useLiveSuspenseQuery(
+  const { data: postTags } = useLiveQuery(
     (q) => {
+      if (!postId) {
+        return undefined;
+      }
       return q
         .from({ tags: postTagCollection })
         .where(({ tags }) =>
-          and(
-            eq(tags.postId, post?.id ?? ""),
-            eq(tags.organizationId, organizationId)
-          )
+          and(eq(tags.postId, postId), eq(tags.organizationId, organizationId))
         )
         .select(({ tags }) => ({
           id: tags.id,
@@ -147,31 +165,31 @@ function RouteComponent() {
           typeId: tags.postId,
         }));
     },
-    [organizationId, post?.id]
+    [organizationId, postId]
   );
 
-  const { data: comments } = useLiveSuspenseQuery(
+  const { data: comments } = useLiveQuery(
     (q) =>
       q
         .from({ comment: commentCollection })
         .where(({ comment }) =>
           and(
             eq(comment.organizationId, organizationId),
-            eq(comment.postId, post?.id ?? "")
+            eq(comment.postId, postId)
           )
         )
         .orderBy((comment) => comment.comment.createdAt, "desc"),
-    [organizationId, post?.id]
+    [organizationId, postId]
   );
 
-  const { data: commentReactions } = useLiveSuspenseQuery(
+  const { data: commentReactions } = useLiveQuery(
     (q) =>
       q
         .from({ commentReaction: commentReactionCollection })
         .where(({ commentReaction }) =>
           and(
             eq(commentReaction.organizationId, organizationId),
-            eq(commentReaction.postId, post?.id ?? "")
+            eq(commentReaction.postId, postId)
           )
         )
         .orderBy(
@@ -186,7 +204,7 @@ function RouteComponent() {
           (commentReaction) => commentReaction.commentReaction.createdAt,
           "asc"
         ),
-    [organizationId, post?.id]
+    [organizationId, postId]
   );
 
   const { allowed: canManagePost } = usePolicy(
@@ -231,9 +249,12 @@ function RouteComponent() {
     isSelected: boolean
   ) => {
     try {
+      if (!postTags) {
+        return;
+      }
       const currentTagIds = postTags.map((tag) => tag.tagId);
       const newTagIds = isSelected
-        ? currentTagIds.filter((id) => id !== option.id)
+        ? currentTagIds?.filter((id) => id !== option.id)
         : [...currentTagIds, option.id];
 
       await fetchRpc((rpc) =>
@@ -357,15 +378,13 @@ function RouteComponent() {
             postCreatorId={post.creatorId}
             postId={post.id}
           />
-          <Suspense fallback={<PostDetails.ActionsSkeleton />}>
-            <div className="flex items-center justify-between py-1">
-              <PostDetails.EngagementBar
-                disabled={isLocked}
-                organizationId={organizationId}
-                postId={post.id}
-              />
-            </div>
-          </Suspense>
+          <div className="flex items-center justify-between py-1">
+            <PostDetails.EngagementBar
+              disabled={isLocked}
+              organizationId={organizationId}
+              postId={post.id}
+            />
+          </div>
           <PostDetails.CommentComposer
             defaultVisibility="PUBLIC"
             disabled={isLocked}
@@ -374,36 +393,35 @@ function RouteComponent() {
             isAuthenticated
             showVisibilityPicker
           />
-          <Suspense fallback={<PostDetails.CommentListSkeleton />}>
-            <PostDetails.CommentList.Root
-              commentReactions={commentReactions}
-              comments={comments}
-              handleDeleteComment={handleDeleteComment}
-              handleToggleCommentReaction={handleToggleCommentReaction}
-              isLocked={isLocked}
-              organizationId={organizationId}
-              postId={post.id}
-            >
-              <PostDetails.CommentList.Content>
-                <PostDetails.CommentList.Items>
-                  <PostDetails.CommentList.Item>
-                    <PostDetails.CommentList.Media>
-                      <PostDetails.CommentList.Avatar />
-                    </PostDetails.CommentList.Media>
-                    <PostDetails.CommentList.Main>
-                      <PostDetails.CommentList.Header>
-                        <PostDetails.CommentList.Author />
-                        <PostDetails.CommentList.Timestamp />
-                      </PostDetails.CommentList.Header>
-                      <PostDetails.CommentList.Body />
-                      <PostDetails.CommentList.Reactions />
-                    </PostDetails.CommentList.Main>
-                    <PostDetails.CommentList.Actions />
-                  </PostDetails.CommentList.Item>
-                </PostDetails.CommentList.Items>
-              </PostDetails.CommentList.Content>
-            </PostDetails.CommentList.Root>
-          </Suspense>
+          <PostDetails.CommentList.Root
+            commentReactions={commentReactions}
+            comments={comments}
+            handleDeleteComment={handleDeleteComment}
+            handleToggleCommentReaction={handleToggleCommentReaction}
+            isLoading
+            isLocked={isLocked}
+            organizationId={organizationId}
+            postId={post.id}
+          >
+            <PostDetails.CommentList.Content>
+              <PostDetails.CommentList.Items>
+                <PostDetails.CommentList.Item>
+                  <PostDetails.CommentList.Media>
+                    <PostDetails.CommentList.Avatar />
+                  </PostDetails.CommentList.Media>
+                  <PostDetails.CommentList.Main>
+                    <PostDetails.CommentList.Header>
+                      <PostDetails.CommentList.Author />
+                      <PostDetails.CommentList.Timestamp />
+                    </PostDetails.CommentList.Header>
+                    <PostDetails.CommentList.Body />
+                    <PostDetails.CommentList.Reactions />
+                  </PostDetails.CommentList.Main>
+                  <PostDetails.CommentList.Actions />
+                </PostDetails.CommentList.Item>
+              </PostDetails.CommentList.Items>
+            </PostDetails.CommentList.Content>
+          </PostDetails.CommentList.Root>
         </PostDetails.Layout>
 
         <aside className="hidden px-6 py-6 lg:block">
@@ -501,10 +519,10 @@ function RouteComponent() {
 
             <SidebarCard title="Tags">
               <div className="flex flex-wrap items-center gap-1.5">
-                <TagList selectedTags={postTags} tags={tags} />
+                <TagList selectedTags={postTags ?? []} tags={tags} />
                 <TagSelect
                   onTagSelect={handleTagSelect}
-                  selectedTags={postTags}
+                  selectedTags={postTags ?? []}
                   tags={tags}
                   type="FEEDBACK"
                 />
@@ -526,10 +544,6 @@ function RouteComponent() {
       <TagCreateDialog />
     </TagCreateDialogProvider>
   );
-}
-
-function PostDetailsRoutePending() {
-  return <PostDetailsFormSkeleton />;
 }
 
 function PostStatusAlerts({ lockedAt }: { lockedAt: Date | string | null }) {
