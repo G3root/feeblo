@@ -1,8 +1,3 @@
-import { and, eq, useLiveSuspenseQuery } from "@tanstack/react-db";
-import { slugify } from "@feeblo/utils/url";
-import { useSelector } from "@xstate/store-react";
-import { Suspense } from "react";
-import { z } from "zod";
 import {
   Sheet,
   SheetContent,
@@ -10,8 +5,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@feeblo/ui/sheet";
-import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
+import { slugify } from "@feeblo/utils/url";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { useSelector } from "@xstate/store-react";
+import { z } from "zod";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -28,13 +26,7 @@ export function TagRenameDialog() {
           <SheetTitle>Rename Tag</SheetTitle>
           <SheetDescription>Rename the tag to a new name.</SheetDescription>
         </SheetHeader>
-        <div className="p-4">
-          {open ? (
-            <Suspense fallback={<TagRenameFormSkeleton />}>
-              <TagRenameForm />
-            </Suspense>
-          ) : null}
-        </div>
+        <div className="p-4">{open ? <TagRenameForm /> : null}</div>
       </SheetContent>
     </Sheet>
   );
@@ -42,25 +34,13 @@ export function TagRenameDialog() {
 
 export const TagEditDialog = TagRenameDialog;
 
-function TagRenameFormSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-12" />
-        <Skeleton className="h-10 w-full rounded-md" />
-      </div>
-      <Skeleton className="h-10 w-full rounded-md" />
-    </div>
-  );
-}
-
 function TagRenameForm() {
   const organizationId = useOrganizationId();
   const { tagCollection } = useDashboardCollections();
   const store = useTagEditDialogContext();
   const tagId = useSelector(store, (state) => state.context.data.tagId);
 
-  const { data } = useLiveSuspenseQuery(
+  const { data } = useLiveQuery(
     (q) =>
       q
         .from({ tag: tagCollection })
