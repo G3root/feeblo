@@ -1,7 +1,4 @@
-import type { Comment } from "@feeblo/domain/comments/schema";
-import { Delete02Icon, Ellipsis } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { createContext, type ReactNode, use } from "react";
+import type { TComment } from "@feeblo/domain/comments/schema";
 import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -22,6 +19,9 @@ import {
 } from "@feeblo/ui/item";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
+import { Delete02Icon, Ellipsis } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { createContext, type ReactNode, use } from "react";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import {
@@ -34,7 +34,7 @@ const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 const WHITESPACE_REGEX = /\s+/;
 
 type PostCommentListProps = {
-  comments?: Comment[];
+  comments?: TComment[];
   commentReactions?: CommentReaction[];
   emptyState?: ReactNode;
   errorState?: ReactNode;
@@ -58,7 +58,6 @@ type PostCommentListContentProps = {
   children?: ReactNode;
   emptyState?: ReactNode;
   errorState?: ReactNode;
-  loadingState?: ReactNode;
 };
 
 type PostCommentListItemsProps = {
@@ -67,7 +66,7 @@ type PostCommentListItemsProps = {
 
 type PostCommentListContextValue = {
   commentReactions: CommentReaction[];
-  comments: Comment[];
+  comments: TComment[];
   handleDeleteComment?: (commentId: string) => Promise<void>;
   handleToggleCommentReaction?: (
     value: CommentReactionToggleInput
@@ -75,13 +74,14 @@ type PostCommentListContextValue = {
   isError: boolean;
   isLocked: boolean;
   isLoading: boolean;
+  loadingState?: ReactNode;
   organizationId: string;
   postId: string;
 };
 
 const PostCommentListContext =
   createContext<PostCommentListContextValue | null>(null);
-const PostCommentItemContext = createContext<Comment | null>(null);
+const PostCommentItemContext = createContext<TComment | null>(null);
 
 function usePostCommentList() {
   const value = use(PostCommentListContext);
@@ -114,6 +114,7 @@ function PostCommentListRoot({
   isError = false,
   isLocked = false,
   isLoading = false,
+  loadingState,
   organizationId,
   postId,
 }: PostCommentListRootProps) {
@@ -127,6 +128,7 @@ function PostCommentListRoot({
         isError,
         isLocked,
         isLoading,
+        loadingState,
         organizationId,
         postId,
       }}
@@ -140,9 +142,8 @@ function PostCommentListContent({
   children,
   emptyState = null,
   errorState,
-  loadingState,
 }: PostCommentListContentProps) {
-  const { comments, isError, isLoading } = usePostCommentList();
+  const { comments, isError, isLoading, loadingState } = usePostCommentList();
 
   if (isLoading) {
     return loadingState ?? <PostCommentListSkeleton />;
@@ -401,14 +402,11 @@ function PostCommentListComponent({
       isError={isError}
       isLoading={isLoading}
       isLocked={isLocked}
+      loadingState={loadingState}
       organizationId={organizationId}
       postId={postId}
     >
-      <PostCommentListContent
-        emptyState={emptyState}
-        errorState={errorState}
-        loadingState={loadingState}
-      />
+      <PostCommentListContent emptyState={emptyState} errorState={errorState} />
     </PostCommentListRoot>
   );
 }
@@ -416,8 +414,27 @@ function PostCommentListComponent({
 export function PostCommentListSkeleton() {
   return (
     <div className="space-y-3">
-      <Skeleton className="h-20 w-full rounded-xl" />
-      <Skeleton className="h-20 w-full rounded-xl" />
+      <PostCommentListSkeletonItem />
+      <PostCommentListSkeletonItem />
+    </div>
+  );
+}
+
+function PostCommentListSkeletonItem() {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border p-3">
+      <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+      <div className="flex-1 space-y-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+        <Skeleton className="h-16 w-full" />
+        <div className="flex items-center gap-1">
+          <Skeleton className="h-7 w-14 rounded-full" />
+          <Skeleton className="h-7 w-14 rounded-full" />
+        </div>
+      </div>
     </div>
   );
 }
