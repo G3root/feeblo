@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "dotenvx run -f ../../.env -- astro build",
+    "build:bare": "astro build",
     "preview": "astro preview",
     "astro": "astro",
     "dev": "dotenvx run -f ../../.env -- astro dev --port 3001",
-    "dev:bare": "dotenvx run -f ../../.env -- astro dev",
+    "dev:bare": "astro dev",
     "generate-types": "wrangler types"
   },
   "dependencies": {
