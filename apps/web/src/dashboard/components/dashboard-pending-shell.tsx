@@ -17,7 +17,7 @@ export function DashboardPendingShell() {
       </div>
 
       {/* Main area */}
-      <main className="relative flex w-full flex-1 flex-col overflow-hidden rounded-2xl bg-background shadow-sm">
+      <main className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-background md:m-2 md:ms-0 md:rounded-2xl md:shadow-sm">
         {/* Content area with spinner */}
         <div className="flex flex-1 items-center justify-center overflow-hidden">
           <div className="flex flex-col items-center gap-3">
