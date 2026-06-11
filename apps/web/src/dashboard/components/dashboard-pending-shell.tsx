@@ -1,28 +1,26 @@
-import { Spinner } from "@feeblo/ui/spinner";
+import { Loading03Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 export function DashboardPendingShell() {
   return (
-    <div
-      className="flex h-dvh min-h-svh w-full overflow-hidden bg-sidebar"
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
-      {/* Sidebar placeholder */}
-      <div className="relative hidden h-svh w-(--sidebar-width) flex-col p-2 md:flex">
-        <div className="flex size-full" />
+    <div className="pending-shell">
+      <div className="pending-shell__sidebar">
+        <div className="pending-shell__sidebar-inner" />
       </div>
 
-      {/* Main area */}
-      <main className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-background md:m-2 md:ms-0 md:rounded-2xl md:shadow-sm">
-        {/* Content area with spinner */}
-        <div className="flex flex-1 items-center justify-center overflow-hidden">
-          <div className="flex flex-col items-center gap-3">
-            <Spinner className="size-6" />
-            <span className="text-muted-foreground text-sm">Loading...</span>
+      <main className="pending-shell__main">
+        <div className="pending-shell__content">
+          <div className="pending-shell__loading">
+            <div className="pending-shell__animate-spin">
+              <HugeiconsIcon
+                aria-label="Loading"
+                className={"pending-shell__spinner"}
+                icon={Loading03Icon}
+                role="status"
+                strokeWidth={2}
+              />
+            </div>
+            <span className="pending-shell__text">Loading...</span>
           </div>
         </div>
       </main>

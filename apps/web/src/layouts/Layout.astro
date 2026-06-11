@@ -14,7 +14,99 @@ import CommonScripts from "./CommonScripts.astro";
 <!doctype html>
 <html lang="en">
   <CommonHead title={title} />
+  <style is:global>
+    .pending-shell {
+      --sidebar-width: calc(var(--spacing) * 72);
+      --header-height: calc(var(--spacing) * 12);
+      display: flex;
+      width: 100%;
+      height: 100dvh;
+      min-height: 100svh;
+      overflow: hidden;
+      background-color: var(--sidebar);
+    }
+
+    .pending-shell__sidebar {
+      position: relative;
+      display: none;
+      flex-direction: column;
+      width: var(--sidebar-width);
+      height: 100svh;
+      padding: 0.5rem;
+    }
+
+    .pending-shell__sidebar-inner {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+
+    .pending-shell__main {
+      position: relative;
+      display: flex;
+      flex: 1 1 0%;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      background-color: var(--background);
+    }
+
+    .pending-shell__content {
+      display: flex;
+      flex: 1 1 0%;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .pending-shell__loading {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    @keyframes pending-shell-spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .pending-shell__animate-spin {
+      animation: pending-shell-spin 1s linear infinite;
+    }
+
+    .pending-shell__spinner {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+
+    .pending-shell__text {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+      color: var(--muted-foreground);
+    }
+
+    @media (min-width: 768px) {
+      .pending-shell__sidebar {
+        display: flex;
+      }
+
+      .pending-shell__main {
+        margin: 0.5rem;
+        margin-inline-start: 0;
+        border-radius: 1rem;
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      }
+    }
+  </style>
   <CommonScripts />
+
   <body>
     <slot />
   </body>
