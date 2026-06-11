@@ -65,7 +65,6 @@ function RouteComponent() {
   const {
     boardCollection,
     commentCollection,
-    commentReactionCollection,
     postCollection,
     postStatusCollection,
     postTagCollection,
@@ -165,45 +164,6 @@ function RouteComponent() {
           typeId: tags.postId,
         }));
     },
-    [organizationId, postId]
-  );
-
-  const { data: comments } = useLiveQuery(
-    (q) =>
-      q
-        .from({ comment: commentCollection })
-        .where(({ comment }) =>
-          and(
-            eq(comment.organizationId, organizationId),
-            eq(comment.postId, postId)
-          )
-        )
-        .orderBy((comment) => comment.comment.createdAt, "desc"),
-    [organizationId, postId]
-  );
-
-  const { data: commentReactions } = useLiveQuery(
-    (q) =>
-      q
-        .from({ commentReaction: commentReactionCollection })
-        .where(({ commentReaction }) =>
-          and(
-            eq(commentReaction.organizationId, organizationId),
-            eq(commentReaction.postId, postId)
-          )
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.commentId,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.emoji,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.createdAt,
-          "asc"
-        ),
     [organizationId, postId]
   );
 
@@ -315,50 +275,6 @@ function RouteComponent() {
     await tx.isPersisted.promise;
   };
 
-  const handleToggleCommentReaction = async ({
-    commentId,
-    emoji,
-    existingReaction,
-    organizationId,
-    postId,
-    userId,
-  }: CommentReactionToggleInput) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    if (existingReaction) {
-      const tx = commentReactionCollection.delete(
-        getCommentReactionCollectionKey(existingReaction)
-      );
-      await tx.isPersisted.promise;
-      return;
-    }
-
-    const tx = commentReactionCollection.insert({
-      id: generateId("commentReaction"),
-      commentId,
-      createdAt: new Date(),
-      emoji,
-      //todo fix
-      memberId: null,
-      organizationId,
-      postId,
-      updatedAt: new Date(),
-      userId,
-    });
-    await tx.isPersisted.promise;
-  };
-
-  const handleDeleteComment = async (commentId: string) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    const tx = commentCollection.delete(commentId);
-    await tx.isPersisted.promise;
-  };
-
   return (
     <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
       <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -393,35 +309,11 @@ function RouteComponent() {
             isAuthenticated
             showVisibilityPicker
           />
-          <PostDetails.CommentList.Root
-            commentReactions={commentReactions}
-            comments={comments}
-            handleDeleteComment={handleDeleteComment}
-            handleToggleCommentReaction={handleToggleCommentReaction}
-            isLoading
+          <PostCommentListSection
             isLocked={isLocked}
             organizationId={organizationId}
             postId={post.id}
-          >
-            <PostDetails.CommentList.Content>
-              <PostDetails.CommentList.Items>
-                <PostDetails.CommentList.Item>
-                  <PostDetails.CommentList.Media>
-                    <PostDetails.CommentList.Avatar />
-                  </PostDetails.CommentList.Media>
-                  <PostDetails.CommentList.Main>
-                    <PostDetails.CommentList.Header>
-                      <PostDetails.CommentList.Author />
-                      <PostDetails.CommentList.Timestamp />
-                    </PostDetails.CommentList.Header>
-                    <PostDetails.CommentList.Body />
-                    <PostDetails.CommentList.Reactions />
-                  </PostDetails.CommentList.Main>
-                  <PostDetails.CommentList.Actions />
-                </PostDetails.CommentList.Item>
-              </PostDetails.CommentList.Items>
-            </PostDetails.CommentList.Content>
-          </PostDetails.CommentList.Root>
+          />
         </PostDetails.Layout>
 
         <aside className="hidden px-6 py-6 lg:block">
@@ -543,6 +435,137 @@ function RouteComponent() {
       </div>
       <TagCreateDialog />
     </TagCreateDialogProvider>
+  );
+}
+
+function PostCommentListSection({
+  isLocked,
+  organizationId,
+  postId,
+}: {
+  isLocked: boolean;
+  organizationId: string;
+  postId: string;
+}) {
+  const { commentCollection, commentReactionCollection } =
+    useDashboardCollections();
+
+  const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
+    (q) =>
+      q
+        .from({ comment: commentCollection })
+        .where(({ comment }) =>
+          and(
+            eq(comment.organizationId, organizationId),
+            eq(comment.postId, postId)
+          )
+        )
+        .orderBy((comment) => comment.comment.createdAt, "desc"),
+    [organizationId, postId]
+  );
+
+  const { data: commentReactions, isLoading: isCommentReactionsLoading } =
+    useLiveQuery(
+      (q) =>
+        q
+          .from({ commentReaction: commentReactionCollection })
+          .where(({ commentReaction }) =>
+            and(
+              eq(commentReaction.organizationId, organizationId),
+              eq(commentReaction.postId, postId)
+            )
+          )
+          .orderBy(
+            (commentReaction) => commentReaction.commentReaction.commentId,
+            "asc"
+          )
+          .orderBy(
+            (commentReaction) => commentReaction.commentReaction.emoji,
+            "asc"
+          )
+          .orderBy(
+            (commentReaction) => commentReaction.commentReaction.createdAt,
+            "asc"
+          ),
+      [organizationId, postId]
+    );
+
+  const isLoading = isCommentsLoading || isCommentReactionsLoading;
+
+  const handleToggleCommentReaction = async ({
+    commentId,
+    emoji,
+    existingReaction,
+    organizationId,
+    postId,
+    userId,
+  }: CommentReactionToggleInput) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
+    if (existingReaction) {
+      const tx = commentReactionCollection.delete(
+        getCommentReactionCollectionKey(existingReaction)
+      );
+      await tx.isPersisted.promise;
+      return;
+    }
+
+    const tx = commentReactionCollection.insert({
+      id: generateId("commentReaction"),
+      commentId,
+      createdAt: new Date(),
+      emoji,
+      //todo fix
+      memberId: null,
+      organizationId,
+      postId,
+      updatedAt: new Date(),
+      userId,
+    });
+    await tx.isPersisted.promise;
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (isLocked) {
+      throw new Error("Post is locked");
+    }
+
+    const tx = commentCollection.delete(commentId);
+    await tx.isPersisted.promise;
+  };
+
+  return (
+    <PostDetails.CommentList.Root
+      commentReactions={commentReactions}
+      comments={comments}
+      handleDeleteComment={handleDeleteComment}
+      handleToggleCommentReaction={handleToggleCommentReaction}
+      isLoading={isLoading}
+      isLocked={isLocked}
+      organizationId={organizationId}
+      postId={postId}
+    >
+      <PostDetails.CommentList.Content>
+        <PostDetails.CommentList.Items>
+          <PostDetails.CommentList.Item>
+            <PostDetails.CommentList.Media>
+              <PostDetails.CommentList.Avatar />
+            </PostDetails.CommentList.Media>
+            <PostDetails.CommentList.Main>
+              <PostDetails.CommentList.Header>
+                <PostDetails.CommentList.Author />
+                <PostDetails.CommentList.Timestamp />
+              </PostDetails.CommentList.Header>
+              <PostDetails.CommentList.Body />
+              <PostDetails.CommentList.Reactions />
+            </PostDetails.CommentList.Main>
+            <PostDetails.CommentList.Actions />
+          </PostDetails.CommentList.Item>
+        </PostDetails.CommentList.Items>
+      </PostDetails.CommentList.Content>
+    </PostDetails.CommentList.Root>
   );
 }
 
