@@ -5,6 +5,7 @@ import { AnchoredToastProvider, ToastProvider } from "@feeblo/ui/toast";
 import { TooltipProvider } from "@feeblo/ui/tooltip";
 import { getContext } from "./integrations/tanstack-query/root-provider";
 import { RuntimeProvider } from "./lib/runtime/runtime-provider";
+import { DashboardPendingShell } from "./components/dashboard-pending-shell";
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
 
@@ -17,11 +18,7 @@ export function createRouter() {
     context: {
       queryClient,
     },
-    defaultPendingComponent: () => (
-      <div className="flex h-full min-h-screen w-full items-center justify-center">
-        <div>Loading...</div>
-      </div>
-    ),
+    defaultPendingComponent: DashboardPendingShell,
     defaultErrorComponent: () => (
       <div className="flex h-full min-h-screen w-full items-center justify-center">
         <div>Error</div>
