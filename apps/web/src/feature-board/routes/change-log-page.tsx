@@ -1,5 +1,3 @@
-import { eq, useLiveQuery } from "@tanstack/react-db";
-import { createLazyRoute, Link } from "@tanstack/react-router";
 import {
   Empty,
   EmptyDescription,
@@ -7,6 +5,8 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Separator } from "@feeblo/ui/separator";
+import { eq, useLiveQuery } from "@tanstack/react-db";
+import { createLazyRoute, Link } from "@tanstack/react-router";
 import {
   ChangelogPageLayout,
   ChangelogTimeline,
@@ -85,9 +85,9 @@ export function ChangelogPage() {
             {changelogs.map((item) => (
               <ChangelogTimelineItem className="pb-14 md:pb-16" key={item.id}>
                 <ChangelogTimelineDate>
-                    <time className="font-medium text-muted-foreground text-sm tracking-tight">
-                      {formatChangelogDate(item.publishedAt ?? item.createdAt)}
-                    </time>
+                  <time className="font-medium text-muted-foreground text-sm tracking-tight">
+                    {formatChangelogDate(item.publishedAt ?? item.createdAt)}
+                  </time>
                 </ChangelogTimelineDate>
 
                 <ChangelogTimelineBody className="space-y-6 p-0 sm:p-0">
@@ -104,6 +104,7 @@ export function ChangelogPage() {
 
                   <div
                     className="typography"
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
                     dangerouslySetInnerHTML={{ __html: item.content }}
                   />
                 </ChangelogTimelineBody>

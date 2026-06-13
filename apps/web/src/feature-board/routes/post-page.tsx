@@ -1,19 +1,3 @@
-import { htmlToExcerpt } from "@feeblo/utils/html";
-import { generateId } from "@feeblo/utils/id";
-import type { ReactionEmoji } from "@feeblo/utils/reaction";
-import { Comment01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  and,
-  debounceStrategy,
-  eq,
-  useLiveQuery,
-  useLiveSuspenseQuery,
-  usePacedMutations,
-} from "@tanstack/react-db";
-import { type ReactNode, Suspense } from "react";
-import { createLazyRoute, useNavigate, useParams } from "@tanstack/react-router";
-import { z } from "zod";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -24,8 +8,26 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
+import { htmlToExcerpt } from "@feeblo/utils/html";
+import { generateId } from "@feeblo/utils/id";
+import type { ReactionEmoji } from "@feeblo/utils/reaction";
+import { Comment01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  and,
+  debounceStrategy,
+  eq,
+  useLiveQuery,
+  usePacedMutations,
+} from "@tanstack/react-db";
+import {
+  createLazyRoute,
+  useNavigate,
+  useParams,
+} from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import { z } from "zod";
 import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
 import {
   PostCommentComposer,
@@ -457,13 +459,11 @@ export function PostPage() {
                 value={post.content}
               />
 
-              <Suspense fallback={<PostReactionBarSkeleton />}>
-                <PostReactionBar
-                  disabled={isLocked}
-                  organizationId={site.organizationId}
-                  postId={post.id}
-                />
-              </Suspense>
+              <PostReactionBar
+                disabled={isLocked}
+                organizationId={site.organizationId}
+                postId={post.id}
+              />
 
               <div className="space-y-4">
                 <PostCommentComposer
@@ -747,7 +747,7 @@ function PostReactionBar({
 }) {
   const { data: session } = authClient.useSession();
   const { publicPostReactionCollection } = usePublicCollections();
-  const { data: postReactions } = useLiveSuspenseQuery(
+  const { data: postReactions } = useLiveQuery(
     (q) =>
       q
         .from({ postReaction: publicPostReactionCollection })
@@ -808,15 +808,5 @@ function PostReactionBar({
       handleToggleReaction={handleToggleReaction}
       postReactions={postReactions}
     />
-  );
-}
-
-function PostReactionBarSkeleton() {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Skeleton className="h-8 w-16 rounded-full" />
-      <Skeleton className="h-8 w-20 rounded-full" />
-      <Skeleton className="h-8 w-24 rounded-full" />
-    </div>
   );
 }
