@@ -1,0 +1,53 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
+import { TagDeleteDialog } from "~/features/tag/components/tag-delete-dialog";
+import { TagRenameDialog } from "~/features/tag/components/tag-rename-dialog";
+import { TagSettingsTable } from "~/features/tag/components/tag-settings-table";
+import {
+  TagCreateDialogProvider,
+  TagDeleteDialogProvider,
+  TagEditDialogProvider,
+} from "~/features/tag/dialog-stores";
+import { tagCollection } from "~/lib/collections";
+
+export const Route = createFileRoute("/$organizationId/settings/feedback-tags")(
+  {
+    component: RouteComponent,
+    beforeLoad: async () => {
+      await tagCollection.preload();
+      return null;
+    },
+  }
+);
+
+function RouteComponent() {
+  return (
+    <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
+      <TagEditDialogProvider>
+        <TagDeleteDialogProvider>
+          <SettingsLayout.Root>
+            <SettingsLayout.Header>
+              <SettingsLayout.HeaderTitle>
+                Feedback Tags
+              </SettingsLayout.HeaderTitle>
+              <SettingsLayout.HeaderDescription>
+                Maintain the tags your team uses to categorize feedback.
+              </SettingsLayout.HeaderDescription>
+            </SettingsLayout.Header>
+            <SettingsLayout.Content>
+              <TagSettingsTable
+                emptyDescription="Create your first feedback tag to start sorting requests and reports."
+                emptyTitle="No feedback tags yet"
+                type="FEEDBACK"
+              />
+            </SettingsLayout.Content>
+          </SettingsLayout.Root>
+          <TagCreateDialog />
+          <TagRenameDialog />
+          <TagDeleteDialog />
+        </TagDeleteDialogProvider>
+      </TagEditDialogProvider>
+    </TagCreateDialogProvider>
+  );
+}

@@ -1,21 +1,24 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useTransition } from "react";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
+import { createFileRoute } from "@tanstack/react-router";
+import { useTransition } from "react";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useSite } from "~/hooks/use-site";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { siteCollection } from "~/lib/collections";
 
 export const Route = createFileRoute(
   "/$organizationId/settings/changelog-privacy"
 )({
   component: ChangelogPrivacySettingsPage,
+  beforeLoad: async () => {
+    await siteCollection.preload();
+    return null;
+  },
 });
 
 function ChangelogPrivacySettingsPage() {
   const site = useSite();
-  const { siteCollection } = useDashboardCollections();
   const [isPending, startTransition] = useTransition();
 
   const handleCheckedChange = (checked: boolean) => {

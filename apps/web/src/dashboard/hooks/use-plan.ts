@@ -1,10 +1,9 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import { workspacePlanCollection } from "~/lib/collections";
 import { useOrganizationId } from "./use-organization-id";
 
 export const usePlan = () => {
   const organizationId = useOrganizationId();
-  const { workspacePlanCollection } = useDashboardCollections();
 
   const query = useLiveQuery(
     (q) =>

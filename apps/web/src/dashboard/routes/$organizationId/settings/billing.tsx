@@ -1,7 +1,5 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { useLiveQuery } from "@tanstack/react-db";
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -14,6 +12,9 @@ import {
 } from "@feeblo/ui/card";
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
+import { useLiveQuery } from "@tanstack/react-db";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import {
   startBillingCheckout,
@@ -31,15 +32,24 @@ import {
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import {
+  workspacePlanCollection,
+  workspaceProductCollection,
+} from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
   component: BillingSettingsPage,
+  beforeLoad: async () => {
+    await Promise.all([
+      workspaceProductCollection.preload(),
+      workspacePlanCollection.preload(),
+    ]);
+    return null;
+  },
 });
 
 function BillingSettingsPage() {
   const organizationId = useOrganizationId();
-  const { workspaceProductCollection } = useDashboardCollections();
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
   const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);

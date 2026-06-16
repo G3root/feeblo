@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useId, useRef } from "react";
 import { Input } from "@feeblo/ui/input";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
+import { createFileRoute } from "@tanstack/react-router";
+import { useId, useRef } from "react";
 import { isPaidPlan } from "~/features/billing/lib/plans";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
@@ -10,11 +10,18 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
 import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { useSite } from "~/hooks/use-site";
+import { siteCollection, workspacePlanCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId/settings/customize")({
   component: RouteComponent,
+  beforeLoad: async () => {
+    await Promise.all([
+      siteCollection.preload(),
+      workspacePlanCollection.preload(),
+    ]);
+    return null;
+  },
 });
 
 function RouteComponent() {
@@ -55,7 +62,6 @@ function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const site = useSite();
-  const { siteCollection } = useDashboardCollections();
 
   const initialName = site?.name;
 
@@ -121,7 +127,6 @@ function HidePoweredByBranding({
 }) {
   const id = useId();
   const site = useSite();
-  const { siteCollection } = useDashboardCollections();
 
   async function handleChange(value: boolean) {
     if (!(canEdit && site)) {

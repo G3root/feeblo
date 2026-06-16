@@ -1,18 +1,28 @@
+import { Input } from "@feeblo/ui/input";
+import { toastManager } from "@feeblo/ui/toast";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
-import { Input } from "@feeblo/ui/input";
-import { toastManager } from "@feeblo/ui/toast";
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { organizationLogoUploadEndpoint } from "~/lib/auth-client";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+import {
+  membershipCollection,
+  organizationCollection,
+} from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/workspace")({
   component: WorkspaceSettingsPage,
+  beforeLoad: async () => {
+    await Promise.all([
+      membershipCollection.preload(),
+      organizationCollection.preload(),
+    ]);
+    return null;
+  },
 });
 
 function WorkspaceSettingsPage() {
@@ -33,8 +43,6 @@ function WorkspaceSettingsPage() {
 
 function WorkspaceDetailsSection() {
   const organizationId = useOrganizationId();
-  const { membershipCollection, organizationCollection } =
-    useDashboardCollections();
   const { allowed: canManageOrganization, isPending: isPolicyPending } =
     usePolicy(hasOwnerOrAdminRole(organizationId));
   const organizationQuery = useLiveQuery(
@@ -105,7 +113,6 @@ function WorkspaceNameField({
   initialName: string;
   organizationId: string;
 }) {
-  const { organizationCollection } = useDashboardCollections();
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -175,7 +182,6 @@ function WorkspaceLogoButton({
   name: string;
   organizationId: string;
 }) {
-  const { organizationCollection } = useDashboardCollections();
   async function uploadWorkspaceLogo(file: File) {
     if (!canEdit) {
       return;
