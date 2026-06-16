@@ -7,6 +7,7 @@
     "build": "dotenvx run -f ../../.env -- astro build",
     "build:bare": "astro build",
     "preview": "astro preview",
+
     "astro": "astro",
     "dev": "dotenvx run -f ../../.env -- astro dev --port 3001",
     "dev:bare": "astro dev",
@@ -16,8 +17,8 @@
     "@astrojs/node": "10.1.4",
     "@astrojs/react": "5.0.7",
     "@base-ui/react": "catalog:",
-    "@dnd-kit/abstract": "^0.4.0",
-    "@dnd-kit/dom": "^0.4.0",
+    "@dnd-kit/abstract": "^0.3.2",
+    "@dnd-kit/dom": "^0.3.2",
     "@dnd-kit/react": "^0.3.2",
     "@feeblo/auth": "workspace:*",
     "@feeblo/domain": "workspace:*",

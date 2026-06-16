@@ -67,13 +67,56 @@ export default defineConfig({
         output: {
           manualChunks(id) {
             if (id.includes("node_modules")) {
-              // if (id.includes("/@hugeicons")) {
-              //   return "hugeicons-vendor";
-              // }
+              if (
+                id.includes("/node_modules/react/") ||
+                id.includes("/node_modules/react-dom/") ||
+                id.includes("/node_modules/scheduler/")
+              ) {
+                return "vendor-react";
+              }
+              if (id.includes("/@hugeicons")) {
+                return "hugeicons-vendor";
+              }
 
-              // biome-ignore lint/style/useCollapsedIf: <explanation>
-              if (id.includes("/effect/")) {
+              if (id.includes("/node_modules/effect/dist/")) {
                 return "effect-runtime-vendor";
+              }
+
+              if (id.includes("/@tanstack/")) {
+                const match = /\/@tanstack\/([^/]+)/.exec(id);
+                if (match) {
+                  const name = match[1];
+                  // react-store and react-router have a circular dependency,
+                  // so keep them in the same chunk to avoid circular chunk warnings.
+                  if (name === "react-store") {
+                    return "tanstack-react-router-vendor";
+                  }
+                  return `tanstack-${name}-vendor`;
+                }
+              }
+
+              if (id.includes("/@base-ui/")) {
+                return "base-ui-vendor";
+              }
+
+              if (id.includes("/zod/")) {
+                return "zod-vendor";
+              }
+
+              if (id.includes("/@dnd-kit/")) {
+                return "dnd-kit-vendor";
+              }
+
+              if (id.includes("/@xstate/store")) {
+                return "xstate-store-vendor";
+              }
+
+              if (id.includes("/lucide-react/")) {
+                return "lucide-vendor";
+              }
+
+              if (id.includes("/@floating-ui/")) {
+                return "floating-ui-vendor";
               }
             }
           },
