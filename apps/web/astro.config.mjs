@@ -118,6 +118,13 @@ export default defineConfig({
               if (id.includes("/@floating-ui/")) {
                 return "floating-ui-vendor";
               }
+
+              if (
+                id.includes("/@tiptap/") ||
+                id.includes("/prosemirror-")
+              ) {
+                return "editor-vendor";
+              }
             }
           },
         },
