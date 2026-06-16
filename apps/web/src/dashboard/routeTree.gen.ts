@@ -229,7 +229,7 @@ const OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  "/$organizationId": typeof OrganizationIdDashboardLayoutRouteWithChildren
+  "/$organizationId": typeof OrganizationIdRouteWithChildren
   "/email-verify": typeof EmailVerifyRoute
   "/register": typeof RegisterRoute
   "/sign-in": typeof SignInRoute

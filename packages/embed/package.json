@@ -1,0 +1,26 @@
+{
+  "name": "@feeblo/embed",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist/**"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "^7"
+  }
+}

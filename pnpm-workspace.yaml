@@ -17,8 +17,8 @@ catalog:
   "@effect/platform-node": ^4.0.0-beta.66
   "@effect/sql-pg": ^4.0.0-beta.66
   "@tailwindcss/cli": ^4.1.18
-  "@tanstack/query-db-collection": ^1.0.32
-  "@tanstack/react-db": ^0.1.79
+  "@tanstack/query-db-collection": ^1.0.40
+  "@tanstack/react-db": ^0.1.86
   "@types/node": ^24.10.1
   "@types/react": ^19.2.14
   "@types/react-dom": ^19.2.3
@@ -46,4 +46,4 @@ catalog:
   "@polar-sh/better-auth":  ^1.8.3
   "@polar-sh/sdk": ^0.47.1
   "@base-ui/react": ^1.3.0
-  "@tanstack/react-router": ^1.168.10
+  "@tanstack/react-router": ^1.170.15

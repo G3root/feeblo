@@ -1,3 +1,72 @@
 ---
+export const prerender = false;
 
+const segments = Astro.params.embed;
+const organizationId = segments;
+
+if (!organizationId) {
+  return new Response("Not found", { status: 404 });
+}
+
+const theme = Astro.url.searchParams.get("theme") ?? "light";
 ---
+
+<!doctype html>
+<html lang="en" data-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feeblo Embed</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      html,
+      body {
+        padding: 0;
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        color: canvastext;
+        background: canvas;
+      }
+      .embed-root {
+        padding: 1.5rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.25rem;
+      }
+      p {
+        margin: 0 0 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="feeblo-embed-content" class="embed-root">
+      <h1>Feeblo Embed</h1>
+      <p>Organization: {organizationId}</p>
+      <p>Theme: {theme}</p>
+    </div>
+
+    <script is:inline>
+      function notifyHeight() {
+        const height = document.documentElement.scrollHeight;
+        if (window.parent !== window) {
+          window.parent.postMessage(
+            { event: "PAGE_HEIGHT", data: { height } },
+            "*",
+          );
+        }
+      }
+
+      window.addEventListener("load", notifyHeight);
+      window.addEventListener("resize", notifyHeight);
+    </script>
+  </body>
+</html>

@@ -29,6 +29,10 @@ function normalizePathname(pathname: string) {
   return pathname;
 }
 
+function isEmbedPath(pathname: string) {
+  return pathname === EMBED_PATH || pathname.startsWith(`${EMBED_PATH}/`);
+}
+
 function resolveSubdomain(context: APIContext) {
   return extractSubdomain({
     url: context.request.url,
@@ -64,6 +68,10 @@ function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   const targetPathPrefix = getTargetPathPrefix(subdomain);
   const pathname = normalizePathname(context.url.pathname);
 
+  if (isEmbedPath(pathname)) {
+    return next();
+  }
+
   if (!hasPathPrefix(pathname, targetPathPrefix)) {
     const suffix = pathname === "/" ? "" : pathname;
     return context.rewrite(`${targetPathPrefix}${suffix}${context.url.search}`);
@@ -73,6 +81,10 @@ function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
 }
 
 async function authMiddleware(context: APIContext, next: MiddlewareNext) {
+  if (isEmbedPath(normalizePathname(context.url.pathname))) {
+    return next();
+  }
+
   const { data } = await authClient.getSession({
     fetchOptions: { headers: context.request.headers },
   });
@@ -107,6 +119,11 @@ function dashboardAuthRedirectMiddleware(
 ) {
   const { url } = context;
   const pathname = normalizePathname(url.pathname);
+
+  if (isEmbedPath(pathname)) {
+    return next();
+  }
+
   const targetPathPrefix = getTargetPathPrefix(context.locals.subdomain);
   const isAppSubdomain = targetPathPrefix === DASHBOARD_PATH;
   if (!isAppSubdomain) {
@@ -147,6 +164,11 @@ function dashboardAuthRedirectMiddleware(
 function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
   const { url } = context;
   const pathname = normalizePathname(url.pathname);
+
+  if (isEmbedPath(pathname)) {
+    return next();
+  }
+
   const targetPathPrefix = getTargetPathPrefix(context.locals.subdomain);
   const organizationIds = getMemberOrganizationIds(context);
   const defaultOrganizationId = getDefaultOrganizationId(context);
