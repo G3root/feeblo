@@ -22,6 +22,7 @@
     "@dnd-kit/react": "^0.3.2",
     "@feeblo/auth": "workspace:*",
     "@feeblo/domain": "workspace:*",
+    "@feeblo/embed-widget": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@feeblo/ui": "workspace:*",

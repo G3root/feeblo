@@ -1,6 +1,9 @@
 ---
 export const prerender = false;
 
+import { WidgetApp } from "@feeblo/embed-widget";
+import "@feeblo/embed-widget/styles";
+
 const segments = Astro.params.embed;
 const organizationId = segments;
 
@@ -12,7 +15,7 @@ const theme = Astro.url.searchParams.get("theme") ?? "light";
 ---
 
 <!doctype html>
-<html lang="en" data-theme={theme}>
+<html lang="en" data-theme={theme} class={theme === "dark" ? "dark" : ""}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -35,24 +38,10 @@ const theme = Astro.url.searchParams.get("theme") ?? "light";
         color: canvastext;
         background: canvas;
       }
-      .embed-root {
-        padding: 1.5rem;
-      }
-      h1 {
-        margin: 0 0 0.5rem;
-        font-size: 1.25rem;
-      }
-      p {
-        margin: 0 0 0.5rem;
-      }
     </style>
   </head>
   <body>
-    <div id="feeblo-embed-content" class="embed-root">
-      <h1>Feeblo Embed</h1>
-      <p>Organization: {organizationId}</p>
-      <p>Theme: {theme}</p>
-    </div>
+    <WidgetApp client:only="react" />
 
     <script is:inline>
       function notifyHeight() {

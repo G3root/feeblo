@@ -164,7 +164,11 @@ export default defineConfig({
 
   integrations: [
     react({
-      include: ["**/dashboard/**", "**/feature-board/**"],
+      include: [
+        "**/dashboard/**",
+        "**/feature-board/**",
+        "**/@feeblo/embed-widget/**",
+      ],
     }),
   ],
 });
