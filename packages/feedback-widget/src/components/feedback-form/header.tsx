@@ -1,18 +1,15 @@
-import { HugeiconsIcon } from "@hugeicons/react";
-
+import { IconPlaceholder } from "../ui/icon-placeholder";
 import { useFeedbackForm } from "./context";
 
 export function FeedbackFormHeader() {
-  const {
-    meta: { board },
-  } = useFeedbackForm();
+  const form = useFeedbackForm();
   return (
-    <div className="mb-5 flex gap-2.5">
-      <span className="text-muted-foreground/60 dark:text-muted-foreground/50">
-        <HugeiconsIcon className="size-4" icon={board.icon} />
+    <div class="mb-5 flex gap-2.5">
+      <span class="text-muted-foreground/60 dark:text-muted-foreground/50">
+        <IconPlaceholder class="size-4" />
       </span>
-      <p className="font-medium text-foreground text-lg first-letter:uppercase">
-        {board.name}
+      <p class="font-medium text-foreground text-lg first-letter:uppercase">
+        {form.meta.board.name}
       </p>
     </div>
   );

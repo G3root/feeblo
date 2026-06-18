@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import solid from "vite-plugin-solid";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [solid(), tailwindcss()],
   build: {
     lib: {
       entry: resolve(import.meta.dirname, "src/main.tsx"),
@@ -13,7 +13,12 @@ export default defineConfig({
       formats: ["es"],
     },
     rollupOptions: {
-      external: ["react", "react-dom", "@tanstack/react-router"],
+      external: [
+        "solid-js",
+        "solid-js/web",
+        "solid-js/store",
+        "@solidjs/router",
+      ],
       output: {
         assetFileNames: "feeblo-feedback-widget[extname]",
       },

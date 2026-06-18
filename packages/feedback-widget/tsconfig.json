@@ -4,6 +4,8 @@
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
     "types": [],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

@@ -1,55 +1,46 @@
-import { createRoute, useParams } from "@tanstack/react-router";
+import { useParams } from "@solidjs/router";
+import { createMemo, Show } from "solid-js";
 import { FeedbackForm, useFeedbackForm } from "../components/feedback-form";
 import { getBoard } from "../lib/boards";
-import { rootRoute } from "./__root";
 
-export const boardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/board/$boardId",
-  component: BoardDetailComponent,
-});
-
-function BoardDetailComponent() {
-  const { boardId } = useParams({ from: "/board/$boardId" });
-  const board = getBoard(boardId);
-
-  if (!board) {
-    return <FeedbackForm.NotFound />;
-  }
+export function BoardDetailComponent() {
+  const params = useParams();
+  const board = createMemo(() => getBoard(params.boardId ?? ""));
 
   return (
-    <FeedbackForm.Provider board={board}>
-      <FeedbackFormView />
-    </FeedbackForm.Provider>
+    <Show when={board()} fallback={<FeedbackForm.NotFound />} keyed>
+      {(board) => (
+        <FeedbackForm.Provider board={board}>
+          <FeedbackFormView />
+        </FeedbackForm.Provider>
+      )}
+    </Show>
   );
 }
 
 function FeedbackFormView() {
-  const {
-    state: { submitted },
-  } = useFeedbackForm();
-
-  if (submitted) {
-    return <FeedbackForm.Success />;
-  }
+  const form = useFeedbackForm();
 
   return (
-    <FeedbackForm.Frame>
-      <FeedbackForm.Header />
-      <FeedbackForm.Fields>
-        <FeedbackForm.TitleField />
-        <FeedbackForm.DetailsField />
-      </FeedbackForm.Fields>
-      <FeedbackForm.Actions>
-        <FeedbackForm.BackButton />
-        <FeedbackForm.ActionsSecondary>
-          {/* <Button variant="outline">
-            <HugeiconsIcon className="size-4" icon={Camera01Icon} />
-            Take a screenshot
-          </Button> */}
-          <FeedbackForm.SubmitButton />
-        </FeedbackForm.ActionsSecondary>
-      </FeedbackForm.Actions>
-    </FeedbackForm.Frame>
+    <Show
+      when={form.state.submitted}
+      fallback={
+        <FeedbackForm.Frame>
+          <FeedbackForm.Header />
+          <FeedbackForm.Fields>
+            <FeedbackForm.TitleField />
+            <FeedbackForm.DetailsField />
+          </FeedbackForm.Fields>
+          <FeedbackForm.Actions>
+            <FeedbackForm.BackButton />
+            <FeedbackForm.ActionsSecondary>
+              <FeedbackForm.SubmitButton />
+            </FeedbackForm.ActionsSecondary>
+          </FeedbackForm.Actions>
+        </FeedbackForm.Frame>
+      }
+    >
+      <FeedbackForm.Success />
+    </Show>
   );
 }

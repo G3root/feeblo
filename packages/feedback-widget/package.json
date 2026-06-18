@@ -16,25 +16,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hugeicons/core-free-icons": "^4.1.1",
-    "@hugeicons/react": "^1.1.6",
-    "@tanstack/react-router": "catalog:",
+    "@solidjs/router": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
-    "react": "catalog:",
-    "react-dom": "catalog:",
+    "solid-js": "catalog:",
     "tailwind-merge": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "@vitejs/plugin-react": "^4.4.1",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",
     "tw-animate-css": "catalog:",
     "typescript": "catalog:",
-    "vite": "^7"
+    "vite": "^7",
+    "vite-plugin-solid": "catalog:"
   }
 }

@@ -1,19 +1,17 @@
-import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useNavigate } from "@tanstack/react-router";
-
-import { Button } from "../ui/button";
+import { useNavigate } from "@solidjs/router";
+import { IconPlaceholder } from "../ui/icon-placeholder";
+import { buttonVariants } from "../ui/button";
 
 export function FeedbackFormBackButton() {
   const navigate = useNavigate();
   return (
-    <Button
+    <button
       aria-label="Back"
-      onClick={() => navigate({ to: "/" })}
-      size="icon-sm"
-      variant="ghost"
+      class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+      onClick={() => navigate("/")}
+      type="button"
     >
-      <HugeiconsIcon className="size-5" icon={ArrowLeft01Icon} />
-    </Button>
+      <IconPlaceholder class="size-5" />
+    </button>
   );
 }

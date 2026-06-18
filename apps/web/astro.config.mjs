@@ -3,12 +3,20 @@
 import cloudflare from "@astrojs/cloudflare";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
+import solidJs from "@astrojs/solid-js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 // import alchemy from "alchemy/cloudflare/astro";
 import { defineConfig, envField, fontProviders } from "astro/config";
 
 const isCloudflareAdapter = process.env.CLOUDFLARE_ADAPTER === "true";
+
+const reactRoutes = ["**/dashboard/**", "**/feature-board/**"];
+const solidRoutes = [
+  "**/packages/feedback-widget/**",
+  "**/@feeblo/feedback-widget/**",
+  "**/node_modules/@solidjs/router/**",
+];
 
 // https://astro.build/config
 export default defineConfig({
@@ -74,6 +82,7 @@ export default defineConfig({
               ) {
                 return "vendor-react";
               }
+
               if (id.includes("/@hugeicons")) {
                 return "hugeicons-vendor";
               }
@@ -119,10 +128,7 @@ export default defineConfig({
                 return "floating-ui-vendor";
               }
 
-              if (
-                id.includes("/@tiptap/") ||
-                id.includes("/prosemirror-")
-              ) {
+              if (id.includes("/@tiptap/") || id.includes("/prosemirror-")) {
                 return "editor-vendor";
               }
             }
@@ -164,11 +170,12 @@ export default defineConfig({
 
   integrations: [
     react({
-      include: [
-        "**/dashboard/**",
-        "**/feature-board/**",
-        "**/@feeblo/feedback-widget/**",
-      ],
+      include: reactRoutes,
+      exclude: solidRoutes,
+    }),
+    solidJs({
+      exclude: reactRoutes,
+      include: solidRoutes,
     }),
   ],
 });

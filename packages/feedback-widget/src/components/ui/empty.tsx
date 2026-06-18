@@ -1,26 +1,28 @@
 import { cva, type VariantProps } from "class-variance-authority";
-
+import { splitProps, type ComponentProps } from "solid-js";
 import { cn } from "../../lib/utils";
 
-function Empty({ className, ...props }: React.ComponentProps<"div">) {
+export function Empty(props: ComponentProps<"div">) {
+  const [local, others] = splitProps(props, ["class"]);
   return (
     <div
-      className={cn(
+      class={cn(
         "flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 text-balance rounded-2xl border-dashed p-12 text-center",
-        className
+        local.class
       )}
       data-slot="empty"
-      {...props}
+      {...others}
     />
   );
 }
 
-function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
+export function EmptyHeader(props: ComponentProps<"div">) {
+  const [local, others] = splitProps(props, ["class"]);
   return (
     <div
-      className={cn("flex max-w-sm flex-col items-center gap-2", className)}
+      class={cn("flex max-w-sm flex-col items-center gap-2", local.class)}
       data-slot="empty-header"
-      {...props}
+      {...others}
     />
   );
 }
@@ -40,65 +42,60 @@ const emptyMediaVariants = cva(
   }
 );
 
-function EmptyMedia({
-  className,
-  variant = "default",
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof emptyMediaVariants>) {
+export function EmptyMedia(
+  props: ComponentProps<"div"> & VariantProps<typeof emptyMediaVariants>
+) {
+  const [local, others] = splitProps(props, ["class", "variant"]);
   return (
     <div
-      className={cn(emptyMediaVariants({ variant, className }))}
+      class={cn(
+        emptyMediaVariants({ variant: local.variant, className: local.class })
+      )}
       data-slot="empty-icon"
-      data-variant={variant}
-      {...props}
+      data-variant={local.variant ?? "default"}
+      {...others}
     />
   );
 }
 
-function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
+export function EmptyTitle(props: ComponentProps<"div">) {
+  const [local, others] = splitProps(props, ["class"]);
   return (
     <div
-      className={cn(
+      class={cn(
         "font-heading font-medium text-lg tracking-tight",
-        className
+        local.class
       )}
       data-slot="empty-title"
-      {...props}
+      {...others}
     />
   );
 }
 
-function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
+export function EmptyDescription(props: ComponentProps<"div">) {
+  const [local, others] = splitProps(props, ["class"]);
   return (
     <div
-      className={cn(
+      class={cn(
         "text-muted-foreground text-sm/relaxed [&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
-        className
+        local.class
       )}
       data-slot="empty-description"
-      {...props}
+      {...others}
     />
   );
 }
 
-function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
+export function EmptyContent(props: ComponentProps<"div">) {
+  const [local, others] = splitProps(props, ["class"]);
   return (
     <div
-      className={cn(
+      class={cn(
         "flex w-full min-w-0 max-w-sm flex-col items-center gap-4 text-balance text-sm",
-        className
+        local.class
       )}
       data-slot="empty-content"
-      {...props}
+      {...others}
     />
   );
 }
-
-export {
-  Empty,
-  EmptyHeader,
-  EmptyTitle,
-  EmptyDescription,
-  EmptyContent,
-  EmptyMedia,
-};

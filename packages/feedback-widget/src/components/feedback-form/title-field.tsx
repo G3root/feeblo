@@ -2,15 +2,12 @@ import { Input } from "../ui/input";
 import { useFeedbackForm } from "./context";
 
 export function FeedbackFormTitleField() {
-  const {
-    state: { title },
-    actions: { setTitle },
-  } = useFeedbackForm();
+  const form = useFeedbackForm();
   return (
     <Input
-      onChange={(event) => setTitle(event.target.value)}
+      onInput={(event) => form.actions.setTitle(event.currentTarget.value)}
       placeholder="Share your product feedback!"
-      value={title}
+      value={form.state.title}
     />
   );
 }

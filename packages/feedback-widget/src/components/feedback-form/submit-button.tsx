@@ -1,18 +1,18 @@
-import { Sent02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-
-import { Button } from "../ui/button";
+import { IconPlaceholder } from "../ui/icon-placeholder";
+import { buttonVariants } from "../ui/button";
 import { useFeedbackForm } from "./context";
 
 export function FeedbackFormSubmitButton() {
-  const {
-    meta: { canSubmit },
-    actions: { submit },
-  } = useFeedbackForm();
+  const form = useFeedbackForm();
   return (
-    <Button disabled={!canSubmit} onClick={submit}>
-      <HugeiconsIcon className="-mt-1 size-4 -rotate-45" icon={Sent02Icon} />
+    <button
+      class={buttonVariants({ variant: "default", size: "default" })}
+      disabled={!form.meta.canSubmit}
+      onClick={() => form.actions.submit()}
+      type="button"
+    >
+      <IconPlaceholder class="-mt-1 size-4 -rotate-45" />
       Create a new post
-    </Button>
+    </button>
   );
 }

@@ -7,7 +7,6 @@
     "build": "dotenvx run -f ../../.env -- astro build",
     "build:bare": "astro build",
     "preview": "astro preview",
-
     "astro": "astro",
     "dev": "dotenvx run -f ../../.env -- astro dev --port 3001",
     "dev:bare": "astro dev",
@@ -16,6 +15,7 @@
   "dependencies": {
     "@astrojs/node": "10.1.4",
     "@astrojs/react": "5.0.7",
+    "@astrojs/solid-js": "catalog:",
     "@base-ui/react": "catalog:",
     "@dnd-kit/abstract": "^0.3.2",
     "@dnd-kit/dom": "^0.3.2",
@@ -24,8 +24,8 @@
     "@feeblo/domain": "workspace:*",
     "@feeblo/feedback-widget": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
-    "@feeblo/utils": "workspace:*",
     "@feeblo/ui": "workspace:*",
+    "@feeblo/utils": "workspace:*",
     "@floating-ui/dom": "^1.7.6",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
@@ -42,7 +42,6 @@
     "@types/react-dom": "catalog:",
     "@xstate/store": "^3.17.1",
     "@xstate/store-react": "^1.0.1",
-
     "astro": "6.4.5",
     "better-auth": "catalog:",
     "class-variance-authority": "catalog:",
@@ -54,6 +53,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "shadcn": "catalog:",
+    "solid-js": "catalog:",
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:",
     "wrangler": "^4.99.0",

@@ -1,37 +1,22 @@
 {
   "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
   "extends": "astro/tsconfigs/strict",
-  "include": [
-    ".astro/types.d.ts",
-    "**/*",
-    "./worker-configuration.d.ts"
-  ],
-  "exclude": [
-    "dist"
-  ],
+  "include": [".astro/types.d.ts", "**/*", "./worker-configuration.d.ts"],
+  "exclude": ["dist"],
   "compilerOptions": {
     "strictNullChecks": true,
     "baseUrl": ".",
     "paths": {
-      "@feeblo/editor": [
-        "../../packages/editor/src/index.ts"
-      ],
-      "@feeblo/ui": [
-        "../../packages/ui/src/index.ts"
-      ],
-      "@feeblo/ui/*": [
-        "../../packages/ui/src/*"
-      ],
-      "~/*": [
-        "./src/dashboard/*"
-      ]
+      "@feeblo/editor": ["../../packages/editor/src/index.ts"],
+      "@feeblo/ui": ["../../packages/ui/src/index.ts"],
+      "@feeblo/ui/*": ["../../packages/ui/src/*"],
+      "~/*": ["./src/dashboard/*"]
     },
     "plugins": [
       {
         "name": "@effect/language-service"
       }
     ],
-    "jsx": "react-jsx",
-    "jsxImportSource": "react"
+    "jsx": "preserve"
   }
 }

@@ -1,4 +1,4 @@
-import { createContext, use } from "react";
+import { createContext, useContext } from "solid-js";
 
 import type { Board } from "../../lib/boards";
 
@@ -27,10 +27,10 @@ export interface FeedbackFormContextValue {
 }
 
 export const FeedbackFormContext =
-  createContext<FeedbackFormContextValue | null>(null);
+  createContext<FeedbackFormContextValue>();
 
 export function useFeedbackForm(): FeedbackFormContextValue {
-  const value = use(FeedbackFormContext);
+  const value = useContext(FeedbackFormContext);
   if (!value) {
     throw new Error(
       "useFeedbackForm must be used within a FeedbackForm.Provider"

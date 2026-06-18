@@ -1,11 +1,9 @@
-export function FeedbackFormFields({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+import type { JSX } from "solid-js";
+
+export function FeedbackFormFields(props: { children: JSX.Element }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-      {children}
+    <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      {props.children}
     </div>
   );
 }
