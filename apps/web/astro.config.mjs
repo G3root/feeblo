@@ -17,6 +17,7 @@ const solidRoutes = [
   "**/@feeblo/feedback-widget/**",
   "**/node_modules/@solidjs/router/**",
 ];
+const tanstackPackageRegex = /\/@tanstack\/([^/]+)/;
 
 // https://astro.build/config
 export default defineConfig({
@@ -92,13 +93,18 @@ export default defineConfig({
               }
 
               if (id.includes("/@tanstack/")) {
-                const match = /\/@tanstack\/([^/]+)/.exec(id);
+                const match = tanstackPackageRegex.exec(id);
                 if (match) {
                   const name = match[1];
                   // react-store and react-router have a circular dependency,
                   // so keep them in the same chunk to avoid circular chunk warnings.
                   if (name === "react-store") {
                     return "tanstack-react-router-vendor";
+                  }
+                  // form-core is only used through @tanstack/react-form; putting it
+                  // in its own chunk leaves an empty chunk after tree-shaking.
+                  if (name === "form-core") {
+                    return "tanstack-react-form-vendor";
                   }
                   return `tanstack-${name}-vendor`;
                 }
