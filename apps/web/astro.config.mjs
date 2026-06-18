@@ -167,7 +167,7 @@ export default defineConfig({
       include: [
         "**/dashboard/**",
         "**/feature-board/**",
-        "**/@feeblo/embed-widget/**",
+        "**/@feeblo/feedback-widget/**",
       ],
     }),
   ],

@@ -11,7 +11,7 @@ const AUTH_EMAIL_VERIFY_PATH = "/email-verify";
 const REGISTER_PATH = "/register";
 const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
-const EMBED_PATH = "/e";
+const FEEDBACK_WIDGET_PATH = "/feedback-widget";
 const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_SIGN_IN_PATH,
   AUTH_SIGN_UP_PATH,
@@ -29,8 +29,11 @@ function normalizePathname(pathname: string) {
   return pathname;
 }
 
-function isEmbedPath(pathname: string) {
-  return pathname === EMBED_PATH || pathname.startsWith(`${EMBED_PATH}/`);
+function isFeedbackWidgetPath(pathname: string) {
+  return (
+    pathname === FEEDBACK_WIDGET_PATH ||
+    pathname.startsWith(`${FEEDBACK_WIDGET_PATH}/`)
+  );
 }
 
 function resolveSubdomain(context: APIContext) {
@@ -68,7 +71,7 @@ function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   const targetPathPrefix = getTargetPathPrefix(subdomain);
   const pathname = normalizePathname(context.url.pathname);
 
-  if (isEmbedPath(pathname)) {
+  if (isFeedbackWidgetPath(pathname)) {
     return next();
   }
 
@@ -81,7 +84,7 @@ function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
 }
 
 async function authMiddleware(context: APIContext, next: MiddlewareNext) {
-  if (isEmbedPath(normalizePathname(context.url.pathname))) {
+  if (isFeedbackWidgetPath(normalizePathname(context.url.pathname))) {
     return next();
   }
 
@@ -120,7 +123,7 @@ function dashboardAuthRedirectMiddleware(
   const { url } = context;
   const pathname = normalizePathname(url.pathname);
 
-  if (isEmbedPath(pathname)) {
+  if (isFeedbackWidgetPath(pathname)) {
     return next();
   }
 
@@ -165,7 +168,7 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
   const { url } = context;
   const pathname = normalizePathname(url.pathname);
 
-  if (isEmbedPath(pathname)) {
+  if (isFeedbackWidgetPath(pathname)) {
     return next();
   }
 

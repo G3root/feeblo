@@ -8,14 +8,14 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(import.meta.dirname, "src/main.tsx"),
-      name: "FeebloEmbedWidget",
-      fileName: "feeblo-embed-widget",
+      name: "FeebloFeedbackWidget",
+      fileName: "feeblo-feedback-widget",
       formats: ["es"],
     },
     rollupOptions: {
       external: ["react", "react-dom", "@tanstack/react-router"],
       output: {
-        assetFileNames: "feeblo-embed-widget[extname]",
+        assetFileNames: "feeblo-feedback-widget[extname]",
       },
     },
     outDir: "dist",

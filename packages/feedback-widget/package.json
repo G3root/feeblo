@@ -1,5 +1,5 @@
 {
-  "name": "@feeblo/embed-widget",
+  "name": "@feeblo/feedback-widget",
   "version": "0.0.1",
   "private": true,
   "type": "module",

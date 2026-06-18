@@ -1,21 +1,21 @@
 ---
+import { WidgetApp } from "@feeblo/feedback-widget";
+import "@feeblo/feedback-widget/styles";
+
 export const prerender = false;
 
-import { WidgetApp } from "@feeblo/embed-widget";
-import "@feeblo/embed-widget/styles";
-
-const segments = Astro.params.embed;
-const organizationId = segments;
+const { organizationId } = Astro.params;
 
 if (!organizationId) {
   return new Response("Not found", { status: 404 });
 }
 
 const theme = Astro.url.searchParams.get("theme") ?? "light";
+const isDark = theme === "dark";
 ---
 
 <!doctype html>
-<html lang="en" data-theme={theme} class={theme === "dark" ? "dark" : ""}>
+<html lang="en" data-theme={theme} class={isDark ? "dark" : ""}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

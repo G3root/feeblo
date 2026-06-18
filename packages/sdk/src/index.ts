@@ -135,7 +135,7 @@ function createIframe(
     params.set("theme", options.theme);
   }
 
-  const path = `${baseUrl}/e/${organizationId}`;
+  const path = `${baseUrl}/feedback-widget/${organizationId}`;
   const query = params.toString();
   iframe.src = query ? `${path}?${query}` : path;
   iframe.style.width = "100%";
