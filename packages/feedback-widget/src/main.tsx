@@ -5,7 +5,7 @@ export interface WidgetAppProps {
   initialRoute?: string;
 }
 
-export function WidgetApp({ initialRoute = "/updates" }: WidgetAppProps) {
+export function WidgetApp({ initialRoute = "/" }: WidgetAppProps) {
   const router = createWidgetRouter(initialRoute);
   return <RouterProvider router={router} />;
 }

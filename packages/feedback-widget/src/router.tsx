@@ -1,16 +1,11 @@
 import { createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { rootRoute } from "./routes/__root";
-import { feedbackRoute } from "./routes/feedback";
-import { roadmapRoute } from "./routes/roadmap";
-import { updatesRoute } from "./routes/updates";
+import { boardRoute } from "./routes/board";
+import { indexRoute } from "./routes/index";
 
-const routeTree = rootRoute.addChildren([
-  feedbackRoute,
-  roadmapRoute,
-  updatesRoute,
-]);
+const routeTree = rootRoute.addChildren([indexRoute, boardRoute]);
 
-export function createWidgetRouter(initialRoute = "/updates") {
+export function createWidgetRouter(initialRoute = "/") {
   const memoryHistory = createMemoryHistory({
     initialEntries: [initialRoute],
   });

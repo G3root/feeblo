@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Feeblo Feedback Widget</title>
+    <link rel="stylesheet" href="./src/styles/widget.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from "react";
+      import { createRoot } from "react-dom/client";
+      import { WidgetApp } from "./src/main.tsx";
+
+      createRoot(document.getElementById("root")).render(
+        React.createElement(WidgetApp, { initialRoute: "/" })
+      );
+    </script>
+  </body>
+</html>
