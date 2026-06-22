@@ -19,6 +19,15 @@
     "./http/router": {
       "default": "./src/http/router.ts"
     },
+    "./widget/schema": {
+      "default": "./src/widget/schema.ts"
+    },
+    "./widget/api-contract": {
+      "default": "./src/widget/api-contract.ts"
+    },
+    "./widget/api-live": {
+      "default": "./src/widget/api-live.ts"
+    },
     "./billing/service": {
       "default": "./src/billing/service.ts"
     },
