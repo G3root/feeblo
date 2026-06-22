@@ -1,7 +1,12 @@
-import { createAsync, useParams } from "@solidjs/router";
+import { createAsync, useParams, useSubmission } from "@solidjs/router";
 import { createMemo, Show } from "solid-js";
-import { FeedbackForm, useFeedbackForm } from "../components/feedback-form";
-import { fetchBoards } from "../lib/api";
+import { FeedbackForm } from "../components/feedback-form";
+import { buttonVariants } from "../components/ui/button";
+import { IconPlaceholder } from "../components/ui/icon-placeholder";
+import { Input } from "../components/ui/input";
+import { Textarea } from "../components/ui/textarea";
+import { createFeedBackAction, fetchBoards } from "../lib/api";
+import type { Board } from "../lib/boards";
 
 export function BoardDetailComponent() {
   const params = useParams();
@@ -12,40 +17,61 @@ export function BoardDetailComponent() {
 
   return (
     <Show fallback={<FeedbackForm.NotFound />} keyed when={board()}>
-      {(board) => (
-        <FeedbackForm.Provider board={board}>
-          <FeedbackFormView />
-        </FeedbackForm.Provider>
-      )}
+      {(board) => <FeedbackFormView board={board} />}
     </Show>
   );
 }
 
 export default BoardDetailComponent;
 
-function FeedbackFormView() {
-  const form = useFeedbackForm();
+function FeedbackFormView(props: { board: Board }) {
+  const submission = useSubmission(createFeedBackAction);
 
   return (
     <Show
-      fallback={
-        <FeedbackForm.Frame>
-          <FeedbackForm.Header />
-          <FeedbackForm.Fields>
-            <FeedbackForm.TitleField />
-            <FeedbackForm.DetailsField />
-          </FeedbackForm.Fields>
-          <FeedbackForm.Actions>
-            <FeedbackForm.BackButton />
-            <FeedbackForm.ActionsSecondary>
-              <FeedbackForm.SubmitButton />
-            </FeedbackForm.ActionsSecondary>
-          </FeedbackForm.Actions>
-        </FeedbackForm.Frame>
-      }
-      when={form.state.submitted}
+      fallback={<FeedbackForm.Success />}
+      when={submission.result?.ok !== true}
     >
-      <FeedbackForm.Success />
+      <form
+        action={createFeedBackAction}
+        class="flex h-full flex-col p-6"
+        method="post"
+      >
+        <FeedbackForm.Header board={props.board} />
+        <FeedbackForm.Fields>
+          <Input
+            name="title"
+            placeholder="Share your product feedback!"
+            required
+          />
+          <Textarea
+            name="content"
+            placeholder="Help us understand what value this feature would bring to your team or workflow"
+          />
+        </FeedbackForm.Fields>
+        <input name="boardId" type="hidden" value={props.board.id} />
+        {submission.result?.ok === false ? (
+          <p class="text-destructive text-sm">{submission.result.message}</p>
+        ) : null}
+        {submission.error ? (
+          <p class="text-destructive text-sm">
+            Something went wrong. Please try again.
+          </p>
+        ) : null}
+        <FeedbackForm.Actions>
+          <FeedbackForm.BackButton />
+          <FeedbackForm.ActionsSecondary>
+            <button
+              class={buttonVariants({ variant: "default", size: "default" })}
+              disabled={submission.pending}
+              type="submit"
+            >
+              <IconPlaceholder class="-mt-1 size-4 -rotate-45" />
+              {submission.pending ? "Creating..." : "Create a new post"}
+            </button>
+          </FeedbackForm.ActionsSecondary>
+        </FeedbackForm.Actions>
+      </form>
     </Show>
   );
 }

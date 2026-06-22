@@ -1,6 +1,6 @@
 import { useNavigate } from "@solidjs/router";
-import { IconPlaceholder } from "../ui/icon-placeholder";
 import { buttonVariants } from "../ui/button";
+import { IconPlaceholder } from "../ui/icon-placeholder";
 
 export function FeedbackFormBackButton() {
   const navigate = useNavigate();
