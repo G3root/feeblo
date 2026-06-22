@@ -8,7 +8,8 @@ interface Props {
 const { title = "feeblo" } = Astro.props;
 
 import CommonHead from "./CommonHead.astro";
-import CommonScripts from "./CommonScripts.astro";
+import EnvScript from "./EnvScript.astro";
+import ThemeScript from "./ThemeScript.astro";
 ---
 
 <!doctype html>
@@ -95,7 +96,8 @@ import CommonScripts from "./CommonScripts.astro";
       }
     }
   </style>
-  <CommonScripts />
+  <EnvScript />
+  <ThemeScript />
 
   <body>
     <slot />

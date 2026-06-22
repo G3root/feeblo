@@ -1,22 +1,6 @@
 ---
-interface Props {
-  organizationId?: string;
-}
 
-const { organizationId } = Astro.props;
-
-import { getPublicEnvServer } from "../dashboard/lib/server-runtime-public-env";
-
-const publicEnv = getPublicEnvServer();
 ---
-
-<script is:inline define:vars={{ publicEnv, organizationId }}>
-  window.global = window.global || {};
-  window.global.__ENV = {
-    ...publicEnv,
-    ...(organizationId ? { organizationId } : {}),
-  };
-</script>
 
 <script is:inline>
   (function () {

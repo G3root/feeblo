@@ -1,22 +1,23 @@
 ---
-import "../feature-board/styles/index.css";
+import "@feeblo/feedback-widget/styles";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
-import ThemeScript from "./ThemeScript.astro";
 
 interface Props {
   organizationId: string;
+  theme: string;
   title?: string;
 }
 
-const { title = "feeblo", organizationId } = Astro.props;
+const { title = "feeblo", organizationId, theme } = Astro.props;
+
+const isDark = theme === "dark";
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme={theme} class={isDark ? "dark" : ""}>
   <CommonHead title={title} />
   <EnvScript organizationId={organizationId} />
-  <ThemeScript />
   <body>
     <slot />
   </body>

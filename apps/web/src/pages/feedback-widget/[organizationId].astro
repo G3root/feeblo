@@ -1,6 +1,6 @@
 ---
 import { WidgetApp } from "@feeblo/feedback-widget";
-import "@feeblo/feedback-widget/styles";
+import Layout from "../../layouts/FeedbackWidgetLayout.astro";
 
 export const prerender = false;
 
@@ -11,51 +11,23 @@ if (!organizationId) {
 }
 
 const theme = Astro.url.searchParams.get("theme") ?? "light";
-const isDark = theme === "dark";
 ---
 
-<!doctype html>
-<html lang="en" data-theme={theme} class={isDark ? "dark" : ""}>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Feeblo Embed</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-      }
-      html,
-      body {
-        padding: 0;
-        margin: 0;
-        font-family:
-          system-ui,
-          -apple-system,
-          BlinkMacSystemFont,
-          "Segoe UI",
-          Roboto,
-          sans-serif;
-        color: canvastext;
-        background: canvas;
-      }
-    </style>
-  </head>
-  <body>
-    <WidgetApp client:only="solid-js" />
+<Layout organizationId={organizationId} theme={theme}>
+  <WidgetApp client:only="solid-js" />
 
-    <script is:inline>
-      function notifyHeight() {
-        const height = document.documentElement.scrollHeight;
-        if (window.parent !== window) {
-          window.parent.postMessage(
-            { event: "PAGE_HEIGHT", data: { height } },
-            "*",
-          );
-        }
+  <script is:inline>
+    function notifyHeight() {
+      const height = document.documentElement.scrollHeight;
+      if (window.parent !== window) {
+        window.parent.postMessage(
+          { event: "PAGE_HEIGHT", data: { height } },
+          "*",
+        );
       }
+    }
 
-      window.addEventListener("load", notifyHeight);
-      window.addEventListener("resize", notifyHeight);
-    </script>
-  </body>
-</html>
+    window.addEventListener("load", notifyHeight);
+    window.addEventListener("resize", notifyHeight);
+  </script>
+</Layout>
