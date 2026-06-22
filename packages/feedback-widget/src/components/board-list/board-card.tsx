@@ -15,9 +15,6 @@ export function BoardCard(props: { board: Board }) {
       </span>
       <span class="flex w-full justify-between">
         <span class="truncate">{props.board.name}</span>
-        <code class="my-auto rounded-none border-border border-l bg-transparent pr-2 pl-3 font-mono text-muted-foreground/80 text-sm dark:border-white/5 dark:text-muted-foreground/60">
-          {props.board.count}
-        </code>
       </span>
     </A>
   );

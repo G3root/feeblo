@@ -1,5 +1,6 @@
-import { type RouteSectionProps } from "@solidjs/router";
-import { Show, createSignal } from "solid-js";
+import type { RouteSectionProps } from "@solidjs/router";
+import { createSignal, ErrorBoundary, Show } from "solid-js";
+import { ErrorFallback } from "../components/error-fallback";
 import { IconPlaceholder } from "../components/ui/icon-placeholder";
 
 export function RootComponent(props: RouteSectionProps) {
@@ -47,7 +48,9 @@ export function RootComponent(props: RouteSectionProps) {
 
             {/* Content */}
             <main class="hide-scrollbar min-h-0 flex-1 overflow-y-auto">
-              {props.children}
+              <ErrorBoundary fallback={(err) => <ErrorFallback error={err} />}>
+                {props.children}
+              </ErrorBoundary>
             </main>
           </div>
         </div>

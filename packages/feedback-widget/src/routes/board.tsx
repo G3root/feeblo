@@ -1,14 +1,17 @@
-import { useParams } from "@solidjs/router";
+import { createAsync, useParams } from "@solidjs/router";
 import { createMemo, Show } from "solid-js";
 import { FeedbackForm, useFeedbackForm } from "../components/feedback-form";
-import { getBoard } from "../lib/boards";
+import { fetchBoards } from "../lib/api";
 
 export function BoardDetailComponent() {
   const params = useParams();
-  const board = createMemo(() => getBoard(params.boardId ?? ""));
+  const boards = createAsync(() => fetchBoards());
+  const board = createMemo(() =>
+    boards()?.find((b) => b.id === params.boardId)
+  );
 
   return (
-    <Show when={board()} fallback={<FeedbackForm.NotFound />} keyed>
+    <Show fallback={<FeedbackForm.NotFound />} keyed when={board()}>
       {(board) => (
         <FeedbackForm.Provider board={board}>
           <FeedbackFormView />
@@ -18,12 +21,13 @@ export function BoardDetailComponent() {
   );
 }
 
+export default BoardDetailComponent;
+
 function FeedbackFormView() {
   const form = useFeedbackForm();
 
   return (
     <Show
-      when={form.state.submitted}
       fallback={
         <FeedbackForm.Frame>
           <FeedbackForm.Header />
@@ -39,6 +43,7 @@ function FeedbackFormView() {
           </FeedbackForm.Actions>
         </FeedbackForm.Frame>
       }
+      when={form.state.submitted}
     >
       <FeedbackForm.Success />
     </Show>
