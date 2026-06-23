@@ -24,12 +24,12 @@
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
-    "@tailwindcss/vite": "^4.1.18",
+    "@tailwindcss/vite": "catalog:",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",
     "tw-animate-css": "catalog:",
     "typescript": "catalog:",
-    "vite": "^7",
+    "vite": "catalog:",
     "vite-plugin-solid": "catalog:"
   }
 }

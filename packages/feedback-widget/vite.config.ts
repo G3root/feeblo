@@ -12,7 +12,7 @@ export default defineConfig({
       fileName: "feeblo-feedback-widget",
       formats: ["es"],
     },
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         "solid-js",
         "solid-js/web",

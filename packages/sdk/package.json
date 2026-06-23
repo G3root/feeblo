@@ -21,6 +21,6 @@
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "typescript": "catalog:",
-    "vite": "^7"
+    "vite": "catalog:"
   }
 }
