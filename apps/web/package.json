@@ -71,6 +71,7 @@
     "@tanstack/router-plugin": "^1.168.18",
     "alchemy": "catalog:",
     "tailwindcss": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite-plugin-icons-spritesheet": "catalog:"
   }
 }

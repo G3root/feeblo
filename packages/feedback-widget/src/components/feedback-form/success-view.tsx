@@ -1,6 +1,6 @@
 import { useNavigate } from "@solidjs/router";
-import { buttonVariants } from "../ui/button";
-import { IconPlaceholder } from "../ui/icon-placeholder";
+import { Button } from "../ui/button";
+import { Icon } from "../ui/icon";
 
 export function FeedbackSuccess() {
   const navigate = useNavigate();
@@ -8,7 +8,7 @@ export function FeedbackSuccess() {
     <div class="flex h-full flex-col p-6">
       <div class="flex flex-1 flex-col items-center justify-center text-center">
         <div class="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <IconPlaceholder class="size-6" />
+          <Icon class="size-6" name="CheckIcon" />
         </div>
         <p class="mt-4 font-medium text-foreground text-lg">
           Thanks for your feedback
@@ -18,13 +18,9 @@ export function FeedbackSuccess() {
         </p>
       </div>
       <div class="mt-4 flex justify-center">
-        <button
-          class={buttonVariants({ variant: "outline", size: "default" })}
-          onClick={() => navigate("/")}
-          type="button"
-        >
+        <Button onClick={() => navigate("/")} type="button" variant="outline">
           Back to boards
-        </button>
+        </Button>
       </div>
     </div>
   );

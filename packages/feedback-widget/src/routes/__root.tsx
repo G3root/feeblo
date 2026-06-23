@@ -1,7 +1,8 @@
 import type { RouteSectionProps } from "@solidjs/router";
 import { createSignal, ErrorBoundary, Show } from "solid-js";
 import { ErrorFallback } from "../components/error-fallback";
-import { IconPlaceholder } from "../components/ui/icon-placeholder";
+import { Button } from "../components/ui/button";
+import { Icon } from "../components/ui/icon";
 
 export function RootComponent(props: RouteSectionProps) {
   const [isOpen, setIsOpen] = createSignal(true);
@@ -37,14 +38,17 @@ export function RootComponent(props: RouteSectionProps) {
         >
           <div class="relative flex h-full w-full max-w-md flex-col overflow-hidden border border-border bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/5 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:rounded-4xl dark:ring-foreground/10">
             {/* Close */}
-            <button
-              aria-label="Close"
-              class="absolute top-5 right-5 z-50 flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30"
-              onClick={handleClose}
-              type="button"
-            >
-              <IconPlaceholder class="size-5" />
-            </button>
+
+            <div class="absolute top-5 right-5">
+              <Button
+                aria-label="Close"
+                onClick={handleClose}
+                size="icon-lg"
+                variant="ghost"
+              >
+                <Icon name="Cancel01Icon" />
+              </Button>
+            </div>
 
             {/* Content */}
             <main class="hide-scrollbar min-h-0 flex-1 overflow-y-auto">

@@ -1,6 +1,5 @@
 import { A } from "@solidjs/router";
 import type { Board } from "../../lib/boards";
-import { IconPlaceholder } from "../ui/icon-placeholder";
 
 export function BoardCard(props: { board: Board }) {
   return (
@@ -10,12 +9,7 @@ export function BoardCard(props: { board: Board }) {
       draggable={false}
       href={`/board/${props.board.id}`}
     >
-      <span class="text-muted-foreground/60 dark:text-muted-foreground/50">
-        <IconPlaceholder class="size-4" />
-      </span>
-      <span class="flex w-full justify-between">
-        <span class="truncate">{props.board.name}</span>
-      </span>
+      <span class="truncate">{props.board.name}</span>
     </A>
   );
 }

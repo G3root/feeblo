@@ -1,5 +1,6 @@
 // @ts-check
 
+import { fileURLToPath } from "node:url";
 import cloudflare from "@astrojs/cloudflare";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
@@ -8,8 +9,19 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 // import alchemy from "alchemy/cloudflare/astro";
 import { defineConfig, envField, fontProviders } from "astro/config";
+import { iconsSpritesheet } from "vite-plugin-icons-spritesheet";
 
 const isCloudflareAdapter = process.env.CLOUDFLARE_ADAPTER === "true";
+
+const widgetDir = fileURLToPath(
+  new URL("../../packages/feedback-widget", import.meta.url)
+);
+const widgetIconsSource = fileURLToPath(
+  new URL("../../packages/feedback-widget/src/icons/source", import.meta.url)
+);
+const widgetIconsDir = fileURLToPath(
+  new URL("../../packages/feedback-widget/src/icons", import.meta.url)
+);
 
 const reactRoutes = ["**/dashboard/**", "**/feature-board/**"];
 const solidRoutes = [
@@ -38,6 +50,12 @@ export default defineConfig({
 
   vite: {
     plugins: [
+      iconsSpritesheet({
+        inputDir: widgetIconsSource,
+        outputDir: widgetIconsDir,
+        fileName: "sprite.svg",
+        cwd: widgetDir,
+      }),
       {
         name: "fix-hugeicons-pure-annotations",
         enforce: "pre",

@@ -1,13 +1,24 @@
 <!doctype html>
 <html lang="en" class="dark">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Feeblo Feedback Widget</title>
-    <link rel="stylesheet" href="./src/styles/widget.css" />
+    <link rel="stylesheet" href="./src/styles/widget.css">
   </head>
   <body>
     <div id="root"></div>
+    <script type="module">
+      import sprite from "./src/icons/sprite.svg?raw";
+
+      const svg = sprite.slice(sprite.indexOf("<svg"));
+      const holder = document.createElement("div");
+      holder.setAttribute("aria-hidden", "true");
+      holder.style.cssText =
+        "position:absolute;width:0;height:0;overflow:hidden";
+      holder.innerHTML = svg;
+      document.head.appendChild(holder.firstElementChild);
+    </script>
     <script type="module">
       import { render } from "solid-js/web";
       import { WidgetApp } from "./src/main.tsx";

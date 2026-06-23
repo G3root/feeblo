@@ -1,8 +1,8 @@
 import { createAsync, useParams, useSubmission } from "@solidjs/router";
 import { createMemo, Show } from "solid-js";
 import { FeedbackForm } from "../components/feedback-form";
-import { buttonVariants } from "../components/ui/button";
-import { IconPlaceholder } from "../components/ui/icon-placeholder";
+import { Button } from "../components/ui/button";
+import { Icon } from "../components/ui/icon";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { createFeedBackAction, fetchBoards } from "../lib/api";
@@ -61,14 +61,13 @@ function FeedbackFormView(props: { board: Board }) {
         <FeedbackForm.Actions>
           <FeedbackForm.BackButton />
           <FeedbackForm.ActionsSecondary>
-            <button
-              class={buttonVariants({ variant: "default", size: "default" })}
+            <Button
               disabled={submission.pending}
               type="submit"
             >
-              <IconPlaceholder class="-mt-1 size-4 -rotate-45" />
+              <Icon class="size-4" name="SentIcon" />
               {submission.pending ? "Creating..." : "Create a new post"}
-            </button>
+            </Button>
           </FeedbackForm.ActionsSecondary>
         </FeedbackForm.Actions>
       </form>

@@ -1,17 +1,17 @@
 import { useNavigate } from "@solidjs/router";
-import { buttonVariants } from "../ui/button";
-import { IconPlaceholder } from "../ui/icon-placeholder";
+import { Button } from "../ui/button";
+import { Icon } from "../ui/icon";
 
 export function FeedbackFormBackButton() {
   const navigate = useNavigate();
   return (
-    <button
+    <Button
       aria-label="Back"
-      class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
       onClick={() => navigate("/")}
-      type="button"
+      size="icon-lg"
+      variant="outline"
     >
-      <IconPlaceholder class="size-5" />
-    </button>
+      <Icon name="ArrowLeft01Icon" />
+    </Button>
   );
 }

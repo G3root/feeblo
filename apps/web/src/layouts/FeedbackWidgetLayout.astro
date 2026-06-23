@@ -1,5 +1,6 @@
 ---
 import "@feeblo/feedback-widget/styles";
+import spriteSvgRaw from "@feeblo/feedback-widget/icons/sprite.svg?raw";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 
@@ -12,6 +13,7 @@ interface Props {
 const { title = "feeblo", organizationId, theme } = Astro.props;
 
 const isDark = theme === "dark";
+const spriteSvg = spriteSvgRaw.slice(spriteSvgRaw.indexOf("<svg"));
 ---
 
 <!doctype html>
@@ -19,6 +21,11 @@ const isDark = theme === "dark";
   <CommonHead title={title} />
   <EnvScript organizationId={organizationId} />
   <body>
+    <div
+      aria-hidden="true"
+      style="position:absolute;width:0;height:0;overflow:hidden"
+      set:html={spriteSvg}
+    />
     <slot />
   </body>
 </html>
