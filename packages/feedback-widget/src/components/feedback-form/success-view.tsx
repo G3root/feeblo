@@ -7,7 +7,7 @@ export function FeedbackSuccess() {
   return (
     <div class="flex h-full flex-col p-6">
       <div class="flex flex-1 flex-col items-center justify-center text-center">
-        <div class="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div class="flex size-12 items-center justify-center rounded-full bg-muted text-foreground">
           <Icon class="size-6" name="CheckIcon" />
         </div>
         <p class="mt-4 font-medium text-foreground text-lg">
@@ -19,7 +19,7 @@ export function FeedbackSuccess() {
       </div>
       <div class="mt-4 flex justify-center">
         <Button onClick={() => navigate("/")} type="button" variant="outline">
-          Back to boards
+          <Icon name="ArrowLeft01Icon" /> Back to boards
         </Button>
       </div>
     </div>
