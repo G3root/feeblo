@@ -1,11 +1,33 @@
+import {
+  autoUpdate,
+  computePosition,
+  flip,
+  offset,
+  shift,
+} from "@floating-ui/dom";
+
 const CONTAINER_ID = "feeblo-embed-container";
 const FEEDBACK_ATTRIBUTE = "data-feeblo-feedback";
+const SCAN_INTERVAL_MS = 1000;
+const FADE_DURATION_MS = 150;
 
-const DEFAULT_CONTAINER_STYLES: Partial<CSSStyleDeclaration> = {
-  position: "relative",
-  maxWidth: "1024px",
-  height: "600px",
-  margin: "0 auto",
+const CONTAINER_STYLES: Partial<CSSStyleDeclaration> = {
+  position: "fixed",
+  width: "400px",
+  height: "400px",
+  maxHeight: "600px",
+  margin: "0",
+  top: "0",
+  left: "0",
+  opacity: "0",
+  transition: `opacity ${FADE_DURATION_MS}ms ease-out`,
+  zIndex: "999999",
+  display: "none",
+  borderRadius: "16px",
+  overflow: "hidden",
+  boxShadow:
+    "0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.06), 0 12px 24px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.12)",
+  border: "none",
 };
 
 function isBrowser(): boolean {
@@ -21,6 +43,10 @@ function compact<T extends object>(obj: T): Record<string, unknown> {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface EmbedErrorDetails {
   code: string;
@@ -53,15 +79,9 @@ export interface UserIdentity {
   token?: string | undefined;
 }
 
-interface NormalizedWidgetCompany {
-  id: string;
-  monthlySpend?: number | undefined;
-  name: string;
-}
-
 interface NormalizedUserIdentity {
   avatar?: string | undefined;
-  companies?: NormalizedWidgetCompany[] | undefined;
+  companies?: WidgetCompany[] | undefined;
   email?: string | undefined;
   firstName?: string | undefined;
   id: string;
@@ -69,28 +89,18 @@ interface NormalizedUserIdentity {
   token?: string | undefined;
 }
 
-const COMPANY_KEYS: readonly (keyof WidgetCompany)[] = [
-  "id",
-  "name",
-  "monthlySpend",
-];
+const COMPANY_KEYS = ["id", "name", "monthlySpend"] as const;
 
-function normalizeCompany(company: WidgetCompany): NormalizedWidgetCompany {
-  return pickDefined(company, COMPANY_KEYS) as NormalizedWidgetCompany;
-}
-
-function pickDefined<T extends object, K extends keyof T>(
-  source: T,
-  keys: readonly K[]
-): Pick<T, K> {
-  const result = {} as Pick<T, K>;
-  for (const key of keys) {
-    const value = source[key];
-    if (value !== undefined) {
-      result[key] = value;
+function normalizeCompany(
+  company: WidgetCompany
+): Pick<WidgetCompany, "id" | "name" | "monthlySpend"> {
+  const result: Record<string, unknown> = {};
+  for (const key of COMPANY_KEYS) {
+    if (company[key] !== undefined) {
+      result[key] = company[key];
     }
   }
-  return result;
+  return result as Pick<WidgetCompany, "id" | "name" | "monthlySpend">;
 }
 
 function normalizeUserIdentity(user: UserIdentity): NormalizedUserIdentity {
@@ -102,17 +112,25 @@ function normalizeUserIdentity(user: UserIdentity): NormalizedUserIdentity {
     });
   }
 
-  const base = pickDefined(rest, [
+  const base: Record<string, unknown> = {};
+  for (const key of [
     "email",
     "firstName",
     "lastName",
     "avatar",
     "token",
-  ]);
+  ] as const) {
+    if (rest[key] !== undefined) {
+      base[key] = rest[key];
+    }
+  }
 
-  const companies = rest.companies?.map(normalizeCompany) ?? undefined;
-
-  return { id, ...base, ...(companies ? { companies } : {}) };
+  const companies = rest.companies?.map(normalizeCompany);
+  return {
+    id,
+    ...base,
+    ...(companies ? { companies } : {}),
+  } as NormalizedUserIdentity;
 }
 
 export interface EmbedOptions {
@@ -127,10 +145,11 @@ export interface EmbedOptions {
 }
 
 export interface FeebloWidget {
+  close: () => void;
   destroy: () => void;
   identify: (user: UserIdentity) => void;
   open: () => void;
-  close: () => void;
+  setBoard: (board: string) => void;
 }
 
 type IncomingMessage =
@@ -143,10 +162,7 @@ type IncomingMessage =
 
 type ExternalMessageData = {
   target: string;
-  data: {
-    action: string;
-    setBoard?: string;
-  };
+  data: { action: string; setBoard?: string };
 };
 
 type CleanupContainer = HTMLDivElement & { _feebloCleanup?: () => void };
@@ -158,18 +174,116 @@ export type FeebloEventName =
 
 export interface FeebloEventDetail {
   data: unknown;
-  type: string;
   namespace: string;
+  type: string;
 }
 
 type EventCallback = (e: CustomEvent<FeebloEventDetail>) => void;
 
+// ---------------------------------------------------------------------------
+// Event helpers
+// ---------------------------------------------------------------------------
+
 function emitWidgetEvent(type: string, data?: unknown): void {
-  const event = new CustomEvent<FeebloEventDetail>(type, {
-    detail: { data, type, namespace: "feeblo" },
-  });
-  window.dispatchEvent(event);
+  window.dispatchEvent(
+    new CustomEvent<FeebloEventDetail>(type, {
+      detail: { data, type, namespace: "feeblo" },
+    })
+  );
 }
+
+// ---------------------------------------------------------------------------
+// Floating UI positioning
+// ---------------------------------------------------------------------------
+
+function createFloatingInstance(
+  reference: HTMLElement,
+  floating: HTMLElement
+): () => void {
+  return autoUpdate(reference, floating, () => {
+    computePosition(reference, floating, {
+      placement: "bottom",
+      middleware: [offset(10), flip({ padding: 8 }), shift({ padding: 8 })],
+    }).then(({ x, y }) => {
+      Object.assign(floating.style, {
+        left: `${x}px`,
+        top: `${y}px`,
+      });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Trigger scanner
+// ---------------------------------------------------------------------------
+
+function findTriggers(): HTMLElement[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(`[${FEEDBACK_ATTRIBUTE}]`)
+  );
+}
+
+const METADATA_KEY_REGEX = /^feeblo([A-Z]\w*)$/;
+
+function extractTriggerMetadata(element: HTMLElement): Record<string, string> {
+  const metadata: Record<string, string> = {};
+  for (const key of Object.keys(element.dataset)) {
+    const match = key.match(METADATA_KEY_REGEX);
+    if (match?.[1]) {
+      const name = match[1].charAt(0).toLowerCase() + match[1].slice(1);
+      const value = element.dataset[key];
+      if (value !== undefined) {
+        metadata[name] = value;
+      }
+    }
+  }
+  return metadata;
+}
+
+let triggerScanInterval: ReturnType<typeof setInterval> | null = null;
+
+function startTriggerScanning(embed: Embed): void {
+  if (triggerScanInterval) {
+    return;
+  }
+  triggerScanInterval = setInterval(
+    () => bindTriggers(embed),
+    SCAN_INTERVAL_MS
+  );
+  bindTriggers(embed);
+}
+
+function stopTriggerScanning(): void {
+  if (triggerScanInterval) {
+    clearInterval(triggerScanInterval);
+    triggerScanInterval = null;
+  }
+}
+
+function bindTriggers(embed: Embed): void {
+  for (const trigger of findTriggers()) {
+    if (trigger.dataset.feebloBound === "true") {
+      continue;
+    }
+    trigger.dataset.feebloBound = "true";
+
+    const handleClick = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const metadata = extractTriggerMetadata(trigger);
+      if (metadata.board) {
+        embed.setBoard(metadata.board);
+      }
+      embed.open(trigger, metadata);
+    };
+
+    trigger.addEventListener("click", handleClick, { passive: false });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Global listeners (shared across embeds)
+// ---------------------------------------------------------------------------
 
 let globalCleanup: (() => void) | null = null;
 
@@ -177,16 +291,6 @@ function setupGlobalListeners(): () => void {
   if (globalCleanup) {
     return globalCleanup;
   }
-
-  const handleClick = (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    const button = target.closest(`[${FEEDBACK_ATTRIBUTE}]`);
-    if (button && currentEmbed) {
-      e.preventDefault();
-      e.stopPropagation();
-      currentEmbed.open();
-    }
-  };
 
   const handleExternalMessage = (e: MessageEvent<unknown>) => {
     const msg = e.data as ExternalMessageData;
@@ -198,7 +302,6 @@ function setupGlobalListeners(): () => void {
     ) {
       return;
     }
-
     if (msg.data.action === "openFeedbackWidget" && currentEmbed) {
       if (msg.data.setBoard) {
         currentEmbed.setBoard(msg.data.setBoard);
@@ -207,17 +310,19 @@ function setupGlobalListeners(): () => void {
     }
   };
 
-  document.addEventListener("click", handleClick, true);
   window.addEventListener("message", handleExternalMessage);
 
   globalCleanup = () => {
-    document.removeEventListener("click", handleClick, true);
     window.removeEventListener("message", handleExternalMessage);
     globalCleanup = null;
   };
 
   return globalCleanup;
 }
+
+// ---------------------------------------------------------------------------
+// Embed class
+// ---------------------------------------------------------------------------
 
 class Embed {
   options: EmbedOptions;
@@ -226,23 +331,26 @@ class Embed {
   private readonly iframe: HTMLIFrameElement;
   private identity: NormalizedUserIdentity | null;
   private isLoaded = false;
-  private isOpen = true;
+  private isOpen = false;
   private pendingBoard: string | null = null;
   private submittedFeedbackSent = false;
+  private cleanupPositioning: (() => void) | null = null;
+  private currentTrigger: HTMLElement | null = null;
+  private escHandler: ((e: KeyboardEvent) => void) | null = null;
+  private outsideClickHandler: ((e: MouseEvent) => void) | null = null;
 
   constructor(organizationId: string, options: EmbedOptions) {
     this.organizationId = organizationId;
     this.options = options;
     this.identity = options.user ? normalizeUserIdentity(options.user) : null;
-    console.debug("[feeblo-sdk] Initializing.", { organizationId, options });
     this.iframe = createIframe(organizationId, options);
-    this.container = this.renderEmbed();
+    this.container = this.createContainer();
 
     setupGlobalListeners();
+    startTriggerScanning(this);
   }
 
-  private renderEmbed(): HTMLDivElement {
-    console.debug("[feeblo-sdk] Rendering embed.");
+  private createContainer(): HTMLDivElement {
     const { root, containerStyles, onError, onHeightChange, onClose } =
       this.options;
 
@@ -256,10 +364,7 @@ class Embed {
 
     const container = document.createElement("div");
     container.id = CONTAINER_ID;
-    Object.assign(container.style, {
-      ...DEFAULT_CONTAINER_STYLES,
-      ...containerStyles,
-    });
+    Object.assign(container.style, CONTAINER_STYLES, containerStyles);
     container.appendChild(this.iframe);
 
     const handleMessage = (event: MessageEvent<unknown>) => {
@@ -270,16 +375,17 @@ class Embed {
       const message = event.data as IncomingMessage;
       switch (message?.event) {
         case "ERROR": {
-          const error = new EmbedError({
-            code: message.data?.code ?? "",
-            message: message.data?.message ?? "",
-          });
-          onError?.(error);
+          onError?.(
+            new EmbedError({
+              code: message.data?.code ?? "",
+              message: message.data?.message ?? "",
+            })
+          );
           break;
         }
         case "PAGE_HEIGHT": {
           const height = message.data?.height;
-          if (height !== undefined) {
+          if (height !== undefined && height > 80) {
             container.style.height = `${height}px`;
             onHeightChange?.(height);
           }
@@ -315,34 +421,50 @@ class Embed {
       }
     };
 
-    const handleLoad = () => {
-      if (!this.isLoaded) {
-        this.isLoaded = true;
-        this.sendIdentify();
-        emitWidgetEvent("widgetReady");
-      }
-    };
+    this.iframe.addEventListener(
+      "load",
+      () => {
+        if (!this.isLoaded) {
+          this.isLoaded = true;
+          this.sendIdentify();
+          emitWidgetEvent("widgetReady");
+        }
+      },
+      { once: true }
+    );
 
     window.addEventListener("message", handleMessage);
-    this.iframe.addEventListener("load", handleLoad);
 
     (container as CleanupContainer)._feebloCleanup = () => {
       window.removeEventListener("message", handleMessage);
-      this.iframe.removeEventListener("load", handleLoad);
     };
 
     (root ?? document.body).appendChild(container);
     return container;
   }
 
-  open(): void {
+  open(trigger?: HTMLElement, _metadata?: Record<string, string>): void {
+    if (this.isOpen) {
+      return;
+    }
+
     this.isOpen = true;
     this.container.style.display = "";
+
+    if (trigger) {
+      this.currentTrigger = trigger;
+      this.cleanupPositioning = createFloatingInstance(trigger, this.container);
+      this.addCloseListeners();
+    }
 
     if (this.pendingBoard) {
       this.sendSetBoard(this.pendingBoard);
       this.pendingBoard = null;
     }
+
+    requestAnimationFrame(() => {
+      this.container.style.opacity = "1";
+    });
 
     this.iframe.contentWindow?.postMessage(
       { event: "SHOW" },
@@ -353,8 +475,23 @@ class Embed {
   }
 
   close(): void {
+    if (!this.isOpen) {
+      return;
+    }
+
+    this.removeCloseListeners();
+    this.cleanupPositioning?.();
+    this.cleanupPositioning = null;
+    this.currentTrigger = null;
+
+    this.container.style.opacity = "0";
     this.isOpen = false;
-    this.container.style.display = "none";
+
+    setTimeout(() => {
+      if (!this.isOpen) {
+        this.container.style.display = "none";
+      }
+    }, FADE_DURATION_MS);
 
     this.iframe.contentWindow?.postMessage(
       { event: "HIDE" },
@@ -385,7 +522,7 @@ class Embed {
   }
 
   private sendIdentify(): void {
-    if (this.identity === null) {
+    if (!this.identity) {
       return;
     }
     this.iframe.contentWindow?.postMessage(
@@ -394,7 +531,42 @@ class Embed {
     );
   }
 
+  private addCloseListeners(): void {
+    this.escHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        this.close();
+      }
+    };
+    this.outsideClickHandler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!this.container.contains(target) && this.currentTrigger !== target) {
+        this.close();
+      }
+    };
+    document.addEventListener("keydown", this.escHandler);
+    document.addEventListener("click", this.outsideClickHandler, {
+      capture: true,
+    });
+  }
+
+  private removeCloseListeners(): void {
+    if (this.escHandler) {
+      document.removeEventListener("keydown", this.escHandler);
+      this.escHandler = null;
+    }
+    if (this.outsideClickHandler) {
+      document.removeEventListener("click", this.outsideClickHandler, {
+        capture: true,
+      });
+      this.outsideClickHandler = null;
+    }
+  }
+
   destroy(): void {
+    this.removeCloseListeners();
+    this.cleanupPositioning?.();
+    this.cleanupPositioning = null;
+
     const container = document.getElementById(
       CONTAINER_ID
     ) as CleanupContainer | null;
@@ -404,10 +576,15 @@ class Embed {
     }
 
     if (currentEmbed === this) {
+      stopTriggerScanning();
       globalCleanup?.();
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Iframe factory
+// ---------------------------------------------------------------------------
 
 function createIframe(
   organizationId: string,
@@ -436,6 +613,10 @@ function createIframe(
   return iframe;
 }
 
+// ---------------------------------------------------------------------------
+// Shared embed instance
+// ---------------------------------------------------------------------------
+
 let currentEmbed: Embed | null = null;
 let currentOrgId: string | null = null;
 
@@ -457,6 +638,7 @@ function init(
       destroy: () => undefined,
       open: () => undefined,
       close: () => undefined,
+      setBoard: () => undefined,
     };
   }
 
@@ -464,12 +646,7 @@ function init(
     if (options.user) {
       currentEmbed.identify(options.user);
     }
-    return {
-      identify: currentEmbed.identify.bind(currentEmbed),
-      destroy: currentEmbed.destroy.bind(currentEmbed),
-      open: currentEmbed.open.bind(currentEmbed),
-      close: currentEmbed.close.bind(currentEmbed),
-    };
+    return createWidgetProxy(currentEmbed);
   }
 
   if (currentEmbed) {
@@ -479,6 +656,11 @@ function init(
   const embed = new Embed(organizationId, options);
   currentEmbed = embed;
   currentOrgId = organizationId;
+
+  return createWidgetProxy(embed);
+}
+
+function createWidgetProxy(embed: Embed): FeebloWidget {
   return {
     identify: embed.identify.bind(embed),
     destroy: () => {
@@ -490,10 +672,15 @@ function init(
     },
     open: embed.open.bind(embed),
     close: embed.close.bind(embed),
+    setBoard: embed.setBoard.bind(embed),
   };
 }
 
 export { init };
+
+// ---------------------------------------------------------------------------
+// Static Feeblo namespace
+// ---------------------------------------------------------------------------
 
 const Feeblo = {
   init,
@@ -539,9 +726,7 @@ const Feeblo = {
     }
 
     window.addEventListener(event, listener);
-    return () => {
-      window.removeEventListener(event, listener);
-    };
+    return () => window.removeEventListener(event, listener);
   },
 
   off(event: string, callback: EventCallback): void {
@@ -554,10 +739,11 @@ const Feeblo = {
 
 export { Feeblo };
 
-function getAutoConfig(): {
-  orgId: string;
-  options: EmbedOptions;
-} | null {
+// ---------------------------------------------------------------------------
+// Auto-init from script tag
+// ---------------------------------------------------------------------------
+
+function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
   const globalConfig = (window as unknown as Record<string, unknown>)
     .feebloConfig as Partial<{
     orgId: string;
@@ -594,15 +780,12 @@ function getAutoConfig(): {
 }
 
 function getFeebloScript(): HTMLScriptElement | null {
-  if (document.currentScript) {
-    const script = document.currentScript as HTMLScriptElement;
-    if (hasFeebloSource(script.src)) {
-      return script;
-    }
+  const currentScript = document.currentScript as HTMLScriptElement | null;
+  if (currentScript && hasFeebloSource(currentScript.src)) {
+    return currentScript;
   }
 
-  const scripts = document.getElementsByTagName("script");
-  for (const script of scripts) {
+  for (const script of document.getElementsByTagName("script")) {
     if (hasFeebloSource(script.src)) {
       return script;
     }

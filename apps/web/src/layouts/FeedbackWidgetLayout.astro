@@ -20,6 +20,17 @@ const spriteSvg = spriteSvgRaw.slice(spriteSvgRaw.indexOf("<svg"));
 <html lang="en" data-theme={theme} class={isDark ? "dark" : ""}>
   <CommonHead title={title} />
   <EnvScript organizationId={organizationId} />
+  <style is:inline>
+    html,
+    body {
+      height: 100%;
+      padding: 0;
+      margin: 0;
+    }
+    [data-feeblo-widget-container] {
+      min-height: 100%;
+    }
+  </style>
   <body>
     <div
       aria-hidden="true"

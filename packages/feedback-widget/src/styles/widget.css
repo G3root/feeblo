@@ -132,9 +132,10 @@
     @apply border-border outline-ring/50;
   }
   html,
-  body {
+  body,
+  #root {
     font-family: var(--font-sans);
-    @apply m-0 p-0 bg-background text-foreground;
+    @apply m-0 p-0 h-full bg-background text-foreground;
   }
 }
 

@@ -18,13 +18,15 @@ const theme = Astro.url.searchParams.get("theme") ?? "light";
 
   <script is:inline>
     function notifyHeight() {
-      const height = document.documentElement.scrollHeight;
-      if (window.parent !== window) {
-        window.parent.postMessage(
-          { event: "PAGE_HEIGHT", data: { height } },
-          "*",
-        );
-      }
+      requestAnimationFrame(() => {
+        const height = document.documentElement.scrollHeight;
+        if (window.parent !== window) {
+          window.parent.postMessage(
+            { event: "PAGE_HEIGHT", data: { height } },
+            "*",
+          );
+        }
+      });
     }
 
     window.addEventListener("load", notifyHeight);
