@@ -1,35 +1,27 @@
 import type { RouteSectionProps } from "@solidjs/router";
 import { useNavigate } from "@solidjs/router";
-import { createSignal, ErrorBoundary, onCleanup, onMount, Show } from "solid-js";
+import {
+  createSignal,
+  ErrorBoundary,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import { ErrorFallback } from "../components/error-fallback";
 import { Button } from "../components/ui/button";
 import { Icon } from "../components/ui/icon";
-
-type ParentMessage =
-  | { event: "SHOW" }
-  | { event: "HIDE" }
-  | { event: "SET_BOARD"; data: { board: string } };
+import {
+  type ParentMessage,
+  sendToParent,
+  subscribeToParentMessages,
+} from "../lib/messages";
 
 export function RootComponent(props: RouteSectionProps) {
   const [isOpen, setIsOpen] = createSignal(true);
   const navigate = useNavigate();
 
-  const sendToParent = (message: unknown) => {
-    if (window.parent !== window) {
-      window.parent.postMessage(message, "*");
-    }
-  };
-
-  onMount(() => {
-    sendToParent({ event: "READY" });
-  });
-
-  const handleParentMessage = (e: MessageEvent<unknown>) => {
-    const message = e.data as ParentMessage;
-    if (!message || typeof message !== "object" || !("event" in message)) {
-      return;
-    }
-
+  const handleParentMessage = (message: ParentMessage) => {
+    // biome-ignore lint/style/useDefaultSwitchClause: <explanation>
     switch (message.event) {
       case "SHOW":
         setIsOpen(true);
@@ -43,17 +35,16 @@ export function RootComponent(props: RouteSectionProps) {
           navigate(`/board/${message.data.board}`);
         }
         break;
-      default:
-        break;
     }
   };
 
   onMount(() => {
-    window.addEventListener("message", handleParentMessage);
+    sendToParent({ event: "READY" });
   });
 
-  onCleanup(() => {
-    window.removeEventListener("message", handleParentMessage);
+  onMount(() => {
+    const unsubscribe = subscribeToParentMessages(handleParentMessage);
+    onCleanup(unsubscribe);
   });
 
   const handleClose = () => {

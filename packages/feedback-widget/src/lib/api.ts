@@ -1,4 +1,5 @@
 import { action, query, type RoutePreloadFuncArgs } from "@solidjs/router";
+import { sendToParent } from "./messages";
 
 export interface WidgetBoard {
   createdAt: string;
@@ -7,6 +8,12 @@ export interface WidgetBoard {
   organizationId: string;
   slug: string;
   updatedAt: string;
+}
+
+export type FeedbackResult = { ok: true } | { ok: false; message: string };
+
+interface FeedbackFormData extends FormData {
+  get(name: "content" | "title" | "boardName" | "boardId"): string;
 }
 
 function getApiBaseUrl(): string {
@@ -34,25 +41,37 @@ export function preloadBoards(_args: RoutePreloadFuncArgs) {
   return fetchBoards();
 }
 
-export const createFeedBackAction = action(async (data: URLSearchParams) => {
-  const organizationId = getOrganizationId();
-  const baseUrl = getApiBaseUrl();
-  const url = `${baseUrl}/`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      boardId: data.get("boardId"),
-      content: data.get("content"),
-      title: data.get("title"),
-      organizationId,
-    }),
-  });
+export const createFeedBackAction = action(
+  async (formData: FormData): Promise<FeedbackResult> => {
+    const data = formData as FeedbackFormData;
+    const boardId = data.get("boardId");
+    const boardName = data.get("boardName");
+    const title = data.get("title");
+    const content = data.get("content");
+    const organizationId = getOrganizationId();
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    return { ok: false, message: errorData.message };
-  }
+    const baseUrl = getApiBaseUrl();
+    const url = `${baseUrl}/`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ boardId, content, title, organizationId }),
+    });
 
-  return { ok: true };
-}, "createFeedback");
+    if (!response.ok) {
+      const errorData = (await response.json()) as { message?: string };
+      return {
+        ok: false,
+        message: errorData.message ?? "Failed to submit feedback",
+      };
+    }
+
+    sendToParent({
+      event: "FEEDBACK_SUBMITTED",
+      data: { post: { boardId, boardName, title } },
+    });
+
+    return { ok: true };
+  },
+  "createFeedback"
+);
