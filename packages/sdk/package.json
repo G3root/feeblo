@@ -1,23 +1,50 @@
 {
   "name": "@feeblo/sdk",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
-  "files": [
-    "dist/**"
-  ],
+  "description": "Embeddable feedback widget SDK for Feeblo.",
+  "license": "AGPL-3.0-only",
+  "sideEffects": true,
+  "main": "./dist/feeblo-sdk.umd.cjs",
+  "module": "./dist/feeblo-sdk.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    }
+      "import": "./dist/feeblo-sdk.js",
+      "require": "./dist/feeblo-sdk.umd.cjs"
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist/**",
+    "README.md"
+  ],
+  "keywords": [
+    "feeblo",
+    "feedback",
+    "widget",
+    "embed",
+    "sdk",
+    "feature-requests",
+    "changelog"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/G3root/feeblo.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/G3root/feeblo/tree/main/packages/sdk",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && tsc -p tsconfig.build.json",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src",
+    "lint:fix": "biome check --write src"
   },
+  "dependencies": {},
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@floating-ui/dom": "^1.7.4",

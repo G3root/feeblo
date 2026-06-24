@@ -24,6 +24,16 @@
       "linter": {
         "enabled": false
       }
+    },
+    {
+      "includes": ["packages/sdk/src/index.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
     }
   ],
 
