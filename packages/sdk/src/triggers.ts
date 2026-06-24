@@ -3,6 +3,11 @@ import type { Logger } from "./debug";
 
 const METADATA_KEY_REGEX = /^feeblo([A-Z]\w*)$/;
 
+const FEEDBACK_DATASET_KEY = FEEDBACK_ATTRIBUTE.replace(/^data-/, "").replace(
+  /-([a-z])/g,
+  (_, c) => c.toUpperCase()
+);
+
 /**
  * The subset of an embed the trigger scanner needs. Mirrors the void-returning
  * methods on {@link Embed} so the scanner stays decoupled from the widget proxy.
@@ -23,6 +28,9 @@ export function extractTriggerMetadata(
 ): Record<string, string> {
   const metadata: Record<string, string> = {};
   for (const key of Object.keys(element.dataset)) {
+    if (key === FEEDBACK_DATASET_KEY) {
+      continue;
+    }
     const match = key.match(METADATA_KEY_REGEX);
     if (match?.[1]) {
       const name = match[1].charAt(0).toLowerCase() + match[1].slice(1);
