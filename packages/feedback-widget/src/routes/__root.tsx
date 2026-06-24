@@ -1,17 +1,64 @@
 import type { RouteSectionProps } from "@solidjs/router";
-import { createSignal, ErrorBoundary, Show } from "solid-js";
+import { useNavigate } from "@solidjs/router";
+import { createSignal, ErrorBoundary, onCleanup, onMount, Show } from "solid-js";
 import { ErrorFallback } from "../components/error-fallback";
 import { Button } from "../components/ui/button";
 import { Icon } from "../components/ui/icon";
 
+type ParentMessage =
+  | { event: "SHOW" }
+  | { event: "HIDE" }
+  | { event: "SET_BOARD"; data: { board: string } };
+
 export function RootComponent(props: RouteSectionProps) {
   const [isOpen, setIsOpen] = createSignal(true);
+  const navigate = useNavigate();
+
+  const sendToParent = (message: unknown) => {
+    if (window.parent !== window) {
+      window.parent.postMessage(message, "*");
+    }
+  };
+
+  onMount(() => {
+    sendToParent({ event: "READY" });
+  });
+
+  const handleParentMessage = (e: MessageEvent<unknown>) => {
+    const message = e.data as ParentMessage;
+    if (!message || typeof message !== "object" || !("event" in message)) {
+      return;
+    }
+
+    switch (message.event) {
+      case "SHOW":
+        setIsOpen(true);
+        sendToParent({ event: "WIDGET_OPENED" });
+        break;
+      case "HIDE":
+        setIsOpen(false);
+        break;
+      case "SET_BOARD":
+        if (message.data?.board) {
+          navigate(`/board/${message.data.board}`);
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  onMount(() => {
+    window.addEventListener("message", handleParentMessage);
+  });
+
+  onCleanup(() => {
+    window.removeEventListener("message", handleParentMessage);
+  });
 
   const handleClose = () => {
     setIsOpen(false);
-    if (window.parent !== window) {
-      window.parent.postMessage({ event: "CLOSE" }, "*");
-    }
+    sendToParent({ event: "CLOSE" });
   };
 
   return (
@@ -38,7 +85,6 @@ export function RootComponent(props: RouteSectionProps) {
         >
           <div class="relative flex h-full w-full max-w-md flex-col overflow-hidden border border-border bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/5 sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:rounded-4xl dark:ring-foreground/10">
             {/* Close */}
-
             <div class="absolute top-5 right-5">
               <Button
                 aria-label="Close"

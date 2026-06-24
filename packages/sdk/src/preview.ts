@@ -1,4 +1,4 @@
-import { init, type UserIdentity } from "./index";
+import { Feeblo, type UserIdentity } from "./index";
 
 const params = new URLSearchParams(window.location.search);
 
@@ -17,7 +17,12 @@ const user: UserIdentity | undefined = userId
     }
   : undefined;
 
-init(organizationId, {
+Feeblo.on("*", (e) => {
+  const { data, type, namespace } = e.detail;
+  console.debug("[Preview] widget event", { data, type, namespace });
+});
+
+Feeblo.init(organizationId, {
   baseUrl,
   theme,
   user,

@@ -1,5 +1,5 @@
 import { createAsync, useParams, useSubmission } from "@solidjs/router";
-import { createMemo, Show } from "solid-js";
+import { createEffect, createMemo, Show } from "solid-js";
 import { FeedbackForm } from "../components/feedback-form";
 import { Button } from "../components/ui/button";
 import { Icon } from "../components/ui/icon";
@@ -27,6 +27,33 @@ export default BoardDetailComponent;
 function FeedbackFormView(props: { board: Board }) {
   const submission = useSubmission(createFeedBackAction);
 
+  createEffect(() => {
+    const result = submission.result;
+    if (result?.ok === true && !submission.pending && window.parent !== window) {
+      window.parent.postMessage(
+        {
+          event: "FEEDBACK_SUBMITTED",
+          data: {
+            post: {
+              boardId: props.board.id,
+              boardName: props.board.name,
+              title: (() => {
+                const form = document.querySelector(
+                  "form"
+                ) as HTMLFormElement | null;
+                const titleField = form?.querySelector(
+                  '[name="title"]'
+                ) as HTMLInputElement | null;
+                return titleField?.value ?? "";
+              })(),
+            },
+          },
+        },
+        "*"
+      );
+    }
+  });
+
   return (
     <Show
       fallback={<FeedbackForm.Success />}
@@ -50,21 +77,18 @@ function FeedbackFormView(props: { board: Board }) {
           />
         </FeedbackForm.Fields>
         <input name="boardId" type="hidden" value={props.board.id} />
-        {submission.result?.ok === false ? (
+        {submission.result?.ok === false && (
           <p class="text-destructive text-sm">{submission.result.message}</p>
-        ) : null}
-        {submission.error ? (
+        )}
+        {submission.error && (
           <p class="text-destructive text-sm">
             Something went wrong. Please try again.
           </p>
-        ) : null}
+        )}
         <FeedbackForm.Actions>
           <FeedbackForm.BackButton />
           <FeedbackForm.ActionsSecondary>
-            <Button
-              disabled={submission.pending}
-              type="submit"
-            >
+            <Button disabled={submission.pending} type="submit">
               <Icon class="size-4" name="SentIcon" />
               {submission.pending ? "Creating..." : "Create a new post"}
             </Button>
