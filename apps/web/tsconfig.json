@@ -7,9 +7,6 @@
     "strictNullChecks": true,
     "baseUrl": ".",
     "paths": {
-      "@feeblo/editor": ["../../packages/editor/src/index.ts"],
-      "@feeblo/ui": ["../../packages/ui/src/index.ts"],
-      "@feeblo/ui/*": ["../../packages/ui/src/*"],
       "~/*": ["./src/dashboard/*"]
     },
     "plugins": [
