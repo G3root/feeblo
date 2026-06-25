@@ -1,4 +1,4 @@
-import type { Node } from '@tiptap/pm/model';
+import type { Node } from "@tiptap/pm/model";
 
 export function isDocumentVisuallyEmpty(doc: Node): boolean {
   let nonGlobalNodeCount = 0;
@@ -7,7 +7,7 @@ export function isDocumentVisuallyEmpty(doc: Node): boolean {
   for (let index = 0; index < doc.childCount; index += 1) {
     const node = doc.child(index);
 
-    if (node.type.name === 'globalContent') {
+    if (node.type.name === "globalContent") {
       continue;
     }
 
@@ -26,7 +26,7 @@ export function isDocumentVisuallyEmpty(doc: Node): boolean {
     return false;
   }
 
-  if (firstNonGlobalNode!.type.name === 'container') {
+  if (firstNonGlobalNode?.type.name === "container") {
     return hasOnlyEmptyParagraph(firstNonGlobalNode!);
   }
 
@@ -46,5 +46,5 @@ function hasOnlyEmptyParagraph(node: Node): boolean {
 }
 
 function isEmptyParagraph(node: Node): boolean {
-  return node.type.name === 'paragraph' && node.content.size === 0;
+  return node.type.name === "paragraph" && node.content.size === 0;
 }

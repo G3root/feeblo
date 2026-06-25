@@ -13,9 +13,7 @@ export function BoardList(props: { boards: Board[] }) {
       </p>
 
       <div class="mt-6 space-y-3">
-        <For each={props.boards}>
-          {(board) => <BoardCard board={board} />}
-        </For>
+        <For each={props.boards}>{(board) => <BoardCard board={board} />}</For>
       </div>
 
       <PoweredByBadge />

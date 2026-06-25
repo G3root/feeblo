@@ -1,8 +1,8 @@
-import type * as React from 'react';
+import type * as React from "react";
 
 export interface BubbleMenuItemGroupProps {
-  className?: string;
   children: React.ReactNode;
+  className?: string;
 }
 
 export function BubbleMenuItemGroup({

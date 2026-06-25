@@ -1,9 +1,9 @@
-import type * as React from 'react';
-import { UnlinkIcon } from '../icons';
-import { useBubbleMenuContext } from './context';
+import type * as React from "react";
+import { UnlinkIcon } from "../icons";
+import { useBubbleMenuContext } from "./context";
 
 export interface BubbleMenuLinkUnlinkProps
-  extends Omit<React.ComponentProps<'button'>, 'type'> {}
+  extends Omit<React.ComponentProps<"button">, "type"> {}
 
 export function BubbleMenuLinkUnlink({
   className,
@@ -16,19 +16,19 @@ export function BubbleMenuLinkUnlink({
 
   return (
     <button
-      type="button"
       aria-label="Remove link"
-      data-re-link-bm-item=""
-      data-item="unlink"
       className={className}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        onMouseDown?.(e);
-      }}
+      data-item="unlink"
+      data-re-link-bm-item=""
       onClick={(e) => {
         onClick?.(e);
         editor.chain().focus().unsetLink().run();
       }}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onMouseDown?.(e);
+      }}
+      type="button"
       {...rest}
     >
       {children ?? <UnlinkIcon />}

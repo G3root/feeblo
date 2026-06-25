@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import {
   Card,
   CardContent,
@@ -6,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@feeblo/ui/card";
+import { Link } from "@tanstack/react-router";
 
 export function BoardNotFound({
   organizationId,

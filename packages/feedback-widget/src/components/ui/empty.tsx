@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { splitProps, type ComponentProps } from "solid-js";
+import { type ComponentProps, splitProps } from "solid-js";
 import { cn } from "../../lib/utils";
 
 export function Empty(props: ComponentProps<"div">) {
@@ -62,10 +62,7 @@ export function EmptyTitle(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <div
-      class={cn(
-        "font-heading font-medium text-lg tracking-tight",
-        local.class
-      )}
+      class={cn("font-heading font-medium text-lg tracking-tight", local.class)}
       data-slot="empty-title"
       {...others}
     />

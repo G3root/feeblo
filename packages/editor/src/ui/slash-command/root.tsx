@@ -4,38 +4,38 @@ import {
   offset,
   shift,
   useFloating,
-} from '@floating-ui/react-dom';
-import type { Editor } from '@tiptap/core';
-import { PluginKey } from '@tiptap/pm/state';
-import { useCurrentEditor } from '@tiptap/react';
-import Suggestion from '@tiptap/suggestion';
+} from "@floating-ui/react-dom";
+import type { Editor } from "@tiptap/core";
+import { PluginKey } from "@tiptap/pm/state";
+import { useCurrentEditor } from "@tiptap/react";
+import Suggestion from "@tiptap/suggestion";
 import {
   type ReactNode,
   useCallback,
   useEffect,
   useRef,
   useState,
-} from 'react';
-import { createPortal } from 'react-dom';
-import { EditorFocusScope } from '../editor-focus-scope';
-import { CommandList } from './command-list';
-import { defaultSlashCommands } from './commands';
-import { filterAndRankItems } from './search';
-import type { SlashCommandItem, SlashCommandRootProps } from './types';
-import { isAtMaxColumnsDepth } from './utils';
+} from "react";
+import { createPortal } from "react-dom";
+import { EditorFocusScope } from "../editor-focus-scope";
+import { CommandList } from "./command-list";
+import { defaultSlashCommands } from "./commands";
+import { filterAndRankItems } from "./search";
+import type { SlashCommandItem, SlashCommandRootProps } from "./types";
+import { isAtMaxColumnsDepth } from "./utils";
 
-const pluginKey = new PluginKey('slash-command');
+const pluginKey = new PluginKey("slash-command");
 
 interface SuggestionState {
   active: boolean;
-  query: string;
-  items: SlashCommandItem[];
   clientRect: (() => DOMRect | null) | null;
+  items: SlashCommandItem[];
+  query: string;
 }
 
 const INITIAL_STATE: SuggestionState = {
   active: false,
-  query: '',
+  query: "",
   items: [],
   clientRect: null,
 };
@@ -43,11 +43,11 @@ const INITIAL_STATE: SuggestionState = {
 function defaultFilterItems(
   items: SlashCommandItem[],
   query: string,
-  editor: Editor,
+  editor: Editor
 ): SlashCommandItem[] {
   const filtered = isAtMaxColumnsDepth(editor)
     ? items.filter(
-        (item) => item.category !== 'Layout' || !item.title.includes('column'),
+        (item) => item.category !== "Layout" || !item.title.includes("column")
       )
     : items;
 
@@ -57,7 +57,7 @@ function defaultFilterItems(
 export function SlashCommandRoot({
   items: itemsProp,
   filterItems: filterItemsProp,
-  char = '/',
+  char = "/",
   allow: allowProp,
   children,
 }: SlashCommandRootProps) {
@@ -69,14 +69,14 @@ export function SlashCommandRoot({
   const filterRef = useRef(filterItemsProp ?? defaultFilterItems);
   const allowRef = useRef(
     allowProp ??
-      (({ editor: e }: { editor: Editor }) => !e.isActive('codeBlock')),
+      (({ editor: e }: { editor: Editor }) => !e.isActive("codeBlock"))
   );
 
   itemsRef.current = itemsProp ?? defaultSlashCommands;
   filterRef.current = filterItemsProp ?? defaultFilterItems;
   allowRef.current =
     allowProp ??
-    (({ editor: e }: { editor: Editor }) => !e.isActive('codeBlock'));
+    (({ editor: e }: { editor: Editor }) => !e.isActive("codeBlock"));
 
   const commandRef = useRef<((item: SlashCommandItem) => void) | null>(null);
   const suggestionItemsRef = useRef<SlashCommandItem[]>([]);
@@ -87,13 +87,15 @@ export function SlashCommandRoot({
 
   const { refs, floatingStyles } = useFloating({
     open: state.active,
-    placement: 'bottom-start',
+    placement: "bottom-start",
     middleware: [offset(8), flip(), shift({ padding: 8 })],
     whileElementsMounted: autoUpdate,
   });
 
   useEffect(() => {
-    if (!state.clientRect) return;
+    if (!state.clientRect) {
+      return;
+    }
     const clientRect = state.clientRect;
     refs.setReference({
       getBoundingClientRect: () => clientRect()!,
@@ -102,7 +104,7 @@ export function SlashCommandRoot({
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [state.items]);
+  }, []);
 
   const onSelect = useCallback((index: number) => {
     const item = suggestionItemsRef.current[index];
@@ -112,7 +114,9 @@ export function SlashCommandRoot({
   }, []);
 
   useEffect(() => {
-    if (!editor) return;
+    if (!editor) {
+      return;
+    }
 
     const plugin = Suggestion<SlashCommandItem, SlashCommandItem>({
       pluginKey,
@@ -144,23 +148,25 @@ export function SlashCommandRoot({
           });
         },
         onKeyDown: ({ event }) => {
-          if (event.key === 'Escape') {
+          if (event.key === "Escape") {
             setState(INITIAL_STATE);
             return true;
           }
 
           const items = suggestionItemsRef.current;
-          if (items.length === 0) return false;
+          if (items.length === 0) {
+            return false;
+          }
 
-          if (event.key === 'ArrowUp') {
+          if (event.key === "ArrowUp") {
             setSelectedIndex((i) => (i + items.length - 1) % items.length);
             return true;
           }
-          if (event.key === 'ArrowDown') {
+          if (event.key === "ArrowDown") {
             setSelectedIndex((i) => (i + 1) % items.length);
             return true;
           }
-          if (event.key === 'Enter') {
+          if (event.key === "Enter") {
             const item = items[selectedIndexRef.current];
             if (item && commandRef.current) {
               commandRef.current(item);
@@ -187,7 +193,9 @@ export function SlashCommandRoot({
     };
   }, [editor, char]);
 
-  if (!editor || !state.active) return null;
+  if (!(editor && state.active)) {
+    return null;
+  }
 
   const renderProps = {
     items: state.items,
@@ -209,6 +217,6 @@ export function SlashCommandRoot({
         {content}
       </div>
     </EditorFocusScope>,
-    document.body,
+    document.body
   );
 }

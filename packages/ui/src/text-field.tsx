@@ -1,9 +1,9 @@
 import { useStore } from "@tanstack/react-store";
 import { useId } from "react";
 import { useFieldContext } from "./form-context";
-import { cn } from "./utils";
 import { Input } from "./input";
 import { Label } from "./label";
+import { cn } from "./utils";
 
 interface TextFieldProps extends React.ComponentProps<"input"> {
   hideLabel?: boolean;

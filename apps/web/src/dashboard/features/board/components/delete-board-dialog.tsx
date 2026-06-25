@@ -1,4 +1,3 @@
-import { useSelector } from "@xstate/store-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,6 +9,7 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
+import { useSelector } from "@xstate/store-react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useDeleteBoardDialogContext } from "../dialog-stores";
 

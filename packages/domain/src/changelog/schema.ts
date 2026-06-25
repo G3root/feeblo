@@ -1,10 +1,6 @@
 import { Schema as S } from "effect";
 
-export const ChangelogStatus = S.Literals([
-  "draft",
-  "scheduled",
-  "published",
-]);
+export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
 
 export type TChangelogStatus = S.Schema.Type<typeof ChangelogStatus>;
 

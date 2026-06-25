@@ -62,17 +62,21 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
         }).pipe(withRemapDbErrors("Membership", "select"));
       },
       OrganizationMembersList: ({ organizationId }) =>
-        repository.findOrganizationMembers({ organizationId }).pipe(
-          Policy.withPolicy(Policy.hasMembership(organizationId)),
-          withRemapDbErrors("Membership", "select")
-        ),
+        repository
+          .findOrganizationMembers({ organizationId })
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(organizationId)),
+            withRemapDbErrors("Membership", "select")
+          ),
       OrganizationInvitationsList: ({ organizationId }) =>
-        repository.findOrganizationInvitations({
-          organizationId,
-        }).pipe(
-          Policy.withPolicy(Policy.hasMembership(organizationId)),
-          withRemapDbErrors("Invitation", "select")
-        ),
+        repository
+          .findOrganizationInvitations({
+            organizationId,
+          })
+          .pipe(
+            Policy.withPolicy(Policy.hasMembership(organizationId)),
+            withRemapDbErrors("Invitation", "select")
+          ),
       OrganizationInviteMember: ({ organizationId, email, role }) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;
@@ -111,17 +115,17 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
             role,
           })
           .pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(organizationId),
-              Policy.any(
-                Policy.hasOrganizationRole(organizationId, "owner"),
-                Policy.hasOrganizationRole(organizationId, "admin")
-              ),
-              membershipPolicy.hasOtherOwners({ organizationId, memberId })
-            )
-          ),
-          withRemapDbErrors("Membership", "update")
+            Policy.withPolicy(
+              Policy.all(
+                Policy.hasMembership(organizationId),
+                Policy.any(
+                  Policy.hasOrganizationRole(organizationId, "owner"),
+                  Policy.hasOrganizationRole(organizationId, "admin")
+                ),
+                membershipPolicy.hasOtherOwners({ organizationId, memberId })
+              )
+            ),
+            withRemapDbErrors("Membership", "update")
           ),
       OrganizationRemoveMember: ({ organizationId, memberId }) =>
         repository
@@ -130,17 +134,17 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
             memberId,
           })
           .pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(organizationId),
-              Policy.any(
-                Policy.hasOrganizationRole(organizationId, "owner"),
-                Policy.hasOrganizationRole(organizationId, "admin")
-              ),
-              membershipPolicy.hasOtherOwners({ organizationId, memberId })
-            )
-          ),
-          withRemapDbErrors("Membership", "delete")
+            Policy.withPolicy(
+              Policy.all(
+                Policy.hasMembership(organizationId),
+                Policy.any(
+                  Policy.hasOrganizationRole(organizationId, "owner"),
+                  Policy.hasOrganizationRole(organizationId, "admin")
+                ),
+                membershipPolicy.hasOtherOwners({ organizationId, memberId })
+              )
+            ),
+            withRemapDbErrors("Membership", "delete")
           ),
       OrganizationCancelInvitation: ({ organizationId, invitationId }) =>
         repository

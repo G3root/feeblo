@@ -32,12 +32,14 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
           ),
 
       ChangelogListPublic: (args: TChangelogList) =>
-        repository.findManyPublished(args).pipe(
-          Policy.withPublicPolicy(
-            sitePolicy.canViewChangelog(args.organizationId)
+        repository
+          .findManyPublished(args)
+          .pipe(
+            Policy.withPublicPolicy(
+              sitePolicy.canViewChangelog(args.organizationId)
+            ),
+            withRemapDbErrors("Changelog", "select")
           ),
-          withRemapDbErrors("Changelog", "select")
-        ),
 
       ChangelogCreate: (args: TChangelogCreate) => {
         return Effect.gen(function* () {

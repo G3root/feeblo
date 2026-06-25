@@ -22,9 +22,9 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
             organizationId: args.organizationId,
           })
           .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Upvote", "select")
-        ),
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            withRemapDbErrors("Upvote", "select")
+          ),
       UpvoteToggle: (args: TUpvoteToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;

@@ -42,16 +42,16 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
             organizationId: args.organizationId,
           })
           .pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(args.organizationId),
-              boardPolicy.isOwner({
-                organizationId: args.organizationId,
-                boardId: args.id,
-              })
-            )
-          ),
-          withRemapDbErrors("Board", "delete")
+            Policy.withPolicy(
+              Policy.all(
+                Policy.hasMembership(args.organizationId),
+                boardPolicy.isOwner({
+                  organizationId: args.organizationId,
+                  boardId: args.id,
+                })
+              )
+            ),
+            withRemapDbErrors("Board", "delete")
           );
       },
       BoardCreate: (args: TBoardCreate) => {

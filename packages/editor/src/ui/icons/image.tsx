@@ -1,21 +1,21 @@
-import type { IconProps } from './types';
+import type { IconProps } from "./types";
 
 export function ImageIcon({ size, width, height, ...props }: IconProps) {
   return (
     <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? width ?? 24}
-      height={size ?? height ?? 24}
-      viewBox="0 0 24 24"
+      aria-hidden="true"
       fill="none"
+      height={size ?? height ?? 24}
       stroke="currentColor"
-      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden="true"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      width={size ?? width ?? 24}
+      xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+      <rect height="18" rx="2" ry="2" width="18" x="3" y="3" />
       <circle cx="9" cy="9" r="2" />
       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
     </svg>

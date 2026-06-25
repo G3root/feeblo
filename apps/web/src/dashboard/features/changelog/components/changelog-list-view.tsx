@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import {
   Table,
@@ -8,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import { Link } from "@tanstack/react-router";
 import type { ChangelogStatus } from "../constants";
 import { ChangelogStatusBadge } from "./changelog-status";
 

@@ -1,9 +1,3 @@
-import { htmlToExcerpt } from "@feeblo/utils/html";
-import { generateId } from "@feeblo/utils/id";
-import { slugify } from "@feeblo/utils/url";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useSelector } from "@xstate/store-react";
-import { useRef, useState } from "react";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -15,6 +9,12 @@ import {
 } from "@feeblo/ui/dialog";
 import type { EmailEditorRef } from "@feeblo/ui/editor";
 import { toastManager } from "@feeblo/ui/toast";
+import { htmlToExcerpt } from "@feeblo/utils/html";
+import { generateId } from "@feeblo/utils/id";
+import { slugify } from "@feeblo/utils/url";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { useSelector } from "@xstate/store-react";
+import { useRef, useState } from "react";
 import type { BoardPostStatus } from "~/features/board/constants";
 import { useAppForm } from "~/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";

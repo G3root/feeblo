@@ -1,5 +1,4 @@
 import type { PostStatus } from "@feeblo/domain/post-status/schema";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@feeblo/ui/button";
 import {
   Combobox,
@@ -11,6 +10,7 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@feeblo/ui/combobox";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   BOARD_LANE_COLOR_MAP,
   BoardIconMap,
@@ -42,7 +42,7 @@ export function StatusSelect({
   onValueChange,
 }: {
   currentStatusId: string;
-  statuses: Array<Pick<PostStatus, "id" | "type">>;
+  statuses: Pick<PostStatus, "id" | "type">[];
   onValueChange: (status: Pick<PostStatus, "id" | "type"> | null) => void;
 }) {
   const items = statuses.map((postStatus) => ({

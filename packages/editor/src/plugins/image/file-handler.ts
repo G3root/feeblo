@@ -1,18 +1,18 @@
-import type { Editor } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
-import type { UseEditorImageOptions } from './types';
-import { executeUploadFlow } from './upload-flow';
+import type { Editor } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { UseEditorImageOptions } from "./types";
+import { executeUploadFlow } from "./upload-flow";
 
 export function createImageFileHandlerPlugin(
   editor: Editor,
-  uploadImage: UseEditorImageOptions['uploadImage'],
+  uploadImage: UseEditorImageOptions["uploadImage"]
 ) {
   return new Plugin({
-    key: new PluginKey('imageFileHandler'),
+    key: new PluginKey("imageFileHandler"),
     props: {
       handlePaste(_view, event) {
         const file = event.clipboardData?.files?.[0];
-        if (!file?.type.includes('image/')) {
+        if (!file?.type.includes("image/")) {
           return false;
         }
 
@@ -27,7 +27,7 @@ export function createImageFileHandlerPlugin(
         }
 
         const file = event.dataTransfer.files[0];
-        if (!file.type.includes('image/')) {
+        if (!file.type.includes("image/")) {
           return false;
         }
 

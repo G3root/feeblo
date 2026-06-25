@@ -102,13 +102,7 @@ export function makeRepository<
   schemas: RepositorySchemas<InsertSchema, UpdateSchema>,
   options: RepositoryOptions<Col, Name>
 ): Effect.Effect<
-  Repository<
-    RecordType,
-    InsertSchema["Type"],
-    UpdateSchema["Type"],
-    Col,
-    Id
-  >,
+  Repository<RecordType, InsertSchema["Type"], UpdateSchema["Type"], Col, Id>,
   never,
   Database
 > {

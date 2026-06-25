@@ -32,7 +32,7 @@ function RoadmapIssueCardContent({
 
       {boardName ? (
         <div className="mt-3">
-          <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-muted-foreground text-[11px]">
+          <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-[11px] text-muted-foreground">
             {boardName}
           </span>
         </div>

@@ -1,7 +1,8 @@
 /** biome-ignore-all lint/a11y/noSvgWithoutTitle: icons are decorative and labeled by button text */
-import { type ReactNode, useState } from "react";
+
 import { Button } from "@feeblo/ui/button";
 import { Field, FieldSeparator } from "@feeblo/ui/field";
+import { type ReactNode, useState } from "react";
 import {
   type SocialProvider,
   signInWithSocialProvider,

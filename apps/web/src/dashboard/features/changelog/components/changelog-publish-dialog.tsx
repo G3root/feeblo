@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -12,6 +11,7 @@ import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
 import { RadioGroup, RadioGroupItem } from "@feeblo/ui/radio-group";
 import { toastManager } from "@feeblo/ui/toast";
+import { useState } from "react";
 import type { ChangelogStatus } from "../constants";
 import {
   publishChangelogSchema,

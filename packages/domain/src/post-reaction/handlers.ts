@@ -22,9 +22,9 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
             organizationId: args.organizationId,
           })
           .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("PostReaction", "select")
-        ),
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            withRemapDbErrors("PostReaction", "select")
+          ),
       PostReactionToggle: (args: TPostReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;

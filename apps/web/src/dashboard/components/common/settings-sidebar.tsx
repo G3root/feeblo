@@ -1,4 +1,15 @@
 import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "@feeblo/ui/sidebar";
+import {
   ArrowLeft01Icon,
   Building03Icon,
   CreditCardIcon,
@@ -13,17 +24,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Fragment } from "react";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarSeparator,
-} from "@feeblo/ui/sidebar";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 const settingsItems = [

@@ -17,9 +17,7 @@ export const CreateWorkspaceOutput = S.Struct({
   organizationId: S.String,
 });
 
-export type TCreateWorkspaceInput = S.Schema.Type<
-  typeof CreateWorkspaceInput
->;
+export type TCreateWorkspaceInput = S.Schema.Type<typeof CreateWorkspaceInput>;
 
 export type TWorkspaceInput = S.Schema.Type<typeof WorkspaceInput>;
 export type TWorkspacePlan = S.Schema.Type<typeof WorkspacePlan>;

@@ -1,24 +1,24 @@
-import { PluginKey } from '@tiptap/pm/state';
-import { useEditorState } from '@tiptap/react';
-import type * as React from 'react';
-import { BubbleMenuButtonEditLink } from './button-edit-link';
-import { BubbleMenuButtonForm } from './button-form';
-import { BubbleMenuButtonToolbar } from './button-toolbar';
-import { BubbleMenuButtonUnlink } from './button-unlink';
-import { useBubbleMenuContext } from './context';
-import { BubbleMenuRoot } from './root';
-import { bubbleMenuTriggers } from './triggers';
+import { PluginKey } from "@tiptap/pm/state";
+import { useEditorState } from "@tiptap/react";
+import type * as React from "react";
+import { BubbleMenuButtonEditLink } from "./button-edit-link";
+import { BubbleMenuButtonForm } from "./button-form";
+import { BubbleMenuButtonToolbar } from "./button-toolbar";
+import { BubbleMenuButtonUnlink } from "./button-unlink";
+import { useBubbleMenuContext } from "./context";
+import { BubbleMenuRoot } from "./root";
+import { bubbleMenuTriggers } from "./triggers";
 
-const buttonPluginKey = new PluginKey('buttonBubbleMenu');
+const buttonPluginKey = new PluginKey("buttonBubbleMenu");
 
 export interface BubbleMenuButtonDefaultProps
-  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'children'> {
-  placement?: 'top' | 'bottom';
+  extends Omit<React.ComponentPropsWithoutRef<"div">, "children"> {
   offset?: number;
   onHide?: () => void;
-  validateUrl?: (value: string) => string | null;
   onLinkApply?: (href: string) => void;
   onLinkRemove?: () => void;
+  placement?: "top" | "bottom";
+  validateUrl?: (value: string) => string | null;
 }
 
 function BubbleMenuButtonDefaultInner({
@@ -27,15 +27,15 @@ function BubbleMenuButtonDefaultInner({
   onLinkRemove,
 }: Pick<
   BubbleMenuButtonDefaultProps,
-  'validateUrl' | 'onLinkApply' | 'onLinkRemove'
+  "validateUrl" | "onLinkApply" | "onLinkRemove"
 >) {
   const { editor } = useBubbleMenuContext();
   const buttonHref = useEditorState({
     editor,
     selector: ({ editor: e }) =>
-      (e?.getAttributes('button').href as string) ?? '',
+      (e?.getAttributes("button").href as string) ?? "",
   });
-  const hasLink = (buttonHref ?? '') !== '' && buttonHref !== '#';
+  const hasLink = (buttonHref ?? "") !== "" && buttonHref !== "#";
 
   return (
     <>
@@ -44,16 +44,16 @@ function BubbleMenuButtonDefaultInner({
         {hasLink && <BubbleMenuButtonUnlink onLinkRemove={onLinkRemove} />}
       </BubbleMenuButtonToolbar>
       <BubbleMenuButtonForm
-        validateUrl={validateUrl}
         onLinkApply={onLinkApply}
         onLinkRemove={onLinkRemove}
+        validateUrl={validateUrl}
       />
     </>
   );
 }
 
 export function BubbleMenuButtonDefault({
-  placement = 'top',
+  placement = "top",
   offset,
   onHide,
   className,
@@ -64,18 +64,18 @@ export function BubbleMenuButtonDefault({
 }: BubbleMenuButtonDefaultProps) {
   return (
     <BubbleMenuRoot
-      trigger={bubbleMenuTriggers.node('button')}
-      pluginKey={buttonPluginKey}
-      placement={placement}
+      className={className}
       offset={offset}
       onHide={onHide}
-      className={className}
+      placement={placement}
+      pluginKey={buttonPluginKey}
+      trigger={bubbleMenuTriggers.node("button")}
       {...rest}
     >
       <BubbleMenuButtonDefaultInner
-        validateUrl={validateUrl}
         onLinkApply={onLinkApply}
         onLinkRemove={onLinkRemove}
+        validateUrl={validateUrl}
       />
     </BubbleMenuRoot>
   );

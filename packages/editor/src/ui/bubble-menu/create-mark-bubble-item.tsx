@@ -1,20 +1,20 @@
-import { useEditorState } from '@tiptap/react';
-import type * as React from 'react';
-import { useBubbleMenuContext } from './context';
-import { BubbleMenuItem } from './item';
+import { useEditorState } from "@tiptap/react";
+import type * as React from "react";
+import { useBubbleMenuContext } from "./context";
+import { BubbleMenuItem } from "./item";
 
 export interface PreWiredItemProps {
-  className?: string;
   /** Override the default icon */
   children?: React.ReactNode;
+  className?: string;
 }
 
 interface MarkBubbleItemConfig {
-  name: string;
   activeName: string;
   activeParams?: Record<string, unknown>;
   command: string;
   icon: React.ReactNode;
+  name: string;
 }
 
 export function createMarkBubbleItem(config: MarkBubbleItemConfig) {
@@ -45,10 +45,10 @@ export function createMarkBubbleItem(config: MarkBubbleItemConfig) {
 
     return (
       <BubbleMenuItem
-        name={config.name}
-        isActive={isActive}
-        onCommand={handleCommand}
         className={className}
+        isActive={isActive}
+        name={config.name}
+        onCommand={handleCommand}
       >
         {children ?? config.icon}
       </BubbleMenuItem>

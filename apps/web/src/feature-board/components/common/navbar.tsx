@@ -1,5 +1,5 @@
-import { Link, useLocation } from "@tanstack/react-router";
 import { Button } from "@feeblo/ui/button";
+import { Link, useLocation } from "@tanstack/react-router";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import { useSite } from "../../providers/site-provider";

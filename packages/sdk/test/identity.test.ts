@@ -65,7 +65,7 @@ describe("normalizeUserIdentity", () => {
     });
 
     expect(result.companies).toHaveLength(1);
-    const company = result.companies![0]!;
+    const company = result.companies?.[0]!;
     expect(company).toHaveProperty("id", "comp_1");
     expect(company).toHaveProperty("name", "Acme Inc");
     expect(company).toHaveProperty("monthlySpend", 1000);
@@ -84,7 +84,7 @@ describe("normalizeUserIdentity", () => {
       ],
     });
 
-    expect(result.companies![0]!).not.toHaveProperty("monthlySpend");
+    expect(result.companies?.[0]!).not.toHaveProperty("monthlySpend");
   });
 
   it("omits companies when not provided", () => {

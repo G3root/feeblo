@@ -48,6 +48,4 @@ export const SiteListBySubdomain = S.Struct({
   subdomain: S.String,
 });
 
-export type TSiteListBySubdomain = S.Schema.Type<
-  typeof SiteListBySubdomain
->;
+export type TSiteListBySubdomain = S.Schema.Type<typeof SiteListBySubdomain>;

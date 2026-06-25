@@ -1,12 +1,12 @@
-import type { Extensions } from '@tiptap/core';
-import { generateJSON } from '@tiptap/html';
-import type { Slice } from '@tiptap/pm/model';
-import type { EditorView } from '@tiptap/pm/view';
-import { sanitizePastedHtml } from '../utils/paste-sanitizer';
+import type { Extensions } from "@tiptap/core";
+import { generateJSON } from "@tiptap/html";
+import type { Slice } from "@tiptap/pm/model";
+import type { EditorView } from "@tiptap/pm/view";
+import { sanitizePastedHtml } from "../utils/paste-sanitizer";
 
 export type PasteHandler = (
   payload: string | File,
-  view: EditorView,
+  view: EditorView
 ) => boolean;
 
 export function createPasteHandler({
@@ -17,7 +17,7 @@ export function createPasteHandler({
   extensions: Extensions;
 }) {
   return (view: EditorView, event: ClipboardEvent, slice: Slice): boolean => {
-    const text = event.clipboardData?.getData('text/plain');
+    const text = event.clipboardData?.getData("text/plain");
 
     if (text && onPaste?.(text, view)) {
       event.preventDefault();
@@ -38,9 +38,9 @@ export function createPasteHandler({
       return false;
     }
 
-    if (event.clipboardData?.getData?.('text/html')) {
+    if (event.clipboardData?.getData?.("text/html")) {
       event.preventDefault();
-      const html = event.clipboardData.getData('text/html');
+      const html = event.clipboardData.getData("text/html");
 
       const sanitizedHtml = sanitizePastedHtml(html);
 

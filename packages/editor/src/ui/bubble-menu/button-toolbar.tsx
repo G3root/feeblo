@@ -1,8 +1,8 @@
-import type * as React from 'react';
-import { useBubbleMenuContext } from './context';
+import type * as React from "react";
+import { useBubbleMenuContext } from "./context";
 
 export interface BubbleMenuButtonToolbarProps
-  extends React.ComponentProps<'div'> {}
+  extends React.ComponentProps<"div"> {}
 
 export function BubbleMenuButtonToolbar({
   children,

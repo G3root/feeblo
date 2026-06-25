@@ -1,27 +1,27 @@
-import type { Editor } from '@tiptap/core';
-import { useEditorState } from '@tiptap/react';
-import * as React from 'react';
-import { editorEventBus } from '../../core/event-bus';
-import { CheckIcon, LinkIcon, UnlinkIcon } from '../icons';
-import { useBubbleMenuContext } from './context';
-import { focusEditor, getUrlFromString, setLinkHref } from './utils';
+import type { Editor } from "@tiptap/core";
+import { useEditorState } from "@tiptap/react";
+import * as React from "react";
+import { editorEventBus } from "../../core/event-bus";
+import { CheckIcon, LinkIcon, UnlinkIcon } from "../icons";
+import { useBubbleMenuContext } from "./context";
+import { focusEditor, getUrlFromString, setLinkHref } from "./utils";
 
 export interface BubbleMenuLinkSelectorProps {
+  /** Plugin slot: extra actions rendered inside the link input form */
+  children?: React.ReactNode;
   className?: string;
-  /** Whether to show the link icon toggle button (default: true) */
-  showToggle?: boolean;
-  /** Custom URL validator. Return the valid URL string or null. */
-  validateUrl?: (value: string) => string | null;
   /** Called after link is applied */
   onLinkApply?: (href: string) => void;
   /** Called after link is removed */
   onLinkRemove?: () => void;
-  /** Plugin slot: extra actions rendered inside the link input form */
-  children?: React.ReactNode;
-  /** Controlled open state */
-  open?: boolean;
   /** Called when open state changes */
   onOpenChange?: (open: boolean) => void;
+  /** Controlled open state */
+  open?: boolean;
+  /** Whether to show the link icon toggle button (default: true) */
+  showToggle?: boolean;
+  /** Custom URL validator. Return the valid URL string or null. */
+  validateUrl?: (value: string) => string | null;
 }
 
 export function BubbleMenuLinkSelector({
@@ -46,15 +46,15 @@ export function BubbleMenuLinkSelector({
       }
       onOpenChange?.(value);
     },
-    [isControlled, onOpenChange],
+    [isControlled, onOpenChange]
   );
 
   const editorState = useEditorState({
     editor,
     selector: ({ editor }) => ({
-      isLinkActive: editor?.isActive('link') ?? false,
-      hasLink: Boolean(editor?.getAttributes('link').href),
-      currentHref: (editor?.getAttributes('link').href as string) || '',
+      isLinkActive: editor?.isActive("link") ?? false,
+      hasLink: Boolean(editor?.getAttributes("link").href),
+      currentHref: (editor?.getAttributes("link").href as string) || "",
     }),
   });
 
@@ -62,7 +62,7 @@ export function BubbleMenuLinkSelector({
   setIsOpenRef.current = setIsOpen;
 
   React.useEffect(() => {
-    const subscription = editorEventBus.on('bubble-menu:add-link', () => {
+    const subscription = editorEventBus.on("bubble-menu:add-link", () => {
       setIsOpenRef.current(true);
     });
 
@@ -83,31 +83,31 @@ export function BubbleMenuLinkSelector({
   return (
     <div
       data-re-link-selector=""
-      {...(isOpen ? { 'data-open': '' } : {})}
-      {...(editorState.hasLink ? { 'data-has-link': '' } : {})}
+      {...(isOpen ? { "data-open": "" } : {})}
+      {...(editorState.hasLink ? { "data-has-link": "" } : {})}
       className={className}
     >
       {showToggle && (
         <button
-          type="button"
           aria-expanded={isOpen}
           aria-haspopup="true"
           aria-label="Add link"
           aria-pressed={editorState.isLinkActive && editorState.hasLink}
           data-re-link-selector-trigger=""
           onClick={handleOpenLink}
+          type="button"
         >
           <LinkIcon />
         </button>
       )}
       {isOpen && (
         <LinkForm
-          editor={editor}
           currentHref={editorState.currentHref}
-          validateUrl={validateUrl}
+          editor={editor}
           onLinkApply={onLinkApply}
           onLinkRemove={onLinkRemove}
           setIsOpen={setIsOpen}
+          validateUrl={validateUrl}
         >
           {children}
         </LinkForm>
@@ -117,13 +117,13 @@ export function BubbleMenuLinkSelector({
 }
 
 interface LinkFormProps {
-  editor: Editor;
+  children?: React.ReactNode;
   currentHref: string;
-  validateUrl?: (value: string) => string | null;
+  editor: Editor;
   onLinkApply?: (href: string) => void;
   onLinkRemove?: () => void;
   setIsOpen: (state: boolean) => void;
-  children?: React.ReactNode;
+  validateUrl?: (value: string) => string | null;
 }
 
 function LinkForm({
@@ -137,7 +137,7 @@ function LinkForm({
 }: LinkFormProps) {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
-  const displayHref = currentHref === '#' ? '' : currentHref;
+  const displayHref = currentHref === "#" ? "" : currentHref;
   const [inputValue, setInputValue] = React.useState(displayHref);
 
   React.useEffect(() => {
@@ -149,8 +149,8 @@ function LinkForm({
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (editor.getAttributes('link').href === '#') {
+      if (event.key === "Escape") {
+        if (editor.getAttributes("link").href === "#") {
           editor.chain().unsetLink().run();
         }
         setIsOpen(false);
@@ -160,7 +160,7 @@ function LinkForm({
     const handleClickOutside = (event: MouseEvent) => {
       if (formRef.current && !formRef.current.contains(event.target as Node)) {
         const form = formRef.current;
-        const submitEvent = new Event('submit', {
+        const submitEvent = new Event("submit", {
           bubbles: true,
           cancelable: true,
         });
@@ -169,12 +169,12 @@ function LinkForm({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [editor, setIsOpen]);
 
@@ -183,8 +183,8 @@ function LinkForm({
 
     const value = inputValue.trim();
 
-    if (value === '') {
-      setLinkHref(editor, '');
+    if (value === "") {
+      setLinkHref(editor, "");
       setIsOpen(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -195,7 +195,7 @@ function LinkForm({
     const finalValue = validate(value);
 
     if (!finalValue) {
-      setLinkHref(editor, '');
+      setLinkHref(editor, "");
       setIsOpen(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -210,7 +210,7 @@ function LinkForm({
 
   function handleUnlink(e: React.MouseEvent) {
     e.stopPropagation();
-    setLinkHref(editor, '');
+    setLinkHref(editor, "");
     setIsOpen(false);
     focusEditor(editor);
     onLinkRemove?.();
@@ -218,40 +218,40 @@ function LinkForm({
 
   return (
     <form
-      ref={formRef}
       data-re-link-selector-form=""
-      onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
       onSubmit={handleSubmit}
+      ref={formRef}
     >
       <input
-        ref={inputRef}
         data-re-link-selector-input=""
-        value={inputValue}
-        onFocus={(e) => e.stopPropagation()}
         onChange={(e) => setInputValue(e.target.value)}
+        onFocus={(e) => e.stopPropagation()}
         placeholder="Paste a link"
+        ref={inputRef}
         type="text"
+        value={inputValue}
       />
 
       {children}
 
       {displayHref ? (
         <button
-          type="button"
           aria-label="Remove link"
           data-re-link-selector-unlink=""
           onClick={handleUnlink}
+          type="button"
         >
           <UnlinkIcon />
         </button>
       ) : (
         <button
-          type="submit"
           aria-label="Apply link"
           data-re-link-selector-apply=""
           onMouseDown={(e) => e.stopPropagation()}
+          type="submit"
         >
           <CheckIcon />
         </button>

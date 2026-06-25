@@ -1,12 +1,3 @@
-import {
-  CreditCardIcon,
-  LogoutSquare01Icon,
-  Moon02Icon,
-  Sun01Icon,
-  UnfoldMoreIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Link, useNavigate } from "@tanstack/react-router";
 import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import {
   DropdownMenu,
@@ -20,15 +11,24 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
-import { useTheme } from "@feeblo/ui/theme-provider";
-import { useOrganizationId } from "~/hooks/use-organization-id";
-import { authClient } from "~/lib/auth-client";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@feeblo/ui/sidebar";
+import { useTheme } from "@feeblo/ui/theme-provider";
+import {
+  CreditCardIcon,
+  LogoutSquare01Icon,
+  Moon02Icon,
+  Sun01Icon,
+  UnfoldMoreIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useOrganizationId } from "~/hooks/use-organization-id";
+import { authClient } from "~/lib/auth-client";
 
 export function NavUser() {
   const { isMobile } = useSidebar();

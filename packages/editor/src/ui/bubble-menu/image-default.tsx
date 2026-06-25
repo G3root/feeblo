@@ -1,27 +1,27 @@
-import { PluginKey } from '@tiptap/pm/state';
-import { useEditorState } from '@tiptap/react';
-import type * as React from 'react';
-import { useBubbleMenuContext } from './context';
-import { BubbleMenuImageEditLink } from './image-edit-link';
-import { BubbleMenuImageForm } from './image-form';
-import { BubbleMenuImageToolbar } from './image-toolbar';
-import { BubbleMenuImageUnlink } from './image-unlink';
-import { BubbleMenuRoot } from './root';
-import { bubbleMenuTriggers } from './triggers';
+import { PluginKey } from "@tiptap/pm/state";
+import { useEditorState } from "@tiptap/react";
+import type * as React from "react";
+import { useBubbleMenuContext } from "./context";
+import { BubbleMenuImageEditLink } from "./image-edit-link";
+import { BubbleMenuImageForm } from "./image-form";
+import { BubbleMenuImageToolbar } from "./image-toolbar";
+import { BubbleMenuImageUnlink } from "./image-unlink";
+import { BubbleMenuRoot } from "./root";
+import { bubbleMenuTriggers } from "./triggers";
 
-const imagePluginKey = new PluginKey('imageBubbleMenu');
+const imagePluginKey = new PluginKey("imageBubbleMenu");
 
-type ExcludableItem = 'edit-link' | 'unlink';
+type ExcludableItem = "edit-link" | "unlink";
 
 export interface BubbleMenuImageDefaultProps
-  extends Omit<React.ComponentPropsWithoutRef<'div'>, 'children'> {
+  extends Omit<React.ComponentPropsWithoutRef<"div">, "children"> {
   excludeItems?: ExcludableItem[];
-  placement?: 'top' | 'bottom';
   offset?: number;
   onHide?: () => void;
-  validateUrl?: (value: string) => string | null;
   onLinkApply?: (href: string) => void;
   onLinkRemove?: () => void;
+  placement?: "top" | "bottom";
+  validateUrl?: (value: string) => string | null;
 }
 
 function BubbleMenuImageDefaultInner({
@@ -31,19 +31,19 @@ function BubbleMenuImageDefaultInner({
   onLinkRemove,
 }: Pick<
   BubbleMenuImageDefaultProps,
-  'excludeItems' | 'validateUrl' | 'onLinkApply' | 'onLinkRemove'
+  "excludeItems" | "validateUrl" | "onLinkApply" | "onLinkRemove"
 > & { excludeItems: ExcludableItem[] }) {
   const { editor } = useBubbleMenuContext();
   const imageHref = useEditorState({
     editor,
     selector: ({ editor: e }) =>
-      (e?.getAttributes('image').href as string | null) ?? '',
+      (e?.getAttributes("image").href as string | null) ?? "",
   });
 
   const has = (item: ExcludableItem) => !excludeItems.includes(item);
-  const hasLink = (imageHref ?? '') !== '';
-  const showEditLink = has('edit-link');
-  const showUnlink = has('unlink') && hasLink;
+  const hasLink = (imageHref ?? "") !== "";
+  const showEditLink = has("edit-link");
+  const showUnlink = has("unlink") && hasLink;
   const hasToolbarItems = showEditLink || showUnlink;
 
   return (
@@ -56,9 +56,9 @@ function BubbleMenuImageDefaultInner({
       )}
       {showEditLink && (
         <BubbleMenuImageForm
-          validateUrl={validateUrl}
           onLinkApply={onLinkApply}
           onLinkRemove={onLinkRemove}
+          validateUrl={validateUrl}
         />
       )}
     </>
@@ -67,7 +67,7 @@ function BubbleMenuImageDefaultInner({
 
 export function BubbleMenuImageDefault({
   excludeItems = [],
-  placement = 'top',
+  placement = "top",
   offset,
   onHide,
   className,
@@ -78,19 +78,19 @@ export function BubbleMenuImageDefault({
 }: BubbleMenuImageDefaultProps) {
   return (
     <BubbleMenuRoot
-      trigger={bubbleMenuTriggers.node('image')}
-      pluginKey={imagePluginKey}
-      placement={placement}
+      className={className}
       offset={offset}
       onHide={onHide}
-      className={className}
+      placement={placement}
+      pluginKey={imagePluginKey}
+      trigger={bubbleMenuTriggers.node("image")}
       {...rest}
     >
       <BubbleMenuImageDefaultInner
         excludeItems={excludeItems}
-        validateUrl={validateUrl}
         onLinkApply={onLinkApply}
         onLinkRemove={onLinkRemove}
+        validateUrl={validateUrl}
       />
     </BubbleMenuRoot>
   );

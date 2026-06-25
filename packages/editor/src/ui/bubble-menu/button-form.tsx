@@ -1,13 +1,13 @@
-import * as React from 'react';
-import { CheckIcon, UnlinkIcon } from '../icons';
-import { useBubbleMenuContext } from './context';
-import { focusEditor, getUrlFromString } from './utils';
+import * as React from "react";
+import { CheckIcon, UnlinkIcon } from "../icons";
+import { useBubbleMenuContext } from "./context";
+import { focusEditor, getUrlFromString } from "./utils";
 
 export interface BubbleMenuButtonFormProps {
   className?: string;
-  validateUrl?: (value: string) => string | null;
   onLinkApply?: (href: string) => void;
   onLinkRemove?: () => void;
+  validateUrl?: (value: string) => string | null;
 }
 
 export function BubbleMenuButtonForm({
@@ -20,16 +20,16 @@ export function BubbleMenuButtonForm({
   const inputRef = React.useRef<HTMLInputElement>(null);
   const formRef = React.useRef<HTMLFormElement>(null);
 
-  const buttonHref = (editor.getAttributes('button').href as string) ?? '';
-  const displayHref = buttonHref === '#' ? '' : buttonHref;
+  const buttonHref = (editor.getAttributes("button").href as string) ?? "";
+  const displayHref = buttonHref === "#" ? "" : buttonHref;
   const [inputValue, setInputValue] = React.useState(displayHref);
 
   React.useEffect(() => {
     if (!isEditing) {
       return;
     }
-    const currentHref = (editor.getAttributes('button').href as string) ?? '';
-    const display = currentHref === '#' ? '' : currentHref;
+    const currentHref = (editor.getAttributes("button").href as string) ?? "";
+    const display = currentHref === "#" ? "" : currentHref;
     setInputValue(display);
     const timeoutId = setTimeout(() => {
       inputRef.current?.focus();
@@ -43,7 +43,7 @@ export function BubbleMenuButtonForm({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setIsEditing(false);
       }
     };
@@ -51,7 +51,7 @@ export function BubbleMenuButtonForm({
     const handleClickOutside = (event: MouseEvent) => {
       if (formRef.current && !formRef.current.contains(event.target as Node)) {
         const form = formRef.current;
-        const submitEvent = new Event('submit', {
+        const submitEvent = new Event("submit", {
           bubbles: true,
           cancelable: true,
         });
@@ -60,12 +60,12 @@ export function BubbleMenuButtonForm({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isEditing, setIsEditing]);
 
@@ -78,8 +78,8 @@ export function BubbleMenuButtonForm({
 
     const value = inputValue.trim();
 
-    if (value === '') {
-      editor.commands.updateButton({ href: '#' });
+    if (value === "") {
+      editor.commands.updateButton({ href: "#" });
       setIsEditing(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -90,7 +90,7 @@ export function BubbleMenuButtonForm({
     const finalValue = validate(value);
 
     if (!finalValue) {
-      editor.commands.updateButton({ href: '#' });
+      editor.commands.updateButton({ href: "#" });
       setIsEditing(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -105,7 +105,7 @@ export function BubbleMenuButtonForm({
 
   function handleUnlink(e: React.MouseEvent) {
     e.stopPropagation();
-    editor.commands.updateButton({ href: '#' });
+    editor.commands.updateButton({ href: "#" });
     setIsEditing(false);
     focusEditor(editor);
     onLinkRemove?.();
@@ -113,39 +113,39 @@ export function BubbleMenuButtonForm({
 
   return (
     <form
-      ref={formRef}
-      data-re-btn-bm-form=""
       className={className}
-      onMouseDown={(e) => e.stopPropagation()}
+      data-re-btn-bm-form=""
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
       onSubmit={handleSubmit}
+      ref={formRef}
     >
       <input
-        ref={inputRef}
         data-re-btn-bm-input=""
-        value={inputValue}
-        onFocus={(e) => e.stopPropagation()}
         onChange={(e) => setInputValue(e.target.value)}
+        onFocus={(e) => e.stopPropagation()}
         placeholder="Paste a link"
+        ref={inputRef}
         type="text"
+        value={inputValue}
       />
 
       {displayHref ? (
         <button
-          type="button"
           aria-label="Remove link"
           data-re-btn-bm-unlink=""
           onClick={handleUnlink}
+          type="button"
         >
           <UnlinkIcon />
         </button>
       ) : (
         <button
-          type="submit"
           aria-label="Apply link"
           data-re-btn-bm-apply=""
           onMouseDown={(e) => e.stopPropagation()}
+          type="submit"
         >
           <CheckIcon />
         </button>

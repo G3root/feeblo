@@ -98,7 +98,10 @@ function getVerificationOtp(): Effect.Effect<
       });
     }
 
-    const state = yield* getCookieVerificationOTPState(cookieValue, secret).pipe(
+    const state = yield* getCookieVerificationOTPState(
+      cookieValue,
+      secret
+    ).pipe(
       Effect.mapError(
         () =>
           new BadRequestError({

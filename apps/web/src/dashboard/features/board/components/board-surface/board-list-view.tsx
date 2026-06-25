@@ -1,16 +1,16 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
 import {
-  Add01Icon,
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
   Accordion,
   AccordionContent,
   AccordionTrigger,
 } from "@feeblo/ui/accordion";
 import { Button } from "@feeblo/ui/button";
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
 import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";

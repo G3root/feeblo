@@ -28,10 +28,7 @@ export function BoardSelect({
       <span className="text-muted-foreground text-xs uppercase tracking-wider">
         Board
       </span>
-      <Select
-        onValueChange={(v) => v !== null && onChange(v)}
-        value={value}
-      >
+      <Select onValueChange={(v) => v !== null && onChange(v)} value={value}>
         <SelectTrigger className="min-w-52">
           <SelectValue />
         </SelectTrigger>

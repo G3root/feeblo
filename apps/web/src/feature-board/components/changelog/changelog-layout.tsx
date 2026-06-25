@@ -6,11 +6,7 @@ import {
   FeedbackBrowseLayoutMain,
 } from "../layout/feedback-browse-layout";
 
-export function ChangelogPageLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function ChangelogPageLayout({ children }: { children: ReactNode }) {
   return (
     <FeedbackBrowseLayout>
       <FeedbackBrowseLayoutContent fullWidth>
@@ -20,11 +16,7 @@ export function ChangelogPageLayout({
   );
 }
 
-export function ChangelogTimeline({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function ChangelogTimeline({ children }: { children: ReactNode }) {
   return (
     <div className="relative">
       <div
@@ -54,11 +46,7 @@ export function ChangelogTimelineItem({
   );
 }
 
-export function ChangelogTimelineDate({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function ChangelogTimelineDate({ children }: { children: ReactNode }) {
   return (
     <div className="relative md:self-start">
       <div className="relative flex items-center gap-3 md:sticky md:top-24 md:pl-8">
@@ -75,11 +63,7 @@ export function ChangelogTimelineDate({
   );
 }
 
-export function ChangelogStickyRail({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function ChangelogStickyRail({ children }: { children: ReactNode }) {
   return (
     <div className="relative md:self-start">
       <div className="relative md:sticky md:top-24">{children}</div>

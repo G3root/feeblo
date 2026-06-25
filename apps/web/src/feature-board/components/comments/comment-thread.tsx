@@ -1,5 +1,4 @@
 import type { Comment } from "@feeblo/domain/comments/schema";
-import { useState } from "react";
 import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -10,6 +9,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@feeblo/ui/item";
+import { useState } from "react";
 import { formatDate, getInitials } from "../../lib/utils";
 import { CommentComposer } from "./comment-composer";
 

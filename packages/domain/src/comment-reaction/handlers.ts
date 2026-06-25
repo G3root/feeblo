@@ -22,9 +22,9 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
             postId: args.postId,
           })
           .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("CommentReaction", "select")
-        ),
+            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+            withRemapDbErrors("CommentReaction", "select")
+          ),
       CommentReactionToggle: (args: TCommentReactionToggle) =>
         Effect.gen(function* () {
           const session = yield* CurrentSession;

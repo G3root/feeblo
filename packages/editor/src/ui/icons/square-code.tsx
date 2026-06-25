@@ -1,23 +1,23 @@
-import type { IconProps } from './types';
+import type { IconProps } from "./types";
 
 export function SquareCodeIcon({ size, width, height, ...props }: IconProps) {
   return (
     <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? width ?? 24}
-      height={size ?? height ?? 24}
-      viewBox="0 0 24 24"
+      aria-hidden="true"
       fill="none"
+      height={size ?? height ?? 24}
       stroke="currentColor"
-      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden="true"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      width={size ?? width ?? 24}
+      xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
       <path d="m10 9-3 3 3 3" />
       <path d="m14 15 3-3-3-3" />
-      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <rect height="18" rx="2" width="18" x="3" y="3" />
     </svg>
   );
 }

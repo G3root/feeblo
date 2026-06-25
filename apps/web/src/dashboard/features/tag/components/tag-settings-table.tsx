@@ -1,13 +1,3 @@
-import {
-  Delete02Icon,
-  Edit,
-  Ellipsis,
-  Plus,
-  Tag01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import type { ReactNode } from "react";
 import { Button } from "@feeblo/ui/button";
 import {
   DropdownMenu,
@@ -32,6 +22,16 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import {
+  Delete02Icon,
+  Edit,
+  Ellipsis,
+  Plus,
+  Tag01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import type { ReactNode } from "react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { cn } from "~/lib/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";

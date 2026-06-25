@@ -1,5 +1,3 @@
-import { DashedLine02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@feeblo/ui/button";
 import {
   Combobox,
@@ -11,6 +9,8 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@feeblo/ui/combobox";
+import { DashedLine02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 type PostBoardSelectProps = {
   boards: { id: string; name: string }[];

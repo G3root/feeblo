@@ -1,15 +1,15 @@
-import { useEditorState } from '@tiptap/react';
-import * as React from 'react';
-import { CheckIcon, UnlinkIcon } from '../icons';
-import { useBubbleMenuContext } from './context';
-import { focusEditor, getUrlFromString, setLinkHref } from './utils';
+import { useEditorState } from "@tiptap/react";
+import * as React from "react";
+import { CheckIcon, UnlinkIcon } from "../icons";
+import { useBubbleMenuContext } from "./context";
+import { focusEditor, getUrlFromString, setLinkHref } from "./utils";
 
 export interface BubbleMenuLinkFormProps {
+  children?: React.ReactNode;
   className?: string;
-  validateUrl?: (value: string) => string | null;
   onLinkApply?: (href: string) => void;
   onLinkRemove?: () => void;
-  children?: React.ReactNode;
+  validateUrl?: (value: string) => string | null;
 }
 
 export function BubbleMenuLinkForm({
@@ -26,10 +26,10 @@ export function BubbleMenuLinkForm({
   const linkHref = useEditorState({
     editor,
     selector: ({ editor: e }) =>
-      (e?.getAttributes('link').href as string) ?? '',
+      (e?.getAttributes("link").href as string) ?? "",
   });
 
-  const displayHref = (linkHref ?? '') === '#' ? '' : (linkHref ?? '');
+  const displayHref = (linkHref ?? "") === "#" ? "" : (linkHref ?? "");
   const [inputValue, setInputValue] = React.useState(displayHref);
 
   React.useEffect(() => {
@@ -49,7 +49,7 @@ export function BubbleMenuLinkForm({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setIsEditing(false);
       }
     };
@@ -57,7 +57,7 @@ export function BubbleMenuLinkForm({
     const handleClickOutside = (event: MouseEvent) => {
       if (formRef.current && !formRef.current.contains(event.target as Node)) {
         const form = formRef.current;
-        const submitEvent = new Event('submit', {
+        const submitEvent = new Event("submit", {
           bubbles: true,
           cancelable: true,
         });
@@ -66,12 +66,12 @@ export function BubbleMenuLinkForm({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isEditing, setIsEditing]);
 
@@ -84,8 +84,8 @@ export function BubbleMenuLinkForm({
 
     const value = inputValue.trim();
 
-    if (value === '') {
-      setLinkHref(editor, '');
+    if (value === "") {
+      setLinkHref(editor, "");
       setIsEditing(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -96,7 +96,7 @@ export function BubbleMenuLinkForm({
     const finalValue = validate(value);
 
     if (!finalValue) {
-      setLinkHref(editor, '');
+      setLinkHref(editor, "");
       setIsEditing(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -111,7 +111,7 @@ export function BubbleMenuLinkForm({
 
   function handleUnlink(e: React.MouseEvent) {
     e.stopPropagation();
-    setLinkHref(editor, '');
+    setLinkHref(editor, "");
     setIsEditing(false);
     focusEditor(editor);
     onLinkRemove?.();
@@ -119,41 +119,41 @@ export function BubbleMenuLinkForm({
 
   return (
     <form
-      ref={formRef}
-      data-re-link-bm-form=""
       className={className}
-      onMouseDown={(e) => e.stopPropagation()}
+      data-re-link-bm-form=""
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
       onSubmit={handleSubmit}
+      ref={formRef}
     >
       <input
-        ref={inputRef}
         data-re-link-bm-input=""
-        value={inputValue}
-        onFocus={(e) => e.stopPropagation()}
         onChange={(e) => setInputValue(e.target.value)}
+        onFocus={(e) => e.stopPropagation()}
         placeholder="Paste a link"
+        ref={inputRef}
         type="text"
+        value={inputValue}
       />
 
       {children}
 
       {displayHref ? (
         <button
-          type="button"
           aria-label="Remove link"
           data-re-link-bm-unlink=""
           onClick={handleUnlink}
+          type="button"
         >
           <UnlinkIcon />
         </button>
       ) : (
         <button
-          type="submit"
           aria-label="Apply link"
           data-re-link-bm-apply=""
           onMouseDown={(e) => e.stopPropagation()}
+          type="submit"
         >
           <CheckIcon />
         </button>

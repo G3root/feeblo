@@ -1,6 +1,6 @@
+import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { useState } from "react";
 import { z } from "zod";
-import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { useAppForm } from "~/hooks/form";
 import { getInitials } from "../../lib/utils";
 

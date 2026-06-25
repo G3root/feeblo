@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { buttonVariants } from "@feeblo/ui/button";
 import {
   Empty,
@@ -6,6 +5,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { Link } from "@tanstack/react-router";
 
 export function NotFoundPage() {
   return (

@@ -1,4 +1,3 @@
-import { useStore } from "@tanstack/react-store";
 import {
   Field,
   FieldDescription,
@@ -11,6 +10,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@feeblo/ui/input-group";
+import { useStore } from "@tanstack/react-store";
 import { withForm } from "~/hooks/form";
 import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
 import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";

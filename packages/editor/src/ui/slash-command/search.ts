@@ -1,35 +1,55 @@
-import type { SearchableItem } from './types';
+import type { SearchableItem } from "./types";
 
 export function scoreItem(item: SearchableItem, query: string): number {
-  if (!query) return 100;
+  if (!query) {
+    return 100;
+  }
 
   const q = query.toLowerCase();
   const title = item.title.toLowerCase();
   const description = item.description.toLowerCase();
   const terms = item.searchTerms?.map((t) => t.toLowerCase()) ?? [];
 
-  if (title === q) return 100;
-  if (title.startsWith(q)) return 90;
+  if (title === q) {
+    return 100;
+  }
+  if (title.startsWith(q)) {
+    return 90;
+  }
 
   const titleWords = title.split(/\s+/);
-  if (titleWords.some((w) => w.startsWith(q))) return 80;
+  if (titleWords.some((w) => w.startsWith(q))) {
+    return 80;
+  }
 
-  if (terms.some((t) => t === q)) return 70;
-  if (terms.some((t) => t.startsWith(q))) return 60;
+  if (terms.some((t) => t === q)) {
+    return 70;
+  }
+  if (terms.some((t) => t.startsWith(q))) {
+    return 60;
+  }
 
-  if (title.includes(q)) return 40;
-  if (terms.some((t) => t.includes(q))) return 30;
-  if (description.includes(q)) return 20;
+  if (title.includes(q)) {
+    return 40;
+  }
+  if (terms.some((t) => t.includes(q))) {
+    return 30;
+  }
+  if (description.includes(q)) {
+    return 20;
+  }
 
   return 0;
 }
 
 export function filterAndRankItems<T extends SearchableItem>(
   items: T[],
-  query: string,
+  query: string
 ): T[] {
   const trimmed = query.trim();
-  if (!trimmed) return items;
+  if (!trimmed) {
+    return items;
+  }
 
   const scored = items
     .map((item) => ({ item, score: scoreItem(item, trimmed) }))

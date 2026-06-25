@@ -1,12 +1,12 @@
-import type { EditorView } from '@tiptap/pm/view';
-import type { PasteHandler } from './create-paste-handler';
+import type { EditorView } from "@tiptap/pm/view";
+import type { PasteHandler } from "./create-paste-handler";
 
 export function createDropHandler({ onPaste }: { onPaste?: PasteHandler }) {
   return (
     view: EditorView,
     event: DragEvent,
     _slice: unknown,
-    moved: boolean,
+    moved: boolean
   ): boolean => {
     if (
       !moved &&

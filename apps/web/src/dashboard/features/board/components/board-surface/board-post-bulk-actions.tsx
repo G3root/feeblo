@@ -1,4 +1,3 @@
-import { useSelector } from "@xstate/store-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +10,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { useSelector } from "@xstate/store-react";
 import {
   useBoardStore,
   useSelectedPostIds,

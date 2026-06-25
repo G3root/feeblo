@@ -7,8 +7,8 @@ import { BoardListView } from "./board-list-view";
 import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardPostsEmpty } from "./board-posts-empty";
 import { BoardPostsLoading } from "./board-posts-loading";
-import { groupPostsByStatus } from "./utils";
 import { useBoardPostsData } from "./use-board-posts-data";
+import { groupPostsByStatus } from "./utils";
 
 export function BoardPosts({
   boardId,

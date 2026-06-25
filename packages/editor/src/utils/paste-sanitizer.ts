@@ -14,12 +14,12 @@ const EDITOR_CLASS_PATTERN = /class="[^"]*node-/;
  * Only functional attributes - NO style or class.
  */
 const PRESERVED_ATTRIBUTES: Record<string, string[]> = {
-  a: ['href', 'target', 'rel'],
-  img: ['src', 'alt', 'width', 'height'],
-  td: ['colspan', 'rowspan'],
-  th: ['colspan', 'rowspan', 'scope'],
-  table: ['border', 'cellpadding', 'cellspacing'],
-  '*': ['id'],
+  a: ["href", "target", "rel"],
+  img: ["src", "alt", "width", "height"],
+  td: ["colspan", "rowspan"],
+  th: ["colspan", "rowspan", "scope"],
+  table: ["border", "cellpadding", "cellspacing"],
+  "*": ["id"],
 };
 
 function isFromEditor(html: string): boolean {
@@ -32,7 +32,7 @@ export function sanitizePastedHtml(html: string): string {
   }
 
   const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
+  const doc = parser.parseFromString(html, "text/html");
 
   sanitizeNode(doc.body);
 
@@ -54,13 +54,13 @@ function sanitizeElement(el: HTMLElement): void {
   const tagName = el.tagName.toLowerCase();
 
   const allowedForTag = PRESERVED_ATTRIBUTES[tagName] || [];
-  const allowedGlobal = PRESERVED_ATTRIBUTES['*'] || [];
+  const allowedGlobal = PRESERVED_ATTRIBUTES["*"] || [];
   const allowed = new Set([...allowedForTag, ...allowedGlobal]);
 
   const attributesToRemove: string[] = [];
 
   for (const attr of Array.from(el.attributes)) {
-    if (attr.name.startsWith('data-')) {
+    if (attr.name.startsWith("data-")) {
       attributesToRemove.push(attr.name);
       continue;
     }

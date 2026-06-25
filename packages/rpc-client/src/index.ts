@@ -36,7 +36,9 @@ export class Rpc extends Context.Service<Rpc, RpcClientType>()("Rpc", {
 }) {}
 
 export const createRpcLive = (apiUrl: string) =>
-  Layer.effect(Rpc, Rpc.make).pipe(Layer.provide(createRpcProtocolLive(apiUrl)));
+  Layer.effect(Rpc, Rpc.make).pipe(
+    Layer.provide(createRpcProtocolLive(apiUrl))
+  );
 
 export const withRpc = <A, E, R>(
   cb: (rpc: RpcClientType) => Effect.Effect<A, E, R>

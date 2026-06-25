@@ -1,7 +1,7 @@
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
-import { useCallback, useRef, useState } from "react";
 import { toastManager } from "@feeblo/ui/toast";
+import { useCallback, useRef, useState } from "react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
 import { BoardGridPostCard } from "./board-grid-post-card";
@@ -117,7 +117,7 @@ export function BoardGridView({
         movePostToColumn(currentItems, source.id as string, targetStatusId)
       );
     },
-    []
+    [movePostToColumn]
   );
 
   const handleDragEnd = useCallback<DragDropEventHandlers["onDragEnd"]>(
@@ -166,7 +166,7 @@ export function BoardGridView({
         });
       });
     },
-    []
+    [postCollection.update]
   );
 
   return (

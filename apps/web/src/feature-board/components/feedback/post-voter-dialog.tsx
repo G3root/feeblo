@@ -1,5 +1,3 @@
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createContext, type ReactNode, use } from "react";
 import {
   Avatar,
   AvatarFallback,
@@ -17,6 +15,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@feeblo/ui/dialog";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { createContext, type ReactNode, use } from "react";
 import { getInitials } from "../../lib/utils";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";

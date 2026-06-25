@@ -1,4 +1,4 @@
-import type { IconProps } from './types';
+import type { IconProps } from "./types";
 
 export function SplitSquareVerticalIcon({
   size,
@@ -8,16 +8,16 @@ export function SplitSquareVerticalIcon({
 }: IconProps) {
   return (
     <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size ?? width ?? 24}
-      height={size ?? height ?? 24}
-      viewBox="0 0 24 24"
+      aria-hidden="true"
       fill="none"
+      height={size ?? height ?? 24}
       stroke="currentColor"
-      strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden="true"
+      strokeWidth={2}
+      viewBox="0 0 24 24"
+      width={size ?? width ?? 24}
+      xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
       <path d="M5 8V5c0-1 1-2 2-2h10c1 0 2 1 2 2v3" />

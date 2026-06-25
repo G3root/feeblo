@@ -7,8 +7,8 @@ import {
   SelectValue,
 } from "@feeblo/ui/select";
 import {
-  CHANGELOG_STATUSES,
   CHANGELOG_STATUS_LABELS,
+  CHANGELOG_STATUSES,
   type ChangelogStatus,
 } from "../constants";
 

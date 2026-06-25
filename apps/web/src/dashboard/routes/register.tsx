@@ -1,5 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
 import { Button } from "@feeblo/ui/button";
 import {
   Card,
@@ -9,6 +7,8 @@ import {
   CardTitle,
 } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 import { RegisterShell } from "~/features/register/components/register-shell";
 import { RegisterWorkspaceStep } from "~/features/register/components/register-workspace-step";
 import { useAppForm } from "~/hooks/form";

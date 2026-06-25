@@ -1,7 +1,3 @@
-import { Search01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Link } from "@tanstack/react-router";
-import { useSelector } from "@xstate/store-react";
 import { Button } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
@@ -11,6 +7,10 @@ import {
 } from "@feeblo/ui/input-group";
 import { SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toggleVariants } from "@feeblo/ui/toggle";
+import { Search01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Link } from "@tanstack/react-router";
+import { useSelector } from "@xstate/store-react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { cn } from "~/lib/utils";
 import { useChangelogAction } from "../hooks/use-changelog-action";

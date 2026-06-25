@@ -1,7 +1,3 @@
-import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import type * as React from "react";
-import { createContext, use, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import {
   DropdownMenu,
@@ -10,6 +6,10 @@ import {
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
 import { toastManager } from "@feeblo/ui/toast";
+import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import type * as React from "react";
+import { createContext, use, useRef } from "react";
 
 interface SettingsAvatarControlContextValue {
   ariaLabel: string;

@@ -1,4 +1,3 @@
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
   Item,
@@ -7,6 +6,7 @@ import {
   ItemDescription,
   ItemTitle,
 } from "@feeblo/ui/item";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { authClient } from "~/lib/auth-client";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
@@ -28,8 +28,8 @@ export function CommentsSection({ postId }: { postId: string }) {
         ),
     [postId, site.organizationId]
   );
-  const canComment = Boolean(session?.user?.id && session.user.name);
-  const currentUserName = session?.user?.name ?? null;
+  const _canComment = Boolean(session?.user?.id && session.user.name);
+  const _currentUserName = session?.user?.name ?? null;
 
   const comments = commentsQuery.data ?? [];
 

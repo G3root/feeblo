@@ -1,13 +1,13 @@
-import type { Editor } from '@tiptap/core';
-import { type EditorState, NodeSelection } from '@tiptap/pm/state';
-import type { EditorView } from '@tiptap/pm/view';
+import type { Editor } from "@tiptap/core";
+import { type EditorState, NodeSelection } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 
 export interface TriggerParams {
   editor: Editor;
-  view: EditorView;
-  state: EditorState;
   from: number;
+  state: EditorState;
   to: number;
+  view: EditorView;
 }
 
 export type TriggerFn = (params: TriggerParams) => boolean;
@@ -15,7 +15,7 @@ export type TriggerFn = (params: TriggerParams) => boolean;
 export const bubbleMenuTriggers = {
   textSelection(
     hideWhenActiveNodes: string[] = [],
-    hideWhenActiveMarks: string[] = [],
+    hideWhenActiveMarks: string[] = []
   ): TriggerFn {
     return ({ editor, state }) => {
       if (

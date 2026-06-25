@@ -1,6 +1,6 @@
-import type { Editor } from '@tiptap/core';
+import type { Editor } from "@tiptap/core";
 
-const SAFE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 
 /**
  * Basic URL validation and auto-prefixing.
@@ -8,7 +8,7 @@ const SAFE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
  * Returns the valid URL string or null.
  */
 export function getUrlFromString(str: string): string | null {
-  if (str === '#') {
+  if (str === "#") {
     return str;
   }
 
@@ -23,7 +23,7 @@ export function getUrlFromString(str: string): string | null {
   }
 
   try {
-    if (str.includes('.') && !str.includes(' ')) {
+    if (str.includes(".") && !str.includes(" ")) {
       return new URL(`https://${str}`).toString();
     }
   } catch {
@@ -43,7 +43,7 @@ export function setLinkHref(editor: Editor, href: string): void {
   if (from === to) {
     editor
       .chain()
-      .extendMarkRange('link')
+      .extendMarkRange("link")
       .setLink({ href })
       .setTextSelection({ from, to })
       .run();

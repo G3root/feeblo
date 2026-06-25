@@ -1,14 +1,14 @@
-import { useEditorState } from '@tiptap/react';
-import * as React from 'react';
-import { CheckIcon, UnlinkIcon } from '../icons';
-import { useBubbleMenuContext } from './context';
-import { focusEditor, getUrlFromString } from './utils';
+import { useEditorState } from "@tiptap/react";
+import * as React from "react";
+import { CheckIcon, UnlinkIcon } from "../icons";
+import { useBubbleMenuContext } from "./context";
+import { focusEditor, getUrlFromString } from "./utils";
 
 export interface BubbleMenuImageFormProps {
   className?: string;
-  validateUrl?: (value: string) => string | null;
   onLinkApply?: (href: string) => void;
   onLinkRemove?: () => void;
+  validateUrl?: (value: string) => string | null;
 }
 
 export function BubbleMenuImageForm({
@@ -24,16 +24,16 @@ export function BubbleMenuImageForm({
   const imageHref = useEditorState({
     editor,
     selector: ({ editor: e }) =>
-      (e?.getAttributes('image').href as string | null) ?? '',
+      (e?.getAttributes("image").href as string | null) ?? "",
   });
 
-  const [inputValue, setInputValue] = React.useState(imageHref ?? '');
+  const [inputValue, setInputValue] = React.useState(imageHref ?? "");
 
   React.useEffect(() => {
     if (!isEditing) {
       return;
     }
-    setInputValue(imageHref ?? '');
+    setInputValue(imageHref ?? "");
     const timeoutId = setTimeout(() => {
       inputRef.current?.focus();
     }, 0);
@@ -46,7 +46,7 @@ export function BubbleMenuImageForm({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setIsEditing(false);
       }
     };
@@ -54,7 +54,7 @@ export function BubbleMenuImageForm({
     const handleClickOutside = (event: MouseEvent) => {
       if (formRef.current && !formRef.current.contains(event.target as Node)) {
         const form = formRef.current;
-        const submitEvent = new Event('submit', {
+        const submitEvent = new Event("submit", {
           bubbles: true,
           cancelable: true,
         });
@@ -63,12 +63,12 @@ export function BubbleMenuImageForm({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isEditing, setIsEditing]);
 
@@ -81,8 +81,8 @@ export function BubbleMenuImageForm({
 
     const value = inputValue.trim();
 
-    if (value === '') {
-      editor.chain().focus().updateAttributes('image', { href: null }).run();
+    if (value === "") {
+      editor.chain().focus().updateAttributes("image", { href: null }).run();
       setIsEditing(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -93,7 +93,7 @@ export function BubbleMenuImageForm({
     const finalValue = validate(value);
 
     if (!finalValue) {
-      editor.chain().focus().updateAttributes('image', { href: null }).run();
+      editor.chain().focus().updateAttributes("image", { href: null }).run();
       setIsEditing(false);
       focusEditor(editor);
       onLinkRemove?.();
@@ -103,7 +103,7 @@ export function BubbleMenuImageForm({
     editor
       .chain()
       .focus()
-      .updateAttributes('image', { href: finalValue })
+      .updateAttributes("image", { href: finalValue })
       .run();
     setIsEditing(false);
     focusEditor(editor);
@@ -112,49 +112,49 @@ export function BubbleMenuImageForm({
 
   function handleUnlink(e: React.MouseEvent) {
     e.stopPropagation();
-    editor.chain().focus().updateAttributes('image', { href: null }).run();
+    editor.chain().focus().updateAttributes("image", { href: null }).run();
     setIsEditing(false);
     focusEditor(editor);
     onLinkRemove?.();
   }
 
-  const hasLink = (imageHref ?? '') !== '';
+  const hasLink = (imageHref ?? "") !== "";
 
   return (
     <form
-      ref={formRef}
-      data-re-img-bm-form=""
       className={className}
-      onMouseDown={(e) => e.stopPropagation()}
+      data-re-img-bm-form=""
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
       onSubmit={handleSubmit}
+      ref={formRef}
     >
       <input
-        ref={inputRef}
         data-re-img-bm-input=""
-        value={inputValue}
-        onFocus={(e) => e.stopPropagation()}
         onChange={(e) => setInputValue(e.target.value)}
+        onFocus={(e) => e.stopPropagation()}
         placeholder="Paste a link"
+        ref={inputRef}
         type="text"
+        value={inputValue}
       />
 
       {hasLink ? (
         <button
-          type="button"
           aria-label="Remove link"
           data-re-img-bm-unlink=""
           onClick={handleUnlink}
+          type="button"
         >
           <UnlinkIcon />
         </button>
       ) : (
         <button
-          type="submit"
           aria-label="Apply link"
           data-re-img-bm-apply=""
           onMouseDown={(e) => e.stopPropagation()}
+          type="submit"
         >
           <CheckIcon />
         </button>

@@ -1,11 +1,11 @@
+import { Button } from "@feeblo/ui/button";
+import { Editor, type EmailEditorRef } from "@feeblo/ui/editor";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { Image01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
 import { useRef } from "react";
 import { z } from "zod";
-import { Button } from "@feeblo/ui/button";
-import { Editor, type EmailEditorRef } from "@feeblo/ui/editor";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,
@@ -25,7 +25,7 @@ const UpdatedPostSchema = z.object({
   organizationId: z.string(),
 });
 
-const READONLY_RICH_TEXT_CLASS =
+const _READONLY_RICH_TEXT_CLASS =
   "public-board-rich-text prose prose-sm max-w-none text-foreground/85 prose-headings:mb-4 prose-headings:font-semibold prose-headings:text-foreground prose-p:my-0 prose-p:mb-5 prose-p:leading-7 prose-strong:text-foreground prose-a:font-medium prose-a:text-foreground prose-a:underline prose-a:decoration-border prose-a:underline-offset-4 prose-blockquote:text-muted-foreground prose-code:text-foreground prose-pre:bg-muted prose-img:my-4 prose-img:max-h-80 prose-img:rounded-lg prose-img:border prose-img:border-border/60 prose-ul:mb-6 prose-ul:space-y-2 prose-ul:pl-5 prose-ol:mb-6 prose-ol:space-y-2 prose-ol:pl-5";
 
 export function PostContentEditor({

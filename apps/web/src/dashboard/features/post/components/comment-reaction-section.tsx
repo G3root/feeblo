@@ -1,6 +1,6 @@
+import { toastManager } from "@feeblo/ui/toast";
 import type { ReactionCounts, ReactionEmoji } from "@feeblo/utils/reaction";
 import { createContext, type ReactNode, use, useMemo, useState } from "react";
-import { toastManager } from "@feeblo/ui/toast";
 import { authClient } from "~/lib/auth-client";
 import { ReactionButton, ReactionList } from "./reaction-button";
 

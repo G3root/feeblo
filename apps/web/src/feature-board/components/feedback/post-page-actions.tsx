@@ -1,12 +1,4 @@
 import {
-  ArrowLeft01Icon,
-  Delete02Icon,
-  Ellipsis,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
-import { Link } from "@tanstack/react-router";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -23,6 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
+import {
+  ArrowLeft01Icon,
+  Delete02Icon,
+  Ellipsis,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { cn } from "~/lib/utils";
 
 type PostPageActionsProps = {

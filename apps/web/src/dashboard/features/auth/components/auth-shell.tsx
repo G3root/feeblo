@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
+import type { ReactNode } from "react";
 
 type AuthShellProps = {
   children: ReactNode;

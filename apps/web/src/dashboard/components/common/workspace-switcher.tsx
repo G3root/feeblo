@@ -1,9 +1,3 @@
-import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useOrganizationId } from "~/hooks/use-organization-id";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import {
   DropdownMenu,
@@ -18,6 +12,12 @@ import {
   SidebarMenuItem,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { eq, useLiveQuery } from "@tanstack/react-db";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useOrganizationId } from "~/hooks/use-organization-id";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function WorkspaceSwitcher() {
   const navigate = useNavigate();

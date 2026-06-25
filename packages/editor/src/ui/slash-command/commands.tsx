@@ -13,172 +13,172 @@ import {
   SquareCodeIcon,
   TextIcon,
   TextQuoteIcon,
-} from '../icons';
-import type { SlashCommandItem } from './types';
+} from "../icons";
+import type { SlashCommandItem } from "./types";
 
 export const TEXT: SlashCommandItem = {
-  title: 'Text',
-  description: 'Plain text block',
+  title: "Text",
+  description: "Plain text block",
   icon: <TextIcon size={20} />,
-  category: 'Text',
-  searchTerms: ['p', 'paragraph'],
+  category: "Text",
+  searchTerms: ["p", "paragraph"],
   command: ({ editor, range }) => {
     editor
       .chain()
       .focus()
       .deleteRange(range)
-      .toggleNode('paragraph', 'paragraph')
+      .toggleNode("paragraph", "paragraph")
       .run();
   },
 };
 
 export const H1: SlashCommandItem = {
-  title: 'Title',
-  description: 'Large heading',
+  title: "Title",
+  description: "Large heading",
   icon: <Heading1Icon size={20} />,
-  category: 'Text',
-  searchTerms: ['title', 'big', 'large', 'h1'],
+  category: "Text",
+  searchTerms: ["title", "big", "large", "h1"],
   command: ({ editor, range }) => {
     editor
       .chain()
       .focus()
       .deleteRange(range)
-      .setNode('heading', { level: 1 })
+      .setNode("heading", { level: 1 })
       .run();
   },
 };
 
 export const H2: SlashCommandItem = {
-  title: 'Subtitle',
-  description: 'Medium heading',
+  title: "Subtitle",
+  description: "Medium heading",
   icon: <Heading2Icon size={20} />,
-  category: 'Text',
-  searchTerms: ['subtitle', 'medium', 'h2'],
+  category: "Text",
+  searchTerms: ["subtitle", "medium", "h2"],
   command: ({ editor, range }) => {
     editor
       .chain()
       .focus()
       .deleteRange(range)
-      .setNode('heading', { level: 2 })
+      .setNode("heading", { level: 2 })
       .run();
   },
 };
 
 export const H3: SlashCommandItem = {
-  title: 'Heading',
-  description: 'Small heading',
+  title: "Heading",
+  description: "Small heading",
   icon: <Heading3Icon size={20} />,
-  category: 'Text',
-  searchTerms: ['subtitle', 'small', 'h3'],
+  category: "Text",
+  searchTerms: ["subtitle", "small", "h3"],
   command: ({ editor, range }) => {
     editor
       .chain()
       .focus()
       .deleteRange(range)
-      .setNode('heading', { level: 3 })
+      .setNode("heading", { level: 3 })
       .run();
   },
 };
 
 export const BULLET_LIST: SlashCommandItem = {
-  title: 'Bullet list',
-  description: 'Unordered list',
+  title: "Bullet list",
+  description: "Unordered list",
   icon: <ListIcon size={20} />,
-  category: 'Text',
-  searchTerms: ['unordered', 'point'],
+  category: "Text",
+  searchTerms: ["unordered", "point"],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).toggleBulletList().run();
   },
 };
 
 export const NUMBERED_LIST: SlashCommandItem = {
-  title: 'Numbered list',
-  description: 'Ordered list',
+  title: "Numbered list",
+  description: "Ordered list",
   icon: <ListOrderedIcon size={20} />,
-  category: 'Text',
-  searchTerms: ['ordered'],
+  category: "Text",
+  searchTerms: ["ordered"],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).toggleOrderedList().run();
   },
 };
 
 export const QUOTE: SlashCommandItem = {
-  title: 'Quote',
-  description: 'Block quote',
+  title: "Quote",
+  description: "Block quote",
   icon: <TextQuoteIcon size={20} />,
-  category: 'Text',
-  searchTerms: ['blockquote'],
+  category: "Text",
+  searchTerms: ["blockquote"],
   command: ({ editor, range }) => {
     editor
       .chain()
       .focus()
       .deleteRange(range)
-      .toggleNode('paragraph', 'paragraph')
+      .toggleNode("paragraph", "paragraph")
       .toggleBlockquote()
       .run();
   },
 };
 
 export const CODE: SlashCommandItem = {
-  title: 'Code block',
-  description: 'Code snippet',
+  title: "Code block",
+  description: "Code snippet",
   icon: <SquareCodeIcon size={20} />,
-  category: 'Text',
-  searchTerms: ['codeblock'],
+  category: "Text",
+  searchTerms: ["codeblock"],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
   },
 };
 
 export const BUTTON: SlashCommandItem = {
-  title: 'Button',
-  description: 'Clickable button',
+  title: "Button",
+  description: "Clickable button",
   icon: <MousePointerIcon size={20} />,
-  category: 'Layout',
-  searchTerms: ['button'],
+  category: "Layout",
+  searchTerms: ["button"],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).setButton().run();
   },
 };
 
 export const DIVIDER: SlashCommandItem = {
-  title: 'Divider',
-  description: 'Horizontal separator',
+  title: "Divider",
+  description: "Horizontal separator",
   icon: <SplitSquareVerticalIcon size={20} />,
-  category: 'Layout',
-  searchTerms: ['hr', 'divider', 'separator'],
+  category: "Layout",
+  searchTerms: ["hr", "divider", "separator"],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).setHorizontalRule().run();
   },
 };
 
 export const SECTION: SlashCommandItem = {
-  title: 'Section',
-  description: 'Content section',
+  title: "Section",
+  description: "Content section",
   icon: <Rows2Icon size={20} />,
-  category: 'Layout',
-  searchTerms: ['section', 'row', 'container'],
+  category: "Layout",
+  searchTerms: ["section", "row", "container"],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).insertSection().run();
   },
 };
 
 export const TWO_COLUMNS: SlashCommandItem = {
-  title: '2 columns',
-  description: 'Two column layout',
+  title: "2 columns",
+  description: "Two column layout",
   icon: <Columns2Icon size={20} />,
-  category: 'Layout',
+  category: "Layout",
   searchTerms: [
-    'columns',
-    'column',
-    'layout',
-    'grid',
-    'split',
-    'side-by-side',
-    'multi-column',
-    'row',
-    'two',
-    '2',
+    "columns",
+    "column",
+    "layout",
+    "grid",
+    "split",
+    "side-by-side",
+    "multi-column",
+    "row",
+    "two",
+    "2",
   ],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).insertColumns(2).run();
@@ -186,20 +186,20 @@ export const TWO_COLUMNS: SlashCommandItem = {
 };
 
 export const THREE_COLUMNS: SlashCommandItem = {
-  title: '3 columns',
-  description: 'Three column layout',
+  title: "3 columns",
+  description: "Three column layout",
   icon: <Columns3Icon size={20} />,
-  category: 'Layout',
+  category: "Layout",
   searchTerms: [
-    'columns',
-    'column',
-    'layout',
-    'grid',
-    'split',
-    'multi-column',
-    'row',
-    'three',
-    '3',
+    "columns",
+    "column",
+    "layout",
+    "grid",
+    "split",
+    "multi-column",
+    "row",
+    "three",
+    "3",
   ],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).insertColumns(3).run();
@@ -207,20 +207,20 @@ export const THREE_COLUMNS: SlashCommandItem = {
 };
 
 export const FOUR_COLUMNS: SlashCommandItem = {
-  title: '4 columns',
-  description: 'Four column layout',
+  title: "4 columns",
+  description: "Four column layout",
   icon: <Columns4Icon size={20} />,
-  category: 'Layout',
+  category: "Layout",
   searchTerms: [
-    'columns',
-    'column',
-    'layout',
-    'grid',
-    'split',
-    'multi-column',
-    'row',
-    'four',
-    '4',
+    "columns",
+    "column",
+    "layout",
+    "grid",
+    "split",
+    "multi-column",
+    "row",
+    "four",
+    "4",
   ],
   command: ({ editor, range }) => {
     editor.chain().focus().deleteRange(range).insertColumns(4).run();

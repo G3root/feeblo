@@ -1,6 +1,3 @@
-import { PlusSignIcon, Tag01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import { Checkbox } from "@feeblo/ui/checkbox";
@@ -14,6 +11,9 @@ import {
   CommandSeparator,
 } from "@feeblo/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
+import { PlusSignIcon, Tag01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react";
 import { useTagCreateDialogContext } from "../dialog-stores";
 
 export interface TagSelectOption {

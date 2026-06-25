@@ -1,7 +1,3 @@
-import { ArrowDown01Icon, MessageLock01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { type ReactNode, useRef, useState } from "react";
-import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
 import { ButtonGroup } from "@feeblo/ui/button-group";
@@ -16,6 +12,10 @@ import {
 } from "@feeblo/ui/dropdown-menu";
 import { Editor, type EmailEditorRef } from "@feeblo/ui/editor";
 import { toastManager } from "@feeblo/ui/toast";
+import { ArrowDown01Icon, MessageLock01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { type ReactNode, useRef, useState } from "react";
+import { z } from "zod";
 import { useAppForm } from "~/hooks/form";
 import { authClient } from "~/lib/auth-client";
 import { isRichTextContentEmpty } from "./post-editor-utils";

@@ -1,12 +1,3 @@
-import {
-  GridViewIcon,
-  ListViewIcon,
-  Search01Icon,
-  SlidersHorizontalIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Link } from "@tanstack/react-router";
-import { useSelector } from "@xstate/store-react";
 import { Button } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
@@ -17,6 +8,15 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
 import { toggleVariants } from "@feeblo/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
+import {
+  GridViewIcon,
+  ListViewIcon,
+  Search01Icon,
+  SlidersHorizontalIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Link } from "@tanstack/react-router";
+import { useSelector } from "@xstate/store-react";
 import { cn } from "~/lib/utils";
 import { useBoardStore } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";

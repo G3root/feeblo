@@ -1,5 +1,3 @@
-import { Link } from "@tanstack/react-router";
-import { SettingsSidebar } from "~/components/common/settings-sidebar";
 import { buttonVariants } from "@feeblo/ui/button";
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import {
@@ -7,6 +5,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@feeblo/ui/sidebar";
+import { Link } from "@tanstack/react-router";
+import { SettingsSidebar } from "~/components/common/settings-sidebar";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 export function SettingsLayout({ children }: { children: React.ReactNode }) {

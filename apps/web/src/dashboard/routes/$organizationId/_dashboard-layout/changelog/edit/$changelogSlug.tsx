@@ -1,5 +1,3 @@
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -9,6 +7,8 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ChangelogEditorBackLink,
   ChangelogEditorContentField,

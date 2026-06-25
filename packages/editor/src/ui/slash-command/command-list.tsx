@@ -1,11 +1,11 @@
-import { useLayoutEffect, useRef } from 'react';
-import type { SlashCommandItem, SlashCommandRenderProps } from './types';
-import { updateScrollView } from './utils';
+import { useLayoutEffect, useRef } from "react";
+import type { SlashCommandItem, SlashCommandRenderProps } from "./types";
+import { updateScrollView } from "./utils";
 
-const CATEGORY_ORDER = ['Text', 'Media', 'Layout', 'Utility'];
+const CATEGORY_ORDER = ["Text", "Media", "Layout", "Utility"];
 
 function groupByCategory(
-  items: SlashCommandItem[],
+  items: SlashCommandItem[]
 ): { category: string; items: SlashCommandItem[] }[] {
   const seen = new Map<string, SlashCommandItem[]>();
 
@@ -35,8 +35,8 @@ function groupByCategory(
 
 interface CommandItemProps {
   item: SlashCommandItem;
-  selected: boolean;
   onSelect: () => void;
+  selected: boolean;
 }
 
 function CommandItem({ item, selected, onSelect }: CommandItemProps) {
@@ -63,12 +63,14 @@ export function CommandList({
 
   useLayoutEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
-    const selected = container.querySelector<HTMLElement>('[data-selected]');
+    if (!container) {
+      return;
+    }
+    const selected = container.querySelector<HTMLElement>("[data-selected]");
     if (selected) {
       updateScrollView(container, selected);
     }
-  }, [selectedIndex]);
+  }, []);
 
   if (items.length === 0) {
     return (

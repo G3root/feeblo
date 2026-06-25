@@ -1,10 +1,10 @@
+import { Button } from "@feeblo/ui/button";
+import { Input } from "@feeblo/ui/input";
+import { toastManager } from "@feeblo/ui/toast";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
-import { Button } from "@feeblo/ui/button";
-import { Input } from "@feeblo/ui/input";
-import { toastManager } from "@feeblo/ui/toast";
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";

@@ -1,5 +1,3 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { z } from "zod";
 import { Button } from "@feeblo/ui/button";
 import {
   Field,
@@ -15,6 +13,8 @@ import {
   InputOTPSlot,
 } from "@feeblo/ui/input-otp";
 import { toastManager } from "@feeblo/ui/toast";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { z } from "zod";
 import { useAppForm } from "~/hooks/form";
 import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
 

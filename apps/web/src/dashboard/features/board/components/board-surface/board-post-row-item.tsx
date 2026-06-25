@@ -1,6 +1,6 @@
+import { Checkbox } from "@feeblo/ui/checkbox";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
-import { Checkbox } from "@feeblo/ui/checkbox";
 import { useBoardStore } from "~/features/board/state/board-store-context";
 import { StatusIcon } from "./status-icon";
 import type { BoardPostRow } from "./types";

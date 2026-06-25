@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  emitWidgetEvent,
-  subscribe,
-  unsubscribe,
-} from "../src/events";
+import { emitWidgetEvent, subscribe, unsubscribe } from "../src/events";
 import type { FeebloEventDetail, SubmittedFeedback } from "../src/types";
 
 describe("subscribe / unsubscribe", () => {
@@ -24,7 +20,7 @@ describe("subscribe / unsubscribe", () => {
     emitWidgetEvent("widgetReady", undefined);
 
     expect(callback).toHaveBeenCalledTimes(1);
-    const event = callback.mock.calls[0]![0] as CustomEvent<FeebloEventDetail>;
+    const event = callback.mock.calls[0]?.[0] as CustomEvent<FeebloEventDetail>;
     expect(event.detail.type).toBe("widgetReady");
     expect(event.detail.namespace).toBe("feeblo");
   });
@@ -53,10 +49,11 @@ describe("subscribe / unsubscribe", () => {
     subscribe("feedbackSubmitted", callback);
     unsubscribe("feedbackSubmitted", callback);
 
-    emitWidgetEvent(
-      "feedbackSubmitted",
-      { boardId: "b1", boardName: "Roadmap", title: "Dark mode" }
-    );
+    emitWidgetEvent("feedbackSubmitted", {
+      boardId: "b1",
+      boardName: "Roadmap",
+      title: "Dark mode",
+    });
 
     expect(callback).not.toHaveBeenCalled();
   });
@@ -72,7 +69,7 @@ describe("subscribe / unsubscribe", () => {
     };
     emitWidgetEvent("feedbackSubmitted", data);
 
-    const event = callback.mock.calls[0]![0] as CustomEvent<
+    const event = callback.mock.calls[0]?.[0] as CustomEvent<
       FeebloEventDetail<"feedbackSubmitted">
     >;
     expect(event.detail.data).toEqual(data);
@@ -84,7 +81,7 @@ describe("subscribe / unsubscribe", () => {
 
     emitWidgetEvent("widgetReady", undefined);
 
-    const event = callback.mock.calls[0]![0] as CustomEvent<FeebloEventDetail>;
+    const event = callback.mock.calls[0]?.[0] as CustomEvent<FeebloEventDetail>;
     expect(event.detail.data).toBeUndefined();
   });
 });
@@ -106,10 +103,11 @@ describe("subscribe wildcard (*)", () => {
 
     emitWidgetEvent("widgetReady", undefined);
     emitWidgetEvent("widgetOpened", undefined);
-    emitWidgetEvent(
-      "feedbackSubmitted",
-      { boardId: "b1", boardName: "Changelog", title: "v2.0" }
-    );
+    emitWidgetEvent("feedbackSubmitted", {
+      boardId: "b1",
+      boardName: "Changelog",
+      title: "v2.0",
+    });
 
     expect(callback).toHaveBeenCalledTimes(3);
   });
@@ -122,10 +120,11 @@ describe("subscribe wildcard (*)", () => {
 
     emitWidgetEvent("widgetReady", undefined);
     emitWidgetEvent("widgetOpened", undefined);
-    emitWidgetEvent(
-      "feedbackSubmitted",
-      { boardId: "b1", boardName: "Roadmap", title: "Test" }
-    );
+    emitWidgetEvent("feedbackSubmitted", {
+      boardId: "b1",
+      boardName: "Roadmap",
+      title: "Test",
+    });
 
     expect(callback).not.toHaveBeenCalled();
   });
@@ -148,7 +147,7 @@ describe("emitWidgetEvent", () => {
     emitWidgetEvent("widgetReady", undefined);
 
     expect(handler).toHaveBeenCalledTimes(1);
-    const event = handler.mock.calls[0]![0] as CustomEvent<FeebloEventDetail>;
+    const event = handler.mock.calls[0]?.[0] as CustomEvent<FeebloEventDetail>;
     expect(event.detail.type).toBe("widgetReady");
     expect(event.detail.namespace).toBe("feeblo");
     expect(event.detail.data).toBeUndefined();

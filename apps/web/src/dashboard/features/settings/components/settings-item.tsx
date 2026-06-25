@@ -1,7 +1,3 @@
-import { LockedIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
-import type { VariantProps } from "class-variance-authority";
-import type * as React from "react";
 import {
   Field as BaseField,
   FieldContent as BaseFieldContent,
@@ -18,6 +14,10 @@ import {
 } from "@feeblo/ui/item";
 import { Separator } from "@feeblo/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@feeblo/ui/tooltip";
+import { LockedIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
+import type { VariantProps } from "class-variance-authority";
+import type * as React from "react";
 import { cn } from "~/lib/utils";
 
 function Root({ children }: { children: React.ReactNode }) {

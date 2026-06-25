@@ -1,14 +1,14 @@
+import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Link } from "@tanstack/react-router";
 import { useUpvote } from "src/feature-board/hooks/use-upvote";
 import {
   formatPostStatus,
   getInitials,
   truncate,
 } from "src/feature-board/lib/utils";
-import { Link } from "@tanstack/react-router";
-import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
-import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "~/lib/utils";
 
 type FeedbackPost = {

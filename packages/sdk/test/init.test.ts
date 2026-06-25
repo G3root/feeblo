@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Feeblo } from "../src/index";
 import { EmbedError } from "../src/errors";
+import { Feeblo } from "../src/index";
 import { getCurrentEmbed, init } from "../src/instance";
 import type { FeebloWidget } from "../src/types";
 
@@ -75,7 +75,7 @@ describe("init", () => {
     const container = document.getElementById("feeblo-embed-container");
 
     expect(container).not.toBeNull();
-    expect(container!.tagName).toBe("DIV");
+    expect(container?.tagName).toBe("DIV");
   });
 
   it("removes previous container when called again with a different org", () => {
@@ -162,7 +162,7 @@ describe("FeebloWidget methods", () => {
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
     expect(boardMsg).toBeDefined();
-    expect(boardMsg![0].data.board).toBe("roadmap");
+    expect(boardMsg?.[0].data.board).toBe("roadmap");
   });
 
   it("identify sends IDENTIFY message when loaded", () => {
@@ -235,7 +235,7 @@ describe("Embed postMessage callbacks", () => {
     });
 
     expect(onError).toHaveBeenCalledTimes(1);
-    const err = onError.mock.calls[0]![0] as EmbedError;
+    const err = onError.mock.calls[0]?.[0] as EmbedError;
     expect(err).toBeInstanceOf(EmbedError);
     expect(err.code).toBe("WIDGET_ERROR");
   });

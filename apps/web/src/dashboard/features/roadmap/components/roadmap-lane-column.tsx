@@ -1,6 +1,6 @@
 import type { ReactNode, Ref } from "react";
-import { getBoardStatusLabel } from "../../board/constants";
 import { cn } from "~/lib/utils";
+import { getBoardStatusLabel } from "../../board/constants";
 import { RoadmapStatusIcon } from "./roadmap-status-icon";
 import type { RoadmapStatus } from "./types";
 

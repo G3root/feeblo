@@ -1,4 +1,27 @@
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@feeblo/ui/dropdown-menu";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@feeblo/ui/sidebar";
+import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+
+import {
   Delete02Icon,
   Edit,
   Ellipsis,
@@ -14,20 +37,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@feeblo/ui/sidebar";
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import {
@@ -39,14 +48,6 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
-import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { NavUser } from "./nav-user";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 

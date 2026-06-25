@@ -1,6 +1,3 @@
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { ArrowLeft } from "lucide-react";
-import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
 import { buttonVariants } from "@feeblo/ui/button";
 import {
   Empty,
@@ -8,6 +5,9 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
 import { cn } from "~/lib/utils";
 import {
   ChangelogPageLayout,
@@ -99,7 +99,9 @@ export function ChangeLogDetailPage() {
         <ChangelogTimelineBody className="space-y-8">
           <header className="space-y-4">
             <p className="font-medium text-muted-foreground text-sm tracking-tight">
-              {formatChangelogDate(changelog.publishedAt ?? changelog.createdAt)}
+              {formatChangelogDate(
+                changelog.publishedAt ?? changelog.createdAt
+              )}
             </p>
             <div className="space-y-3">
               <h1 className="max-w-3xl font-semibold text-4xl tracking-tight sm:text-5xl">
