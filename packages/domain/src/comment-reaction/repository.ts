@@ -65,7 +65,8 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           Effect.map((reactions) =>
             reactions.map((reaction) => ({
               ...reaction,
-              emoji: reaction.emoji,
+              //Todo : fix later
+              emoji: reaction.emoji as ReactionEmoji,
             }))
           )
         ),
@@ -115,7 +116,8 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           Effect.map((reactions) =>
             reactions.map((reaction) => ({
               ...reaction,
-              emoji: reaction.emoji,
+              //Todo : fix later
+              emoji: reaction.emoji as ReactionEmoji,
             }))
           )
         ),
