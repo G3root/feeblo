@@ -12,6 +12,9 @@
     "@feeblo/domain": "workspace:*",
     "effect": "catalog:"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "typescript": "catalog:"

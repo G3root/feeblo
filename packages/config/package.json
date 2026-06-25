@@ -7,7 +7,13 @@
     "./effect": "./src/effect.ts",
     "./tsconfig.base.json": "./tsconfig.base.json"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "dependencies": {
     "effect": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
   }
 }

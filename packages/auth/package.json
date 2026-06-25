@@ -18,7 +18,9 @@
       "default": "./src/auth-client.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "dependencies": {
     "@feeblo/config": "workspace:*",
     "@feeblo/domain": "workspace:*",

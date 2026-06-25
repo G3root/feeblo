@@ -10,7 +10,8 @@
     "astro": "astro",
     "dev": "dotenvx run -f ../../.env -- astro dev --port 3001",
     "dev:bare": "astro dev",
-    "generate-types": "wrangler types"
+    "generate-types": "wrangler types",
+    "check-types": "astro check"
   },
   "dependencies": {
     "@astrojs/node": "11.0.0",

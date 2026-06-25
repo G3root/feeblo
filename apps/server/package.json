@@ -6,7 +6,8 @@
   "scripts": {
     "build": "dotenvx run -f ../../.env -- rolldown -c",
     "dev": "dotenvx run -f ../../.env -- tsx watch src/index.ts",
-    "start": "dotenvx run -f ../../.env -- tsx src/index.ts"
+    "start": "dotenvx run -f ../../.env -- tsx src/index.ts",
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@feeblo/auth": "workspace:*",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "rolldown": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "typescript": "catalog:"
   }
 }

@@ -24,6 +24,9 @@
     "tailwind-merge": "catalog:",
     "zod": "catalog:"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "typescript": "catalog:",

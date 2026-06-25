@@ -14,7 +14,7 @@
   "scripts": {
     "build": "rolldown -c",
     "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit"
+    "check-types": "tsc --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",

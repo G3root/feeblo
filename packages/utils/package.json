@@ -12,6 +12,9 @@
     "./media": "./src/media.ts",
     "./reaction": "./src/reaction.ts"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "dependencies": {
     "@better-auth/utils": "catalog:",
     "@noble/ciphers": "^2.0.1",
@@ -19,5 +22,9 @@
     "nanoid": "^5.1.6",
     "@sindresorhus/slugify": "^2.2.1",
     "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "typescript": "catalog:"
   }
 }
