@@ -28,7 +28,6 @@ import { Route as OrganizationIdSettingsCustomizeRouteImport } from "./routes/$o
 import { Route as OrganizationIdSettingsChangelogTagsRouteImport } from "./routes/$organizationId/settings/changelog-tags"
 import { Route as OrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/$organizationId/settings/changelog-privacy"
 import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
-import { Route as OrganizationIdDashboardLayoutSettingsRouteImport } from "./routes/$organizationId/_dashboard-layout/settings"
 import { Route as OrganizationIdDashboardLayoutRoadmapRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap"
 import { Route as OrganizationIdDashboardLayoutFeedbackIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/index"
 import { Route as OrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/index"
@@ -149,12 +148,6 @@ const OrganizationIdSettingsBillingRoute =
     path: "/billing",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdDashboardLayoutSettingsRoute =
-  OrganizationIdDashboardLayoutSettingsRouteImport.update({
-    id: "/settings",
-    path: "/settings",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
-  } as any)
 const OrganizationIdDashboardLayoutRoadmapRoute =
   OrganizationIdDashboardLayoutRoadmapRouteImport.update({
     id: "/roadmap",
@@ -234,7 +227,7 @@ export interface FileRoutesByFullPath {
   "/register": typeof RegisterRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
-  "/$organizationId/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
+  "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
   "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
@@ -267,7 +260,6 @@ export interface FileRoutesByTo {
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
-  "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
@@ -278,6 +270,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
+  "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
   "/$organizationId/changelog/draft": typeof OrganizationIdDashboardLayoutChangelogDraftRoute
   "/$organizationId/changelog/published": typeof OrganizationIdDashboardLayoutChangelogPublishedRoute
   "/$organizationId/feedback/active": typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
@@ -300,7 +293,6 @@ export interface FileRoutesById {
   "/$organizationId/_dashboard-layout": typeof OrganizationIdDashboardLayoutRouteWithChildren
   "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
   "/$organizationId/_dashboard-layout/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
-  "/$organizationId/_dashboard-layout/settings": typeof OrganizationIdDashboardLayoutSettingsRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
@@ -366,7 +358,6 @@ export interface FileRouteTypes {
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/roadmap"
-    | "/$organizationId/settings"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
@@ -377,6 +368,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/workspace"
+    | "/$organizationId/settings"
     | "/$organizationId/changelog/draft"
     | "/$organizationId/changelog/published"
     | "/$organizationId/feedback/active"
@@ -398,7 +390,6 @@ export interface FileRouteTypes {
     | "/$organizationId/_dashboard-layout"
     | "/$organizationId/settings"
     | "/$organizationId/_dashboard-layout/roadmap"
-    | "/$organizationId/_dashboard-layout/settings"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
@@ -567,13 +558,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsBillingRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
-    "/$organizationId/_dashboard-layout/settings": {
-      id: "/$organizationId/_dashboard-layout/settings"
-      path: "/settings"
-      fullPath: "/$organizationId/settings"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutSettingsRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
-    }
     "/$organizationId/_dashboard-layout/roadmap": {
       id: "/$organizationId/_dashboard-layout/roadmap"
       path: "/roadmap"
@@ -663,7 +647,6 @@ declare module "@tanstack/react-router" {
 
 interface OrganizationIdDashboardLayoutRouteChildren {
   OrganizationIdDashboardLayoutRoadmapRoute: typeof OrganizationIdDashboardLayoutRoadmapRoute
-  OrganizationIdDashboardLayoutSettingsRoute: typeof OrganizationIdDashboardLayoutSettingsRoute
   OrganizationIdDashboardLayoutIndexRoute: typeof OrganizationIdDashboardLayoutIndexRoute
   OrganizationIdDashboardLayoutChangelogDraftRoute: typeof OrganizationIdDashboardLayoutChangelogDraftRoute
   OrganizationIdDashboardLayoutChangelogPublishedRoute: typeof OrganizationIdDashboardLayoutChangelogPublishedRoute
@@ -682,8 +665,6 @@ const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutR
   {
     OrganizationIdDashboardLayoutRoadmapRoute:
       OrganizationIdDashboardLayoutRoadmapRoute,
-    OrganizationIdDashboardLayoutSettingsRoute:
-      OrganizationIdDashboardLayoutSettingsRoute,
     OrganizationIdDashboardLayoutIndexRoute:
       OrganizationIdDashboardLayoutIndexRoute,
     OrganizationIdDashboardLayoutChangelogDraftRoute:

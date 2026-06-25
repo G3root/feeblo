@@ -1,0 +1,182 @@
+name: Publish Images
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+  build-and-push:
+    name: Build and Push ${{ matrix.service.path }} (${{ matrix.platform.arch }})
+    if: ${{ (github.event_name == 'release' || github.event.workflow_run.conclusion == 'success') && github.repository == 'G3root/feeblo' }}
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - path: server
+            image: feeblo-server
+          - path: web
+            image: feeblo-web
+        platform:
+          - arch: amd64
+            os: linux/amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            os: linux/arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract release metadata
+        id: release-meta
+        if: ${{ github.event_name == 'release' }}
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
+          flavor: |
+            suffix=-${{ matrix.platform.arch }},onlatest=true
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Extract workflow run metadata
+        id: workflow-run-meta
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
+          flavor: |
+            suffix=-${{ matrix.platform.arch }},onlatest=true
+          tags: |
+            type=sha,prefix=
+            type=raw,value=${{ github.event.workflow_run.head_branch }}
+            type=raw,value=nightly,enable=${{ github.event.workflow_run.head_branch == 'main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: apps/${{ matrix.service.path }}/Dockerfile
+          platforms: ${{ matrix.platform.os }}
+          push: true
+          build-args: |
+            APP_RELEASE=${{ github.event.release.tag_name || github.event.workflow_run.head_sha || github.sha }}
+          tags: |
+            ${{ steps.release-meta.outputs.tags }}
+            ${{ steps.workflow-run-meta.outputs.tags }}
+          labels: |
+            ${{ steps.release-meta.outputs.labels }}
+            ${{ steps.workflow-run-meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service.path }}-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.path }}-${{ matrix.platform.arch }}
+
+  merge-manifests:
+    name: Merge ${{ matrix.service.path }} Manifest
+    needs: build-and-push
+    if: ${{ (github.event_name == 'release' || github.event.workflow_run.conclusion == 'success') && github.repository == 'G3root/feeblo' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - path: server
+            image: feeblo-server
+          - path: web
+            image: feeblo-web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract release metadata
+        id: release-meta
+        if: ${{ github.event_name == 'release' }}
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Extract workflow run metadata
+        id: workflow-run-meta
+        if: ${{ github.event_name == 'workflow_run' }}
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=${{ github.event.workflow_run.head_branch }}
+            type=raw,value=nightly,enable=${{ github.event.workflow_run.head_branch == 'main' }}
+
+      - name: Create multi-platform manifest
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
+          TAGS: |
+            ${{ steps.release-meta.outputs.tags }}
+            ${{ steps.workflow-run-meta.outputs.tags }}
+        run: |
+          image_ref="$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')"
+
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            tag_name="${tag#${image_ref}:}"
+            docker buildx imagetools create \
+              --tag "$tag" \
+              "${image_ref}:${tag_name}-amd64" \
+              "${image_ref}:${tag_name}-arm64"
+          done <<< "$TAGS"
