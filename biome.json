@@ -8,6 +8,15 @@
   ],
   "overrides": [
     {
+      "includes": ["**/migrations/**", "**/worker-configuration.d.ts"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
       "includes": ["**/*.astro"],
       "formatter": {
         "enabled": false

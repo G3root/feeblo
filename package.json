@@ -29,6 +29,7 @@
     "db:down": "turbo -F @feeblo/db db:down",
     "deploy": "turbo -F @feeblo/infra deploy",
     "destroy": "turbo -F @feeblo/infra destroy",
+    "format": "biome check --write --unsafe .",
     "check": "ultracite check",
     "fix": "ultracite fix"
   },
