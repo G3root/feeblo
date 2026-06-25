@@ -1,0 +1,50 @@
+{
+  "name": "feeblo",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "apps/*",
+      "packages/*"
+    ]
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "typecheck": "turbo check-types",
+    "prepare": "effect-language-service patch",
+    "dev:native": "turbo -F native dev",
+    "dev:web": "turbo -F web dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @feeblo/db db:push",
+    "db:studio": "turbo -F @feeblo/db db:studio",
+    "db:generate": "turbo -F @feeblo/db db:generate",
+    "db:migrate": "turbo -F @feeblo/db db:migrate",
+    "db:nuke": "turbo -F @feeblo/db db:nuke",
+    "db:seed": "turbo -F @feeblo/db db:seed",
+    "db:start": "turbo -F @feeblo/db db:start",
+    "db:watch": "turbo -F @feeblo/db db:watch",
+    "db:stop": "turbo -F @feeblo/db db:stop",
+    "db:down": "turbo -F @feeblo/db db:down",
+    "deploy": "turbo -F @feeblo/infra deploy",
+    "destroy": "turbo -F @feeblo/infra destroy",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
+  },
+  "devDependencies": {
+    "dotenv": "catalog:",
+    "zod": "catalog:",
+    "@dotenvx/dotenvx": "catalog:",
+    "@biomejs/biome": "2.4.0",
+    "@cloudflare/workers-types": "catalog:",
+    "@effect/language-service": "^0.85.1",
+    "@feeblo/config": "workspace:*",
+    "@types/node": "catalog:",
+    "effect-solutions": "^0.5.2",
+    "turbo": "^2.9.9",
+    "typescript": "catalog:",
+    "ultracite": "7.2.3"
+  },
+  "packageManager": "pnpm@11.0.3"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@feeblo/db-migrator",
+  "type": "module",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "migrate": "node ./src/migrator.mjs",
+    "build": "rolldown -c"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "rolldown": "catalog:",
+    "tsx": "catalog:"
+  }
+}

@@ -22,11 +22,8 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
         
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-      - run: npm install -g pnpm && pnpm install --frozen-lockfile
-        shell: bash
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/pnpm-install
 
       - name: Copy env
         run: cp .env.example .env

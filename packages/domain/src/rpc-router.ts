@@ -1,0 +1,45 @@
+import { Layer } from "effect";
+import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import { BillingRpcHandlers } from "./billing/handlers";
+import { BoardRpcHandlers } from "./board/handlers";
+import { ChangelogRpcHandlers } from "./changelog/handlers";
+import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
+import { CommentRpcHandlers } from "./comments/handlers";
+import { MembershipRpcHandlers } from "./membership/handlers";
+import { OrganizationRpcHandlers } from "./organization/handlers";
+import { PostRpcHandlers } from "./post/handlers";
+import { PostReactionRpcHandlers } from "./post-reaction/handlers";
+import { PostStatusRpcHandlers } from "./post-status/handlers";
+import { AllRpcs } from "./rpc-group";
+import {
+  AuthMiddlewareLive,
+  OptionalAuthMiddlewareLive,
+} from "./session-middleware";
+import { SiteRpcHandlers } from "./site/handlers";
+import { TagRpcHandlers } from "./tag/handlers";
+import { UpvoteRpcHandlers } from "./upvote/handlers";
+import { WorkspaceRpcHandlers } from "./workspace/handlers";
+
+export const RpcRoute = RpcServer.layerHttp({
+  path: "/rpc",
+  protocol: "http",
+  group: AllRpcs,
+}).pipe(
+  Layer.provide(PostRpcHandlers),
+  Layer.provide(BillingRpcHandlers),
+  Layer.provide(BoardRpcHandlers),
+  Layer.provide(ChangelogRpcHandlers),
+  Layer.provide(MembershipRpcHandlers),
+  Layer.provide(OrganizationRpcHandlers),
+  Layer.provide(CommentReactionRpcHandlers),
+  Layer.provide(CommentRpcHandlers),
+  Layer.provide(SiteRpcHandlers),
+  Layer.provide(TagRpcHandlers),
+  Layer.provide(UpvoteRpcHandlers),
+  Layer.provide(PostReactionRpcHandlers),
+  Layer.provide(PostStatusRpcHandlers),
+  Layer.provide(WorkspaceRpcHandlers),
+  Layer.provide(RpcSerialization.layerNdjson),
+  Layer.provide(AuthMiddlewareLive),
+  Layer.provide(OptionalAuthMiddlewareLive)
+);

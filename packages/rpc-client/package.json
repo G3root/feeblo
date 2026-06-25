@@ -1,0 +1,19 @@
+{
+  "name": "@feeblo/rpc-client",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@feeblo/domain": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
