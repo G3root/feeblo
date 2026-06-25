@@ -26,6 +26,7 @@
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/ui": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@feeblo/db": "workspace:*",
     "@floating-ui/dom": "^1.7.6",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",

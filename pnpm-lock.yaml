@@ -234,6 +234,9 @@ importers:
       '@feeblo/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@feeblo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../../packages/domain
