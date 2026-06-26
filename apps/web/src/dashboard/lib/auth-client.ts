@@ -1,4 +1,8 @@
-import { authStateSchema, createAuthClient } from "@feeblo/auth/client";
+import {
+  type AuthClientSession,
+  authStateSchema,
+  createAuthClient,
+} from "@feeblo/auth/client";
 import {
   createCollection,
   localOnlyCollectionOptions,
@@ -31,3 +35,26 @@ export const authStateCollection = createCollection(
     schema: authStateSchema,
   })
 );
+
+export type AuthState = z.infer<typeof authStateSchema>;
+
+export const AUTH_STATE_KEY = "auth";
+
+export const isAuthStateValid = (
+  state: AuthState | undefined | null
+): state is AuthState => {
+  return !!state && !!state.session && state.session.expiresAt > new Date();
+};
+
+export const getAuthState = (): AuthState | undefined => {
+  const state = authStateCollection.get(AUTH_STATE_KEY);
+  return isAuthStateValid(state) ? state : undefined;
+};
+
+export const insertAuthState = (data: AuthClientSession): AuthState => {
+  const state: AuthState = { id: AUTH_STATE_KEY, ...data };
+
+  authStateCollection.insert(state);
+
+  return state;
+};
