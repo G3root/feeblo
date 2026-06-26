@@ -33,7 +33,7 @@ import { authClient } from "~/lib/auth-client";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-  const session = useAuthState();
+  const { data: session } = useAuthState();
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
   return (

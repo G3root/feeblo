@@ -38,23 +38,40 @@ export const authStateCollection = createCollection(
 
 export type AuthState = z.infer<typeof authStateSchema>;
 
+export type ValidAuthState = AuthState & {
+  session: NonNullable<AuthState["session"]>;
+  user: NonNullable<AuthState["user"]>;
+};
+
 export const AUTH_STATE_KEY = "auth";
 
 export const isAuthStateValid = (
   state: AuthState | undefined | null
-): state is AuthState => {
-  return !!state && !!state.session && state.session.expiresAt > new Date();
+): state is ValidAuthState => {
+  return (
+    !!state &&
+    !!state.session &&
+    !!state.user &&
+    state.session.expiresAt > new Date()
+  );
 };
 
-export const getAuthState = (): AuthState | undefined => {
+export const getAuthState = (): ValidAuthState | undefined => {
   const state = authStateCollection.get(AUTH_STATE_KEY);
   return isAuthStateValid(state) ? state : undefined;
 };
 
-export const insertAuthState = (data: AuthClientSession): AuthState => {
+export const updateAuthState = (data: AuthClientSession): AuthState => {
   const state: AuthState = { id: AUTH_STATE_KEY, ...data };
 
-  authStateCollection.insert(state);
+  if (authStateCollection.has(AUTH_STATE_KEY)) {
+    authStateCollection.update(AUTH_STATE_KEY, (draft) => {
+      draft.session = state.session;
+      draft.user = state.user;
+    });
+  } else {
+    authStateCollection.insert(state);
+  }
 
   return state;
 };

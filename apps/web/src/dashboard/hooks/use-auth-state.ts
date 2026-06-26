@@ -1,13 +1,28 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { authStateCollection } from "~/lib/auth-client";
+import { useCallback } from "react";
+import {
+  AUTH_STATE_KEY,
+  authClient,
+  authStateCollection,
+  updateAuthState,
+} from "~/lib/auth-client";
 
 export const useAuthState = () => {
-  const { data } = useLiveQuery((q) =>
-    q
-      .from({ auth: authStateCollection })
-      .where(({ auth }) => eq(auth.id, "auth"))
-      .findOne()
+  const { data } = useLiveQuery(
+    (q) =>
+      q
+        .from({ auth: authStateCollection })
+        .where(({ auth }) => eq(auth.id, AUTH_STATE_KEY))
+        .findOne(),
+    []
   );
 
-  return data;
+  const refetch = useCallback(async () => {
+    const result = await authClient.getSession();
+    if (result.data) {
+      updateAuthState(result.data);
+    }
+  }, []);
+
+  return { data, refetch };
 };

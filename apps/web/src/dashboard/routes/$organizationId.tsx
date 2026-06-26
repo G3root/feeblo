@@ -1,5 +1,9 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
-import { authClient, getAuthState, insertAuthState } from "~/lib/auth-client";
+import {
+  authClient,
+  getAuthState,
+  updateAuthState,
+} from "~/lib/auth-client";
 
 export const Route = createFileRoute("/$organizationId")({
   component: OrganizationLayoutRoute,
@@ -14,7 +18,7 @@ export const Route = createFileRoute("/$organizationId")({
       throw new Response("Unauthorized", { status: 401 });
     }
 
-    return insertAuthState(result.data);
+    return updateAuthState(result.data);
   },
 });
 

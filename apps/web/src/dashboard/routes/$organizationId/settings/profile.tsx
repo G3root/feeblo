@@ -8,6 +8,7 @@ import { useId, useRef } from "react";
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { authClient, profilePictureUploadEndpoint } from "~/lib/auth-client";
 
 export const Route = createFileRoute("/$organizationId/settings/profile")({
@@ -60,15 +61,15 @@ function ProfileSettingsPage() {
 
 function FullNameField() {
   const id = useId();
-  const { data, refetch } = authClient.useSession();
+  const { data, refetch } = useAuthState();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  if (!data) {
+  if (!data?.user) {
     return null;
   }
 
   async function handleBlur() {
-    const currentName = data?.user.name;
+    const currentName = data?.user?.name;
     if (!currentName) {
       return;
     }
@@ -144,9 +145,9 @@ function DangerZone() {
 }
 
 function ProfileButton() {
-  const { data, refetch } = authClient.useSession();
+  const { data, refetch } = useAuthState();
 
-  if (!data) {
+  if (!data?.user) {
     return null;
   }
 
@@ -176,8 +177,8 @@ function ProfileButton() {
     <SettingsAvatarControl.Root
       ariaLabel="Edit profile picture"
       imageAlt="Profile picture"
-      imageUrl={data.user.image}
-      name={data.user.name}
+      imageUrl={data?.user?.image}
+      name={data?.user?.name}
       onRemove={async () => {
         await authClient.updateUser({
           image: null,
@@ -186,7 +187,7 @@ function ProfileButton() {
       }}
       onUpload={uploadProfilePicture}
     >
-      {data.user.image ? (
+      {data?.user?.image ? (
         <SettingsAvatarControl.Dropdown>
           <SettingsAvatarControl.DropdownTrigger />
           <SettingsAvatarControl.Menu>

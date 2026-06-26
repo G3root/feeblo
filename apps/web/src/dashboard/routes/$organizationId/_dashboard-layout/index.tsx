@@ -39,7 +39,7 @@ export const Route = createFileRoute("/$organizationId/_dashboard-layout/")({
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
-  const sessionData = useAuthState();
+  const { data: sessionData } = useAuthState();
   const createPostStore = usePostCreateDialogContext();
   const createBoardStore = useCreateBoardDialogContext();
 
