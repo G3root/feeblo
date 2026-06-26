@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { sequence } from "astro:middleware";
+import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";
 import type { APIContext, MiddlewareNext } from "astro";
 import { authClient } from "~/lib/server-auth-client";
@@ -92,9 +93,11 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
     fetchOptions: { headers: context.request.headers },
   });
 
-  context.locals.user = data?.user ?? null;
-  context.locals.session = data?.session ?? null;
-  context.locals.organizations = data?.organizations ?? null;
+  const sessionData = data as AuthClientSession | null;
+
+  context.locals.user = sessionData?.user ?? null;
+  context.locals.session = sessionData?.session ?? null;
+  context.locals.organizations = sessionData?.organizations ?? null;
 
   return next();
 }
