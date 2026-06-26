@@ -27,12 +27,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { authClient } from "~/lib/auth-client";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-  const { data: session } = authClient.useSession();
+  const session = useAuthState();
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
   return (

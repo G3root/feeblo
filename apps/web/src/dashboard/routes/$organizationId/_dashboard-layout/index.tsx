@@ -16,8 +16,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { authClient } from "~/lib/auth-client";
 import {
   boardCollection,
   postCollection,
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/$organizationId/_dashboard-layout/")({
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
-  const { data: session } = authClient.useSession();
+  const sessionData = useAuthState();
   const createPostStore = usePostCreateDialogContext();
   const createBoardStore = useCreateBoardDialogContext();
 
@@ -72,7 +72,9 @@ function RouteComponent() {
   );
 
   const boardMap = new Map((boards ?? []).map((b) => [b.id, b]));
-  const userName = session?.user?.name ?? session?.user?.email ?? "there";
+
+  const userName =
+    sessionData?.user?.name ?? sessionData?.user?.email ?? "there";
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">

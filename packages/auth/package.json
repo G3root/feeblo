@@ -31,7 +31,8 @@
     "@polar-sh/sdk": "catalog:",
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"

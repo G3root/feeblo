@@ -1,4 +1,4 @@
-import { createAuthClient } from "@feeblo/auth/client";
+import { authStateSchema, createAuthClient } from "@feeblo/auth/client";
 import {
   createCollection,
   localOnlyCollectionOptions,
@@ -23,12 +23,6 @@ export const uploadedEditorMediaSchema = z.object({
 });
 
 export const authClient = createAuthClient(baseUrl);
-
-const authStateSchema = z.object({
-  id: z.string(),
-  session: z.any().nullable(),
-  user: z.any().nullable(),
-});
 
 export const authStateCollection = createCollection(
   localOnlyCollectionOptions({
