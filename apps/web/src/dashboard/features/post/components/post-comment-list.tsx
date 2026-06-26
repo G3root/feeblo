@@ -22,7 +22,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { Delete02Icon, Ellipsis } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, type ReactNode, use } from "react";
-import { authClient } from "~/lib/auth-client";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { cn } from "~/lib/utils";
 import {
   type CommentReaction,
@@ -301,7 +301,7 @@ function PostCommentListReactions() {
 }
 
 function PostCommentListActions() {
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const { handleDeleteComment, isLocked } = usePostCommentList();
   const comment = usePostCommentItem();
 

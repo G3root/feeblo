@@ -3,9 +3,9 @@ import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasMembership, usePolicy } from "~/hooks/use-policy";
-import { authClient } from "~/lib/auth-client";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
 
@@ -13,7 +13,7 @@ export const useChangelogAction = () => {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
   const { changelogCollection, membersCollection } = useDashboardCollections();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
 
   const createChangeLog = async () => {

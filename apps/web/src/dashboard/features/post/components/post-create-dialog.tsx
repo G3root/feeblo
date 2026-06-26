@@ -17,9 +17,9 @@ import { useSelector } from "@xstate/store-react";
 import { useRef, useState } from "react";
 import type { BoardPostStatus } from "~/features/board/constants";
 import { useAppForm } from "~/hooks/form";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { hasMembership, usePolicy } from "~/hooks/use-policy";
-import { authClient } from "~/lib/auth-client";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { usePostCreateDialogContext } from "../dialog-stores";
 import { PostCreateLayout } from "./post-create-dialog-layout";
@@ -65,7 +65,7 @@ function PostCreateForm() {
     postCollection,
     postStatusCollection,
   } = useDashboardCollections();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
 
   const { data: member } = useLiveQuery(

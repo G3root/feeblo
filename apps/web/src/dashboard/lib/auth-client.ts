@@ -1,5 +1,6 @@
 import {
   type AuthClientSession,
+  type AuthClientSessionResponse,
   authStateSchema,
   createAuthClient,
 } from "@feeblo/auth/client";
@@ -57,17 +58,28 @@ export const isAuthStateValid = (
 };
 
 export const getAuthState = (): ValidAuthState | undefined => {
-  const state = authStateCollection.get(AUTH_STATE_KEY);
+  const state = authStateCollection.get(AUTH_STATE_KEY) as
+    | AuthState
+    | undefined;
   return isAuthStateValid(state) ? state : undefined;
 };
 
 export const updateAuthState = (data: AuthClientSession): AuthState => {
-  const state: AuthState = { id: AUTH_STATE_KEY, ...data };
+  const response = data as AuthClientSessionResponse;
+  const state: AuthState = {
+    id: AUTH_STATE_KEY,
+    session: response.session,
+    user: response.user,
+    memberships: response.memberships,
+    organizations: response.organizations,
+  };
 
   if (authStateCollection.has(AUTH_STATE_KEY)) {
     authStateCollection.update(AUTH_STATE_KEY, (draft) => {
       draft.session = state.session;
       draft.user = state.user;
+      draft.memberships = state.memberships;
+      draft.organizations = state.organizations;
     });
   } else {
     authStateCollection.insert(state);

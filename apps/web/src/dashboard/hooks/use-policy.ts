@@ -1,16 +1,8 @@
 import { type ReactNode, useMemo } from "react";
-import { authClient } from "~/lib/auth-client";
+import { useAuthState } from "~/hooks/use-auth-state";
+import type { ValidAuthState } from "~/lib/auth-client";
 
-type SessionData = NonNullable<
-  ReturnType<typeof authClient.useSession>["data"]
-> & {
-  memberships: Array<{
-    membershipId: string;
-    organizationId: string;
-    role: "owner" | "admin" | "member";
-    userId: string;
-  }>;
-};
+type SessionData = ValidAuthState;
 
 export type ClientPolicy = (session: SessionData) => boolean;
 
@@ -18,13 +10,13 @@ export function usePolicy(policy: ClientPolicy): {
   allowed: boolean;
   isPending: boolean;
 } {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, isPending } = useAuthState();
 
   const allowed = useMemo(() => {
     if (!session) {
       return false;
     }
-    return policy(session as SessionData);
+    return policy(session);
   }, [session, policy]);
 
   return { allowed, isPending };

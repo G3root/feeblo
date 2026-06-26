@@ -7,7 +7,7 @@ import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
-import { authClient } from "~/lib/auth-client";
+import { useAuthState } from "~/hooks/use-auth-state";
 import {
   getPostReactionCollectionKey,
   getUpvoteCollectionKey,
@@ -36,7 +36,7 @@ export function PostDetailsEngagementBar({
 }) {
   const { postReactionCollection, upvoteCollection } =
     useDashboardCollections();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
     (q) => {
       if (!postId) {

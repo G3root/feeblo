@@ -31,8 +31,26 @@ export type AuthClientSession = NonNullable<TAuthClient["$Infer"]["Session"]>;
 export type AuthClientSessionData = AuthClientSession["session"];
 export type AuthClientUser = AuthClientSession["user"];
 
+export type AuthClientMembership = {
+  membershipId: string;
+  organizationId: string;
+  role: "owner" | "admin" | "member";
+  userId: string;
+};
+
+export type AuthClientOrganization = {
+  id: string;
+};
+
+export type AuthClientSessionResponse = AuthClientSession & {
+  memberships: AuthClientMembership[];
+  organizations: AuthClientOrganization[];
+};
+
 export const authStateSchema = z.object({
   id: z.string(),
   session: z.custom<AuthClientSessionData | null>(),
   user: z.custom<AuthClientUser | null>(),
+  memberships: z.custom<AuthClientMembership[]>(),
+  organizations: z.custom<AuthClientOrganization[]>(),
 });

@@ -17,7 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useRef, useState } from "react";
 import { z } from "zod";
 import { useAppForm } from "~/hooks/form";
-import { authClient } from "~/lib/auth-client";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { isRichTextContentEmpty } from "./post-editor-utils";
 
 const CommentVisibilitySchema = z.enum(["PUBLIC", "INTERNAL"]);
@@ -68,7 +68,7 @@ export function PostCommentComposer({
 }: PostCommentComposerProps) {
   const editorRef = useRef<EmailEditorRef | null>(null);
   const [editorKey, setEditorKey] = useState(0);
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
 
   const userId = session?.user?.id;
   const userName = session?.user?.name;

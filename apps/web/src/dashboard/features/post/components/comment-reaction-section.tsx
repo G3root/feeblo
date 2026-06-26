@@ -1,7 +1,7 @@
 import { toastManager } from "@feeblo/ui/toast";
 import type { ReactionCounts, ReactionEmoji } from "@feeblo/utils/reaction";
 import { createContext, type ReactNode, use, useMemo, useState } from "react";
-import { authClient } from "~/lib/auth-client";
+import { useAuthState } from "~/hooks/use-auth-state";
 import { ReactionButton, ReactionList } from "./reaction-button";
 
 export type CommentReaction = {
@@ -69,7 +69,7 @@ function CommentReactionRoot({
   organizationId,
   postId,
 }: CommentReactionRootProps) {
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const [isToggling, setIsToggling] = useState(false);
   const currentUserId = session?.user?.id;
 

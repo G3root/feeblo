@@ -27,13 +27,13 @@ import {
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
+import { useAuthState } from "~/hooks/use-auth-state";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,
   isUser,
   usePolicy,
 } from "~/hooks/use-policy";
-import { authClient } from "~/lib/auth-client";
 import {
   boardCollection,
   postCollection,
@@ -70,7 +70,7 @@ function RouteComponent() {
     postTagCollection,
     tagCollection,
   } = useDashboardCollections();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const navigate = useNavigate();
 
   const { data: board } = useLiveQuery(
