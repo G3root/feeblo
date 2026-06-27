@@ -29,6 +29,7 @@ export interface LegidFactory<Name extends string> {
   readonly generate: Effect.Effect<LegidOf<Name>, LegidError>;
   readonly is: (input: string) => input is LegidOf<Name>;
   readonly parse: (input: string) => Effect.Effect<LegidOf<Name>, LegidError>;
+  readonly schema: Schema.Schema<LegidOf<Name>>;
   readonly unsafeGenerate: () => Promise<LegidOf<Name>>;
   readonly unsafeParse: (input: string) => Promise<LegidOf<Name>>;
   readonly verify: (input: string) => Effect.Effect<boolean>;
@@ -38,6 +39,28 @@ export interface PrefixableLegidFactory<Name extends string>
   extends LegidFactory<Name> {
   readonly prefix: string;
 }
+
+/**
+ * Type-only helper that casts a single raw legid string into a branded legid
+ * for the supplied factory. Use this when loading a single ID from a trusted
+ * source (such as a database row) and you only need compile-time safety.
+ */
+export const asLegid =
+  <Name extends string>(
+    _factory: LegidFactory<Name>
+  ): ((input: string) => LegidOf<Name>) =>
+  (input) =>
+    input as unknown as LegidOf<Name>;
+
+/**
+ * Type-only helper that brands the `id` field of a single object using the
+ * supplied legid factory. Use this when loading a single row from a trusted
+ * source such as the database.
+ */
+export const asLegidById =
+  <Name extends string>(_factory: LegidFactory<Name>) =>
+  <T extends { id: string }>(input: T): WithLegidId<Name, T> =>
+    input as unknown as WithLegidId<Name, T>;
 
 export type LegidFrom<Factory> =
   Factory extends LegidFactory<infer Name> ? LegidOf<Name> : never;
@@ -227,9 +250,15 @@ export const makeId = <
     return brandLegidId(LegidId.make(input));
   });
 
+  const idSchema = Schema.String.pipe(
+    Schema.brand("LegidId"),
+    Schema.brand(brand)
+  ) as Schema.Schema<LegidOf<BrandName>>;
+
   return {
     brand,
     prefix: validPrefix,
+    schema: idSchema,
     generate: generate(),
     verify,
     parse,
