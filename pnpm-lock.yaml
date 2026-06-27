@@ -702,6 +702,25 @@ importers:
         specifier: 'catalog:'
         version: 2.11.12(solid-js@1.9.13)(vite@8.0.16(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
 
+  packages/id:
+    dependencies:
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.66
+      legid:
+        specifier: ^0.1.4
+        version: 0.1.4
+    devDependencies:
+      '@feeblo/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.6(@types/node@25.6.0)(happy-dom@20.10.6)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.2(@types/node@25.6.0)(typescript@6.0.3))(tsx@4.21.0)(yaml@2.8.4)
+
   packages/rpc-client:
     dependencies:
       '@feeblo/domain':
