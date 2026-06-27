@@ -1,6 +1,18 @@
 // biome-ignore-all lint/suspicious/noConsole: Seed script requires console output
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
+import {
+  BoardId,
+  CommentId,
+  CommentReactionId,
+  MemberId,
+  PostId,
+  PostReactionId,
+  PostStatusId,
+  SiteId,
+  UpvoteId,
+  WorkspaceId,
+} from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { and, eq, inArray } from "drizzle-orm";
 import { Data, Effect } from "effect";
@@ -52,8 +64,6 @@ const REACTIONS = [
 class SeedDataError extends Data.TaggedError("SeedDataError")<{
   readonly message: string;
 }> {}
-
-const makeId = (prefix: string) => `${prefix}-${faker.string.alphanumeric(12)}`;
 
 const slugify = (value: string) =>
   value
@@ -159,11 +169,12 @@ const ensureOrganization = (userId: string) =>
     );
 
     if (!org) {
+      const orgId = yield* WorkspaceId.generate;
       [org] = yield* Effect.tryPromise(() =>
         db
           .insert(organizationTable)
           .values({
-            id: userId,
+            id: orgId,
             name: "Personal",
             slug: userId,
             createdAt: new Date(),
@@ -196,9 +207,10 @@ const ensureOrganization = (userId: string) =>
     );
 
     if (!existingOwnerMembership) {
+      const memberId = yield* MemberId.generate;
       yield* Effect.tryPromise(() =>
         db.insert(memberTable).values({
-          id: makeId("mem"),
+          id: memberId,
           organizationId: org.id,
           userId,
           role: "owner",
@@ -217,9 +229,10 @@ const ensureOrganization = (userId: string) =>
 
     if (existingPostStatuses.length === 0) {
       for (const postStatusDefinition of DEFAULT_POST_STATUSES) {
+        const postStatusId = yield* PostStatusId.generate;
         yield* Effect.tryPromise(() =>
           db.insert(postStatusTable).values({
-            id: makeId("pss"),
+            id: postStatusId,
             organizationId: org.id,
             type: postStatusDefinition.type,
             orderIndex: postStatusDefinition.orderIndex,
@@ -255,11 +268,12 @@ const ensureSite = ({
     );
 
     if (!existing) {
+      const siteId = yield* SiteId.generate;
       [existing] = yield* Effect.tryPromise(() =>
         db
           .insert(siteTable)
           .values({
-            id: makeId("ste"),
+            id: siteId,
             name,
             subdomain,
             organizationId,
@@ -306,11 +320,12 @@ const ensureMember = ({
     );
 
     if (!existing) {
+      const memberId = yield* MemberId.generate;
       [existing] = yield* Effect.tryPromise(() =>
         db
           .insert(memberTable)
           .values({
-            id: makeId("mem"),
+            id: memberId,
             organizationId,
             userId,
             role,
@@ -343,9 +358,10 @@ const ensureBoards = ({
 
     if (boards.length === 0) {
       for (const name of names) {
+        const boardId = yield* BoardId.generate;
         yield* Effect.tryPromise(() =>
           db.insert(boardTable).values({
-            id: makeId("brd"),
+            id: boardId,
             name,
             slug: slugify(name),
             visibility: "PUBLIC",
@@ -423,9 +439,10 @@ const ensurePosts = ({
         const content = faker.lorem.paragraphs({ min: 2, max: 4 });
         const lockedAt = i % 13 === 0 ? now : null;
 
+        const postId = yield* PostId.generate;
         yield* Effect.tryPromise(() =>
           db.insert(postTable).values({
-            id: makeId("pst"),
+            id: postId,
             title,
             slug: slugify(`${title}-${i + 1}`),
             content,
@@ -521,7 +538,7 @@ const seedEngagement = ({
           continue;
         }
 
-        const commentId = makeId("cmt");
+        const commentId = yield* CommentId.generate;
 
         yield* Effect.tryPromise(() =>
           db.insert(commentTable).values({
@@ -559,9 +576,10 @@ const seedEngagement = ({
         );
 
         if (!existing) {
+          const upvoteId = yield* UpvoteId.generate;
           yield* Effect.tryPromise(() =>
             db.insert(upvoteTable).values({
-              id: makeId("upv"),
+              id: upvoteId,
               userId: upvoterId,
               memberId: memberIdByUserId.get(upvoterId) ?? null,
               postId: postItem.id,
@@ -593,9 +611,10 @@ const seedEngagement = ({
         );
 
         if (!existing) {
+          const reactionId = yield* PostReactionId.generate;
           yield* Effect.tryPromise(() =>
             db.insert(postReactionTable).values({
-              id: makeId("rct"),
+              id: reactionId,
               userId: reactorId,
               memberId: memberIdByUserId.get(reactorId) ?? null,
               postId: postItem.id,
@@ -635,9 +654,10 @@ const seedEngagement = ({
         );
 
         if (!existing) {
+          const commentReactionId = yield* CommentReactionId.generate;
           yield* Effect.tryPromise(() =>
             db.insert(commentReactionTable).values({
-              id: makeId("crt"),
+              id: commentReactionId,
               userId: reactorId,
               memberId: memberIdByUserId.get(reactorId) ?? null,
               commentId: item.id,
