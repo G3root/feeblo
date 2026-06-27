@@ -42,6 +42,52 @@ export interface PrefixableLegidFactory<Name extends string>
 export type LegidFrom<Factory> =
   Factory extends LegidFactory<infer Name> ? LegidOf<Name> : never;
 
+/**
+ * A type-only array of branded IDs for a given legid brand.
+ *
+ * Use this when data coming from a trusted source (for example, the database)
+ * is already known to be valid and you only need compile-time branding on an
+ * array of IDs.
+ */
+export type LegidArray<Name extends string> = readonly LegidOf<Name>[];
+
+/**
+ * Type-only helper that casts an array of raw legid strings into an array of
+ * branded IDs for the supplied factory.
+ *
+ * Use this when loading IDs from a trusted source such as the database and you
+ * only need compile-time safety.
+ */
+export const asLegidArray = <Name extends string>(
+  _factory: LegidFactory<Name>
+): ((input: readonly string[]) => LegidArray<Name>) => {
+  return (input) => input as unknown as LegidArray<Name>;
+};
+
+/**
+ * A type-only object whose `id` field has been branded with a legid brand.
+ */
+export type WithLegidId<Name extends string, T extends { id: string }> = Omit<
+  T,
+  "id"
+> & {
+  readonly id: LegidOf<Name>;
+};
+
+/**
+ * Type-only helper that casts an array of objects with an `id` string into an
+ * array of objects whose `id` is branded for the supplied factory.
+ *
+ * Use this when loading rows from a trusted source such as the database and you
+ * only need compile-time safety on the `id` field.
+ */
+export const asLegidArrayById =
+  <Name extends string>(_factory: LegidFactory<Name>) =>
+  <T extends { id: string }>(
+    input: readonly T[]
+  ): readonly WithLegidId<Name, T>[] =>
+    input as unknown as readonly WithLegidId<Name, T>[];
+
 type DefaultBrandName<Name extends string> =
   Name extends `${infer Head}_${infer Tail}`
     ? `${Capitalize<Head>}${DefaultBrandName<Tail>}`

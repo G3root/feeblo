@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 export * from "./legid";
 
 import { makeId } from "./legid";
@@ -28,11 +29,9 @@ export const PostId = makeId("post", "pst", {
 export const UpvoteId = makeId("upvote", "upv", {
   approximateLength,
 });
-export const CommentReactionId = makeId(
-  "comment_reaction",
-  "crt",
-  { approximateLength }
-);
+export const CommentReactionId = makeId("comment_reaction", "crt", {
+  approximateLength,
+});
 export const CommentId = makeId("comment", "cmt", {
   approximateLength,
 });

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { beforeEach, describe, expect, it } from "vitest";
-import { LegidError, makeId } from "../src/legid";
+import { asLegidArray, asLegidArrayById, LegidError, makeId } from "../src/legid";
 
 const run = <A>(
   effect: Effect.Effect<A, LegidError>
@@ -174,6 +174,28 @@ describe("makeId", () => {
 
     it("throws on a prefix with underscores", () => {
       expect(() => makeId("post", "p_s")).toThrow();
+    });
+  });
+
+  describe("asLegidArray", () => {
+    it("returns the same array at runtime", () => {
+      const raw = ["pst_aB3xY9kQ2rMn", "pst_bC4zZ0lQ3sNo"];
+      const branded = asLegidArray(factory)(raw);
+
+      expect(branded).toBe(raw);
+    });
+  });
+
+  describe("asLegidArrayById", () => {
+    it("returns the same array at runtime and preserves other fields", () => {
+      const raw = [
+        { id: "pst_aB3xY9kQ2rMn", title: "Hello" },
+        { id: "pst_bC4zZ0lQ3sNo", title: "World" },
+      ];
+      const branded = asLegidArrayById(factory)(raw);
+
+      expect(branded).toBe(raw);
+      expect(branded[0]?.title).toBe("Hello");
     });
   });
 });
