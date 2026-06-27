@@ -1,3 +1,4 @@
+import { Button } from "@feeblo/ui/button";
 import {
   Field,
   FieldDescription,
@@ -19,18 +20,63 @@ import { toWorkspaceSlug } from "../utils";
 
 const appRootDomain = getRuntimePublicEnv().appRootDomain;
 
-const slugStatusMessages: Partial<
-  Record<ReturnType<typeof useWorkspaceSlugAvailability>, React.ReactNode>
-> = {
-  checking: <FieldDescription>Checking availability…</FieldDescription>,
-  available: (
-    <FieldDescription className="text-emerald-600">
-      Name is available.
-    </FieldDescription>
-  ),
-  taken: <FieldError>This name is already taken.</FieldError>,
-  error: <FieldError>Could not check availability. Try again.</FieldError>,
-};
+interface SlugCheckForm {
+  setFieldValue: (name: "workspaceName", value: string) => void;
+}
+
+function renderSlugFooter(
+  slug: string,
+  slugStatus: "idle" | "checking" | "available" | "taken" | "error",
+  suggestion: string | null,
+  form: SlugCheckForm
+) {
+  if (slug.length < 4) {
+    return (
+      <FieldDescription>
+        Workspace name must produce a slug of at least 4 characters.
+      </FieldDescription>
+    );
+  }
+  if (slugStatus === "checking") {
+    return <FieldDescription>Checking availability…</FieldDescription>;
+  }
+  if (slugStatus === "available") {
+    return (
+      <FieldDescription className="text-emerald-600">
+        Name is available.
+      </FieldDescription>
+    );
+  }
+  if (slugStatus === "taken") {
+    return (
+      <div className="flex flex-col gap-2">
+        <FieldError>This name is already taken.</FieldError>
+        {suggestion ? (
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() =>
+                form.setFieldValue(
+                  "workspaceName",
+                  suggestion.replace(/-/g, " ")
+                )
+              }
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Use {suggestion}
+            </Button>
+            <FieldDescription>{suggestion}</FieldDescription>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+  if (slugStatus === "error") {
+    return <FieldError>Could not check availability. Try again.</FieldError>;
+  }
+  return null;
+}
 
 export const RegisterWorkspaceStep = withForm({
   ...registerFormOpts,
@@ -41,7 +87,10 @@ export const RegisterWorkspaceStep = withForm({
     );
 
     const slug = toWorkspaceSlug(workspaceName);
-    const slugStatus = useWorkspaceSlugAvailability(slug, slug.length >= 2);
+    const { status: slugStatus, suggestion } = useWorkspaceSlugAvailability(
+      slug,
+      slug.length >= 4
+    );
 
     return (
       <div className="flex flex-col gap-4">
@@ -83,7 +132,7 @@ export const RegisterWorkspaceStep = withForm({
               <InputGroupText>.{appRootDomain}</InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-          {slug.length >= 2 ? slugStatusMessages[slugStatus] : null}
+          {renderSlugFooter(slug, slugStatus, suggestion, form)}
         </Field>
       </div>
     );

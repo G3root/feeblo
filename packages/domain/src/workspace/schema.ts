@@ -17,10 +17,24 @@ export const CreateWorkspaceOutput = S.Struct({
   organizationId: S.String,
 });
 
-export type TCreateWorkspaceInput = S.Schema.Type<typeof CreateWorkspaceInput>;
+export const WorkspaceSlugCheckInput = S.Struct({
+  slug: S.String.pipe(S.check(S.isMinLength(4))),
+});
 
+export const WorkspaceSlugCheckOutput = S.Struct({
+  available: S.Boolean,
+  suggestion: S.NullOr(S.String),
+});
+
+export type TCreateWorkspaceInput = S.Schema.Type<typeof CreateWorkspaceInput>;
 export type TWorkspaceInput = S.Schema.Type<typeof WorkspaceInput>;
 export type TWorkspacePlan = S.Schema.Type<typeof WorkspacePlan>;
+export type TWorkspaceSlugCheckInput = S.Schema.Type<
+  typeof WorkspaceSlugCheckInput
+>;
+export type TWorkspaceSlugCheckOutput = S.Schema.Type<
+  typeof WorkspaceSlugCheckOutput
+>;
 
 export const WorkspacePreferences = S.Struct({
   allowMemberInvites: S.Boolean,

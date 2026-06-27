@@ -6,7 +6,7 @@ import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 import { FailedToCreateWorkspaceError } from "./errors";
 
 interface CreateWorkspaceArgs {
-  slug: string;
+  subdomain: string;
   userId: string;
   workspaceName: string;
 }
@@ -29,18 +29,41 @@ const makeWorkspaceRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
   return {
-    isOrganizationSlugTaken: (slug: string, tx?: TxFn) => {
+    isSubdomainTaken: (subdomain: string, tx?: TxFn) => {
       return db
-        .makeQuery((execute, slug: string) =>
+        .makeQuery((execute, subdomain: string) =>
           execute((client) =>
             client
-              .select()
-              .from(schema.organizationTable)
-              .where(eq(schema.organizationTable.slug, slug))
+              .select({ id: schema.siteTable.id })
+              .from(schema.siteTable)
+              .where(eq(schema.siteTable.subdomain, subdomain))
               .limit(1)
           )
-        )(slug, tx)
+        )(subdomain, tx)
         .pipe(Effect.map((results) => results.length > 0));
+    },
+
+    getSubdomainSuggestion: (subdomain: string, tx?: TxFn) => {
+      return Effect.gen(function* () {
+        for (let i = 2; i <= 12; i++) {
+          const candidate = `${subdomain}-${i}`;
+          const taken = yield* db
+            .makeQuery((execute, candidate: string) =>
+              execute((client) =>
+                client
+                  .select({ id: schema.siteTable.id })
+                  .from(schema.siteTable)
+                  .where(eq(schema.siteTable.subdomain, candidate))
+                  .limit(1)
+              )
+            )(candidate, tx)
+            .pipe(Effect.map((results) => results.length > 0));
+          if (!taken) {
+            return Option.some(candidate);
+          }
+        }
+        return Option.none();
+      });
     },
 
     createWorkspace: (args: CreateWorkspaceArgs, tx?: TxFn) =>
@@ -53,7 +76,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
                 .values({
                   id: generateId("workspace"),
                   name: input.workspaceName,
-                  slug: input.slug,
+                  slug: input.subdomain,
                   createdAt: new Date(),
                 })
                 .returning()
@@ -134,7 +157,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               createdAt: new Date(),
               updatedAt: new Date(),
               name: input.workspaceName,
-              subdomain: input.slug,
+              subdomain: input.subdomain,
               hidePoweredBy: false,
             })
           )

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "site_subdomain_uidx" ON "site" USING btree ("subdomain");

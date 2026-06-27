@@ -1,11 +1,18 @@
-import { slugify } from "@feeblo/utils/url";
-import { Effect, Layer } from "effect";
+import { RESERVED_SUBDOMAINS, slugify } from "@feeblo/utils/url";
+import { Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "./repository";
 import { WorkspaceRpcs } from "./rpcs";
-import type { TCreateWorkspaceInput, TWorkspaceInput } from "./schema";
+import type {
+  TCreateWorkspaceInput,
+  TWorkspaceInput,
+  TWorkspaceSlugCheckInput,
+} from "./schema";
+
+const isReservedSubdomain = (subdomain: string) =>
+  RESERVED_SUBDOMAINS.includes(subdomain);
 
 export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
   Effect.gen(function* () {
@@ -17,25 +24,33 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
           const session = yield* CurrentSession;
           const workspaceName = args.workspaceName.trim();
 
-          const slug = slugify(workspaceName);
-          if (!slug) {
+          const subdomain = slugify(workspaceName);
+          if (subdomain.length < 4) {
             return yield* new BadRequestError({
-              message: "Invalid workspace name",
+              message:
+                "Workspace name must produce a subdomain of at least 4 characters",
+            });
+          }
+          if (isReservedSubdomain(subdomain)) {
+            return yield* new BadRequestError({
+              message:
+                "This workspace name is reserved. Please choose another.",
             });
           }
 
-          const isSlugTaken = yield* repository.isOrganizationSlugTaken(slug);
+          const isSubdomainTaken =
+            yield* repository.isSubdomainTaken(subdomain);
 
-          if (isSlugTaken) {
+          if (isSubdomainTaken) {
             return yield* new BadRequestError({
-              message: "Company name is already taken",
+              message: "This workspace name is already taken",
             });
           }
 
           const organizationId = yield* repository.createWorkspace({
             userId: session.session.userId,
             workspaceName,
-            slug,
+            subdomain,
           });
 
           return { organizationId };
@@ -54,6 +69,23 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
             withRemapDbErrors("Workspace", "select")
           ),
+      WorkspaceSlugCheck: (args: TWorkspaceSlugCheckInput) =>
+        Effect.gen(function* () {
+          if (isReservedSubdomain(args.slug)) {
+            return { available: false, suggestion: null };
+          }
+          const taken = yield* repository.isSubdomainTaken(args.slug);
+          if (!taken) {
+            return { available: true, suggestion: null };
+          }
+          const suggestion = yield* repository.getSubdomainSuggestion(
+            args.slug
+          );
+          return {
+            available: false,
+            suggestion: Option.getOrNull(suggestion),
+          };
+        }).pipe(withRemapDbErrors("Workspace", "select")),
     };
   })
 ).pipe(Layer.provide(WorkspaceRepository.layer));

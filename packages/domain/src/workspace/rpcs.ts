@@ -8,6 +8,8 @@ import {
   WorkspaceInput,
   WorkspacePlan,
   WorkspaceProduct,
+  WorkspaceSlugCheckInput,
+  WorkspaceSlugCheckOutput,
 } from "./schema";
 
 export class WorkspaceRpcs extends RpcGroup.make(
@@ -23,6 +25,11 @@ export class WorkspaceRpcs extends RpcGroup.make(
   Rpc.make("WorkspacePlanGet", {
     payload: WorkspaceInput,
     success: WorkspacePlan,
+    error: WorkspaceServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("WorkspaceSlugCheck", {
+    payload: WorkspaceSlugCheckInput,
+    success: WorkspaceSlugCheckOutput,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

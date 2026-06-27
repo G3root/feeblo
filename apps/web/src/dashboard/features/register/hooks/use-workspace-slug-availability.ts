@@ -1,33 +1,47 @@
 import { useEffect, useState } from "react";
-import { authClient } from "~/lib/auth-client";
+import { fetchRpc } from "~/lib/runtime";
 
 type SlugStatus = "idle" | "checking" | "available" | "taken" | "error";
 
+interface SlugAvailabilityState {
+  status: SlugStatus;
+  suggestion: string | null;
+}
+
 export function useWorkspaceSlugAvailability(slug: string, enabled: boolean) {
-  const [status, setStatus] = useState<SlugStatus>("idle");
+  const [state, setState] = useState<SlugAvailabilityState>({
+    status: "idle",
+    suggestion: null,
+  });
 
   useEffect(() => {
     if (!(enabled && slug)) {
-      setStatus("idle");
+      setState({ status: "idle", suggestion: null });
       return;
     }
 
     let cancelled = false;
 
     const timeoutId = window.setTimeout(async () => {
-      setStatus("checking");
+      setState({ status: "checking", suggestion: null });
 
       try {
-        const response = await authClient.organization.checkSlug({ slug });
+        const response = await fetchRpc((rpc) =>
+          rpc.WorkspaceSlugCheck({ slug })
+        );
 
         if (cancelled) {
           return;
         }
 
-        setStatus(response.error ? "taken" : "available");
+        if (response.available) {
+          setState({ status: "available", suggestion: null });
+        } else {
+          setState({ status: "taken", suggestion: response.suggestion });
+        }
       } catch {
         if (!cancelled) {
-          setStatus("error");
+          setState({ status: "error", suggestion: null });
         }
       }
     }, 350);
@@ -38,5 +52,5 @@ export function useWorkspaceSlugAvailability(slug: string, enabled: boolean) {
     };
   }, [slug, enabled]);
 
-  return status;
+  return state;
 }

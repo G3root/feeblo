@@ -291,15 +291,13 @@ export const postTable = pgTable(
       "post_no_self_merge_chk",
       sql`${table.mergedIntoPostId} is null or ${table.mergedIntoPostId} <> ${table.id}`
     ),
+    foreignKey({
+      name: "post_merged_into_same_organization_fk",
+      columns: [table.mergedIntoPostId, table.organizationId],
+      foreignColumns: [table.id, table.organizationId],
+    }).onDelete("restrict"),
   ]
 );
-
-// ✅ Self-referential FK defined AFTER the table exists
-export const postSelfRefRelations = foreignKey({
-  name: "post_merged_into_same_organization_fk",
-  columns: [postTable.mergedIntoPostId, postTable.organizationId],
-  foreignColumns: [postTable.id, postTable.organizationId],
-}).onDelete("restrict");
 
 export const upvoteTable = pgTable(
   "upvote",
@@ -445,7 +443,10 @@ export const siteTable = pgTable(
       .notNull()
       .$onUpdate(() => /* @__PURE__ */ new Date()),
   },
-  (table) => [uniqueIndex("site_organizationId_uidx").on(table.organizationId)]
+  (table) => [
+    uniqueIndex("site_organizationId_uidx").on(table.organizationId),
+    uniqueIndex("site_subdomain_uidx").on(table.subdomain),
+  ]
 );
 
 export const changelogTable = pgTable(
