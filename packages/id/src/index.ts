@@ -1,55 +1,53 @@
 export * from "./legid";
 
-import { makeLegid, makePrefixableLegid } from "./legid";
+import { makeId } from "./legid";
 
 const approximateLength = 12;
 
-export const OrganizationId = makePrefixableLegid("organization", "org", {
+export const OrganizationId = makeId("organization", "org", {
   approximateLength,
 });
-export const WorkspaceId = makePrefixableLegid("workspace", "org", {
+export const WorkspaceId = makeId("workspace", "org", {
   approximateLength,
 });
-export const ProjectId = makePrefixableLegid("project", "prj", {
+export const ProjectId = makeId("project", "prj", {
   approximateLength,
 });
-export const MemberId = makePrefixableLegid("member", "mem", {
+export const MemberId = makeId("member", "mem", {
   approximateLength,
 });
-export const BoardId = makePrefixableLegid("board", "brd", {
+export const BoardId = makeId("board", "brd", {
   approximateLength,
 });
-export const PostStatusId = makePrefixableLegid("post_status", "pss", {
+export const PostStatusId = makeId("post_status", "pss", {
   approximateLength,
 });
-export const PostId = makePrefixableLegid("post", "pst", {
+export const PostId = makeId("post", "pst", {
   approximateLength,
 });
-export const UpvoteId = makePrefixableLegid("upvote", "upv", {
+export const UpvoteId = makeId("upvote", "upv", {
   approximateLength,
 });
-export const CommentReactionId = makePrefixableLegid(
+export const CommentReactionId = makeId(
   "comment_reaction",
   "crt",
   { approximateLength }
 );
-export const CommentId = makePrefixableLegid("comment", "cmt", {
+export const CommentId = makeId("comment", "cmt", {
   approximateLength,
 });
-export const ReplyId = makePrefixableLegid("reply", "rpl", {
+export const ReplyId = makeId("reply", "rpl", {
   approximateLength,
 });
-export const PostReactionId = makePrefixableLegid("post_reaction", "rct", {
+export const PostReactionId = makeId("post_reaction", "rct", {
   approximateLength,
 });
-export const SiteId = makePrefixableLegid("site", "sit", {
+export const SiteId = makeId("site", "sit", {
   approximateLength,
 });
-export const SubscriptionId = makePrefixableLegid("subscription", "sub", {
+export const SubscriptionId = makeId("subscription", "sub", {
   approximateLength,
 });
-export const ChangelogId = makePrefixableLegid("changelog", "chg", {
+export const ChangelogId = makeId("changelog", "chg", {
   approximateLength,
 });
-
-export const PublicId = makeLegid("public", { approximateLength });
