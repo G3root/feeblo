@@ -246,6 +246,9 @@ importers:
       '@feeblo/feedback-widget':
         specifier: workspace:*
         version: link:../../packages/feedback-widget
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
       '@feeblo/rpc-client':
         specifier: workspace:*
         version: link:../../packages/rpc-client
@@ -469,6 +472,9 @@ importers:
       '@feeblo/config':
         specifier: workspace:*
         version: link:../config
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../id
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../utils

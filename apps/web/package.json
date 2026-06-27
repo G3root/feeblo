@@ -24,6 +24,7 @@
     "@feeblo/auth": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/feedback-widget": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/ui": "workspace:*",
     "@feeblo/utils": "workspace:*",

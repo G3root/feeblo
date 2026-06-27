@@ -1,3 +1,4 @@
+import { CommentId, CommentReactionId, PostReactionId } from "@feeblo/id";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -10,7 +11,6 @@ import {
 } from "@feeblo/ui/empty";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
-import { generateId } from "@feeblo/utils/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { Comment01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -337,7 +337,7 @@ export function PostPage() {
     }
 
     const tx = publicCommentCollection.insert({
-      id: generateId("comment"),
+      id: await CommentId.unsafeGenerate(),
       createdAt: new Date(),
       updatedAt: new Date(),
       content,
@@ -377,7 +377,7 @@ export function PostPage() {
     }
 
     const tx = publicCommentReactionCollection.insert({
-      id: generateId("commentReaction"),
+      id: await CommentReactionId.unsafeGenerate(),
       commentId,
       createdAt: new Date(),
       emoji,
@@ -790,7 +790,7 @@ function PostReactionBar({
       return;
     }
     const tx = publicPostReactionCollection.insert({
-      id: generateId("postReaction"),
+      id: await PostReactionId.unsafeGenerate(),
       createdAt: new Date(),
       updatedAt: new Date(),
       organizationId,
