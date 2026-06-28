@@ -527,6 +527,9 @@ importers:
       '@feeblo/db':
         specifier: workspace:*
         version: link:../db
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../id
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../utils
