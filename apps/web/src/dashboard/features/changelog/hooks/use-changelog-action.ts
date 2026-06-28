@@ -1,5 +1,5 @@
+import { ChangelogId } from "@feeblo/id";
 import { toastManager } from "@feeblo/ui/toast";
-import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
@@ -41,7 +41,7 @@ export const useChangelogAction = () => {
     );
 
     try {
-      const id = generateId("changelog");
+      const id = await ChangelogId.unsafeGenerate();
       const title = "Untitled changelog";
       const slug = `${slugify(title) || "changelog"}-${id.slice(-6)}`;
       const tx = changelogCollection.insert({

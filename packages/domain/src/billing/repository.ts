@@ -1,5 +1,5 @@
 import { Database, schema } from "@feeblo/db";
-import { generateId } from "@feeblo/utils/id";
+import { SubscriptionId } from "@feeblo/id";
 import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
 import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
 import { eq } from "drizzle-orm";
@@ -90,9 +90,10 @@ const decodeProductMetadata = Schema.decodeUnknownSync(
 );
 
 const toSubscriptionValues = (
-  payload: SubscriptionPayload
+  payload: SubscriptionPayload,
+  id: string
 ): SubscriptionInsert => ({
-  id: generateId("subscription"),
+  id,
   externalId: payload.id,
   organizationId: decodeString(payload.metadata.org),
   amount: payload.amount,
@@ -140,11 +141,12 @@ const makeBillingRepository = Effect.gen(function* () {
   return {
     createSubscription: (payload: SubscriptionPayload) =>
       db.makeQuery((execute, input: SubscriptionPayload) =>
-        execute((client) =>
-          client
+        execute(async (client) => {
+          const id = await SubscriptionId.unsafeGenerate();
+          return client
             .insert(schema.subscriptionTable)
-            .values(toSubscriptionValues(input))
-        )
+            .values(toSubscriptionValues(input, id));
+        })
       )(payload),
     upsertSubscription: (payload: SubscriptionPayload) =>
       Effect.gen(function* () {
@@ -161,7 +163,8 @@ const makeBillingRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingSubscription)) {
-          const { id: _id, ...values } = toSubscriptionValues(payload);
+          const { id } = existingSubscription.value;
+          const { id: _id, ...values } = toSubscriptionValues(payload, id);
 
           yield* db.makeQuery((execute, input: SubscriptionPayload) =>
             execute((client) =>
@@ -178,11 +181,12 @@ const makeBillingRepository = Effect.gen(function* () {
         }
 
         yield* db.makeQuery((execute, input: SubscriptionPayload) =>
-          execute((client) =>
-            client
+          execute(async (client) => {
+            const id = await SubscriptionId.unsafeGenerate();
+            return client
               .insert(schema.subscriptionTable)
-              .values(toSubscriptionValues(input))
-          )
+              .values(toSubscriptionValues(input, id));
+          })
         )(payload);
       }),
     createProduct: (payload: ProductPayload) =>

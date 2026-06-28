@@ -1,3 +1,4 @@
+import { SiteId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const changelogVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
@@ -25,8 +26,8 @@ export const SiteList = S.Struct({
 export type TSiteList = S.Schema.Type<typeof SiteList>;
 
 export const SiteUpdate = S.Struct({
-  id: S.String,
-  organizationId: S.String,
+  id: SiteId.schema,
+  organizationId: WorkspaceId.schema,
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
   name: S.String,
@@ -35,8 +36,8 @@ export const SiteUpdate = S.Struct({
 export type TSiteUpdate = S.Schema.Type<typeof SiteUpdate>;
 
 export const SiteHidePoweredByBranding = S.Struct({
-  id: S.String,
-  organizationId: S.String,
+  id: SiteId.schema,
+  organizationId: WorkspaceId.schema,
   hidePoweredBy: S.Boolean,
 });
 

@@ -1,3 +1,4 @@
+import { BoardId } from "@feeblo/id";
 import {
   Sheet,
   SheetContent,
@@ -6,7 +7,6 @@ import {
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
-import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -55,7 +55,7 @@ function CreateBoardForm() {
     onSubmit: async (data) => {
       try {
         const tx = boardCollection.insert({
-          id: generateId("board"),
+          id: await BoardId.unsafeGenerate(),
           createdAt: new Date(),
           updatedAt: new Date(),
           name: data.value.name,

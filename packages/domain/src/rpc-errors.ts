@@ -43,7 +43,8 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
     effect: Effect.Effect<R, E, A>
   ): Effect.Effect<
     R,
-    Exclude<E, { _tag: "DatabaseError" | "SchemaError" }> | InternalServerError,
+    | Exclude<E, { _tag: "DatabaseError" | "SchemaError" | "LegidError" }>
+    | InternalServerError,
     A
   > => {
     const toInternalError = (err: unknown, detailPrefix: string) =>
@@ -65,10 +66,16 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
         (e): e is Extract<E, { _tag: "SchemaError" }> =>
           Predicate.isTagged(e, "SchemaError"),
         (err) => toInternalError(err, "There was an error in parsing when")
+      ),
+      Effect.catchIf(
+        (e): e is Extract<E, { _tag: "LegidError" }> =>
+          Predicate.isTagged(e, "LegidError"),
+        (err) =>
+          toInternalError(err, "There was an error generating an id when")
       )
     ) as Effect.Effect<
       R,
-      | Exclude<E, { _tag: "DatabaseError" | "SchemaError" }>
+      | Exclude<E, { _tag: "DatabaseError" | "SchemaError" | "LegidError" }>
       | InternalServerError,
       A
     >;

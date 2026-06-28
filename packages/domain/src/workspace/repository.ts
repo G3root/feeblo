@@ -1,5 +1,11 @@
 import { Database, schema, type TxFn } from "@feeblo/db";
-import { generateId } from "@feeblo/utils/id";
+import {
+  BoardId,
+  MemberId,
+  PostStatusId,
+  SiteId,
+  WorkspaceId,
+} from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, desc, eq } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
@@ -68,13 +74,14 @@ const makeWorkspaceRepository = Effect.gen(function* () {
 
     createWorkspace: (args: CreateWorkspaceArgs, tx?: TxFn) =>
       Effect.gen(function* () {
+        const workspaceId = yield* WorkspaceId.generate;
         const organization = yield* db
           .makeQuery((execute, input: CreateWorkspaceArgs) =>
             execute((client) =>
               client
                 .insert(schema.organizationTable)
                 .values({
-                  id: generateId("workspace"),
+                  id: workspaceId,
                   name: input.workspaceName,
                   slug: input.subdomain,
                   createdAt: new Date(),
@@ -91,11 +98,12 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         }
 
         const organizationId = organization.value.id;
+        const memberId = yield* MemberId.generate;
 
         yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
           execute((client) =>
             client.insert(schema.memberTable).values({
-              id: generateId("member"),
+              id: memberId,
               organizationId,
               role: "owner",
               createdAt: new Date(),
@@ -105,10 +113,11 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         )(args, tx);
 
         for (const postStatus of schema.DEFAULT_POST_STATUSES) {
+          const postStatusId = yield* PostStatusId.generate;
           yield* db.makeQuery((execute, input: CreatePostStatusArgs) =>
             execute((client) =>
               client.insert(schema.postStatusTable).values({
-                id: generateId("postStatus"),
+                id: postStatusId,
                 organizationId: input.organizationId,
                 type: input.postStatus.type,
                 orderIndex: input.postStatus.orderIndex,
@@ -128,10 +137,11 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
 
         for (const boardName of defaultBoards) {
+          const boardId = yield* BoardId.generate;
           yield* db.makeQuery((execute, input: CreateBoardArgs) =>
             execute((client) =>
               client.insert(schema.boardTable).values({
-                id: generateId("board"),
+                id: boardId,
                 name: input.boardName,
                 slug: slugify(input.boardName),
                 visibility: "PUBLIC",
@@ -148,11 +158,11 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             tx
           );
         }
-
+        const siteId = yield* SiteId.generate;
         yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
           execute((client) =>
             client.insert(schema.siteTable).values({
-              id: generateId("site"),
+              id: siteId,
               organizationId,
               createdAt: new Date(),
               updatedAt: new Date(),

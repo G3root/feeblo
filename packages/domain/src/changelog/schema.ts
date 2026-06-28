@@ -1,3 +1,4 @@
+import { ChangelogId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
@@ -32,34 +33,34 @@ export const ChangelogList = S.Struct({
 export type TChangelogList = S.Schema.Type<typeof ChangelogList>;
 
 export const ChangelogCreate = S.Struct({
-  id: S.String,
+  id: ChangelogId.schema,
   title: S.String,
   slug: S.String,
   content: S.String,
   status: ChangelogStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TChangelogCreate = S.Schema.Type<typeof ChangelogCreate>;
 
 export const ChangelogUpdate = S.Struct({
-  id: S.String,
+  id: ChangelogId.schema,
   title: S.String,
   slug: S.String,
   content: S.String,
   status: ChangelogStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TChangelogUpdate = S.Schema.Type<typeof ChangelogUpdate>;
 
 export const ChangelogDelete = S.Struct({
-  id: S.String,
-  organizationId: S.String,
+  id: ChangelogId.schema,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TChangelogDelete = S.Schema.Type<typeof ChangelogDelete>;

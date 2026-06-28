@@ -1,5 +1,5 @@
+import { type LegidOf, UpvoteId } from "@feeblo/id";
 import { toastManager } from "@feeblo/ui/toast";
-import { generateId } from "@feeblo/utils/id";
 import { createOptimisticAction } from "@tanstack/react-db";
 import { authClient } from "~/lib/auth-client";
 import { getUpvoteCollectionKey } from "~/lib/reaction-keys";
@@ -17,17 +17,19 @@ export function useUpvote() {
   const { publicPostCollection, publicUpvoteCollection } =
     usePublicCollections();
 
-  const handleToggleUpvote = createOptimisticAction<{
+  const toggleUpvote = createOptimisticAction<{
     disabled?: boolean;
     postId: string;
     organizationId: string;
     existingUpvote: boolean;
+    upvoteId: LegidOf<"UpvoteId">;
   }>({
     onMutate: ({
       disabled = false,
       postId,
       organizationId,
       existingUpvote,
+      upvoteId,
     }) => {
       if (disabled) {
         return;
@@ -73,7 +75,7 @@ export function useUpvote() {
       }
 
       publicUpvoteCollection.insert({
-        id: generateId("upvote"),
+        id: upvoteId,
         createdAt: new Date(),
         updatedAt: new Date(),
         organizationId,
@@ -112,6 +114,16 @@ export function useUpvote() {
       ]);
     },
   });
+
+  const handleToggleUpvote = async (args: {
+    disabled?: boolean;
+    postId: string;
+    organizationId: string;
+    existingUpvote: boolean;
+  }) => {
+    const upvoteId = await UpvoteId.unsafeGenerate();
+    return toggleUpvote({ ...args, upvoteId });
+  };
 
   return {
     handleToggleUpvote,

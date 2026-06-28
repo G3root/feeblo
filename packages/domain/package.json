@@ -91,6 +91,12 @@
     "./upvote/schema": {
       "default": "./src/upvote/schema.ts"
     },
+    "./comment-reaction/schema": {
+      "default": "./src/comment-reaction/schema.ts"
+    },
+    "./post-reaction/schema": {
+      "default": "./src/post-reaction/schema.ts"
+    },
     "./changelog/schema": {
       "default": "./src/changelog/schema.ts"
     },
@@ -108,6 +114,7 @@
     "@effect-aws/client-s3": "catalog:",
     "@effect-aws/s3": "catalog:",
     "@feeblo/db": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@polar-sh/sdk": "catalog:",
     "better-auth": "catalog:",

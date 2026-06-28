@@ -1,6 +1,9 @@
+import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
+import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
+import type { Upvote } from "@feeblo/domain/upvote/schema";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
-import { Duration } from "effect";
+import { Duration, type Schema } from "effect";
 import { fetchRpc } from "~/lib/runtime";
 import {
   getCommentReactionCollectionKey,
@@ -8,6 +11,10 @@ import {
   getUpvoteCollectionKey,
 } from "../../dashboard/lib/reaction-keys";
 import { getContext } from "../integrations/tanstack-query/root-provider";
+
+type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
+type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
+type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 
 const queryClient = getContext().queryClient;
 
@@ -387,7 +394,9 @@ export const publicCommentReactionCollection = createCollection(
       }
     },
     queryClient,
-    getKey: getCommentReactionCollectionKey,
+    getKey: getCommentReactionCollectionKey as (
+      item: CommentReactionRow
+    ) => string,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newCommentReaction } = mutation;
@@ -447,7 +456,7 @@ export const publicUpvoteCollection = createCollection(
       return [...data];
     },
     queryClient,
-    getKey: getUpvoteCollectionKey,
+    getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newUpvote } = mutation;
@@ -507,7 +516,7 @@ export const publicPostReactionCollection = createCollection(
       return [...data];
     },
     queryClient,
-    getKey: getPostReactionCollectionKey,
+    getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newPostReaction } = mutation;

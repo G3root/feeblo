@@ -1,3 +1,4 @@
+import { ChangelogId, PostId, TagId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const TagType = S.Literals(["FEEDBACK", "CHANGELOG"]);
@@ -21,26 +22,26 @@ export const TagList = S.Struct({
 export type TTagList = S.Schema.Type<typeof TagList>;
 
 export const TagCreate = S.Struct({
-  id: S.String,
+  id: TagId.schema,
   name: S.String,
   type: TagType,
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TTagCreate = S.Schema.Type<typeof TagCreate>;
 
 export const TagUpdate = S.Struct({
-  id: S.String,
+  id: TagId.schema,
   name: S.String,
   type: TagType,
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TTagUpdate = S.Schema.Type<typeof TagUpdate>;
 
 export const TagDelete = S.Struct({
-  id: S.String,
-  organizationId: S.String,
+  id: TagId.schema,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TTagDelete = S.Schema.Type<typeof TagDelete>;
@@ -82,17 +83,17 @@ export const ChangelogTagList = S.Struct({
 export type TChangelogTagList = S.Schema.Type<typeof ChangelogTagList>;
 
 export const PostTagSet = S.Struct({
-  postId: S.String,
-  organizationId: S.String,
-  tagIds: S.Array(S.String),
+  postId: PostId.schema,
+  organizationId: WorkspaceId.schema,
+  tagIds: S.Array(TagId.schema),
 });
 
 export type TPostTagSet = S.Schema.Type<typeof PostTagSet>;
 
 export const ChangelogTagSet = S.Struct({
-  changelogId: S.String,
-  organizationId: S.String,
-  tagIds: S.Array(S.String),
+  changelogId: ChangelogId.schema,
+  organizationId: WorkspaceId.schema,
+  tagIds: S.Array(TagId.schema),
 });
 
 export type TChangelogTagSet = S.Schema.Type<typeof ChangelogTagSet>;

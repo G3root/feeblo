@@ -1,3 +1,4 @@
+import { BoardId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const Board = S.Struct({
@@ -13,10 +14,10 @@ export const Board = S.Struct({
 export type TBoard = S.Schema.Type<typeof Board>;
 
 export const BoardCreate = S.Struct({
-  id: S.String,
+  id: BoardId.schema,
   name: S.String,
   visibility: S.Literals(["PUBLIC", "PRIVATE"]),
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export const BoardList = S.Struct({
@@ -27,15 +28,15 @@ export type TBoardList = S.Schema.Type<typeof BoardList>;
 export type TBoardCreate = S.Schema.Type<typeof BoardCreate>;
 
 export const BoardUpdate = S.Struct({
-  id: S.String,
+  id: BoardId.schema,
   name: S.String,
   visibility: S.Literals(["PUBLIC", "PRIVATE"]),
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export const BoardDelete = S.Struct({
-  id: S.String,
-  organizationId: S.String,
+  id: BoardId.schema,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TBoardUpdate = S.Schema.Type<typeof BoardUpdate>;

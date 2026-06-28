@@ -1,5 +1,5 @@
 import { Database, schema } from "@feeblo/db";
-import { generateId } from "@feeblo/utils/id";
+import { PostReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
@@ -89,7 +89,7 @@ const makePostReactionRepository = Effect.gen(function* () {
 
         return reactions.map((reaction) => ({
           ...reaction,
-          emoji: reaction.emoji,
+          emoji: reaction.emoji as ReactionEmoji,
         }));
       }),
 
@@ -151,7 +151,7 @@ const makePostReactionRepository = Effect.gen(function* () {
 
         return reactions.map((reaction) => ({
           ...reaction,
-          emoji: reaction.emoji,
+          emoji: reaction.emoji as ReactionEmoji,
         }));
       }),
 
@@ -225,10 +225,12 @@ const makePostReactionRepository = Effect.gen(function* () {
           )({ organizationId, userId })
           .pipe(Effect.map(EffectArray.get(0)));
 
+        const postReactionId = yield* PostReactionId.generate;
+
         yield* db.makeQuery((execute, input: TCreatePostReaction) =>
           execute((client) =>
             client.insert(schema.postReactionTable).values({
-              id: generateId("postReaction"),
+              id: postReactionId,
               postId: input.postId,
               userId: input.userId,
               memberId: input.memberId,
@@ -328,10 +330,11 @@ const makePostReactionRepository = Effect.gen(function* () {
           )({ organizationId, userId })
           .pipe(Effect.map(EffectArray.get(0)));
 
+        const postReactionId = yield* PostReactionId.generate;
         yield* db.makeQuery((execute, input: TCreatePostReaction) =>
           execute((client) =>
             client.insert(schema.postReactionTable).values({
-              id: generateId("postReaction"),
+              id: postReactionId,
               postId: input.postId,
               userId: input.userId,
               memberId: input.memberId,

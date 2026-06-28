@@ -1,3 +1,4 @@
+import { PostId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -10,7 +11,6 @@ import {
 import type { EmailEditorRef } from "@feeblo/ui/editor";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
-import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
@@ -143,7 +143,7 @@ function PostCreateForm() {
       }
 
       try {
-        const postId = generateId("post");
+        const postId = await PostId.unsafeGenerate();
         const title = value.title.trim();
         const selectedPostStatus = postStatuses.find(
           (postStatus) => postStatus.id === value.statusId

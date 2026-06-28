@@ -1,3 +1,4 @@
+import { BoardId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const WidgetBoard = S.Struct({
@@ -18,8 +19,8 @@ export const WidgetBoardList = S.Struct({
 export type TWidgetBoardList = S.Schema.Type<typeof WidgetBoardList>;
 
 export const WidgetFeedbackCreate = S.Struct({
-  boardId: S.String,
-  organizationId: S.String,
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
   title: S.String,
   content: S.String,
 });

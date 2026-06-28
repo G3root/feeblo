@@ -50,3 +50,15 @@ export const SubscriptionId = makeId("subscription", "sub", {
 export const ChangelogId = makeId("changelog", "chg", {
   approximateLength,
 });
+
+export const TagId = makeId("tag", "tag", {
+  approximateLength,
+});
+
+export const PostTagId = makeId("post_tag", "ptg", {
+  approximateLength,
+});
+
+export const ChangelogTagId = makeId("changelog_tag", "ctg", {
+  approximateLength,
+});

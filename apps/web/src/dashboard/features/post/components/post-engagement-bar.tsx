@@ -1,7 +1,7 @@
+import { PostReactionId, UpvoteId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
-import { generateId } from "@feeblo/utils/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -115,7 +115,7 @@ export function PostDetailsEngagementBar({
     }
 
     const tx = upvoteCollection.insert({
-      id: generateId("upvote"),
+      id: await UpvoteId.unsafeGenerate(),
       createdAt: new Date(),
       updatedAt: new Date(),
       organizationId,
@@ -159,7 +159,7 @@ export function PostDetailsEngagementBar({
       return;
     }
     const tx = postReactionCollection.insert({
-      id: generateId("postReaction"),
+      id: await PostReactionId.unsafeGenerate(),
       createdAt: new Date(),
       updatedAt: new Date(),
       organizationId,

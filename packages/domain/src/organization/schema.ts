@@ -1,3 +1,4 @@
+import { WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const Organization = S.Struct({
@@ -9,7 +10,7 @@ export const Organization = S.Struct({
 });
 
 export const OrganizationUpdate = S.Struct({
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
   name: S.String,
   logo: S.NullOr(S.String),
 });

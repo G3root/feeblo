@@ -1,3 +1,4 @@
+import { CommentId, CommentReactionId } from "@feeblo/id";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
@@ -9,7 +10,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { toastManager } from "@feeblo/ui/toast";
-import { generateId } from "@feeblo/utils/id";
 import { CircleLockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -257,7 +257,7 @@ function RouteComponent() {
     const postId = post.id;
 
     const tx = commentCollection.insert({
-      id: generateId("comment"),
+      id: await CommentId.unsafeGenerate(),
       createdAt: new Date(),
       updatedAt: new Date(),
       content,
@@ -513,7 +513,7 @@ function PostCommentListSection({
     }
 
     const tx = commentReactionCollection.insert({
-      id: generateId("commentReaction"),
+      id: await CommentReactionId.unsafeGenerate(),
       commentId,
       createdAt: new Date(),
       emoji,
