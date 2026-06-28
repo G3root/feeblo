@@ -1,6 +1,6 @@
 import { Database, schema } from "@feeblo/db";
+import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
-import { generateId } from "@feeblo/utils/id";
 import { slugify } from "@feeblo/utils/url";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -72,7 +72,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           }
 
           const sanitizedContent = sanitizeRichText(content);
-          const id = generateId("post");
+          const id = yield* PostId.generate;
           const now = new Date();
 
           const created = yield* db.execute((client) =>
@@ -111,6 +111,11 @@ export const WidgetApiLive = HttpApiBuilder.group(
         }).pipe(
           Effect.provide([BoardRepository.layer, PostStatusRepository.layer]),
           Effect.catchTag("DatabaseError", () =>
+            Effect.fail(
+              new InternalServerError({ message: "Failed to create feedback" })
+            )
+          ),
+          Effect.catchTag("LegidError", () =>
             Effect.fail(
               new InternalServerError({ message: "Failed to create feedback" })
             )

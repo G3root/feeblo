@@ -91,6 +91,12 @@
     "./upvote/schema": {
       "default": "./src/upvote/schema.ts"
     },
+    "./comment-reaction/schema": {
+      "default": "./src/comment-reaction/schema.ts"
+    },
+    "./post-reaction/schema": {
+      "default": "./src/post-reaction/schema.ts"
+    },
     "./changelog/schema": {
       "default": "./src/changelog/schema.ts"
     },
