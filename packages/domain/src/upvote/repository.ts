@@ -1,5 +1,5 @@
 import { Database, schema } from "@feeblo/db";
-import { generateId } from "@feeblo/utils/id";
+import { UpvoteId } from "@feeblo/id";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
@@ -183,10 +183,11 @@ const makeUpvoteRepository = Effect.gen(function* () {
           )({ organizationId, userId })
           .pipe(Effect.map(EffectArray.get(0)));
 
+        const upvoteId = yield* UpvoteId.generate;
         yield* db.makeQuery((execute, input: TCreateUpvote) =>
           execute((client) =>
             client.insert(schema.upvoteTable).values({
-              id: generateId("upvote"),
+              id: upvoteId,
               postId: input.postId,
               userId: input.userId,
               memberId: input.memberId,

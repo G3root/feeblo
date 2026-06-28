@@ -1,5 +1,5 @@
 import { Database, schema } from "@feeblo/db";
-import { generateId } from "@feeblo/utils/id";
+import { CommentReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
@@ -195,10 +195,12 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           )(args)
           .pipe(Effect.map(EffectArray.get(0)));
 
+        const commentReactionId = yield* CommentReactionId.generate;
+
         yield* db.makeQuery((execute, input: TCommentReactionCreate) =>
           execute((client) =>
             client.insert(schema.commentReactionTable).values({
-              id: generateId("commentReaction"),
+              id: commentReactionId,
               commentId: input.commentId,
               userId: input.userId,
               memberId: input.memberId,
@@ -294,10 +296,11 @@ const makeCommentReactionRepository = Effect.gen(function* () {
             ).pipe(Effect.map(EffectArray.get(0)))
         )(args);
 
+        const commentReactionId = yield* CommentReactionId.generate;
         yield* db.makeQuery((execute, input: TCommentReactionCreate) =>
           execute((client) =>
             client.insert(schema.commentReactionTable).values({
-              id: generateId("commentReaction"),
+              id: commentReactionId,
               commentId: input.commentId,
               userId: input.userId,
               memberId: input.memberId,
