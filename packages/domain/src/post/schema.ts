@@ -1,3 +1,4 @@
+import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const Post = S.Struct({
@@ -37,27 +38,27 @@ export type TPostList = S.Schema.Type<typeof PostList>;
 export const PostIds = S.Array(S.String);
 
 export const PostDelete = S.Struct({
-  id: S.Union([S.String, PostIds]),
-  boardId: S.String,
-  organizationId: S.String,
+  id: S.Union([PostId.schema, S.Array(PostId.schema)]),
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TPostDelete = S.Schema.Type<typeof PostDelete>;
 
 export const PostUpdate = S.Struct({
-  id: S.String,
+  id: PostId.schema,
   title: S.String,
   content: S.String,
-  statusId: S.String,
-  boardId: S.String,
-  organizationId: S.String,
+  statusId: PostStatusId.schema,
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TPostUpdate = S.Schema.Type<typeof PostUpdate>;
 
 export const PostAdminUpdate = S.Struct({
-  id: S.String,
-  organizationId: S.String,
+  id: PostId.schema,
+  organizationId: WorkspaceId.schema,
   archived: S.optional(S.Boolean),
   locked: S.optional(S.Boolean),
 });
@@ -65,20 +66,20 @@ export const PostAdminUpdate = S.Struct({
 export type TPostAdminUpdate = S.Schema.Type<typeof PostAdminUpdate>;
 
 export const PostMerge = S.Struct({
-  organizationId: S.String,
-  sourcePostId: S.String,
-  targetPostId: S.String,
+  organizationId: WorkspaceId.schema,
+  sourcePostId: PostId.schema,
+  targetPostId: PostId.schema,
 });
 
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
 export const PostCreate = S.Struct({
-  id: S.String,
-  boardId: S.String,
+  id: PostId.schema,
+  boardId: BoardId.schema,
   title: S.String,
   content: S.String,
-  statusId: S.String,
-  organizationId: S.String,
+  statusId: PostStatusId.schema,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TPostCreate = S.Schema.Type<typeof PostCreate>;

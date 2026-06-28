@@ -17,7 +17,9 @@ import type {
   TTagUpdate,
 } from "./schema";
 
-const normalizeTagIds = (tagIds: readonly string[]) => [...new Set(tagIds)];
+const normalizeTagIds = <T extends string>(tagIds: readonly T[]): T[] => [
+  ...new Set(tagIds),
+];
 
 const validateTagIds = ({
   organizationId,

@@ -89,7 +89,7 @@ const makePostReactionRepository = Effect.gen(function* () {
 
         return reactions.map((reaction) => ({
           ...reaction,
-          emoji: reaction.emoji,
+          emoji: reaction.emoji as ReactionEmoji,
         }));
       }),
 
@@ -151,7 +151,7 @@ const makePostReactionRepository = Effect.gen(function* () {
 
         return reactions.map((reaction) => ({
           ...reaction,
-          emoji: reaction.emoji,
+          emoji: reaction.emoji as ReactionEmoji,
         }));
       }),
 

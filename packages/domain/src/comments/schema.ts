@@ -1,3 +1,4 @@
+import { CommentId, PostId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const Comment = S.Struct({
@@ -26,28 +27,28 @@ export const CommentList = S.Struct({
 export type TCommentList = S.Schema.Type<typeof CommentList>;
 
 export const CommentCreate = S.Struct({
-  id: S.String,
-  organizationId: S.String,
-  postId: S.String,
+  id: CommentId.schema,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
   content: S.String,
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
-  parentCommentId: S.Union([S.String, S.Null]),
+  parentCommentId: S.Union([CommentId.schema, S.Null]),
 });
 
 export type TCommentCreate = S.Schema.Type<typeof CommentCreate>;
 
 export const CommentDelete = S.Struct({
-  id: S.String,
-  organizationId: S.String,
-  postId: S.String,
+  id: CommentId.schema,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
 });
 
 export type TCommentDelete = S.Schema.Type<typeof CommentDelete>;
 
 export const CommentUpdate = S.Struct({
-  id: S.String,
-  organizationId: S.String,
-  postId: S.String,
+  id: CommentId.schema,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
   content: S.String,
 });
 

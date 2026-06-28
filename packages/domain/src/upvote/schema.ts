@@ -1,3 +1,4 @@
+import { PostId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 export const Upvote = S.Struct({
@@ -24,8 +25,8 @@ export const UpvoteList = S.Struct({
 export type TUpvoteList = S.Schema.Type<typeof UpvoteList>;
 
 export const UpvoteToggle = S.Struct({
-  organizationId: S.String,
-  postId: S.String,
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
 });
 
 export type TUpvoteToggle = S.Schema.Type<typeof UpvoteToggle>;

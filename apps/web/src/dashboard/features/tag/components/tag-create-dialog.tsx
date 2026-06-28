@@ -1,3 +1,4 @@
+import { TagId } from "@feeblo/id";
 import {
   Sheet,
   SheetContent,
@@ -56,8 +57,9 @@ function TagCreateForm() {
     },
     onSubmit: async (data) => {
       try {
+        const id = await TagId.unsafeGenerate();
         const tx = tagCollection.insert({
-          id: `tag-${crypto.randomUUID()}`,
+          id,
           createdAt: new Date(),
           updatedAt: new Date(),
           name: data.value.name,

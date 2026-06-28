@@ -1,3 +1,4 @@
+import { MemberId, WorkspaceId } from "@feeblo/id";
 import { Schema as S } from "effect";
 
 const ROLE_LITERAL = S.Literals(["owner", "admin", "member"]);
@@ -42,23 +43,23 @@ export const OrganizationId = S.Struct({
 });
 
 export const InviteMember = S.Struct({
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
   email: S.String,
   role: ROLE_LITERAL,
 });
 
 export const UpdateMemberRole = S.Struct({
-  organizationId: S.String,
-  memberId: S.String,
+  organizationId: WorkspaceId.schema,
+  memberId: MemberId.schema,
   role: ROLE_LITERAL,
 });
 
 export const RemoveMember = S.Struct({
-  organizationId: S.String,
-  memberId: S.String,
+  organizationId: WorkspaceId.schema,
+  memberId: MemberId.schema,
 });
 
 export const CancelInvitation = S.Struct({
-  organizationId: S.String,
+  organizationId: WorkspaceId.schema,
   invitationId: S.String,
 });

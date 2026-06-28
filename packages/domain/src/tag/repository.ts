@@ -1,5 +1,5 @@
 import { Database, schema } from "@feeblo/db";
-import { generatePublicId } from "@feeblo/utils/id";
+import { ChangelogTagId, PostTagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer } from "effect";
@@ -219,7 +219,7 @@ const makeTagRepository = Effect.gen(function* () {
         }
 
         const rows = yield* Effect.forEach(tagIds, (tagId) =>
-          Effect.promise(() => generatePublicId()).pipe(
+          PostTagId.generate.pipe(
             Effect.map((id) => ({
               id,
               postId,
@@ -265,7 +265,7 @@ const makeTagRepository = Effect.gen(function* () {
         }
 
         const rows = yield* Effect.forEach(tagIds, (tagId) =>
-          Effect.promise(() => generatePublicId()).pipe(
+          ChangelogTagId.generate.pipe(
             Effect.map((id) => ({
               id,
               changelogId,

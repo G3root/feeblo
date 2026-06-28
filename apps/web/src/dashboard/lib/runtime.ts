@@ -1,6 +1,5 @@
 import {
   createRuntime,
-  type Rpc,
   type RpcClientType,
   withRpc,
 } from "@feeblo/rpc-client";
@@ -14,13 +13,14 @@ const runtime = createRuntime(getRuntimePublicEnv().apiUrl);
  * Runs an Effect with the default runtime and optional AbortSignal.
  * Resolves with the value on success, throws the cause on failure.
  */
-export async function runEffect<A, E, R extends Rpc>(
+export async function runEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
   options?: { signal?: AbortSignal; runtime?: LiveManagedRuntime }
 ): Promise<A> {
-  const result = await (options?.runtime ?? runtime).runPromiseExit(effect, {
-    signal: options?.signal,
-  });
+  const result = await (options?.runtime ?? runtime).runPromiseExit(
+    effect as Effect.Effect<A, E, never>,
+    { signal: options?.signal }
+  );
   if (Exit.isFailure(result)) {
     const cause = result.cause;
 
@@ -33,8 +33,8 @@ export async function runEffect<A, E, R extends Rpc>(
  * Fetches via RPC: runs the given RPC effect with the default runtime.
  * Resolves with the value on success, throws the cause on failure.
  */
-export function fetchRpc<A, E>(
-  cb: (rpc: RpcClientType) => Effect.Effect<A, E>,
+export function fetchRpc<A, E, R>(
+  cb: (rpc: RpcClientType) => Effect.Effect<A, E, R>,
   options?: { signal?: AbortSignal }
 ): Promise<A> {
   return runEffect(withRpc(cb), options);
@@ -42,7 +42,7 @@ export function fetchRpc<A, E>(
 
 export const useFetchRpc = () => {
   const runtime = useRuntime();
-  return <A, E>(cb: (rpc: RpcClientType) => Effect.Effect<A, E>) => {
+  return <A, E, R>(cb: (rpc: RpcClientType) => Effect.Effect<A, E, R>) => {
     return runEffect(withRpc(cb), { runtime });
   };
 };
