@@ -10,7 +10,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
-import { useAppForm } from "~/hooks/form";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useTagEditDialogContext } from "../dialog-stores";

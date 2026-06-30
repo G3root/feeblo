@@ -15,14 +15,14 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useRef, useState } from "react";
-import type { BoardPostStatus } from "~/features/board/constants";
-import { useAppForm } from "~/hooks/form";
-import { useAuthState } from "~/hooks/use-auth-state";
+import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { useAppForm } from "@feeblo/ui/hooks/form";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { hasMembership, usePolicy } from "~/hooks/use-policy";
+import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { usePostCreateDialogContext } from "../dialog-stores";
-import { PostCreateLayout } from "./post-create-dialog-layout";
+import { PostCreateLayout } from "@feeblo/post-ui/post-create-dialog-layout";
 import {
   PostBoardField,
   PostContentField,
@@ -30,8 +30,8 @@ import {
   PostStatusField,
   PostTitleField,
   postCreateFormOpts,
-} from "./post-create-form-shared";
-import { PropertyRow } from "./post-properties";
+} from "@feeblo/post-ui/post-create-form-shared";
+import { PropertyRow } from "@feeblo/post-ui/post-properties";
 
 export function PostCreateDialog() {
   const store = usePostCreateDialogContext();

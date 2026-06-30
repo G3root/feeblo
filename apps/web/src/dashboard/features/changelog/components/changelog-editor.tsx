@@ -15,15 +15,15 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, use } from "react";
 import { z } from "zod";
-import { PostContentEditor } from "~/features/post/components/post-content";
-import { PostTitleInput } from "~/features/post/components/post-title-input";
-import { useAppForm } from "~/hooks/form";
+import { PostContentEditor } from "@feeblo/post-ui/post-content";
+import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   allPolicy,
   hasMembership,
   isUser,
   usePolicy,
-} from "~/hooks/use-policy";
+} from "@feeblo/web-shared/use-policy";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
 import {

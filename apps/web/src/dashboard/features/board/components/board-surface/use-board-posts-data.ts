@@ -8,7 +8,7 @@ import {
   useLiveQuery,
 } from "@tanstack/react-db";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-import type { BoardPostStatus } from "../../constants";
+import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import type {
   BoardPostStatusFilter,
   BoardStatusOperator,

@@ -16,7 +16,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
-import { useAuthState } from "~/hooks/use-auth-state";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   boardCollection,

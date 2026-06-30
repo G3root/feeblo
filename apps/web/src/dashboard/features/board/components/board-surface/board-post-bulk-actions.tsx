@@ -18,7 +18,7 @@ import {
 } from "~/features/board/state/board-store-context";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { fetchRpc } from "~/lib/runtime";
-import { cn } from "~/lib/utils";
+import { cn } from "@feeblo/ui/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function BoardPostBulkActions() {

@@ -11,7 +11,7 @@ import {
   getPostReactionCollectionKey,
   getPostSubscriptionCollectionKey,
   getUpvoteCollectionKey,
-} from "~/lib/reaction-keys";
+} from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "./runtime";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;

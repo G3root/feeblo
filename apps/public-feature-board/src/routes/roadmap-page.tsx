@@ -1,8 +1,6 @@
-import {
-  groupRoadmapPostsByStatus,
-  PublicRoadmapIssueCard,
-  RoadmapGrid,
-} from "@feeblo/post-ui/roadmap";
+import { RoadmapGrid } from "@feeblo/post-ui/roadmap/roadmap-grid";
+import { PublicRoadmapIssueCard } from "@feeblo/post-ui/roadmap/roadmap-issue-card";
+import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
 import {
   Empty,
   EmptyDescription,

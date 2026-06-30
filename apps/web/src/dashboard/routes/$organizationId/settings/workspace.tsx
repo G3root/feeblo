@@ -7,8 +7,8 @@ import { SettingsAvatarControl } from "~/features/settings/components/settings-a
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
-import { organizationLogoUploadEndpoint } from "~/lib/auth-client";
+import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import { organizationLogoUploadEndpoint } from "@feeblo/web-shared/auth-client";
 import {
   membershipCollection,
   organizationCollection,

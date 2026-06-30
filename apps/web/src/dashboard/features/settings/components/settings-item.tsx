@@ -18,7 +18,7 @@ import { LockedIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
 import type { VariantProps } from "class-variance-authority";
 import type * as React from "react";
-import { cn } from "~/lib/utils";
+import { cn } from "@feeblo/ui/utils";
 
 function Root({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col gap-4">{children}</div>;

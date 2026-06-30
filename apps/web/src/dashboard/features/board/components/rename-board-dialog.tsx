@@ -11,7 +11,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
-import { useAppForm } from "~/hooks/form";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useRenameBoardDialogContext } from "../dialog-stores";

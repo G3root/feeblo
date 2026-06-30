@@ -22,9 +22,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { createContext, type ReactNode, useContext } from "react";
-import { cn } from "~/lib/utils";
+import { cn } from "@feeblo/ui/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
+import { type BoardPostStatus, getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
 import {
   type BoardStatusOperator,
   type BoardTagOperator,

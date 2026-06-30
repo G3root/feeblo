@@ -1,14 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { AuthShell } from "~/features/auth/components/auth-shell";
-import { SocialAuthButtons } from "~/features/auth/components/social-auth-buttons";
+import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import {
   getSafeCallbackURL,
   initializeEmailVerification,
-} from "~/features/auth/lib/auth-flows";
-import { useAppForm } from "~/hooks/form";
-import { authClient } from "~/lib/auth-client";
-import { EmailSchema, PasswordSchema } from "~/utils/user-validation";
+} from "@feeblo/post-ui/auth-flows";
+import { useAppForm } from "@feeblo/ui/hooks/form";
+import { authClient } from "@feeblo/web-shared/auth-client";
+import { EmailSchema, PasswordSchema } from "@feeblo/web-shared/user-validation";
 
 export const Route = createFileRoute("/sign-in")({
   validateSearch: (search) =>

@@ -1,10 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useBoardPostsData } from "~/features/board/components/board-surface/use-board-posts-data";
-import {
-  groupRoadmapPostsByStatus,
-  PublicRoadmapIssueCard,
-  RoadmapGrid,
-} from "~/features/roadmap/components";
+import { RoadmapGrid } from "@feeblo/post-ui/roadmap/roadmap-grid";
+import { PublicRoadmapIssueCard } from "@feeblo/post-ui/roadmap/roadmap-issue-card";
+import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/roadmap"

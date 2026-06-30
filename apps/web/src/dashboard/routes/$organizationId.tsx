@@ -3,7 +3,7 @@ import {
   authClient,
   getAuthState,
   updateAuthState,
-} from "~/lib/auth-client";
+} from "@feeblo/web-shared/auth-client";
 
 export const Route = createFileRoute("/$organizationId")({
   component: OrganizationLayoutRoute,

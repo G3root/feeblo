@@ -11,8 +11,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { RegisterShell } from "~/features/register/components/register-shell";
 import { RegisterWorkspaceStep } from "~/features/register/components/register-workspace-step";
-import { useAppForm } from "~/hooks/form";
-import { useAuthState } from "~/hooks/use-auth-state";
+import { useAppForm } from "@feeblo/ui/hooks/form";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { fetchRpc } from "~/lib/runtime";
 import { registerFormOpts } from "../features/register/shared-form";
 

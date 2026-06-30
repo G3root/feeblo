@@ -12,8 +12,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
-import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
-import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
+import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
+import { type BoardPostStatus, getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
 import type { BoardPostLane } from "./types";

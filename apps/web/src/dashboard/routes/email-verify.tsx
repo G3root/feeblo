@@ -15,8 +15,8 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { z } from "zod";
-import { useAppForm } from "~/hooks/form";
-import { authClient, verificationOtpEndpoint } from "~/lib/auth-client";
+import { useAppForm } from "@feeblo/ui/hooks/form";
+import { authClient, verificationOtpEndpoint } from "@feeblo/web-shared/auth-client";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),

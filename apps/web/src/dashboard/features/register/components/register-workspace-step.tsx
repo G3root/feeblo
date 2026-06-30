@@ -12,8 +12,8 @@ import {
   InputGroupText,
 } from "@feeblo/ui/input-group";
 import { useStore } from "@tanstack/react-store";
-import { withForm } from "~/hooks/form";
-import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
+import { withForm } from "@feeblo/ui/hooks/form";
+import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
 import { registerFormOpts } from "../shared-form";
 import { toWorkspaceSlug } from "../utils";

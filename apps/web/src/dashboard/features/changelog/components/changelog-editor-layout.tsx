@@ -1,6 +1,6 @@
 import { Separator } from "@feeblo/ui/separator";
 import type { ComponentProps, ReactNode } from "react";
-import { cn } from "~/lib/utils";
+import { cn } from "@feeblo/ui/utils";
 
 type ChangelogEditorRootProps = {
   children: ReactNode;

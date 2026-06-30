@@ -1,4 +1,4 @@
-import { cn } from "~/lib/utils";
+import { cn } from "@feeblo/ui/utils";
 
 interface RootProps extends React.ComponentProps<"div"> {
   children: React.ReactNode;

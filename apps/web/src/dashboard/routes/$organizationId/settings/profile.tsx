@@ -8,8 +8,8 @@ import { useId, useRef } from "react";
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-import { useAuthState } from "~/hooks/use-auth-state";
-import { authClient, profilePictureUploadEndpoint } from "~/lib/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { authClient, profilePictureUploadEndpoint } from "@feeblo/web-shared/auth-client";
 
 export const Route = createFileRoute("/$organizationId/settings/profile")({
   component: ProfileSettingsPage,

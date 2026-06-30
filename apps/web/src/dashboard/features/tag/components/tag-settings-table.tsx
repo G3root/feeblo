@@ -33,7 +33,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { cn } from "~/lib/utils";
+import { cn } from "@feeblo/ui/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import {
   useTagCreateDialogContext,

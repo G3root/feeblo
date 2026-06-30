@@ -10,14 +10,14 @@ import {
   hasOwnerOrAdminRole,
   isUser,
   usePolicy,
-} from "~/hooks/use-policy";
+} from "@feeblo/web-shared/use-policy";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-import { PostCommentComposer } from "./post-comment-composer";
-import { PostCommentList, PostCommentListSkeleton } from "./post-comment-list";
-import { PostEditableContent } from "./post-content";
-import { PostDetailsEngagementBar } from "./post-engagement-bar";
-import { PostTitleInput } from "./post-title-input";
+import { PostCommentComposer } from "@feeblo/post-ui/post-comment-composer";
+import { PostCommentList, PostCommentListSkeleton } from "@feeblo/post-ui/post-comment-list";
+import { PostEditableContent } from "@feeblo/post-ui/post-content";
+import { PostDetailsEngagementBar } from "@feeblo/post-ui/post-engagement-bar";
+import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 
 function PostDetailsLayout({ children }: { children: ReactNode }) {
   return (

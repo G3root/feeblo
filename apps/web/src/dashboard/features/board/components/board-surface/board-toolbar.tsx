@@ -17,7 +17,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
-import { cn } from "~/lib/utils";
+import { cn } from "@feeblo/ui/utils";
 import { useBoardStore } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";
 

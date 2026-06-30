@@ -8,7 +8,7 @@ import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
-import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
+import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useSite } from "~/hooks/use-site";
 import { siteCollection, workspacePlanCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";

@@ -1,4 +1,4 @@
-import type { BoardPostStatus } from "../../constants";
+import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 
 export type BoardPostRow = {
   archivedAt: Date | string | null;

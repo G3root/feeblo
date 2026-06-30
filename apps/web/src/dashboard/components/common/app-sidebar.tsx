@@ -45,7 +45,7 @@ import {
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { hasOwnerOrAdminRole, usePolicy } from "~/hooks/use-policy";
+import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { NavUser } from "./nav-user";

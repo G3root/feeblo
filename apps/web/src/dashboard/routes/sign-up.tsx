@@ -3,19 +3,19 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
 import { AuthShell } from "~/features/auth/components/auth-shell";
-import { SocialAuthButtons } from "~/features/auth/components/social-auth-buttons";
+import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import {
   getSafeCallbackURL,
   initializeEmailVerification,
-} from "~/features/auth/lib/auth-flows";
-import { useAppForm } from "~/hooks/form";
-import { authClient } from "~/lib/auth-client";
-import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
+} from "@feeblo/post-ui/auth-flows";
+import { useAppForm } from "@feeblo/ui/hooks/form";
+import { authClient } from "@feeblo/web-shared/auth-client";
+import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import {
   EmailSchema,
   NameSchema,
   PasswordAndConfirmPasswordSchema,
-} from "~/utils/user-validation";
+} from "@feeblo/web-shared/user-validation";
 
 export const Route = createFileRoute("/sign-up")({
   validateSearch: (search) =>

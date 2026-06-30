@@ -1,5 +1,5 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { getRuntimePublicEnv } from "~/lib/runtime-public-env";
+import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useOrganizationId } from "./use-organization-id";
 

@@ -15,10 +15,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
-import type { CommentReactionToggleInput } from "~/features/post/components/comment-reaction-section";
-import { PostBoardSelect } from "~/features/post/components/post-board-select";
+import type { CommentReactionToggleInput } from "@feeblo/post-ui/comment-reaction-section";
+import { PostBoardSelect } from "@feeblo/post-ui/post-board-select";
 import { PostDetails } from "~/features/post/components/post-details-form";
-import { StatusSelect } from "~/features/post/components/post-properties";
+import { StatusSelect } from "@feeblo/post-ui/post-properties";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
@@ -27,13 +27,13 @@ import {
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
-import { useAuthState } from "~/hooks/use-auth-state";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,
   isUser,
   usePolicy,
-} from "~/hooks/use-policy";
+} from "@feeblo/web-shared/use-policy";
 import {
   boardCollection,
   postCollection,
@@ -41,7 +41,7 @@ import {
   postTagCollection,
   tagCollection,
 } from "~/lib/collections";
-import { getCommentReactionCollectionKey } from "~/lib/reaction-keys";
+import { getCommentReactionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 

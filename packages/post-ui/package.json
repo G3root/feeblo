@@ -56,9 +56,29 @@
       "types": "./src/auth/auth-flows.ts",
       "default": "./src/auth/auth-flows.ts"
     },
-    "./roadmap": {
-      "types": "./src/roadmap/index.ts",
-      "default": "./src/roadmap/index.ts"
+    "./roadmap/roadmap-grid": {
+      "types": "./src/roadmap/roadmap-grid.tsx",
+      "default": "./src/roadmap/roadmap-grid.tsx"
+    },
+    "./roadmap/roadmap-issue-card": {
+      "types": "./src/roadmap/roadmap-issue-card.tsx",
+      "default": "./src/roadmap/roadmap-issue-card.tsx"
+    },
+    "./roadmap/roadmap-lane-column": {
+      "types": "./src/roadmap/roadmap-lane-column.tsx",
+      "default": "./src/roadmap/roadmap-lane-column.tsx"
+    },
+    "./roadmap/roadmap-status-icon": {
+      "types": "./src/roadmap/roadmap-status-icon.tsx",
+      "default": "./src/roadmap/roadmap-status-icon.tsx"
+    },
+    "./roadmap/types": {
+      "types": "./src/roadmap/types.ts",
+      "default": "./src/roadmap/types.ts"
+    },
+    "./roadmap/utils": {
+      "types": "./src/roadmap/utils.ts",
+      "default": "./src/roadmap/utils.ts"
     }
   },
   "scripts": {

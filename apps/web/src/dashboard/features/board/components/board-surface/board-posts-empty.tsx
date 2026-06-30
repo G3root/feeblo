@@ -8,7 +8,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
-import { hasMembership, PolicyGuard } from "~/hooks/use-policy";
+import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
 
 export function BoardPostsEmpty({
   boardId,

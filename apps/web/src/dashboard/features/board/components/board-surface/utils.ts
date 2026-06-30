@@ -1,4 +1,4 @@
-import type { BoardPostStatus } from "../../constants";
+import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import type { BoardPostLane, BoardPostRow } from "./types";
 
 export function formatPostDate(value: Date | string) {

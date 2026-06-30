@@ -1,12 +1,15 @@
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { useSortable } from "@dnd-kit/react/sortable";
+import { RoadmapLaneColumn } from "@feeblo/post-ui/roadmap/roadmap-lane-column";
 import { Button } from "@feeblo/ui/button";
+import {
+  type BoardPostStatus,
+  getBoardStatusLabel,
+} from "@feeblo/web-shared/board/constants";
 import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo } from "react";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
-import { RoadmapLaneColumn } from "~/features/roadmap/components";
-import { type BoardPostStatus, getBoardStatusLabel } from "../../constants";
 
 interface BoardGridLaneColumnProps {
   boardId?: string;
