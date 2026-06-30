@@ -32,10 +32,6 @@
       "types": "./src/lib/reaction-keys.ts",
       "default": "./src/lib/reaction-keys.ts"
     },
-    "./form": {
-      "types": "./src/hooks/form.tsx",
-      "default": "./src/hooks/form.tsx"
-    },
     "./use-policy": {
       "types": "./src/hooks/use-policy.ts",
       "default": "./src/hooks/use-policy.ts"

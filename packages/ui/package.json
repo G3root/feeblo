@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     "./editor": "./src/editor/index.tsx",
+    "./utils": "./src/utils.ts",
+    "./hooks/*": "./src/hooks/*.tsx",
     "./*": "./src/*.tsx"
   },
   "dependencies": {
