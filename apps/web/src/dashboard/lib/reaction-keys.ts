@@ -22,3 +22,10 @@ export function getUpvoteCollectionKey(upvote: {
 }) {
   return `${upvote.postId}:${upvote.userId}`;
 }
+
+export function getPostSubscriptionCollectionKey(subscription: {
+  postId: string;
+  userId: string;
+}) {
+  return `${subscription.postId}:${subscription.userId}`;
+}
