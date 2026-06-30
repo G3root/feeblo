@@ -1,6 +1,5 @@
 import { createRuntime, type RpcClientType, withRpc } from "@feeblo/rpc-client";
 import { Cause, type Effect, Exit } from "effect";
-import type { LiveManagedRuntime } from "./runtime/live-layer";
 import { getRuntimePublicEnv } from "./runtime-public-env";
 
 const runtime = createRuntime(getRuntimePublicEnv().apiUrl);
@@ -10,7 +9,7 @@ const runtime = createRuntime(getRuntimePublicEnv().apiUrl);
  */
 export async function runEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  options?: { signal?: AbortSignal; runtime?: LiveManagedRuntime }
+  options?: { signal?: AbortSignal; runtime?: typeof runtime }
 ): Promise<A> {
   const result = await (options?.runtime ?? runtime).runPromiseExit(
     effect as Effect.Effect<A, E, never>,
