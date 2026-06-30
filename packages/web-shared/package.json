@@ -1,0 +1,93 @@
+{
+  "name": "@feeblo/web-shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./runtime": {
+      "types": "./src/lib/runtime.ts",
+      "default": "./src/lib/runtime.ts"
+    },
+    "./runtime-provider": {
+      "types": "./src/lib/runtime/runtime-provider.tsx",
+      "default": "./src/lib/runtime/runtime-provider.tsx"
+    },
+    "./runtime-context": {
+      "types": "./src/lib/runtime/runtime-context.tsx",
+      "default": "./src/lib/runtime/runtime-context.tsx"
+    },
+    "./use-runtime": {
+      "types": "./src/lib/runtime/use-runtime.tsx",
+      "default": "./src/lib/runtime/use-runtime.tsx"
+    },
+    "./runtime-public-env": {
+      "types": "./src/lib/runtime-public-env.ts",
+      "default": "./src/lib/runtime-public-env.ts"
+    },
+    "./auth-client": {
+      "types": "./src/lib/auth-client.ts",
+      "default": "./src/lib/auth-client.ts"
+    },
+    "./reaction-keys": {
+      "types": "./src/lib/reaction-keys.ts",
+      "default": "./src/lib/reaction-keys.ts"
+    },
+    "./form": {
+      "types": "./src/hooks/form.tsx",
+      "default": "./src/hooks/form.tsx"
+    },
+    "./use-policy": {
+      "types": "./src/hooks/use-policy.ts",
+      "default": "./src/hooks/use-policy.ts"
+    },
+    "./use-auth-state": {
+      "types": "./src/hooks/use-auth-state.ts",
+      "default": "./src/hooks/use-auth-state.ts"
+    },
+    "./user-validation": {
+      "types": "./src/utils/user-validation.ts",
+      "default": "./src/utils/user-validation.ts"
+    },
+    "./collections": {
+      "types": "./src/lib/collections.ts",
+      "default": "./src/lib/collections.ts"
+    },
+    "./dashboard-collections-provider": {
+      "types": "./src/providers/dashboard-collections-provider.tsx",
+      "default": "./src/providers/dashboard-collections-provider.tsx"
+    },
+    "./integrations/tanstack-query/root-provider": {
+      "types": "./src/integrations/tanstack-query/root-provider.tsx",
+      "default": "./src/integrations/tanstack-query/root-provider.tsx"
+    },
+    "./board/constants": {
+      "types": "./src/board/constants.ts",
+      "default": "./src/board/constants.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@feeblo/auth": "workspace:*",
+    "@feeblo/db": "workspace:*",
+    "@feeblo/domain": "workspace:*",
+    "@feeblo/rpc-client": "workspace:*",
+    "@feeblo/ui": "workspace:*",
+    "@feeblo/utils": "workspace:*",
+    "@tanstack/query-db-collection": "catalog:",
+    "@tanstack/react-db": "catalog:",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-form": "^1.28.6",
+    "effect": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}
