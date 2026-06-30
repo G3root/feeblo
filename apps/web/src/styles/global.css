@@ -4,6 +4,8 @@
 
 @source "../**/*.{ts,tsx,js,jsx,astro}";
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../../packages/post-ui/src/**/*.{ts,tsx}";
+@source "../../../public-feature-board/src/**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));
 

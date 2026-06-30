@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { DashboardPendingShell } from "./components/dashboard-pending-shell";
 import { getContext } from "./integrations/tanstack-query/root-provider";
-import { RuntimeProvider } from "./lib/runtime/runtime-provider";
+
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
 
@@ -29,11 +29,9 @@ export function createRouter() {
         <ThemeProvider>
           <ToastProvider>
             <AnchoredToastProvider>
-              <RuntimeProvider>
-                <QueryClientProvider client={queryClient}>
-                  <TooltipProvider>{children}</TooltipProvider>
-                </QueryClientProvider>
-              </RuntimeProvider>
+              <QueryClientProvider client={queryClient}>
+                <TooltipProvider>{children}</TooltipProvider>
+              </QueryClientProvider>
             </AnchoredToastProvider>
           </ToastProvider>
         </ThemeProvider>

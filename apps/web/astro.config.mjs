@@ -23,7 +23,11 @@ const widgetIconsDir = fileURLToPath(
   new URL("../../packages/feedback-widget/src/icons", import.meta.url)
 );
 
-const reactRoutes = ["**/dashboard/**", "**/feature-board/**"];
+const reactRoutes = [
+  "**/dashboard/**",
+  "**/public-feature-board/**",
+  "**/@feeblo/public-feature-board/**",
+];
 const solidRoutes = [
   "**/packages/feedback-widget/**",
   "**/@feeblo/feedback-widget/**",

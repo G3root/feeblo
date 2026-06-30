@@ -1,0 +1,87 @@
+{
+  "name": "@feeblo/post-ui",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./post-create-dialog-layout": {
+      "types": "./src/post/post-create-dialog-layout.tsx",
+      "default": "./src/post/post-create-dialog-layout.tsx"
+    },
+    "./post-create-form-shared": {
+      "types": "./src/post/post-create-form-shared.tsx",
+      "default": "./src/post/post-create-form-shared.tsx"
+    },
+    "./post-properties": {
+      "types": "./src/post/post-properties.tsx",
+      "default": "./src/post/post-properties.tsx"
+    },
+    "./post-comment-composer": {
+      "types": "./src/post/post-comment-composer.tsx",
+      "default": "./src/post/post-comment-composer.tsx"
+    },
+    "./post-comment-list": {
+      "types": "./src/post/post-comment-list.tsx",
+      "default": "./src/post/post-comment-list.tsx"
+    },
+    "./post-content": {
+      "types": "./src/post/post-content.tsx",
+      "default": "./src/post/post-content.tsx"
+    },
+    "./post-engagement-bar": {
+      "types": "./src/post/post-engagement-bar.tsx",
+      "default": "./src/post/post-engagement-bar.tsx"
+    },
+    "./post-reaction-section": {
+      "types": "./src/post/post-reaction-section.tsx",
+      "default": "./src/post/post-reaction-section.tsx"
+    },
+    "./post-title-input": {
+      "types": "./src/post/post-title-input.tsx",
+      "default": "./src/post/post-title-input.tsx"
+    },
+    "./post-board-select": {
+      "types": "./src/post/post-board-select.tsx",
+      "default": "./src/post/post-board-select.tsx"
+    },
+    "./comment-reaction-section": {
+      "types": "./src/post/comment-reaction-section.tsx",
+      "default": "./src/post/comment-reaction-section.tsx"
+    },
+    "./social-auth-buttons": {
+      "types": "./src/auth/social-auth-buttons.tsx",
+      "default": "./src/auth/social-auth-buttons.tsx"
+    },
+    "./auth-flows": {
+      "types": "./src/auth/auth-flows.ts",
+      "default": "./src/auth/auth-flows.ts"
+    },
+    "./roadmap": {
+      "types": "./src/roadmap/index.ts",
+      "default": "./src/roadmap/index.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@feeblo/domain": "workspace:*",
+    "@feeblo/id": "workspace:*",
+    "@feeblo/ui": "workspace:*",
+    "@feeblo/utils": "workspace:*",
+    "@feeblo/web-shared": "workspace:*",
+    "@hugeicons/core-free-icons": "^4.1.1",
+    "@hugeicons/react": "^1.1.6",
+    "@tanstack/react-db": "catalog:",
+    "@tanstack/react-form": "^1.28.6",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@feeblo/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}
