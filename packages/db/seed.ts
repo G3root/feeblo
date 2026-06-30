@@ -164,7 +164,7 @@ const ensureOrganization = (userId: string) =>
           slug: organizationTable.slug,
         })
         .from(organizationTable)
-        .where(eq(organizationTable.id, userId))
+        .where(eq(organizationTable.slug, userId))
         .limit(1)
     );
 
@@ -734,14 +734,14 @@ const seed = Effect.gen(function* () {
         userId: userRecord.id,
         role: "member",
       });
-    }
 
-    const personalOrg = yield* ensureOrganization(userRecord.id);
-    yield* ensureSite({
-      organizationId: personalOrg.id,
-      name: personalOrg.name,
-      subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
-    });
+      const personalOrg = yield* ensureOrganization(userRecord.id);
+      yield* ensureSite({
+        organizationId: personalOrg.id,
+        name: personalOrg.name,
+        subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
+      });
+    }
   }
 
   console.log(
