@@ -1,22 +1,27 @@
-name: "Setup Node.js"
+name: Initialize Node.js, pnpm, and dependencies
 description: "Sets up a consistent Node.js environment"
 inputs:
-  node-version:
-    description: "Node.js version"
-    required: true
-    default: "24"
   cache:
-    description: "Package manager for caching"
     required: false
-    default: "pnpm"
+    default: 'pnpm'
+    description: Allow to disable pnpm cache for better security
+  install:
+    required: false
+    default: ''
+    description: Allow to disable `pnpm install` call
 runs:
   using: "composite"
   steps:
     - name: Setup pnpm
-      uses: pnpm/action-setup@v6
+      uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
-        node-version: ${{ inputs.node-version }}
-        cache: ${{ inputs.cache }}
+        node-version-file: .node-version
+        cache: ${{ inputs.cache && 'pnpm' || '' }}
+
+    - name: Install pnpm dependencies
+      if: ${{ inputs.install != 'false' }}
+      shell: bash
+      run: pnpm install ${{ inputs.install }}

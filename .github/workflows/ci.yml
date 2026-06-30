@@ -23,7 +23,6 @@ jobs:
           persist-credentials: false
         
       - uses: ./.github/actions/setup-node
-      - uses: ./.github/actions/pnpm-install
 
       - name: Copy env
         run: cp .env.example .env
