@@ -1,0 +1,42 @@
+name: Cleanup Untagged Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/cleanup-untagged-images.yml'
+      - '.github/actions/setup-node/action.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/cleanup-untagged-images.yml'
+      - '.github/actions/setup-node/action.yml'
+  schedule:
+    - cron: '00 10 * * 1' # Every Monday at 10:00 UTC
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    name: Delete untagged GHCR images
+    runs-on: ubuntu-latest
+    if: github.repository == 'G3root/feeblo'
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: block
+          disable-telemetry: true
+          allowed-endpoints: |
+            api.github.com:443
+            ghcr.io:443
+            github.com:443
+
+      - name: Delete untagged server image
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          packages: feeblo-server,feeblo-web
+          delete-untagged: true
+          keep-n-untagged: 5
+          
