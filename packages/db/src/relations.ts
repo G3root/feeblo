@@ -11,6 +11,7 @@ import {
   organizationTable,
   postReactionTable,
   postStatusTable,
+  postSubscriptionTable,
   postTable,
   postTagTable,
   productTable,
@@ -36,6 +37,7 @@ export const userRelations = relations(userTable, ({ many }) => ({
   createdPosts: many(postTable),
   createdChangelogs: many(changelogTable),
   createdTags: many(tagTable),
+  postSubscriptions: many(postSubscriptionTable),
 }));
 
 export const sessionRelations = relations(sessionTable, ({ one }) => ({
@@ -178,7 +180,26 @@ export const postRelations = relations(postTable, ({ many, one }) => ({
   postReactions: many(postReactionTable),
   comments: many(commentTable),
   postTags: many(postTagTable),
+  subscriptions: many(postSubscriptionTable),
 }));
+
+export const postSubscriptionRelations = relations(
+  postSubscriptionTable,
+  ({ one }) => ({
+    post: one(postTable, {
+      fields: [postSubscriptionTable.postId],
+      references: [postTable.id],
+    }),
+    user: one(userTable, {
+      fields: [postSubscriptionTable.userId],
+      references: [userTable.id],
+    }),
+    organization: one(organizationTable, {
+      fields: [postSubscriptionTable.organizationId],
+      references: [organizationTable.id],
+    }),
+  })
+);
 
 export const upvoteRelations = relations(upvoteTable, ({ one }) => ({
   user: one(userTable, {

@@ -41,6 +41,9 @@ export const ReplyId = makeId("reply", "rpl", {
 export const PostReactionId = makeId("post_reaction", "rct", {
   approximateLength,
 });
+export const PostSubscriptionId = makeId("post_subscription", "psb", {
+  approximateLength,
+});
 export const SiteId = makeId("site", "sit", {
   approximateLength,
 });

@@ -1,6 +1,8 @@
+import { Database } from "@feeblo/db";
 import { Effect, Layer } from "effect";
 import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
+import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
@@ -88,6 +90,8 @@ export const PostRpcHandlers = PostRpcs.toLayer(
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
+          const subscriptionRepository = yield* PostSubscriptionRepository;
+          const db = yield* Database.Database;
           const board = yield* boardRepository.getById({
             id: args.boardId,
             organizationId: args.organizationId,
@@ -105,12 +109,26 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             });
           }
 
-          yield* repository.create({
-            ...args,
-            content: sanitizeRichText(args.content),
-            creatorId: session.session.userId,
-            ...(membership ? { creatorMemberId: membership.membershipId } : {}),
-          });
+          yield* db.transaction(
+            Effect.gen(function* () {
+              yield* repository.create({
+                ...args,
+                content: sanitizeRichText(args.content),
+                creatorId: session.session.userId,
+                ...(membership
+                  ? { creatorMemberId: membership.membershipId }
+                  : {}),
+              });
+
+              // The creator of a post is automatically subscribed to it.
+              yield* subscriptionRepository.subscribe({
+                organizationId: args.organizationId,
+                postId: args.id,
+                userId: session.session.userId,
+                ...(membership ? { memberId: membership.membershipId } : {}),
+              });
+            })
+          );
         }).pipe(withRemapDbErrors("Post", "create"));
       },
       PostAdminUpdate: (args: TPostAdminUpdate) =>
@@ -142,5 +160,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
   Layer.provide(BoardRepository.layer),
-  Layer.provide(PostRepository.layer)
+  Layer.provide(PostRepository.layer),
+  Layer.provide(PostSubscriptionRepository.layer)
 );

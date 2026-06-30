@@ -357,6 +357,40 @@ export const postReactionTable = pgTable(
   ]
 );
 
+export const postSubscriptionTable = pgTable(
+  "post_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => userTable.id, { onDelete: "cascade" }),
+    memberId: text("member_id").references(() => memberTable.id, {
+      onDelete: "set null",
+    }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("post_subscription_postId_idx").on(table.postId),
+    index("post_subscription_userId_idx").on(table.userId),
+    uniqueIndex("post_subscription_postId_userId_uidx").on(
+      table.postId,
+      table.userId
+    ),
+  ]
+);
+
 export const commentTable = pgTable("comment", {
   id: text("id").primaryKey(),
   content: text("content").notNull(),
@@ -488,3 +522,5 @@ export const changelogTable = pgTable(
 );
 
 export type InsertComment = typeof commentTable.$inferInsert;
+export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
+export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;

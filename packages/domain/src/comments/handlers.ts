@@ -1,7 +1,9 @@
+import { Database } from "@feeblo/db";
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
+import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { withRemapDbErrors } from "../rpc-errors";
 import { sanitizeRichText } from "../sanitize-html";
 import { CurrentSession } from "../session-middleware";
@@ -27,6 +29,8 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
     const postRepository = yield* PostRepository;
     // const sitePolicy = yield* SitePolicy;
 
+    const subscriptionRepository = yield* PostSubscriptionRepository;
+
     return {
       CommentList: (args: TCommentList) =>
         repository
@@ -49,6 +53,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
+          const db = yield* Database.Database;
 
           const isPublicPost = yield* postRepository.isPublicPost({
             id: args.postId,
@@ -61,12 +66,24 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             });
           }
 
-          yield* repository.create({
-            ...args,
-            content: sanitizeRichText(args.content),
-            userId: session.session.userId,
-            ...(membership ? { memberId: membership.membershipId } : {}),
-          });
+          yield* db.transaction(
+            Effect.gen(function* () {
+              yield* repository.create({
+                ...args,
+                content: sanitizeRichText(args.content),
+                userId: session.session.userId,
+                ...(membership ? { memberId: membership.membershipId } : {}),
+              });
+
+              // Commenting on a post automatically subscribes the user to it.
+              yield* subscriptionRepository.subscribe({
+                organizationId: args.organizationId,
+                postId: args.postId,
+                userId: session.session.userId,
+                ...(membership ? { memberId: membership.membershipId } : {}),
+              });
+            })
+          );
 
           return {
             message: "Comment created successfully",
@@ -168,5 +185,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(PostPolicy.layer),
   Layer.provide(CommentPolicy.layer),
   Layer.provide(PostRepository.layer),
-  Layer.provide(CommentRepository.layer)
+  Layer.provide(CommentRepository.layer),
+  Layer.provide(PostSubscriptionRepository.layer)
 );
