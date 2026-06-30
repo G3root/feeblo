@@ -1,5 +1,6 @@
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
+import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
@@ -8,12 +9,14 @@ import { fetchRpc } from "~/lib/runtime";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
+  getPostSubscriptionCollectionKey,
   getUpvoteCollectionKey,
 } from "../../dashboard/lib/reaction-keys";
 import { getContext } from "../integrations/tanstack-query/root-provider";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
 type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
+type PostSubscriptionRow = Schema.Schema.Type<typeof PostSubscription>;
 type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 
 const queryClient = getContext().queryClient;
@@ -544,6 +547,67 @@ export const publicPostReactionCollection = createCollection(
   })
 );
 
+export const publicPostSubscriptionCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const postId = getEqFilterValue(parsed.filters, "postId");
+
+      return postId
+        ? getOrganizationScopedQueryKey(
+            "public-post-subscription",
+            "postId",
+            postId
+          )
+        : getOrganizationScopedQueryKey("public-post-subscription");
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const postId = getEqFilterValue(parsed.filters, "postId");
+
+      if (!(postId && organizationId)) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.PostSubscriptionList({ organizationId, postId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+      return [...data];
+    },
+    queryClient,
+    getKey: getPostSubscriptionCollectionKey as (
+      item: PostSubscriptionRow
+    ) => string,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newSubscription } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.PostSubscriptionCreate({
+          organizationId: newSubscription.organizationId,
+          postId: newSubscription.postId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedSubscription } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.PostSubscriptionDelete({
+          organizationId: deletedSubscription.organizationId,
+          postId: deletedSubscription.postId,
+        })
+      );
+    },
+  })
+);
+
 export const publicCollections = {
   publicBoardCollection,
   publicChangelogCollection,
@@ -553,6 +617,7 @@ export const publicCollections = {
   publicPostCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
+  publicPostSubscriptionCollection,
   publicPostTagCollection,
   publicTagCollection,
   publicUpvoteCollection,

@@ -82,6 +82,9 @@
     "./post/schema": {
       "default": "./src/post/schema.ts"
     },
+    "./post-subscription/schema": {
+      "default": "./src/post-subscription/schema.ts"
+    },
     "./post-status/schema": {
       "default": "./src/post-status/schema.ts"
     },
