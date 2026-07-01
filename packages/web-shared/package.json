@@ -8,6 +8,10 @@
       "types": "./src/lib/runtime.ts",
       "default": "./src/lib/runtime.ts"
     },
+    "./xstate": {
+      "types": "./src/lib/xstate.tsx",
+      "default": "./src/lib/xstate.tsx"
+    },
     "./runtime-provider": {
       "types": "./src/lib/runtime/runtime-provider.tsx",
       "default": "./src/lib/runtime/runtime-provider.tsx"

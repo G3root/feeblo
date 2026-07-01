@@ -10,19 +10,28 @@
     "./*": "./src/*.tsx"
   },
   "dependencies": {
+    "@feeblo/web-shared": "workspace:*",
     "@base-ui/react": "catalog:",
-    "@feeblo/editor": "workspace:*",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
     "@tanstack/react-form": "^1.28.6",
     "@tanstack/react-pacer": "^0.20.0",
     "@tanstack/react-store": "^0.11.0",
+    "beautiful-mermaid": "^1.1.3",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "cmdk": "^1.1.1",
     "input-otp": "^1.4.2",
+    "katex": "^0.17.0",
+    "prosekit": "^0.21.4",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "rehype-parse": "^9.0.1",
+    "rehype-remark": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-html": "^16.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
     "tailwind-merge": "catalog:",
     "zod": "catalog:"
   },
@@ -31,8 +40,8 @@
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
-    "typescript": "catalog:",
     "@types/react": "catalog:",
-    "@types/react-dom": "catalog:"
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
   }
 }
