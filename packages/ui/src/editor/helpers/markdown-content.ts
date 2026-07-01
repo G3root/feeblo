@@ -12,7 +12,7 @@ import type { Editor } from "prosekit/core";
 import { htmlFromNode, nodeFromHTML } from "prosekit/core";
 import { ListDOMSerializer } from "prosekit/extensions/list";
 import type { EditorExtension } from "../extension";
-import { htmlToMarkdown, markdownToHtml } from "./markdown";
+import { htmlToMarkdown, markdownToHtml } from "@feeblo/utils/markdown";
 
 export const getMarkdownContent = (editor: Editor<EditorExtension>): string => {
   if (!editor.mounted) {

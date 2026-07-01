@@ -15,11 +15,9 @@ import remarkHtml from "remark-html";
 import remarkParse from "remark-parse";
 import remarkStringify from "remark-stringify";
 import { unified } from "unified";
-import { rehypeJoinParagraph } from "../plugins/rehype-join-paragaraph";
-import { customBreakHandler } from "../plugins/remark-break-handler";
+import { rehypeJoinParagraph } from "./rehype-join-paragraph";
+import { customBreakHandler } from "./remark-break-handler";
 
-// By default, remark-stringify escapes underscores (i.e. "_" => "\_"). We want
-// to disable this behavior so that we can have underscores in mention usernames.
 const unescapeUnderscore = (str: string) => {
   return str.replace(/(^|[^\\])\\_/g, "$1_");
 };

@@ -16,7 +16,7 @@ import { useMemo } from "react";
 import { cn } from "../utils";
 import { useEditorContext } from "./editor-store";
 import { defineExtension } from "./extension";
-import { markdownToHtml } from "./helpers/markdown";
+import { markdownToHtml } from "@feeblo/utils/markdown";
 import useContentChange from "./hooks/use-content-change";
 import { tags } from "./sample/sample-tag-data";
 import { users } from "./sample/sample-user-data";

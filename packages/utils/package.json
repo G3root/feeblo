@@ -9,7 +9,8 @@
     "./crypto": "./src/crypto.ts",
     "./html": "./src/html.ts",
     "./media": "./src/media.ts",
-    "./reaction": "./src/reaction.ts"
+    "./reaction": "./src/reaction.ts",
+    "./markdown": "./src/markdown/index.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit"
@@ -20,10 +21,20 @@
     "legid": "^0.1.4",
     "nanoid": "^5.1.6",
     "@sindresorhus/slugify": "^2.2.1",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "mdast-util-to-markdown": "^2.1.2",
+    "rehype-parse": "^9.0.1",
+    "rehype-remark": "^10.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-html": "^16.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
+    "unist-util-visit-parents": "^6.0.2"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
+    "@types/hast": "^3.0.4",
     "typescript": "catalog:"
   }
 }
