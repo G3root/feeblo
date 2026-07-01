@@ -10,7 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
-import { Editor, type EmailEditorRef } from "@feeblo/ui/editor";
+import type { EmailEditorRef } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
@@ -121,19 +121,20 @@ export function PostCommentComposer({
 
               return (
                 <form.AppField name="content">
-                  {(field) => (
-                    <Editor
-                      className="min-w-0 flex-1"
-                      content={field.state.value}
-                      editable={!disabled}
-                      key={visibility + editorKey}
-                      onUpdate={(ref) =>
-                        field.handleChange(ref.editor?.getHTML() ?? "")
-                      }
-                      placeholder={selectedCopy.placeholder}
-                      ref={editorRef}
-                    />
-                  )}
+                  {(field) =>
+                    null
+                    // <Editor
+                    //   className="min-w-0 flex-1"
+                    //   content={field.state.value}
+                    //   editable={!disabled}
+                    //   key={visibility + editorKey}
+                    //   onUpdate={(ref) =>
+                    //     field.handleChange(ref.editor?.getHTML() ?? "")
+                    //   }
+                    //   placeholder={selectedCopy.placeholder}
+                    //   ref={editorRef}
+                    // />
+                  }
                 </form.AppField>
               );
             }}

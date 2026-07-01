@@ -2,6 +2,8 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@plugin "@egoist/tailwindcss-icons";
+
 @source "../**/*.{ts,tsx,js,jsx,astro}";
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
 @source "../../../../packages/post-ui/src/**/*.{ts,tsx}";
