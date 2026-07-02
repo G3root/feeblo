@@ -85,3 +85,17 @@ export const updateAuthState = (data: AuthClientSession): AuthState => {
 
   return state;
 };
+
+export const initAuthStateCache = async () => {
+  const cached = getAuthState();
+  if (cached) {
+    return cached;
+  }
+
+  const result = await authClient.getSession();
+  if (!result.data) {
+    throw new Response("Unauthorized", { status: 401 });
+  }
+
+  return updateAuthState(result.data);
+};

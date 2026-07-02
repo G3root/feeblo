@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@feeblo/ui/select";
 import { cn } from "@feeblo/ui/utils";
-import { authClient } from "@feeblo/web-shared/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ChatFeedback01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
@@ -37,7 +37,8 @@ import {
 import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
-import { openAuthDialog, openPostCreateDialog } from "../stores";
+import { usePostCreateDialogContext } from "@feeblo/post-ui/post-dialog-stores";
+import { openAuthDialog } from "../stores";
 
 function MainContent({ children }: { children: ReactNode }) {
   return (
@@ -101,7 +102,8 @@ export const Route = createLazyRoute("/")({
 });
 
 function HomePage() {
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
+  const postCreateStore = usePostCreateDialogContext();
   const site = useSite();
   const {
     publicBoardCollection,
@@ -457,7 +459,10 @@ function HomePage() {
                 <Button
                   onClick={() => {
                     if (session) {
-                      openPostCreateDialog(activeBoardId);
+                      postCreateStore.send({
+                        type: "toggle",
+                        data: { boardId: activeBoardId },
+                      });
                     } else {
                       openAuthDialog("sign-in");
                     }

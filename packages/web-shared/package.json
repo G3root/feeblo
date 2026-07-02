@@ -73,7 +73,6 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
-    "@feeblo/ui": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@tanstack/query-db-collection": "catalog:",
     "@tanstack/react-db": "catalog:",

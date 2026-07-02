@@ -1,7 +1,7 @@
 import { CommentId, CommentReactionId } from "@feeblo/id";
 import type { CommentReactionToggleInput } from "@feeblo/post-ui/comment-reaction-section";
 import { PostBoardSelect } from "@feeblo/post-ui/post-board-select";
-import { StatusSelect } from "@feeblo/post-ui/post-properties";
+import { StatusField } from "@feeblo/post-ui/post-properties";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
@@ -330,7 +330,7 @@ function RouteComponent() {
             {canManagePost ? (
               <SidebarCard title="Properties">
                 <div>
-                  <StatusSelect
+                  <StatusField
                     currentStatusId={post.statusId}
                     onValueChange={async (nextPostStatus) => {
                       if (!nextPostStatus) {

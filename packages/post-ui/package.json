@@ -13,8 +13,16 @@
       "default": "./src/post/post-create-form-shared.tsx"
     },
     "./post-properties": {
-      "types": "./src/post/post-properties.tsx",
-      "default": "./src/post/post-properties.tsx"
+      "types": "./src/v2/post-field.tsx",
+      "default": "./src/v2/post-field.tsx"
+    },
+    "./post-create-dialog": {
+      "types": "./src/v2/dialogs/post-create-dialog.tsx",
+      "default": "./src/v2/dialogs/post-create-dialog.tsx"
+    },
+    "./post-dialog-stores": {
+      "types": "./src/v2/dialog-stores/post.ts",
+      "default": "./src/v2/dialog-stores/post.ts"
     },
     "./post-comment-composer": {
       "types": "./src/post/post-comment-composer.tsx",
@@ -87,6 +95,7 @@
     "ladle:build": "ladle build"
   },
   "dependencies": {
+    "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/ui": "workspace:*",
