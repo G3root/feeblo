@@ -1,23 +1,44 @@
+import type { PostCreateCollections } from "@feeblo/post-ui/post-create-collections-context";
+import { PostCreateCollectionsProvider } from "@feeblo/post-ui/post-create-collections-context";
+import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
 import { PostCreateDialogProvider } from "@feeblo/post-ui/post-dialog-stores";
 import type { ReactNode } from "react";
+import {
+  publicBoardCollection,
+  publicPostCollection,
+  publicPostStatusCollection,
+} from "../../lib/collections";
 import { useSite } from "../../providers/site-provider";
 import { AuthDialogRoot } from "../common/auth-dialog";
 import { Navbar } from "../common/navbar";
-import { PostCreateDialog } from "../feedback/post-create-dialog";
 import { PoweredByTag } from "./powered-by-tag";
 
 export function PublicBoardShell({ children }: { children: ReactNode }) {
   const site = useSite();
 
+  const collections: PostCreateCollections = {
+    boardCollection:
+      publicBoardCollection as PostCreateCollections["boardCollection"],
+    postCollection:
+      publicPostCollection as PostCreateCollections["postCollection"],
+    postStatusCollection:
+      publicPostStatusCollection as PostCreateCollections["postStatusCollection"],
+  };
+
   return (
-    <PostCreateDialogProvider>
-      <div className="flex min-h-dvh flex-col bg-background text-foreground">
-        <Navbar />
-        <main className="min-h-0 flex-1">{children}</main>
-        <AuthDialogRoot />
-        <PostCreateDialog />
-        {site.hidePoweredBy ? null : <PoweredByTag />}
-      </div>
-    </PostCreateDialogProvider>
+    <PostCreateCollectionsProvider
+      collections={collections}
+      organizationId={site.organizationId}
+    >
+      <PostCreateDialogProvider>
+        <div className="flex min-h-dvh flex-col bg-background text-foreground">
+          <Navbar />
+          <main className="min-h-0 flex-1">{children}</main>
+          <AuthDialogRoot />
+          <PostCreateDialog />
+          {site.hidePoweredBy ? null : <PoweredByTag />}
+        </div>
+      </PostCreateDialogProvider>
+    </PostCreateCollectionsProvider>
   );
 }

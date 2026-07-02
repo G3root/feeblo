@@ -1,6 +1,6 @@
+/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 import { PostId } from "@feeblo/id";
 import { PostCreateLayout } from "@feeblo/post-ui/post-create-dialog-layout";
-
 import { FieldRow } from "@feeblo/post-ui/post-properties";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -17,13 +17,11 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useState } from "react";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-
 import { usePostCreateDialogContext } from "../dialog-stores/post";
+import { usePostCreateCollections } from "../dialog-stores/post-create-collections-context";
 import {
   PostBoardField,
   PostContentField,
@@ -33,13 +31,12 @@ import {
   postCreateFormOpts,
 } from "../forms/post-create-form-shared";
 
+export type { PostCreateCollections } from "../dialog-stores/post-create-collections-context";
+export { PostCreateCollectionsProvider } from "../dialog-stores/post-create-collections-context";
+
 export function PostCreateDialog() {
   const store = usePostCreateDialogContext();
   const open = useSelector(store, (state) => state.context.open);
-  const organizationId = useSelector(
-    store,
-    (state) => state.context.data.organizationId
-  );
   return (
     <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
       <DialogPopup
@@ -53,27 +50,27 @@ export function PostCreateDialog() {
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
-          <PostCreateForm organizationId={organizationId} />
+          <PostCreateForm />
         </DialogPanel>
       </DialogPopup>
     </Dialog>
   );
 }
 
-function PostCreateForm({ organizationId }: { organizationId: string }) {
+function PostCreateForm() {
   const store = usePostCreateDialogContext();
+  const { collections, organizationId } = usePostCreateCollections();
   const {
     boardCollection,
     membersCollection,
     postCollection,
     postStatusCollection,
-  } = useDashboardCollections();
+  } = collections;
   const { data: session } = useAuthState();
-  const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
 
   const { data: member } = useLiveQuery(
     (q) => {
-      if (!(organizationId && session?.user?.id)) {
+      if (!(membersCollection && organizationId && session?.user?.id)) {
         return undefined;
       }
       return q
@@ -140,7 +137,7 @@ function PostCreateForm({ organizationId }: { organizationId: string }) {
     },
 
     onSubmit: async ({ value }) => {
-      if (!canCreate) {
+      if (!session) {
         return;
       }
 
@@ -207,14 +204,6 @@ function PostCreateForm({ organizationId }: { organizationId: string }) {
 
   if (postStatuses.length === 0) {
     return null;
-  }
-
-  if (!canCreate) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        You must be a member of this organization to create posts.
-      </p>
-    );
   }
 
   return (

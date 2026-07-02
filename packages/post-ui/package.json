@@ -20,6 +20,10 @@
       "types": "./src/v2/dialogs/post-create-dialog.tsx",
       "default": "./src/v2/dialogs/post-create-dialog.tsx"
     },
+    "./post-create-collections-context": {
+      "types": "./src/v2/dialog-stores/post-create-collections-context.tsx",
+      "default": "./src/v2/dialog-stores/post-create-collections-context.tsx"
+    },
     "./post-dialog-stores": {
       "types": "./src/v2/dialog-stores/post.ts",
       "default": "./src/v2/dialog-stores/post.ts"

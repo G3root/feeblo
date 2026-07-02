@@ -1,3 +1,5 @@
+import { PostCreateCollectionsProvider } from "@feeblo/post-ui/post-create-collections-context";
+import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import {
   SidebarInset,
@@ -14,53 +16,70 @@ import {
   DeleteBoardDialogProvider,
   RenameBoardDialogProvider,
 } from "~/features/board/dialog-stores";
-import { PostCreateDialog } from "~/features/post/components/post-create-dialog";
 import { PostDeleteDialog } from "~/features/post/components/post-delete-dialog";
 import {
   PostCreateDialogProvider,
   PostDeleteDialogProvider,
 } from "~/features/post/dialog-stores";
+import { useOrganizationId } from "~/hooks/use-organization-id";
+import {
+  boardCollection,
+  membersCollection,
+  postCollection,
+  postStatusCollection,
+} from "~/lib/collections";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const organizationId = useOrganizationId();
   return (
     <UpgradePlanDialogProvider>
-      <PostCreateDialogProvider>
-        <RenameBoardDialogProvider>
-          <DeleteBoardDialogProvider>
-            <CreateBoardDialogProvider>
-              <PostDeleteDialogProvider>
-                <SidebarProvider
-                  className="h-dvh overflow-hidden"
-                  style={
-                    {
-                      "--sidebar-width": "calc(var(--spacing) * 72)",
-                      "--header-height": "calc(var(--spacing) * 12)",
-                    } as React.CSSProperties
-                  }
-                >
-                  <AppSidebar variant="inset" />
-                  <SidebarInset className="h-full min-h-0 overflow-hidden">
-                    <header className="flex h-(--header-height) shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-                      <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-                        <SidebarTrigger className="-ml-1" />
-                      </div>
-                    </header>
+      <PostCreateCollectionsProvider
+        collections={{
+          boardCollection,
+          postCollection,
+          postStatusCollection,
+          membersCollection,
+        }}
+        organizationId={organizationId}
+      >
+        <PostCreateDialogProvider>
+          <RenameBoardDialogProvider>
+            <DeleteBoardDialogProvider>
+              <CreateBoardDialogProvider>
+                <PostDeleteDialogProvider>
+                  <SidebarProvider
+                    className="h-dvh overflow-hidden"
+                    style={
+                      {
+                        "--sidebar-width": "calc(var(--spacing) * 72)",
+                        "--header-height": "calc(var(--spacing) * 12)",
+                      } as React.CSSProperties
+                    }
+                  >
+                    <AppSidebar variant="inset" />
+                    <SidebarInset className="h-full min-h-0 overflow-hidden">
+                      <header className="flex h-(--header-height) shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+                        <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+                          <SidebarTrigger className="-ml-1" />
+                        </div>
+                      </header>
 
-                    <ScrollArea className="min-h-0 flex-1 overflow-hidden">
-                      {children}
-                    </ScrollArea>
-                  </SidebarInset>
-                  <CreateBoardDialog />
-                  <DeleteBoardDialog />
-                  <RenameBoardDialog />
-                  <PostDeleteDialog />
-                  <PostCreateDialog />
-                </SidebarProvider>
-              </PostDeleteDialogProvider>
-            </CreateBoardDialogProvider>
-          </DeleteBoardDialogProvider>
-        </RenameBoardDialogProvider>
-      </PostCreateDialogProvider>
+                      <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+                        {children}
+                      </ScrollArea>
+                    </SidebarInset>
+                    <CreateBoardDialog />
+                    <DeleteBoardDialog />
+                    <RenameBoardDialog />
+                    <PostDeleteDialog />
+                    <PostCreateDialog />
+                  </SidebarProvider>
+                </PostDeleteDialogProvider>
+              </CreateBoardDialogProvider>
+            </DeleteBoardDialogProvider>
+          </RenameBoardDialogProvider>
+        </PostCreateDialogProvider>
+      </PostCreateCollectionsProvider>
     </UpgradePlanDialogProvider>
   );
 }
