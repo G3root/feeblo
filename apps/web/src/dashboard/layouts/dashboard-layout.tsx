@@ -29,6 +29,7 @@ import {
   commentCollection,
   membersCollection,
   postCollection,
+  postReactionCollection,
   postStatusCollection,
   upvoteCollection,
 } from "~/lib/collections";
@@ -45,6 +46,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           postCollection,
           postStatusCollection,
           upvoteCollection,
+          postReactionCollection,
         }}
         organizationId={organizationId}
       >

@@ -99,7 +99,7 @@ function PostVoterDialogTrigger() {
   return (
     <DialogTrigger
       render={(props) => (
-        <Button size="xs" variant="link" {...props}>
+        <Button size="xs" variant="ghost" {...props}>
           See all
         </Button>
       )}

@@ -1,4 +1,4 @@
-import { CommentId, CommentReactionId, PostReactionId } from "@feeblo/id";
+import { CommentId, CommentReactionId } from "@feeblo/id";
 import type { CommentReactionToggleInput } from "@feeblo/post-ui/comment-reaction-section";
 import {
   PostCommentComposer,
@@ -6,11 +6,8 @@ import {
 } from "@feeblo/post-ui/post-comment-composer";
 import { PostCommentList } from "@feeblo/post-ui/post-comment-list";
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
-import {
-  type PostReaction,
-  PostReactionSection,
-} from "@feeblo/post-ui/post-reaction-section";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
+import { PostReactionPicker } from "@feeblo/post-ui/reaction-picker";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
@@ -26,10 +23,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
-import {
-  getCommentReactionCollectionKey,
-  getPostReactionCollectionKey,
-} from "@feeblo/web-shared/reaction-keys";
+import { getCommentReactionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
@@ -42,6 +36,7 @@ import { Comment01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   and,
+  count,
   debounceStrategy,
   eq,
   useLiveQuery,
@@ -58,6 +53,7 @@ import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
+
 // import { useUpvote } from "../hooks/use-upvote";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
@@ -713,66 +709,74 @@ function PostReactionBar({
 }) {
   const { data: session } = useAuthState();
   const { publicPostReactionCollection } = usePublicCollections();
-  const { data: postReactions } = useLiveQuery(
-    (q) =>
-      q
-        .from({ postReaction: publicPostReactionCollection })
-        .where(({ postReaction }) =>
-          and(
-            eq(postReaction.organizationId, organizationId),
-            eq(postReaction.postId, postId)
+
+  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!postId) {
+          return undefined;
+        }
+        return q
+          .from({ postReaction: publicPostReactionCollection })
+          .where(({ postReaction }) =>
+            and(
+              eq(postReaction.organizationId, organizationId),
+              eq(postReaction.postId, postId)
+            )
           )
-        ),
-    [organizationId, postId]
-  );
-
-  const handleToggleReaction = async (
-    emoji: ReactionEmoji,
-    existingUserEmojiReaction: PostReaction | undefined
-  ) => {
-    if (disabled) {
-      return;
-    }
-
-    const currentUserId = session?.user?.id;
-    const memberships = (
-      session as { memberships?: SessionMembership[] } | null
-    )?.memberships;
-    if (!currentUserId) {
-      toastManager.add({ title: "Sign in to react", type: "error" });
-      return;
-    }
-    const isMember = memberships?.find(
-      (membership: SessionMembership) =>
-        membership.userId === currentUserId &&
-        membership.organizationId === organizationId
+          .groupBy(({ postReaction }) => postReaction.emoji)
+          .select(({ postReaction }) => ({
+            emoji: postReaction.emoji,
+            count: count(postReaction.id),
+          }))
+          .orderBy(({ postReaction }) => postReaction.emoji, "asc");
+      },
+      [organizationId, postId]
     );
 
-    if (existingUserEmojiReaction) {
-      const tx = publicPostReactionCollection.delete(
-        getPostReactionCollectionKey(existingUserEmojiReaction)
-      );
-      await tx.isPersisted.promise;
-      return;
-    }
-    const tx = publicPostReactionCollection.insert({
-      id: await PostReactionId.unsafeGenerate(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      organizationId,
-      postId,
-      userId: currentUserId,
-      memberId: isMember ? isMember.membershipId : null,
-      emoji,
-    });
-    await tx.isPersisted.promise;
-  };
+  const { data: userReactions, isLoading: isUserReactionsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!(postId && session?.user?.id)) {
+          return undefined;
+        }
+        return q
+          .from({ postReaction: publicPostReactionCollection })
+          .where(({ postReaction }) =>
+            and(
+              eq(postReaction.organizationId, organizationId),
+              eq(postReaction.postId, postId),
+              eq(postReaction.userId, session.user.id)
+            )
+          )
+          .select(({ postReaction }) => ({
+            emoji: postReaction.emoji,
+          }))
+          .distinct();
+      },
+      [organizationId, postId, session?.user?.id]
+    );
+
+  const existingReactions = new Set(
+    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
+  );
+  const reactionList = new Map(
+    (reactionCounts ?? []).map((r) => [
+      r.emoji as ReactionEmoji,
+      { count: r.count },
+    ])
+  );
+
+  if (isReactionCountsLoading || isUserReactionsLoading) {
+    return null;
+  }
 
   return (
-    <PostReactionSection
+    <PostReactionPicker
       disabled={disabled}
-      handleToggleReaction={handleToggleReaction}
-      postReactions={postReactions}
+      existingReactions={existingReactions}
+      postId={postId}
+      reactionList={reactionList}
     />
   );
 }

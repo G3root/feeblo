@@ -52,10 +52,6 @@
       "types": "./src/lib/collections.ts",
       "default": "./src/lib/collections.ts"
     },
-    "./dashboard-collections-provider": {
-      "types": "./src/providers/dashboard-collections-provider.tsx",
-      "default": "./src/providers/dashboard-collections-provider.tsx"
-    },
     "./integrations/tanstack-query/root-provider": {
       "types": "./src/integrations/tanstack-query/root-provider.tsx",
       "default": "./src/integrations/tanstack-query/root-provider.tsx"

@@ -1,13 +1,19 @@
+import { PostReactionId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
+import { toastManager } from "@feeblo/ui/toast";
 import {
   getReactionEmoji,
   REACTION_EMOJIS,
   type ReactionEmoji,
 } from "@feeblo/utils/reaction";
+import { getPostReactionCollectionKey } from "@feeblo/web-shared/reaction-keys";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, queryOnce } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
+import { usePostCollections } from "./providers/post-collections-provider";
 
 type ReactionPickerState = {
   disabled: boolean;
@@ -170,6 +176,109 @@ function ReactionPickerComponent(props: ReactionPickerRootProps) {
   return (
     <ReactionPickerProvider {...props}>
       <ReactionPickerTrigger />
+      <ReactionPickerGrid />
+    </ReactionPickerProvider>
+  );
+}
+
+interface PostReactionPickerProps
+  extends Omit<ReactionPickerProviderProps, "onToggle"> {
+  postId: string;
+}
+
+export function PostReactionPicker({
+  postId,
+  disabled,
+  ...rest
+}: PostReactionPickerProps) {
+  const {
+    collections: { postReactionCollection, membersCollection },
+    organizationId,
+  } = usePostCollections();
+  const { data: session } = useAuthState();
+
+  const handleToggleReaction = async (emoji: ReactionEmoji) => {
+    if (disabled) {
+      return;
+    }
+
+    const currentUserId = session?.user?.id;
+
+    if (!currentUserId) {
+      toastManager.add({ title: "Sign in to react", type: "error" });
+      return;
+    }
+    let membershipId: string | null = null;
+
+    if (membersCollection) {
+      const query = await queryOnce((q) =>
+        q
+          .from({ members: membersCollection })
+          .where(({ members }) =>
+            and(
+              eq(members.organizationId, organizationId),
+              eq(members.userId, currentUserId)
+            )
+          )
+          .select(({ members }) => ({
+            id: members.id,
+          }))
+          .findOne()
+      );
+
+      if (query) {
+        membershipId = query.id;
+      }
+    }
+
+    const existingUserEmojiReaction = await queryOnce((q) =>
+      q
+        .from({ post: postReactionCollection })
+        .where(({ post }) =>
+          and(
+            eq(post.emoji, emoji),
+            eq(post.organizationId, organizationId),
+            eq(post.postId, postId),
+            eq(post.userId, currentUserId)
+          )
+        )
+        .findOne()
+    );
+
+    if (existingUserEmojiReaction) {
+      const tx = postReactionCollection.delete(
+        getPostReactionCollectionKey({
+          emoji,
+          postId,
+          userId: currentUserId,
+        })
+      );
+      await tx.isPersisted.promise;
+      return;
+    }
+    const tx = postReactionCollection.insert({
+      id: await PostReactionId.unsafeGenerate(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationId,
+      postId,
+      userId: currentUserId,
+      memberId: membershipId,
+      emoji,
+    });
+    await tx.isPersisted.promise;
+  };
+
+  return (
+    <ReactionPickerProvider
+      disabled={disabled}
+      onToggle={handleToggleReaction}
+      {...rest}
+    >
+      <div className="flex items-center gap-1">
+        <ReactionPickerDisplayRow />
+        <ReactionPickerTrigger />
+      </div>
       <ReactionPickerGrid />
     </ReactionPickerProvider>
   );

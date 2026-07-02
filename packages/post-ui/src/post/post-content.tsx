@@ -1,5 +1,4 @@
 import { Editor, type EditorProps, EditorProvider } from "@feeblo/ui/editor";
-import { useDashboardCollections } from "@feeblo/web-shared/dashboard-collections-provider";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import {
   anyPolicy,
@@ -9,6 +8,7 @@ import {
 } from "@feeblo/web-shared/use-policy";
 import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
 import { z } from "zod";
+import { usePostCollections } from "../v2/providers/post-collections-provider";
 
 const UpdatedPostSchema = z.object({
   id: z.string(),
@@ -81,7 +81,9 @@ export function PostEditableContent({
   postCreatorId: string | null;
   postId: string;
 }) {
-  const { postCollection } = useDashboardCollections();
+  const {
+    collections: { postCollection },
+  } = usePostCollections();
   const { allowed: isOwner } = usePolicy(
     anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
   );

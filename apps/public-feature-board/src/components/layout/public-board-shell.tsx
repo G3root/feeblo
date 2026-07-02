@@ -7,6 +7,7 @@ import {
   publicBoardCollection,
   publicCommentCollection,
   publicPostCollection,
+  publicPostReactionCollection,
   publicPostStatusCollection,
   publicUpvoteCollection,
 } from "../../lib/collections";
@@ -24,6 +25,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
     postStatusCollection: publicPostStatusCollection,
     upvoteCollection: publicUpvoteCollection,
     commentCollection: publicCommentCollection,
+    postReactionCollection: publicPostReactionCollection,
     //todo add member collection
   };
 
