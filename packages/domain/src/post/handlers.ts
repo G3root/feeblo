@@ -1,11 +1,11 @@
 import { Database } from "@feeblo/db";
+import { htmlToExcerpt } from "@feeblo/utils/html";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { Effect, Layer } from "effect";
 import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { htmlToExcerpt } from "@feeblo/utils/html";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -74,9 +74,15 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           );
       },
       PostUpdate: (args: TPostUpdate) => {
-        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
+        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+          args.content
+        );
         return repository
-          .update({ ...args, content: sanitizedMarkdown, excerpt: htmlToExcerpt(sanitizedHtml) })
+          .update({
+            ...args,
+            content: sanitizedMarkdown,
+            excerpt: htmlToExcerpt(sanitizedHtml),
+          })
           .pipe(
             Policy.withPolicy(
               postPolicy.isOwner({
@@ -89,7 +95,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           );
       },
       PostCreate: (args: TPostCreate) => {
-        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
@@ -111,6 +116,13 @@ export const PostRpcHandlers = PostRpcs.toLayer(
               reason: "You are not allowed to post to this board.",
             });
           }
+
+          const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+            args.content
+          );
+
+          console.log("sanitizedMarkdown", sanitizedMarkdown);
+          console.log("sanitizedHtml", sanitizedHtml);
 
           yield* db.transaction(
             Effect.gen(function* () {
