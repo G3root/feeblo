@@ -7,60 +7,169 @@ import {
 } from "@feeblo/utils/reaction";
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
+import { createContext, type ReactNode, use, useState } from "react";
 
-type ReactionPickerProps = {
-  disabled?: boolean;
-  onSelect: (emoji: ReactionEmoji) => void;
-  existingReactions?: Set<ReactionEmoji>;
-  label?: string;
+type ReactionPickerState = {
+  disabled: boolean;
+  open: boolean;
+  selectedReactions: Set<ReactionEmoji>;
 };
 
-export function ReactionPicker({
+type ReactionPickerActions = {
+  onSelect: (emoji: ReactionEmoji) => void;
+  setOpen: (open: boolean) => void;
+};
+
+type ReactionPickerMeta = {
+  label: string;
+};
+
+type ReactionPickerContextValue = {
+  actions: ReactionPickerActions;
+  meta: ReactionPickerMeta;
+  state: ReactionPickerState;
+};
+
+const ReactionPickerContext =
+  createContext<ReactionPickerContextValue | null>(null);
+
+function useReactionPicker() {
+  const value = use(ReactionPickerContext);
+
+  if (!value) {
+    throw new Error("ReactionPicker components must be used within Provider.");
+  }
+
+  return value;
+}
+
+type ReactionPickerProviderProps = {
+  children?: ReactNode;
+  disabled?: boolean;
+  existingReactions?: Set<ReactionEmoji>;
+  label?: string;
+  onSelect: (emoji: ReactionEmoji) => void;
+};
+
+type ReactionPickerRootProps = ReactionPickerProviderProps & {
+  children?: never;
+};
+
+function ReactionPickerProvider({
+  children,
   disabled = false,
   existingReactions,
-  onSelect,
   label = "Add reaction",
-}: ReactionPickerProps) {
+  onSelect,
+}: ReactionPickerProviderProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <Popover onOpenChange={setOpen} open={open}>
-      <PopoverTrigger
-        render={
-          <Button
-            aria-label={label}
-            className="rounded-full"
-            disabled={disabled}
-            size="icon-sm"
-            variant="ghost"
-          >
-            <HugeiconsIcon icon={SmileIcon} />
-          </Button>
-        }
-      />
-      <PopoverContent className="w-auto p-1" sideOffset={4}>
-        <div className="grid grid-cols-4 gap-1">
-          {REACTION_EMOJIS.map((emoji) => {
-            const isSelected = existingReactions?.has(emoji) ?? false;
-            return (
-              <Button
-                disabled={disabled}
-                key={emoji}
-                onClick={() => {
-                  setOpen(false);
-                  onSelect(emoji);
-                }}
-                size="icon-sm"
-                type="button"
-                variant={isSelected ? "secondary" : "ghost"}
-              >
-                {getReactionEmoji(emoji)}
-              </Button>
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
+    <ReactionPickerContext
+      value={{
+        actions: { onSelect, setOpen },
+        meta: { label },
+        state: {
+          disabled,
+          open,
+          selectedReactions: existingReactions ?? new Set(),
+        },
+      }}
+    >
+      <Popover onOpenChange={setOpen} open={open}>
+        {children}
+      </Popover>
+    </ReactionPickerContext>
   );
 }
+
+function ReactionPickerTrigger() {
+  const { meta, state } = useReactionPicker();
+
+  return (
+    <PopoverTrigger
+      render={
+        <Button
+          aria-label={meta.label}
+          className="rounded-full"
+          disabled={state.disabled}
+          size="icon-sm"
+          variant="ghost"
+        >
+          <HugeiconsIcon icon={SmileIcon} />
+        </Button>
+      }
+    />
+  );
+}
+
+function ReactionPickerGrid() {
+  const { actions, state } = useReactionPicker();
+
+  return (
+    <PopoverContent className="w-auto p-1" sideOffset={4}>
+      <div className="grid grid-cols-4 gap-1">
+        {REACTION_EMOJIS.map((emoji) => {
+          const isSelected = state.selectedReactions.has(emoji);
+          return (
+            <Button
+              disabled={state.disabled}
+              key={emoji}
+              onClick={() => {
+                actions.setOpen(false);
+                actions.onSelect(emoji);
+              }}
+              size="icon-sm"
+              type="button"
+              variant={isSelected ? "secondary" : "ghost"}
+            >
+              {getReactionEmoji(emoji)}
+            </Button>
+          );
+        })}
+      </div>
+    </PopoverContent>
+  );
+}
+
+function ReactionPickerDisplayRow() {
+  const { actions, state } = useReactionPicker();
+
+  return (
+    <div className="flex flex-row gap-1">
+      {REACTION_EMOJIS.map((emoji) => {
+        const isSelected = state.selectedReactions.has(emoji);
+        return (
+          <Button
+            disabled={state.disabled}
+            key={emoji}
+            onClick={() => {
+              actions.onSelect(emoji);
+            }}
+            size="icon-sm"
+            type="button"
+            variant={isSelected ? "secondary" : "ghost"}
+          >
+            {getReactionEmoji(emoji)}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ReactionPickerComponent(props: ReactionPickerRootProps) {
+  return (
+    <ReactionPickerProvider {...props}>
+      <ReactionPickerTrigger />
+      <ReactionPickerGrid />
+    </ReactionPickerProvider>
+  );
+}
+
+export const ReactionPicker = Object.assign(ReactionPickerComponent, {
+  Grid: ReactionPickerGrid,
+  Provider: ReactionPickerProvider,
+  displayRow: ReactionPickerDisplayRow,
+  Trigger: ReactionPickerTrigger,
+});
