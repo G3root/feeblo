@@ -26,6 +26,8 @@ const SAMPLE_REACTIONS = new Map<ReactionEmoji, { count: number }>([
   ["party_popper", { count: 1 }],
 ]);
 
+const noopReply = async () => {};
+
 export function Default() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-8">
@@ -36,7 +38,7 @@ export function Default() {
           content={SAMPLE_HTML}
           createdAt={new Date(Date.now() - 1000 * 60 * 30)}
           onDelete={() => {}}
-          onReply={() => {}}
+          onReply={noopReply}
           onToggleReaction={() => {}}
           reactionList={new Map()}
           selectedReactions={new Set()}
@@ -57,7 +59,7 @@ export function InternalNote() {
           createdAt={new Date(Date.now() - 1000 * 60 * 60)}
           isInternal
           onDelete={() => {}}
-          onReply={() => {}}
+          onReply={noopReply}
           onToggleReaction={() => {}}
           reactionList={new Map()}
           selectedReactions={new Set()}
@@ -87,7 +89,10 @@ export function AsAuthor() {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Edit comment");
           }}
-          onReply={() => {}}
+          onReply={async ({ content, isPrivate }) => {
+            // biome-ignore lint/suspicious/noConsole: story demo
+            console.log("Reply", { content, isPrivate });
+          }}
           onToggleReaction={() => {}}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
           reactionList={SAMPLE_REACTIONS}
@@ -110,7 +115,7 @@ export function WithReactions() {
           content={SAMPLE_HTML}
           createdAt={new Date(Date.now() - 1000 * 60 * 60 * 3)}
           onDelete={() => {}}
-          onReply={() => {}}
+          onReply={noopReply}
           onToggleReaction={(emoji) => {
             setSelected((prev) => {
               const next = new Set(prev);
@@ -141,7 +146,7 @@ export function Disabled() {
           createdAt={new Date(Date.now() - 1000 * 60 * 60 * 12)}
           disabled
           onDelete={() => {}}
-          onReply={() => {}}
+          onReply={noopReply}
           onToggleReaction={() => {}}
           reactionList={SAMPLE_REACTIONS}
           selectedReactions={new Set()}
@@ -172,7 +177,10 @@ export function Composed() {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Edit comment");
           }}
-          onReply={() => {}}
+          onReply={async ({ content, isPrivate }) => {
+            // biome-ignore lint/suspicious/noConsole: story demo
+            console.log("Reply", { content, isPrivate });
+          }}
           onToggleReaction={(emoji) => {
             setSelected((prev) => {
               const next = new Set(prev);
@@ -198,7 +206,6 @@ export function Composed() {
                 </div>
                 <CommentDisplay.Body />
                 <CommentDisplay.Actions />
-                <CommentDisplay.Reactions />
               </div>
             </div>
           </div>
@@ -274,7 +281,13 @@ export function TimelineComposition() {
                     // biome-ignore lint/suspicious/noConsole: story demo
                     console.log(`Edit ${comment.commentId}`);
                   }}
-                  onReply={() => {}}
+                  onReply={async ({ content, isPrivate }) => {
+                    // biome-ignore lint/suspicious/noConsole: story demo
+                    console.log(`Reply to ${comment.commentId}`, {
+                      content,
+                      isPrivate,
+                    });
+                  }}
                   onToggleReaction={(emoji) => {
                     setSelected((prev) => {
                       const next = new Set(prev);

@@ -6,20 +6,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
-import {
-  getReactionEmoji,
-  type ReactionEmoji,
-} from "@feeblo/utils/reaction";
+import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import {
   Delete02Icon,
   Edit01Icon,
   Ellipsis,
   EyeIcon,
-  MailReply01Icon,
   ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { createContext, type ReactNode, use } from "react";
+import { createContext, type ReactNode, use, useState } from "react";
+import { CommentComposer } from "./comment-composer";
 import { ReactionPicker } from "./reaction-picker";
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
@@ -74,7 +71,10 @@ type CommentDisplayState = {
 type CommentDisplayActions = {
   onDelete: () => void;
   onEdit: () => void;
-  onReply: () => void;
+  onReply: (value: {
+    content: string;
+    isPrivate: boolean;
+  }) => void | Promise<void>;
   onToggleReaction: (emoji: ReactionEmoji) => void;
   onToggleVisibility: () => void;
 };
@@ -126,7 +126,10 @@ type CommentDisplayProviderProps = {
   isInternal?: boolean;
   onDelete: () => void;
   onEdit?: () => void;
-  onReply: () => void;
+  onReply: (value: {
+    content: string;
+    isPrivate: boolean;
+  }) => void | Promise<void>;
   onToggleReaction: (emoji: ReactionEmoji) => void;
   onToggleVisibility?: () => void;
   reactionList: Map<ReactionEmoji, { count: number }>;
@@ -234,30 +237,47 @@ function CommentDisplayBody() {
 
 function CommentDisplayActions() {
   const { actions, meta, state, reactions } = useCommentDisplay();
+  const [isReplying, setIsReplying] = useState(false);
 
   return (
-    <div className="flex items-center gap-1 pt-2">
-      <Button
-        disabled={state.disabled}
-        onClick={actions.onReply}
-        size="sm"
-        type="button"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={MailReply01Icon} />
-        {meta.replyLabel}
-      </Button>
+    <>
+      <div className="flex items-center gap-1 pt-2">
+        {/* <Button
+          disabled={state.disabled}
+          onClick={() => setIsReplying((prev) => !prev)}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
+          <HugeiconsIcon icon={MailReply01Icon} />
+          {isReplying ? "Hide reply" : meta.replyLabel}
+        </Button> */}
 
-      <ReactionPicker.Provider
-        disabled={state.disabled}
-        existingReactions={reactions.selectedReactions}
-        onToggle={actions.onToggleReaction}
-        reactionList={reactions.reactionList}
-      >
-        <ReactionPicker.Trigger />
-        <ReactionPicker.Grid />
-      </ReactionPicker.Provider>
-    </div>
+        <ReactionPicker.Provider
+          disabled={state.disabled}
+          existingReactions={reactions.selectedReactions}
+          onToggle={actions.onToggleReaction}
+          reactionList={reactions.reactionList}
+        >
+          <div className="flex items-center gap-1">
+            <ReactionPicker.displayRow />
+            <ReactionPicker.Trigger />
+          </div>
+          <ReactionPicker.Grid />
+        </ReactionPicker.Provider>
+      </div>
+
+      {isReplying && (
+        <div className="pt-2">
+          <CommentComposer
+            onSubmit={async (value) => {
+              await actions.onReply(value);
+              setIsReplying(false);
+            }}
+          />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -279,9 +299,7 @@ function CommentDisplayDropdown() {
           {meta.editLabel}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={actions.onToggleVisibility}>
-          <HugeiconsIcon
-            icon={state.isInternal ? EyeIcon : ViewOffIcon}
-          />
+          <HugeiconsIcon icon={state.isInternal ? EyeIcon : ViewOffIcon} />
           {state.isInternal
             ? meta.toggleToPublicLabel
             : meta.toggleToInternalLabel}
@@ -295,40 +313,7 @@ function CommentDisplayDropdown() {
   );
 }
 
-function CommentDisplayReactions() {
-  const { actions, reactions, state } = useCommentDisplay();
-
-  if (reactions.reactionList.size === 0) {
-    return null;
-  }
-
-  return (
-    <div className="flex flex-row gap-1 pt-1">
-      {Array.from(reactions.reactionList.entries()).map(([emoji, { count }]) => {
-        const isSelected = reactions.selectedReactions.has(emoji);
-        return (
-          <Button
-            className="flex flex-row items-center gap-1"
-            disabled={state.disabled}
-            key={emoji}
-            onClick={() => actions.onToggleReaction(emoji)}
-            size="sm"
-            type="button"
-            variant={isSelected ? "secondary" : "ghost"}
-          >
-            <span>{getReactionEmoji(emoji)}</span>
-            <span className="text-xs">{count}</span>
-          </Button>
-        );
-      })}
-    </div>
-  );
-}
-
-type CommentDisplayRootProps = Omit<
-  CommentDisplayProviderProps,
-  "children"
-> & {
+type CommentDisplayRootProps = Omit<CommentDisplayProviderProps, "children"> & {
   children?: never;
 };
 
@@ -351,7 +336,6 @@ function CommentDisplayComponent(props: CommentDisplayRootProps) {
             </div>
             <CommentDisplayBody />
             <CommentDisplayActions />
-            <CommentDisplayReactions />
           </div>
         </div>
       </div>
@@ -366,5 +350,4 @@ export const CommentDisplay = Object.assign(CommentDisplayComponent, {
   Dropdown: CommentDisplayDropdown,
   Header: CommentDisplayHeader,
   Provider: CommentDisplayProvider,
-  Reactions: CommentDisplayReactions,
 });
