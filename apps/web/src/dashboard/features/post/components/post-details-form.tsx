@@ -1,23 +1,15 @@
-import { Separator } from "@feeblo/ui/separator";
-import { Skeleton } from "@feeblo/ui/skeleton";
-import { toastManager } from "@feeblo/ui/toast";
-import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
-import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-import { z } from "zod";
-import {
-  anyPolicy,
-  hasOwnerOrAdminRole,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
-import { fetchRpc } from "~/lib/runtime";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { PostCommentComposer } from "@feeblo/post-ui/post-comment-composer";
-import { PostCommentList, PostCommentListSkeleton } from "@feeblo/post-ui/post-comment-list";
+import {
+  PostCommentList,
+  PostCommentListSkeleton,
+} from "@feeblo/post-ui/post-comment-list";
 import { PostEditableContent } from "@feeblo/post-ui/post-content";
 import { PostDetailsEngagementBar } from "@feeblo/post-ui/post-engagement-bar";
-import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
+import { PostTitleUpdateInput } from "@feeblo/post-ui/post-title-input";
+import { Separator } from "@feeblo/ui/separator";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 function PostDetailsLayout({ children }: { children: ReactNode }) {
   return (
@@ -26,15 +18,6 @@ function PostDetailsLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-const UpdatedPostSchema = z.object({
-  id: z.string(),
-  statusId: z.string(),
-  content: z.string(),
-  title: z.string(),
-  boardId: z.string(),
-  organizationId: z.string(),
-});
 
 function PostDetailsHeader({
   boardName,
@@ -51,38 +34,6 @@ function PostDetailsHeader({
   postId: string;
   postCreatorId: string | null;
 }) {
-  const { postCollection } = useDashboardCollections();
-  const { allowed: isOwner } = usePolicy(
-    anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
-  );
-
-  const mutate = usePacedMutations<{ value: string }>({
-    onMutate: ({ value }) => {
-      // Apply optimistic update immediately
-      postCollection.update(postId, (draft) => {
-        draft.title = value;
-      });
-    },
-    mutationFn: async ({ transaction }) => {
-      // Persist the final merged state to the backend
-      const mutation = transaction.mutations[0];
-      const { modified: updatedPost } = mutation;
-      const validatedPost = UpdatedPostSchema.parse(updatedPost);
-      await fetchRpc((rpc) => rpc.PostUpdate(validatedPost));
-    },
-    // Wait 500ms after the last change before persisting
-    strategy: debounceStrategy({ wait: 500 }),
-  });
-
-  const handleChange = (value: string) => {
-    // Multiple rapid changes merge into a single transaction
-
-    if (value.trim() === "") {
-      toastManager.add({ title: "Title is required", type: "error" });
-      return;
-    }
-    mutate({ value });
-  };
   return (
     <div className="space-y-3">
       <Link
@@ -93,10 +44,10 @@ function PostDetailsHeader({
         Back to {boardName}
       </Link>
 
-      <PostTitleInput
+      <PostTitleUpdateInput
         defaultValue={title}
-        onChange={isOwner ? (e) => handleChange(e.target.value) : undefined}
-        readOnly={!isOwner}
+        postCreatorId={postCreatorId}
+        postId={postId}
       />
     </div>
   );
