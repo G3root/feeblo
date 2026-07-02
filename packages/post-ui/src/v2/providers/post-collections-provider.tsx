@@ -1,12 +1,13 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
+import type { TComment } from "@feeblo/domain/comments/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { Collection } from "@tanstack/react-db";
 import { createContext, useContext } from "react";
 
-//Todo fix the type error later
-export interface PostCreateCollections {
+export interface PostCollections {
   boardCollection: Collection<TBoard, string, any, any>;
+  commentCollection: Collection<TComment, string, any, any>;
   membersCollection?: Collection<
     { id: string; organizationId: string; userId: string },
     string,
@@ -17,38 +18,35 @@ export interface PostCreateCollections {
   postStatusCollection: Collection<TPostStatus, string, any, any>;
 }
 
-export interface PostCreateCollectionsValue {
-  collections: PostCreateCollections;
+export interface PostCollectionsValue {
+  collections: PostCollections;
   organizationId: string;
 }
 
-const PostCreateCollectionsContext =
-  createContext<PostCreateCollectionsValue | null>(null);
+const PostCollectionsContext = createContext<PostCollectionsValue | null>(null);
 
-export function usePostCreateCollections() {
-  const ctx = useContext(PostCreateCollectionsContext);
+export function usePostCollections() {
+  const ctx = useContext(PostCollectionsContext);
   if (!ctx) {
     throw new Error(
-      "usePostCreateCollections must be used within PostCreateCollectionsProvider"
+      "usePostCollections must be used within PostCollectionsProvider"
     );
   }
   return ctx;
 }
 
-export function PostCreateCollectionsProvider({
+export function PostCollectionsProvider({
   children,
   collections,
   organizationId,
 }: {
   children: React.ReactNode;
-  collections: PostCreateCollections;
+  collections: PostCollections;
   organizationId: string;
 }) {
   return (
-    <PostCreateCollectionsContext.Provider
-      value={{ collections, organizationId }}
-    >
+    <PostCollectionsContext.Provider value={{ collections, organizationId }}>
       {children}
-    </PostCreateCollectionsContext.Provider>
+    </PostCollectionsContext.Provider>
   );
 }

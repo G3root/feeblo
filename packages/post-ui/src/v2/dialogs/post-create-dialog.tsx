@@ -21,7 +21,6 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useState } from "react";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
-import { usePostCreateCollections } from "../dialog-stores/post-create-collections-context";
 import {
   PostBoardField,
   PostContentField,
@@ -30,9 +29,10 @@ import {
   PostTitleField,
   postCreateFormOpts,
 } from "../forms/post-create-form-shared";
+import { usePostCollections } from "../providers/post-collections-provider";
 
-export type { PostCreateCollections } from "../dialog-stores/post-create-collections-context";
-export { PostCreateCollectionsProvider } from "../dialog-stores/post-create-collections-context";
+export type { PostCollections } from "../providers/post-collections-provider";
+export { PostCollectionsProvider } from "../providers/post-collections-provider";
 
 export function PostCreateDialog() {
   const store = usePostCreateDialogContext();
@@ -59,7 +59,7 @@ export function PostCreateDialog() {
 
 function PostCreateForm() {
   const store = usePostCreateDialogContext();
-  const { collections, organizationId } = usePostCreateCollections();
+  const { collections, organizationId } = usePostCollections();
   const {
     boardCollection,
     membersCollection,

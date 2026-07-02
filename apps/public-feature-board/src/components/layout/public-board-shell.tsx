@@ -1,5 +1,5 @@
-import type { PostCreateCollections } from "@feeblo/post-ui/post-create-collections-context";
-import { PostCreateCollectionsProvider } from "@feeblo/post-ui/post-create-collections-context";
+import type { PostCollections } from "@feeblo/post-ui/post-collections-provider";
+import { PostCollectionsProvider } from "@feeblo/post-ui/post-collections-provider";
 import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
 import { PostCreateDialogProvider } from "@feeblo/post-ui/post-dialog-stores";
 import type { ReactNode } from "react";
@@ -16,17 +16,17 @@ import { PoweredByTag } from "./powered-by-tag";
 export function PublicBoardShell({ children }: { children: ReactNode }) {
   const site = useSite();
 
-  const collections: PostCreateCollections = {
+  const collections: PostCollections = {
     boardCollection:
-      publicBoardCollection as PostCreateCollections["boardCollection"],
+      publicBoardCollection as PostCollections["boardCollection"],
     postCollection:
-      publicPostCollection as PostCreateCollections["postCollection"],
+      publicPostCollection as PostCollections["postCollection"],
     postStatusCollection:
-      publicPostStatusCollection as PostCreateCollections["postStatusCollection"],
+      publicPostStatusCollection as PostCollections["postStatusCollection"],
   };
 
   return (
-    <PostCreateCollectionsProvider
+    <PostCollectionsProvider
       collections={collections}
       organizationId={site.organizationId}
     >
@@ -39,6 +39,6 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
           {site.hidePoweredBy ? null : <PoweredByTag />}
         </div>
       </PostCreateDialogProvider>
-    </PostCreateCollectionsProvider>
+    </PostCollectionsProvider>
   );
 }

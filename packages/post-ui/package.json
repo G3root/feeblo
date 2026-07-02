@@ -20,9 +20,17 @@
       "types": "./src/v2/dialogs/post-create-dialog.tsx",
       "default": "./src/v2/dialogs/post-create-dialog.tsx"
     },
-    "./post-create-collections-context": {
-      "types": "./src/v2/dialog-stores/post-create-collections-context.tsx",
-      "default": "./src/v2/dialog-stores/post-create-collections-context.tsx"
+    "./post-delete-dialog": {
+      "types": "./src/v2/dialogs/post-delete-dialog.tsx",
+      "default": "./src/v2/dialogs/post-delete-dialog.tsx"
+    },
+    "./comment-delete-dialog": {
+      "types": "./src/v2/dialogs/comment-delete-dialog.tsx",
+      "default": "./src/v2/dialogs/comment-delete-dialog.tsx"
+    },
+    "./post-collections-provider": {
+      "types": "./src/v2/providers/post-collections-provider.tsx",
+      "default": "./src/v2/providers/post-collections-provider.tsx"
     },
     "./post-dialog-stores": {
       "types": "./src/v2/dialog-stores/post.ts",
