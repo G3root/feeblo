@@ -7,22 +7,17 @@ export default {
 };
 
 export function Default() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="w-full max-w-xl">
         <CommentComposer
-          isSubmitting={isSubmitting}
           onSubmit={async ({ content, isPrivate }) => {
-            setIsSubmitting(true);
             await new Promise((resolve) => setTimeout(resolve, 1000));
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log({
               content,
               isPrivate: isPrivate ? "Internal" : "Public",
             });
-            setIsSubmitting(false);
           }}
         />
       </div>
@@ -111,17 +106,17 @@ export function ControlledState() {
 export function Composed() {
   const [content, setContent] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
 
   const handleSubmit = async () => {
-    setIsSubmitting(true);
     await new Promise((resolve) => setTimeout(resolve, 1000));
     // biome-ignore lint/suspicious/noConsole: story demo
     console.log({
       content,
       isPrivate: isPrivate ? "Internal" : "Public",
     });
-    setIsSubmitting(false);
+    setResetKey((k) => k + 1);
+    setContent("");
   };
 
   return (
@@ -130,10 +125,10 @@ export function Composed() {
         <CommentComposer.Provider
           content={content}
           isPrivate={isPrivate}
-          isSubmitting={isSubmitting}
           onContentChange={(c) => setContent(c)}
           onSubmit={handleSubmit}
           onVisibilityChange={(checked) => setIsPrivate(checked)}
+          resetKey={resetKey}
         >
           <div className="rounded-md border p-3">
             <CommentComposer.Editor />

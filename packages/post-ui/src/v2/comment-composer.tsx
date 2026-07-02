@@ -9,8 +9,8 @@ type CommentComposerState = {
   content: string;
   disabled: boolean;
   isPrivate: boolean;
-  isSubmitting: boolean;
   placeholder: string;
+  resetKey: number;
 };
 
 type CommentComposerActions = {
@@ -48,13 +48,13 @@ type CommentComposerProviderProps = {
   content?: string;
   disabled?: boolean;
   isPrivate?: boolean;
-  isSubmitting?: boolean;
   onContentChange?: (content: string) => void;
   onSubmit: () => void;
   onVisibilityChange?: (isPrivate: boolean) => void;
   placeholder?: string;
   privateLabel?: string;
   publicLabel?: string;
+  resetKey?: number;
 };
 
 function CommentComposerProvider({
@@ -62,13 +62,13 @@ function CommentComposerProvider({
   content = "",
   disabled = false,
   isPrivate = false,
-  isSubmitting = false,
   onContentChange,
   onSubmit,
   onVisibilityChange,
   placeholder,
   privateLabel = "Internal",
   publicLabel = "Public",
+  resetKey = 0,
 }: CommentComposerProviderProps) {
   return (
     <CommentComposerContext
@@ -83,10 +83,10 @@ function CommentComposerProvider({
           content,
           disabled,
           isPrivate,
-          isSubmitting,
           placeholder:
             placeholder ??
             (isPrivate ? "Add an internal note..." : "Add a comment..."),
+          resetKey,
         },
       }}
     >
@@ -99,7 +99,7 @@ function CommentComposerEditor() {
   const { actions, state } = useCommentComposer();
 
   return (
-    <EditorProvider>
+    <EditorProvider key={state.resetKey}>
       <Editor
         onChange={(doc) => actions.onContentChange(doc)}
         placeholder={state.placeholder}
@@ -116,7 +116,7 @@ function CommentComposerSubmit() {
     <div className="flex items-center justify-end pt-2">
       <ButtonGroup>
         <Button
-          disabled={state.disabled || state.isSubmitting || !state.content}
+          disabled={state.disabled || !state.content}
           onClick={actions.onSubmit}
           size="sm"
           type="button"
@@ -150,7 +150,6 @@ type CommentComposerRootProps = {
   content?: string;
   disabled?: boolean;
   isPrivate?: boolean;
-  isSubmitting?: boolean;
   onContentChange?: (content: string) => void;
   onSubmit: (value: {
     content: string;
@@ -166,7 +165,6 @@ function CommentComposerComponent({
   content: externalContent,
   disabled,
   isPrivate: externalIsPrivate,
-  isSubmitting,
   onContentChange: externalOnContentChange,
   onSubmit,
   onVisibilityChange: externalOnVisibilityChange,
@@ -178,6 +176,7 @@ function CommentComposerComponent({
   const [internalIsPrivate, setInternalIsPrivate] = useState(
     externalIsPrivate ?? false
   );
+  const [resetKey, setResetKey] = useState(0);
 
   const isContentControlled = externalContent !== undefined;
   const isVisibilityControlled = externalIsPrivate !== undefined;
@@ -205,6 +204,7 @@ function CommentComposerComponent({
 
   const handleSubmit = async () => {
     await onSubmit({ content, isPrivate });
+    setResetKey((k) => k + 1);
     if (!isContentControlled) {
       setInternalContent("");
     }
@@ -215,13 +215,13 @@ function CommentComposerComponent({
       content={content}
       disabled={disabled}
       isPrivate={isPrivate}
-      isSubmitting={isSubmitting}
       onContentChange={handleContentChange}
       onSubmit={handleSubmit}
       onVisibilityChange={handleVisibilityChange}
       placeholder={placeholder}
       privateLabel={privateLabel}
       publicLabel={publicLabel}
+      resetKey={resetKey}
     >
       <div className="rounded-md border border-border p-3">
         <CommentComposerEditor />
