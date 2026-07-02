@@ -82,7 +82,9 @@
     }
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "ladle": "ladle serve",
+    "ladle:build": "ladle build"
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
@@ -99,9 +101,14 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@egoist/tailwindcss-icons": "^1.9.2",
     "@feeblo/config": "workspace:*",
+    "@ladle/react": "^5.1.1",
+    "@tailwindcss/vite": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "tw-animate-css": "catalog:",
     "typescript": "catalog:"
   }
 }
