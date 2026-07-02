@@ -23,7 +23,7 @@ import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
-import { authClient } from "@feeblo/web-shared/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { useStore } from "@nanostores/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useRef, useState } from "react";
@@ -73,7 +73,7 @@ function PostCreateForm({
   onComplete: () => void;
 }) {
   const site = useSite();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const {
     publicBoardCollection,
     publicPostCollection,

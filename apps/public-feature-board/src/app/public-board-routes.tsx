@@ -1,3 +1,4 @@
+import { initAuthStateCache } from "@feeblo/web-shared/auth-client";
 import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
 import { PublicBoardShell } from "../components/layout/public-board-shell";
 import {
@@ -11,6 +12,7 @@ import {
 import { NotFoundPage } from "../routes/not-found-page";
 
 const rootRoute = createRootRoute({
+  beforeLoad: () => initAuthStateCache(),
   component: () => (
     <PublicBoardShell>
       <Outlet />

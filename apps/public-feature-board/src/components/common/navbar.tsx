@@ -1,6 +1,7 @@
 import { Button } from "@feeblo/ui/button";
 import { cn } from "@feeblo/ui/utils";
 import { authClient } from "@feeblo/web-shared/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Link, useLocation } from "@tanstack/react-router";
 import { useSite } from "../../providers/site-provider";
 import { AuthDialog } from "./auth-dialog";
@@ -70,7 +71,7 @@ function NavTab({ href, label }: { href: string; label: string }) {
 }
 
 function UserActions() {
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   return (
     <div className="flex items-center gap-2">
       {session ? (

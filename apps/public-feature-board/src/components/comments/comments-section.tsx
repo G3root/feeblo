@@ -6,7 +6,7 @@ import {
   ItemDescription,
   ItemTitle,
 } from "@feeblo/ui/item";
-import { authClient } from "@feeblo/web-shared/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
@@ -15,7 +15,7 @@ import { AuthDialog } from "../common/auth-dialog";
 export function CommentsSection({ postId }: { postId: string }) {
   const site = useSite();
   const { publicCommentCollection } = usePublicCollections();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const commentsQuery = useLiveQuery(
     (q) =>
       q
@@ -60,7 +60,7 @@ export function CommentsSection({ postId }: { postId: string }) {
 }
 
 function NonAuthenticatedCommentsSection() {
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   if (session) {
     return null;
   }

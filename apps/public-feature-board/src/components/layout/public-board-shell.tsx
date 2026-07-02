@@ -1,3 +1,4 @@
+import { PostCreateDialogProvider } from "@feeblo/post-ui/post-dialog-stores";
 import type { ReactNode } from "react";
 import { useSite } from "../../providers/site-provider";
 import { AuthDialogRoot } from "../common/auth-dialog";
@@ -9,12 +10,14 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
   const site = useSite();
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
-      <Navbar />
-      <main className="min-h-0 flex-1">{children}</main>
-      <AuthDialogRoot />
-      <PostCreateDialog />
-      {site.hidePoweredBy ? null : <PoweredByTag />}
-    </div>
+    <PostCreateDialogProvider>
+      <div className="flex min-h-dvh flex-col bg-background text-foreground">
+        <Navbar />
+        <main className="min-h-0 flex-1">{children}</main>
+        <AuthDialogRoot />
+        <PostCreateDialog />
+        {site.hidePoweredBy ? null : <PoweredByTag />}
+      </div>
+    </PostCreateDialogProvider>
   );
 }

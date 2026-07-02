@@ -26,12 +26,12 @@ import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
-import { authClient } from "@feeblo/web-shared/auth-client";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
 } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,
@@ -127,7 +127,7 @@ export const Route = createLazyRoute("/p/$slug")({
 
 export function PostPage() {
   const site = useSite();
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const navigate = useNavigate();
   const { slug } = useParams({ from: "/p/$slug" });
   const {
@@ -744,7 +744,7 @@ function PostReactionBar({
   organizationId: string;
   postId: string;
 }) {
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const { publicPostReactionCollection } = usePublicCollections();
   const { data: postReactions } = useLiveQuery(
     (q) =>

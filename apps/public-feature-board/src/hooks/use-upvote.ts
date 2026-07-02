@@ -1,8 +1,8 @@
 import { type LegidOf, UpvoteId } from "@feeblo/id";
 import { toastManager } from "@feeblo/ui/toast";
-import { authClient } from "@feeblo/web-shared/auth-client";
 import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { createOptimisticAction } from "@tanstack/react-db";
 import { usePublicCollections } from "../providers/public-collections-provider";
 
@@ -13,7 +13,7 @@ type SessionMembership = {
 };
 
 export function useUpvote() {
-  const { data: session } = authClient.useSession();
+  const { data: session } = useAuthState();
   const { publicPostCollection, publicUpvoteCollection } =
     usePublicCollections();
 
