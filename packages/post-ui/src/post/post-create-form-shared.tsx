@@ -1,15 +1,12 @@
-import type { PostStatus } from "@feeblo/domain/post-status/schema";
-import { Editor, type EditorProps } from "@feeblo/ui/editor";
+import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import { Editor, type EditorProps, EditorProvider } from "@feeblo/ui/editor";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Label } from "@feeblo/ui/label";
 import { Switch } from "@feeblo/ui/switch";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 import { PostBoardSelect } from "./post-board-select";
-import {
-  isRichTextContentEmpty,
-  uploadPostEditorImage,
-} from "./post-editor-utils";
+import { isRichTextContentEmpty } from "./post-editor-utils";
 import { StatusSelect } from "./post-properties";
 import { PostTitleInput } from "./post-title-input";
 
@@ -63,14 +60,13 @@ export const PostContentField = withForm({
     return (
       <form.AppField name="content">
         {(field) => (
-          <Editor
-            content={field.state.value}
-            editable
-            onUpdate={(ref) => field.handleChange(ref.editor?.getHTML() ?? "")}
-            onUploadImage={uploadPostEditorImage}
-            placeholder="Type '/' for commands or start typing a description..."
-            {...rest}
-          />
+          <EditorProvider defaultValue={{ postContent: field.state.value }}>
+            <Editor
+              onChange={(doc) => field.handleChange(doc)}
+              placeholder="Type '/' for commands or start typing a description..."
+              {...rest}
+            />
+          </EditorProvider>
         )}
       </form.AppField>
     );
@@ -105,7 +101,7 @@ export const PostBoardField = withForm({
 export const PostStatusField = withForm({
   ...postCreateFormOpts,
   props: {} as {
-    statuses: Pick<PostStatus, "id" | "type">[];
+    statuses: Pick<TPostStatus, "id" | "type">[];
   },
   render: ({ form, statuses }) => {
     return (

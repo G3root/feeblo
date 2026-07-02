@@ -1,6 +1,4 @@
-import { Button } from "@feeblo/ui/button";
-import { Editor, type EmailEditorRef } from "@feeblo/ui/editor";
-import { htmlToExcerpt } from "@feeblo/utils/html";
+import { Editor, type EditorProps, EditorProvider } from "@feeblo/ui/editor";
 import { useDashboardCollections } from "@feeblo/web-shared/dashboard-collections-provider";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import {
@@ -9,12 +7,8 @@ import {
   isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
-import { Image01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
-import { useRef } from "react";
 import { z } from "zod";
-import { uploadPostEditorImage } from "./post-editor-utils";
 
 const UpdatedPostSchema = z.object({
   id: z.string(),
@@ -25,50 +19,53 @@ const UpdatedPostSchema = z.object({
   organizationId: z.string(),
 });
 
-export function PostContentEditor({
-  disabled = false,
-  onChange,
-  value,
-}: {
-  disabled?: boolean;
+interface PostContentEditorProps extends EditorProps {
   onChange: (value: string) => void;
   value: string;
-}) {
-  const editorRef = useRef<EmailEditorRef | null>(null);
-  const initialValue = useRef(value);
+}
 
+export function PostContentEditor({
+  onChange,
+  value,
+  readOnly,
+  ...rest
+}: PostContentEditorProps) {
   return (
     <div className="space-y-3">
-      <Editor
-        className="min-h-24"
-        content={initialValue.current}
-        editable={!disabled}
-        onUpdate={(ref) => onChange(ref.editor?.getHTML() ?? "")}
-        onUploadImage={uploadPostEditorImage}
-        placeholder="Add description..."
-        ref={editorRef}
-      />
-      {disabled ? null : (
-        <div className="flex justify-end">
-          <Button
-            className="rounded-full"
-            onClick={() => {
-              editorRef.current?.editor?.commands.focus();
-              (
-                editorRef.current?.editor?.commands as {
-                  uploadImage?: () => boolean;
-                }
-              )?.uploadImage?.();
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={Image01Icon} strokeWidth={2} />
-            <span>Add image</span>
-          </Button>
-        </div>
-      )}
+      <EditorProvider defaultValue={{ postContent: value }}>
+        <Editor
+          onChange={(doc) => {
+            onChange(doc);
+          }}
+          placeholder="Add description..."
+          readOnly={readOnly}
+          {...rest}
+        />
+      </EditorProvider>
+
+      {
+        //TODO: Add image upload button when editor is not readOnly
+        readOnly ? null : null
+        // <div className="flex justify-end">
+        //   <Button
+        //     className="rounded-full"
+        //     onClick={() => {
+        //       editorRef.current?.editor?.commands.focus();
+        //       (
+        //         editorRef.current?.editor?.commands as {
+        //           uploadImage?: () => boolean;
+        //         }
+        //       )?.uploadImage?.();
+        //     }}
+        //     size="sm"
+        //     type="button"
+        //     variant="outline"
+        //   >
+        //     <HugeiconsIcon icon={Image01Icon} strokeWidth={2} />
+        //     <span>Add image</span>
+        //   </Button>
+        // </div>
+      }
     </div>
   );
 }
@@ -88,13 +85,12 @@ export function PostEditableContent({
   const { allowed: isOwner } = usePolicy(
     anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
   );
-  const initialDescription = useRef(description);
 
   const mutate = usePacedMutations<{ value: string }>({
     onMutate: ({ value }) => {
       postCollection.update(postId, (draft) => {
         draft.content = value;
-        draft.excerpt = htmlToExcerpt(value);
+        draft.excerpt = value;
       });
     },
     mutationFn: async ({ transaction }) => {
@@ -107,10 +103,13 @@ export function PostEditableContent({
   });
 
   return (
-    <PostContentEditor
-      disabled={!isOwner}
-      onChange={(value) => mutate({ value })}
-      value={initialDescription.current}
-    />
+    <EditorProvider defaultValue={{ postContent: description }}>
+      <Editor
+        onChange={(doc) => {
+          mutate({ value: doc });
+        }}
+        readOnly={!isOwner}
+      />
+    </EditorProvider>
   );
 }

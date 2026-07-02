@@ -10,16 +10,18 @@
 
 import "prosekit/basic/style.css";
 import "prosekit/basic/typography.css";
+import { markdownToHtml } from "@feeblo/utils/markdown";
 import { createEditor } from "prosekit/core";
 import { ProseKit } from "prosekit/react";
 import { useMemo } from "react";
 import { cn } from "../utils";
 import { useEditorContext } from "./editor-store";
 import { defineExtension } from "./extension";
-import { markdownToHtml } from "@feeblo/utils/markdown";
 import useContentChange from "./hooks/use-content-change";
 import { tags } from "./sample/sample-tag-data";
 import { users } from "./sample/sample-user-data";
+import { BlockHandle } from "./ui/block-handle";
+import { DropIndicator } from "./ui/drop-indicator";
 import { InlineMenu } from "./ui/inline-menu/index";
 import { SlashMenu } from "./ui/slash-menu/index";
 import { TableHandle } from "./ui/table-handle/index";
@@ -30,7 +32,8 @@ export interface EditorProps {
   className?: string;
   onChange?: (doc: string) => void;
   placeholder?: string;
-  readonly?: boolean;
+  readOnly?: boolean;
+  showBlockHandle?: boolean;
 }
 
 export function Editor(props: EditorProps) {
@@ -45,13 +48,13 @@ export function Editor(props: EditorProps) {
   const editor = useMemo(() => {
     const extension = defineExtension({
       placeholder: props.placeholder,
-      readonly: props.readonly,
+      readonly: props.readOnly,
     });
     return createEditor({
       extension,
       ...(defaultContent ? { defaultContent } : {}),
     });
-  }, [props.placeholder, props.readonly, defaultContent]);
+  }, [props.placeholder, props.readOnly, defaultContent]);
 
   useContentChange(editor, props.onChange);
 
@@ -67,9 +70,10 @@ export function Editor(props: EditorProps) {
       <SlashMenu />
       <UserMenu users={users} />
       <TagMenu tags={tags} />
-      {/* <BlockHandle /> */}
+      {props.showBlockHandle ? <BlockHandle /> : null}
+
       <TableHandle />
-      {/* <DropIndicator /> */}
+      <DropIndicator />
     </ProseKit>
   );
 }

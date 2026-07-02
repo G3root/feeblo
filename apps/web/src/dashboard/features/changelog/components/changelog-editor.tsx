@@ -1,3 +1,5 @@
+import { PostContentEditor } from "@feeblo/post-ui/post-content";
+import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
 import {
   DropdownMenu,
@@ -5,7 +7,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
+import {
+  allPolicy,
+  hasMembership,
+  isUser,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
   Delete02Icon,
@@ -15,15 +24,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, use } from "react";
 import { z } from "zod";
-import { PostContentEditor } from "@feeblo/post-ui/post-content";
-import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
-import { useAppForm } from "@feeblo/ui/hooks/form";
-import {
-  allPolicy,
-  hasMembership,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
 import {
@@ -363,13 +363,15 @@ export function ChangelogEditorSubmitAction() {
 export function ChangelogEditorContentField() {
   const { form, formResetKey, isOwner } = useChangelogEditor();
 
+  const isDisabled = !isOwner;
   return (
     <form.Field name="content">
       {(field) => (
         <PostContentEditor
-          disabled={!isOwner}
           key={formResetKey}
           onChange={field.handleChange}
+          readOnly={isDisabled}
+          showBlockHandle={!isDisabled}
           value={field.state.value}
         />
       )}

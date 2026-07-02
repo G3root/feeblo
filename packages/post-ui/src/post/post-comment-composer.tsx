@@ -10,13 +10,13 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
-import type { EmailEditorRef } from "@feeblo/ui/editor";
+import { Editor, EditorProvider } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ArrowDown01Icon, MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { z } from "zod";
 import { isRichTextContentEmpty } from "./post-editor-utils";
 
@@ -66,7 +66,6 @@ export function PostCommentComposer({
   isAuthenticated,
   showVisibilityPicker = false,
 }: PostCommentComposerProps) {
-  const editorRef = useRef<EmailEditorRef | null>(null);
   const [editorKey, setEditorKey] = useState(0);
   const { data: session } = useAuthState();
 
@@ -121,20 +120,16 @@ export function PostCommentComposer({
 
               return (
                 <form.AppField name="content">
-                  {(field) =>
-                    null
-                    // <Editor
-                    //   className="min-w-0 flex-1"
-                    //   content={field.state.value}
-                    //   editable={!disabled}
-                    //   key={visibility + editorKey}
-                    //   onUpdate={(ref) =>
-                    //     field.handleChange(ref.editor?.getHTML() ?? "")
-                    //   }
-                    //   placeholder={selectedCopy.placeholder}
-                    //   ref={editorRef}
-                    // />
-                  }
+                  {(field) => (
+                    <EditorProvider>
+                      <Editor
+                        key={visibility + editorKey}
+                        onChange={(doc) => field.handleChange(doc)}
+                        placeholder={selectedCopy.placeholder}
+                        readOnly={disabled}
+                      />
+                    </EditorProvider>
+                  )}
                 </form.AppField>
               );
             }}

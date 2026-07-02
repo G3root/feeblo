@@ -453,8 +453,8 @@ export function PostPage() {
               </div>
 
               <PostContentEditor
-                disabled={!canEdit}
                 onChange={(value) => contentMutate({ value })}
+                readOnly={!canEdit}
                 value={post.content}
               />
 
