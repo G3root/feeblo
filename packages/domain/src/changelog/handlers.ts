@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
-import { sanitizeRichText } from "../sanitize-html";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -42,13 +42,14 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
           ),
 
       ChangelogCreate: (args: TChangelogCreate) => {
+        const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const isMember = Policy.getMembership(session, args.organizationId);
 
           yield* repository.create({
             ...args,
-            content: sanitizeRichText(args.content),
+            content: sanitizedMarkdown,
             creatorId: session.session.userId,
             ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
           });
@@ -72,13 +73,14 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
           withRemapDbErrors("Changelog", "delete")
         ),
 
-      ChangelogUpdate: (args: TChangelogUpdate) =>
-        repository
+      ChangelogUpdate: (args: TChangelogUpdate) => {
+        const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
+        return repository
           .update({
             ...args,
-            content: sanitizeRichText(args.content),
+            content: sanitizedMarkdown,
           })
-          .pipe(
+            .pipe(
             Policy.withPolicy(
               Policy.all(
                 Policy.hasMembership(args.organizationId),
@@ -89,7 +91,8 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
               )
             ),
             withRemapDbErrors("Changelog", "update")
-          ),
+          );
+      },
     };
   })
 ).pipe(

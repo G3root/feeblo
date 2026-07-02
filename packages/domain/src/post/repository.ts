@@ -23,6 +23,7 @@ interface TPostCreate {
   content: string;
   creatorId: string;
   creatorMemberId?: string;
+  excerpt?: string;
   id: string;
   organizationId: string;
   statusId: string;
@@ -347,27 +348,32 @@ const makePostRepository = Effect.gen(function* () {
       boardId,
       title,
       content,
-    }: TPostUpdate) =>
+      excerpt,
+    }: TPostUpdate & { excerpt?: string }) =>
       db
-        .makeQuery((execute, input: TPostUpdate) =>
-          execute((client) =>
-            client
-              .update(schema.postTable)
-              .set({
-                statusId: input.statusId,
-                boardId: input.boardId,
-                title: input.title,
-                content: input.content,
-                excerpt: htmlToExcerpt(input.content),
-              })
-              .where(
-                and(
-                  eq(schema.postTable.id, input.id),
-                  eq(schema.postTable.organizationId, input.organizationId)
+        .makeQuery(
+          (
+            execute,
+            input: TPostUpdate & { excerpt?: string }
+          ) =>
+            execute((client) =>
+              client
+                .update(schema.postTable)
+                .set({
+                  statusId: input.statusId,
+                  boardId: input.boardId,
+                  title: input.title,
+                  content: input.content,
+                  excerpt: input.excerpt ?? htmlToExcerpt(input.content),
+                })
+                .where(
+                  and(
+                    eq(schema.postTable.id, input.id),
+                    eq(schema.postTable.organizationId, input.organizationId)
+                  )
                 )
-              )
-          )
-        )({ id, organizationId, statusId, boardId, title, content })
+            )
+        )({ id, organizationId, statusId, boardId, title, content, ...(excerpt ? { excerpt } : {}) })
         .pipe(Effect.asVoid),
 
     adminUpdate: ({ id, organizationId, archived, locked }: TPostAdminUpdate) =>
@@ -436,8 +442,9 @@ const makePostRepository = Effect.gen(function* () {
       statusId,
       creatorId,
       creatorMemberId,
+      excerpt: inputExcerpt,
     }: TPostCreate) => {
-      const excerpt = htmlToExcerpt(content);
+      const excerpt = inputExcerpt ?? htmlToExcerpt(content);
 
       return db
         .makeQuery((execute, input: TPostCreateInternal) =>

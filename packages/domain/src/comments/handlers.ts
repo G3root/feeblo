@@ -5,7 +5,7 @@ import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { withRemapDbErrors } from "../rpc-errors";
-import { sanitizeRichText } from "../sanitize-html";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { CurrentSession } from "../session-middleware";
 import {
   FailedToDeleteCommentError,
@@ -50,6 +50,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
           })
           .pipe(withRemapDbErrors("Comment", "select")),
       CommentCreate: (args: TCommentCreate) => {
+        const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
@@ -70,7 +71,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             Effect.gen(function* () {
               yield* repository.create({
                 ...args,
-                content: sanitizeRichText(args.content),
+                content: sanitizedMarkdown,
                 userId: session.session.userId,
                 ...(membership ? { memberId: membership.membershipId } : {}),
               });
@@ -142,13 +143,14 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         );
       },
       CommentUpdate: (args: TCommentUpdate) => {
+        const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const updatedComment = yield* repository.update({
             id: args.id,
             organizationId: args.organizationId,
             postId: args.postId,
-            content: sanitizeRichText(args.content),
+            content: sanitizedMarkdown,
             userId: session.session.userId,
           });
 

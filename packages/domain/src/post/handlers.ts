@@ -4,7 +4,8 @@ import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
-import { sanitizeRichText } from "../sanitize-html";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -73,8 +74,9 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           );
       },
       PostUpdate: (args: TPostUpdate) => {
+        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
         return repository
-          .update({ ...args, content: sanitizeRichText(args.content) })
+          .update({ ...args, content: sanitizedMarkdown, excerpt: htmlToExcerpt(sanitizedHtml) })
           .pipe(
             Policy.withPolicy(
               postPolicy.isOwner({
@@ -87,6 +89,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           );
       },
       PostCreate: (args: TPostCreate) => {
+        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
@@ -113,7 +116,8 @@ export const PostRpcHandlers = PostRpcs.toLayer(
             Effect.gen(function* () {
               yield* repository.create({
                 ...args,
-                content: sanitizeRichText(args.content),
+                content: sanitizedMarkdown,
+                excerpt: htmlToExcerpt(sanitizedHtml),
                 creatorId: session.session.userId,
                 ...(membership
                   ? { creatorMemberId: membership.membershipId }

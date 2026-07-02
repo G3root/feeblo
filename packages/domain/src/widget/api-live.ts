@@ -1,6 +1,7 @@
 import { Database, schema } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -12,7 +13,6 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../rpc-errors";
-import { sanitizeRichText } from "../sanitize-html";
 
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
@@ -71,7 +71,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
             });
           }
 
-          const sanitizedContent = sanitizeRichText(content);
+          const { sanitizedMarkdown: sanitizedContent, sanitizedHtml } =
+            sanitizeMarkdown(content);
           const id = yield* PostId.generate;
           const now = new Date();
 
@@ -84,7 +85,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 organizationId,
                 title,
                 content: sanitizedContent,
-                excerpt: htmlToExcerpt(sanitizedContent),
+                excerpt: htmlToExcerpt(sanitizedHtml),
                 statusId: defaultStatus.id,
                 slug: slugify(title),
                 createdAt: now,
