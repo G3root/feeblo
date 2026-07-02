@@ -47,8 +47,7 @@ type PostEditorContextValue = {
   state: PostEditorState;
 };
 
-const PostEditorContext =
-  createContext<PostEditorContextValue | null>(null);
+const PostEditorContext = createContext<PostEditorContextValue | null>(null);
 
 function usePostEditor() {
   const value = use(PostEditorContext);
@@ -65,7 +64,7 @@ type PostEditorProviderProps = {
   content?: string;
   disabled?: boolean;
   onContentChange?: (content: string) => void;
-  onSubmit: () => void | Promise<void>;
+  onSubmit?: () => void | Promise<void>;
   placeholder?: string;
   resetKey?: number;
   submitLabel?: string;
@@ -76,7 +75,7 @@ function PostEditorProvider({
   content = "",
   disabled = false,
   onContentChange,
-  onSubmit,
+  onSubmit = () => {},
   placeholder,
   resetKey = 0,
   submitLabel = "Publish",
@@ -123,7 +122,7 @@ function PostEditorSubmit() {
   return (
     <div className="flex items-center justify-end pt-2">
       <Button
-        disabled={state.disabled || isRichTextContentEmpty(state.content)}
+        disabled={state.disabled}
         onClick={actions.onSubmit}
         size="sm"
         type="button"
@@ -139,7 +138,7 @@ type PostEditorRootProps = {
   content?: string;
   disabled?: boolean;
   onContentChange?: (content: string) => void;
-  onSubmit: (value: { content: string }) => void | Promise<void>;
+  onSubmit?: (value: { content: string }) => void | Promise<void>;
   placeholder?: string;
   submitLabel?: string;
 };
@@ -149,7 +148,7 @@ function PostEditorComponent({
   content: externalContent,
   disabled,
   onContentChange: externalOnContentChange,
-  onSubmit,
+  onSubmit = () => {},
   placeholder,
   submitLabel,
 }: PostEditorRootProps) {
