@@ -13,10 +13,11 @@ type ReactionPickerState = {
   disabled: boolean;
   open: boolean;
   selectedReactions: Set<ReactionEmoji>;
+  reactionList: Map<ReactionEmoji, { count: number }>;
 };
 
 type ReactionPickerActions = {
-  onSelect: (emoji: ReactionEmoji) => void;
+  onToggle: (emoji: ReactionEmoji) => void;
   setOpen: (open: boolean) => void;
 };
 
@@ -30,8 +31,9 @@ type ReactionPickerContextValue = {
   state: ReactionPickerState;
 };
 
-const ReactionPickerContext =
-  createContext<ReactionPickerContextValue | null>(null);
+const ReactionPickerContext = createContext<ReactionPickerContextValue | null>(
+  null
+);
 
 function useReactionPicker() {
   const value = use(ReactionPickerContext);
@@ -48,7 +50,8 @@ type ReactionPickerProviderProps = {
   disabled?: boolean;
   existingReactions?: Set<ReactionEmoji>;
   label?: string;
-  onSelect: (emoji: ReactionEmoji) => void;
+  onToggle: (emoji: ReactionEmoji) => void;
+  reactionList?: Map<ReactionEmoji, { count: number }>;
 };
 
 type ReactionPickerRootProps = ReactionPickerProviderProps & {
@@ -60,19 +63,21 @@ function ReactionPickerProvider({
   disabled = false,
   existingReactions,
   label = "Add reaction",
-  onSelect,
+  onToggle,
+  reactionList,
 }: ReactionPickerProviderProps) {
   const [open, setOpen] = useState(false);
 
   return (
     <ReactionPickerContext
       value={{
-        actions: { onSelect, setOpen },
+        actions: { onToggle, setOpen },
         meta: { label },
         state: {
           disabled,
           open,
           selectedReactions: existingReactions ?? new Set(),
+          reactionList: reactionList ?? new Map(),
         },
       }}
     >
@@ -117,7 +122,7 @@ function ReactionPickerGrid() {
               key={emoji}
               onClick={() => {
                 actions.setOpen(false);
-                actions.onSelect(emoji);
+                actions.onToggle(emoji);
               }}
               size="icon-sm"
               type="button"
@@ -137,20 +142,23 @@ function ReactionPickerDisplayRow() {
 
   return (
     <div className="flex flex-row gap-1">
-      {REACTION_EMOJIS.map((emoji) => {
+      {Array.from(state.reactionList.entries()).map(([emoji, { count }]) => {
         const isSelected = state.selectedReactions.has(emoji);
         return (
           <Button
+            className="flex flex-row items-center gap-1"
             disabled={state.disabled}
             key={emoji}
             onClick={() => {
-              actions.onSelect(emoji);
+              actions.onToggle(emoji);
             }}
-            size="icon-sm"
+            size="sm"
             type="button"
             variant={isSelected ? "secondary" : "ghost"}
           >
-            {getReactionEmoji(emoji)}
+            <span>{getReactionEmoji(emoji)}</span>
+
+            <span className="text-xs">{count}</span>
           </Button>
         );
       })}
