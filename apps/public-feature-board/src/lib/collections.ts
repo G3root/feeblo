@@ -431,26 +431,16 @@ export const publicCommentReactionCollection = createCollection(
 
 export const publicUpvoteCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
-
-      return postId
-        ? getOrganizationScopedQueryKey("public-upvote", "postId", postId)
-        : getOrganizationScopedQueryKey("public-upvote");
-    },
-    syncMode: "on-demand",
+    queryKey: getOrganizationScopedQueryKey("public-upvote"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
 
-      if (!(postId && organizationId)) {
+      if (!organizationId) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.UpvoteListPublic({ organizationId, postId }),
+        (rpc) => rpc.UpvoteListPublic({ organizationId }),
         {
           signal: ctx.signal,
         }

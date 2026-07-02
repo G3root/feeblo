@@ -312,6 +312,9 @@ export const upvoteTable = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => postTable.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

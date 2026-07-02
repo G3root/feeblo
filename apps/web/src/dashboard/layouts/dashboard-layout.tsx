@@ -30,6 +30,7 @@ import {
   membersCollection,
   postCollection,
   postStatusCollection,
+  upvoteCollection,
 } from "~/lib/collections";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -43,6 +44,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           membersCollection,
           postCollection,
           postStatusCollection,
+          upvoteCollection,
         }}
         organizationId={organizationId}
       >

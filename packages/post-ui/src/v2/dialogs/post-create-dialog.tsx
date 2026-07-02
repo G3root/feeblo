@@ -31,9 +31,6 @@ import {
 } from "../forms/post-create-form-shared";
 import { usePostCollections } from "../providers/post-collections-provider";
 
-export type { PostCollections } from "../providers/post-collections-provider";
-export { PostCollectionsProvider } from "../providers/post-collections-provider";
-
 export function PostCreateDialog() {
   const store = usePostCreateDialogContext();
   const open = useSelector(store, (state) => state.context.open);

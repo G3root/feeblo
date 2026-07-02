@@ -21,7 +21,6 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
       UpvoteList: (args: TUpvoteList) =>
         repository
           .list({
-            postId: args.postId,
             organizationId: args.organizationId,
           })
           .pipe(
@@ -72,7 +71,6 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
       UpvoteListPublic: (args: TUpvoteList) =>
         repository
           .list({
-            postId: args.postId,
             organizationId: args.organizationId,
           })
           .pipe(withRemapDbErrors("Upvote", "select")),

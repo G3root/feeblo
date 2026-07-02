@@ -8,6 +8,7 @@ import {
   postTagCollection,
   siteCollection,
   tagCollection,
+  upvoteCollection,
   workspacePlanCollection,
 } from "~/lib/collections";
 
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/$organizationId/_dashboard-layout")({
       siteCollection.preload(),
       workspacePlanCollection.preload(),
       postCollection.preload(),
+      upvoteCollection.preload(),
       postStatusCollection.preload(),
       tagCollection.preload(),
       postTagCollection.preload(),

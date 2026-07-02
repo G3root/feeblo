@@ -1,19 +1,13 @@
-import { PostReactionId, UpvoteId } from "@feeblo/id";
-import { Button } from "@feeblo/ui/button";
+import { PostReactionId } from "@feeblo/id";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
-import { cn } from "@feeblo/ui/utils";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { useDashboardCollections } from "@feeblo/web-shared/dashboard-collections-provider";
-import {
-  getPostReactionCollectionKey,
-  getUpvoteCollectionKey,
-} from "@feeblo/web-shared/reaction-keys";
+import { getPostReactionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useState } from "react";
+import { usePostCollections } from "../v2/providers/post-collections-provider";
+import { UpvoteButton } from "../v2/upvote-toggle";
 import {
   type PostReaction,
   PostReactionSection,
@@ -34,8 +28,11 @@ export function PostDetailsEngagementBar({
   organizationId: string;
   postId: string;
 }) {
-  const { postReactionCollection, upvoteCollection } =
-    useDashboardCollections();
+  const { postReactionCollection } = useDashboardCollections();
+
+  const {
+    collections: { upvoteCollection },
+  } = usePostCollections();
   const { data: session } = useAuthState();
   const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
     (q) => {
@@ -82,53 +79,6 @@ export function PostDetailsEngagementBar({
       ? upvotes?.some((upvote) => upvote.userId === session.user.id)
       : false;
 
-  const handleToggleUpvote = async () => {
-    if (disabled || !upvotes) {
-      return;
-    }
-
-    const currentUserId = session?.user?.id;
-    if (!currentUserId) {
-      toastManager.add({ title: "Sign in to upvote", type: "error" });
-      return;
-    }
-
-    const memberships = (
-      session as { memberships?: SessionMembership[] } | null
-    )?.memberships;
-    const isMember = memberships?.find(
-      (membership: SessionMembership) =>
-        membership.userId === currentUserId &&
-        membership.organizationId === organizationId
-    );
-
-    const existingUpvote = upvotes.find(
-      (upvote) => upvote.userId === currentUserId
-    );
-
-    if (existingUpvote) {
-      const tx = upvoteCollection.delete(
-        getUpvoteCollectionKey(existingUpvote)
-      );
-      await tx.isPersisted.promise;
-      return;
-    }
-
-    const tx = upvoteCollection.insert({
-      id: await UpvoteId.unsafeGenerate(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      organizationId,
-      postId,
-      userId: currentUserId,
-      memberId: isMember ? isMember.membershipId : null,
-      user: {
-        name: session?.user?.name ?? null,
-        image: session?.user?.image ?? null,
-      },
-    });
-    await tx.isPersisted.promise;
-  };
   const handleToggleReaction = async (
     emoji: ReactionEmoji,
     existingUserEmojiReaction: PostReaction | undefined
@@ -185,12 +135,10 @@ export function PostDetailsEngagementBar({
         postReactions={postReactions ?? []}
       />
 
-      <PostUpvoteButton
-        disabled={disabled}
-        handleToggleUpvote={handleToggleUpvote}
-        isUpvoted={hasCurrentUserUpvoted ?? false}
+      <UpvoteButton
+        isUpvoted={!!hasCurrentUserUpvoted}
+        postId={postId}
         upvoteCount={upvotes?.length ?? 0}
-        variant="default"
       />
     </>
   );
@@ -204,67 +152,5 @@ export function PostDetailsEngagementBarSkeleton() {
       <Skeleton className="h-8 w-24 rounded-full" />
       <Skeleton className="h-8 w-16 rounded-full" />
     </div>
-  );
-}
-
-export function PostUpvoteButton({
-  disabled = false,
-  isUpvoted,
-  variant,
-  handleToggleUpvote,
-  upvoteCount,
-}: {
-  disabled?: boolean;
-  isUpvoted: boolean;
-  variant: "compact" | "default";
-  handleToggleUpvote: () => Promise<void> | void;
-  upvoteCount: number;
-}) {
-  const [isToggling, setIsToggling] = useState(false);
-
-  const handleToggleUpvote_ = async () => {
-    try {
-      setIsToggling(true);
-      await handleToggleUpvote();
-    } catch (_error) {
-      toastManager.add({ title: "Failed to update upvote", type: "error" });
-    } finally {
-      setIsToggling(false);
-    }
-  };
-
-  if (variant === "compact") {
-    return (
-      <button
-        className={cn(
-          "flex h-9 w-10 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors",
-          isUpvoted
-            ? "bg-primary/10 text-primary"
-            : "bg-muted/70 text-muted-foreground hover:bg-muted"
-        )}
-        disabled={disabled || isToggling}
-        onClick={handleToggleUpvote_}
-        type="button"
-      >
-        <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
-        <span className="font-medium text-xs tabular-nums leading-none">
-          {upvoteCount}
-        </span>
-      </button>
-    );
-  }
-
-  return (
-    <Button
-      className="rounded-full"
-      disabled={disabled || isToggling}
-      onClick={handleToggleUpvote_}
-      size="sm"
-      type="button"
-      variant={isUpvoted ? "default" : "outline"}
-    >
-      <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} />
-      <span>{upvoteCount}</span>
-    </Button>
   );
 }

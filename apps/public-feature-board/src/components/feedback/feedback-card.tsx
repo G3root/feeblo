@@ -1,10 +1,8 @@
+import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "@feeblo/ui/utils";
-import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
-import { useUpvote } from "../../hooks/use-upvote";
 import { formatPostStatus, getInitials, truncate } from "../../lib/utils";
 
 type FeedbackPost = {
@@ -14,6 +12,7 @@ type FeedbackPost = {
   excerpt: string;
   upVotes: number;
   hasUserUpVoted: boolean;
+  lockedAt: Date | null;
   creatorId: string | null;
   user: {
     image: string | null;
@@ -77,38 +76,26 @@ export function FeedbackCard({
   post: FeedbackPost;
   status: string;
 }) {
-  const { handleToggleUpvote } = useUpvote();
   const existingUpvote = post.hasUserUpVoted;
   const upvoteCount = post.upVotes;
   const description = truncate(post.excerpt, 100) || "No details yet.";
+  const isLocked = post.lockedAt !== null;
 
   return (
     <Link
       className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
-      to={`/p/${post.slug}`}
+      params={{
+        slug: post.slug,
+      }}
+      to="/p/$slug"
     >
-      <button
-        className={cn(
-          "flex h-9 w-10 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors",
-          existingUpvote
-            ? "bg-primary/10 text-primary"
-            : "bg-muted/70 text-muted-foreground hover:bg-muted"
-        )}
-        onClick={(e) => {
-          e.preventDefault();
-          handleToggleUpvote({
-            postId: post.id,
-            organizationId: board.organizationId,
-            existingUpvote,
-          });
-        }}
-        type="button"
-      >
-        <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
-        <span className="font-medium text-xs tabular-nums leading-none">
-          {upvoteCount}
-        </span>
-      </button>
+      <UpvoteButton
+        disabled={isLocked}
+        isUpvoted={existingUpvote}
+        postId={post.id}
+        upvoteCount={upvoteCount}
+        variant="compact"
+      />
 
       <div className="min-w-0 flex-1">
         <h3 className="truncate font-medium text-sm leading-snug">

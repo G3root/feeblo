@@ -583,6 +583,7 @@ const seedEngagement = ({
               userId: upvoterId,
               memberId: memberIdByUserId.get(upvoterId) ?? null,
               postId: postItem.id,
+              organizationId,
             })
           );
         }

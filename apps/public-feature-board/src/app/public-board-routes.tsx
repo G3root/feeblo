@@ -8,6 +8,7 @@ import {
   publicPostStatusCollection,
   publicPostTagCollection,
   publicTagCollection,
+  publicUpvoteCollection,
 } from "../lib/collections";
 import { NotFoundPage } from "../routes/not-found-page";
 
@@ -36,6 +37,7 @@ const homeRoute = createRoute({
   beforeLoad: async () => {
     await Promise.all([
       publicBoardCollection.preload(),
+      publicUpvoteCollection.preload(),
       publicPostCollection.preload(),
       publicPostStatusCollection.preload(),
     ]);
@@ -50,6 +52,7 @@ const roadmapRoute = createRoute({
   beforeLoad: async () => {
     await Promise.all([
       publicBoardCollection.preload(),
+      publicUpvoteCollection.preload(),
       publicPostCollection.preload(),
       publicPostStatusCollection.preload(),
     ]);
@@ -65,6 +68,7 @@ const boardRoute = createRoute({
   beforeLoad: async () => {
     await Promise.all([
       publicBoardCollection.preload(),
+      publicUpvoteCollection.preload(),
       publicPostCollection.preload(),
       publicPostStatusCollection.preload(),
     ]);
@@ -79,6 +83,7 @@ const postRoute = createRoute({
   beforeLoad: async () => {
     await Promise.all([
       publicBoardCollection.preload(),
+      publicUpvoteCollection.preload(),
       publicPostCollection.preload(),
       publicPostStatusCollection.preload(),
       publicPostTagCollection.preload(),

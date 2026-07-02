@@ -2,6 +2,7 @@ import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TComment } from "@feeblo/domain/comments/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import type { Collection } from "@tanstack/react-db";
 import { createContext, useContext } from "react";
 
@@ -16,6 +17,7 @@ export interface PostCollections {
   >;
   postCollection: Collection<TPost, string, any, any>;
   postStatusCollection: Collection<TPostStatus, string, any, any>;
+  upvoteCollection: Collection<TUpvote, string, any, any>;
 }
 
 export interface PostCollectionsValue {

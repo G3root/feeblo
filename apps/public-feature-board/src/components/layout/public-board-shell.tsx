@@ -5,8 +5,10 @@ import { PostCreateDialogProvider } from "@feeblo/post-ui/post-dialog-stores";
 import type { ReactNode } from "react";
 import {
   publicBoardCollection,
+  publicCommentCollection,
   publicPostCollection,
   publicPostStatusCollection,
+  publicUpvoteCollection,
 } from "../../lib/collections";
 import { useSite } from "../../providers/site-provider";
 import { AuthDialogRoot } from "../common/auth-dialog";
@@ -17,12 +19,12 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
   const site = useSite();
 
   const collections: PostCollections = {
-    boardCollection:
-      publicBoardCollection as PostCollections["boardCollection"],
-    postCollection:
-      publicPostCollection as PostCollections["postCollection"],
-    postStatusCollection:
-      publicPostStatusCollection as PostCollections["postStatusCollection"],
+    boardCollection: publicBoardCollection,
+    postCollection: publicPostCollection,
+    postStatusCollection: publicPostStatusCollection,
+    upvoteCollection: publicUpvoteCollection,
+    commentCollection: publicCommentCollection,
+    //todo add member collection
   };
 
   return (

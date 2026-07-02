@@ -1,3 +1,4 @@
+import { usePostCreateDialogContext } from "@feeblo/post-ui/post-dialog-stores";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
@@ -37,7 +38,6 @@ import {
 import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
-import { usePostCreateDialogContext } from "@feeblo/post-ui/post-dialog-stores";
 import { openAuthDialog } from "../stores";
 
 function MainContent({ children }: { children: ReactNode }) {
@@ -268,6 +268,7 @@ function HomePage() {
           hasUserUpVoted: post.hasUserUpVoted,
           creatorId: post.creatorId,
           user: post.user,
+          lockedAt: post.lockedAt,
         },
         status: {
           type: status.type,

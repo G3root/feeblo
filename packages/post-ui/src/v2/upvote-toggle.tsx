@@ -1,8 +1,13 @@
+import { UpvoteId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { cn } from "@feeblo/ui/utils";
+import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, queryOnce } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
+import { usePostCollections } from "./providers/post-collections-provider";
 
 type UpvoteToggleState = {
   disabled: boolean;
@@ -132,6 +137,85 @@ function UpvoteToggleComponent({
 }: UpvoteToggleRootProps) {
   return (
     <UpvoteToggleProvider {...providerProps}>
+      <UpvoteToggleTrigger variant={variant} />
+    </UpvoteToggleProvider>
+  );
+}
+
+interface UpvoteButtonProps
+  extends Omit<UpvoteToggleProviderProps, "onToggle" | "children"> {
+  postId: string;
+  variant?: "compact" | "default";
+}
+
+export function UpvoteButton({
+  disabled,
+  variant,
+  postId,
+  ...rest
+}: UpvoteButtonProps) {
+  const { data: session } = useAuthState();
+  const {
+    collections: { upvoteCollection, membersCollection },
+    organizationId,
+  } = usePostCollections();
+
+  const onToggle = async () => {
+    if (disabled || !session) {
+      return;
+    }
+    const userId = session.user.id;
+    const key = getUpvoteCollectionKey({ userId, postId });
+
+    const hasUpvoted = upvoteCollection.has(key);
+
+    let membershipId: string | null = null;
+
+    if (membersCollection) {
+      const query = await queryOnce((q) =>
+        q
+          .from({ members: membersCollection })
+          .where(({ members }) =>
+            and(
+              eq(members.organizationId, organizationId),
+              eq(members.userId, userId)
+            )
+          )
+          .select(({ members }) => ({
+            id: members.id,
+          }))
+          .findOne()
+      );
+
+      if (query) {
+        membershipId = query.id;
+      }
+    }
+
+    if (hasUpvoted) {
+      const tx = upvoteCollection.delete(key);
+      await tx.isPersisted.promise;
+    } else {
+      const upvoteId = await UpvoteId.unsafeGenerate();
+      const tx = upvoteCollection.insert({
+        id: upvoteId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organizationId,
+        postId,
+        userId,
+        memberId: membershipId,
+        user: {
+          name: session?.user?.name ?? null,
+          image: session?.user?.image ?? null,
+        },
+      });
+      await tx.isPersisted.promise;
+    }
+  };
+
+  return (
+    <UpvoteToggleProvider disabled={disabled} onToggle={onToggle} {...rest}>
       <UpvoteToggleTrigger variant={variant} />
     </UpvoteToggleProvider>
   );

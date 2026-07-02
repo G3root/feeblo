@@ -18,8 +18,8 @@ export const Upvote = S.Struct({
 export type TUpvote = S.Schema.Type<typeof Upvote>;
 
 export const UpvoteList = S.Struct({
-  organizationId: S.String,
-  postId: S.String,
+  organizationId: WorkspaceId.schema,
+  postId: S.optional(PostId.schema),
 });
 
 export type TUpvoteList = S.Schema.Type<typeof UpvoteList>;

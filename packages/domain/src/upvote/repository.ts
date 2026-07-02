@@ -5,7 +5,6 @@ import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
 interface TUpvoteList {
   organizationId: string;
-  postId: string;
   visibility?: "PUBLIC" | "PRIVATE";
 }
 
@@ -36,6 +35,7 @@ interface TFindMember {
 
 interface TCreateUpvote {
   memberId: string | null;
+  organizationId: string;
   postId: string;
   userId: string;
 }
@@ -44,40 +44,15 @@ const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
   return {
-    list: ({ postId, organizationId, visibility }: TUpvoteList) =>
+    list: ({ organizationId, visibility }: TUpvoteList) =>
       Effect.gen(function* () {
-        const operators = [
-          eq(schema.postTable.id, postId),
-          eq(schema.postTable.organizationId, organizationId),
-          ...(visibility ? [eq(schema.boardTable.visibility, visibility)] : []),
-        ];
-        const post = yield* db
-          .makeQuery((execute, input: TOperatorsQuery) =>
-            execute((client) =>
-              client
-                .select({ id: schema.postTable.id })
-                .from(schema.postTable)
-                .innerJoin(
-                  schema.boardTable,
-                  eq(schema.boardTable.id, schema.postTable.boardId)
-                )
-                .where(and(...input.operators))
-                .limit(1)
-            )
-          )({ operators })
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isNone(post)) {
-          return [];
-        }
-
         return yield* db.makeQuery((execute, input: TUpvoteList) =>
           execute((client) =>
             client
               .select({
                 id: schema.upvoteTable.id,
                 postId: schema.upvoteTable.postId,
-                organizationId: schema.postTable.organizationId,
+                organizationId: schema.upvoteTable.organizationId,
                 userId: schema.upvoteTable.userId,
                 user: {
                   name: schema.userTable.name,
@@ -89,25 +64,14 @@ const makeUpvoteRepository = Effect.gen(function* () {
               })
               .from(schema.upvoteTable)
               .innerJoin(
-                schema.postTable,
-                eq(schema.postTable.id, schema.upvoteTable.postId)
-              )
-              .innerJoin(
                 schema.userTable,
                 eq(schema.userTable.id, schema.upvoteTable.userId)
               )
               .where(
-                and(
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  eq(schema.upvoteTable.postId, input.postId)
-                )
+                and(eq(schema.upvoteTable.organizationId, input.organizationId))
               )
           )
-        )(
-          visibility
-            ? { postId, organizationId, visibility }
-            : { postId, organizationId }
-        );
+        )(visibility ? { organizationId, visibility } : { organizationId });
       }),
 
     toggle: ({ organizationId, postId, userId, visibility }: TUpvoteToggle) =>
@@ -190,12 +154,14 @@ const makeUpvoteRepository = Effect.gen(function* () {
               id: upvoteId,
               postId: input.postId,
               userId: input.userId,
+              organizationId: input.organizationId,
               memberId: input.memberId,
             })
           )
         )({
           postId,
           userId,
+          organizationId,
           memberId: Option.getOrNull(member)?.id ?? null,
         });
 

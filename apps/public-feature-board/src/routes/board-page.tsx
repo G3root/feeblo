@@ -117,6 +117,7 @@ export function BoardPage() {
             hasUserUpVoted: post.hasUserUpVoted,
             creatorId: post.creatorId,
             user: post.user,
+            lockedAt: post.lockedAt,
           },
           postStatus: {
             type: postStatus.type,

@@ -2,16 +2,20 @@ import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
-import { queryCollectionOptions } from "@tanstack/query-db-collection";
-import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
-import { Duration, type Schema } from "effect";
-import { getContext } from "~/integrations/tanstack-query/root-provider";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
   getPostSubscriptionCollectionKey,
   getUpvoteCollectionKey,
 } from "@feeblo/web-shared/reaction-keys";
+import { queryCollectionOptions } from "@tanstack/query-db-collection";
+import {
+  BasicIndex,
+  createCollection,
+  parseLoadSubsetOptions,
+} from "@tanstack/react-db";
+import { Duration, type Schema } from "effect";
+import { getContext } from "~/integrations/tanstack-query/root-provider";
 import { fetchRpc } from "./runtime";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
@@ -133,6 +137,14 @@ export const postCollection = createCollection(
     },
   })
 );
+
+postCollection.createIndex((row) => row.createdAt, {
+  indexType: BasicIndex,
+});
+
+postCollection.createIndex((row) => row.statusId, {
+  indexType: BasicIndex,
+});
 
 export const postStatusCollection = createCollection(
   queryCollectionOptions({
@@ -661,30 +673,17 @@ export const commentReactionCollection = createCollection(
 
 export const upvoteCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
-
-      return postId
-        ? getOrganizationScopedQueryKey("upvote", "postId", postId)
-        : getOrganizationScopedQueryKey("upvote");
-    },
-    syncMode: "on-demand",
+    queryKey: getOrganizationScopedQueryKey("upvote"),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
 
-      if (!(organizationId && postId)) {
+      if (!organizationId) {
         return [];
       }
 
-      const data = await fetchRpc(
-        (rpc) => rpc.UpvoteList({ organizationId, postId }),
-        {
-          signal: ctx.signal,
-        }
-      );
+      const data = await fetchRpc((rpc) => rpc.UpvoteList({ organizationId }), {
+        signal: ctx.signal,
+      });
       return [...data];
     },
     queryClient,

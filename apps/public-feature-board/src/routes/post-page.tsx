@@ -6,12 +6,12 @@ import {
 } from "@feeblo/post-ui/post-comment-composer";
 import { PostCommentList } from "@feeblo/post-ui/post-comment-list";
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
-import { PostUpvoteButton } from "@feeblo/post-ui/post-engagement-bar";
 import {
   type PostReaction,
   PostReactionSection,
 } from "@feeblo/post-ui/post-reaction-section";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
+import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -58,7 +58,7 @@ import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
-import { useUpvote } from "../hooks/use-upvote";
+// import { useUpvote } from "../hooks/use-upvote";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
@@ -422,10 +422,11 @@ export function PostPage() {
           <div className="flex items-start gap-4 sm:gap-6">
             <div className="shrink-0 pt-1">
               <UpvoteButton
-                hasUserUpVoted={post.hasUserUpVoted}
-                isLocked={isLocked}
-                postId={post.id}
+                disabled={isLocked}
+                isUpvoted={post.hasUserUpVoted}
+                postId={postId}
                 upvoteCount={post.upVotes}
+                variant="compact"
               />
             </div>
 
@@ -700,40 +701,6 @@ const PostMetaSidebar = {
   PublishedOn: PostMetaSidebarPublishedOn,
   Share: ShareFeedBack,
 };
-
-function UpvoteButton({
-  hasUserUpVoted,
-  isLocked = false,
-  postId,
-  upvoteCount,
-}: {
-  hasUserUpVoted: boolean;
-  isLocked?: boolean;
-  postId: string;
-  upvoteCount: number;
-}) {
-  const site = useSite();
-  const organizationId = site.organizationId;
-
-  const { handleToggleUpvote } = useUpvote();
-
-  return (
-    <PostUpvoteButton
-      disabled={isLocked}
-      handleToggleUpvote={async () => {
-        await handleToggleUpvote({
-          disabled: isLocked,
-          postId,
-          organizationId,
-          existingUpvote: hasUserUpVoted,
-        });
-      }}
-      isUpvoted={hasUserUpVoted}
-      upvoteCount={upvoteCount}
-      variant="compact"
-    />
-  );
-}
 
 function PostReactionBar({
   disabled = false,

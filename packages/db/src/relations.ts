@@ -210,6 +210,10 @@ export const upvoteRelations = relations(upvoteTable, ({ one }) => ({
     fields: [upvoteTable.postId],
     references: [postTable.id],
   }),
+  organization: one(organizationTable, {
+    fields: [upvoteTable.organizationId],
+    references: [organizationTable.id],
+  }),
 }));
 
 export const postReactionRelations = relations(
