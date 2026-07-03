@@ -1,5 +1,5 @@
-import { CommentId, CommentReactionId } from "@feeblo/id";
-import type { CommentReactionToggleInput } from "@feeblo/post-ui/comment-reaction-section";
+import { CommentId } from "@feeblo/id";
+import { CommentsList } from "@feeblo/post-ui/comment-display";
 import { PostBoardSelect, StatusField } from "@feeblo/post-ui/post-properties";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
@@ -12,7 +12,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { toastManager } from "@feeblo/ui/toast";
-import { getCommentReactionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   anyPolicy,
@@ -307,11 +306,7 @@ function RouteComponent() {
             postId={post.id}
             showVisibilityPicker
           />
-          <PostCommentListSection
-            isLocked={isLocked}
-            organizationId={organizationId}
-            postId={post.id}
-          />
+          <CommentsList postId={post.id} />
         </PostDetails.Layout>
 
         <aside className="hidden px-6 py-6 lg:block">
@@ -433,137 +428,6 @@ function RouteComponent() {
       </div>
       <TagCreateDialog />
     </TagCreateDialogProvider>
-  );
-}
-
-function PostCommentListSection({
-  isLocked,
-  organizationId,
-  postId,
-}: {
-  isLocked: boolean;
-  organizationId: string;
-  postId: string;
-}) {
-  const { commentCollection, commentReactionCollection } =
-    useDashboardCollections();
-
-  const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
-    (q) =>
-      q
-        .from({ comment: commentCollection })
-        .where(({ comment }) =>
-          and(
-            eq(comment.organizationId, organizationId),
-            eq(comment.postId, postId)
-          )
-        )
-        .orderBy((comment) => comment.comment.createdAt, "desc"),
-    [organizationId, postId]
-  );
-
-  const { data: commentReactions, isLoading: isCommentReactionsLoading } =
-    useLiveQuery(
-      (q) =>
-        q
-          .from({ commentReaction: commentReactionCollection })
-          .where(({ commentReaction }) =>
-            and(
-              eq(commentReaction.organizationId, organizationId),
-              eq(commentReaction.postId, postId)
-            )
-          )
-          .orderBy(
-            (commentReaction) => commentReaction.commentReaction.commentId,
-            "asc"
-          )
-          .orderBy(
-            (commentReaction) => commentReaction.commentReaction.emoji,
-            "asc"
-          )
-          .orderBy(
-            (commentReaction) => commentReaction.commentReaction.createdAt,
-            "asc"
-          ),
-      [organizationId, postId]
-    );
-
-  const isLoading = isCommentsLoading || isCommentReactionsLoading;
-
-  const handleToggleCommentReaction = async ({
-    commentId,
-    emoji,
-    existingReaction,
-    organizationId,
-    postId,
-    userId,
-  }: CommentReactionToggleInput) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    if (existingReaction) {
-      const tx = commentReactionCollection.delete(
-        getCommentReactionCollectionKey(existingReaction)
-      );
-      await tx.isPersisted.promise;
-      return;
-    }
-
-    const tx = commentReactionCollection.insert({
-      id: await CommentReactionId.unsafeGenerate(),
-      commentId,
-      createdAt: new Date(),
-      emoji,
-      //todo fix
-      memberId: null,
-      organizationId,
-      postId,
-      updatedAt: new Date(),
-      userId,
-    });
-    await tx.isPersisted.promise;
-  };
-
-  const handleDeleteComment = async (commentId: string) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    const tx = commentCollection.delete(commentId);
-    await tx.isPersisted.promise;
-  };
-
-  return (
-    <PostDetails.CommentList.Root
-      commentReactions={commentReactions}
-      comments={comments}
-      handleDeleteComment={handleDeleteComment}
-      handleToggleCommentReaction={handleToggleCommentReaction}
-      isLoading={isLoading}
-      isLocked={isLocked}
-      organizationId={organizationId}
-      postId={postId}
-    >
-      <PostDetails.CommentList.Content>
-        <PostDetails.CommentList.Items>
-          <PostDetails.CommentList.Item>
-            <PostDetails.CommentList.Media>
-              <PostDetails.CommentList.Avatar />
-            </PostDetails.CommentList.Media>
-            <PostDetails.CommentList.Main>
-              <PostDetails.CommentList.Header>
-                <PostDetails.CommentList.Author />
-                <PostDetails.CommentList.Timestamp />
-              </PostDetails.CommentList.Header>
-              <PostDetails.CommentList.Body />
-              <PostDetails.CommentList.Reactions />
-            </PostDetails.CommentList.Main>
-            <PostDetails.CommentList.Actions />
-          </PostDetails.CommentList.Item>
-        </PostDetails.CommentList.Items>
-      </PostDetails.CommentList.Content>
-    </PostDetails.CommentList.Root>
   );
 }
 

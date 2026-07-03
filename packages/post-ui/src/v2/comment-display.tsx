@@ -1,3 +1,4 @@
+import type { TComment } from "@feeblo/domain/src/comments/schema.js";
 import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -7,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   Delete02Icon,
   Edit01Icon,
@@ -15,9 +17,11 @@ import {
   ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { and, count, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
 import { CommentComposer } from "./comment-composer";
-import { ReactionPicker } from "./reaction-picker";
+import { usePostCollections } from "./providers/post-collections-provider";
+import { CommentReactionPicker } from "./reaction-picker";
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 const WHITESPACE_REGEX = /\s+/;
@@ -61,6 +65,7 @@ function formatRelativeTime(value: Date | string) {
 type CommentDisplayState = {
   authorName: string;
   commentId: string;
+  postId: string;
   content: string;
   createdAt: Date;
   disabled: boolean;
@@ -117,6 +122,7 @@ type CommentDisplayProviderProps = {
   children?: ReactNode;
   authorName: string;
   commentId: string;
+  postId: string;
   content: string;
   createdAt: Date;
   deleteLabel?: string;
@@ -143,6 +149,7 @@ function CommentDisplayProvider({
   children,
   authorName,
   commentId,
+  postId,
   content,
   createdAt,
   deleteLabel = "Delete",
@@ -186,6 +193,7 @@ function CommentDisplayProvider({
           disabled,
           isAuthor,
           isInternal,
+          postId,
         },
         reactions: { reactionList, selectedReactions },
       }}
@@ -236,7 +244,7 @@ function CommentDisplayBody() {
 }
 
 function CommentDisplayActions() {
-  const { actions, meta, state, reactions } = useCommentDisplay();
+  const { actions, state, reactions } = useCommentDisplay();
   const [isReplying, setIsReplying] = useState(false);
 
   return (
@@ -252,19 +260,13 @@ function CommentDisplayActions() {
           <HugeiconsIcon icon={MailReply01Icon} />
           {isReplying ? "Hide reply" : meta.replyLabel}
         </Button> */}
-
-        <ReactionPicker.Provider
+        <CommentReactionPicker
+          commentId={state.commentId}
           disabled={state.disabled}
           existingReactions={reactions.selectedReactions}
-          onToggle={actions.onToggleReaction}
+          postId={state.postId}
           reactionList={reactions.reactionList}
-        >
-          <div className="flex items-center gap-1">
-            <ReactionPicker.displayRow />
-            <ReactionPicker.Trigger />
-          </div>
-          <ReactionPicker.Grid />
-        </ReactionPicker.Provider>
+        />
       </div>
 
       {isReplying && (
@@ -323,8 +325,8 @@ function CommentDisplayComponent(props: CommentDisplayRootProps) {
       <div
         className={
           props.isInternal
-            ? "rounded-md border border-border bg-primary/5 p-4"
-            : "rounded-md border border-border p-4"
+            ? "rounded-2xl border border-border bg-primary/5 p-4"
+            : "rounded-2xl border border-border p-4"
         }
       >
         <div className="flex items-start gap-3">
@@ -351,3 +353,127 @@ export const CommentDisplay = Object.assign(CommentDisplayComponent, {
   Header: CommentDisplayHeader,
   Provider: CommentDisplayProvider,
 });
+
+interface CommentsListProps {
+  postId: string;
+}
+
+export function CommentsList({ postId }: CommentsListProps) {
+  const {
+    collections: { commentCollection },
+    organizationId,
+  } = usePostCollections();
+  const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
+    (q) =>
+      q
+        .from({ comment: commentCollection })
+        .where(({ comment }) =>
+          and(
+            eq(comment.organizationId, organizationId),
+            eq(comment.postId, postId)
+          )
+        )
+        .orderBy((comment) => comment.comment.createdAt, "desc"),
+    [organizationId, postId]
+  );
+
+  if (isCommentsLoading) {
+    return null;
+  }
+
+  return comments.map((data) => (
+    <CommentDisplayitem data={data} key={data.id} />
+  ));
+}
+
+interface CommentDisplayItemProps {
+  data: TComment;
+}
+
+function CommentDisplayitem({ data }: CommentDisplayItemProps) {
+  const {
+    collections: { commentReactionCollection },
+  } = usePostCollections();
+  const { data: session } = useAuthState();
+
+  const organizationId = data.organizationId;
+  const postId = data.postId;
+  const commentId = data.id;
+
+  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!postId) {
+          return undefined;
+        }
+        return q
+          .from({ commentReaction: commentReactionCollection })
+          .where(({ commentReaction }) =>
+            and(
+              eq(commentReaction.commentId, commentId),
+              eq(commentReaction.postId, postId)
+            )
+          )
+          .groupBy(({ commentReaction }) => commentReaction.emoji)
+          .select(({ commentReaction }) => ({
+            emoji: commentReaction.emoji,
+            count: count(commentReaction.id),
+          }))
+          .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
+      },
+      [organizationId, postId]
+    );
+
+  const { data: userReactions, isLoading: isUserReactionsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!(postId && session?.user?.id)) {
+          return undefined;
+        }
+        return q
+          .from({ commentReaction: commentReactionCollection })
+          .where(({ commentReaction }) =>
+            and(
+              eq(commentReaction.commentId, commentId),
+              eq(commentReaction.userId, session.user.id),
+              eq(commentReaction.postId, postId)
+            )
+          )
+          .select(({ commentReaction }) => ({
+            emoji: commentReaction.emoji,
+          }))
+          .distinct();
+      },
+      [organizationId, postId, session?.user?.id]
+    );
+
+  const existingReactions = new Set(
+    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
+  );
+
+  const reactionList = new Map(
+    (reactionCounts ?? []).map((r) => [
+      r.emoji as ReactionEmoji,
+      { count: r.count },
+    ])
+  );
+
+  const isLoading = isReactionCountsLoading || isUserReactionsLoading;
+
+  if (isLoading) {
+    return null;
+  }
+
+  return (
+    <CommentDisplayComponent
+      authorName={data.user.name}
+      commentId={data.id}
+      content={data.content}
+      createdAt={data.createdAt}
+      isInternal={data.visibility === "INTERNAL"}
+      postId={data.postId}
+      reactionList={reactionList}
+      selectedReactions={existingReactions}
+    />
+  );
+}

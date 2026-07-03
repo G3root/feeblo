@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import {
   publicBoardCollection,
   publicCommentCollection,
+  publicCommentReactionCollection,
   publicPostCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
@@ -26,6 +27,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
     upvoteCollection: publicUpvoteCollection,
     commentCollection: publicCommentCollection,
     postReactionCollection: publicPostReactionCollection,
+    commentReactionCollection: publicCommentReactionCollection,
     //todo add member collection
   };
 

@@ -1,4 +1,4 @@
-import { PostReactionId } from "@feeblo/id";
+import { CommentReactionId, PostReactionId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
 import { toastManager } from "@feeblo/ui/toast";
@@ -7,11 +7,14 @@ import {
   REACTION_EMOJIS,
   type ReactionEmoji,
 } from "@feeblo/utils/reaction";
-import { getPostReactionCollectionKey } from "@feeblo/web-shared/reaction-keys";
+import {
+  getCommentReactionCollectionKey,
+  getPostReactionCollectionKey,
+} from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, queryOnce } from "@tanstack/react-db";
+import { and, count, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -197,6 +200,53 @@ export function PostReactionPicker({
   } = usePostCollections();
   const { data: session } = useAuthState();
 
+  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!postId) {
+          return undefined;
+        }
+        return q
+          .from({ postReaction: postReactionCollection })
+          .where(({ postReaction }) =>
+            and(
+              eq(postReaction.organizationId, organizationId),
+              eq(postReaction.postId, postId)
+            )
+          )
+          .groupBy(({ postReaction }) => postReaction.emoji)
+          .select(({ postReaction }) => ({
+            emoji: postReaction.emoji,
+            count: count(postReaction.id),
+          }))
+          .orderBy(({ postReaction }) => postReaction.emoji, "asc");
+      },
+      [organizationId, postId]
+    );
+
+  const { data: userReactions, isLoading: isUserReactionsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!(postId && session?.user?.id)) {
+          return undefined;
+        }
+        return q
+          .from({ postReaction: postReactionCollection })
+          .where(({ postReaction }) =>
+            and(
+              eq(postReaction.organizationId, organizationId),
+              eq(postReaction.postId, postId),
+              eq(postReaction.userId, session.user.id)
+            )
+          )
+          .select(({ postReaction }) => ({
+            emoji: postReaction.emoji,
+          }))
+          .distinct();
+      },
+      [organizationId, postId, session?.user?.id]
+    );
+
   const handleToggleReaction = async (emoji: ReactionEmoji) => {
     if (disabled) {
       return;
@@ -249,6 +299,115 @@ export function PostReactionPicker({
       userId: currentUserId,
       memberId: membership?.membershipId ?? null,
       emoji,
+    });
+    await tx.isPersisted.promise;
+  };
+
+  const isLoading = isUserReactionsLoading || isReactionCountsLoading;
+
+  if (isLoading) {
+    return null;
+  }
+
+  const existingReactions = new Set(
+    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
+  );
+
+  const reactionList = new Map(
+    (reactionCounts ?? []).map((r) => [
+      r.emoji as ReactionEmoji,
+      { count: r.count },
+    ])
+  );
+
+  return (
+    <ReactionPickerProvider
+      disabled={disabled}
+      existingReactions={existingReactions}
+      onToggle={handleToggleReaction}
+      reactionList={reactionList}
+      {...rest}
+    >
+      <div className="flex items-center gap-1">
+        <ReactionPickerDisplayRow />
+        <ReactionPickerTrigger />
+      </div>
+      <ReactionPickerGrid />
+    </ReactionPickerProvider>
+  );
+}
+
+interface CommentReactionPickerProps
+  extends Omit<ReactionPickerProviderProps, "onToggle"> {
+  commentId: string;
+  postId: string;
+}
+
+export function CommentReactionPicker({
+  commentId,
+  disabled,
+  postId,
+  ...rest
+}: CommentReactionPickerProps) {
+  const {
+    collections: { commentReactionCollection },
+    organizationId,
+  } = usePostCollections();
+  const { data: session } = useAuthState();
+
+  const handleToggleReaction = async (emoji: ReactionEmoji) => {
+    if (disabled) {
+      return;
+    }
+
+    const currentUserId = session?.user?.id;
+
+    if (!currentUserId) {
+      toastManager.add({ title: "Sign in to react", type: "error" });
+      return;
+    }
+
+    const membership = session.memberships.find(
+      (value) =>
+        value.organizationId === organizationId &&
+        value.userId === session.user.id
+    );
+
+    const existingUserEmojiReaction = await queryOnce((q) =>
+      q
+        .from({ reaction: commentReactionCollection })
+        .where(({ reaction }) =>
+          and(
+            eq(reaction.emoji, emoji),
+            eq(reaction.organizationId, organizationId),
+            eq(reaction.commentId, commentId),
+            eq(reaction.userId, currentUserId)
+          )
+        )
+        .findOne()
+    );
+
+    if (existingUserEmojiReaction) {
+      const tx = commentReactionCollection.delete(
+        getCommentReactionCollectionKey({
+          emoji,
+          userId: currentUserId,
+          commentId,
+        })
+      );
+      await tx.isPersisted.promise;
+      return;
+    }
+    const tx = commentReactionCollection.insert({
+      id: await CommentReactionId.unsafeGenerate(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationId,
+      postId,
+      userId: currentUserId,
+      memberId: membership?.membershipId ?? null,
+      emoji,
+      commentId,
     });
     await tx.isPersisted.promise;
   };

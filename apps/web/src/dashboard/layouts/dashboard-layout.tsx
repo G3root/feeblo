@@ -27,6 +27,7 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   boardCollection,
   commentCollection,
+  commentReactionCollection,
   membersCollection,
   postCollection,
   postReactionCollection,
@@ -47,6 +48,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           postStatusCollection,
           upvoteCollection,
           postReactionCollection,
+          commentReactionCollection,
         }}
         organizationId={organizationId}
       >

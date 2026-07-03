@@ -1,6 +1,7 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TComment } from "@feeblo/domain/comments/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
+import type { TCommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TPostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
@@ -10,6 +11,7 @@ import { createContext, useContext } from "react";
 export interface PostCollections {
   boardCollection: Collection<TBoard, string, any, any>;
   commentCollection: Collection<TComment, string, any, any>;
+  commentReactionCollection: Collection<TCommentReaction, string, any, any>;
   membersCollection?: Collection<
     { id: string; organizationId: string; userId: string },
     string,

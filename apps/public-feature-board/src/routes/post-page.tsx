@@ -1,10 +1,8 @@
-import { CommentReactionId } from "@feeblo/id";
-import type { CommentReactionToggleInput } from "@feeblo/post-ui/comment-reaction-section";
+import { CommentsList } from "@feeblo/post-ui/comment-display";
 import {
   PostCommentComposer,
   PostCommentGuestPrompt,
 } from "@feeblo/post-ui/post-comment-composer";
-import { PostCommentList } from "@feeblo/post-ui/post-comment-list";
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { PostReactionPicker } from "@feeblo/post-ui/reaction-picker";
@@ -16,14 +14,11 @@ import {
   Empty,
   EmptyDescription,
   EmptyHeader,
-  EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { htmlToExcerpt } from "@feeblo/utils/html";
-import type { ReactionEmoji } from "@feeblo/utils/reaction";
-import { getCommentReactionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
@@ -32,11 +27,8 @@ import {
   isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
-import { Comment01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
   and,
-  count,
   debounceStrategy,
   eq,
   useLiveQuery,
@@ -53,7 +45,6 @@ import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
-
 // import { useUpvote } from "../hooks/use-upvote";
 import { formatPostStatus, getInitials } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
@@ -310,50 +301,6 @@ export function PostPage() {
   const publishedDate = formatPublishedDate(post.createdAt);
   const selectedTags = postTagsQuery.data ?? [];
 
-  const handleToggleCommentReaction = async ({
-    commentId,
-    emoji,
-    existingReaction,
-    organizationId,
-    postId,
-    userId,
-  }: CommentReactionToggleInput) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    if (existingReaction) {
-      const tx = publicCommentReactionCollection.delete(
-        getCommentReactionCollectionKey(existingReaction)
-      );
-      await tx.isPersisted.promise;
-      return;
-    }
-
-    const tx = publicCommentReactionCollection.insert({
-      id: await CommentReactionId.unsafeGenerate(),
-      commentId,
-      createdAt: new Date(),
-      emoji,
-      //todo fix
-      memberId: null,
-      organizationId,
-      postId,
-      updatedAt: new Date(),
-      userId,
-    });
-    await tx.isPersisted.promise;
-  };
-
-  const handleDeleteComment = async (commentId: string) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    const tx = publicCommentCollection.delete(commentId);
-    await tx.isPersisted.promise;
-  };
-
   const handleDeletePost = async () => {
     try {
       const tx = publicPostCollection.delete(postId);
@@ -414,11 +361,7 @@ export function PostPage() {
                 value={post.content}
               />
 
-              <PostReactionBar
-                disabled={isLocked}
-                organizationId={site.organizationId}
-                postId={post.id}
-              />
+              <PostReactionPicker disabled={isLocked} postId={post.id} />
 
               <div className="space-y-4">
                 <PostCommentComposer
@@ -431,51 +374,8 @@ export function PostPage() {
                   action={<AuthDialog variant="sign-in" />}
                   isAuthenticated={!!session?.session}
                 />
-                <PostCommentList.Root
-                  commentReactions={commentReactionsQuery.data ?? []}
-                  comments={commentsQuery.data ?? []}
-                  handleDeleteComment={handleDeleteComment}
-                  handleToggleCommentReaction={handleToggleCommentReaction}
-                  isError={
-                    commentsQuery.isError || commentReactionsQuery.isError
-                  }
-                  isLoading={
-                    commentsQuery.isLoading || commentReactionsQuery.isLoading
-                  }
-                  isLocked={isLocked}
-                  organizationId={site.organizationId}
-                  postId={post.id}
-                >
-                  <PostCommentList.Content
-                    emptyState={
-                      <Empty>
-                        <EmptyHeader>
-                          <EmptyMedia variant="icon">
-                            <HugeiconsIcon icon={Comment01Icon} />
-                          </EmptyMedia>
-                          <EmptyTitle>No comments yet.</EmptyTitle>
-                        </EmptyHeader>
-                      </Empty>
-                    }
-                  >
-                    <PostCommentList.Items>
-                      <PostCommentList.Item>
-                        <PostCommentList.Media>
-                          <PostCommentList.Avatar />
-                        </PostCommentList.Media>
-                        <PostCommentList.Main>
-                          <PostCommentList.Header>
-                            <PostCommentList.Author />
-                            <PostCommentList.Timestamp />
-                          </PostCommentList.Header>
-                          <PostCommentList.Body />
-                          <PostCommentList.Reactions />
-                        </PostCommentList.Main>
-                        <PostCommentList.Actions />
-                      </PostCommentList.Item>
-                    </PostCommentList.Items>
-                  </PostCommentList.Content>
-                </PostCommentList.Root>
+
+                <CommentsList postId={post.id} />
               </div>
             </div>
           </div>
@@ -655,86 +555,3 @@ const PostMetaSidebar = {
   PublishedOn: PostMetaSidebarPublishedOn,
   Share: ShareFeedBack,
 };
-
-function PostReactionBar({
-  disabled = false,
-  organizationId,
-  postId,
-}: {
-  disabled?: boolean;
-  organizationId: string;
-  postId: string;
-}) {
-  const { data: session } = useAuthState();
-  const { publicPostReactionCollection } = usePublicCollections();
-
-  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
-    useLiveQuery(
-      (q) => {
-        if (!postId) {
-          return undefined;
-        }
-        return q
-          .from({ postReaction: publicPostReactionCollection })
-          .where(({ postReaction }) =>
-            and(
-              eq(postReaction.organizationId, organizationId),
-              eq(postReaction.postId, postId)
-            )
-          )
-          .groupBy(({ postReaction }) => postReaction.emoji)
-          .select(({ postReaction }) => ({
-            emoji: postReaction.emoji,
-            count: count(postReaction.id),
-          }))
-          .orderBy(({ postReaction }) => postReaction.emoji, "asc");
-      },
-      [organizationId, postId]
-    );
-
-  const { data: userReactions, isLoading: isUserReactionsLoading } =
-    useLiveQuery(
-      (q) => {
-        if (!(postId && session?.user?.id)) {
-          return undefined;
-        }
-        return q
-          .from({ postReaction: publicPostReactionCollection })
-          .where(({ postReaction }) =>
-            and(
-              eq(postReaction.organizationId, organizationId),
-              eq(postReaction.postId, postId),
-              eq(postReaction.userId, session.user.id)
-            )
-          )
-          .select(({ postReaction }) => ({
-            emoji: postReaction.emoji,
-          }))
-          .distinct();
-      },
-      [organizationId, postId, session?.user?.id]
-    );
-
-  const existingReactions = new Set(
-    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
-  );
-  const reactionList = new Map(
-    (reactionCounts ?? []).map((r) => [
-      r.emoji as ReactionEmoji,
-      { count: r.count },
-    ])
-  );
-
-  if (isReactionCountsLoading || isUserReactionsLoading) {
-    return null;
-  }
-
-  return (
-    <PostReactionPicker
-      disabled={disabled}
-      existingReactions={existingReactions}
-      postId={postId}
-      reactionList={reactionList}
-    />
-  );
-}
