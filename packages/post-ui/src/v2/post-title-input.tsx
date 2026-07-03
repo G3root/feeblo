@@ -1,13 +1,8 @@
 import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
-import {
-  anyPolicy,
-  hasOwnerOrAdminRole,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
 import { useId } from "react";
+import { usePostCollectionData } from "./post-collection";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 interface PostTitleInputProps
@@ -41,24 +36,15 @@ export function PostTitleInput({
   );
 }
 
-interface PostTitleUpdateInputProps {
-  defaultValue: string;
-  postCreatorId: string | null;
-  postId: string;
-}
+export function PostTitleUpdateInput() {
+  const { canManagePost, post } = usePostCollectionData();
 
-export function PostTitleUpdateInput({
-  postId,
-  postCreatorId,
-  defaultValue,
-}: PostTitleUpdateInputProps) {
+  const defaultValue = post.title;
+  const postId = post.id;
+
   const {
     collections: { postCollection },
-    organizationId,
   } = usePostCollections();
-  const { allowed: isOwner } = usePolicy(
-    anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
-  );
 
   const handleChange = async (value: string) => {
     // Multiple rapid changes merge into a single transaction
@@ -87,8 +73,8 @@ export function PostTitleUpdateInput({
   return (
     <PostTitleInput
       defaultValue={defaultValue}
-      onBlur={isOwner ? (e) => handleChange(e.target.value) : undefined}
-      readOnly={!isOwner}
+      onBlur={canManagePost ? (e) => handleChange(e.target.value) : undefined}
+      readOnly={!canManagePost}
     />
   );
 }

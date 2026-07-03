@@ -18,6 +18,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
 import { CommentComposer } from "./comment-composer";
+import { usePostCollectionData } from "./post-collection";
 import { usePostCollections } from "./providers/post-collections-provider";
 import { CommentReactionPicker } from "./reaction-picker";
 
@@ -335,15 +336,13 @@ export const CommentDisplay = Object.assign(CommentDisplayComponent, {
   Provider: CommentDisplayProvider,
 });
 
-interface CommentsListProps {
-  postId: string;
-}
-
-export function CommentsList({ postId }: CommentsListProps) {
+export function CommentsList() {
+  const { organizationId, post } = usePostCollectionData();
   const {
     collections: { commentCollection },
-    organizationId,
   } = usePostCollections();
+  const postId = post.id;
+
   const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
     (q) =>
       q

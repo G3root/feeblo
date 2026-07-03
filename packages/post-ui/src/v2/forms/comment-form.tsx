@@ -8,6 +8,7 @@ import {
   CommentComposer,
   type CommentComposerProviderProps,
 } from "../comment-composer";
+import { usePostCollectionData } from "../post-collection";
 import { usePostCollections } from "../providers/post-collections-provider";
 
 const CommentVisibilitySchema = z.enum(["PUBLIC", "INTERNAL"]);
@@ -35,19 +36,18 @@ export const commentCreateFormOpts = formOptions({
 
 interface useCommentFormProps {
   defaultValues?: Partial<TSchema>;
-  postId: string;
   setEditorKey: Dispatch<SetStateAction<number>>;
   showVisibilityPicker: boolean;
 }
 
 export const useCommentForm = ({
-  postId,
   defaultValues,
   setEditorKey,
 }: useCommentFormProps) => {
+  const { post, organizationId } = usePostCollectionData();
+  const postId = post.id;
   const {
     collections: { commentCollection },
-    organizationId,
   } = usePostCollections();
 
   const { data: session } = useAuthState();

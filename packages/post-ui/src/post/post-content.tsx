@@ -1,23 +1,4 @@
 import { Editor, type EditorProps, EditorProvider } from "@feeblo/ui/editor";
-import { fetchRpc } from "@feeblo/web-shared/runtime";
-import {
-  anyPolicy,
-  hasOwnerOrAdminRole,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
-import { debounceStrategy, usePacedMutations } from "@tanstack/react-db";
-import { z } from "zod";
-import { usePostCollections } from "../v2/providers/post-collections-provider";
-
-const UpdatedPostSchema = z.object({
-  id: z.string(),
-  statusId: z.string(),
-  content: z.string(),
-  title: z.string(),
-  boardId: z.string(),
-  organizationId: z.string(),
-});
 
 interface PostContentEditorProps extends EditorProps {
   onChange: (value: string) => void;
@@ -67,51 +48,5 @@ export function PostContentEditor({
         // </div>
       }
     </div>
-  );
-}
-
-export function PostEditableContent({
-  description,
-  organizationId,
-  postCreatorId,
-  postId,
-}: {
-  description: string;
-  organizationId: string;
-  postCreatorId: string | null;
-  postId: string;
-}) {
-  const {
-    collections: { postCollection },
-  } = usePostCollections();
-  const { allowed: isOwner } = usePolicy(
-    anyPolicy(hasOwnerOrAdminRole(organizationId), isUser(postCreatorId ?? ""))
-  );
-
-  const mutate = usePacedMutations<{ value: string }>({
-    onMutate: ({ value }) => {
-      postCollection.update(postId, (draft) => {
-        draft.content = value;
-        draft.excerpt = value;
-      });
-    },
-    mutationFn: async ({ transaction }) => {
-      const mutation = transaction.mutations[0];
-      const { modified: updatedPost } = mutation;
-      const validatedPost = UpdatedPostSchema.parse(updatedPost);
-      await fetchRpc((rpc) => rpc.PostUpdate(validatedPost));
-    },
-    strategy: debounceStrategy({ wait: 500 }),
-  });
-
-  return (
-    <EditorProvider defaultValue={{ postContent: description }}>
-      <Editor
-        onChange={(doc) => {
-          mutate({ value: doc });
-        }}
-        readOnly={!isOwner}
-      />
-    </EditorProvider>
   );
 }

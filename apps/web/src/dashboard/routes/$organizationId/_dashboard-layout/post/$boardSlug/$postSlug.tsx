@@ -1,4 +1,13 @@
 import { CommentsList } from "@feeblo/post-ui/comment-display";
+import {
+  PostCollectionDataProvider,
+  usePostCollectionData,
+} from "@feeblo/post-ui/post-collection";
+import { PostCommentComposer } from "@feeblo/post-ui/post-comment-composer";
+import { PostContentUpdateInput } from "@feeblo/post-ui/post-editor";
+import { PostTitleUpdateInput } from "@feeblo/post-ui/post-title-input";
+import { PostReactionPicker } from "@feeblo/post-ui/reaction-picker";
+import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
@@ -21,11 +30,9 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { PostBoardField } from "~/features/post/components/post-board-field";
-import { PostDetails } from "~/features/post/components/post-details-form";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
-
 import {
   boardCollection,
   postCollection,
@@ -56,43 +63,26 @@ function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
 
-  const { data: board } = useLiveQuery(
+  const { data: postRow } = useLiveQuery(
     (q) => {
-      return q
-        .from({ board: boardCollection })
-        .where(({ board }) =>
-          and(
-            eq(board.slug, boardSlug),
-            eq(board.organizationId, organizationId)
-          )
-        )
-        .findOne();
-    },
-    [boardSlug, organizationId]
-  );
-
-  const boardId = board?.id;
-
-  const { data: post } = useLiveQuery(
-    (q) => {
-      if (!boardId) {
-        return undefined;
-      }
       return q
         .from({ post: postCollection })
+
+        .join(
+          { board: boardCollection },
+          ({ post, board }) => eq(post.boardId, board.id),
+          "left"
+        )
         .where(({ post }) =>
-          and(
-            eq(post.slug, postSlug),
-            eq(post.organizationId, organizationId),
-            eq(post.boardId, boardId)
-          )
+          and(eq(post.slug, postSlug), eq(post.organizationId, organizationId))
         )
         .findOne();
     },
-    [postSlug, organizationId, boardId]
+    [organizationId, postSlug]
   );
 
-  const postId = post?.id;
+  const board = postRow?.board;
+  const post = postRow?.post;
 
   const { allowed: canManagePost } = usePolicy(
     anyPolicy(
@@ -129,87 +119,88 @@ function RouteComponent() {
     );
   }
 
-  const isLocked = post.lockedAt !== null;
-
   return (
-    <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
-      <PostDetails.Layout>
-        <PostDetails.Header
-          boardName={board.name}
-          boardSlug={board.slug}
-          organizationId={organizationId}
-          postCreatorId={post.creatorId}
-          postId={post.id}
-          title={post.title}
-        />
-        <PostStatusAlerts lockedAt={post.lockedAt} />
-        <PostDetails.Description
-          description={post.content}
-          organizationId={organizationId}
-          postCreatorId={post.creatorId}
-          postId={post.id}
-        />
-        <div className="flex items-center justify-between py-1">
-          <PostDetails.EngagementBar disabled={isLocked} postId={post.id} />
+    <PostCollectionDataProvider
+      board={board}
+      organizationId={organizationId}
+      post={post}
+    >
+      <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
+          <section className="space-y-6">
+            <div className="space-y-3">
+              <Link
+                className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
+                params={{ organizationId, boardSlug }}
+                to="/$organizationId/board/$boardSlug"
+              >
+                Back to {board.name}
+              </Link>
+
+              <PostTitleUpdateInput />
+            </div>
+            <PostStatusAlerts />
+            <PostContentUpdateInput />
+            <div className="flex items-center justify-between py-1">
+              <PostReactionPicker />
+
+              <UpvoteButton />
+            </div>
+            <PostCommentComposer />
+
+            <CommentsList />
+          </section>
         </div>
-        <PostDetails.CommentComposer
-          defaultVisibility="PUBLIC"
-          disabled={isLocked}
-          disabledReason="This post is locked, so new comments and notes are disabled until it is unlocked."
-          postId={post.id}
-          showVisibilityPicker
-        />
-        <CommentsList postId={post.id} />
-      </PostDetails.Layout>
 
-      <aside className="hidden px-6 py-6 lg:block">
-        <div className="sticky top-0 space-y-4">
-          <PostSidebarActions
-            boardSlug={boardSlug}
-            canManagePost={canManagePost}
-            lockedAt={post.lockedAt}
-            organizationId={organizationId}
-            postId={post.id}
-            postSlug={post.slug}
-          />
+        <aside className="hidden px-6 py-6 lg:block">
+          <div className="sticky top-0 space-y-4">
+            <PostSidebarActions
+              boardSlug={boardSlug}
+              canManagePost={canManagePost}
+              lockedAt={post.lockedAt}
+              organizationId={organizationId}
+              postId={post.id}
+              postSlug={post.slug}
+            />
 
-          {canManagePost ? (
-            <SidebarCard title="Properties">
-              <div>
-                <PostStatusSelect
-                  currentStatusId={post.statusId}
+            {canManagePost ? (
+              <SidebarCard title="Properties">
+                <div>
+                  <PostStatusSelect
+                    currentStatusId={post.statusId}
+                    postId={post.id}
+                  />
+                </div>
+
+                <PostBoardField
+                  currentBoardId={board.id}
+                  organizationId={organizationId}
                   postId={post.id}
+                  postSlug={postSlug}
                 />
-              </div>
+              </SidebarCard>
+            ) : null}
 
-              <PostBoardField
-                currentBoardId={board.id}
-                organizationId={organizationId}
-                postId={post.id}
-                postSlug={postSlug}
-              />
+            <PostTagField organizationId={organizationId} postId={post.id} />
+
+            <SidebarCard title="Details">
+              <p className="text-muted-foreground text-sm">
+                {formatPostDate(post.createdAt)}
+              </p>
+
+              <p className="text-muted-foreground text-sm">
+                {post.user?.name ?? "Unknown author"}
+              </p>
             </SidebarCard>
-          ) : null}
-
-          <PostTagField organizationId={organizationId} postId={post.id} />
-
-          <SidebarCard title="Details">
-            <p className="text-muted-foreground text-sm">
-              {formatPostDate(post.createdAt)}
-            </p>
-
-            <p className="text-muted-foreground text-sm">
-              {post.user?.name ?? "Unknown author"}
-            </p>
-          </SidebarCard>
-        </div>
-      </aside>
-    </div>
+          </div>
+        </aside>
+      </div>
+    </PostCollectionDataProvider>
   );
 }
 
-function PostStatusAlerts({ lockedAt }: { lockedAt: Date | string | null }) {
-  const isLocked = lockedAt !== null;
+function PostStatusAlerts() {
+  const { isLocked } = usePostCollectionData();
 
   if (!isLocked) {
     return null;

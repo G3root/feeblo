@@ -77,7 +77,6 @@ export function FeedbackCard({
   status: string;
 }) {
   const description = truncate(post.excerpt, 100) || "No details yet.";
-  const isLocked = post.lockedAt !== null;
 
   return (
     /// TODO: fix the link wrapping
@@ -88,7 +87,7 @@ export function FeedbackCard({
       }}
       to="/p/$slug"
     >
-      <UpvoteButton disabled={isLocked} postId={post.id} variant="compact" />
+      <UpvoteButton variant="compact" />
 
       <div className="min-w-0 flex-1">
         <h3 className="truncate font-medium text-sm leading-snug">

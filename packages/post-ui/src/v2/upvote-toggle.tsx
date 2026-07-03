@@ -7,6 +7,7 @@ import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
+import { usePostCollectionData } from "./post-collection";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 type UpvoteToggleState = {
@@ -135,25 +136,19 @@ function UpvoteToggleComponent({
   );
 }
 
-interface UpvoteButtonProps
-  extends Omit<
-    UpvoteToggleProviderProps,
-    "onToggle" | "children" | "isUpvoted" | "upvoteCount"
-  > {
-  postId: string;
+interface UpvoteButtonProps {
   variant?: "compact" | "default";
 }
 
-export function UpvoteButton({
-  disabled,
-  variant,
-  postId,
-  ...rest
-}: UpvoteButtonProps) {
+export function UpvoteButton({ variant }: UpvoteButtonProps) {
+  const { isLocked, post, organizationId } = usePostCollectionData();
+
+  const disabled = isLocked;
+  const postId = post.id;
+
   const { data: session } = useAuthState();
   const {
     collections: { upvoteCollection },
-    organizationId,
   } = usePostCollections();
 
   const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
@@ -245,7 +240,6 @@ export function UpvoteButton({
       isUpvoted={isUpvoted}
       onToggle={onToggle}
       upvoteCount={upvoteCount}
-      {...rest}
     >
       <UpvoteToggleTrigger variant={variant} />
     </UpvoteToggleProvider>

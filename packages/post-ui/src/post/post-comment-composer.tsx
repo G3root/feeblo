@@ -3,31 +3,29 @@ import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useState } from "react";
 import { CommentComposerField, useCommentForm } from "../v2/forms/comment-form";
+import { usePostCollectionData } from "../v2/post-collection";
 
 type TCommentVisibility = "PUBLIC" | "INTERNAL";
 
 type PostCommentComposerProps = {
-  disabled?: boolean;
   disabledReason?: string;
   defaultVisibility?: TCommentVisibility;
   showVisibilityPicker?: boolean;
-  postId: string;
 };
 
 export function PostCommentComposer({
-  disabled = false,
   disabledReason = "Comments are locked for this post.",
   defaultVisibility = "PUBLIC",
   showVisibilityPicker = false,
-  postId,
 }: PostCommentComposerProps) {
+  const { isLocked } = usePostCollectionData();
+  const disabled = isLocked;
   const [editorKey, setEditorKey] = useState(0);
 
   const form = useCommentForm({
     defaultValues: {
       visibility: defaultVisibility,
     },
-    postId,
     setEditorKey,
     showVisibilityPicker,
   });

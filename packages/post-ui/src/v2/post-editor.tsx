@@ -1,29 +1,8 @@
 import { Button } from "@feeblo/ui/button";
 import { Editor, EditorProvider } from "@feeblo/ui/editor";
-import { createContext, type ReactNode, use, useState } from "react";
-
-function isRichTextContentEmpty(content: string) {
-  const trimmed = content.trim();
-  if (trimmed.length === 0) {
-    return true;
-  }
-
-  if (!/<\/?[a-z][\s\S]*>/i.test(trimmed)) {
-    return trimmed.length === 0;
-  }
-
-  if (/<img\b/i.test(trimmed)) {
-    return false;
-  }
-
-  const textOnly = trimmed
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return textOnly.length === 0;
-}
+import { createContext, type ReactNode, use, useRef, useState } from "react";
+import { usePostCollectionData } from "./post-collection";
+import { usePostCollections } from "./providers/post-collections-provider";
 
 type PostEditorState = {
   content: string;
@@ -106,7 +85,10 @@ function PostEditorEditor() {
   const { actions, state } = usePostEditor();
 
   return (
-    <EditorProvider key={state.resetKey}>
+    <EditorProvider
+      defaultValue={{ postContent: state.content }}
+      key={state.resetKey}
+    >
       <Editor
         onChange={(doc) => actions.onContentChange(doc)}
         placeholder={state.placeholder}
@@ -154,6 +136,7 @@ function PostEditorComponent({
 }: PostEditorRootProps) {
   const [internalContent, setInternalContent] = useState(externalContent ?? "");
   const [resetKey, setResetKey] = useState(0);
+  const contentRef = useRef(externalContent ?? "");
 
   const isContentControlled = externalContent !== undefined;
 
@@ -161,7 +144,10 @@ function PostEditorComponent({
     ? (externalContent as string)
     : internalContent;
 
+  contentRef.current = content;
+
   const handleContentChange = (doc: string) => {
+    contentRef.current = doc;
     if (!isContentControlled) {
       setInternalContent(doc);
     }
@@ -169,11 +155,12 @@ function PostEditorComponent({
   };
 
   const handleSubmit = async () => {
-    await onSubmit({ content });
+    await onSubmit({ content: contentRef.current });
     setResetKey((k) => k + 1);
     if (!isContentControlled) {
       setInternalContent("");
     }
+    contentRef.current = "";
   };
 
   return (
@@ -199,3 +186,31 @@ export const PostEditor = Object.assign(PostEditorComponent, {
   Provider: PostEditorProvider,
   Submit: PostEditorSubmit,
 });
+
+export function PostContentUpdateInput() {
+  const {
+    collections: { postCollection },
+  } = usePostCollections();
+  const { canManagePost, isLocked, post } = usePostCollectionData();
+
+  const disabled = isLocked || !canManagePost;
+
+  return (
+    <PostEditor
+      content={post.content}
+      disabled={disabled}
+      onSubmit={async ({ content }) => {
+        if (content !== "") {
+          const tx = postCollection.update(post.id, (draft) => {
+            draft.content = content;
+          });
+
+          await tx.isPersisted.promise;
+        }
+      }}
+      submitLabel="Update"
+    >
+      <PostEditor.Submit />
+    </PostEditor>
+  );
+}

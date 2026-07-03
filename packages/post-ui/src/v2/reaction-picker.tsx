@@ -16,6 +16,7 @@ import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, count, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
+import { usePostCollectionData } from "./post-collection";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 type ReactionPickerState = {
@@ -184,19 +185,13 @@ function ReactionPickerComponent(props: ReactionPickerRootProps) {
   );
 }
 
-interface PostReactionPickerProps
-  extends Omit<ReactionPickerProviderProps, "onToggle"> {
-  postId: string;
-}
+export function PostReactionPicker() {
+  const { isLocked, post, organizationId } = usePostCollectionData();
 
-export function PostReactionPicker({
-  postId,
-  disabled,
-  ...rest
-}: PostReactionPickerProps) {
+  const disabled = isLocked;
+  const postId = post.id;
   const {
     collections: { postReactionCollection },
-    organizationId,
   } = usePostCollections();
   const { data: session } = useAuthState();
 
@@ -326,7 +321,6 @@ export function PostReactionPicker({
       existingReactions={existingReactions}
       onToggle={handleToggleReaction}
       reactionList={reactionList}
-      {...rest}
     >
       <div className="flex items-center gap-1">
         <ReactionPickerDisplayRow />
