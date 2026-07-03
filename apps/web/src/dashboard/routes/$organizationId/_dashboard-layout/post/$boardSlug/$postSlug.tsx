@@ -154,14 +154,7 @@ function RouteComponent() {
 
         <aside className="hidden px-6 py-6 lg:block">
           <div className="sticky top-0 space-y-4">
-            <PostSidebarActions
-              boardSlug={boardSlug}
-              canManagePost={canManagePost}
-              lockedAt={post.lockedAt}
-              organizationId={organizationId}
-              postId={post.id}
-              postSlug={post.slug}
-            />
+            <PostSidebarActions />
 
             {canManagePost ? (
               <SidebarCard title="Properties">

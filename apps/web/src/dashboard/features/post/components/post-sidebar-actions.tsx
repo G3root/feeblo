@@ -1,3 +1,4 @@
+import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,63 +30,27 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 type DialogAction = "lock" | null;
 type PostAdminAction = "lock";
 
-type PostSidebarActionsProps = {
-  boardSlug: string;
-  canManagePost: boolean;
-  lockedAt: Date | string | null;
-  organizationId: string;
-  postId: string;
-  postSlug: string;
-};
-
-export function PostSidebarActions({
-  boardSlug,
-  canManagePost,
-  lockedAt,
-  organizationId,
-  postId,
-  postSlug,
-}: PostSidebarActionsProps) {
+export function PostSidebarActions() {
   return (
     <div className="flex items-center justify-end gap-2">
-      <PostPublicActionButtons postSlug={postSlug} />
-      <PostAdminActionButtons
-        boardSlug={boardSlug}
-        canManagePost={canManagePost}
-        lockedAt={lockedAt}
-        organizationId={organizationId}
-        postId={postId}
-      />
+      <PostPublicActionButtons />
+      <PostAdminActionButtons />
     </div>
   );
 }
 
-const PostPublicActionButtons = memo(function PostPublicActionButtons({
-  postSlug,
-}: {
-  postSlug: string;
-}) {
+const PostPublicActionButtons = memo(function PostPublicActionButtons() {
   return (
     <>
-      <RedirectToPostUrlButton postSlug={postSlug} />
-      <CopyPostButton postSlug={postSlug} />
+      <RedirectToPostUrlButton />
+      <CopyPostButton />
     </>
   );
 });
 
-function PostAdminActionButtons({
-  boardSlug,
-  canManagePost,
-  lockedAt,
-  organizationId,
-  postId,
-}: {
-  boardSlug: string;
-  canManagePost: boolean;
-  lockedAt: Date | string | null;
-  organizationId: string;
-  postId: string;
-}) {
+function PostAdminActionButtons() {
+  const { post, board, canManagePost, isLocked, organizationId } =
+    usePostCollectionData();
   const { postCollection } = useDashboardCollections();
   const postDialogStore = usePostDeleteDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
@@ -93,21 +58,20 @@ function PostAdminActionButtons({
     null
   );
 
-  const isLocked = lockedAt !== null;
   const lockLabel = isLocked ? "Unlock post" : "Lock post";
 
   const updatePostAdminState = createOptimisticAction<{
     locked: boolean;
   }>({
     onMutate: ({ locked }) => {
-      postCollection.update(postId, (draft) => {
+      postCollection.update(post.id, (draft) => {
         draft.lockedAt = locked ? new Date() : null;
       });
     },
     mutationFn: async ({ locked }) => {
       await fetchRpc((rpc) =>
         rpc.PostAdminUpdate({
-          id: postId,
+          id: post.id,
           organizationId,
           locked,
         })
@@ -178,12 +142,12 @@ function PostAdminActionButtons({
                     postDialogStore.send({
                       type: "toggle",
                       data: {
-                        postId,
+                        postId: post.id,
                         redirectOptions: {
                           to: "/$organizationId/board/$boardSlug",
                           params: {
                             organizationId,
-                            boardSlug,
+                            boardSlug: board.slug,
                           },
                         },
                       },
@@ -250,7 +214,8 @@ function ConfirmActionDialog({
   );
 }
 
-function RedirectToPostUrlButton({ postSlug }: { postSlug: string }) {
+function RedirectToPostUrlButton() {
+  const { post } = usePostCollectionData();
   const publicSiteUrl = getPublicSiteUrl();
 
   if (!publicSiteUrl) {
@@ -268,7 +233,7 @@ function RedirectToPostUrlButton({ postSlug }: { postSlug: string }) {
             render={(buttonProps) => (
               <a
                 {...buttonProps}
-                href={`${publicSiteUrl}/p/${postSlug}`}
+                href={`${publicSiteUrl}/p/${post.slug}`}
                 rel="noopener noreferrer"
                 target="_blank"
               >
@@ -285,7 +250,8 @@ function RedirectToPostUrlButton({ postSlug }: { postSlug: string }) {
   );
 }
 
-function CopyPostButton({ postSlug }: { postSlug: string }) {
+function CopyPostButton() {
+  const { post } = usePostCollectionData();
   const publicSiteUrl = getPublicSiteUrl();
 
   if (!publicSiteUrl) {
@@ -301,7 +267,9 @@ function CopyPostButton({ postSlug }: { postSlug: string }) {
             className="rounded-full"
             onClick={() => {
               try {
-                navigator.clipboard.writeText(`${publicSiteUrl}/p/${postSlug}`);
+                navigator.clipboard.writeText(
+                  `${publicSiteUrl}/p/${post.slug}`
+                );
                 toastManager.add({
                   title: "Post URL copied to clipboard",
                   type: "success",
