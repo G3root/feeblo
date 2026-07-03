@@ -50,8 +50,6 @@ export function CommentsSection({ postId }: { postId: string }) {
     );
   }
 
-  console.log({ comments });
-
   return (
     <section className="space-y-4">
       <NonAuthenticatedCommentsSection />

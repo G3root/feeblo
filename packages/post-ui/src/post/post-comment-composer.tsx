@@ -1,107 +1,36 @@
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
-import { Button } from "@feeblo/ui/button";
-import { ButtonGroup } from "@feeblo/ui/button-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
-import { Editor, EditorProvider } from "@feeblo/ui/editor";
-import { useAppForm } from "@feeblo/ui/hooks/form";
-import { toastManager } from "@feeblo/ui/toast";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { ArrowDown01Icon, MessageLock01Icon } from "@hugeicons/core-free-icons";
+import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useState } from "react";
-import { z } from "zod";
-import { isRichTextContentEmpty } from "./post-editor-utils";
+import { CommentComposerField, useCommentForm } from "../v2/forms/comment-form";
 
-const CommentVisibilitySchema = z.enum(["PUBLIC", "INTERNAL"]);
-
-const Schema = z.object({
-  content: z
-    .string()
-    .refine((value) => !isRichTextContentEmpty(value), "Comment is required"),
-  visibility: CommentVisibilitySchema,
-});
-
-type TCommentVisibility = z.infer<typeof CommentVisibilitySchema>;
-type TSchema = z.infer<typeof Schema>;
+type TCommentVisibility = "PUBLIC" | "INTERNAL";
 
 type PostCommentComposerProps = {
   disabled?: boolean;
   disabledReason?: string;
-  handleAddComment: (value: TSchema) => Promise<void>;
-  defaultVisibility?: TSchema["visibility"];
-  isAuthenticated: boolean;
+  defaultVisibility?: TCommentVisibility;
   showVisibilityPicker?: boolean;
-};
-
-const commentVisibilityCopy: Record<
-  TCommentVisibility,
-  {
-    label: string;
-    placeholder: string;
-  }
-> = {
-  PUBLIC: {
-    label: "Comment Publicly",
-    placeholder: "Add a comment...",
-  },
-  INTERNAL: {
-    label: "Comment Internal",
-    placeholder: "Add an internal note...",
-  },
+  postId: string;
 };
 
 export function PostCommentComposer({
   disabled = false,
   disabledReason = "Comments are locked for this post.",
   defaultVisibility = "PUBLIC",
-  handleAddComment,
-  isAuthenticated,
   showVisibilityPicker = false,
+  postId,
 }: PostCommentComposerProps) {
   const [editorKey, setEditorKey] = useState(0);
-  const { data: session } = useAuthState();
 
-  const userId = session?.user?.id;
-  const userName = session?.user?.name;
-
-  const form = useAppForm({
-    defaultValues: { content: "", visibility: defaultVisibility },
-    validators: {
-      onSubmit: Schema,
+  const form = useCommentForm({
+    defaultValues: {
+      visibility: defaultVisibility,
     },
-    onSubmit: async ({ value }) => {
-      if (disabled) {
-        toastManager.add({ title: disabledReason, type: "error" });
-        return;
-      }
-
-      if (!(userId && userName)) {
-        toastManager.add({ title: "Sign in to comment", type: "error" });
-        return;
-      }
-
-      try {
-        await handleAddComment(value);
-        setEditorKey((current) => current + 1);
-        form.reset();
-        toastManager.add({ title: "Comment added", type: "success" });
-      } catch (_error) {
-        toastManager.add({ title: "Failed to add comment", type: "error" });
-      }
-    },
+    postId,
+    setEditorKey,
+    showVisibilityPicker,
   });
-
-  if (!isAuthenticated) {
-    return null;
-  }
 
   return (
     <form
@@ -112,106 +41,11 @@ export function PostCommentComposer({
         form.handleSubmit();
       }}
     >
-      <div className="flex rounded-md border p-2">
-        <div className="flex w-full flex-col gap-2">
-          <form.Subscribe selector={(state) => state.values.visibility}>
-            {(visibility) => {
-              const selectedCopy = commentVisibilityCopy[visibility];
-
-              return (
-                <form.AppField name="content">
-                  {(field) => (
-                    <EditorProvider>
-                      <Editor
-                        key={visibility + editorKey}
-                        onChange={(doc) => field.handleChange(doc)}
-                        placeholder={selectedCopy.placeholder}
-                        readOnly={disabled}
-                      />
-                    </EditorProvider>
-                  )}
-                </form.AppField>
-              );
-            }}
-          </form.Subscribe>
-
-          <div className="flex items-center justify-end">
-            <ButtonGroup>
-              <form.Subscribe selector={(state) => state.isSubmitting}>
-                {(isSubmitting) => (
-                  <form.Subscribe selector={(state) => state.values.visibility}>
-                    {(visibility) => {
-                      const selectedCopy = commentVisibilityCopy[visibility];
-
-                      return (
-                        <Button
-                          disabled={disabled || isSubmitting}
-                          size="sm"
-                          type="submit"
-                          variant={
-                            visibility === "INTERNAL" ? "default" : "outline"
-                          }
-                        >
-                          {selectedCopy.label}
-                        </Button>
-                      );
-                    }}
-                  </form.Subscribe>
-                )}
-              </form.Subscribe>
-              {showVisibilityPicker ? (
-                <form.AppField name="visibility">
-                  {(field) => (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            className="pl-2!"
-                            disabled={disabled}
-                            size="sm"
-                            variant={
-                              field.state.value === "INTERNAL"
-                                ? "default"
-                                : "outline"
-                            }
-                          >
-                            <HugeiconsIcon
-                              icon={ArrowDown01Icon}
-                              strokeWidth={2}
-                            />
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent className="w-32">
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel>
-                            Comment Visibility
-                          </DropdownMenuLabel>
-                          <DropdownMenuRadioGroup
-                            onValueChange={(value) =>
-                              field.handleChange(
-                                CommentVisibilitySchema.parse(value)
-                              )
-                            }
-                            value={field.state.value}
-                          >
-                            <DropdownMenuRadioItem value="INTERNAL">
-                              {commentVisibilityCopy.INTERNAL.label}
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="PUBLIC">
-                              {commentVisibilityCopy.PUBLIC.label}
-                            </DropdownMenuRadioItem>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </form.AppField>
-              ) : null}
-            </ButtonGroup>
-          </div>
-        </div>
-      </div>
+      <CommentComposerField
+        disabled={disabled}
+        form={form}
+        resetKey={editorKey}
+      />
       {disabled && (
         <Alert variant="info">
           <HugeiconsIcon icon={MessageLock01Icon} />

@@ -15,7 +15,7 @@ type CommentComposerState = {
 
 type CommentComposerActions = {
   onContentChange: (content: string) => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   onVisibilityChange: (isPrivate: boolean) => void;
 };
 
@@ -43,13 +43,13 @@ function useCommentComposer() {
   return value;
 }
 
-type CommentComposerProviderProps = {
+export type CommentComposerProviderProps = {
   children?: ReactNode;
   content?: string;
   disabled?: boolean;
   isPrivate?: boolean;
   onContentChange?: (content: string) => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   onVisibilityChange?: (isPrivate: boolean) => void;
   placeholder?: string;
   privateLabel?: string;
@@ -109,38 +109,52 @@ function CommentComposerEditor() {
   );
 }
 
-function CommentComposerSubmit() {
-  const { actions, meta, state } = useCommentComposer();
+function SubmitButton() {
+  const { actions, state } = useCommentComposer();
+  return (
+    <Button
+      aria-label={state.isPrivate ? "Switch to public" : "Switch to internal"}
+      disabled={state.disabled}
+      onClick={() => actions.onVisibilityChange(!state.isPrivate)}
+      size="sm"
+      type="button"
+      variant={state.isPrivate ? "default" : "outline"}
+    >
+      <HugeiconsIcon
+        icon={state.isPrivate ? ViewOffIcon : GlobeIcon}
+        strokeWidth={2}
+      />
+    </Button>
+  );
+}
 
+function VisibilitySwitcher() {
+  const { actions, meta, state } = useCommentComposer();
+  return (
+    <Button
+      disabled={state.disabled || !state.content}
+      size="sm"
+      type={actions.onSubmit ? "button" : "submit"}
+      variant={state.isPrivate ? "default" : "outline"}
+      {...(actions?.onSubmit
+        ? {
+            onClick: actions.onSubmit,
+          }
+        : {})}
+    >
+      {state.isPrivate
+        ? `Comment ${meta.privateLabel}`
+        : `Comment ${meta.publicLabel}`}
+    </Button>
+  );
+}
+
+function CommentComposerSubmit() {
   return (
     <div className="flex items-center justify-end pt-2">
       <ButtonGroup>
-        <Button
-          disabled={state.disabled || !state.content}
-          onClick={actions.onSubmit}
-          size="sm"
-          type="button"
-          variant={state.isPrivate ? "default" : "outline"}
-        >
-          {state.isPrivate
-            ? `Comment ${meta.privateLabel}`
-            : `Comment ${meta.publicLabel}`}
-        </Button>
-        <Button
-          aria-label={
-            state.isPrivate ? "Switch to public" : "Switch to internal"
-          }
-          disabled={state.disabled}
-          onClick={() => actions.onVisibilityChange(!state.isPrivate)}
-          size="sm"
-          type="button"
-          variant={state.isPrivate ? "default" : "outline"}
-        >
-          <HugeiconsIcon
-            icon={state.isPrivate ? ViewOffIcon : GlobeIcon}
-            strokeWidth={2}
-          />
-        </Button>
+        <VisibilitySwitcher />
+        <SubmitButton />
       </ButtonGroup>
     </div>
   );
@@ -151,7 +165,7 @@ type CommentComposerRootProps = {
   disabled?: boolean;
   isPrivate?: boolean;
   onContentChange?: (content: string) => void;
-  onSubmit: (value: {
+  onSubmit?: (value: {
     content: string;
     isPrivate: boolean;
   }) => void | Promise<void>;
@@ -203,6 +217,9 @@ function CommentComposerComponent({
   };
 
   const handleSubmit = async () => {
+    if (!onSubmit) {
+      return;
+    }
     await onSubmit({ content, isPrivate });
     setResetKey((k) => k + 1);
     if (!isContentControlled) {
@@ -216,7 +233,7 @@ function CommentComposerComponent({
       disabled={disabled}
       isPrivate={isPrivate}
       onContentChange={handleContentChange}
-      onSubmit={handleSubmit}
+      onSubmit={onSubmit ? handleSubmit : undefined}
       onVisibilityChange={handleVisibilityChange}
       placeholder={placeholder}
       privateLabel={privateLabel}

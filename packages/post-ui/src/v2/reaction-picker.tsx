@@ -192,7 +192,7 @@ export function PostReactionPicker({
   ...rest
 }: PostReactionPickerProps) {
   const {
-    collections: { postReactionCollection, membersCollection },
+    collections: { postReactionCollection },
     organizationId,
   } = usePostCollections();
   const { data: session } = useAuthState();
@@ -208,28 +208,12 @@ export function PostReactionPicker({
       toastManager.add({ title: "Sign in to react", type: "error" });
       return;
     }
-    let membershipId: string | null = null;
 
-    if (membersCollection) {
-      const query = await queryOnce((q) =>
-        q
-          .from({ members: membersCollection })
-          .where(({ members }) =>
-            and(
-              eq(members.organizationId, organizationId),
-              eq(members.userId, currentUserId)
-            )
-          )
-          .select(({ members }) => ({
-            id: members.id,
-          }))
-          .findOne()
-      );
-
-      if (query) {
-        membershipId = query.id;
-      }
-    }
+    const membership = session.memberships.find(
+      (value) =>
+        value.organizationId === organizationId &&
+        value.userId === session.user.id
+    );
 
     const existingUserEmojiReaction = await queryOnce((q) =>
       q
@@ -263,7 +247,7 @@ export function PostReactionPicker({
       organizationId,
       postId,
       userId: currentUserId,
-      memberId: membershipId,
+      memberId: membership?.membershipId ?? null,
       emoji,
     });
     await tx.isPersisted.promise;

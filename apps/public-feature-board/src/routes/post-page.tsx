@@ -1,4 +1,4 @@
-import { CommentId, CommentReactionId } from "@feeblo/id";
+import { CommentReactionId } from "@feeblo/id";
 import type { CommentReactionToggleInput } from "@feeblo/post-ui/comment-reaction-section";
 import {
   PostCommentComposer,
@@ -110,12 +110,6 @@ const UpdatedPostSchema = z.object({
   boardId: z.string(),
   organizationId: z.string(),
 });
-
-type SessionMembership = {
-  membershipId: string;
-  organizationId: string;
-  userId: string;
-};
 
 export const Route = createLazyRoute("/p/$slug")({
   component: PostPage,
@@ -316,41 +310,6 @@ export function PostPage() {
   const publishedDate = formatPublishedDate(post.createdAt);
   const selectedTags = postTagsQuery.data ?? [];
 
-  const handleAddComment = async ({
-    content,
-    visibility,
-  }: {
-    content: string;
-    visibility: "PUBLIC" | "INTERNAL";
-  }) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    if (!session) {
-      throw new Error("session not found");
-    }
-
-    const tx = publicCommentCollection.insert({
-      id: await CommentId.unsafeGenerate(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      content,
-      visibility,
-      parentCommentId: null,
-      organizationId: site.organizationId,
-      //todo fix
-      memberId: null,
-      postId,
-      userId: session.user.id,
-      user: {
-        name: session.user.name,
-      },
-    });
-
-    await tx.isPersisted.promise;
-  };
-
   const handleToggleCommentReaction = async ({
     commentId,
     emoji,
@@ -466,8 +425,7 @@ export function PostPage() {
                   defaultVisibility="PUBLIC"
                   disabled={isLocked}
                   disabledReason="This post is locked, so new comments are disabled until it is unlocked."
-                  handleAddComment={handleAddComment}
-                  isAuthenticated={!!session?.session}
+                  postId={post.id}
                 />
                 <PostCommentGuestPrompt
                   action={<AuthDialog variant="sign-in" />}

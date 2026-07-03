@@ -304,8 +304,7 @@ function RouteComponent() {
             defaultVisibility="PUBLIC"
             disabled={isLocked}
             disabledReason="This post is locked, so new comments and notes are disabled until it is unlocked."
-            handleAddComment={handleAddComment}
-            isAuthenticated
+            postId={post.id}
             showVisibilityPicker
           />
           <PostCommentListSection

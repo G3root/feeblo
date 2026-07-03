@@ -5,7 +5,6 @@ import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, queryOnce } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -156,7 +155,7 @@ export function UpvoteButton({
 }: UpvoteButtonProps) {
   const { data: session } = useAuthState();
   const {
-    collections: { upvoteCollection, membersCollection },
+    collections: { upvoteCollection },
     organizationId,
   } = usePostCollections();
 
@@ -169,28 +168,11 @@ export function UpvoteButton({
 
     const hasUpvoted = upvoteCollection.has(key);
 
-    let membershipId: string | null = null;
-
-    if (membersCollection) {
-      const query = await queryOnce((q) =>
-        q
-          .from({ members: membersCollection })
-          .where(({ members }) =>
-            and(
-              eq(members.organizationId, organizationId),
-              eq(members.userId, userId)
-            )
-          )
-          .select(({ members }) => ({
-            id: members.id,
-          }))
-          .findOne()
-      );
-
-      if (query) {
-        membershipId = query.id;
-      }
-    }
+    const membership = session.memberships.find(
+      (value) =>
+        value.organizationId === organizationId &&
+        value.userId === session.user.id
+    );
 
     if (hasUpvoted) {
       const tx = upvoteCollection.delete(key);
@@ -204,7 +186,7 @@ export function UpvoteButton({
         organizationId,
         postId,
         userId,
-        memberId: membershipId,
+        memberId: membership?.membershipId ?? null,
         user: {
           name: session?.user?.name ?? null,
           image: session?.user?.image ?? null,
