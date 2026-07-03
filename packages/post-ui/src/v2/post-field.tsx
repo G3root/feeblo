@@ -41,10 +41,12 @@ export function StatusField({
   currentStatusId,
   statuses,
   onValueChange,
+  disabled = false,
 }: {
   currentStatusId: string;
   statuses: Pick<TPostStatus, "id" | "type">[];
   onValueChange: (status: Pick<TPostStatus, "id" | "type"> | null) => void;
+  disabled?: boolean;
 }) {
   const items = statuses.map((postStatus) => ({
     label: getBoardStatusLabel(postStatus.type),
@@ -78,7 +80,7 @@ export function StatusField({
     >
       <ComboboxTrigger
         render={
-          <Button size="sm" variant="ghost">
+          <Button disabled={disabled} size="sm" variant="ghost">
             <ComboboxValue>
               {(value) => (
                 <span className="flex items-center gap-2">
@@ -128,12 +130,14 @@ type PostBoardSelectProps = {
   boards: { id: string; name: string }[];
   currentBoardId: string;
   onValueChange: (boardId: string | null) => void;
+  disabled?: boolean;
 };
 
 export function PostBoardSelect({
   boards,
   currentBoardId,
   onValueChange,
+  disabled = false,
 }: PostBoardSelectProps) {
   const currentBoard = boards.find((b) => b.id === currentBoardId);
   const items = boards.map((board) => ({
@@ -153,7 +157,12 @@ export function PostBoardSelect({
     >
       <ComboboxTrigger
         render={
-          <Button className="w-full justify-between" size="sm" variant="ghost">
+          <Button
+            className="w-full justify-between"
+            disabled={disabled}
+            size="sm"
+            variant="ghost"
+          >
             <ComboboxValue placeholder="Select board">
               {(value) => (
                 <span className="flex items-center gap-2">

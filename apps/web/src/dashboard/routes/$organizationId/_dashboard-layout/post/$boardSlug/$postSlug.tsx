@@ -1,6 +1,4 @@
-import { CommentId } from "@feeblo/id";
 import { CommentsList } from "@feeblo/post-ui/comment-display";
-import { PostBoardSelect, StatusField } from "@feeblo/post-ui/post-properties";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
@@ -11,8 +9,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import { toastManager } from "@feeblo/ui/toast";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,
@@ -22,25 +18,22 @@ import {
 import { CircleLockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
+import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostDetails } from "~/features/post/components/post-details-form";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
-import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
-import {
-  TagList,
-  TagSelect,
-  type TagSelectOption,
-} from "~/features/tag/components/tag-select";
-import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
+import { PostTagField } from "~/features/post/components/post-tag-field";
+import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
+
 import {
   boardCollection,
   postCollection,
   postStatusCollection,
   postTagCollection,
   tagCollection,
+  upvoteCollection,
 } from "~/lib/collections";
-import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
@@ -54,22 +47,14 @@ export const Route = createFileRoute(
       postStatusCollection.preload(),
       postTagCollection.preload(),
       tagCollection.preload(),
+      upvoteCollection.preload(),
     ]);
   },
 });
 
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
-  const {
-    boardCollection,
-    commentCollection,
-    postCollection,
-    postStatusCollection,
-    postTagCollection,
-    tagCollection,
-  } = useDashboardCollections();
-  const { data: session } = useAuthState();
-  const navigate = useNavigate();
+  const { boardCollection, postCollection } = useDashboardCollections();
 
   const { data: board } = useLiveQuery(
     (q) => {
@@ -109,62 +94,6 @@ function RouteComponent() {
 
   const postId = post?.id;
 
-  const { data: allBoards } = useLiveQuery(
-    (q) => {
-      return q
-        .from({ board: boardCollection })
-        .where(({ board }) => eq(board.organizationId, organizationId));
-    },
-    [organizationId]
-  );
-  const { data: postStatuses } = useLiveQuery(
-    (q) =>
-      q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        ),
-    [organizationId]
-  );
-
-  const { data: tags } = useLiveQuery(
-    (q) => {
-      return q
-        .from({ tags: tagCollection })
-        .where(({ tags }) =>
-          and(
-            eq(tags.organizationId, organizationId),
-            eq(tags.type, "FEEDBACK")
-          )
-        )
-        .select(({ tags }) => ({
-          id: tags.id,
-          name: tags.name,
-          type: tags.type,
-        }));
-    },
-    [organizationId]
-  );
-
-  const { data: postTags } = useLiveQuery(
-    (q) => {
-      if (!postId) {
-        return undefined;
-      }
-      return q
-        .from({ tags: postTagCollection })
-        .where(({ tags }) =>
-          and(eq(tags.postId, postId), eq(tags.organizationId, organizationId))
-        )
-        .select(({ tags }) => ({
-          id: tags.id,
-          tagId: tags.tagId,
-          typeId: tags.postId,
-        }));
-    },
-    [organizationId, postId]
-  );
-
   const { allowed: canManagePost } = usePolicy(
     anyPolicy(
       hasOwnerOrAdminRole(organizationId),
@@ -202,232 +131,80 @@ function RouteComponent() {
 
   const isLocked = post.lockedAt !== null;
 
-  const handleTagSelect = async (
-    option: TagSelectOption,
-    isSelected: boolean
-  ) => {
-    try {
-      if (!postTags) {
-        return;
-      }
-      const currentTagIds = postTags.map((tag) => tag.tagId);
-      const newTagIds = isSelected
-        ? currentTagIds?.filter((id) => id !== option.id)
-        : [...currentTagIds, option.id];
-
-      await fetchRpc((rpc) =>
-        rpc.PostTagSet({
-          postId: post.id,
-          organizationId,
-          tagIds: newTagIds,
-        })
-      );
-
-      await postTagCollection.utils.refetch();
-
-      toastManager.add({
-        title: "Tags updated",
-        type: "success",
-      });
-    } catch (_error) {
-      toastManager.add({
-        title: "Failed to update tags",
-        type: "error",
-      });
-    }
-  };
-
-  const handleAddComment = async ({
-    content,
-    visibility,
-  }: {
-    content: string;
-    visibility: "PUBLIC" | "INTERNAL";
-  }) => {
-    if (isLocked) {
-      throw new Error("Post is locked");
-    }
-
-    if (!session) {
-      throw new Error("session not found");
-    }
-
-    const postId = post.id;
-
-    const tx = commentCollection.insert({
-      id: await CommentId.unsafeGenerate(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      content,
-      visibility,
-      parentCommentId: null,
-      organizationId,
-      memberId: null,
-      postId,
-      userId: session.user.id,
-      user: {
-        name: session.user.name,
-      },
-    });
-
-    await tx.isPersisted.promise;
-  };
-
   return (
-    <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
-      <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
-        <PostDetails.Layout>
-          <PostDetails.Header
-            boardName={board.name}
-            boardSlug={board.slug}
+    <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
+      <PostDetails.Layout>
+        <PostDetails.Header
+          boardName={board.name}
+          boardSlug={board.slug}
+          organizationId={organizationId}
+          postCreatorId={post.creatorId}
+          postId={post.id}
+          title={post.title}
+        />
+        <PostStatusAlerts lockedAt={post.lockedAt} />
+        <PostDetails.Description
+          description={post.content}
+          organizationId={organizationId}
+          postCreatorId={post.creatorId}
+          postId={post.id}
+        />
+        <div className="flex items-center justify-between py-1">
+          <PostDetails.EngagementBar disabled={isLocked} postId={post.id} />
+        </div>
+        <PostDetails.CommentComposer
+          defaultVisibility="PUBLIC"
+          disabled={isLocked}
+          disabledReason="This post is locked, so new comments and notes are disabled until it is unlocked."
+          postId={post.id}
+          showVisibilityPicker
+        />
+        <CommentsList postId={post.id} />
+      </PostDetails.Layout>
+
+      <aside className="hidden px-6 py-6 lg:block">
+        <div className="sticky top-0 space-y-4">
+          <PostSidebarActions
+            boardSlug={boardSlug}
+            canManagePost={canManagePost}
+            lockedAt={post.lockedAt}
             organizationId={organizationId}
-            postCreatorId={post.creatorId}
             postId={post.id}
-            title={post.title}
+            postSlug={post.slug}
           />
-          <PostStatusAlerts lockedAt={post.lockedAt} />
-          <PostDetails.Description
-            description={post.content}
-            organizationId={organizationId}
-            postCreatorId={post.creatorId}
-            postId={post.id}
-          />
-          <div className="flex items-center justify-between py-1">
-            <PostDetails.EngagementBar
-              disabled={isLocked}
-              organizationId={organizationId}
-              postId={post.id}
-            />
-          </div>
-          <PostDetails.CommentComposer
-            defaultVisibility="PUBLIC"
-            disabled={isLocked}
-            disabledReason="This post is locked, so new comments and notes are disabled until it is unlocked."
-            postId={post.id}
-            showVisibilityPicker
-          />
-          <CommentsList postId={post.id} />
-        </PostDetails.Layout>
 
-        <aside className="hidden px-6 py-6 lg:block">
-          <div className="sticky top-0 space-y-4">
-            <PostSidebarActions
-              boardSlug={boardSlug}
-              canManagePost={canManagePost}
-              lockedAt={post.lockedAt}
-              organizationId={organizationId}
-              postId={post.id}
-              postSlug={post.slug}
-            />
-
-            {canManagePost ? (
-              <SidebarCard title="Properties">
-                <div>
-                  <StatusField
-                    currentStatusId={post.statusId}
-                    onValueChange={async (nextPostStatus) => {
-                      if (!nextPostStatus) {
-                        return;
-                      }
-                      try {
-                        const tx = postCollection.update(post.id, (draft) => {
-                          draft.statusId = nextPostStatus.id;
-                        });
-                        await tx.isPersisted.promise;
-
-                        toastManager.add({
-                          title: "Status updated",
-                          type: "success",
-                        });
-                      } catch (_error) {
-                        toastManager.add({
-                          title: "Failed to update status",
-                          type: "error",
-                        });
-                      }
-                    }}
-                    statuses={postStatuses}
-                  />
-                </div>
-
-                <PostBoardSelect
-                  boards={allBoards}
-                  currentBoardId={board.id}
-                  onValueChange={async (boardId) => {
-                    if (!boardId) {
-                      return;
-                    }
-                    try {
-                      const nextBoard = allBoards.find(
-                        (item) => item.id === boardId
-                      );
-                      const nextBoardSlug = nextBoard?.slug;
-                      const tx = postCollection.update(
-                        post.id,
-                        {
-                          optimistic: false,
-                        },
-                        (draft) => {
-                          draft.boardId = boardId;
-                        }
-                      );
-                      await tx.isPersisted.promise;
-
-                      toastManager.add({
-                        title: "Board updated",
-                        type: "success",
-                      });
-
-                      if (!nextBoardSlug) {
-                        return;
-                      }
-
-                      navigate({
-                        to: "/$organizationId/post/$boardSlug/$postSlug",
-                        params: {
-                          organizationId,
-                          boardSlug: nextBoardSlug,
-                          postSlug,
-                        },
-                        replace: true,
-                      });
-                    } catch (_error) {
-                      toastManager.add({
-                        title: "Failed to update board",
-                        type: "error",
-                      });
-                    }
-                  }}
-                />
-              </SidebarCard>
-            ) : null}
-
-            <SidebarCard title="Tags">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <TagList selectedTags={postTags ?? []} tags={tags} />
-                <TagSelect
-                  onTagSelect={handleTagSelect}
-                  selectedTags={postTags ?? []}
-                  tags={tags}
-                  type="FEEDBACK"
+          {canManagePost ? (
+            <SidebarCard title="Properties">
+              <div>
+                <PostStatusSelect
+                  currentStatusId={post.statusId}
+                  postId={post.id}
                 />
               </div>
-            </SidebarCard>
 
-            <SidebarCard title="Details">
-              <p className="text-muted-foreground text-sm">
-                {formatPostDate(post.createdAt)}
-              </p>
-
-              <p className="text-muted-foreground text-sm">
-                {post.user?.name ?? "Unknown author"}
-              </p>
+              <PostBoardField
+                currentBoardId={board.id}
+                organizationId={organizationId}
+                postId={post.id}
+                postSlug={postSlug}
+              />
             </SidebarCard>
-          </div>
-        </aside>
-      </div>
-      <TagCreateDialog />
-    </TagCreateDialogProvider>
+          ) : null}
+
+          <PostTagField organizationId={organizationId} postId={post.id} />
+
+          <SidebarCard title="Details">
+            <p className="text-muted-foreground text-sm">
+              {formatPostDate(post.createdAt)}
+            </p>
+
+            <p className="text-muted-foreground text-sm">
+              {post.user?.name ?? "Unknown author"}
+            </p>
+          </SidebarCard>
+        </div>
+      </aside>
+    </div>
   );
 }
 

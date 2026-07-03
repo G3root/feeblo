@@ -29,6 +29,7 @@ export interface SelectedTag {
 }
 
 interface TagSelectProps {
+  disabled?: boolean;
   onTagSelect: (
     option: TagSelectOption,
     isSelected: boolean
@@ -43,6 +44,7 @@ export const TagSelect = ({
   selectedTags,
   onTagSelect,
   type,
+  disabled = false,
 }: TagSelectProps) => {
   const [open, setOpen] = useState(false);
   const createDialogStore = useTagCreateDialogContext();
@@ -52,7 +54,11 @@ export const TagSelect = ({
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger
         render={
-          <Button size={hasSelectedTags ? "icon-xs" : "xs"} variant="ghost">
+          <Button
+            disabled={disabled}
+            size={hasSelectedTags ? "icon-xs" : "xs"}
+            variant="ghost"
+          >
             {hasSelectedTags ? (
               <HugeiconsIcon icon={PlusSignIcon} />
             ) : (

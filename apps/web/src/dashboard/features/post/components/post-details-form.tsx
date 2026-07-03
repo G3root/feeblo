@@ -1,8 +1,5 @@
 import { PostCommentComposer } from "@feeblo/post-ui/post-comment-composer";
-import {
-  PostCommentList,
-  PostCommentListSkeleton,
-} from "@feeblo/post-ui/post-comment-list";
+
 import { PostEditableContent } from "@feeblo/post-ui/post-content";
 import { PostDetailsEngagementBar } from "@feeblo/post-ui/post-engagement-bar";
 import { PostTitleUpdateInput } from "@feeblo/post-ui/post-title-input";
@@ -68,8 +65,6 @@ export const PostDetails = {
   Description: PostEditableContent,
   ActionsSkeleton: PostDetailsActionsSkeleton,
   CommentComposer: PostCommentComposer,
-  CommentList: PostCommentList,
-  CommentListSkeleton: PostCommentListSkeleton,
   EngagementBar: PostDetailsEngagementBar,
 };
 
