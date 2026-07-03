@@ -113,8 +113,6 @@ export function PostPage() {
   const { slug } = useParams({ from: "/p/$slug" });
   const {
     publicBoardCollection,
-    publicCommentCollection,
-    publicCommentReactionCollection,
     publicPostCollection,
     publicPostStatusCollection,
     publicPostTagCollection,
@@ -177,43 +175,7 @@ export function PostPage() {
         })),
     [site.organizationId, postId]
   );
-  const commentsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ comment: publicCommentCollection })
-        .where(({ comment }) =>
-          and(
-            eq(comment.organizationId, site.organizationId),
-            eq(comment.postId, postId)
-          )
-        )
-        .orderBy((comment) => comment.comment.createdAt, "desc"),
-    [site.organizationId, postId]
-  );
-  const commentReactionsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ commentReaction: publicCommentReactionCollection })
-        .where(({ commentReaction }) =>
-          and(
-            eq(commentReaction.organizationId, site.organizationId),
-            eq(commentReaction.postId, postId)
-          )
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.commentId,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.emoji,
-          "asc"
-        )
-        .orderBy(
-          (commentReaction) => commentReaction.commentReaction.createdAt,
-          "asc"
-        ),
-    [site.organizationId, postId]
-  );
+
   const { allowed: canEdit } = usePolicy(
     anyPolicy(
       hasOwnerOrAdminRole(site.organizationId),
@@ -325,9 +287,7 @@ export function PostPage() {
             <div className="shrink-0 pt-1">
               <UpvoteButton
                 disabled={isLocked}
-                isUpvoted={post.hasUserUpVoted}
                 postId={postId}
-                upvoteCount={post.upVotes}
                 variant="compact"
               />
             </div>

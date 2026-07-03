@@ -5,6 +5,7 @@ import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -142,7 +143,10 @@ function UpvoteToggleComponent({
 }
 
 interface UpvoteButtonProps
-  extends Omit<UpvoteToggleProviderProps, "onToggle" | "children"> {
+  extends Omit<
+    UpvoteToggleProviderProps,
+    "onToggle" | "children" | "isUpvoted" | "upvoteCount"
+  > {
   postId: string;
   variant?: "compact" | "default";
 }
@@ -158,6 +162,49 @@ export function UpvoteButton({
     collections: { upvoteCollection },
     organizationId,
   } = usePostCollections();
+
+  const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
+    (q) => {
+      if (!postId) {
+        return undefined;
+      }
+      return q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) =>
+          and(
+            eq(upvote.organizationId, organizationId),
+            eq(upvote.postId, postId)
+          )
+        )
+        .select(({ upvote }) => ({ id: upvote.id }));
+    },
+    [organizationId, postId]
+  );
+
+  const { data: hasUserUpvoted, isLoading: isUserUpvotedLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!(postId && session)) {
+          return undefined;
+        }
+        return q
+          .from({ upvote: upvoteCollection })
+          .where(({ upvote }) =>
+            and(
+              eq(upvote.organizationId, organizationId),
+              eq(upvote.postId, postId),
+              eq(upvote.userId, session.user.id)
+            )
+          )
+          .select(({ upvote }) => ({ id: upvote.id }))
+          .findOne();
+      },
+      [organizationId, postId]
+    );
+
+  if (isUpvotesLoading || isUserUpvotedLoading) {
+    return null;
+  }
 
   const onToggle = async () => {
     if (disabled || !session) {
@@ -197,7 +244,13 @@ export function UpvoteButton({
   };
 
   return (
-    <UpvoteToggleProvider disabled={disabled} onToggle={onToggle} {...rest}>
+    <UpvoteToggleProvider
+      disabled={disabled}
+      isUpvoted={!!hasUserUpvoted}
+      onToggle={onToggle}
+      upvoteCount={upvotes?.length ?? 0}
+      {...rest}
+    >
       <UpvoteToggleTrigger variant={variant} />
     </UpvoteToggleProvider>
   );

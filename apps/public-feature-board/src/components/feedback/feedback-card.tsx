@@ -76,12 +76,11 @@ export function FeedbackCard({
   post: FeedbackPost;
   status: string;
 }) {
-  const existingUpvote = post.hasUserUpVoted;
-  const upvoteCount = post.upVotes;
   const description = truncate(post.excerpt, 100) || "No details yet.";
   const isLocked = post.lockedAt !== null;
 
   return (
+    /// TODO: fix the link wrapping
     <Link
       className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
       params={{
@@ -89,13 +88,7 @@ export function FeedbackCard({
       }}
       to="/p/$slug"
     >
-      <UpvoteButton
-        disabled={isLocked}
-        isUpvoted={existingUpvote}
-        postId={post.id}
-        upvoteCount={upvoteCount}
-        variant="compact"
-      />
+      <UpvoteButton disabled={isLocked} postId={post.id} variant="compact" />
 
       <div className="min-w-0 flex-1">
         <h3 className="truncate font-medium text-sm leading-snug">
