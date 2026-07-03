@@ -86,13 +86,6 @@ function UpvoteToggleTrigger({
 }: UpvoteToggleTriggerProps) {
   const { actions, meta, state } = useUpvoteToggle();
 
-  const handleToggle = () => {
-    if (state.disabled) {
-      return;
-    }
-    actions.onToggle();
-  };
-
   if (variant === "compact") {
     return (
       <button
@@ -104,7 +97,7 @@ function UpvoteToggleTrigger({
             : "bg-muted/70 text-muted-foreground hover:bg-muted"
         )}
         disabled={state.disabled}
-        onClick={handleToggle}
+        onClick={actions.onToggle}
         type="button"
       >
         <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
@@ -120,7 +113,7 @@ function UpvoteToggleTrigger({
       aria-label={meta.label}
       className="rounded-full"
       disabled={state.disabled}
-      onClick={handleToggle}
+      onClick={actions.onToggle}
       size="sm"
       type="button"
       variant={state.isUpvoted ? "default" : "outline"}
@@ -199,7 +192,7 @@ export function UpvoteButton({
           .select(({ upvote }) => ({ id: upvote.id }))
           .findOne();
       },
-      [organizationId, postId]
+      [organizationId, postId, session?.user.id]
     );
 
   if (isUpvotesLoading || isUserUpvotedLoading) {
@@ -243,12 +236,15 @@ export function UpvoteButton({
     }
   };
 
+  const upvoteCount = upvotes?.length ?? 0;
+  const isUpvoted = !!hasUserUpvoted;
+
   return (
     <UpvoteToggleProvider
       disabled={disabled}
-      isUpvoted={!!hasUserUpvoted}
+      isUpvoted={isUpvoted}
       onToggle={onToggle}
-      upvoteCount={upvotes?.length ?? 0}
+      upvoteCount={upvoteCount}
       {...rest}
     >
       <UpvoteToggleTrigger variant={variant} />
