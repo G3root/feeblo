@@ -1,21 +1,13 @@
+import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
 import { StatusField } from "@feeblo/post-ui/post-properties";
 import { toastManager } from "@feeblo/ui/toast";
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-interface PostStatusSelectProps {
-  currentStatusId: string;
-  disabled?: boolean;
-  postId: string;
-}
-
-export function PostStatusSelect({
-  currentStatusId,
-  disabled,
-  postId,
-}: PostStatusSelectProps) {
-  const organizationId = useOrganizationId();
+export function PostStatusSelect() {
+  const { post, organizationId, isLocked, canManagePost } =
+    usePostCollectionData();
+  const disabled = isLocked || !canManagePost;
   const { postCollection, postStatusCollection } = useDashboardCollections();
 
   const { data: postStatuses } = useLiveQuery(
@@ -34,14 +26,14 @@ export function PostStatusSelect({
 
   return (
     <StatusField
-      currentStatusId={currentStatusId}
+      currentStatusId={post.statusId}
       disabled={disabled}
       onValueChange={async (nextPostStatus) => {
         if (!nextPostStatus || disabled) {
           return;
         }
         try {
-          const tx = postCollection.update(postId, (draft) => {
+          const tx = postCollection.update(post.id, (draft) => {
             draft.statusId = nextPostStatus.id;
           });
           await tx.isPersisted.promise;

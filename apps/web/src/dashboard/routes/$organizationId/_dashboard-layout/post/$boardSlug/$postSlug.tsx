@@ -159,18 +159,10 @@ function RouteComponent() {
             {canManagePost ? (
               <SidebarCard title="Properties">
                 <div>
-                  <PostStatusSelect
-                    currentStatusId={post.statusId}
-                    postId={post.id}
-                  />
+                  <PostStatusSelect />
                 </div>
 
-                <PostBoardField
-                  currentBoardId={board.id}
-                  organizationId={organizationId}
-                  postId={post.id}
-                  postSlug={postSlug}
-                />
+                <PostBoardField />
               </SidebarCard>
             ) : null}
 
