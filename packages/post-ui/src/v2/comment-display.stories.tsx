@@ -9,7 +9,6 @@ import {
   TimelineSeparator,
   TimelineTitle,
 } from "@feeblo/ui/reui/timeline";
-import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { useState } from "react";
 import { CommentDisplay } from "./comment-display";
 
@@ -19,12 +18,6 @@ export default {
 
 const SAMPLE_HTML =
   "<p>This is a sample comment with <strong>bold</strong> text and a <a href='#'>link</a>.</p>";
-
-const SAMPLE_REACTIONS = new Map<ReactionEmoji, { count: number }>([
-  ["red_heart", { count: 5 }],
-  ["thumbs_up", { count: 3 }],
-  ["party_popper", { count: 1 }],
-]);
 
 const noopReply = async () => {};
 
@@ -39,9 +32,7 @@ export function Default() {
           createdAt={new Date(Date.now() - 1000 * 60 * 30)}
           onDelete={() => {}}
           onReply={noopReply}
-          onToggleReaction={() => {}}
-          reactionList={new Map()}
-          selectedReactions={new Set()}
+          postId="post-1"
         />
       </div>
     </div>
@@ -60,9 +51,7 @@ export function InternalNote() {
           isInternal
           onDelete={() => {}}
           onReply={noopReply}
-          onToggleReaction={() => {}}
-          reactionList={new Map()}
-          selectedReactions={new Set()}
+          postId="post-1"
         />
       </div>
     </div>
@@ -93,10 +82,8 @@ export function AsAuthor() {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Reply", { content, isPrivate });
           }}
-          onToggleReaction={() => {}}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
-          reactionList={SAMPLE_REACTIONS}
-          selectedReactions={new Set()}
+          postId="post-1"
         />
       </div>
     </div>
@@ -104,8 +91,6 @@ export function AsAuthor() {
 }
 
 export function WithReactions() {
-  const [selected, setSelected] = useState<Set<ReactionEmoji>>(new Set());
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="w-full max-w-xl">
@@ -116,19 +101,7 @@ export function WithReactions() {
           createdAt={new Date(Date.now() - 1000 * 60 * 60 * 3)}
           onDelete={() => {}}
           onReply={noopReply}
-          onToggleReaction={(emoji) => {
-            setSelected((prev) => {
-              const next = new Set(prev);
-              if (next.has(emoji)) {
-                next.delete(emoji);
-              } else {
-                next.add(emoji);
-              }
-              return next;
-            });
-          }}
-          reactionList={SAMPLE_REACTIONS}
-          selectedReactions={selected}
+          postId="post-1"
         />
       </div>
     </div>
@@ -147,9 +120,7 @@ export function Disabled() {
           disabled
           onDelete={() => {}}
           onReply={noopReply}
-          onToggleReaction={() => {}}
-          reactionList={SAMPLE_REACTIONS}
-          selectedReactions={new Set()}
+          postId="post-1"
         />
       </div>
     </div>
@@ -157,7 +128,6 @@ export function Disabled() {
 }
 
 export function Composed() {
-  const [selected, setSelected] = useState<Set<ReactionEmoji>>(new Set());
   const [isInternal, setIsInternal] = useState(false);
 
   return (
@@ -181,20 +151,8 @@ export function Composed() {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Reply", { content, isPrivate });
           }}
-          onToggleReaction={(emoji) => {
-            setSelected((prev) => {
-              const next = new Set(prev);
-              if (next.has(emoji)) {
-                next.delete(emoji);
-              } else {
-                next.add(emoji);
-              }
-              return next;
-            });
-          }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
-          reactionList={SAMPLE_REACTIONS}
-          selectedReactions={selected}
+          postId="post-1"
         >
           <div className="rounded-md border border-border p-4">
             <div className="flex items-start gap-3">
@@ -216,7 +174,6 @@ export function Composed() {
 }
 
 export function TimelineComposition() {
-  const [selected, setSelected] = useState<Set<ReactionEmoji>>(new Set());
   const [internalComments, setInternalComments] = useState<Set<string>>(
     new Set(["c3"])
   );
@@ -288,17 +245,6 @@ export function TimelineComposition() {
                       isPrivate,
                     });
                   }}
-                  onToggleReaction={(emoji) => {
-                    setSelected((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(emoji)) {
-                        next.delete(emoji);
-                      } else {
-                        next.add(emoji);
-                      }
-                      return next;
-                    });
-                  }}
                   onToggleVisibility={() => {
                     setInternalComments((prev) => {
                       const next = new Set(prev);
@@ -310,15 +256,7 @@ export function TimelineComposition() {
                       return next;
                     });
                   }}
-                  reactionList={
-                    index === 0
-                      ? new Map([
-                          ["red_heart", { count: 5 }],
-                          ["thumbs_up", { count: 2 }],
-                        ])
-                      : new Map()
-                  }
-                  selectedReactions={selected}
+                  postId="post-1"
                 />
               </TimelineContent>
             </TimelineItem>

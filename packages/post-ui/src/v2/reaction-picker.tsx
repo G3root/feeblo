@@ -337,9 +337,9 @@ export function PostReactionPicker({
   );
 }
 
-interface CommentReactionPickerProps
-  extends Omit<ReactionPickerProviderProps, "onToggle"> {
+interface CommentReactionPickerProps {
   commentId: string;
+  disabled?: boolean;
   postId: string;
 }
 
@@ -347,13 +347,59 @@ export function CommentReactionPicker({
   commentId,
   disabled,
   postId,
-  ...rest
 }: CommentReactionPickerProps) {
   const {
     collections: { commentReactionCollection },
     organizationId,
   } = usePostCollections();
   const { data: session } = useAuthState();
+
+  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!postId) {
+          return undefined;
+        }
+        return q
+          .from({ commentReaction: commentReactionCollection })
+          .where(({ commentReaction }) =>
+            and(
+              eq(commentReaction.commentId, commentId),
+              eq(commentReaction.postId, postId)
+            )
+          )
+          .groupBy(({ commentReaction }) => commentReaction.emoji)
+          .select(({ commentReaction }) => ({
+            emoji: commentReaction.emoji,
+            count: count(commentReaction.id),
+          }))
+          .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
+      },
+      [organizationId, postId]
+    );
+
+  const { data: userReactions, isLoading: isUserReactionsLoading } =
+    useLiveQuery(
+      (q) => {
+        if (!(postId && session?.user?.id)) {
+          return undefined;
+        }
+        return q
+          .from({ commentReaction: commentReactionCollection })
+          .where(({ commentReaction }) =>
+            and(
+              eq(commentReaction.commentId, commentId),
+              eq(commentReaction.userId, session.user.id),
+              eq(commentReaction.postId, postId)
+            )
+          )
+          .select(({ commentReaction }) => ({
+            emoji: commentReaction.emoji,
+          }))
+          .distinct();
+      },
+      [organizationId, postId, session?.user?.id]
+    );
 
   const handleToggleReaction = async (emoji: ReactionEmoji) => {
     if (disabled) {
@@ -412,11 +458,29 @@ export function CommentReactionPicker({
     await tx.isPersisted.promise;
   };
 
+  const isLoading = isReactionCountsLoading || isUserReactionsLoading;
+
+  if (isLoading) {
+    return null;
+  }
+
+  const existingReactions = new Set(
+    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
+  );
+
+  const reactionList = new Map(
+    (reactionCounts ?? []).map((r) => [
+      r.emoji as ReactionEmoji,
+      { count: r.count },
+    ])
+  );
+
   return (
     <ReactionPickerProvider
       disabled={disabled}
+      existingReactions={existingReactions}
       onToggle={handleToggleReaction}
-      {...rest}
+      reactionList={reactionList}
     >
       <div className="flex items-center gap-1">
         <ReactionPickerDisplayRow />

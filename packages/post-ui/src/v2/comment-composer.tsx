@@ -111,6 +111,7 @@ function CommentComposerEditor() {
 
 function SubmitButton() {
   const { actions, state } = useCommentComposer();
+
   return (
     <Button
       aria-label={state.isPrivate ? "Switch to public" : "Switch to internal"}
@@ -132,7 +133,7 @@ function VisibilitySwitcher() {
   const { actions, meta, state } = useCommentComposer();
   return (
     <Button
-      disabled={state.disabled || !state.content}
+      disabled={state.disabled}
       size="sm"
       type={actions.onSubmit ? "button" : "submit"}
       variant={state.isPrivate ? "default" : "outline"}

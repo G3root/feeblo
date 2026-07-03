@@ -7,8 +7,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
-import type { ReactionEmoji } from "@feeblo/utils/reaction";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   Delete02Icon,
   Edit01Icon,
@@ -17,7 +15,7 @@ import {
   ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, count, eq, useLiveQuery } from "@tanstack/react-db";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
 import { CommentComposer } from "./comment-composer";
 import { usePostCollections } from "./providers/post-collections-provider";
@@ -80,7 +78,6 @@ type CommentDisplayActions = {
     content: string;
     isPrivate: boolean;
   }) => void | Promise<void>;
-  onToggleReaction: (emoji: ReactionEmoji) => void;
   onToggleVisibility: () => void;
 };
 
@@ -92,16 +89,10 @@ type CommentDisplayMeta = {
   toggleToPublicLabel: string;
 };
 
-type CommentDisplayReactionData = {
-  reactionList: Map<ReactionEmoji, { count: number }>;
-  selectedReactions: Set<ReactionEmoji>;
-};
-
 type CommentDisplayContextValue = {
   actions: CommentDisplayActions;
   meta: CommentDisplayMeta;
   state: CommentDisplayState;
-  reactions: CommentDisplayReactionData;
 };
 
 const CommentDisplayContext = createContext<CommentDisplayContextValue | null>(
@@ -136,11 +127,8 @@ type CommentDisplayProviderProps = {
     content: string;
     isPrivate: boolean;
   }) => void | Promise<void>;
-  onToggleReaction: (emoji: ReactionEmoji) => void;
   onToggleVisibility?: () => void;
-  reactionList: Map<ReactionEmoji, { count: number }>;
   replyLabel?: string;
-  selectedReactions: Set<ReactionEmoji>;
   toggleToInternalLabel?: string;
   toggleToPublicLabel?: string;
 };
@@ -160,11 +148,8 @@ function CommentDisplayProvider({
   onDelete,
   onEdit = () => {},
   onReply,
-  onToggleReaction,
   onToggleVisibility = () => {},
-  reactionList,
   replyLabel = "Reply",
-  selectedReactions,
   toggleToInternalLabel = "Make internal",
   toggleToPublicLabel = "Make public",
 }: CommentDisplayProviderProps) {
@@ -175,7 +160,6 @@ function CommentDisplayProvider({
           onDelete,
           onEdit,
           onReply,
-          onToggleReaction,
           onToggleVisibility,
         },
         meta: {
@@ -195,7 +179,6 @@ function CommentDisplayProvider({
           isInternal,
           postId,
         },
-        reactions: { reactionList, selectedReactions },
       }}
     >
       {children}
@@ -244,7 +227,7 @@ function CommentDisplayBody() {
 }
 
 function CommentDisplayActions() {
-  const { actions, state, reactions } = useCommentDisplay();
+  const { actions, state } = useCommentDisplay();
   const [isReplying, setIsReplying] = useState(false);
 
   return (
@@ -263,9 +246,7 @@ function CommentDisplayActions() {
         <CommentReactionPicker
           commentId={state.commentId}
           disabled={state.disabled}
-          existingReactions={reactions.selectedReactions}
           postId={state.postId}
-          reactionList={reactions.reactionList}
         />
       </div>
 
@@ -391,79 +372,6 @@ interface CommentDisplayItemProps {
 }
 
 function CommentDisplayitem({ data }: CommentDisplayItemProps) {
-  const {
-    collections: { commentReactionCollection },
-  } = usePostCollections();
-  const { data: session } = useAuthState();
-
-  const organizationId = data.organizationId;
-  const postId = data.postId;
-  const commentId = data.id;
-
-  const { data: reactionCounts, isLoading: isReactionCountsLoading } =
-    useLiveQuery(
-      (q) => {
-        if (!postId) {
-          return undefined;
-        }
-        return q
-          .from({ commentReaction: commentReactionCollection })
-          .where(({ commentReaction }) =>
-            and(
-              eq(commentReaction.commentId, commentId),
-              eq(commentReaction.postId, postId)
-            )
-          )
-          .groupBy(({ commentReaction }) => commentReaction.emoji)
-          .select(({ commentReaction }) => ({
-            emoji: commentReaction.emoji,
-            count: count(commentReaction.id),
-          }))
-          .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
-      },
-      [organizationId, postId]
-    );
-
-  const { data: userReactions, isLoading: isUserReactionsLoading } =
-    useLiveQuery(
-      (q) => {
-        if (!(postId && session?.user?.id)) {
-          return undefined;
-        }
-        return q
-          .from({ commentReaction: commentReactionCollection })
-          .where(({ commentReaction }) =>
-            and(
-              eq(commentReaction.commentId, commentId),
-              eq(commentReaction.userId, session.user.id),
-              eq(commentReaction.postId, postId)
-            )
-          )
-          .select(({ commentReaction }) => ({
-            emoji: commentReaction.emoji,
-          }))
-          .distinct();
-      },
-      [organizationId, postId, session?.user?.id]
-    );
-
-  const existingReactions = new Set(
-    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
-  );
-
-  const reactionList = new Map(
-    (reactionCounts ?? []).map((r) => [
-      r.emoji as ReactionEmoji,
-      { count: r.count },
-    ])
-  );
-
-  const isLoading = isReactionCountsLoading || isUserReactionsLoading;
-
-  if (isLoading) {
-    return null;
-  }
-
   return (
     <CommentDisplayComponent
       authorName={data.user.name}
@@ -472,8 +380,6 @@ function CommentDisplayitem({ data }: CommentDisplayItemProps) {
       createdAt={data.createdAt}
       isInternal={data.visibility === "INTERNAL"}
       postId={data.postId}
-      reactionList={reactionList}
-      selectedReactions={existingReactions}
     />
   );
 }
