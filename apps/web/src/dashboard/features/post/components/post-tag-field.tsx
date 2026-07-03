@@ -1,3 +1,4 @@
+import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -12,17 +13,11 @@ import { tagCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-interface PostTagFieldProps {
-  disabled?: boolean;
-  organizationId: string;
-  postId: string;
-}
+export function PostTagField() {
+  const { post, organizationId, isLocked, canManagePost } =
+    usePostCollectionData();
 
-export function PostTagField({
-  disabled,
-  postId,
-  organizationId,
-}: PostTagFieldProps) {
+  const disabled = isLocked || !canManagePost;
   const { postTagCollection } = useDashboardCollections();
 
   const { data: tags } = useLiveQuery(
@@ -46,13 +41,13 @@ export function PostTagField({
 
   const { data: postTags } = useLiveQuery(
     (q) => {
-      if (!postId) {
+      if (!post.id) {
         return undefined;
       }
       return q
         .from({ tags: postTagCollection })
         .where(({ tags }) =>
-          and(eq(tags.postId, postId), eq(tags.organizationId, organizationId))
+          and(eq(tags.postId, post.id), eq(tags.organizationId, organizationId))
         )
         .select(({ tags }) => ({
           id: tags.id,
@@ -60,7 +55,7 @@ export function PostTagField({
           typeId: tags.postId,
         }));
     },
-    [organizationId, postId]
+    [organizationId, post.id]
   );
 
   const handleTagSelect = async (
@@ -81,7 +76,7 @@ export function PostTagField({
 
       await fetchRpc((rpc) =>
         rpc.PostTagSet({
-          postId,
+          postId: post.id,
           organizationId,
           tagIds: newTagIds,
         })

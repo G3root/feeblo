@@ -166,7 +166,7 @@ function RouteComponent() {
               </SidebarCard>
             ) : null}
 
-            <PostTagField organizationId={organizationId} postId={post.id} />
+            <PostTagField />
 
             <SidebarCard title="Details">
               <p className="text-muted-foreground text-sm">
