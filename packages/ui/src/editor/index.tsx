@@ -18,15 +18,11 @@ import { cn } from "../utils";
 import { useEditorContext } from "./editor-store";
 import { defineExtension } from "./extension";
 import useContentChange from "./hooks/use-content-change";
-import { tags } from "./sample/sample-tag-data";
-import { users } from "./sample/sample-user-data";
 import { BlockHandle } from "./ui/block-handle";
 import { DropIndicator } from "./ui/drop-indicator";
 import { InlineMenu } from "./ui/inline-menu/index";
 import { SlashMenu } from "./ui/slash-menu/index";
 import { TableHandle } from "./ui/table-handle/index";
-import { TagMenu } from "./ui/tag-menu/index";
-import { UserMenu } from "./ui/user-menu/index";
 
 export interface EditorProps {
   className?: string;
@@ -66,14 +62,16 @@ export function Editor(props: EditorProps) {
         )}
         ref={editor.mount}
       />
-      <InlineMenu />
-      <SlashMenu />
-      <UserMenu users={users} />
-      <TagMenu tags={tags} />
-      {props.showBlockHandle ? <BlockHandle /> : null}
-
-      <TableHandle />
-      <DropIndicator />
+      {props.readOnly ? null : (
+        <>
+          <InlineMenu />
+          <SlashMenu />
+          <TableHandle />
+          <DropIndicator />
+          {props.showBlockHandle ? <BlockHandle /> : null}
+          {/* <UserMenu users={users} /> */}
+        </>
+      )}
     </ProseKit>
   );
 }
