@@ -10,12 +10,14 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
-import { useCommentDeleteDialogContext } from "../dialog-stores/post";
+import { useCommentDeleteDialogContext } from "../dialog-stores/comment";
 import { usePostCollections } from "../providers/post-collections-provider";
 
 export function CommentDeleteDialog() {
   const store = useCommentDeleteDialogContext();
-  const { collections } = usePostCollections();
+  const {
+    collections: { commentCollection },
+  } = usePostCollections();
   const open = useSelector(store, (state) => state.context.open);
   return (
     <AlertDialog
@@ -37,7 +39,7 @@ export function CommentDeleteDialog() {
               try {
                 const id = store.get().context.data.commentId;
                 store.send({ type: "toggle" });
-                const tx = collections.commentCollection.delete(id);
+                const tx = commentCollection.delete(id);
                 await tx.isPersisted.promise;
                 toastManager.add({
                   title: "Comment deleted successfully",

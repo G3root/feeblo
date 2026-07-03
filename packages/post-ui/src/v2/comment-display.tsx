@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@feeblo/ui/dropdown-menu";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   Delete02Icon,
   Edit01Icon,
@@ -18,6 +19,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
 import { CommentComposer } from "./comment-composer";
+import { useCommentDeleteDialogContext } from "./dialog-stores/comment";
 import { usePostCollectionData } from "./post-collection";
 import { usePostCollections } from "./providers/post-collections-provider";
 import { CommentReactionPicker } from "./reaction-picker";
@@ -265,33 +267,70 @@ function CommentDisplayActions() {
   );
 }
 
-function CommentDisplayDropdown() {
+function DeleteButton() {
+  const store = useCommentDeleteDialogContext();
+  const { meta, state } = useCommentDisplay();
+
+  return (
+    <DropdownMenuItem
+      onClick={() =>
+        store.send({
+          type: "toggle",
+          data: {
+            commentId: state.commentId,
+          },
+        })
+      }
+    >
+      <HugeiconsIcon icon={Delete02Icon} />
+      {meta.deleteLabel}
+    </DropdownMenuItem>
+  );
+}
+
+function EditButton() {
+  const { meta, actions } = useCommentDisplay();
+
+  return (
+    <DropdownMenuItem onClick={actions.onEdit}>
+      <HugeiconsIcon icon={Edit01Icon} />
+      {meta.editLabel}
+    </DropdownMenuItem>
+  );
+}
+
+function ToggleVisibilityButton() {
   const { actions, meta, state } = useCommentDisplay();
+
+  return (
+    <DropdownMenuItem onClick={actions.onToggleVisibility}>
+      <HugeiconsIcon icon={state.isInternal ? EyeIcon : ViewOffIcon} />
+      {state.isInternal ? meta.toggleToPublicLabel : meta.toggleToInternalLabel}
+    </DropdownMenuItem>
+  );
+}
+
+function CommentDisplayDropdown() {
+  const { canManagePost } = usePostCollectionData();
+  const { state } = useCommentDisplay();
+
+  if (!(canManagePost || state.isAuthor)) {
+    return null;
+  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button disabled={state.disabled} size="icon-sm" variant="ghost">
+          <Button size="icon-sm" variant="ghost">
             <HugeiconsIcon icon={Ellipsis} />
           </Button>
         }
       />
       <DropdownMenuContent>
-        <DropdownMenuItem onClick={actions.onEdit}>
-          <HugeiconsIcon icon={Edit01Icon} />
-          {meta.editLabel}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={actions.onToggleVisibility}>
-          <HugeiconsIcon icon={state.isInternal ? EyeIcon : ViewOffIcon} />
-          {state.isInternal
-            ? meta.toggleToPublicLabel
-            : meta.toggleToInternalLabel}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={actions.onDelete}>
-          <HugeiconsIcon icon={Delete02Icon} />
-          {meta.deleteLabel}
-        </DropdownMenuItem>
+        <EditButton />
+        <ToggleVisibilityButton />
+        <DeleteButton />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -337,6 +376,7 @@ export const CommentDisplay = Object.assign(CommentDisplayComponent, {
 });
 
 export function CommentsList() {
+  const { data: session } = useAuthState();
   const { organizationId, post } = usePostCollectionData();
   const {
     collections: { commentCollection },
@@ -362,21 +402,27 @@ export function CommentsList() {
   }
 
   return comments.map((data) => (
-    <CommentDisplayitem data={data} key={data.id} />
+    <CommentDisplayitem
+      currentUserId={session?.user?.id}
+      data={data}
+      key={data.id}
+    />
   ));
 }
 
 interface CommentDisplayItemProps {
+  currentUserId?: string;
   data: TComment;
 }
 
-function CommentDisplayitem({ data }: CommentDisplayItemProps) {
+function CommentDisplayitem({ data, currentUserId }: CommentDisplayItemProps) {
   return (
     <CommentDisplayComponent
       authorName={data.user.name}
       commentId={data.id}
       content={data.content}
       createdAt={data.createdAt}
+      isAuthor={currentUserId ? data.userId === currentUserId : false}
       isInternal={data.visibility === "INTERNAL"}
       postId={data.postId}
     />

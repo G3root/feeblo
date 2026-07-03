@@ -1,4 +1,4 @@
-import { usePostCreateDialogContext } from "@feeblo/post-ui/post-dialog-stores";
+import { usePostCreateDialogContext } from "@feeblo/post-ui/dialog-stores";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {

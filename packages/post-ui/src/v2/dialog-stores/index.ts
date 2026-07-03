@@ -1,9 +1,11 @@
-// biome-ignore lint/performance/noBarrelFile: <explanation>
+/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 export {
   CommentDeleteDialogProvider,
+  useCommentDeleteDialogContext,
+} from "./comment";
+export {
   PostCreateDialogProvider,
   PostDeleteDialogProvider,
-  useCommentDeleteDialogContext,
   usePostCreateDialogContext,
   usePostDeleteDialogContext,
-} from "@feeblo/post-ui/dialog-stores";
+} from "./post";

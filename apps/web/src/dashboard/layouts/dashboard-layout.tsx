@@ -1,12 +1,12 @@
 import { CommentDeleteDialog } from "@feeblo/post-ui/comment-delete-dialog";
-import { PostCollectionsProvider } from "@feeblo/post-ui/post-collections-provider";
-import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
-import { PostDeleteDialog } from "@feeblo/post-ui/post-delete-dialog";
 import {
   CommentDeleteDialogProvider,
   PostCreateDialogProvider,
   PostDeleteDialogProvider,
-} from "@feeblo/post-ui/post-dialog-stores";
+} from "@feeblo/post-ui/dialog-stores";
+import { PostCollectionsProvider } from "@feeblo/post-ui/post-collections-provider";
+import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
+import { PostDeleteDialog } from "@feeblo/post-ui/post-delete-dialog";
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import {
   SidebarInset,

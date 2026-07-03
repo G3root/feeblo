@@ -1,9 +1,15 @@
+import { CommentDeleteDialog } from "@feeblo/post-ui/comment-delete-dialog";
 import { CommentsList } from "@feeblo/post-ui/comment-display";
+import {
+  CommentDeleteDialogProvider,
+  PostDeleteDialogProvider,
+} from "@feeblo/post-ui/dialog-stores";
 import {
   PostCollectionDataProvider,
   usePostCollectionData,
 } from "@feeblo/post-ui/post-collection";
 import { PostCommentComposer } from "@feeblo/post-ui/post-comment-composer";
+import { PostDeleteDialog } from "@feeblo/post-ui/post-delete-dialog";
 import { PostContentUpdateInput } from "@feeblo/post-ui/post-editor";
 import { PostTitleUpdateInput } from "@feeblo/post-ui/post-title-input";
 import { PostReactionPicker } from "@feeblo/post-ui/reaction-picker";
@@ -120,67 +126,73 @@ function RouteComponent() {
   }
 
   return (
-    <PostCollectionDataProvider
-      board={board}
-      organizationId={organizationId}
-      post={post}
-    >
-      <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
-          <section className="space-y-6">
-            <div className="space-y-3">
-              <Link
-                className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
-                params={{ organizationId, boardSlug }}
-                to="/$organizationId/board/$boardSlug"
-              >
-                Back to {board.name}
-              </Link>
+    <PostDeleteDialogProvider>
+      <CommentDeleteDialogProvider>
+        <PostCollectionDataProvider
+          board={board}
+          organizationId={organizationId}
+          post={post}
+        >
+          <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
+              <section className="space-y-6">
+                <div className="space-y-3">
+                  <Link
+                    className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
+                    params={{ organizationId, boardSlug }}
+                    to="/$organizationId/board/$boardSlug"
+                  >
+                    Back to {board.name}
+                  </Link>
 
-              <PostTitleUpdateInput />
-            </div>
-            <PostStatusAlerts />
-            <PostContentUpdateInput />
-            <div className="flex items-center justify-between py-1">
-              <PostReactionPicker />
-
-              <UpvoteButton />
-            </div>
-            <PostCommentComposer />
-
-            <CommentsList />
-          </section>
-        </div>
-
-        <aside className="hidden px-6 py-6 lg:block">
-          <div className="sticky top-0 space-y-4">
-            <PostSidebarActions />
-
-            {canManagePost ? (
-              <SidebarCard title="Properties">
-                <div>
-                  <PostStatusSelect />
+                  <PostTitleUpdateInput />
                 </div>
+                <PostStatusAlerts />
+                <PostContentUpdateInput />
+                <div className="flex items-center justify-between py-1">
+                  <PostReactionPicker />
 
-                <PostBoardField />
-              </SidebarCard>
-            ) : null}
+                  <UpvoteButton />
+                </div>
+                <PostCommentComposer />
 
-            <PostTagField />
+                <CommentsList />
+              </section>
+            </div>
 
-            <SidebarCard title="Details">
-              <p className="text-muted-foreground text-sm">
-                {formatPostDate(post.createdAt)}
-              </p>
+            <aside className="hidden px-6 py-6 lg:block">
+              <div className="sticky top-0 space-y-4">
+                <PostSidebarActions />
 
-              <p className="text-muted-foreground text-sm">
-                {post.user?.name ?? "Unknown author"}
-              </p>
-            </SidebarCard>
+                {canManagePost ? (
+                  <SidebarCard title="Properties">
+                    <div>
+                      <PostStatusSelect />
+                    </div>
+
+                    <PostBoardField />
+                  </SidebarCard>
+                ) : null}
+
+                <PostTagField />
+
+                <SidebarCard title="Details">
+                  <p className="text-muted-foreground text-sm">
+                    {formatPostDate(post.createdAt)}
+                  </p>
+
+                  <p className="text-muted-foreground text-sm">
+                    {post.user?.name ?? "Unknown author"}
+                  </p>
+                </SidebarCard>
+              </div>
+            </aside>
           </div>
-        </aside>
-      </div>
-    </PostCollectionDataProvider>
+          <PostDeleteDialog />
+          <CommentDeleteDialog />
+        </PostCollectionDataProvider>
+      </CommentDeleteDialogProvider>
+    </PostDeleteDialogProvider>
   );
 }
 

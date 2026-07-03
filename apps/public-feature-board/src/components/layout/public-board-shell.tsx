@@ -1,7 +1,7 @@
+import { PostCreateDialogProvider } from "@feeblo/post-ui/dialog-stores";
 import type { PostCollections } from "@feeblo/post-ui/post-collections-provider";
 import { PostCollectionsProvider } from "@feeblo/post-ui/post-collections-provider";
 import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
-import { PostCreateDialogProvider } from "@feeblo/post-ui/post-dialog-stores";
 import type { ReactNode } from "react";
 import {
   publicBoardCollection,

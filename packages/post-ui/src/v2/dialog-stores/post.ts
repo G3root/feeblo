@@ -22,10 +22,3 @@ export const [PostCreateDialogProvider, usePostCreateDialogContext] =
     hookName: "usePostCreateDialogContext",
     providerName: "PostCreateDialogProvider",
   });
-
-export const [CommentDeleteDialogProvider, useCommentDeleteDialogContext] =
-  createModalStoreContext<{ commentId: string }>({
-    name: "CommentDeleteDialogContext",
-    hookName: "useCommentDeleteDialogContext",
-    providerName: "CommentDeleteDialogProvider",
-  });
