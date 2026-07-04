@@ -4,7 +4,10 @@ import {
   CommentDeleteDialogProvider,
   PostDeleteDialogProvider,
 } from "@feeblo/post-ui/dialog-stores";
-import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
+import {
+  PostCollectionDataProvider,
+  usePostCollectionData,
+} from "@feeblo/post-ui/post-collection";
 import {
   PostCommentComposer,
   PostCommentGuestPrompt,
@@ -188,10 +191,6 @@ export function PostPage() {
     );
   }
 
-  const boardName = board?.name ?? "Unassigned";
-  const authorName = post?.user?.name ?? "Anonymous";
-  const authorInitials = getInitials(post?.user?.name ?? "Anonymous");
-  const publishedDate = formatPublishedDate(post.createdAt);
   const selectedTags = postTagsQuery.data ?? [];
 
   return (
@@ -235,21 +234,14 @@ export function PostPage() {
               </article>
 
               <PostMetaSidebar.Root>
-                <PostMetaSidebar.Voters postId={post.id} />
-                <PostMetaSidebar.Board
-                  boardName={boardName}
-                  boardSlug={board?.slug}
-                />
+                <PostMetaSidebar.Voters />
+                <PostMetaSidebar.Board />
                 <PostMetaSidebar.Status
                   status={postStatus?.type ?? "PLANNED"}
                 />
                 <PostMetaSidebar.Tags tags={selectedTags} />
-                <PostMetaSidebar.Author
-                  authorImage={post.user.image ?? undefined}
-                  authorInitials={authorInitials}
-                  authorName={authorName}
-                />
-                <PostMetaSidebar.PublishedOn publishedDate={publishedDate} />
+                <PostMetaSidebar.Author />
+                <PostMetaSidebar.PublishedOn />
                 {/* <PostMetaSidebar.Share /> */}
               </PostMetaSidebar.Root>
             </div>
@@ -294,9 +286,10 @@ function PostMetaSidebarSection({
   );
 }
 
-function PostMetaSidebarVoters({ postId }: { postId: string }) {
+function PostMetaSidebarVoters() {
+  const { post } = usePostCollectionData();
   return (
-    <PostVoterDialog.Root postId={postId}>
+    <PostVoterDialog.Root postId={post.id}>
       <PostMetaSidebarSection
         actions={<PostVoterDialog.Trigger />}
         title="Voters"
@@ -308,18 +301,13 @@ function PostMetaSidebarVoters({ postId }: { postId: string }) {
   );
 }
 
-function PostMetaSidebarBoard({
-  boardName,
-  boardSlug,
-}: {
-  boardName: string;
-  boardSlug?: string | null;
-}) {
+function PostMetaSidebarBoard() {
+  const { board } = usePostCollectionData();
   return (
     <PostMetaSidebarSection title="Board">
       <BoardNavLink
-        href={`/b/${boardSlug ?? ""}`}
-        label={boardName}
+        href={`/b/${board.slug ?? ""}`}
+        label={board.name}
         showActiveIndicator
       />
     </PostMetaSidebarSection>
@@ -360,15 +348,11 @@ function PostMetaSidebarTags({
   );
 }
 
-function PostMetaSidebarAuthor({
-  authorImage,
-  authorInitials,
-  authorName,
-}: {
-  authorImage?: string;
-  authorInitials: string;
-  authorName: string;
-}) {
+function PostMetaSidebarAuthor() {
+  const { post } = usePostCollectionData();
+  const authorName = post?.user?.name ?? "Anonymous";
+  const authorInitials = getInitials(authorName);
+  const authorImage = post?.user?.image ?? undefined;
   return (
     <PostMetaSidebarSection title="Posted by">
       <div className="flex items-center gap-2.5">
@@ -382,11 +366,9 @@ function PostMetaSidebarAuthor({
   );
 }
 
-function PostMetaSidebarPublishedOn({
-  publishedDate,
-}: {
-  publishedDate: string;
-}) {
+function PostMetaSidebarPublishedOn() {
+  const { post } = usePostCollectionData();
+  const publishedDate = formatPublishedDate(post.createdAt);
   return (
     <PostMetaSidebarSection title="Posted on">
       <p className="font-medium text-foreground text-sm">{publishedDate}</p>
