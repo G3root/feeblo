@@ -19,7 +19,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
 import { CommentComposer } from "./comment-composer";
-import { useCommentDeleteDialogContext } from "./dialog-stores/comment";
+import {
+  useCommentDeleteDialogContext,
+  useCommentVisibilityDialogContext,
+} from "./dialog-stores";
 import { usePostCollectionData } from "./post-collection";
 import { usePostCollections } from "./providers/post-collections-provider";
 import { CommentReactionPicker } from "./reaction-picker";
@@ -300,10 +303,26 @@ function EditButton() {
 }
 
 function ToggleVisibilityButton() {
-  const { actions, meta, state } = useCommentDisplay();
+  const postData = usePostCollectionData();
+  const store = useCommentVisibilityDialogContext();
+  const { meta, state } = useCommentDisplay();
+
+  if (!postData.isMember) {
+    return null;
+  }
 
   return (
-    <DropdownMenuItem onClick={actions.onToggleVisibility}>
+    <DropdownMenuItem
+      onClick={() =>
+        store.send({
+          type: "toggle",
+          data: {
+            commentId: state.commentId,
+            isInternal: state.isInternal,
+          },
+        })
+      }
+    >
       <HugeiconsIcon icon={state.isInternal ? EyeIcon : ViewOffIcon} />
       {state.isInternal ? meta.toggleToPublicLabel : meta.toggleToInternalLabel}
     </DropdownMenuItem>

@@ -4,6 +4,10 @@ export {
   useCommentDeleteDialogContext,
 } from "./comment";
 export {
+  CommentVisibilityDialogProvider,
+  useCommentVisibilityDialogContext,
+} from "./comment-visibility";
+export {
   PostCreateDialogProvider,
   PostDeleteDialogProvider,
   usePostCreateDialogContext,

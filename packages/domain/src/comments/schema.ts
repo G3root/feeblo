@@ -50,6 +50,7 @@ export const CommentUpdate = S.Struct({
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
   content: S.String,
+  visibility: S.Literals(["PUBLIC", "INTERNAL"]),
 });
 
 export type TCommentUpdate = S.Schema.Type<typeof CommentUpdate>;

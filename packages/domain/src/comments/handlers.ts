@@ -1,11 +1,11 @@
 import { Database } from "@feeblo/db";
-import { Effect, Layer } from "effect";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { withRemapDbErrors } from "../rpc-errors";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { CurrentSession } from "../session-middleware";
 import {
   FailedToDeleteCommentError,
@@ -146,12 +146,33 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
+          const membership = Policy.getMembership(session, args.organizationId);
+
+          //Todo turn into a policy
+          if (!membership) {
+            const existing = yield* repository.findById({
+              id: args.id,
+              organizationId: args.organizationId,
+              postId: args.postId,
+              userId: session.session.userId,
+            });
+            if (
+              Option.isSome(existing) &&
+              existing.value.visibility !== args.visibility
+            ) {
+              return yield* new Policy.PolicyDeniedError({
+                reason: "You are not allowed to change comment visibility.",
+              });
+            }
+          }
+
           const updatedComment = yield* repository.update({
             id: args.id,
             organizationId: args.organizationId,
             postId: args.postId,
             content: sanitizedMarkdown,
             userId: session.session.userId,
+            ...(membership ? { visibility: args.visibility } : {}),
           });
 
           if (!updatedComment) {

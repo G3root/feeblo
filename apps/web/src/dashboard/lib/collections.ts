@@ -603,6 +603,7 @@ export const commentCollection = createCollection(
             organizationId: updatedComment.organizationId,
             postId: updatedComment.postId,
             content: updatedComment.content,
+            visibility: updatedComment.visibility,
           }),
         {}
       );

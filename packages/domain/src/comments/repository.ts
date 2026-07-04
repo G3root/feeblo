@@ -16,6 +16,7 @@ interface UpdateComment {
   organizationId: string;
   postId: string;
   userId: string;
+  visibility?: "PUBLIC" | "INTERNAL";
 }
 
 interface FindByIdComment {
@@ -165,6 +166,11 @@ const makeCommentRepository = Effect.gen(function* () {
               .set({
                 content: input.content,
                 updatedAt: new Date(),
+                ...(input.visibility
+                  ? {
+                      visibility: input.visibility,
+                    }
+                  : {}),
               })
               .where(
                 and(
@@ -185,6 +191,7 @@ const makeCommentRepository = Effect.gen(function* () {
             client
               .select({
                 id: schema.commentTable.id,
+                visibility: schema.commentTable.visibility,
               })
               .from(schema.commentTable)
               .where(

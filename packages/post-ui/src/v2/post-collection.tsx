@@ -1,5 +1,6 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   anyPolicy,
   hasOwnerOrAdminRole,
@@ -8,15 +9,18 @@ import {
 } from "@feeblo/web-shared/use-policy";
 import { createContext, type ReactNode, use } from "react";
 
+type TPageType = "Dashboard" | "PublicPage";
 export interface PostCollectionState {
   board: TBoard;
   canManagePost: boolean;
   isArchived: boolean;
   isLocked: boolean;
+  isMember: boolean;
   isMerged: boolean;
   isPrivateBoard: boolean;
   isPublicBoard: boolean;
   organizationId: string;
+  pageType: TPageType;
   post: TPost;
 }
 
@@ -40,6 +44,7 @@ export interface PostCollectionDataProviderProps {
   board: TBoard;
   children?: ReactNode;
   organizationId: string;
+  pageType: TPageType;
   post: TPost;
 }
 
@@ -48,13 +53,19 @@ export function PostCollectionDataProvider({
   children,
   post,
   organizationId,
+  pageType,
 }: PostCollectionDataProviderProps) {
+  const { data: session } = useAuthState();
   const { allowed: canManagePost } = usePolicy(
     anyPolicy(
       hasOwnerOrAdminRole(organizationId),
       isUser(post?.creatorId ?? "")
     )
   );
+
+  const isMember =
+    session?.memberships?.some((m) => m.organizationId === organizationId) ??
+    false;
 
   const state: PostCollectionState = {
     board,
@@ -67,6 +78,8 @@ export function PostCollectionDataProvider({
     post,
     canManagePost,
     organizationId,
+    isMember,
+    pageType,
   };
 
   return (
