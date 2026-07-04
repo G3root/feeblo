@@ -1,4 +1,5 @@
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useState } from "react";
@@ -18,8 +19,9 @@ export function PostCommentComposer({
   defaultVisibility = "PUBLIC",
   showVisibilityPicker = false,
 }: PostCommentComposerProps) {
-  const { isLocked } = usePostCollectionData();
-  const disabled = isLocked;
+  const { data: session } = useAuthState();
+  const { isLocked, canManagePost } = usePostCollectionData();
+  const disabled = isLocked || !canManagePost || !session;
   const [editorKey, setEditorKey] = useState(0);
 
   const form = useCommentForm({
