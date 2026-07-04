@@ -26,6 +26,7 @@ import { TableHandle } from "./ui/table-handle/index";
 
 export interface EditorProps {
   className?: string;
+  minimal?: boolean;
   onChange?: (doc: string) => void;
   placeholder?: string;
   readOnly?: boolean;
@@ -62,7 +63,7 @@ export function Editor(props: EditorProps) {
         )}
         ref={editor.mount}
       />
-      {props.readOnly ? null : (
+      {props.readOnly || props.minimal ? null : (
         <>
           <InlineMenu />
           <SlashMenu />

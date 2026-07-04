@@ -101,6 +101,7 @@ function CommentComposerEditor() {
   return (
     <EditorProvider key={state.resetKey}>
       <Editor
+        minimal
         onChange={(doc) => actions.onContentChange(doc)}
         placeholder={state.placeholder}
         readOnly={state.disabled}
