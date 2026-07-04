@@ -1,13 +1,5 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@feeblo/ui/alert-dialog";
+import { usePostDeleteDialogContext } from "@feeblo/post-ui/dialog-stores";
+import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import {
   DropdownMenu,
@@ -23,89 +15,58 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
 
-type PostPageActionsProps = {
-  canDelete: boolean;
-  onDelete: () => Promise<void>;
-};
+export function PostPageActions() {
+  const { canManagePost, post } = usePostCollectionData();
+  const postId = post.id;
 
-export function PostPageActions({ canDelete, onDelete }: PostPageActionsProps) {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-
-    try {
-      await onDelete();
-      setDeleteDialogOpen(false);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  const store = usePostDeleteDialogContext();
 
   return (
-    <>
-      <AlertDialog onOpenChange={setDeleteDialogOpen} open={deleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete post</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              post.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={isDeleting}
-              onClick={handleDelete}
+    <div className="mb-8 flex items-center justify-between gap-2">
+      <Link
+        aria-label="Back"
+        className={cn(buttonVariants({ size: "icon-sm", variant: "outline" }))}
+        search={{
+          board: undefined,
+          sort: undefined,
+          status: undefined,
+        }}
+        to="/"
+      >
+        <HugeiconsIcon icon={ArrowLeft01Icon} />
+      </Link>
+
+      {canManagePost ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={(props) => (
+              <Button
+                {...props}
+                aria-label="More actions"
+                size="icon-sm"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={Ellipsis} />
+              </Button>
+            )}
+          />
+          <DropdownMenuContent align="start" className="w-40">
+            <DropdownMenuItem
+              onClick={() =>
+                store.send({
+                  type: "toggle",
+                  data: { postId, redirectOptions: { to: "/" } },
+                })
+              }
               variant="destructive"
             >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <div className="mb-8 flex items-center justify-between gap-2">
-        <Link
-          aria-label="Back"
-          className={cn(
-            buttonVariants({ size: "icon-sm", variant: "outline" })
-          )}
-          to="/"
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} />
-        </Link>
-
-        {canDelete ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={(props) => (
-                <Button
-                  {...props}
-                  aria-label="More actions"
-                  size="icon-sm"
-                  variant="outline"
-                >
-                  <HugeiconsIcon icon={Ellipsis} />
-                </Button>
-              )}
-            />
-            <DropdownMenuContent align="start" className="w-40">
-              <DropdownMenuItem
-                onClick={() => setDeleteDialogOpen(true)}
-                variant="destructive"
-              >
-                <HugeiconsIcon icon={Delete02Icon} />
-                <span>Delete</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </div>
-    </>
+              <HugeiconsIcon icon={Delete02Icon} />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </div>
   );
 }

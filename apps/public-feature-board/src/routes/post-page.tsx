@@ -1,9 +1,15 @@
+import { CommentDeleteDialog } from "@feeblo/post-ui/comment-delete-dialog";
 import { CommentsList } from "@feeblo/post-ui/comment-display";
+import {
+  CommentDeleteDialogProvider,
+  PostDeleteDialogProvider,
+} from "@feeblo/post-ui/dialog-stores";
 import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
 import {
   PostCommentComposer,
   PostCommentGuestPrompt,
 } from "@feeblo/post-ui/post-comment-composer";
+import { PostDeleteDialog } from "@feeblo/post-ui/post-delete-dialog";
 import { PostContentUpdateInput } from "@feeblo/post-ui/post-editor";
 import { PostTitleUpdateInput } from "@feeblo/post-ui/post-title-input";
 import { PostReactionPicker } from "@feeblo/post-ui/reaction-picker";
@@ -17,21 +23,10 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import {
-  anyPolicy,
-  hasOwnerOrAdminRole,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import {
-  createLazyRoute,
-  useNavigate,
-  useParams,
-} from "@tanstack/react-router";
+import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
@@ -91,9 +86,8 @@ export const Route = createLazyRoute("/p/$slug")({
 
 export function PostPage() {
   const site = useSite();
-  const orgaizationId = site.organizationId;
+  const organizationId = site.organizationId;
   const { data: session } = useAuthState();
-  const navigate = useNavigate();
   const { slug } = useParams({ from: "/p/$slug" });
   const {
     publicBoardCollection,
@@ -160,13 +154,6 @@ export function PostPage() {
     [site.organizationId, postId]
   );
 
-  const { allowed: canEdit } = usePolicy(
-    anyPolicy(
-      hasOwnerOrAdminRole(site.organizationId),
-      isUser(post?.creatorId ?? "")
-    )
-  );
-
   if (postLoading || postTagsQuery.isLoading) {
     return <RootLayout>Loading post...</RootLayout>;
   }
@@ -204,81 +191,74 @@ export function PostPage() {
   const boardName = board?.name ?? "Unassigned";
   const authorName = post?.user?.name ?? "Anonymous";
   const authorInitials = getInitials(post?.user?.name ?? "Anonymous");
-  const isLocked = post.lockedAt !== null;
   const publishedDate = formatPublishedDate(post.createdAt);
   const selectedTags = postTagsQuery.data ?? [];
 
-  const handleDeletePost = async () => {
-    try {
-      const tx = publicPostCollection.delete(postId);
-      await tx.isPersisted.promise;
-      navigate({ to: "/" });
-    } catch (_error) {
-      toastManager.add({
-        title: "Failed to delete post",
-        type: "error",
-      });
-      throw _error;
-    }
-  };
-
   return (
-    <PostCollectionDataProvider
-      board={board}
-      organizationId={orgaizationId}
-      post={post}
-    >
-      <RootLayout>
-        <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
-          <article className="min-w-0 lg:col-span-9">
-            <PostPageActions canDelete={canEdit} onDelete={handleDeletePost} />
+    <PostDeleteDialogProvider>
+      <CommentDeleteDialogProvider>
+        <PostCollectionDataProvider
+          board={board}
+          organizationId={organizationId}
+          post={post}
+        >
+          <RootLayout>
+            <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
+              <article className="min-w-0 lg:col-span-9">
+                <PostPageActions />
 
-            <div className="flex items-start gap-4 sm:gap-6">
-              <div className="shrink-0 pt-1">
-                <UpvoteButton variant="compact" />
-              </div>
+                <div className="flex items-start gap-4 sm:gap-6">
+                  <div className="shrink-0 pt-1">
+                    <UpvoteButton variant="compact" />
+                  </div>
 
-              <div className="min-w-0 flex-1 space-y-6">
-                <div className="space-y-3">
-                  <PostTitleUpdateInput />
+                  <div className="min-w-0 flex-1 space-y-6">
+                    <div className="space-y-3">
+                      <PostTitleUpdateInput />
+                    </div>
+
+                    <PostContentUpdateInput />
+
+                    <PostReactionPicker />
+
+                    <div className="space-y-4">
+                      <PostCommentComposer defaultVisibility="PUBLIC" />
+                      <PostCommentGuestPrompt
+                        action={<AuthDialog variant="sign-in" />}
+                        isAuthenticated={!!session?.session}
+                      />
+
+                      <CommentsList />
+                    </div>
+                  </div>
                 </div>
+              </article>
 
-                <PostContentUpdateInput />
-
-                <PostReactionPicker />
-
-                <div className="space-y-4">
-                  <PostCommentComposer defaultVisibility="PUBLIC" />
-                  <PostCommentGuestPrompt
-                    action={<AuthDialog variant="sign-in" />}
-                    isAuthenticated={!!session?.session}
-                  />
-
-                  <CommentsList />
-                </div>
-              </div>
+              <PostMetaSidebar.Root>
+                <PostMetaSidebar.Voters postId={post.id} />
+                <PostMetaSidebar.Board
+                  boardName={boardName}
+                  boardSlug={board?.slug}
+                />
+                <PostMetaSidebar.Status
+                  status={postStatus?.type ?? "PLANNED"}
+                />
+                <PostMetaSidebar.Tags tags={selectedTags} />
+                <PostMetaSidebar.Author
+                  authorImage={post.user.image ?? undefined}
+                  authorInitials={authorInitials}
+                  authorName={authorName}
+                />
+                <PostMetaSidebar.PublishedOn publishedDate={publishedDate} />
+                {/* <PostMetaSidebar.Share /> */}
+              </PostMetaSidebar.Root>
             </div>
-          </article>
-
-          <PostMetaSidebar.Root>
-            <PostMetaSidebar.Voters postId={post.id} />
-            <PostMetaSidebar.Board
-              boardName={boardName}
-              boardSlug={board?.slug}
-            />
-            <PostMetaSidebar.Status status={postStatus?.type ?? "PLANNED"} />
-            <PostMetaSidebar.Tags tags={selectedTags} />
-            <PostMetaSidebar.Author
-              authorImage={post.user.image ?? undefined}
-              authorInitials={authorInitials}
-              authorName={authorName}
-            />
-            <PostMetaSidebar.PublishedOn publishedDate={publishedDate} />
-            {/* <PostMetaSidebar.Share /> */}
-          </PostMetaSidebar.Root>
-        </div>
-      </RootLayout>
-    </PostCollectionDataProvider>
+          </RootLayout>
+          <PostDeleteDialog />
+          <CommentDeleteDialog />
+        </PostCollectionDataProvider>
+      </CommentDeleteDialogProvider>
+    </PostDeleteDialogProvider>
   );
 }
 
