@@ -58,14 +58,17 @@ export const initAuthHandler = () =>
     const trustedOrigins = yield* getTrustedOrigins;
     const db = yield* Database.Database;
 
+    const dbLayer = Layer.succeed(Database.Database, db);
+
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
+        dbLayer,
         PolarService.layer,
         BillingRepository.layer,
         MembershipRepository.layer,
         Mailer.layer,
         WorkspaceRepository.layer
-      ).pipe(Layer.provide(Layer.succeed(Database.Database, db)))
+      ).pipe(Layer.provide(dbLayer))
     );
 
     const config = {
@@ -223,15 +226,17 @@ export const initAuthHandler = () =>
           : []),
 
         customSession(async ({ user, session }) => {
-          const memberships = await authDrizzle
-            .select({
-              userId: schema.memberTable.userId,
-              organizationId: schema.memberTable.organizationId,
-              role: schema.memberTable.role,
-              membershipId: schema.memberTable.id,
-            })
-            .from(schema.memberTable)
-            .where(eq(schema.memberTable.userId, session.userId));
+          const memberships = await callbackRuntime.runPromise(
+            db
+              .select({
+                userId: schema.memberTable.userId,
+                organizationId: schema.memberTable.organizationId,
+                role: schema.memberTable.role,
+                membershipId: schema.memberTable.id,
+              })
+              .from(schema.memberTable)
+              .where(eq(schema.memberTable.userId, session.userId))
+          );
 
           const organizations = memberships.map((membership) => ({
             id: membership.organizationId,
@@ -426,6 +431,9 @@ export const initAuthHandler = () =>
             }
           }
         }),
+      },
+      experimental: {
+        joins: true,
       },
     } satisfies BetterAuthOptions;
     return betterAuth(config);
