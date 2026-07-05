@@ -2,6 +2,7 @@
 // credit https://github.com/HazelChat/hazel/blob/main/packages/db/src/services/database.ts
 
 import type { ExtractTablesWithRelations } from "drizzle-orm";
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
   drizzle,
@@ -65,6 +66,9 @@ export class DatabaseError extends Schema.TaggedErrorClass<DatabaseError>()(
 }
 
 const matchPgError = (error: unknown) => {
+  if (error instanceof DrizzleQueryError) {
+    return matchPgError(error.cause);
+  }
   if (error instanceof postgres.PostgresError) {
     switch (error.code) {
       case "23505":
