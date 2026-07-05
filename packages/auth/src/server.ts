@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 
+import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
@@ -13,7 +14,6 @@ import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { Mailer } from "@feeblo/transactional/mailer";
 import { polar, webhooks } from "@polar-sh/better-auth";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import {
   admin,
@@ -57,9 +57,7 @@ export const initAuthHandler = () =>
 
     const trustedOrigins = yield* getTrustedOrigins;
     const db = yield* Database.Database;
-    const context = yield* Effect.context<
-      Database.Database | AuthConfig | PolarService
-    >();
+
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
         PolarService.layer,
@@ -71,9 +69,8 @@ export const initAuthHandler = () =>
     );
 
     const config = {
-      database: drizzleAdapter(db.db, {
+      database: drizzleAdapter(db, {
         provider: "pg",
-
         schema: {
           user: schema.userTable,
           session: schema.sessionTable,
@@ -226,19 +223,15 @@ export const initAuthHandler = () =>
           : []),
 
         customSession(async ({ user, session }) => {
-          const memberships = await Effect.runPromiseWith(context)(
-            db.execute((client) =>
-              client
-                .select({
-                  userId: schema.memberTable.userId,
-                  organizationId: schema.memberTable.organizationId,
-                  role: schema.memberTable.role,
-                  membershipId: schema.memberTable.id,
-                })
-                .from(schema.memberTable)
-                .where(eq(schema.memberTable.userId, session.userId))
-            )
-          );
+          const memberships = await authDrizzle
+            .select({
+              userId: schema.memberTable.userId,
+              organizationId: schema.memberTable.organizationId,
+              role: schema.memberTable.role,
+              membershipId: schema.memberTable.id,
+            })
+            .from(schema.memberTable)
+            .where(eq(schema.memberTable.userId, session.userId));
 
           const organizations = memberships.map((membership) => ({
             id: membership.organizationId,

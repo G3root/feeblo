@@ -3,11 +3,10 @@ import { Effect } from "effect";
 import { Database } from "./index";
 
 export const nukeDatabase = Effect.fn("nukeDatabase")(function* () {
-  const dbService = yield* Database.Database;
+  const db = yield* Database.Database;
 
-  yield* Effect.promise(() =>
-    dbService.db.execute(
-      sql.raw(`
+  yield* db.execute(
+    sql.raw(`
       DO $$
       DECLARE
         tables_to_truncate text;
@@ -24,6 +23,5 @@ export const nukeDatabase = Effect.fn("nukeDatabase")(function* () {
       END
       $$;
     `)
-    )
   );
 });

@@ -23,7 +23,7 @@ import { HttpApiScalar } from "effect/unstable/httpapi";
 import { ServerConfig } from "./config";
 import { corsVaryFix } from "./middlewares/cors-vary";
 
-const ServiceLayers = Database.Database.Client;
+const ServiceLayers = Database.DatabaseContextLive;
 const AuthLayer = Layer.effect(Auth, initAuthHandler());
 
 const BetterAuthApp = Effect.gen(function* () {

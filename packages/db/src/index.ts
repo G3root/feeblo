@@ -1,6 +1,8 @@
 /** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
-export type { DatabaseError, TransactionClient, TxFn } from "./database";
+
 export * as Database from "./database";
+export { currentDb, transaction, TransactionContext } from "./database";
+export type { TransactionService } from "./database";
 export * as DrizzleEffect from "./drizzle-effect";
-export * as Repository from "./repository";
+export { relations } from "./relations";
 export * as schema from "./schema";

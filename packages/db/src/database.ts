@@ -1,310 +1,99 @@
-/** biome-ignore-all lint/style/useConsistentMemberAccessibility: <explanation> */
-// credit https://github.com/HazelChat/hazel/blob/main/packages/db/src/services/database.ts
-
-import type { ExtractTablesWithRelations } from "drizzle-orm";
-import { DrizzleQueryError } from "drizzle-orm/errors";
-import type { PgTransaction } from "drizzle-orm/pg-core";
-import {
-  drizzle,
-  type PostgresJsDatabase,
-  type PostgresJsQueryResultHKT,
-} from "drizzle-orm/postgres-js";
-import { Config, Context, Schema } from "effect";
+import * as SQLPG from "@effect/sql-pg";
+import * as PgDrizzle from "drizzle-orm/effect-postgres";
+import * as Config from "effect/Config";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
-import * as Schedule from "effect/Schedule";
-import postgres from "postgres";
-import * as schema from "./schema";
+import type * as Redacted from "effect/Redacted";
+import type { SqlError } from "effect/unstable/sql/SqlError";
+import { type CustomTypesConfig, types } from "pg";
+import { relations } from "./relations";
 
-export type TransactionClient = PgTransaction<
-  PostgresJsQueryResultHKT,
-  typeof schema,
-  ExtractTablesWithRelations<typeof schema>
->;
+const pgTypes: CustomTypesConfig = {
+  getTypeParser: (typeId, format) => {
+    if (
+      [1184, 1114, 1082, 1186, 1231, 1115, 1185, 1187, 1182].includes(typeId)
+    ) {
+      return (value: string) => value;
+    }
 
-export type Client = PostgresJsDatabase<typeof schema> & {
-  $client: postgres.Sql;
+    return types.getTypeParser(typeId, format);
+  },
 };
 
-export type TxFn = <T>(
-  fn: (client: TransactionClient) => Promise<T>
-) => Effect.Effect<T, DatabaseError, never>;
+export const PgClientFactory = {
+  create: (url: Config.Config<Redacted.Redacted<string>>) =>
+    SQLPG.PgClient.layerConfig({
+      url,
+      types: Config.succeed(pgTypes),
+    }),
+};
 
+// Configure the PgClient layer
+export const PgClientLive = PgClientFactory.create(
+  Config.redacted("DATABASE_URL")
+);
+
+// Create the DB effect with default services
+const dbEffect = PgDrizzle.make({ relations }).pipe(
+  Effect.provide(PgDrizzle.DefaultServices)
+);
+
+// Define a DB service tag for dependency injection
+export class Database extends Context.Service<
+  Database,
+  PgDrizzle.EffectPgDatabase
+>()("@feeblo/Database") {}
+
+// Create a layer that provides the DB service
+export const DatabaseLive = Layer.effect(Database, dbEffect);
+
+export const DatabaseContextLive = DatabaseLive.pipe(
+  Layer.provide(PgClientLive)
+);
+
+// Tracks the active transaction client so repository methods automatically
+// run on the current transaction when one is in progress.
 export interface TransactionService {
-  readonly execute: TxFn;
+  readonly db: PgDrizzle.EffectPgDatabase;
 }
 
 export class TransactionContext extends Context.Service<
   TransactionContext,
   TransactionService
->()("TransactionContext") {}
+>()("@feeblo/TransactionContext") {}
 
-const DatabaseErrorType = Schema.Literals([
-  "unique_violation",
-  "foreign_key_violation",
-  "connection_error",
-  "query_error",
-]);
-
-export class DatabaseError extends Schema.TaggedErrorClass<DatabaseError>()(
-  "DatabaseError",
-  {
-    type: DatabaseErrorType,
-    cause: Schema.Unknown,
+// Resolve the drizzle database to use for the current scope: the in-flight
+// transaction client when inside a `transaction` block, otherwise the main
+// `Database` service.
+export const currentDb: Effect.Effect<
+  PgDrizzle.EffectPgDatabase,
+  never,
+  Database
+> = Effect.gen(function* () {
+  const maybeTx = yield* Effect.serviceOption(TransactionContext);
+  if (Option.isSome(maybeTx)) {
+    return maybeTx.value.db;
   }
-) {
-  public override toString() {
-    return `DatabaseError: ${(this.cause as postgres.PostgresError).message}`;
-  }
-
-  public override get message() {
-    return (this.cause as postgres.PostgresError).message;
-  }
-}
-
-const matchPgError = (error: unknown) => {
-  if (error instanceof DrizzleQueryError) {
-    return matchPgError(error.cause);
-  }
-  if (error instanceof postgres.PostgresError) {
-    switch (error.code) {
-      case "23505":
-        return new DatabaseError({ type: "unique_violation", cause: error });
-      case "23503":
-        return new DatabaseError({
-          type: "foreign_key_violation",
-          cause: error,
-        });
-      case "08000":
-        return new DatabaseError({ type: "connection_error", cause: error });
-      default:
-        return new DatabaseError({ type: "query_error", cause: error });
-    }
-  }
-  return null;
-};
-
-export class DatabaseConnectionLostError extends Schema.TaggedErrorClass<DatabaseConnectionLostError>()(
-  "DatabaseConnectionLostError",
-  {
-    cause: Schema.Unknown,
-    message: Schema.String,
-  }
-) {}
-
-/** Sentinel error used to trigger Drizzle transaction rollback when an Effect fails */
-class EffectTransactionRollback extends Error {
-  constructor() {
-    super("Effect transaction rollback");
-    this.name = "EffectTransactionRollback";
-  }
-}
-
-export type DatabaseConfig = {
-  url: Redacted.Redacted;
-  ssl: boolean;
-};
-
-const makeService = (config: DatabaseConfig) =>
-  Effect.gen(function* () {
-    const sql = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        postgres(Redacted.value(config.url), {
-          ssl: config.ssl,
-          idle_timeout: 0,
-          connect_timeout: 10,
-        })
-      ),
-      (pool) => Effect.promise(() => pool.end())
-    );
-
-    yield* Effect.tryPromise(() => sql`SELECT 1`).pipe(
-      Effect.retry(
-        Schedule.jittered(Schedule.spaced("1.25 seconds")).pipe(
-          Schedule.both(Schedule.recurs(10)),
-          Schedule.tapOutput(([output]) =>
-            Effect.logWarning(
-              `[Database client]: Connection to the database failed. Retrying (attempt ${output}).`
-            )
-          )
-        )
-      ),
-      Effect.tap(() =>
-        Effect.logInfo(
-          "[Database client]: Connection to the database established."
-        )
-      ),
-      Effect.orDie
-    );
-
-    const db = drizzle(sql, { schema });
-
-    const execute = Effect.fn(<T>(fn: (client: Client) => Promise<T>) =>
-      Effect.tryPromise({
-        try: () => fn(db),
-        catch: (cause) => {
-          const error = matchPgError(cause);
-          if (error !== null) {
-            return error;
-          }
-          throw cause;
-        },
-      })
-    );
-
-    const transaction = Effect.fn("Database.transaction")(
-      <T, E, R>(effect: Effect.Effect<T, E, R>) =>
-        Effect.context<R>().pipe(
-          Effect.map((services) => Effect.runPromiseExitWith(services)),
-          Effect.flatMap((runPromiseExit) =>
-            Effect.callback<T, DatabaseError | E, R>((resume) => {
-              db.transaction(async (tx: TransactionClient) => {
-                const txWrapper: TxFn = (
-                  fn: (client: TransactionClient) => Promise<any>
-                ) =>
-                  Effect.tryPromise({
-                    try: () => fn(tx),
-                    catch: (cause) => {
-                      const error = matchPgError(cause);
-                      if (error !== null) {
-                        return error;
-                      }
-                      throw cause;
-                    },
-                  });
-
-                const withContext = effect.pipe(
-                  Effect.provideService(TransactionContext, {
-                    execute: txWrapper,
-                  })
-                );
-
-                const result = await runPromiseExit(withContext);
-                if (Exit.isFailure(result)) {
-                  resume(Effect.failCause(result.cause));
-                  throw new EffectTransactionRollback();
-                }
-                resume(Effect.succeed(result.value));
-              }).catch((cause) => {
-                // Ignore our sentinel error - already handled via resume() in onFailure
-                if (cause instanceof EffectTransactionRollback) {
-                  return;
-                }
-                const error = matchPgError(cause);
-                resume(error !== null ? Effect.fail(error) : Effect.die(cause));
-              });
-            })
-          )
-        )
-    );
-
-    const makeQueryWithSchema = <InputSchema extends Schema.Top, A, E, R>(
-      inputSchema: InputSchema,
-      queryFn: (
-        execute: <T>(
-          fn: (client: Client | TransactionClient) => Promise<T>
-        ) => Effect.Effect<T, DatabaseError, never>,
-        validatedInput: InputSchema["Type"],
-        options?: { spanPrefix?: string }
-      ) => Effect.Effect<A, E, never>
-    ) => {
-      return (
-        rawData: unknown,
-        tx?: <T>(
-          fn: (client: TransactionClient) => Promise<T>
-        ) => Effect.Effect<T, DatabaseError, never>
-      ): Effect.Effect<A, E | DatabaseError | Schema.SchemaError, R> => {
-        return Effect.gen(function* () {
-          const validatedInput =
-            yield* Schema.decodeUnknownEffect(inputSchema)(rawData);
-
-          if (tx) {
-            return yield* queryFn(tx, validatedInput);
-          }
-
-          const maybeCtx = yield* Effect.serviceOption(TransactionContext);
-          if (Option.isSome(maybeCtx)) {
-            return yield* queryFn(maybeCtx.value.execute, validatedInput);
-          }
-
-          return yield* queryFn(execute, validatedInput);
-        }).pipe(
-          Effect.withSpan("queryWithSchema", {
-            attributes: { "input.schema": inputSchema.ast.toString() },
-          })
-        ) as Effect.Effect<A, E | DatabaseError | Schema.SchemaError, R>;
-      };
-    };
-
-    const makeQuery = <Input, A, E, R>(
-      queryFn: (
-        executor: <T>(
-          fn: (client: Client | TransactionClient) => Promise<T>
-        ) => Effect.Effect<T, DatabaseError>,
-        input: Input
-      ) => Effect.Effect<A, E, R>
-    ) => {
-      return (
-        input: Input,
-        tx?: <U>(
-          fn: (client: TransactionClient) => Promise<U>
-        ) => Effect.Effect<U, DatabaseError>
-      ): Effect.Effect<A, E | DatabaseError, R> => {
-        return Effect.gen(function* () {
-          if (tx) {
-            return yield* queryFn(
-              tx as <T>(
-                fn: (client: Client | TransactionClient) => Promise<T>
-              ) => Effect.Effect<T, DatabaseError>,
-              input
-            );
-          }
-
-          const maybeCtx = yield* Effect.serviceOption(TransactionContext);
-          if (Option.isSome(maybeCtx)) {
-            return yield* queryFn(
-              maybeCtx.value.execute as <T>(
-                fn: (client: Client | TransactionClient) => Promise<T>
-              ) => Effect.Effect<T, DatabaseError>,
-              input
-            );
-          }
-
-          return yield* queryFn(execute, input);
-        });
-      };
-    };
-
-    return {
-      db,
-      execute,
-      transaction,
-      makeQuery,
-      makeQueryWithSchema,
-    } as const;
-  });
-
-type Shape = Effect.Success<ReturnType<typeof makeService>>;
-
-export const databaseConfig = Config.all({
-  url: Config.redacted("DATABASE_URL"),
-  ssl: Config.boolean("DATABASE_SSL").pipe(Config.withDefault(false)),
+  return yield* Database;
 });
 
-export class Database extends Context.Service<Database, Shape>()("Database") {
-  static get Client() {
-    return Layer.effect(
-      Database,
-      Effect.gen(function* () {
-        const config = yield* databaseConfig;
-        return yield* makeService(config);
-      })
+// Run an effect inside a database transaction. The transaction client is
+// provided via `TransactionContext` so any `currentDb` usage within `effect`
+// (including by repository methods) automatically participates in the tx.
+export function transaction<A, E, R>(
+  effect: Effect.Effect<A, E, R>
+): Effect.Effect<A, E | SqlError, R | Database> {
+  return Effect.gen(function* () {
+    const db = yield* Database;
+    return yield* db.transaction((tx) =>
+      effect.pipe(
+        Effect.provideService(
+          TransactionContext,
+          TransactionContext.of({ db: tx })
+        )
+      )
     );
-  }
+  });
 }
-
-export const layer = (config: DatabaseConfig) =>
-  Layer.effect(Database, makeService(config));

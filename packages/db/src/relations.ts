@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm/relations";
+import { defineRelations } from "drizzle-orm";
 import {
   accountTable,
   boardTable,
@@ -24,308 +24,399 @@ import {
   userTable,
 } from "./schema";
 
-export const userRelations = relations(userTable, ({ many }) => ({
-  sessions: many(sessionTable),
-  accounts: many(accountTable),
-  twoFactors: many(twoFactorTable),
-  members: many(memberTable),
-  invitations: many(invitationTable),
-  upvotes: many(upvoteTable),
-  postReactions: many(postReactionTable),
-  comments: many(commentTable),
-  commentReactions: many(commentReactionTable),
-  createdPosts: many(postTable),
-  createdChangelogs: many(changelogTable),
-  createdTags: many(tagTable),
-  postSubscriptions: many(postSubscriptionTable),
-}));
-
-export const sessionRelations = relations(sessionTable, ({ one }) => ({
-  user: one(userTable, {
-    fields: [sessionTable.userId],
-    references: [userTable.id],
-  }),
-}));
-
-export const accountRelations = relations(accountTable, ({ one }) => ({
-  user: one(userTable, {
-    fields: [accountTable.userId],
-    references: [userTable.id],
-  }),
-}));
-
-export const twoFactorRelations = relations(twoFactorTable, ({ one }) => ({
-  user: one(userTable, {
-    fields: [twoFactorTable.userId],
-    references: [userTable.id],
-  }),
-}));
-
-export const organizationRelations = relations(
-  organizationTable,
-  ({ many, one }) => ({
-    members: many(memberTable),
-    invitations: many(invitationTable),
-    boards: many(boardTable),
-    tags: many(tagTable),
-    postStatuses: many(postStatusTable),
-    posts: many(postTable),
-    postTags: many(postTagTable),
-    comments: many(commentTable),
-    changelogs: many(changelogTable),
-    changelogTags: many(changelogTagTable),
-    site: one(siteTable, {
-      fields: [organizationTable.id],
-      references: [siteTable.organizationId],
-    }),
-    subscriptions: many(subscriptionTable),
+export const relations = defineRelations(
+  {
+    userTable,
+    sessionTable,
+    accountTable,
+    twoFactorTable,
+    organizationTable,
+    memberTable,
+    invitationTable,
+    subscriptionTable,
+    productTable,
+    boardTable,
+    tagTable,
+    postTable,
+    postTagTable,
+    postStatusTable,
+    upvoteTable,
+    postReactionTable,
+    postSubscriptionTable,
+    commentTable,
+    commentReactionTable,
+    siteTable,
+    changelogTable,
+    changelogTagTable,
+  },
+  (r) => ({
+    userTable: {
+      sessions: r.many.sessionTable({
+        from: r.userTable.id,
+        to: r.sessionTable.userId,
+      }),
+      accounts: r.many.accountTable({
+        from: r.userTable.id,
+        to: r.accountTable.userId,
+      }),
+      twoFactors: r.many.twoFactorTable({
+        from: r.userTable.id,
+        to: r.twoFactorTable.userId,
+      }),
+      members: r.many.memberTable({
+        from: r.userTable.id,
+        to: r.memberTable.userId,
+      }),
+      invitations: r.many.invitationTable({
+        from: r.userTable.id,
+        to: r.invitationTable.inviterId,
+      }),
+      upvotes: r.many.upvoteTable({
+        from: r.userTable.id,
+        to: r.upvoteTable.userId,
+      }),
+      postReactions: r.many.postReactionTable({
+        from: r.userTable.id,
+        to: r.postReactionTable.userId,
+      }),
+      comments: r.many.commentTable({
+        from: r.userTable.id,
+        to: r.commentTable.userId,
+      }),
+      commentReactions: r.many.commentReactionTable({
+        from: r.userTable.id,
+        to: r.commentReactionTable.userId,
+      }),
+      createdPosts: r.many.postTable({
+        from: r.userTable.id,
+        to: r.postTable.creatorId,
+      }),
+      createdChangelogs: r.many.changelogTable({
+        from: r.userTable.id,
+        to: r.changelogTable.creatorId,
+      }),
+      createdTags: r.many.tagTable({
+        from: r.userTable.id,
+        to: r.tagTable.creatorId,
+      }),
+      postSubscriptions: r.many.postSubscriptionTable({
+        from: r.userTable.id,
+        to: r.postSubscriptionTable.userId,
+      }),
+    },
+    sessionTable: {
+      user: r.one.userTable({
+        from: r.sessionTable.userId,
+        to: r.userTable.id,
+      }),
+    },
+    accountTable: {
+      user: r.one.userTable({
+        from: r.accountTable.userId,
+        to: r.userTable.id,
+      }),
+    },
+    twoFactorTable: {
+      user: r.one.userTable({
+        from: r.twoFactorTable.userId,
+        to: r.userTable.id,
+      }),
+    },
+    organizationTable: {
+      members: r.many.memberTable({
+        from: r.organizationTable.id,
+        to: r.memberTable.organizationId,
+      }),
+      invitations: r.many.invitationTable({
+        from: r.organizationTable.id,
+        to: r.invitationTable.organizationId,
+      }),
+      boards: r.many.boardTable({
+        from: r.organizationTable.id,
+        to: r.boardTable.organizationId,
+      }),
+      tags: r.many.tagTable({
+        from: r.organizationTable.id,
+        to: r.tagTable.organizationId,
+      }),
+      postStatuses: r.many.postStatusTable({
+        from: r.organizationTable.id,
+        to: r.postStatusTable.organizationId,
+      }),
+      posts: r.many.postTable({
+        from: r.organizationTable.id,
+        to: r.postTable.organizationId,
+      }),
+      postTags: r.many.postTagTable({
+        from: r.organizationTable.id,
+        to: r.postTagTable.organizationId,
+      }),
+      comments: r.many.commentTable({
+        from: r.organizationTable.id,
+        to: r.commentTable.organizationId,
+      }),
+      changelogs: r.many.changelogTable({
+        from: r.organizationTable.id,
+        to: r.changelogTable.organizationId,
+      }),
+      changelogTags: r.many.changelogTagTable({
+        from: r.organizationTable.id,
+        to: r.changelogTagTable.organizationId,
+      }),
+      site: r.one.siteTable({
+        from: r.organizationTable.id,
+        to: r.siteTable.organizationId,
+      }),
+      subscriptions: r.many.subscriptionTable({
+        from: r.organizationTable.id,
+        to: r.subscriptionTable.organizationId,
+      }),
+    },
+    memberTable: {
+      organization: r.one.organizationTable({
+        from: r.memberTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      user: r.one.userTable({
+        from: r.memberTable.userId,
+        to: r.userTable.id,
+      }),
+    },
+    invitationTable: {
+      organization: r.one.organizationTable({
+        from: r.invitationTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      user: r.one.userTable({
+        from: r.invitationTable.inviterId,
+        to: r.userTable.id,
+      }),
+    },
+    boardTable: {
+      organization: r.one.organizationTable({
+        from: r.boardTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      posts: r.many.postTable({
+        from: r.boardTable.id,
+        to: r.postTable.boardId,
+      }),
+    },
+    tagTable: {
+      organization: r.one.organizationTable({
+        from: r.tagTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      creator: r.one.userTable({
+        from: r.tagTable.creatorId,
+        to: r.userTable.id,
+      }),
+      creatorMember: r.one.memberTable({
+        from: r.tagTable.creatorMemberId,
+        to: r.memberTable.id,
+      }),
+      postTags: r.many.postTagTable({
+        from: r.tagTable.id,
+        to: r.postTagTable.tagId,
+      }),
+      changelogTags: r.many.changelogTagTable({
+        from: r.tagTable.id,
+        to: r.changelogTagTable.tagId,
+      }),
+    },
+    postTagTable: {
+      post: r.one.postTable({
+        from: r.postTagTable.postId,
+        to: r.postTable.id,
+      }),
+      tag: r.one.tagTable({
+        from: r.postTagTable.tagId,
+        to: r.tagTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.postTagTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
+    postStatusTable: {
+      organization: r.one.organizationTable({
+        from: r.postStatusTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      posts: r.many.postTable({
+        from: r.postStatusTable.id,
+        to: r.postTable.statusId,
+      }),
+    },
+    postTable: {
+      board: r.one.boardTable({
+        from: r.postTable.boardId,
+        to: r.boardTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.postTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      postStatus: r.one.postStatusTable({
+        from: r.postTable.statusId,
+        to: r.postStatusTable.id,
+      }),
+      creator: r.one.userTable({
+        from: r.postTable.creatorId,
+        to: r.userTable.id,
+      }),
+      creatorMember: r.one.memberTable({
+        from: r.postTable.creatorMemberId,
+        to: r.memberTable.id,
+      }),
+      upvotes: r.many.upvoteTable({
+        from: r.postTable.id,
+        to: r.upvoteTable.postId,
+      }),
+      postReactions: r.many.postReactionTable({
+        from: r.postTable.id,
+        to: r.postReactionTable.postId,
+      }),
+      comments: r.many.commentTable({
+        from: r.postTable.id,
+        to: r.commentTable.postId,
+      }),
+      postTags: r.many.postTagTable({
+        from: r.postTable.id,
+        to: r.postTagTable.postId,
+      }),
+      subscriptions: r.many.postSubscriptionTable({
+        from: r.postTable.id,
+        to: r.postSubscriptionTable.postId,
+      }),
+    },
+    postSubscriptionTable: {
+      post: r.one.postTable({
+        from: r.postSubscriptionTable.postId,
+        to: r.postTable.id,
+      }),
+      user: r.one.userTable({
+        from: r.postSubscriptionTable.userId,
+        to: r.userTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.postSubscriptionTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
+    upvoteTable: {
+      user: r.one.userTable({
+        from: r.upvoteTable.userId,
+        to: r.userTable.id,
+      }),
+      post: r.one.postTable({
+        from: r.upvoteTable.postId,
+        to: r.postTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.upvoteTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
+    postReactionTable: {
+      user: r.one.userTable({
+        from: r.postReactionTable.userId,
+        to: r.userTable.id,
+      }),
+      post: r.one.postTable({
+        from: r.postReactionTable.postId,
+        to: r.postTable.id,
+      }),
+    },
+    commentTable: {
+      organization: r.one.organizationTable({
+        from: r.commentTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      post: r.one.postTable({
+        from: r.commentTable.postId,
+        to: r.postTable.id,
+      }),
+      user: r.one.userTable({
+        from: r.commentTable.userId,
+        to: r.userTable.id,
+      }),
+      parentComment: r.one.commentTable({
+        from: r.commentTable.parentCommentId,
+        to: r.commentTable.id,
+        alias: "commentReplies",
+      }),
+      replies: r.many.commentTable({
+        alias: "commentReplies",
+      }),
+      commentReactions: r.many.commentReactionTable({
+        from: r.commentTable.id,
+        to: r.commentReactionTable.commentId,
+      }),
+    },
+    commentReactionTable: {
+      user: r.one.userTable({
+        from: r.commentReactionTable.userId,
+        to: r.userTable.id,
+      }),
+      comment: r.one.commentTable({
+        from: r.commentReactionTable.commentId,
+        to: r.commentTable.id,
+      }),
+    },
+    siteTable: {
+      organization: r.one.organizationTable({
+        from: r.siteTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
+    changelogTable: {
+      organization: r.one.organizationTable({
+        from: r.changelogTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      creator: r.one.userTable({
+        from: r.changelogTable.creatorId,
+        to: r.userTable.id,
+      }),
+      creatorMember: r.one.memberTable({
+        from: r.changelogTable.creatorMemberId,
+        to: r.memberTable.id,
+      }),
+      changelogTags: r.many.changelogTagTable({
+        from: r.changelogTable.id,
+        to: r.changelogTagTable.changelogId,
+      }),
+    },
+    changelogTagTable: {
+      changelog: r.one.changelogTable({
+        from: r.changelogTagTable.changelogId,
+        to: r.changelogTable.id,
+      }),
+      tag: r.one.tagTable({
+        from: r.changelogTagTable.tagId,
+        to: r.tagTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.changelogTagTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
+    subscriptionTable: {
+      organization: r.one.organizationTable({
+        from: r.subscriptionTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      product: r.one.productTable({
+        from: r.subscriptionTable.productId,
+        to: r.productTable.id,
+      }),
+    },
+    productTable: {
+      subscriptions: r.many.subscriptionTable({
+        from: r.productTable.id,
+        to: r.subscriptionTable.productId,
+      }),
+    },
   })
 );
-
-export const memberRelations = relations(memberTable, ({ one }) => ({
-  organization: one(organizationTable, {
-    fields: [memberTable.organizationId],
-    references: [organizationTable.id],
-  }),
-  user: one(userTable, {
-    fields: [memberTable.userId],
-    references: [userTable.id],
-  }),
-}));
-
-export const invitationRelations = relations(invitationTable, ({ one }) => ({
-  organization: one(organizationTable, {
-    fields: [invitationTable.organizationId],
-    references: [organizationTable.id],
-  }),
-  user: one(userTable, {
-    fields: [invitationTable.inviterId],
-    references: [userTable.id],
-  }),
-}));
-
-export const boardRelations = relations(boardTable, ({ many, one }) => ({
-  organization: one(organizationTable, {
-    fields: [boardTable.organizationId],
-    references: [organizationTable.id],
-  }),
-  posts: many(postTable),
-}));
-
-export const tagRelations = relations(tagTable, ({ many, one }) => ({
-  organization: one(organizationTable, {
-    fields: [tagTable.organizationId],
-    references: [organizationTable.id],
-  }),
-  creator: one(userTable, {
-    fields: [tagTable.creatorId],
-    references: [userTable.id],
-  }),
-  creatorMember: one(memberTable, {
-    fields: [tagTable.creatorMemberId],
-    references: [memberTable.id],
-  }),
-  postTags: many(postTagTable),
-  changelogTags: many(changelogTagTable),
-}));
-
-export const postTagRelations = relations(postTagTable, ({ one }) => ({
-  post: one(postTable, {
-    fields: [postTagTable.postId],
-    references: [postTable.id],
-  }),
-  tag: one(tagTable, {
-    fields: [postTagTable.tagId],
-    references: [tagTable.id],
-  }),
-  organization: one(organizationTable, {
-    fields: [postTagTable.organizationId],
-    references: [organizationTable.id],
-  }),
-}));
-
-export const postStatusRelations = relations(
-  postStatusTable,
-  ({ many, one }) => ({
-    organization: one(organizationTable, {
-      fields: [postStatusTable.organizationId],
-      references: [organizationTable.id],
-    }),
-    posts: many(postTable),
-  })
-);
-
-export const postRelations = relations(postTable, ({ many, one }) => ({
-  board: one(boardTable, {
-    fields: [postTable.boardId],
-    references: [boardTable.id],
-  }),
-  organization: one(organizationTable, {
-    fields: [postTable.organizationId],
-    references: [organizationTable.id],
-  }),
-  postStatus: one(postStatusTable, {
-    fields: [postTable.statusId],
-    references: [postStatusTable.id],
-  }),
-  creator: one(userTable, {
-    fields: [postTable.creatorId],
-    references: [userTable.id],
-  }),
-  creatorMember: one(memberTable, {
-    fields: [postTable.creatorMemberId],
-    references: [memberTable.id],
-  }),
-  upvotes: many(upvoteTable),
-  postReactions: many(postReactionTable),
-  comments: many(commentTable),
-  postTags: many(postTagTable),
-  subscriptions: many(postSubscriptionTable),
-}));
-
-export const postSubscriptionRelations = relations(
-  postSubscriptionTable,
-  ({ one }) => ({
-    post: one(postTable, {
-      fields: [postSubscriptionTable.postId],
-      references: [postTable.id],
-    }),
-    user: one(userTable, {
-      fields: [postSubscriptionTable.userId],
-      references: [userTable.id],
-    }),
-    organization: one(organizationTable, {
-      fields: [postSubscriptionTable.organizationId],
-      references: [organizationTable.id],
-    }),
-  })
-);
-
-export const upvoteRelations = relations(upvoteTable, ({ one }) => ({
-  user: one(userTable, {
-    fields: [upvoteTable.userId],
-    references: [userTable.id],
-  }),
-  post: one(postTable, {
-    fields: [upvoteTable.postId],
-    references: [postTable.id],
-  }),
-  organization: one(organizationTable, {
-    fields: [upvoteTable.organizationId],
-    references: [organizationTable.id],
-  }),
-}));
-
-export const postReactionRelations = relations(
-  postReactionTable,
-  ({ one }) => ({
-    user: one(userTable, {
-      fields: [postReactionTable.userId],
-      references: [userTable.id],
-    }),
-    post: one(postTable, {
-      fields: [postReactionTable.postId],
-      references: [postTable.id],
-    }),
-  })
-);
-
-export const commentRelations = relations(commentTable, ({ many, one }) => ({
-  organization: one(organizationTable, {
-    fields: [commentTable.organizationId],
-    references: [organizationTable.id],
-  }),
-  post: one(postTable, {
-    fields: [commentTable.postId],
-    references: [postTable.id],
-  }),
-  user: one(userTable, {
-    fields: [commentTable.userId],
-    references: [userTable.id],
-  }),
-  parentComment: one(commentTable, {
-    fields: [commentTable.parentCommentId],
-    references: [commentTable.id],
-    relationName: "commentReplies",
-  }),
-  replies: many(commentTable, {
-    relationName: "commentReplies",
-  }),
-  commentReactions: many(commentReactionTable),
-}));
-
-export const commentReactionRelations = relations(
-  commentReactionTable,
-  ({ one }) => ({
-    user: one(userTable, {
-      fields: [commentReactionTable.userId],
-      references: [userTable.id],
-    }),
-    comment: one(commentTable, {
-      fields: [commentReactionTable.commentId],
-      references: [commentTable.id],
-    }),
-  })
-);
-
-export const siteRelations = relations(siteTable, ({ one }) => ({
-  organization: one(organizationTable, {
-    fields: [siteTable.organizationId],
-    references: [organizationTable.id],
-  }),
-}));
-
-export const changelogRelations = relations(
-  changelogTable,
-  ({ many, one }) => ({
-    organization: one(organizationTable, {
-      fields: [changelogTable.organizationId],
-      references: [organizationTable.id],
-    }),
-    creator: one(userTable, {
-      fields: [changelogTable.creatorId],
-      references: [userTable.id],
-    }),
-    creatorMember: one(memberTable, {
-      fields: [changelogTable.creatorMemberId],
-      references: [memberTable.id],
-    }),
-    changelogTags: many(changelogTagTable),
-  })
-);
-
-export const changelogTagRelations = relations(
-  changelogTagTable,
-  ({ one }) => ({
-    changelog: one(changelogTable, {
-      fields: [changelogTagTable.changelogId],
-      references: [changelogTable.id],
-    }),
-    tag: one(tagTable, {
-      fields: [changelogTagTable.tagId],
-      references: [tagTable.id],
-    }),
-    organization: one(organizationTable, {
-      fields: [changelogTagTable.organizationId],
-      references: [organizationTable.id],
-    }),
-  })
-);
-
-export const subscriptionRelations = relations(
-  subscriptionTable,
-  ({ one }) => ({
-    organization: one(organizationTable, {
-      fields: [subscriptionTable.organizationId],
-      references: [organizationTable.id],
-    }),
-    product: one(productTable, {
-      fields: [subscriptionTable.productId],
-      references: [productTable.id],
-    }),
-  })
-);
-
-export const productRelations = relations(productTable, ({ many }) => ({
-  subscriptions: many(subscriptionTable),
-}));
