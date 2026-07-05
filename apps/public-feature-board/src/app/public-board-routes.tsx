@@ -1,5 +1,7 @@
 import { initAuthStateCache } from "@feeblo/web-shared/auth-client";
 import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
+import { zodValidator } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { PublicBoardShell } from "../components/layout/public-board-shell";
 import {
   publicBoardCollection,
@@ -21,19 +23,16 @@ const rootRoute = createRootRoute({
   ),
 });
 
+const HomeSearchSchema = z.object({
+  board: z.string().optional(),
+  sort: z.string().optional(),
+  status: z.string().optional(),
+});
+
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  validateSearch: (search: Record<string, unknown>) => ({
-    board:
-      typeof search.board === "string" ? search.board : (undefined as unknown),
-    sort:
-      typeof search.sort === "string" ? search.sort : (undefined as unknown),
-    status:
-      typeof search.status === "string"
-        ? search.status
-        : (undefined as unknown),
-  }),
+  validateSearch: zodValidator(HomeSearchSchema),
   beforeLoad: async () => {
     await Promise.all([
       publicBoardCollection.preload(),

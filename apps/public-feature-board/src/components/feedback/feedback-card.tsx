@@ -1,3 +1,4 @@
+import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Skeleton } from "@feeblo/ui/skeleton";
@@ -67,15 +68,9 @@ function UserAvatar({
   );
 }
 
-export function FeedbackCard({
-  board,
-  post,
-  status,
-}: {
-  board: FeedbackBoard;
-  post: FeedbackPost;
-  status: string;
-}) {
+export function FeedbackCard({ status }: { status: string }) {
+  const { board, post } = usePostCollectionData();
+
   const description = truncate(post.excerpt, 100) || "No details yet.";
 
   return (

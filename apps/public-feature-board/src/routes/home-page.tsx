@@ -1,4 +1,5 @@
 import { usePostCreateDialogContext } from "@feeblo/post-ui/dialog-stores";
+import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
@@ -105,6 +106,8 @@ function HomePage() {
   const { data: session } = useAuthState();
   const postCreateStore = usePostCreateDialogContext();
   const site = useSite();
+
+  const organizationId = site.id;
   const {
     publicBoardCollection,
     publicPostCollection,
@@ -255,20 +258,10 @@ function HomePage() {
 
       const projectedQuery = query.select(({ post, board, status }) => ({
         board: {
-          id: board.id,
-          name: board.name,
-          organizationId: board.organizationId,
+          ...board,
         },
         post: {
-          id: post.id,
-          slug: post.slug,
-          title: post.title,
-          excerpt: post.excerpt,
-          upVotes: post.upVotes,
-          hasUserUpVoted: post.hasUserUpVoted,
-          creatorId: post.creatorId,
-          user: post.user,
-          lockedAt: post.lockedAt,
+          ...post,
         },
         status: {
           type: status.type,
@@ -491,12 +484,15 @@ function HomePage() {
                 ) : (
                   <div className="divide-y divide-border/40">
                     {filteredPosts.map(({ board, post, status }) => (
-                      <FeedbackCard
+                      <PostCollectionDataProvider
                         board={board}
                         key={post.id}
+                        organizationId={organizationId}
+                        pageType="PublicPage"
                         post={post}
-                        status={status.type}
-                      />
+                      >
+                        <FeedbackCard status={status.type} />
+                      </PostCollectionDataProvider>
                     ))}
                   </div>
                 )}

@@ -1,3 +1,4 @@
+import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
 import {
   Empty,
   EmptyDescription,
@@ -53,6 +54,7 @@ export const Route = createLazyRoute("/b/$boardSlug")({
 
 export function BoardPage() {
   const site = useSite();
+  const organizationId = site.organizationId;
   const { boardSlug } = useParams({ from: "/b/$boardSlug" });
   const {
     publicBoardCollection,
@@ -109,15 +111,7 @@ export function BoardPage() {
         )
         .select(({ post, postStatus }) => ({
           post: {
-            id: post.id,
-            slug: post.slug,
-            title: post.title,
-            excerpt: post.excerpt,
-            upVotes: post.upVotes,
-            hasUserUpVoted: post.hasUserUpVoted,
-            creatorId: post.creatorId,
-            user: post.user,
-            lockedAt: post.lockedAt,
+            ...post,
           },
           postStatus: {
             type: postStatus.type,
@@ -196,12 +190,15 @@ export function BoardPage() {
         <ListHeader count={posts.length} title={board.name} />
         <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
           {posts.map(({ post, postStatus }) => (
-            <FeedbackCard
+            <PostCollectionDataProvider
               board={board}
               key={post.id}
+              organizationId={organizationId}
+              pageType="PublicPage"
               post={post}
-              status={postStatus.type}
-            />
+            >
+              <FeedbackCard status={postStatus.type} />
+            </PostCollectionDataProvider>
           ))}
         </div>
       </div>
