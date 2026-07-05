@@ -1,4 +1,4 @@
-import { Database } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { Effect, Layer } from "effect";
@@ -99,7 +99,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
           const subscriptionRepository = yield* PostSubscriptionRepository;
-          const db = yield* Database.Database;
           const board = yield* boardRepository.getById({
             id: args.boardId,
             organizationId: args.organizationId,
@@ -124,7 +123,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           console.log("sanitizedMarkdown", sanitizedMarkdown);
           console.log("sanitizedHtml", sanitizedHtml);
 
-          yield* db.transaction(
+          yield* transaction(
             Effect.gen(function* () {
               yield* repository.create({
                 ...args,

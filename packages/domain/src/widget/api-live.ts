@@ -1,9 +1,9 @@
-import { Database, schema } from "@feeblo/db";
+import { schema, currentDb } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { BoardRepository } from "../board/repository";
 import { Api } from "../http/api";
@@ -31,10 +31,14 @@ export const WidgetApiLive = HttpApiBuilder.group(
           return boards.map(({ visibility: _visibility, ...board }) => board);
         }).pipe(
           Effect.provide(BoardRepository.layer),
-          Effect.catchTag("DatabaseError", () =>
-            Effect.fail(
-              new InternalServerError({ message: "Failed to list boards" })
-            )
+          Effect.catchIf(
+            (e) =>
+              Predicate.isTagged(e, "EffectDrizzleQueryError") ||
+              Predicate.isTagged(e, "SqlError"),
+            () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to list boards" })
+              )
           )
         )
       )
@@ -43,7 +47,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const { boardId, organizationId, title, content } = payload;
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
-          const db = yield* Database.Database;
+          const db = yield* currentDb;
 
           const board = yield* boardRepository.getById({
             id: boardId,
@@ -76,30 +80,28 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const id = yield* PostId.generate;
           const now = new Date();
 
-          const created = yield* db.execute((client) =>
-            client
-              .insert(schema.postTable)
-              .values({
-                id,
-                boardId,
-                organizationId,
-                title,
-                content: sanitizedContent,
-                excerpt: htmlToExcerpt(sanitizedHtml),
-                statusId: defaultStatus.id,
-                slug: slugify(title),
-                createdAt: now,
-                updatedAt: now,
-              })
-              .returning({
-                id: schema.postTable.id,
-                slug: schema.postTable.slug,
-                title: schema.postTable.title,
-                boardId: schema.postTable.boardId,
-                organizationId: schema.postTable.organizationId,
-                createdAt: schema.postTable.createdAt,
-              })
-          );
+          const created = yield* db
+            .insert(schema.postTable)
+            .values({
+              id,
+              boardId,
+              organizationId,
+              title,
+              content: sanitizedContent,
+              excerpt: htmlToExcerpt(sanitizedHtml),
+              statusId: defaultStatus.id,
+              slug: slugify(title),
+              createdAt: now,
+              updatedAt: now,
+            })
+            .returning({
+              id: schema.postTable.id,
+              slug: schema.postTable.slug,
+              title: schema.postTable.title,
+              boardId: schema.postTable.boardId,
+              organizationId: schema.postTable.organizationId,
+              createdAt: schema.postTable.createdAt,
+            });
 
           const row = created[0];
           if (!row) {
@@ -111,15 +113,15 @@ export const WidgetApiLive = HttpApiBuilder.group(
           return row;
         }).pipe(
           Effect.provide([BoardRepository.layer, PostStatusRepository.layer]),
-          Effect.catchTag("DatabaseError", () =>
-            Effect.fail(
-              new InternalServerError({ message: "Failed to create feedback" })
-            )
-          ),
-          Effect.catchTag("LegidError", () =>
-            Effect.fail(
-              new InternalServerError({ message: "Failed to create feedback" })
-            )
+          Effect.catchIf(
+            (e) =>
+              Predicate.isTagged(e, "EffectDrizzleQueryError") ||
+              Predicate.isTagged(e, "SqlError") ||
+              Predicate.isTagged(e, "LegidError"),
+            () =>
+              Effect.fail(
+                new InternalServerError({ message: "Failed to create feedback" })
+              )
           )
         )
       )

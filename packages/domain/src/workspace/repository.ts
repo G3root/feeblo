@@ -1,4 +1,4 @@
-import { Database, schema, type TxFn } from "@feeblo/db";
+import { schema, currentDb } from "@feeblo/db";
 import {
   BoardId,
   MemberId,
@@ -17,78 +17,53 @@ interface CreateWorkspaceArgs {
   workspaceName: string;
 }
 
-interface CreatePostStatusArgs {
-  organizationId: string;
-  postStatus: (typeof schema.DEFAULT_POST_STATUSES)[number];
-}
-
-interface CreateBoardArgs {
-  boardName: string;
-  organizationId: string;
-}
-
 interface FindPlanByOrganizationIdArgs {
   organizationId: string;
 }
 
 const makeWorkspaceRepository = Effect.gen(function* () {
-  const db = yield* Database.Database;
-
   return {
-    isSubdomainTaken: (subdomain: string, tx?: TxFn) => {
-      return db
-        .makeQuery((execute, subdomain: string) =>
-          execute((client) =>
-            client
-              .select({ id: schema.siteTable.id })
-              .from(schema.siteTable)
-              .where(eq(schema.siteTable.subdomain, subdomain))
-              .limit(1)
-          )
-        )(subdomain, tx)
-        .pipe(Effect.map((results) => results.length > 0));
-    },
+    isSubdomainTaken: (subdomain: string) =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const results = yield* db
+          .select({ id: schema.siteTable.id })
+          .from(schema.siteTable)
+          .where(eq(schema.siteTable.subdomain, subdomain))
+          .limit(1);
+        return results.length > 0;
+      }),
 
-    getSubdomainSuggestion: (subdomain: string, tx?: TxFn) => {
-      return Effect.gen(function* () {
+    getSubdomainSuggestion: (subdomain: string) =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
         for (let i = 2; i <= 12; i++) {
           const candidate = `${subdomain}-${i}`;
-          const taken = yield* db
-            .makeQuery((execute, candidate: string) =>
-              execute((client) =>
-                client
-                  .select({ id: schema.siteTable.id })
-                  .from(schema.siteTable)
-                  .where(eq(schema.siteTable.subdomain, candidate))
-                  .limit(1)
-              )
-            )(candidate, tx)
-            .pipe(Effect.map((results) => results.length > 0));
-          if (!taken) {
+          const results = yield* db
+            .select({ id: schema.siteTable.id })
+            .from(schema.siteTable)
+            .where(eq(schema.siteTable.subdomain, candidate))
+            .limit(1);
+          if (results.length === 0) {
             return Option.some(candidate);
           }
         }
         return Option.none();
-      });
-    },
+      }),
 
-    createWorkspace: (args: CreateWorkspaceArgs, tx?: TxFn) =>
+    createWorkspace: (args: CreateWorkspaceArgs) =>
       Effect.gen(function* () {
+        const db = yield* currentDb;
         const workspaceId = yield* WorkspaceId.generate;
         const organization = yield* db
-          .makeQuery((execute, input: CreateWorkspaceArgs) =>
-            execute((client) =>
-              client
-                .insert(schema.organizationTable)
-                .values({
-                  id: workspaceId,
-                  name: input.workspaceName,
-                  slug: input.subdomain,
-                  createdAt: new Date(),
-                })
-                .returning()
-            )
-          )(args, tx)
+          .insert(schema.organizationTable)
+          .values({
+            id: workspaceId,
+            name: args.workspaceName,
+            slug: args.subdomain,
+            createdAt: new Date(),
+          })
+          .returning()
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isNone(organization)) {
@@ -100,160 +75,117 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         const organizationId = organization.value.id;
         const memberId = yield* MemberId.generate;
 
-        yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
-          execute((client) =>
-            client.insert(schema.memberTable).values({
-              id: memberId,
-              organizationId,
-              role: "owner",
-              createdAt: new Date(),
-              userId: input.userId,
-            })
-          )
-        )(args, tx);
+        yield* db.insert(schema.memberTable).values({
+          id: memberId,
+          organizationId,
+          role: "owner",
+          createdAt: new Date(),
+          userId: args.userId,
+        });
 
         for (const postStatus of schema.DEFAULT_POST_STATUSES) {
           const postStatusId = yield* PostStatusId.generate;
-          yield* db.makeQuery((execute, input: CreatePostStatusArgs) =>
-            execute((client) =>
-              client.insert(schema.postStatusTable).values({
-                id: postStatusId,
-                organizationId: input.organizationId,
-                type: input.postStatus.type,
-                orderIndex: input.postStatus.orderIndex,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              })
-            )
-          )(
-            {
-              organizationId,
-              postStatus,
-            },
-            tx
-          );
+          yield* db.insert(schema.postStatusTable).values({
+            id: postStatusId,
+            organizationId,
+            type: postStatus.type,
+            orderIndex: postStatus.orderIndex,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
         }
 
         const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
 
         for (const boardName of defaultBoards) {
           const boardId = yield* BoardId.generate;
-          yield* db.makeQuery((execute, input: CreateBoardArgs) =>
-            execute((client) =>
-              client.insert(schema.boardTable).values({
-                id: boardId,
-                name: input.boardName,
-                slug: slugify(input.boardName),
-                visibility: "PUBLIC",
-                organizationId: input.organizationId,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              })
-            )
-          )(
-            {
-              boardName,
-              organizationId,
-            },
-            tx
-          );
+          yield* db.insert(schema.boardTable).values({
+            id: boardId,
+            name: boardName,
+            slug: slugify(boardName),
+            visibility: "PUBLIC",
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
         }
         const siteId = yield* SiteId.generate;
-        yield* db.makeQuery((execute, input: CreateWorkspaceArgs) =>
-          execute((client) =>
-            client.insert(schema.siteTable).values({
-              id: siteId,
-              organizationId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              name: input.workspaceName,
-              subdomain: input.subdomain,
-              hidePoweredBy: false,
-            })
-          )
-        )(args, tx);
+        yield* db.insert(schema.siteTable).values({
+          id: siteId,
+          organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          name: args.workspaceName,
+          subdomain: args.subdomain,
+          hidePoweredBy: false,
+        });
 
         return organizationId;
       }),
 
-    findProducts: (tx?: TxFn) => {
-      return db
-        .makeQuery((execute) =>
-          execute((client) =>
-            client
-              .select({
-                id: schema.productTable.id,
-                name: schema.productTable.name,
-                description: schema.productTable.description,
-                trialInterval: schema.productTable.trialInterval,
-                trialIntervalCount: schema.productTable.trialIntervalCount,
-                recurringInterval: schema.productTable.recurringInterval,
-                recurringIntervalCount:
-                  schema.productTable.recurringIntervalCount,
-                isRecurring: schema.productTable.isRecurring,
-                isArchived: schema.productTable.isArchived,
-                externalOrganizationId:
-                  schema.productTable.externalOrganizationId,
-                visibility: schema.productTable.visibility,
-                prices: schema.productTable.prices,
-                metadata: schema.productTable.metadata,
-                createdAt: schema.productTable.createdAt,
-                updatedAt: schema.productTable.updatedAt,
-              })
-              .from(schema.productTable)
-              .where(eq(schema.productTable.isArchived, false))
-          )
-        )(undefined, tx)
-        .pipe(Effect.map((results) => results));
-    },
+    findProducts: () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        return yield* db
+          .select({
+            id: schema.productTable.id,
+            name: schema.productTable.name,
+            description: schema.productTable.description,
+            trialInterval: schema.productTable.trialInterval,
+            trialIntervalCount: schema.productTable.trialIntervalCount,
+            recurringInterval: schema.productTable.recurringInterval,
+            recurringIntervalCount: schema.productTable.recurringIntervalCount,
+            isRecurring: schema.productTable.isRecurring,
+            isArchived: schema.productTable.isArchived,
+            externalOrganizationId: schema.productTable.externalOrganizationId,
+            visibility: schema.productTable.visibility,
+            prices: schema.productTable.prices,
+            metadata: schema.productTable.metadata,
+            createdAt: schema.productTable.createdAt,
+            updatedAt: schema.productTable.updatedAt,
+          })
+          .from(schema.productTable)
+          .where(eq(schema.productTable.isArchived, false));
+      }),
 
-    findPlanByOrganizationId: (
-      args: FindPlanByOrganizationIdArgs,
-      tx?: TxFn
-    ) => {
-      return db
-        .makeQuery((execute, input: FindPlanByOrganizationIdArgs) =>
-          execute((client) =>
-            client
-              .select({
-                organizationId: schema.subscriptionTable.organizationId,
-                plan: schema.productTable.metadata,
-              })
-              .from(schema.subscriptionTable)
-              .innerJoin(
-                schema.productTable,
-                eq(schema.productTable.id, schema.subscriptionTable.productId)
-              )
-              .where(
-                and(
-                  eq(
-                    schema.subscriptionTable.organizationId,
-                    input.organizationId
-                  ),
-                  eq(schema.subscriptionTable.status, "active")
-                )
-              )
-              .orderBy(
-                desc(schema.subscriptionTable.currentPeriodEnd),
-                desc(schema.subscriptionTable.createdAt)
-              )
-              .limit(1)
+    findPlanByOrganizationId: (args: FindPlanByOrganizationIdArgs) =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        return yield* db
+          .select({
+            organizationId: schema.subscriptionTable.organizationId,
+            plan: schema.productTable.metadata,
+          })
+          .from(schema.subscriptionTable)
+          .innerJoin(
+            schema.productTable,
+            eq(schema.productTable.id, schema.subscriptionTable.productId)
           )
-        )(args, tx)
-        .pipe(
-          Effect.map(EffectArray.get(0)),
-          Effect.map(
-            Option.match({
-              onNone: () => "free" as const,
-              onSome: (subscription) => subscription.plan?.plan ?? "free",
-            })
-          ),
-          Effect.map((plan) => ({
-            organizationId: args.organizationId,
-            plan,
-          }))
-        );
-    },
+          .where(
+            and(
+              eq(schema.subscriptionTable.organizationId, args.organizationId),
+              eq(schema.subscriptionTable.status, "active")
+            )
+          )
+          .orderBy(
+            desc(schema.subscriptionTable.currentPeriodEnd),
+            desc(schema.subscriptionTable.createdAt)
+          )
+          .limit(1)
+          .pipe(
+            Effect.map(EffectArray.get(0)),
+            Effect.map(
+              Option.match({
+                onNone: () => "free" as const,
+                onSome: (subscription) => subscription.plan?.plan ?? "free",
+              })
+            ),
+            Effect.map((plan) => ({
+              organizationId: args.organizationId,
+              plan,
+            }))
+          );
+      }),
   };
 });
 

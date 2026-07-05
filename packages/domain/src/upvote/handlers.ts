@@ -1,4 +1,4 @@
-import { Database } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import { Effect, Layer } from "effect";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
@@ -31,9 +31,8 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
         Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
-          const db = yield* Database.Database;
 
-          const result = yield* db.transaction(
+          const result = yield* transaction(
             Effect.gen(function* () {
               const result = yield* repository.toggle({
                 organizationId: args.organizationId,
@@ -78,12 +77,11 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
         Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
-          const db = yield* Database.Database;
 
           //TODO: comeback later
           // yield* sitePolicy.canViewRoadmap(args.organizationId);
 
-          const result = yield* db.transaction(
+          const result = yield* transaction(
             Effect.gen(function* () {
               const result = yield* repository.toggle({
                 organizationId: args.organizationId,

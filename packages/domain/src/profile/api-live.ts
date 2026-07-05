@@ -1,6 +1,6 @@
-import { Database, schema } from "@feeblo/db";
+import { schema, currentDb } from "@feeblo/db";
 import { eq } from "drizzle-orm";
-import { Effect, FileSystem, Layer } from "effect";
+import { Effect, FileSystem, Layer, Predicate } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
@@ -67,14 +67,12 @@ export const ProfileApiLive = HttpApiBuilder.group(
             )
           );
 
-        const db = yield* Database.Database;
+        const db = yield* currentDb;
 
-        yield* db.execute((client) =>
-          client
-            .update(schema.userTable)
-            .set({ image: uploaded.url })
-            .where(eq(schema.userTable.id, session.user.id))
-        );
+        yield* db
+          .update(schema.userTable)
+          .set({ image: uploaded.url })
+          .where(eq(schema.userTable.id, session.user.id));
 
         return uploaded;
       }).pipe(
@@ -86,12 +84,16 @@ export const ProfileApiLive = HttpApiBuilder.group(
             })
           )
         ),
-        Effect.catchTag("DatabaseError", () =>
-          Effect.fail(
-            new InternalServerError({
-              message: "Failed to update profile logo",
-            })
-          )
+        Effect.catchIf(
+          (e) =>
+            Predicate.isTagged(e, "EffectDrizzleQueryError") ||
+            Predicate.isTagged(e, "SqlError"),
+          () =>
+            Effect.fail(
+              new InternalServerError({
+                message: "Failed to update profile logo",
+              })
+            )
         )
       );
     })

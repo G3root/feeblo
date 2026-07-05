@@ -1,6 +1,6 @@
-import { Database, schema } from "@feeblo/db";
+import { schema, currentDb } from "@feeblo/db";
 import { eq } from "drizzle-orm";
-import { Effect, FileSystem, Layer } from "effect";
+import { Effect, FileSystem, Layer, Predicate } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import {
@@ -91,14 +91,12 @@ export const OrganizationApiLive = HttpApiBuilder.group(
               )
             );
 
-          const db = yield* Database.Database;
+          const db = yield* currentDb;
 
-          yield* db.execute((client) =>
-            client
-              .update(schema.organizationTable)
-              .set({ logo: uploaded.url })
-              .where(eq(schema.organizationTable.id, organizationId))
-          );
+          yield* db
+            .update(schema.organizationTable)
+            .set({ logo: uploaded.url })
+            .where(eq(schema.organizationTable.id, organizationId));
 
           return uploaded;
         }).pipe(
@@ -110,12 +108,16 @@ export const OrganizationApiLive = HttpApiBuilder.group(
               })
             )
           ),
-          Effect.catchTag("DatabaseError", () =>
-            Effect.fail(
-              new InternalServerError({
-                message: "Failed to update workspace logo",
-              })
-            )
+          Effect.catchIf(
+            (e) =>
+              Predicate.isTagged(e, "EffectDrizzleQueryError") ||
+              Predicate.isTagged(e, "SqlError"),
+            () =>
+              Effect.fail(
+                new InternalServerError({
+                  message: "Failed to update workspace logo",
+                })
+              )
           )
         );
       }

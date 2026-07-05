@@ -43,7 +43,16 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
     effect: Effect.Effect<R, E, A>
   ): Effect.Effect<
     R,
-    | Exclude<E, { _tag: "DatabaseError" | "SchemaError" | "LegidError" }>
+    | Exclude<
+        E,
+        {
+          _tag:
+            | "EffectDrizzleQueryError"
+            | "SqlError"
+            | "SchemaError"
+            | "LegidError"
+        }
+      >
     | InternalServerError,
     A
   > => {
@@ -58,8 +67,13 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
 
     return effect.pipe(
       Effect.catchIf(
-        (e): e is Extract<E, { _tag: "DatabaseError" }> =>
-          Predicate.isTagged(e, "DatabaseError"),
+        (e): e is Extract<E, { _tag: "EffectDrizzleQueryError" }> =>
+          Predicate.isTagged(e, "EffectDrizzleQueryError"),
+        (err) => toInternalError(err, "There was a database error when")
+      ),
+      Effect.catchIf(
+        (e): e is Extract<E, { _tag: "SqlError" }> =>
+          Predicate.isTagged(e, "SqlError"),
         (err) => toInternalError(err, "There was a database error when")
       ),
       Effect.catchIf(
@@ -75,7 +89,16 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
       )
     ) as Effect.Effect<
       R,
-      | Exclude<E, { _tag: "DatabaseError" | "SchemaError" | "LegidError" }>
+      | Exclude<
+          E,
+          {
+            _tag:
+              | "EffectDrizzleQueryError"
+              | "SqlError"
+              | "SchemaError"
+              | "LegidError"
+          }
+        >
       | InternalServerError,
       A
     >;

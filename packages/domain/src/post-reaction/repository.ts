@@ -1,4 +1,4 @@
-import { Database, schema } from "@feeblo/db";
+import { schema, currentDb } from "@feeblo/db";
 import { PostReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
@@ -16,76 +16,49 @@ interface TPostReactionToggle {
   userId: string;
 }
 
-interface TDeletePostReaction {
-  id: string;
-}
-
-interface TFindMember {
-  organizationId: string;
-  userId: string;
-}
-
-interface TCreatePostReaction {
-  emoji: ReactionEmoji;
-  memberId: string | null;
-  postId: string;
-  userId: string;
-}
-
 const makePostReactionRepository = Effect.gen(function* () {
-  const db = yield* Database.Database;
-
   return {
     list: ({ postId, organizationId }: TPostReactionList) =>
       Effect.gen(function* () {
+        const db = yield* currentDb;
         const post = yield* db
-          .makeQuery((execute, input: TPostReactionList) =>
-            execute((client) =>
-              client
-                .select({ id: schema.postTable.id })
-                .from(schema.postTable)
-                .where(
-                  and(
-                    eq(schema.postTable.id, input.postId),
-                    eq(schema.postTable.organizationId, input.organizationId)
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId)
             )
-          )({ postId, organizationId })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isNone(post)) {
           return [];
         }
 
-        const reactions = yield* db.makeQuery(
-          (execute, input: TPostReactionList) =>
-            execute((client) =>
-              client
-                .select({
-                  id: schema.postReactionTable.id,
-                  postId: schema.postReactionTable.postId,
-                  organizationId: schema.postTable.organizationId,
-                  userId: schema.postReactionTable.userId,
-                  memberId: schema.postReactionTable.memberId,
-                  emoji: schema.postReactionTable.emoji,
-                  createdAt: schema.postReactionTable.createdAt,
-                  updatedAt: schema.postReactionTable.updatedAt,
-                })
-                .from(schema.postReactionTable)
-                .innerJoin(
-                  schema.postTable,
-                  eq(schema.postTable.id, schema.postReactionTable.postId)
-                )
-                .where(
-                  and(
-                    eq(schema.postTable.organizationId, input.organizationId),
-                    eq(schema.postReactionTable.postId, input.postId)
-                  )
-                )
+        const reactions = yield* db
+          .select({
+            id: schema.postReactionTable.id,
+            postId: schema.postReactionTable.postId,
+            organizationId: schema.postTable.organizationId,
+            userId: schema.postReactionTable.userId,
+            memberId: schema.postReactionTable.memberId,
+            emoji: schema.postReactionTable.emoji,
+            createdAt: schema.postReactionTable.createdAt,
+            updatedAt: schema.postReactionTable.updatedAt,
+          })
+          .from(schema.postReactionTable)
+          .innerJoin(
+            schema.postTable,
+            eq(schema.postTable.id, schema.postReactionTable.postId)
+          )
+          .where(
+            and(
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postReactionTable.postId, postId)
             )
-        )({ postId, organizationId });
+          );
 
         return reactions.map((reaction) => ({
           ...reaction,
@@ -95,59 +68,50 @@ const makePostReactionRepository = Effect.gen(function* () {
 
     listPublic: ({ postId, organizationId }: TPostReactionList) =>
       Effect.gen(function* () {
+        const db = yield* currentDb;
         const post = yield* db
-          .makeQuery((execute, input: TPostReactionList) =>
-            execute((client) =>
-              client
-                .select({ id: schema.postTable.id })
-                .from(schema.postTable)
-                .innerJoin(
-                  schema.boardTable,
-                  eq(schema.boardTable.id, schema.postTable.boardId)
-                )
-                .where(
-                  and(
-                    eq(schema.postTable.id, input.postId),
-                    eq(schema.postTable.organizationId, input.organizationId),
-                    eq(schema.boardTable.visibility, "PUBLIC")
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
+          )
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.boardTable.visibility, "PUBLIC")
             )
-          )({ postId, organizationId })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isNone(post)) {
           return [];
         }
 
-        const reactions = yield* db.makeQuery(
-          (execute, input: TPostReactionList) =>
-            execute((client) =>
-              client
-                .select({
-                  id: schema.postReactionTable.id,
-                  postId: schema.postReactionTable.postId,
-                  organizationId: schema.postTable.organizationId,
-                  userId: schema.postReactionTable.userId,
-                  memberId: schema.postReactionTable.memberId,
-                  emoji: schema.postReactionTable.emoji,
-                  createdAt: schema.postReactionTable.createdAt,
-                  updatedAt: schema.postReactionTable.updatedAt,
-                })
-                .from(schema.postReactionTable)
-                .innerJoin(
-                  schema.postTable,
-                  eq(schema.postTable.id, schema.postReactionTable.postId)
-                )
-                .where(
-                  and(
-                    eq(schema.postTable.organizationId, input.organizationId),
-                    eq(schema.postReactionTable.postId, input.postId)
-                  )
-                )
+        const reactions = yield* db
+          .select({
+            id: schema.postReactionTable.id,
+            postId: schema.postReactionTable.postId,
+            organizationId: schema.postTable.organizationId,
+            userId: schema.postReactionTable.userId,
+            memberId: schema.postReactionTable.memberId,
+            emoji: schema.postReactionTable.emoji,
+            createdAt: schema.postReactionTable.createdAt,
+            updatedAt: schema.postReactionTable.updatedAt,
+          })
+          .from(schema.postReactionTable)
+          .innerJoin(
+            schema.postTable,
+            eq(schema.postTable.id, schema.postReactionTable.postId)
+          )
+          .where(
+            and(
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postReactionTable.postId, postId)
             )
-        )({ postId, organizationId });
+          );
 
         return reactions.map((reaction) => ({
           ...reaction,
@@ -157,21 +121,17 @@ const makePostReactionRepository = Effect.gen(function* () {
 
     toggle: ({ organizationId, postId, userId, emoji }: TPostReactionToggle) =>
       Effect.gen(function* () {
+        const db = yield* currentDb;
         const post = yield* db
-          .makeQuery((execute, input: TPostReactionToggle) =>
-            execute((client) =>
-              client
-                .select({ id: schema.postTable.id })
-                .from(schema.postTable)
-                .where(
-                  and(
-                    eq(schema.postTable.id, input.postId),
-                    eq(schema.postTable.organizationId, input.organizationId)
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId)
             )
-          )({ organizationId, postId, userId, emoji })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isNone(post)) {
@@ -179,72 +139,49 @@ const makePostReactionRepository = Effect.gen(function* () {
         }
 
         const existingReaction = yield* db
-          .makeQuery((execute, input: TPostReactionToggle) =>
-            execute((client) =>
-              client
-                .select({ id: schema.postReactionTable.id })
-                .from(schema.postReactionTable)
-                .where(
-                  and(
-                    eq(schema.postReactionTable.postId, input.postId),
-                    eq(schema.postReactionTable.userId, input.userId),
-                    eq(schema.postReactionTable.emoji, input.emoji)
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.postReactionTable.id })
+          .from(schema.postReactionTable)
+          .where(
+            and(
+              eq(schema.postReactionTable.postId, postId),
+              eq(schema.postReactionTable.userId, userId),
+              eq(schema.postReactionTable.emoji, emoji)
             )
-          )({ organizationId, postId, userId, emoji })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingReaction)) {
-          yield* db.makeQuery((execute, input: TDeletePostReaction) =>
-            execute((client) =>
-              client
-                .delete(schema.postReactionTable)
-                .where(eq(schema.postReactionTable.id, input.id))
-            )
-          )({ id: existingReaction.value.id });
+          yield* db
+            .delete(schema.postReactionTable)
+            .where(eq(schema.postReactionTable.id, existingReaction.value.id));
 
           return { reacted: false, emoji: null };
         }
 
         const member = yield* db
-          .makeQuery((execute, input: TFindMember) =>
-            execute((client) =>
-              client
-                .select({ id: schema.memberTable.id })
-                .from(schema.memberTable)
-                .where(
-                  and(
-                    eq(schema.memberTable.organizationId, input.organizationId),
-                    eq(schema.memberTable.userId, input.userId)
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, organizationId),
+              eq(schema.memberTable.userId, userId)
             )
-          )({ organizationId, userId })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         const postReactionId = yield* PostReactionId.generate;
 
-        yield* db.makeQuery((execute, input: TCreatePostReaction) =>
-          execute((client) =>
-            client.insert(schema.postReactionTable).values({
-              id: postReactionId,
-              postId: input.postId,
-              userId: input.userId,
-              memberId: input.memberId,
-              emoji: input.emoji,
-            })
-          )
-        )({
+        yield* db.insert(schema.postReactionTable).values({
+          id: postReactionId,
           postId,
           userId,
-          emoji,
           memberId: Option.match(member, {
             onNone: () => null,
             onSome: (value) => value.id,
           }),
+          emoji,
         });
 
         return { reacted: true, emoji };
@@ -257,26 +194,22 @@ const makePostReactionRepository = Effect.gen(function* () {
       emoji,
     }: TPostReactionToggle) =>
       Effect.gen(function* () {
+        const db = yield* currentDb;
         const post = yield* db
-          .makeQuery((execute, input: TPostReactionToggle) =>
-            execute((client) =>
-              client
-                .select({ id: schema.postTable.id })
-                .from(schema.postTable)
-                .innerJoin(
-                  schema.boardTable,
-                  eq(schema.boardTable.id, schema.postTable.boardId)
-                )
-                .where(
-                  and(
-                    eq(schema.postTable.id, input.postId),
-                    eq(schema.postTable.organizationId, input.organizationId),
-                    eq(schema.boardTable.visibility, "PUBLIC")
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
+          )
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.boardTable.visibility, "PUBLIC")
             )
-          )({ organizationId, postId, userId, emoji })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isNone(post)) {
@@ -284,71 +217,48 @@ const makePostReactionRepository = Effect.gen(function* () {
         }
 
         const existingReaction = yield* db
-          .makeQuery((execute, input: TPostReactionToggle) =>
-            execute((client) =>
-              client
-                .select({ id: schema.postReactionTable.id })
-                .from(schema.postReactionTable)
-                .where(
-                  and(
-                    eq(schema.postReactionTable.postId, input.postId),
-                    eq(schema.postReactionTable.userId, input.userId),
-                    eq(schema.postReactionTable.emoji, input.emoji)
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.postReactionTable.id })
+          .from(schema.postReactionTable)
+          .where(
+            and(
+              eq(schema.postReactionTable.postId, postId),
+              eq(schema.postReactionTable.userId, userId),
+              eq(schema.postReactionTable.emoji, emoji)
             )
-          )({ organizationId, postId, userId, emoji })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         if (Option.isSome(existingReaction)) {
-          yield* db.makeQuery((execute, input: TDeletePostReaction) =>
-            execute((client) =>
-              client
-                .delete(schema.postReactionTable)
-                .where(eq(schema.postReactionTable.id, input.id))
-            )
-          )({ id: existingReaction.value.id });
+          yield* db
+            .delete(schema.postReactionTable)
+            .where(eq(schema.postReactionTable.id, existingReaction.value.id));
 
           return { reacted: false, emoji: null };
         }
 
         const member = yield* db
-          .makeQuery((execute, input: TFindMember) =>
-            execute((client) =>
-              client
-                .select({ id: schema.memberTable.id })
-                .from(schema.memberTable)
-                .where(
-                  and(
-                    eq(schema.memberTable.organizationId, input.organizationId),
-                    eq(schema.memberTable.userId, input.userId)
-                  )
-                )
-                .limit(1)
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, organizationId),
+              eq(schema.memberTable.userId, userId)
             )
-          )({ organizationId, userId })
+          )
+          .limit(1)
           .pipe(Effect.map(EffectArray.get(0)));
 
         const postReactionId = yield* PostReactionId.generate;
-        yield* db.makeQuery((execute, input: TCreatePostReaction) =>
-          execute((client) =>
-            client.insert(schema.postReactionTable).values({
-              id: postReactionId,
-              postId: input.postId,
-              userId: input.userId,
-              memberId: input.memberId,
-              emoji: input.emoji,
-            })
-          )
-        )({
+        yield* db.insert(schema.postReactionTable).values({
+          id: postReactionId,
           postId,
           userId,
-          emoji,
           memberId: Option.match(member, {
             onNone: () => null,
             onSome: (value) => value.id,
           }),
+          emoji,
         });
 
         return { reacted: true, emoji };

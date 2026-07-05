@@ -1,4 +1,4 @@
-import { Database, schema } from "@feeblo/db";
+import { schema, currentDb } from "@feeblo/db";
 import { and, eq } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
 
@@ -18,87 +18,71 @@ interface TFindMemberRole {
 }
 
 const makeOrganizationRepository = Effect.gen(function* () {
-  const db = yield* Database.Database;
-
   return {
     findManyByUserId: ({ userId }: TFindManyByUserId) =>
       Effect.gen(function* () {
-        const organizations = yield* db.makeQuery(
-          (execute, input: TFindManyByUserId) =>
-            execute((client) =>
-              client
-                .select({
-                  id: schema.organizationTable.id,
-                  name: schema.organizationTable.name,
-                  slug: schema.organizationTable.slug,
-                  logo: schema.organizationTable.logo,
-                  createdAt: schema.organizationTable.createdAt,
-                })
-                .from(schema.memberTable)
-                .innerJoin(
-                  schema.organizationTable,
-                  eq(
-                    schema.memberTable.organizationId,
-                    schema.organizationTable.id
-                  )
-                )
-                .where(eq(schema.memberTable.userId, input.userId))
+        const db = yield* currentDb;
+        return yield* db
+          .select({
+            id: schema.organizationTable.id,
+            name: schema.organizationTable.name,
+            slug: schema.organizationTable.slug,
+            logo: schema.organizationTable.logo,
+            createdAt: schema.organizationTable.createdAt,
+          })
+          .from(schema.memberTable)
+          .innerJoin(
+            schema.organizationTable,
+            eq(
+              schema.memberTable.organizationId,
+              schema.organizationTable.id
             )
-        )({ userId });
-
-        return organizations;
+          )
+          .where(eq(schema.memberTable.userId, userId));
       }),
     update: ({ organizationId, name, logo }: TUpdate) =>
       Effect.gen(function* () {
-        const updatedOrganization = yield* db
-          .makeQuery((execute, input: TUpdate) =>
-            execute((client) =>
-              client
-                .update(schema.organizationTable)
-                .set({
-                  logo: input.logo,
-                  name: input.name,
-                })
-                .where(eq(schema.organizationTable.id, input.organizationId))
-                .returning({
-                  id: schema.organizationTable.id,
-                  name: schema.organizationTable.name,
-                  slug: schema.organizationTable.slug,
-                  logo: schema.organizationTable.logo,
-                  createdAt: schema.organizationTable.createdAt,
-                })
-            )
-          )({ organizationId, name, logo })
+        const db = yield* currentDb;
+        return yield* db
+          .update(schema.organizationTable)
+          .set({
+            logo,
+            name,
+          })
+          .where(eq(schema.organizationTable.id, organizationId))
+          .returning({
+            id: schema.organizationTable.id,
+            name: schema.organizationTable.name,
+            slug: schema.organizationTable.slug,
+            logo: schema.organizationTable.logo,
+            createdAt: schema.organizationTable.createdAt,
+          })
           .pipe(Effect.map(EffectArray.get(0)));
-
-        return updatedOrganization;
       }),
     findMemberRole: ({ organizationId, userId }: TFindMemberRole) =>
-      db
-        .makeQuery((execute, input: TFindMemberRole) =>
-          execute((client) =>
-            client
-              .select({
-                role: schema.memberTable.role,
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        return yield* db
+          .select({
+            role: schema.memberTable.role,
+          })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, organizationId),
+              eq(schema.memberTable.userId, userId)
+            )
+          )
+          .pipe(
+            Effect.map(EffectArray.get(0)),
+            Effect.map((row) =>
+              Option.match(row, {
+                onNone: () => undefined,
+                onSome: (value) => value,
               })
-              .from(schema.memberTable)
-              .where(
-                and(
-                  eq(schema.memberTable.organizationId, input.organizationId),
-                  eq(schema.memberTable.userId, input.userId)
-                )
-              )
-          )
-        )({ organizationId, userId })
-        .pipe(
-          Effect.map(EffectArray.get(0)),
-          Effect.map((row) =>
-            Option.match(row, {
-              onNone: () => undefined,
-              onSome: (value) => value,
-            })
-          )
-        ),
+            )
+          );
+      }),
   };
 });
 

@@ -13,7 +13,7 @@ const runMigrate = async () => {
   }
 
   const connection = postgres(process.env.DATABASE_URL, { max: 1 });
-  const db = drizzle(connection);
+  const db = drizzle({ client: connection });
 
   console.log("Running migrations...");
 

@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { Database, schema } from "@feeblo/db";
+import { schema, currentDb, transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
@@ -50,90 +50,9 @@ interface TPostFindByCreatorIds {
   userId: string;
 }
 
-interface TPostFindManyQuery {
-  userId?: string | null | undefined;
-  whereClause: SQL | undefined;
-}
-
 interface TPostById {
   id: string;
   organizationId: string;
-}
-
-interface TPostDeleteQuery {
-  boardId: string;
-  organizationId: string;
-  where: SQL[];
-}
-
-interface TPostCreateInternal extends TPostCreate {
-  excerpt: string;
-}
-
-interface TMoveCommentsToMergedPost {
-  sourcePostId: string;
-  targetPostId: string;
-}
-
-interface TSelectMergedUpvotes {
-  sourcePostId: string;
-}
-
-interface TFindExistingMergedUpvote {
-  targetPostId: string;
-  userId: string;
-}
-
-interface TDeleteMergedUpvote {
-  id: string;
-}
-
-interface TMoveUpvoteToMergedPost {
-  id: string;
-  targetPostId: string;
-}
-
-interface TSelectMergedReactions {
-  sourcePostId: string;
-}
-
-interface TFindExistingMergedReaction {
-  emoji: string;
-  targetPostId: string;
-  userId: string;
-}
-
-interface TDeleteMergedReaction {
-  id: string;
-}
-
-interface TMoveReactionToMergedPost {
-  id: string;
-  targetPostId: string;
-}
-
-interface TSelectMergedPostTags {
-  sourcePostId: string;
-}
-
-interface TFindExistingMergedPostTag {
-  tagId: string;
-  targetPostId: string;
-}
-
-interface TDeleteMergedPostTag {
-  id: string;
-}
-
-interface TMovePostTagToMergedPost {
-  id: string;
-  targetPostId: string;
-}
-
-interface TArchiveMergedSourcePost {
-  organizationId: string;
-  sourcePostId: string;
-  targetPostId: string;
 }
 
 const getWhereClause = (where: SQL[]) =>
@@ -177,8 +96,6 @@ const selectPostFields = (userId?: string | null) => ({
 });
 
 const makePostRepository = Effect.gen(function* () {
-  const db = yield* Database.Database;
-
   return {
     findByCreatorId: ({
       id,
@@ -186,23 +103,21 @@ const makePostRepository = Effect.gen(function* () {
       userId,
       boardId,
     }: TPostFindByCreatorId) =>
-      db
-        .makeQuery((execute, input: TPostFindByCreatorId) =>
-          execute((client) =>
-            client
-              .select({ id: schema.postTable.id })
-              .from(schema.postTable)
-              .where(
-                and(
-                  eq(schema.postTable.id, input.id),
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  eq(schema.postTable.creatorId, input.userId),
-                  eq(schema.postTable.boardId, input.boardId)
-                )
-              )
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        return yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.creatorId, userId),
+              eq(schema.postTable.boardId, boardId)
+            )
           )
-        )({ id, organizationId, userId, boardId })
-        .pipe(Effect.map(EffectArray.get(0))),
+          .pipe(Effect.map(EffectArray.get(0)));
+      }),
 
     findByCreatorIds: ({
       ids,
@@ -210,21 +125,20 @@ const makePostRepository = Effect.gen(function* () {
       userId,
       boardId,
     }: TPostFindByCreatorIds) =>
-      db.makeQuery((execute, input: TPostFindByCreatorIds) =>
-        execute((client) =>
-          client
-            .select({ id: schema.postTable.id })
-            .from(schema.postTable)
-            .where(
-              and(
-                inArray(schema.postTable.id, input.ids),
-                eq(schema.postTable.organizationId, input.organizationId),
-                eq(schema.postTable.creatorId, input.userId),
-                eq(schema.postTable.boardId, input.boardId)
-              )
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        return yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              inArray(schema.postTable.id, ids),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.creatorId, userId),
+              eq(schema.postTable.boardId, boardId)
             )
-        )
-      )({ ids, organizationId, userId, boardId }),
+          );
+      }),
 
     findMany: ({ boardId, organizationId, userId }: TPostFindMany) => {
       const where: SQL[] = [];
@@ -235,18 +149,17 @@ const makePostRepository = Effect.gen(function* () {
       where.push(eq(schema.postTable.organizationId, organizationId));
       const whereClause = getWhereClause(where);
 
-      return db.makeQuery((execute, input: TPostFindManyQuery) =>
-        execute((client) =>
-          client
-            .select(selectPostFields(input.userId))
-            .from(schema.postTable)
-            .leftJoin(
-              schema.userTable,
-              eq(schema.userTable.id, schema.postTable.creatorId)
-            )
-            .where(input.whereClause)
-        )
-      )({ whereClause, userId });
+      return Effect.gen(function* () {
+        const db = yield* currentDb;
+        return yield* db
+          .select(selectPostFields(userId))
+          .from(schema.postTable)
+          .leftJoin(
+            schema.userTable,
+            eq(schema.userTable.id, schema.postTable.creatorId)
+          )
+          .where(whereClause);
+      });
     },
 
     findManyPublic: ({ boardId, organizationId, userId }: TPostFindMany) => {
@@ -260,86 +173,79 @@ const makePostRepository = Effect.gen(function* () {
 
       const whereClause = and(...where);
 
-      return db.makeQuery((execute, input: TPostFindManyQuery) =>
-        execute((client) =>
-          client
-            .select(selectPostFields(input.userId))
-            .from(schema.postTable)
-            .innerJoin(
-              schema.boardTable,
-              eq(schema.boardTable.id, schema.postTable.boardId)
-            )
-            .leftJoin(
-              schema.userTable,
-              eq(schema.userTable.id, schema.postTable.creatorId)
-            )
-            .where(input.whereClause)
-        )
-      )({ whereClause, userId });
+      return Effect.gen(function* () {
+        const db = yield* currentDb;
+        return yield* db
+          .select(selectPostFields(userId))
+          .from(schema.postTable)
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
+          )
+          .leftJoin(
+            schema.userTable,
+            eq(schema.userTable.id, schema.postTable.creatorId)
+          )
+          .where(whereClause);
+      });
     },
 
     isPublicPost: ({ id, organizationId }: TPostById) =>
-      db
-        .makeQuery((execute, input: TPostById) =>
-          execute((client) =>
-            client
-              .select({ id: schema.postTable.id })
-              .from(schema.postTable)
-              .innerJoin(
-                schema.boardTable,
-                eq(schema.boardTable.id, schema.postTable.boardId)
-              )
-              .where(
-                and(
-                  eq(schema.postTable.id, input.id),
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  eq(schema.boardTable.visibility, "PUBLIC")
-                )
-              )
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const rows = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
           )
-        )({ id, organizationId })
-        .pipe(Effect.map((rows) => rows.length > 0)),
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.boardTable.visibility, "PUBLIC")
+            )
+          );
+        return rows.length > 0;
+      }),
 
     isUnlocked: ({ id, organizationId }: TPostById) =>
-      db
-        .makeQuery((execute, input: TPostById) =>
-          execute((client) =>
-            client
-              .select({ id: schema.postTable.id })
-              .from(schema.postTable)
-              .where(
-                and(
-                  eq(schema.postTable.id, input.id),
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  sql`${schema.postTable.lockedAt} is null`
-                )
-              )
-          )
-        )({ id, organizationId })
-        .pipe(Effect.map((rows) => rows.length > 0)),
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const rows = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId),
+              sql`${schema.postTable.lockedAt} is null`
+            )
+          );
+        return rows.length > 0;
+      }),
 
     isUnlockedPublic: ({ id, organizationId }: TPostById) =>
-      db
-        .makeQuery((execute, input: TPostById) =>
-          execute((client) =>
-            client
-              .select({ id: schema.postTable.id })
-              .from(schema.postTable)
-              .innerJoin(
-                schema.boardTable,
-                eq(schema.boardTable.id, schema.postTable.boardId)
-              )
-              .where(
-                and(
-                  eq(schema.postTable.id, input.id),
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  eq(schema.boardTable.visibility, "PUBLIC"),
-                  sql`${schema.postTable.lockedAt} is null`
-                )
-              )
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const rows = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
           )
-        )({ id, organizationId })
-        .pipe(Effect.map((rows) => rows.length > 0)),
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.boardTable.visibility, "PUBLIC"),
+              sql`${schema.postTable.lockedAt} is null`
+            )
+          );
+        return rows.length > 0;
+      }),
 
     update: ({
       id,
@@ -350,62 +256,52 @@ const makePostRepository = Effect.gen(function* () {
       content,
       excerpt,
     }: TPostUpdate & { excerpt?: string }) =>
-      db
-        .makeQuery(
-          (
-            execute,
-            input: TPostUpdate & { excerpt?: string }
-          ) =>
-            execute((client) =>
-              client
-                .update(schema.postTable)
-                .set({
-                  statusId: input.statusId,
-                  boardId: input.boardId,
-                  title: input.title,
-                  content: input.content,
-                  excerpt: input.excerpt ?? htmlToExcerpt(input.content),
-                })
-                .where(
-                  and(
-                    eq(schema.postTable.id, input.id),
-                    eq(schema.postTable.organizationId, input.organizationId)
-                  )
-                )
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        yield* db
+          .update(schema.postTable)
+          .set({
+            statusId,
+            boardId,
+            title,
+            content,
+            excerpt: excerpt ?? htmlToExcerpt(content),
+          })
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId)
             )
-        )({ id, organizationId, statusId, boardId, title, content, ...(excerpt ? { excerpt } : {}) })
-        .pipe(Effect.asVoid),
+          );
+      }),
 
     adminUpdate: ({ id, organizationId, archived, locked }: TPostAdminUpdate) =>
-      db
-        .makeQuery((execute, input: TPostAdminUpdate) =>
-          execute((client) =>
-            client
-              .update(schema.postTable)
-              .set({
-                archivedAt:
-                  input.archived === undefined
-                    ? undefined
-                    : input.archived
-                      ? new Date()
-                      : null,
-                lockedAt:
-                  input.locked === undefined
-                    ? undefined
-                    : input.locked
-                      ? new Date()
-                      : null,
-                updatedAt: new Date(),
-              })
-              .where(
-                and(
-                  eq(schema.postTable.id, input.id),
-                  eq(schema.postTable.organizationId, input.organizationId)
-                )
-              )
-          )
-        )({ id, organizationId, archived, locked })
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        yield* db
+          .update(schema.postTable)
+          .set({
+            archivedAt:
+              archived === undefined
+                ? undefined
+                : archived
+                  ? new Date()
+                  : null,
+            lockedAt:
+              locked === undefined
+                ? undefined
+                : locked
+                  ? new Date()
+                  : null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId)
+            )
+          );
+      }),
 
     delete: ({ id, organizationId, boardId }: TPostDelete) => {
       const where: SQL[] = [];
@@ -416,21 +312,18 @@ const makePostRepository = Effect.gen(function* () {
         where.push(inArray(schema.postTable.id, id));
       }
 
-      return db
-        .makeQuery((execute, input: TPostDeleteQuery) =>
-          execute((client) =>
-            client
-              .delete(schema.postTable)
-              .where(
-                and(
-                  ...input.where,
-                  eq(schema.postTable.organizationId, input.organizationId),
-                  eq(schema.postTable.boardId, input.boardId)
-                )
-              )
-          )
-        )({ where, organizationId, boardId })
-        .pipe(Effect.asVoid);
+      return Effect.gen(function* () {
+        const db = yield* currentDb;
+        yield* db
+          .delete(schema.postTable)
+          .where(
+            and(
+              ...where,
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.boardId, boardId)
+            )
+          );
+      });
     },
 
     create: ({
@@ -446,76 +339,45 @@ const makePostRepository = Effect.gen(function* () {
     }: TPostCreate) => {
       const excerpt = inputExcerpt ?? htmlToExcerpt(content);
 
-      return db
-        .makeQuery((execute, input: TPostCreateInternal) =>
-          execute((client) =>
-            client.insert(schema.postTable).values({
-              id: input.id,
-              boardId: input.boardId,
-              organizationId: input.organizationId,
-              title: input.title,
-              content: input.content,
-              excerpt: input.excerpt,
-              statusId: input.statusId,
-              creatorId: input.creatorId,
-              ...(input.creatorMemberId
-                ? { creatorMemberId: input.creatorMemberId }
-                : {}),
-              createdAt: new Date(),
-              slug: slugify(input.title),
-              updatedAt: new Date(),
-            })
-          )
-        )(
-          creatorMemberId
-            ? {
-                id,
-                boardId,
-                organizationId,
-                title,
-                content,
-                statusId,
-                creatorId,
-                creatorMemberId,
-                excerpt,
-              }
-            : {
-                id,
-                boardId,
-                organizationId,
-                title,
-                content,
-                statusId,
-                creatorId,
-                excerpt,
-              }
-        )
-        .pipe(Effect.asVoid);
+      return Effect.gen(function* () {
+        const db = yield* currentDb;
+        yield* db.insert(schema.postTable).values({
+          id,
+          boardId,
+          organizationId,
+          title,
+          content,
+          excerpt,
+          statusId,
+          creatorId,
+          ...(creatorMemberId ? { creatorMemberId } : {}),
+          createdAt: new Date(),
+          slug: slugify(title),
+          updatedAt: new Date(),
+        });
+      });
     },
 
     merge: ({ organizationId, sourcePostId, targetPostId }: TPostMerge) =>
-      db.transaction(
+      transaction(
         Effect.gen(function* () {
-          const posts = yield* db.makeQuery((execute, input: TPostMerge) =>
-            execute((client) =>
-              client
-                .select({
-                  id: schema.postTable.id,
-                  archivedAt: schema.postTable.archivedAt,
-                  mergedIntoPostId: schema.postTable.mergedIntoPostId,
-                })
-                .from(schema.postTable)
-                .where(
-                  and(
-                    inArray(schema.postTable.id, [
-                      input.sourcePostId,
-                      input.targetPostId,
-                    ]),
-                    eq(schema.postTable.organizationId, input.organizationId)
-                  )
-                )
-            )
-          )({ organizationId, sourcePostId, targetPostId });
+          const db = yield* currentDb;
+          const posts = yield* db
+            .select({
+              id: schema.postTable.id,
+              archivedAt: schema.postTable.archivedAt,
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+            })
+            .from(schema.postTable)
+            .where(
+              and(
+                inArray(schema.postTable.id, [
+                  sourcePostId,
+                  targetPostId,
+                ]),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
 
           const sourcePost = posts.find((post) => post.id === sourcePostId);
           const targetPost = posts.find((post) => post.id === targetPostId);
@@ -531,197 +393,129 @@ const makePostRepository = Effect.gen(function* () {
             return;
           }
 
-          yield* db.makeQuery((execute, input: TMoveCommentsToMergedPost) =>
-            execute((client) =>
-              client
-                .update(schema.commentTable)
-                .set({ postId: input.targetPostId })
-                .where(eq(schema.commentTable.postId, input.sourcePostId))
-            )
-          )({ sourcePostId, targetPostId });
+          yield* db
+            .update(schema.commentTable)
+            .set({ postId: targetPostId })
+            .where(eq(schema.commentTable.postId, sourcePostId));
 
-          const upvotes = yield* db.makeQuery(
-            (execute, input: TSelectMergedUpvotes) =>
-              execute((client) =>
-                client
-                  .select({
-                    id: schema.upvoteTable.id,
-                    userId: schema.upvoteTable.userId,
-                  })
-                  .from(schema.upvoteTable)
-                  .where(eq(schema.upvoteTable.postId, input.sourcePostId))
-              )
-          )({ sourcePostId });
+          const upvotes = yield* db
+            .select({
+              id: schema.upvoteTable.id,
+              userId: schema.upvoteTable.userId,
+            })
+            .from(schema.upvoteTable)
+            .where(eq(schema.upvoteTable.postId, sourcePostId));
 
           for (const upvote of upvotes) {
             const existing = yield* db
-              .makeQuery((execute, input: TFindExistingMergedUpvote) =>
-                execute((client) =>
-                  client
-                    .select({ id: schema.upvoteTable.id })
-                    .from(schema.upvoteTable)
-                    .where(
-                      and(
-                        eq(schema.upvoteTable.postId, input.targetPostId),
-                        eq(schema.upvoteTable.userId, input.userId)
-                      )
-                    )
-                    .limit(1)
+              .select({ id: schema.upvoteTable.id })
+              .from(schema.upvoteTable)
+              .where(
+                and(
+                  eq(schema.upvoteTable.postId, targetPostId),
+                  eq(schema.upvoteTable.userId, upvote.userId)
                 )
-              )({ targetPostId, userId: upvote.userId })
+              )
+              .limit(1)
               .pipe(Effect.map(EffectArray.get(0)));
 
             if (Option.isSome(existing)) {
-              yield* db.makeQuery((execute, input: TDeleteMergedUpvote) =>
-                execute((client) =>
-                  client
-                    .delete(schema.upvoteTable)
-                    .where(eq(schema.upvoteTable.id, input.id))
-                )
-              )({ id: upvote.id });
+              yield* db
+                .delete(schema.upvoteTable)
+                .where(eq(schema.upvoteTable.id, upvote.id));
               continue;
             }
 
-            yield* db.makeQuery((execute, input: TMoveUpvoteToMergedPost) =>
-              execute((client) =>
-                client
-                  .update(schema.upvoteTable)
-                  .set({ postId: input.targetPostId })
-                  .where(eq(schema.upvoteTable.id, input.id))
-              )
-            )({ id: upvote.id, targetPostId });
+            yield* db
+              .update(schema.upvoteTable)
+              .set({ postId: targetPostId })
+              .where(eq(schema.upvoteTable.id, upvote.id));
           }
 
-          const reactions = yield* db.makeQuery(
-            (execute, input: TSelectMergedReactions) =>
-              execute((client) =>
-                client
-                  .select({
-                    emoji: schema.postReactionTable.emoji,
-                    id: schema.postReactionTable.id,
-                    userId: schema.postReactionTable.userId,
-                  })
-                  .from(schema.postReactionTable)
-                  .where(
-                    eq(schema.postReactionTable.postId, input.sourcePostId)
-                  )
-              )
-          )({ sourcePostId });
+          const reactions = yield* db
+            .select({
+              emoji: schema.postReactionTable.emoji,
+              id: schema.postReactionTable.id,
+              userId: schema.postReactionTable.userId,
+            })
+            .from(schema.postReactionTable)
+            .where(eq(schema.postReactionTable.postId, sourcePostId));
 
           for (const reaction of reactions) {
             const existing = yield* db
-              .makeQuery((execute, input: TFindExistingMergedReaction) =>
-                execute((client) =>
-                  client
-                    .select({ id: schema.postReactionTable.id })
-                    .from(schema.postReactionTable)
-                    .where(
-                      and(
-                        eq(schema.postReactionTable.postId, input.targetPostId),
-                        eq(schema.postReactionTable.userId, input.userId),
-                        eq(schema.postReactionTable.emoji, input.emoji)
-                      )
-                    )
-                    .limit(1)
+              .select({ id: schema.postReactionTable.id })
+              .from(schema.postReactionTable)
+              .where(
+                and(
+                  eq(schema.postReactionTable.postId, targetPostId),
+                  eq(schema.postReactionTable.userId, reaction.userId),
+                  eq(schema.postReactionTable.emoji, reaction.emoji)
                 )
-              )({
-                targetPostId,
-                userId: reaction.userId,
-                emoji: reaction.emoji,
-              })
+              )
+              .limit(1)
               .pipe(Effect.map(EffectArray.get(0)));
 
             if (Option.isSome(existing)) {
-              yield* db.makeQuery((execute, input: TDeleteMergedReaction) =>
-                execute((client) =>
-                  client
-                    .delete(schema.postReactionTable)
-                    .where(eq(schema.postReactionTable.id, input.id))
-                )
-              )({ id: reaction.id });
+              yield* db
+                .delete(schema.postReactionTable)
+                .where(eq(schema.postReactionTable.id, reaction.id));
               continue;
             }
 
-            yield* db.makeQuery((execute, input: TMoveReactionToMergedPost) =>
-              execute((client) =>
-                client
-                  .update(schema.postReactionTable)
-                  .set({ postId: input.targetPostId })
-                  .where(eq(schema.postReactionTable.id, input.id))
-              )
-            )({ id: reaction.id, targetPostId });
+            yield* db
+              .update(schema.postReactionTable)
+              .set({ postId: targetPostId })
+              .where(eq(schema.postReactionTable.id, reaction.id));
           }
 
-          const postTags = yield* db.makeQuery(
-            (execute, input: TSelectMergedPostTags) =>
-              execute((client) =>
-                client
-                  .select({
-                    id: schema.postTagTable.id,
-                    tagId: schema.postTagTable.tagId,
-                  })
-                  .from(schema.postTagTable)
-                  .where(eq(schema.postTagTable.postId, input.sourcePostId))
-              )
-          )({ sourcePostId });
+          const postTags = yield* db
+            .select({
+              id: schema.postTagTable.id,
+              tagId: schema.postTagTable.tagId,
+            })
+            .from(schema.postTagTable)
+            .where(eq(schema.postTagTable.postId, sourcePostId));
 
           for (const postTag of postTags) {
             const existing = yield* db
-              .makeQuery((execute, input: TFindExistingMergedPostTag) =>
-                execute((client) =>
-                  client
-                    .select({ id: schema.postTagTable.id })
-                    .from(schema.postTagTable)
-                    .where(
-                      and(
-                        eq(schema.postTagTable.postId, input.targetPostId),
-                        eq(schema.postTagTable.tagId, input.tagId)
-                      )
-                    )
-                    .limit(1)
+              .select({ id: schema.postTagTable.id })
+              .from(schema.postTagTable)
+              .where(
+                and(
+                  eq(schema.postTagTable.postId, targetPostId),
+                  eq(schema.postTagTable.tagId, postTag.tagId)
                 )
-              )({ targetPostId, tagId: postTag.tagId })
+              )
+              .limit(1)
               .pipe(Effect.map(EffectArray.get(0)));
 
             if (Option.isSome(existing)) {
-              yield* db.makeQuery((execute, input: TDeleteMergedPostTag) =>
-                execute((client) =>
-                  client
-                    .delete(schema.postTagTable)
-                    .where(eq(schema.postTagTable.id, input.id))
-                )
-              )({ id: postTag.id });
+              yield* db
+                .delete(schema.postTagTable)
+                .where(eq(schema.postTagTable.id, postTag.id));
               continue;
             }
 
-            yield* db.makeQuery((execute, input: TMovePostTagToMergedPost) =>
-              execute((client) =>
-                client
-                  .update(schema.postTagTable)
-                  .set({ postId: input.targetPostId })
-                  .where(eq(schema.postTagTable.id, input.id))
-              )
-            )({ id: postTag.id, targetPostId });
+            yield* db
+              .update(schema.postTagTable)
+              .set({ postId: targetPostId })
+              .where(eq(schema.postTagTable.id, postTag.id));
           }
 
-          yield* db.makeQuery((execute, input: TArchiveMergedSourcePost) =>
-            execute((client) =>
-              client
-                .update(schema.postTable)
-                .set({
-                  archivedAt: new Date(),
-                  mergedAt: new Date(),
-                  mergedIntoPostId: input.targetPostId,
-                  updatedAt: new Date(),
-                })
-                .where(
-                  and(
-                    eq(schema.postTable.id, input.sourcePostId),
-                    eq(schema.postTable.organizationId, input.organizationId)
-                  )
-                )
-            )
-          )({ organizationId, sourcePostId, targetPostId });
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: new Date(),
+              mergedAt: new Date(),
+              mergedIntoPostId: targetPostId,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(schema.postTable.id, sourcePostId),
+                eq(schema.postTable.organizationId, organizationId)
+              )
+            );
         })
       ),
   };

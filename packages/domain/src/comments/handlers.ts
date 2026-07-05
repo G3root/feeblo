@@ -1,4 +1,4 @@
-import { Database } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
@@ -54,7 +54,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
           const membership = Policy.getMembership(session, args.organizationId);
-          const db = yield* Database.Database;
 
           const isPublicPost = yield* postRepository.isPublicPost({
             id: args.postId,
@@ -67,7 +66,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
             });
           }
 
-          yield* db.transaction(
+          yield* transaction(
             Effect.gen(function* () {
               yield* repository.create({
                 ...args,
