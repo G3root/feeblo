@@ -1,4 +1,5 @@
 import * as SQLPG from "@effect/sql-pg";
+import { sql } from "drizzle-orm";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
@@ -6,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
+import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { type CustomTypesConfig, types } from "pg";
 import { relations } from "./relations";
@@ -35,9 +37,31 @@ export const PgClientLive = PgClientFactory.create(
   Config.redacted("DATABASE_URL")
 );
 
+/** Connection health-check that retries with jittered backoff on startup. */
+const testConnection = (db: PgDrizzle.EffectPgDatabase) =>
+  db.execute(sql`SELECT 1`).pipe(
+    Effect.retry(
+      Schedule.jittered(Schedule.spaced("1.25 seconds")).pipe(
+        Schedule.both(Schedule.recurs(10)),
+        Schedule.tapOutput(([output]) =>
+          Effect.logWarning(
+            `[Database client]: Connection to the database failed. Retrying (attempt ${output}).`
+          )
+        )
+      )
+    ),
+    Effect.tap(() =>
+      Effect.logInfo(
+        "[Database client]: Connection to the database established."
+      )
+    ),
+    Effect.orDie
+  );
+
 // Create the DB effect with default services
 const dbEffect = PgDrizzle.make({ relations }).pipe(
-  Effect.provide(PgDrizzle.DefaultServices)
+  Effect.provide(PgDrizzle.DefaultServices),
+  Effect.tap(testConnection)
 );
 
 // Define a DB service tag for dependency injection
