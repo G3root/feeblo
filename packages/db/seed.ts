@@ -82,21 +82,18 @@ const ensureUser = ({
   password: string;
 }) =>
   Effect.gen(function* () {
-    const dbService = yield* Database.Database;
-    const db = dbService.db;
+    const db = yield* Database.Database;
     const auth = yield* initAuthHandler();
 
-    let [existingUser] = yield* dbService.execute((db) =>
-      db
-        .select({
-          id: userTable.id,
-          email: userTable.email,
-          emailVerified: userTable.emailVerified,
-        })
-        .from(userTable)
-        .where(eq(userTable.email, email))
-        .limit(1)
-    );
+    let [existingUser] = yield* db
+      .select({
+        id: userTable.id,
+        email: userTable.email,
+        emailVerified: userTable.emailVerified,
+      })
+      .from(userTable)
+      .where(eq(userTable.email, email))
+      .limit(1);
 
     if (!existingUser) {
       const result = yield* Effect.tryPromise(() =>
@@ -120,17 +117,15 @@ const ensureUser = ({
         });
       }
 
-      [existingUser] = yield* Effect.tryPromise(() =>
-        db
-          .select({
-            id: userTable.id,
-            email: userTable.email,
-            emailVerified: userTable.emailVerified,
-          })
-          .from(userTable)
-          .where(eq(userTable.email, email))
-          .limit(1)
-      );
+      [existingUser] = yield* db
+        .select({
+          id: userTable.id,
+          email: userTable.email,
+          emailVerified: userTable.emailVerified,
+        })
+        .from(userTable)
+        .where(eq(userTable.email, email))
+        .limit(1);
     }
 
     if (!existingUser) {
@@ -140,12 +135,10 @@ const ensureUser = ({
     }
 
     if (!existingUser.emailVerified) {
-      yield* Effect.tryPromise(() =>
-        db
-          .update(userTable)
-          .set({ emailVerified: true })
-          .where(eq(userTable.id, existingUser.id))
-      );
+      yield* db
+        .update(userTable)
+        .set({ emailVerified: true })
+        .where(eq(userTable.id, existingUser.id));
     }
 
     return existingUser;
@@ -153,38 +146,33 @@ const ensureUser = ({
 
 const ensureOrganization = (userId: string) =>
   Effect.gen(function* () {
-    const dbService = yield* Database.Database;
-    const db = dbService.db;
+    const db = yield* Database.Database;
 
-    let [org] = yield* Effect.tryPromise(() =>
-      db
-        .select({
-          id: organizationTable.id,
-          name: organizationTable.name,
-          slug: organizationTable.slug,
-        })
-        .from(organizationTable)
-        .where(eq(organizationTable.slug, userId))
-        .limit(1)
-    );
+    let [org] = yield* db
+      .select({
+        id: organizationTable.id,
+        name: organizationTable.name,
+        slug: organizationTable.slug,
+      })
+      .from(organizationTable)
+      .where(eq(organizationTable.slug, userId))
+      .limit(1);
 
     if (!org) {
       const orgId = yield* WorkspaceId.generate;
-      [org] = yield* Effect.tryPromise(() =>
-        db
-          .insert(organizationTable)
-          .values({
-            id: orgId,
-            name: "Personal",
-            slug: userId,
-            createdAt: new Date(),
-          })
-          .returning({
-            id: organizationTable.id,
-            name: organizationTable.name,
-            slug: organizationTable.slug,
-          })
-      );
+      [org] = yield* db
+        .insert(organizationTable)
+        .values({
+          id: orgId,
+          name: "Personal",
+          slug: userId,
+          createdAt: new Date(),
+        })
+        .returning({
+          id: organizationTable.id,
+          name: organizationTable.name,
+          slug: organizationTable.slug,
+        });
     }
 
     if (!org) {
@@ -193,53 +181,45 @@ const ensureOrganization = (userId: string) =>
       });
     }
 
-    const [existingOwnerMembership] = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: memberTable.id })
-        .from(memberTable)
-        .where(
-          and(
-            eq(memberTable.organizationId, org.id),
-            eq(memberTable.userId, userId)
-          )
+    const [existingOwnerMembership] = yield* db
+      .select({ id: memberTable.id })
+      .from(memberTable)
+      .where(
+        and(
+          eq(memberTable.organizationId, org.id),
+          eq(memberTable.userId, userId)
         )
-        .limit(1)
-    );
+      )
+      .limit(1);
 
     if (!existingOwnerMembership) {
       const memberId = yield* MemberId.generate;
-      yield* Effect.tryPromise(() =>
-        db.insert(memberTable).values({
-          id: memberId,
-          organizationId: org.id,
-          userId,
-          role: "owner",
-          createdAt: new Date(),
-        })
-      );
+      yield* db.insert(memberTable).values({
+        id: memberId,
+        organizationId: org.id,
+        userId,
+        role: "owner",
+        createdAt: new Date(),
+      });
     }
 
-    const existingPostStatuses = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: postStatusTable.id })
-        .from(postStatusTable)
-        .where(eq(postStatusTable.organizationId, org.id))
-        .limit(1)
-    );
+    const existingPostStatuses = yield* db
+      .select({ id: postStatusTable.id })
+      .from(postStatusTable)
+      .where(eq(postStatusTable.organizationId, org.id))
+      .limit(1);
 
     if (existingPostStatuses.length === 0) {
       for (const postStatusDefinition of DEFAULT_POST_STATUSES) {
         const postStatusId = yield* PostStatusId.generate;
-        yield* Effect.tryPromise(() =>
-          db.insert(postStatusTable).values({
-            id: postStatusId,
-            organizationId: org.id,
-            type: postStatusDefinition.type,
-            orderIndex: postStatusDefinition.orderIndex,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-        );
+        yield* db.insert(postStatusTable).values({
+          id: postStatusId,
+          organizationId: org.id,
+          type: postStatusDefinition.type,
+          orderIndex: postStatusDefinition.orderIndex,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
       }
     }
 
@@ -256,32 +236,27 @@ const ensureSite = ({
   subdomain: string;
 }) =>
   Effect.gen(function* () {
-    const dbService = yield* Database.Database;
-    const db = dbService.db;
+    const db = yield* Database.Database;
 
-    let [existing] = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: siteTable.id, subdomain: siteTable.subdomain })
-        .from(siteTable)
-        .where(eq(siteTable.organizationId, organizationId))
-        .limit(1)
-    );
+    let [existing] = yield* db
+      .select({ id: siteTable.id, subdomain: siteTable.subdomain })
+      .from(siteTable)
+      .where(eq(siteTable.organizationId, organizationId))
+      .limit(1);
 
     if (!existing) {
       const siteId = yield* SiteId.generate;
-      [existing] = yield* Effect.tryPromise(() =>
-        db
-          .insert(siteTable)
-          .values({
-            id: siteId,
-            name,
-            subdomain,
-            organizationId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning({ id: siteTable.id, subdomain: siteTable.subdomain })
-      );
+      [existing] = yield* db
+        .insert(siteTable)
+        .values({
+          id: siteId,
+          name,
+          subdomain,
+          organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning({ id: siteTable.id, subdomain: siteTable.subdomain });
     }
 
     if (!existing) {
@@ -303,36 +278,31 @@ const ensureMember = ({
   role: NonNullable<typeof memberTable.$inferInsert.role>;
 }) =>
   Effect.gen(function* () {
-    const dbService = yield* Database.Database;
-    const db = dbService.db;
+    const db = yield* Database.Database;
 
-    let [existing] = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: memberTable.id, role: memberTable.role })
-        .from(memberTable)
-        .where(
-          and(
-            eq(memberTable.organizationId, organizationId),
-            eq(memberTable.userId, userId)
-          )
+    let [existing] = yield* db
+      .select({ id: memberTable.id, role: memberTable.role })
+      .from(memberTable)
+      .where(
+        and(
+          eq(memberTable.organizationId, organizationId),
+          eq(memberTable.userId, userId)
         )
-        .limit(1)
-    );
+      )
+      .limit(1);
 
     if (!existing) {
       const memberId = yield* MemberId.generate;
-      [existing] = yield* Effect.tryPromise(() =>
-        db
-          .insert(memberTable)
-          .values({
-            id: memberId,
-            organizationId,
-            userId,
-            role,
-            createdAt: new Date(),
-          })
-          .returning({ id: memberTable.id, role: memberTable.role })
-      );
+      [existing] = yield* db
+        .insert(memberTable)
+        .values({
+          id: memberId,
+          organizationId,
+          userId,
+          role,
+          createdAt: new Date(),
+        })
+        .returning({ id: memberTable.id, role: memberTable.role });
     }
 
     return existing;
@@ -346,38 +316,31 @@ const ensureBoards = ({
   names: string[];
 }) =>
   Effect.gen(function* () {
-    const dbService = yield* Database.Database;
-    const db = dbService.db;
+    const db = yield* Database.Database;
 
-    let boards = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: boardTable.id, name: boardTable.name })
-        .from(boardTable)
-        .where(eq(boardTable.organizationId, organizationId))
-    );
+    let boards = yield* db
+      .select({ id: boardTable.id, name: boardTable.name })
+      .from(boardTable)
+      .where(eq(boardTable.organizationId, organizationId));
 
     if (boards.length === 0) {
       for (const name of names) {
         const boardId = yield* BoardId.generate;
-        yield* Effect.tryPromise(() =>
-          db.insert(boardTable).values({
-            id: boardId,
-            name,
-            slug: slugify(name),
-            visibility: "PUBLIC",
-            organizationId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-        );
+        yield* db.insert(boardTable).values({
+          id: boardId,
+          name,
+          slug: slugify(name),
+          visibility: "PUBLIC",
+          organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
       }
 
-      boards = yield* Effect.tryPromise(() =>
-        db
-          .select({ id: boardTable.id, name: boardTable.name })
-          .from(boardTable)
-          .where(eq(boardTable.organizationId, organizationId))
-      );
+      boards = yield* db
+        .select({ id: boardTable.id, name: boardTable.name })
+        .from(boardTable)
+        .where(eq(boardTable.organizationId, organizationId));
     }
 
     return boards;
@@ -397,23 +360,18 @@ const ensurePosts = ({
   creatorMemberId?: string;
 }) =>
   Effect.gen(function* () {
-    const dbService = yield* Database.Database;
-    const db = dbService.db;
+    const db = yield* Database.Database;
     const now = new Date();
-    const postStatuses = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: postStatusTable.id, type: postStatusTable.type })
-        .from(postStatusTable)
-        .where(eq(postStatusTable.organizationId, organizationId))
-    );
+    const postStatuses = yield* db
+      .select({ id: postStatusTable.id, type: postStatusTable.type })
+      .from(postStatusTable)
+      .where(eq(postStatusTable.organizationId, organizationId));
 
-    const [existing] = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: postTable.id })
-        .from(postTable)
-        .where(eq(postTable.organizationId, organizationId))
-        .limit(1)
-    );
+    const [existing] = yield* db
+      .select({ id: postTable.id })
+      .from(postTable)
+      .where(eq(postTable.organizationId, organizationId))
+      .limit(1);
 
     if (!existing) {
       for (let i = 0; i < count; i++) {
@@ -440,35 +398,31 @@ const ensurePosts = ({
         const lockedAt = i % 13 === 0 ? now : null;
 
         const postId = yield* PostId.generate;
-        yield* Effect.tryPromise(() =>
-          db.insert(postTable).values({
-            id: postId,
-            title,
-            slug: slugify(`${title}-${i + 1}`),
-            content,
-            excerpt: htmlToExcerpt(content),
-            boardId,
-            statusId: randomPostStatus.id,
-            organizationId,
-            creatorId: creatorId ?? null,
-            creatorMemberId: creatorMemberId ?? null,
-            lockedAt,
-            archivedAt: null,
-            mergedIntoPostId: null,
-            mergedAt: null,
-            createdAt: faker.date.recent({ days: 120, refDate: now }),
-            updatedAt: now,
-          })
-        );
+        yield* db.insert(postTable).values({
+          id: postId,
+          title,
+          slug: slugify(`${title}-${i + 1}`),
+          content,
+          excerpt: htmlToExcerpt(content),
+          boardId,
+          statusId: randomPostStatus.id,
+          organizationId,
+          creatorId: creatorId ?? null,
+          creatorMemberId: creatorMemberId ?? null,
+          lockedAt,
+          archivedAt: null,
+          mergedIntoPostId: null,
+          mergedAt: null,
+          createdAt: faker.date.recent({ days: 120, refDate: now }),
+          updatedAt: now,
+        });
       }
     }
 
-    return yield* Effect.tryPromise(() =>
-      db
-        .select({ id: postTable.id, title: postTable.title })
-        .from(postTable)
-        .where(eq(postTable.organizationId, organizationId))
-    );
+    return yield* db
+      .select({ id: postTable.id, title: postTable.title })
+      .from(postTable)
+      .where(eq(postTable.organizationId, organizationId));
   });
 
 const seedEngagement = ({
@@ -481,8 +435,7 @@ const seedEngagement = ({
   posts: Array<{ id: string; title: string }>;
 }) =>
   Effect.gen(function* () {
-    const dbService = yield* Database.Database;
-    const db = dbService.db;
+    const db = yield* Database.Database;
 
     if (actorIds.length === 0 || posts.length === 0) {
       return;
@@ -490,30 +443,26 @@ const seedEngagement = ({
 
     const membershipRows =
       actorIds.length > 0
-        ? yield* Effect.tryPromise(() =>
-            db
-              .select({ userId: memberTable.userId, memberId: memberTable.id })
-              .from(memberTable)
-              .where(
-                and(
-                  eq(memberTable.organizationId, organizationId),
-                  inArray(memberTable.userId, actorIds)
-                )
+        ? yield* db
+            .select({ userId: memberTable.userId, memberId: memberTable.id })
+            .from(memberTable)
+            .where(
+              and(
+                eq(memberTable.organizationId, organizationId),
+                inArray(memberTable.userId, actorIds)
               )
-          )
+            )
         : [];
 
     const memberIdByUserId = new Map(
       membershipRows.map((item) => [item.userId, item.memberId])
     );
 
-    const [existingComment] = yield* Effect.tryPromise(() =>
-      db
-        .select({ id: commentTable.id })
-        .from(commentTable)
-        .where(eq(commentTable.organizationId, organizationId))
-        .limit(1)
-    );
+    const [existingComment] = yield* db
+      .select({ id: commentTable.id })
+      .from(commentTable)
+      .where(eq(commentTable.organizationId, organizationId))
+      .limit(1);
 
     if (existingComment) {
       console.log(
@@ -540,18 +489,16 @@ const seedEngagement = ({
 
         const commentId = yield* CommentId.generate;
 
-        yield* Effect.tryPromise(() =>
-          db.insert(commentTable).values({
-            id: commentId,
-            content: faker.lorem.sentences({ min: 1, max: 3 }),
-            organizationId,
-            postId: postItem.id,
-            userId: actorId,
-            memberId: memberIdByUserId.get(actorId) ?? null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-        );
+        yield* db.insert(commentTable).values({
+          id: commentId,
+          content: faker.lorem.sentences({ min: 1, max: 3 }),
+          organizationId,
+          postId: postItem.id,
+          userId: actorId,
+          memberId: memberIdByUserId.get(actorId) ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
         createdComments.push({ id: commentId, userId: actorId });
       }
@@ -562,30 +509,26 @@ const seedEngagement = ({
       );
 
       for (const upvoterId of upvoters) {
-        const [existing] = yield* Effect.tryPromise(() =>
-          db
-            .select({ id: upvoteTable.id })
-            .from(upvoteTable)
-            .where(
-              and(
-                eq(upvoteTable.userId, upvoterId),
-                eq(upvoteTable.postId, postItem.id)
-              )
+        const [existing] = yield* db
+          .select({ id: upvoteTable.id })
+          .from(upvoteTable)
+          .where(
+            and(
+              eq(upvoteTable.userId, upvoterId),
+              eq(upvoteTable.postId, postItem.id)
             )
-            .limit(1)
-        );
+          )
+          .limit(1);
 
         if (!existing) {
           const upvoteId = yield* UpvoteId.generate;
-          yield* Effect.tryPromise(() =>
-            db.insert(upvoteTable).values({
-              id: upvoteId,
-              userId: upvoterId,
-              memberId: memberIdByUserId.get(upvoterId) ?? null,
-              postId: postItem.id,
-              organizationId,
-            })
-          );
+          yield* db.insert(upvoteTable).values({
+            id: upvoteId,
+            userId: upvoterId,
+            memberId: memberIdByUserId.get(upvoterId) ?? null,
+            postId: postItem.id,
+            organizationId,
+          });
         }
       }
 
@@ -597,31 +540,27 @@ const seedEngagement = ({
       for (const reactorId of reactors) {
         const emoji = faker.helpers.arrayElement(REACTIONS) ?? "thumbs_up";
 
-        const [existing] = yield* Effect.tryPromise(() =>
-          db
-            .select({ id: postReactionTable.id })
-            .from(postReactionTable)
-            .where(
-              and(
-                eq(postReactionTable.userId, reactorId),
-                eq(postReactionTable.postId, postItem.id),
-                eq(postReactionTable.emoji, emoji)
-              )
+        const [existing] = yield* db
+          .select({ id: postReactionTable.id })
+          .from(postReactionTable)
+          .where(
+            and(
+              eq(postReactionTable.userId, reactorId),
+              eq(postReactionTable.postId, postItem.id),
+              eq(postReactionTable.emoji, emoji)
             )
-            .limit(1)
-        );
+          )
+          .limit(1);
 
         if (!existing) {
           const reactionId = yield* PostReactionId.generate;
-          yield* Effect.tryPromise(() =>
-            db.insert(postReactionTable).values({
-              id: reactionId,
-              userId: reactorId,
-              memberId: memberIdByUserId.get(reactorId) ?? null,
-              postId: postItem.id,
-              emoji,
-            })
-          );
+          yield* db.insert(postReactionTable).values({
+            id: reactionId,
+            userId: reactorId,
+            memberId: memberIdByUserId.get(reactorId) ?? null,
+            postId: postItem.id,
+            emoji,
+          });
         }
       }
     }
@@ -640,31 +579,27 @@ const seedEngagement = ({
 
         const emoji = faker.helpers.arrayElement(REACTIONS) ?? "thumbs_up";
 
-        const [existing] = yield* Effect.tryPromise(() =>
-          db
-            .select({ id: commentReactionTable.id })
-            .from(commentReactionTable)
-            .where(
-              and(
-                eq(commentReactionTable.userId, reactorId),
-                eq(commentReactionTable.commentId, item.id),
-                eq(commentReactionTable.emoji, emoji)
-              )
+        const [existing] = yield* db
+          .select({ id: commentReactionTable.id })
+          .from(commentReactionTable)
+          .where(
+            and(
+              eq(commentReactionTable.userId, reactorId),
+              eq(commentReactionTable.commentId, item.id),
+              eq(commentReactionTable.emoji, emoji)
             )
-            .limit(1)
-        );
+          )
+          .limit(1);
 
         if (!existing) {
           const commentReactionId = yield* CommentReactionId.generate;
-          yield* Effect.tryPromise(() =>
-            db.insert(commentReactionTable).values({
-              id: commentReactionId,
-              userId: reactorId,
-              memberId: memberIdByUserId.get(reactorId) ?? null,
-              commentId: item.id,
-              emoji,
-            })
-          );
+          yield* db.insert(commentReactionTable).values({
+            id: commentReactionId,
+            userId: reactorId,
+            memberId: memberIdByUserId.get(reactorId) ?? null,
+            commentId: item.id,
+            emoji,
+          });
         }
       }
     }
@@ -809,7 +744,7 @@ const seed = Effect.gen(function* () {
   console.log(`Primary user password: ${TEST_USER.password}`);
 });
 
-const SeedLayer = Database.Database.Client;
+const SeedLayer = Database.DatabaseContextLive;
 
 Effect.runPromise(seed.pipe(Effect.provide(SeedLayer))).catch((error) => {
   console.error("Seed failed:", error);

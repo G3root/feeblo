@@ -9,7 +9,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
+    "drizzle-orm": "1.0.0-rc.4",
     "postgres": "^3.4.7"
   },
   "devDependencies": {

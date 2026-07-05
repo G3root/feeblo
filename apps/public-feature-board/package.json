@@ -26,6 +26,7 @@
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "catalog:",
+    "@tanstack/zod-adapter": "^1.167.0",
     "clsx": "catalog:",
     "effect": "catalog:",
     "lucide-react": "^1.14.0",

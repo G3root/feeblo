@@ -82,8 +82,8 @@ export const TagSelect = ({
                   <CommandItem
                     key={tag.id}
                     onSelect={async () => {
-                      setOpen(false);
                       await onTagSelect(tag, isSelected);
+                      setOpen(false);
                     }}
                     value={tag.name}
                   >

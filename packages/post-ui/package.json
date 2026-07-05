@@ -16,6 +16,14 @@
       "types": "./src/v2/post-field.tsx",
       "default": "./src/v2/post-field.tsx"
     },
+    "./post-editor": {
+      "types": "./src/v2/post-editor.tsx",
+      "default": "./src/v2/post-editor.tsx"
+    },
+    "./upvote-toggle": {
+      "types": "./src/v2/upvote-toggle.tsx",
+      "default": "./src/v2/upvote-toggle.tsx"
+    },
     "./post-create-dialog": {
       "types": "./src/v2/dialogs/post-create-dialog.tsx",
       "default": "./src/v2/dialogs/post-create-dialog.tsx"
@@ -23,6 +31,10 @@
     "./post-delete-dialog": {
       "types": "./src/v2/dialogs/post-delete-dialog.tsx",
       "default": "./src/v2/dialogs/post-delete-dialog.tsx"
+    },
+    "./comment-display": {
+      "types": "./src/v2/comment-display.tsx",
+      "default": "./src/v2/comment-display.tsx"
     },
     "./comment-delete-dialog": {
       "types": "./src/v2/dialogs/comment-delete-dialog.tsx",
@@ -32,9 +44,17 @@
       "types": "./src/v2/providers/post-collections-provider.tsx",
       "default": "./src/v2/providers/post-collections-provider.tsx"
     },
-    "./post-dialog-stores": {
-      "types": "./src/v2/dialog-stores/post.ts",
-      "default": "./src/v2/dialog-stores/post.ts"
+    "./post-collection": {
+      "types": "./src/v2/post-collection.tsx",
+      "default": "./src/v2/post-collection.tsx"
+    },
+    "./dialogs": {
+      "types": "./src/v2/dialogs/index.ts",
+      "default": "./src/v2/dialogs/index.ts"
+    },
+    "./dialog-stores": {
+      "types": "./src/v2/dialog-stores/index.ts",
+      "default": "./src/v2/dialog-stores/index.ts"
     },
     "./post-comment-composer": {
       "types": "./src/post/post-comment-composer.tsx",
@@ -57,8 +77,8 @@
       "default": "./src/post/post-reaction-section.tsx"
     },
     "./post-title-input": {
-      "types": "./src/post/post-title-input.tsx",
-      "default": "./src/post/post-title-input.tsx"
+      "types": "./src/v2/post-title-input.tsx",
+      "default": "./src/v2/post-title-input.tsx"
     },
     "./post-board-select": {
       "types": "./src/post/post-board-select.tsx",
@@ -67,6 +87,10 @@
     "./comment-reaction-section": {
       "types": "./src/post/comment-reaction-section.tsx",
       "default": "./src/post/comment-reaction-section.tsx"
+    },
+    "./reaction-picker": {
+      "types": "./src/v2/reaction-picker.tsx",
+      "default": "./src/v2/reaction-picker.tsx"
     },
     "./social-auth-buttons": {
       "types": "./src/auth/social-auth-buttons.tsx",
