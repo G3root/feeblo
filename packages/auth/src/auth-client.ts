@@ -10,9 +10,7 @@ import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import { z } from "zod";
 import type { Auth } from "./server";
 
-export const createAuthClient = (
-  baseURL: string
-): ReturnType<typeof createAuthClientBase> => {
+export const createAuthClient = (baseURL: string) => {
   return createAuthClientBase({
     plugins: [
       customSessionClient<Auth>(),

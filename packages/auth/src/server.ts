@@ -1,6 +1,5 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 
-import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
@@ -25,6 +24,7 @@ import {
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import { Effect, Layer, ManagedRuntime, Option, Redacted } from "effect";
+import { drizzleAdapter } from "./adapter/drizzzle-adapter";
 import { AuthConfig } from "./config";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
 
@@ -431,9 +431,6 @@ export const initAuthHandler = () =>
             }
           }
         }),
-      },
-      experimental: {
-        joins: true,
       },
     } satisfies BetterAuthOptions;
     return betterAuth(config);
