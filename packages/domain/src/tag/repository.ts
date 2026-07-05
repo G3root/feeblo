@@ -200,89 +200,109 @@ const makeTagRepository = Effect.gen(function* () {
       )({ organizationId }),
 
     setPostTags: ({ postId, organizationId, tagIds }: TPostTagSet) =>
-      Effect.gen(function* () {
-        yield* db.makeQuery((execute, input: TDeletePostTags) =>
-          execute((client) =>
-            client
-              .delete(schema.postTagTable)
-              .where(
-                and(
-                  eq(schema.postTagTable.postId, input.postId),
-                  eq(schema.postTagTable.organizationId, input.organizationId)
-                )
+      db
+        .transaction(
+          Effect.gen(function* () {
+            yield* db.makeQuery((execute, input: TDeletePostTags) =>
+              execute((client) =>
+                client
+                  .delete(schema.postTagTable)
+                  .where(
+                    and(
+                      eq(schema.postTagTable.postId, input.postId),
+                      eq(
+                        schema.postTagTable.organizationId,
+                        input.organizationId
+                      )
+                    )
+                  )
               )
-          )
-        )({ postId, organizationId });
+            )({ postId, organizationId });
 
-        if (tagIds.length === 0) {
-          return;
-        }
+            if (tagIds.length === 0) {
+              return;
+            }
 
-        const rows = yield* Effect.forEach(tagIds, (tagId) =>
-          PostTagId.generate.pipe(
-            Effect.map((id) => ({
-              id,
-              postId,
-              tagId,
-              organizationId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }))
-          )
-        );
+            const rows = yield* Effect.forEach(tagIds, (tagId) =>
+              PostTagId.generate.pipe(
+                Effect.map((id) => ({
+                  id,
+                  postId,
+                  tagId,
+                  organizationId,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                }))
+              )
+            );
 
-        yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
-          execute((client) =>
-            client.insert(schema.postTagTable).values(input.rows)
-          )
-        )({ rows });
-      }).pipe(Effect.asVoid),
+            yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
+              execute((client) =>
+                client
+                  .insert(schema.postTagTable)
+                  .values(input.rows)
+                  .onConflictDoNothing()
+              )
+            )({ rows });
+          })
+        )
+        .pipe(Effect.asVoid),
 
     setChangelogTags: ({
       changelogId,
       organizationId,
       tagIds,
     }: TChangelogTagSet) =>
-      Effect.gen(function* () {
-        yield* db.makeQuery((execute, input: TDeleteChangelogTags) =>
-          execute((client) =>
-            client
-              .delete(schema.changelogTagTable)
-              .where(
-                and(
-                  eq(schema.changelogTagTable.changelogId, input.changelogId),
-                  eq(
-                    schema.changelogTagTable.organizationId,
-                    input.organizationId
+      db
+        .transaction(
+          Effect.gen(function* () {
+            yield* db.makeQuery((execute, input: TDeleteChangelogTags) =>
+              execute((client) =>
+                client
+                  .delete(schema.changelogTagTable)
+                  .where(
+                    and(
+                      eq(
+                        schema.changelogTagTable.changelogId,
+                        input.changelogId
+                      ),
+                      eq(
+                        schema.changelogTagTable.organizationId,
+                        input.organizationId
+                      )
+                    )
                   )
-                )
               )
-          )
-        )({ changelogId, organizationId });
+            )({ changelogId, organizationId });
 
-        if (tagIds.length === 0) {
-          return;
-        }
+            if (tagIds.length === 0) {
+              return;
+            }
 
-        const rows = yield* Effect.forEach(tagIds, (tagId) =>
-          ChangelogTagId.generate.pipe(
-            Effect.map((id) => ({
-              id,
-              changelogId,
-              tagId,
-              organizationId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }))
-          )
-        );
+            const rows = yield* Effect.forEach(tagIds, (tagId) =>
+              ChangelogTagId.generate.pipe(
+                Effect.map((id) => ({
+                  id,
+                  changelogId,
+                  tagId,
+                  organizationId,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                }))
+              )
+            );
 
-        yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
-          execute((client) =>
-            client.insert(schema.changelogTagTable).values(input.rows)
-          )
-        )({ rows });
-      }).pipe(Effect.asVoid),
+            yield* db.makeQuery((execute, input: TInsertRows<typeof rows>) =>
+              execute((client) =>
+                client
+                  .insert(schema.changelogTagTable)
+                  .values(input.rows)
+                  .onConflictDoNothing()
+              )
+            )({ rows });
+          })
+        )
+        .pipe(Effect.asVoid),
 
     countExistingTags: ({
       organizationId,
