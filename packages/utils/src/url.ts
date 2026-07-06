@@ -1,7 +1,7 @@
-import slug from "@sindresorhus/slugify";
+import UrlSlugify from "slugify";
 
 export function slugify(str: string) {
-  return slug(str, { lowercase: true });
+  return UrlSlugify(str, { lower: true });
 }
 
 interface ExtractSubdomainContext {
