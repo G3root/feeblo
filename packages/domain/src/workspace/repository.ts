@@ -1,4 +1,4 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import {
   BoardId,
   MemberId,
@@ -52,76 +52,78 @@ const makeWorkspaceRepository = Effect.gen(function* () {
       }),
 
     createWorkspace: (args: CreateWorkspaceArgs) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const workspaceId = yield* WorkspaceId.generate;
-        const organization = yield* db
-          .insert(schema.organizationTable)
-          .values({
-            id: workspaceId,
+      transaction(
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const workspaceId = yield* WorkspaceId.generate;
+          const organization = yield* db
+            .insert(schema.organizationTable)
+            .values({
+              id: workspaceId,
+              name: args.workspaceName,
+              slug: args.subdomain,
+              createdAt: new Date(),
+            })
+            .returning()
+            .pipe(Effect.map(EffectArray.get(0)));
+
+          if (Option.isNone(organization)) {
+            return yield* new FailedToCreateWorkspaceError({
+              message: "Failed to create organization",
+            });
+          }
+
+          const organizationId = organization.value.id;
+          const memberId = yield* MemberId.generate;
+
+          yield* db.insert(schema.memberTable).values({
+            id: memberId,
+            organizationId,
+            role: "owner",
+            createdAt: new Date(),
+            userId: args.userId,
+          });
+
+          for (const postStatus of schema.DEFAULT_POST_STATUSES) {
+            const postStatusId = yield* PostStatusId.generate;
+            yield* db.insert(schema.postStatusTable).values({
+              id: postStatusId,
+              organizationId,
+              type: postStatus.type,
+              orderIndex: postStatus.orderIndex,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+
+          const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
+
+          for (const boardName of defaultBoards) {
+            const boardId = yield* BoardId.generate;
+            yield* db.insert(schema.boardTable).values({
+              id: boardId,
+              name: boardName,
+              slug: slugify(boardName),
+              visibility: "PUBLIC",
+              organizationId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
+          const siteId = yield* SiteId.generate;
+          yield* db.insert(schema.siteTable).values({
+            id: siteId,
+            organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
             name: args.workspaceName,
-            slug: args.subdomain,
-            createdAt: new Date(),
-          })
-          .returning()
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isNone(organization)) {
-          return yield* new FailedToCreateWorkspaceError({
-            message: "Failed to create organization",
+            subdomain: args.subdomain,
+            hidePoweredBy: false,
           });
-        }
 
-        const organizationId = organization.value.id;
-        const memberId = yield* MemberId.generate;
-
-        yield* db.insert(schema.memberTable).values({
-          id: memberId,
-          organizationId,
-          role: "owner",
-          createdAt: new Date(),
-          userId: args.userId,
-        });
-
-        for (const postStatus of schema.DEFAULT_POST_STATUSES) {
-          const postStatusId = yield* PostStatusId.generate;
-          yield* db.insert(schema.postStatusTable).values({
-            id: postStatusId,
-            organizationId,
-            type: postStatus.type,
-            orderIndex: postStatus.orderIndex,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        }
-
-        const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
-
-        for (const boardName of defaultBoards) {
-          const boardId = yield* BoardId.generate;
-          yield* db.insert(schema.boardTable).values({
-            id: boardId,
-            name: boardName,
-            slug: slugify(boardName),
-            visibility: "PUBLIC",
-            organizationId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        }
-        const siteId = yield* SiteId.generate;
-        yield* db.insert(schema.siteTable).values({
-          id: siteId,
-          organizationId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          name: args.workspaceName,
-          subdomain: args.subdomain,
-          hidePoweredBy: false,
-        });
-
-        return organizationId;
-      }),
+          return organizationId;
+        })
+      ),
 
     findProducts: () =>
       Effect.gen(function* () {

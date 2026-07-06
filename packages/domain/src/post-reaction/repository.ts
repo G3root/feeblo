@@ -182,7 +182,7 @@ const makePostReactionRepository = Effect.gen(function* () {
             onSome: (value) => value.id,
           }),
           emoji,
-        });
+        }).onConflictDoNothing();
 
         return { reacted: true, emoji };
       }),
@@ -259,7 +259,7 @@ const makePostReactionRepository = Effect.gen(function* () {
             onSome: (value) => value.id,
           }),
           emoji,
-        });
+        }).onConflictDoNothing();
 
         return { reacted: true, emoji };
       }),

@@ -1,4 +1,4 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { UpvoteId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
@@ -98,13 +98,16 @@ const makeUpvoteRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         const upvoteId = yield* UpvoteId.generate;
-        yield* db.insert(schema.upvoteTable).values({
-          id: upvoteId,
-          postId,
-          userId,
-          organizationId,
-          memberId: Option.getOrNull(member)?.id ?? null,
-        });
+        yield* db
+          .insert(schema.upvoteTable)
+          .values({
+            id: upvoteId,
+            postId,
+            userId,
+            organizationId,
+            memberId: Option.getOrNull(member)?.id ?? null,
+          })
+          .onConflictDoNothing();
 
         return { upvoted: true };
       }),

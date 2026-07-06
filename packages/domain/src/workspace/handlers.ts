@@ -1,3 +1,4 @@
+import { transaction } from "@feeblo/db";
 import { RESERVED_SUBDOMAINS, slugify } from "@feeblo/utils/url";
 import { Effect, Layer, Option } from "effect";
 import * as Policy from "../policy";
@@ -38,20 +39,24 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
             });
           }
 
-          const isSubdomainTaken =
-            yield* repository.isSubdomainTaken(subdomain);
+          const organizationId = yield* transaction(
+            Effect.gen(function* () {
+              const isSubdomainTaken =
+                yield* repository.isSubdomainTaken(subdomain);
 
-          if (isSubdomainTaken) {
-            return yield* new BadRequestError({
-              message: "This workspace name is already taken",
-            });
-          }
+              if (isSubdomainTaken) {
+                return yield* new BadRequestError({
+                  message: "This workspace name is already taken",
+                });
+              }
 
-          const organizationId = yield* repository.createWorkspace({
-            userId: session.session.userId,
-            workspaceName,
-            subdomain,
-          });
+              return yield* repository.createWorkspace({
+                userId: session.session.userId,
+                workspaceName,
+                subdomain,
+              });
+            })
+          );
 
           return { organizationId };
         }).pipe(withRemapDbErrors("Workspace", "create"));

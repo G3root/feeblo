@@ -1,9 +1,10 @@
 /** biome-ignore-all lint/style/noNestedTernary: <explanation> */
-import { schema, currentDb, transaction } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
 import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import { FailedToMergePostError } from "./errors";
 import type { TPostAdminUpdate, TPostUpdate } from "./schema";
 
 interface TPostFindMany {
@@ -282,17 +283,9 @@ const makePostRepository = Effect.gen(function* () {
           .update(schema.postTable)
           .set({
             archivedAt:
-              archived === undefined
-                ? undefined
-                : archived
-                  ? new Date()
-                  : null,
+              archived === undefined ? undefined : archived ? new Date() : null,
             lockedAt:
-              locked === undefined
-                ? undefined
-                : locked
-                  ? new Date()
-                  : null,
+              locked === undefined ? undefined : locked ? new Date() : null,
             updatedAt: new Date(),
           })
           .where(
@@ -371,10 +364,7 @@ const makePostRepository = Effect.gen(function* () {
             .from(schema.postTable)
             .where(
               and(
-                inArray(schema.postTable.id, [
-                  sourcePostId,
-                  targetPostId,
-                ]),
+                inArray(schema.postTable.id, [sourcePostId, targetPostId]),
                 eq(schema.postTable.organizationId, organizationId)
               )
             );
@@ -382,15 +372,35 @@ const makePostRepository = Effect.gen(function* () {
           const sourcePost = posts.find((post) => post.id === sourcePostId);
           const targetPost = posts.find((post) => post.id === targetPostId);
 
-          if (
-            !(sourcePost && targetPost) ||
-            sourcePostId === targetPostId ||
-            sourcePost.mergedIntoPostId ||
-            sourcePost.archivedAt ||
-            targetPost.mergedIntoPostId ||
-            targetPost.archivedAt
-          ) {
-            return;
+          if (!(sourcePost && targetPost)) {
+            return yield* new FailedToMergePostError({
+              message: "Source or target post not found",
+            });
+          }
+          if (sourcePostId === targetPostId) {
+            return yield* new FailedToMergePostError({
+              message: "Source and target posts must be different",
+            });
+          }
+          if (sourcePost.mergedIntoPostId) {
+            return yield* new FailedToMergePostError({
+              message: "Source post is already merged into another post",
+            });
+          }
+          if (sourcePost.archivedAt) {
+            return yield* new FailedToMergePostError({
+              message: "Source post is archived and cannot be merged",
+            });
+          }
+          if (targetPost.mergedIntoPostId) {
+            return yield* new FailedToMergePostError({
+              message: "Target post is already merged into another post",
+            });
+          }
+          if (targetPost.archivedAt) {
+            return yield* new FailedToMergePostError({
+              message: "Target post is archived and cannot be a merge target",
+            });
           }
 
           yield* db

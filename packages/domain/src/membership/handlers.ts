@@ -1,5 +1,6 @@
 import { APIError as BetterAuthApiError } from "better-auth";
 import { Effect, Layer } from "effect";
+import { transaction } from "@feeblo/db";
 import * as Policy from "../policy";
 import {
   BadRequestError,
@@ -108,25 +109,33 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
           )
         ),
       OrganizationUpdateMemberRole: ({ organizationId, memberId, role }) =>
-        repository
-          .updateMemberRole({
-            organizationId,
-            memberId,
-            role,
+        transaction(
+          Effect.gen(function* () {
+            yield* membershipPolicy.canAssignRoleWithinPlan({
+              organizationId,
+              memberId,
+              role,
+            });
+
+            yield* repository.updateMemberRole({
+              organizationId,
+              memberId,
+              role,
+            });
           })
-          .pipe(
-            Policy.withPolicy(
-              Policy.all(
-                Policy.hasMembership(organizationId),
-                Policy.any(
-                  Policy.hasOrganizationRole(organizationId, "owner"),
-                  Policy.hasOrganizationRole(organizationId, "admin")
-                ),
-                membershipPolicy.hasOtherOwners({ organizationId, memberId })
-              )
-            ),
-            withRemapDbErrors("Membership", "update")
+        ).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(organizationId),
+              Policy.any(
+                Policy.hasOrganizationRole(organizationId, "owner"),
+                Policy.hasOrganizationRole(organizationId, "admin")
+              ),
+              membershipPolicy.hasOtherOwners({ organizationId, memberId })
+            )
           ),
+          withRemapDbErrors("Membership", "update")
+        ),
       OrganizationRemoveMember: ({ organizationId, memberId }) =>
         repository
           .deleteMember({

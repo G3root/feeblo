@@ -160,7 +160,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           userId: args.userId,
           memberId: Option.isSome(member) ? member.value.id : null,
           emoji: args.emoji,
-        });
+        }).onConflictDoNothing();
 
         return { reacted: true, emoji: args.emoji };
       }),
@@ -233,7 +233,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           userId: args.userId,
           memberId: Option.isSome(member) ? member.value.id : null,
           emoji: args.emoji,
-        });
+        }).onConflictDoNothing();
 
         return { reacted: true, emoji: args.emoji };
       }),

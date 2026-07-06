@@ -26,7 +26,7 @@ export class FailedToUpdatePostError extends Schema.TaggedErrorClass<FailedToUpd
 
 export class FailedToMergePostError extends Schema.TaggedErrorClass<FailedToMergePostError>()(
   "FailedToMergePostError",
-  {},
+  { message: Schema.String },
   { httpApiStatus: 500, identifier: "FailedToMergePostError" }
 ) {}
 

@@ -8,7 +8,6 @@ import {
   Effect,
   Array as EffectArray,
   Layer,
-  Option,
   Schema,
   SchemaTransformation,
 } from "effect";
@@ -143,64 +142,47 @@ const makeBillingRepository = Effect.gen(function* () {
         const id = yield* SubscriptionId.generate;
         yield* db
           .insert(schema.subscriptionTable)
-          .values(toSubscriptionValues(payload, id));
+          .values(toSubscriptionValues(payload, id))
+          .onConflictDoNothing();
       }),
     upsertSubscription: (payload: SubscriptionPayload) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const existingSubscription = yield* db
-          .select({ id: schema.subscriptionTable.id })
-          .from(schema.subscriptionTable)
-          .where(eq(schema.subscriptionTable.externalId, payload.id))
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isSome(existingSubscription)) {
-          const { id } = existingSubscription.value;
-          const { id: _id, ...values } = toSubscriptionValues(payload, id);
-
-          yield* db
-            .update(schema.subscriptionTable)
-            .set({
-              ...values,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.subscriptionTable.externalId, payload.id));
-          return;
-        }
-
         const id = yield* SubscriptionId.generate;
+        const values = toSubscriptionValues(payload, id);
+        const { id: _id, ...updateValues } = values;
         yield* db
           .insert(schema.subscriptionTable)
-          .values(toSubscriptionValues(payload, id));
+          .values(values)
+          .onConflictDoUpdate({
+            target: schema.subscriptionTable.externalId,
+            set: {
+              ...updateValues,
+              updatedAt: new Date(),
+            },
+          });
       }),
     createProduct: (payload: ProductPayload) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        yield* db.insert(schema.productTable).values(toProductValues(payload));
+        yield* db
+          .insert(schema.productTable)
+          .values(toProductValues(payload))
+          .onConflictDoNothing();
       }),
     upsertProduct: (payload: ProductPayload) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const existingProduct = yield* db
-          .select({ id: schema.productTable.id })
-          .from(schema.productTable)
-          .where(eq(schema.productTable.id, payload.id))
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isSome(existingProduct)) {
-          yield* db
-            .update(schema.productTable)
-            .set({
+        yield* db
+          .insert(schema.productTable)
+          .values(toProductValues(payload))
+          .onConflictDoUpdate({
+            target: schema.productTable.id,
+            set: {
               ...toProductValues(payload),
               updatedAt: payload.modifiedAt ?? new Date(),
-            })
-            .where(eq(schema.productTable.id, payload.id));
-          return;
-        }
-
-        yield* db.insert(schema.productTable).values(toProductValues(payload));
+            },
+          });
       }),
     findSubscriptionByOrganizationId: ({
       organizationId,
