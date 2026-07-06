@@ -6,11 +6,9 @@ import {
 } from "prosekit/extensions/code-block";
 import { defineHorizontalRule } from "prosekit/extensions/horizontal-rule";
 import { defineImageUploadHandler } from "prosekit/extensions/image";
-import { defineMath } from "prosekit/extensions/math";
 import { defineMention } from "prosekit/extensions/mention";
 import { definePlaceholder } from "prosekit/extensions/placeholder";
 import { defineReadonly } from "prosekit/extensions/readonly";
-import { renderKaTeXMathBlock, renderKaTeXMathInline } from "./sample/katex.js";
 import { sampleUploader } from "./sample/sample-uploader.js";
 import { defineCodeBlockView } from "./ui/code-block-view/index.js";
 import { defineImageView } from "./ui/image-view/index.js";
@@ -23,10 +21,10 @@ export function defineExtension({
     defineBasicExtension(),
     definePlaceholder({ placeholder }),
     defineMention(),
-    defineMath({
-      renderMathBlock: renderKaTeXMathBlock,
-      renderMathInline: renderKaTeXMathInline,
-    }),
+    // defineMath({
+    //   renderMathBlock: renderKaTeXMathBlock,
+    //   renderMathInline: renderKaTeXMathInline,
+    // }),
     defineCodeBlock(),
     defineCodeBlockShiki(),
     defineHorizontalRule(),

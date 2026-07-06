@@ -1,12 +1,11 @@
-import { renderMermaidSVG, THEMES } from "beautiful-mermaid";
+// import { renderMermaidSVG, THEMES } from "beautiful-mermaid";
 import {
   type CodeBlockAttrs,
   isCodeBlockPreviewHiddenDecoration,
   shikiBundledLanguagesInfo,
 } from "prosekit/extensions/code-block";
-import { TextSelection } from "prosekit/pm/state";
 import type { ReactNodeViewProps } from "prosekit/react";
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 
 export default function CodeBlockView(props: ReactNodeViewProps) {
   const attrs = props.node.attrs as CodeBlockAttrs;
@@ -23,44 +22,44 @@ export default function CodeBlockView(props: ReactNodeViewProps) {
     props.setAttrs(attrs);
   };
 
-  const focusSource = (event: React.MouseEvent | React.KeyboardEvent) => {
-    event.preventDefault();
-    const pos = props.getPos();
-    if (typeof pos !== "number") {
-      return;
-    }
-    const { state, dispatch } = props.view;
-    const selection = TextSelection.near(state.doc.resolve(pos + 1), 1);
-    dispatch(state.tr.setSelection(selection));
-    props.view.focus();
-    preRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  };
+  // const focusSource = (event: React.MouseEvent | React.KeyboardEvent) => {
+  //   event.preventDefault();
+  //   const pos = props.getPos();
+  //   if (typeof pos !== "number") {
+  //     return;
+  //   }
+  //   const { state, dispatch } = props.view;
+  //   const selection = TextSelection.near(state.doc.resolve(pos + 1), 1);
+  //   dispatch(state.tr.setSelection(selection));
+  //   props.view.focus();
+  //   preRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  // };
 
-  const code = props.node.textContent;
+  // const code = props.node.textContent;
 
-  const mermaidPreview = useMemo(() => {
-    if (language !== "mermaid") {
-      return { svg: null, error: null };
-    }
-    try {
-      return {
-        svg: renderMermaidSVG(code, THEMES["tokyo-night"]),
-        error: null,
-      };
-    } catch (err) {
-      return {
-        svg: null,
-        error: err instanceof Error ? err : new Error(String(err)),
-      };
-    }
-  }, [code, language]);
+  // const mermaidPreview = useMemo(() => {
+  //   if (language !== "mermaid") {
+  //     return { svg: null, error: null };
+  //   }
+  //   try {
+  //     return {
+  //       svg: renderMermaidSVG(code, THEMES["tokyo-night"]),
+  //       error: null,
+  //     };
+  //   } catch (err) {
+  //     return {
+  //       svg: null,
+  //       error: err instanceof Error ? err : new Error(String(err)),
+  //     };
+  //   }
+  // }, [code, language]);
 
   return (
     <>
       <div
         className="relative top-3 mx-2 h-0 select-none overflow-visible text-xs data-preview:hidden"
         contentEditable={false}
-        data-preview={showMermaidPreview ? "" : undefined}
+        // data-preview={showMermaidPreview ? "" : undefined}
       >
         <select
           aria-label="Code block language"
@@ -85,7 +84,7 @@ export default function CodeBlockView(props: ReactNodeViewProps) {
           preRef.current = element;
         }}
       />
-      {showMermaidPreview && (
+      {/* {showMermaidPreview && (
         <div
           aria-label="Edit source"
           className="block overflow-auto py-2"
@@ -99,7 +98,7 @@ export default function CodeBlockView(props: ReactNodeViewProps) {
             <div dangerouslySetInnerHTML={{ __html: mermaidPreview.svg }} />
           ) : null}
         </div>
-      )}
+      )} */}
     </>
   );
 }

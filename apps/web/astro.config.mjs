@@ -152,9 +152,22 @@ export default defineConfig({
                 return "floating-ui-vendor";
               }
 
+              if (id.includes("/better-auth/") || id.includes("/@better-auth/")) {
+                return "better-auth-vendor";
+              }
+
+              if (id.includes("/node_modules/solid-js/") || id.includes("/@solidjs/")) {
+                return "solid-vendor";
+              }
+
+              if (id.includes("/dompurify/")) {
+                return "dompurify-vendor";
+              }
+
               if (
                 id.includes("/prosemirror-") ||
                 id.includes("/prosekit/") ||
+                id.includes("/katex/") ||
                 id.includes("/mdast-util-to-markdown/") ||
                 id.includes("/unist-util-visit-parents/") ||
                 id.includes("/unified/") ||
