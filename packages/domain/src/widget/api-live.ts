@@ -6,7 +6,8 @@ import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+
 import { BoardRepository } from "../board/repository";
 import { Api } from "../http/api";
 import { PostStatusRepository } from "../post-status/repository";

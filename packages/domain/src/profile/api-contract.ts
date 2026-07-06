@@ -1,11 +1,11 @@
 import * as Schema from "effect/Schema";
 
-import { Multipart } from "effect/unstable/http";
-import {
-  HttpApiEndpoint,
-  HttpApiGroup,
-  HttpApiSchema,
-} from "effect/unstable/httpapi";
+import * as Multipart from "effect/unstable/http/Multipart";
+
+import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
+import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
+
 import {
   BadRequestError,
   InternalServerError,

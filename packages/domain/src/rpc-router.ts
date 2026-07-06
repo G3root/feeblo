@@ -1,6 +1,8 @@
 import * as Layer from "effect/Layer";
 
-import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
+import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
+import * as RpcServer from "effect/unstable/rpc/RpcServer";
+
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";

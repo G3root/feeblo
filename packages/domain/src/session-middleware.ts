@@ -5,8 +5,11 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 
-import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi";
-import { RpcMiddleware } from "effect/unstable/rpc";
+import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
+import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
+
+import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
+
 import { UnauthorizedError } from "./rpc-errors";
 import { getSessionCookieName } from "./session-cookie";
 

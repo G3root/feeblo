@@ -15,14 +15,14 @@ import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import {
-  HttpEffect,
-  HttpMiddleware,
-  HttpRouter,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "effect/unstable/http";
-import { HttpApiScalar } from "effect/unstable/httpapi";
+import * as HttpEffect from "effect/unstable/http/HttpEffect";
+import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
+import * as HttpRouter from "effect/unstable/http/HttpRouter";
+import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+
+import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
+
 import { ServerConfig } from "./config";
 import { corsVaryFix } from "./middlewares/cors-vary";
 

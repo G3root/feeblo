@@ -1,6 +1,7 @@
 import * as Layer from "effect/Layer";
 
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+
 import { AuthApiLive } from "../auth/api-live";
 import { MediaApiLive } from "../media/api-live";
 import { OrganizationApiLive } from "../organization/api-live";

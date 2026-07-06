@@ -5,12 +5,11 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 
-import { FetchHttpClient } from "effect/unstable/http";
-import {
-  RpcClient,
-  type RpcClientError,
-  RpcSerialization,
-} from "effect/unstable/rpc";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+
+import * as RpcClient from "effect/unstable/rpc/RpcClient";
+import type * as RpcClientError from "effect/unstable/rpc/RpcClientError";
+import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
 
 /** Fetch client that sends cookies (needed for BetterAuth session) */
 export const FetchWithCredentials = FetchHttpClient.layer.pipe(

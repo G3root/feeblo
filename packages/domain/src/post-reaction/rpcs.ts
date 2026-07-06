@@ -1,7 +1,9 @@
 import { ReactionEmojiSchema } from "@feeblo/utils/reaction";
 import * as Schema from "effect/Schema";
 
-import { Rpc, RpcGroup } from "effect/unstable/rpc";
+import * as Rpc from "effect/unstable/rpc/Rpc";
+import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
+
 import { AuthMiddleware } from "../session-middleware";
 import { PostReactionServiceErrors } from "./errors";
 import { PostReaction, PostReactionList, PostReactionToggle } from "./schema";

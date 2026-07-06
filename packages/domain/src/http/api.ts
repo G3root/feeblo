@@ -1,4 +1,5 @@
-import { HttpApi } from "effect/unstable/httpapi";
+import * as HttpApi from "effect/unstable/httpapi/HttpApi";
+
 import { AuthApiGroup } from "../auth/api-contract";
 import { MediaApiGroup } from "../media/api-contract";
 import { OrganizationApiGroup } from "../organization/api-contract";

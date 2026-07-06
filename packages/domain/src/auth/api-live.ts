@@ -1,11 +1,11 @@
 import * as Effect from "effect/Effect";
 
-import {
-  HttpEffect,
-  HttpServerRequest,
-  HttpServerResponse,
-} from "effect/unstable/http";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import * as HttpEffect from "effect/unstable/http/HttpEffect";
+import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
+
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+
 import { Api } from "../http/api";
 import {
   BadRequestError,

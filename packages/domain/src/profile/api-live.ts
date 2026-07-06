@@ -5,7 +5,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Predicate from "effect/Predicate";
 
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+
 import { Api } from "../http/api";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { S3UploadService, S3UploadServiceLive } from "../services/s3";
