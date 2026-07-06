@@ -1,6 +1,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <explanation> */
 import { AllRpcs } from "@feeblo/domain/rpc-group";
-import { Context, Effect, Layer, ManagedRuntime } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
+
 import { FetchHttpClient } from "effect/unstable/http";
 import {
   RpcClient,

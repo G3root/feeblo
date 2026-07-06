@@ -2,7 +2,11 @@ import { currentDb, schema, transaction } from "@feeblo/db";
 import { ChangelogTagId, PostTagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as EffectArray from "effect/Array";
+import * as Layer from "effect/Layer";
+
 import type {
   TChangelogTagList,
   TChangelogTagSet,

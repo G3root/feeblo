@@ -1,4 +1,6 @@
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { WorkspaceRepository } from "../workspace/repository";

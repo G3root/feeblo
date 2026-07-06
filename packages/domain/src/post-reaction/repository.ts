@@ -2,7 +2,11 @@ import { schema, currentDb } from "@feeblo/db";
 import { PostReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as EffectArray from "effect/Array";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 interface TPostReactionList {
   organizationId: string;

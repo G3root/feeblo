@@ -1,7 +1,10 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer } from "effect";
+import * as EffectArray from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 interface DeleteComment {
   id: string;

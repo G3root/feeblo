@@ -1,6 +1,6 @@
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
-import { ManagedRuntime } from "effect";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 
 const authRuntime = ManagedRuntime.make(Database.DatabaseContextLive);
 

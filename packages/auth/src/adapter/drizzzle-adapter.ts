@@ -34,7 +34,8 @@ import {
   sql,
 } from "drizzle-orm";
 import type { EffectPgDatabase } from "drizzle-orm/effect-postgres";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
+
 import {
   insensitiveEq,
   insensitiveIlike,

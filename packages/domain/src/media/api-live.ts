@@ -1,4 +1,7 @@
-import { Effect, FileSystem, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import { BadRequestError, InternalServerError } from "../rpc-errors";

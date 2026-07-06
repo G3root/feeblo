@@ -1,5 +1,5 @@
 import { MemberId, WorkspaceId } from "@feeblo/id";
-import { Schema as S } from "effect";
+import * as S from "effect/Schema";
 
 const ROLE_LITERAL = S.Literals(["owner", "admin", "member"]);
 

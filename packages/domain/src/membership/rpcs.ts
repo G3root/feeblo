@@ -1,4 +1,5 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
+
 import { Rpc, RpcGroup } from "effect/unstable/rpc";
 import { AuthMiddleware } from "../session-middleware";
 import { MembershipServiceErrors } from "./errors";

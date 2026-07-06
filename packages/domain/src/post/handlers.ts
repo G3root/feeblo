@@ -1,7 +1,9 @@
 import { transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { Effect, Layer } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+
 import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
 import { PostSubscriptionRepository } from "../post-subscription/repository";

@@ -1,8 +1,12 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { CommentReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import * as EffectArray from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 interface TCommentReactionList {
   organizationId: string;
@@ -136,7 +140,9 @@ const makeCommentReactionRepository = Effect.gen(function* () {
         if (Option.isSome(existingReaction)) {
           yield* db
             .delete(schema.commentReactionTable)
-            .where(eq(schema.commentReactionTable.id, existingReaction.value.id));
+            .where(
+              eq(schema.commentReactionTable.id, existingReaction.value.id)
+            );
           return { reacted: false, emoji: null };
         }
 
@@ -154,13 +160,16 @@ const makeCommentReactionRepository = Effect.gen(function* () {
 
         const commentReactionId = yield* CommentReactionId.generate;
 
-        yield* db.insert(schema.commentReactionTable).values({
-          id: commentReactionId,
-          commentId: args.commentId,
-          userId: args.userId,
-          memberId: Option.isSome(member) ? member.value.id : null,
-          emoji: args.emoji,
-        }).onConflictDoNothing();
+        yield* db
+          .insert(schema.commentReactionTable)
+          .values({
+            id: commentReactionId,
+            commentId: args.commentId,
+            userId: args.userId,
+            memberId: Option.isSome(member) ? member.value.id : null,
+            emoji: args.emoji,
+          })
+          .onConflictDoNothing();
 
         return { reacted: true, emoji: args.emoji };
       }),
@@ -210,7 +219,9 @@ const makeCommentReactionRepository = Effect.gen(function* () {
         if (Option.isSome(existingReaction)) {
           yield* db
             .delete(schema.commentReactionTable)
-            .where(eq(schema.commentReactionTable.id, existingReaction.value.id));
+            .where(
+              eq(schema.commentReactionTable.id, existingReaction.value.id)
+            );
           return { reacted: false, emoji: null };
         }
 
@@ -227,13 +238,16 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         const commentReactionId = yield* CommentReactionId.generate;
-        yield* db.insert(schema.commentReactionTable).values({
-          id: commentReactionId,
-          commentId: args.commentId,
-          userId: args.userId,
-          memberId: Option.isSome(member) ? member.value.id : null,
-          emoji: args.emoji,
-        }).onConflictDoNothing();
+        yield* db
+          .insert(schema.commentReactionTable)
+          .values({
+            id: commentReactionId,
+            commentId: args.commentId,
+            userId: args.userId,
+            memberId: Option.isSome(member) ? member.value.id : null,
+            emoji: args.emoji,
+          })
+          .onConflictDoNothing();
 
         return { reacted: true, emoji: args.emoji };
       }),

@@ -1,7 +1,11 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, sql } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer } from "effect";
+import * as EffectArray from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+
 import type {
   TChangelogCreate,
   TChangelogDelete,
@@ -167,12 +171,14 @@ const makeChangelogRepository = Effect.gen(function* () {
     delete: ({ id, organizationId }: TChangelogDelete) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        yield* db.delete(schema.changelogTable).where(
-          and(
-            eq(schema.changelogTable.id, id),
-            eq(schema.changelogTable.organizationId, organizationId)
-          )
-        );
+        yield* db
+          .delete(schema.changelogTable)
+          .where(
+            and(
+              eq(schema.changelogTable.id, id),
+              eq(schema.changelogTable.organizationId, organizationId)
+            )
+          );
       }).pipe(Effect.asVoid),
   };
 });

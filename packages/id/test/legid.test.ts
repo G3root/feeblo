@@ -1,4 +1,5 @@
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
+
 import { beforeEach, describe, expect, it } from "vitest";
 import { asLegidArray, asLegidArrayById, LegidError, makeId } from "../src/legid";
 

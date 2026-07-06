@@ -1,5 +1,7 @@
 import { createRuntime, type RpcClientType, withRpc } from "@feeblo/rpc-client";
-import { Cause, type Effect, Exit } from "effect";
+import * as Cause from "effect/Cause";
+import type * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 
 import { getServerRuntimePublicEnv } from "./server-runtime-public-env";
 

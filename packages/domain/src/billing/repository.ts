@@ -1,16 +1,14 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { SubscriptionId } from "@feeblo/id";
 import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
 import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
 import { eq } from "drizzle-orm";
-import {
-  Context,
-  Effect,
-  Array as EffectArray,
-  Layer,
-  Schema,
-  SchemaTransformation,
-} from "effect";
+import * as EffectArray from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 
 type SubscriptionPayload = WebhookSubscriptionCreatedPayload["data"];
 type ProductPayload = WebhookProductCreatedPayload["data"];

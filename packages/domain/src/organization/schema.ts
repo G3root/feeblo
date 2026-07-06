@@ -1,5 +1,5 @@
 import { WorkspaceId } from "@feeblo/id";
-import { Schema as S } from "effect";
+import * as S from "effect/Schema";
 
 export const Organization = S.Struct({
   id: S.String,

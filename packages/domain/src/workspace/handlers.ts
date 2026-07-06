@@ -1,6 +1,9 @@
 import { transaction } from "@feeblo/db";
 import { RESERVED_SUBDOMAINS, slugify } from "@feeblo/utils/url";
-import { Effect, Layer, Option } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";

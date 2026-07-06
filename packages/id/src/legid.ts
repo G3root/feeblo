@@ -1,4 +1,7 @@
-import { type Brand, Effect, Schema } from "effect";
+import type * as Brand from "effect/Brand";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+
 import { createId, verifyId } from "legid";
 
 const maxIdLength = 54;

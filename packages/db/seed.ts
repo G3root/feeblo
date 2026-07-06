@@ -15,7 +15,9 @@ import {
 } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { and, eq, inArray } from "drizzle-orm";
-import { Data, Effect } from "effect";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+
 import { Database } from "./src";
 import { nukeDatabase } from "./src/nuke";
 import {

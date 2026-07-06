@@ -1,5 +1,5 @@
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
-import { Schema as S } from "effect";
+import * as S from "effect/Schema";
 
 export const Post = S.Struct({
   id: S.String,

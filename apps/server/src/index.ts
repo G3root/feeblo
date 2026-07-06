@@ -11,7 +11,10 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
-import { Config, Effect, Layer } from "effect";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+
 import {
   HttpEffect,
   HttpMiddleware,

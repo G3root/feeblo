@@ -1,4 +1,6 @@
-import { Effect, Predicate, Schema } from "effect";
+import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 
 export class BadRequestError extends Schema.TaggedErrorClass<BadRequestError>()(
   "BadRequestError",
@@ -50,7 +52,7 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
             | "EffectDrizzleQueryError"
             | "SqlError"
             | "SchemaError"
-            | "LegidError"
+            | "LegidError";
         }
       >
     | InternalServerError,
@@ -96,7 +98,7 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
               | "EffectDrizzleQueryError"
               | "SqlError"
               | "SchemaError"
-              | "LegidError"
+              | "LegidError";
           }
         >
       | InternalServerError,

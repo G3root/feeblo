@@ -1,5 +1,8 @@
 import { symmetricDecrypt, symmetricEncrypt } from "@feeblo/utils/crypto";
-import { Duration, Effect, Schema } from "effect";
+import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
+
 import {
   type VerificationOTPState,
   VerificationOTPStateSchema,

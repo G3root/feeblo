@@ -1,5 +1,9 @@
 import { Polar } from "@polar-sh/sdk";
-import { Context, Effect, Layer, Redacted } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+
 import { BadRequestError } from "../rpc-errors";
 import { PolarConfig } from "./config";
 import {

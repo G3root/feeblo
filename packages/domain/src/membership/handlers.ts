@@ -1,6 +1,7 @@
-import { APIError as BetterAuthApiError } from "better-auth";
-import { Effect, Layer } from "effect";
 import { transaction } from "@feeblo/db";
+import { APIError as BetterAuthApiError } from "better-auth";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import {
   BadRequestError,

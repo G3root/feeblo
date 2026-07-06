@@ -3,7 +3,9 @@ import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
-import { Effect, Predicate } from "effect";
+import * as Effect from "effect/Effect";
+import * as Predicate from "effect/Predicate";
+
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { BoardRepository } from "../board/repository";
 import { Api } from "../http/api";

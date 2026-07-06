@@ -11,7 +11,9 @@ import {
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { createCollection, parseLoadSubsetOptions } from "@tanstack/react-db";
-import { Duration, type Schema } from "effect";
+import * as Duration from "effect/Duration";
+import type * as Schema from "effect/Schema";
+
 import { getContext } from "../integrations/tanstack-query/root-provider";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;

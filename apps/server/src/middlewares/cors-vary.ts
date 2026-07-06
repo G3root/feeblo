@@ -1,4 +1,5 @@
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
+
 import { HttpRouter, HttpServerResponse } from "effect/unstable/http";
 
 export const corsVaryFix = HttpRouter.middleware(

@@ -3,8 +3,12 @@
 /** biome-ignore-all lint/complexity/noBannedTypes: <explanation> */
 // credits: https://github.com/CapSoftware/Cap/blob/main/packages/web-domain/src/Policy.ts
 
-import { Context, Data, Effect, type Option, Schema } from "effect";
 import type { NonEmptyReadonlyArray } from "effect/Array";
+import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import type * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import { CurrentSession } from "./session-middleware";
 

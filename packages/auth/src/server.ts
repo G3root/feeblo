@@ -23,7 +23,12 @@ import {
   organization,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
-import { Effect, Layer, ManagedRuntime, Option, Redacted } from "effect";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
+
 import { drizzleAdapter } from "./adapter/drizzzle-adapter";
 import { AuthConfig } from "./config";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";

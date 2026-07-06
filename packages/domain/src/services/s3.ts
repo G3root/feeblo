@@ -1,6 +1,10 @@
 import { S3 } from "@effect-aws/client-s3";
 import { S3FileSystem } from "@effect-aws/s3";
-import { Context, Effect, FileSystem, Layer } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+
 import { S3Config } from "./s3-config";
 
 export const S3Layer = Layer.unwrap(

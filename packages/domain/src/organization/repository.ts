@@ -1,6 +1,10 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { and, eq } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import * as EffectArray from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 interface TUpdate {
   logo: string | null;
@@ -33,10 +37,7 @@ const makeOrganizationRepository = Effect.gen(function* () {
           .from(schema.memberTable)
           .innerJoin(
             schema.organizationTable,
-            eq(
-              schema.memberTable.organizationId,
-              schema.organizationTable.id
-            )
+            eq(schema.memberTable.organizationId, schema.organizationTable.id)
           )
           .where(eq(schema.memberTable.userId, userId));
       }),

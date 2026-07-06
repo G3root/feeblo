@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
 
 export const REACTION_EMOJI_BY_NAME = {
   thumbs_up: "👍️",

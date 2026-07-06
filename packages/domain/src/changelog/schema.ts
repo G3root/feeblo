@@ -1,5 +1,5 @@
 import { ChangelogId, WorkspaceId } from "@feeblo/id";
-import { Schema as S } from "effect";
+import * as S from "effect/Schema";
 
 export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
 

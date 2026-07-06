@@ -1,4 +1,8 @@
-import { Config, Context, Effect, Layer } from "effect";
+import * as Config from "effect/Config";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+
 import { InternalServerError } from "../rpc-errors";
 
 export class VerificationOtpConfig extends Context.Service<VerificationOtpConfig>()(

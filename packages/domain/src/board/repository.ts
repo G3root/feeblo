@@ -1,7 +1,10 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer } from "effect";
+import * as EffectArray from "effect/Array";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 
 interface TBoardCreate {
   creatorId: string;
@@ -115,9 +118,7 @@ const makeBoardRepository = Effect.gen(function* () {
 
         return boards;
       }),
-    countByOrganizationId: ({
-      organizationId,
-    }: { organizationId: string }) =>
+    countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
         const boards = yield* db
@@ -131,12 +132,14 @@ const makeBoardRepository = Effect.gen(function* () {
     delete: ({ id, organizationId }: TBoardDelete) =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        yield* db.delete(schema.boardTable).where(
-          and(
-            eq(schema.boardTable.id, id),
-            eq(schema.boardTable.organizationId, organizationId)
-          )
-        );
+        yield* db
+          .delete(schema.boardTable)
+          .where(
+            and(
+              eq(schema.boardTable.id, id),
+              eq(schema.boardTable.organizationId, organizationId)
+            )
+          );
       }).pipe(Effect.asVoid),
     update: (args: TBoardUpdate) =>
       Effect.gen(function* () {

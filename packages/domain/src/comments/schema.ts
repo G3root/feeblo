@@ -1,5 +1,5 @@
 import { CommentId, PostId, WorkspaceId } from "@feeblo/id";
-import { Schema as S } from "effect";
+import * as S from "effect/Schema";
 
 export const Comment = S.Struct({
   id: S.String,

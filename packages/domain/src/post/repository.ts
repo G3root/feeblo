@@ -3,7 +3,12 @@ import { currentDb, schema, transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
-import { Context, Effect, Array as EffectArray, Layer, Option } from "effect";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as EffectArray from "effect/Array";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+
 import { FailedToMergePostError } from "./errors";
 import type { TPostAdminUpdate, TPostUpdate } from "./schema";
 

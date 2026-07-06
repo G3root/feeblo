@@ -1,6 +1,6 @@
 import { CommentId, PostId, WorkspaceId } from "@feeblo/id";
 import { ReactionEmojiSchema } from "@feeblo/utils/reaction";
-import { Schema as S } from "effect";
+import * as S from "effect/Schema";
 
 export const CommentReaction = S.Struct({
   id: S.String,

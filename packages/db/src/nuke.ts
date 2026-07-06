@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
+
 import { Database } from "./index";
 
 export const nukeDatabase = Effect.fn("nukeDatabase")(function* () {

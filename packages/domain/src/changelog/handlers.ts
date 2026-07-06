@@ -1,7 +1,8 @@
-import { Effect, Layer } from "effect";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -80,7 +81,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
             ...args,
             content: sanitizedMarkdown,
           })
-            .pipe(
+          .pipe(
             Policy.withPolicy(
               Policy.all(
                 Policy.hasMembership(args.organizationId),

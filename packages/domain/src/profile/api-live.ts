@@ -1,6 +1,10 @@
 import { schema, currentDb } from "@feeblo/db";
 import { eq } from "drizzle-orm";
-import { Effect, FileSystem, Layer, Predicate } from "effect";
+import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
+
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Api } from "../http/api";
 import { BadRequestError, InternalServerError } from "../rpc-errors";

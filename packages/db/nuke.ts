@@ -1,5 +1,6 @@
 // biome-ignore-all lint/suspicious/noConsole: CLI script requires console output
-import { Effect } from "effect";
+import * as Effect from "effect/Effect";
+
 import { Database } from "./src";
 import { nukeDatabase } from "./src/nuke";
 

@@ -1,4 +1,5 @@
-import { Schema } from "effect";
+import * as Schema from "effect/Schema";
+
 import { Multipart } from "effect/unstable/http";
 import {
   HttpApiEndpoint,
