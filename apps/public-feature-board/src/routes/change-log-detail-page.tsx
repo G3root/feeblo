@@ -6,9 +6,10 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { cn } from "@feeblo/ui/utils";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
 import {
   ChangelogPageLayout,
   ChangelogStickyRail,
@@ -90,7 +91,7 @@ export function ChangeLogDetailPage() {
             )}
             to="/changelog"
           >
-            <ArrowLeft />
+            <HugeiconsIcon icon={ArrowLeft01Icon} />
             Back
           </Link>
         </ChangelogStickyRail>

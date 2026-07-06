@@ -148,15 +148,20 @@ export default defineConfig({
                 return "xstate-store-vendor";
               }
 
-              if (id.includes("/lucide-react/")) {
-                return "lucide-vendor";
-              }
-
               if (id.includes("/@floating-ui/")) {
                 return "floating-ui-vendor";
               }
 
-              if (id.includes("/@tiptap/") || id.includes("/prosemirror-")) {
+              if (
+                id.includes("/prosemirror-") ||
+                id.includes("/prosekit/") ||
+                id.includes("/mdast-util-to-markdown/") ||
+                id.includes("/unist-util-visit-parents/") ||
+                id.includes("/unified/") ||
+                id.includes("/hast-") ||
+                id.includes("/rehype-") ||
+                id.includes("/remark-")
+              ) {
                 return "editor-vendor";
               }
             }

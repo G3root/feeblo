@@ -29,7 +29,6 @@
     "@tanstack/zod-adapter": "^1.167.0",
     "clsx": "catalog:",
     "effect": "catalog:",
-    "lucide-react": "^1.14.0",
     "nanostores": "^1.3.0",
     "react": "catalog:",
     "tailwind-merge": "catalog:",
