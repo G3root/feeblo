@@ -8,21 +8,10 @@
       "types": "./src/post/post-create-dialog-layout.tsx",
       "default": "./src/post/post-create-dialog-layout.tsx"
     },
-    "./post-create-form-shared": {
-      "types": "./src/post/post-create-form-shared.tsx",
-      "default": "./src/post/post-create-form-shared.tsx"
-    },
+
     "./post-properties": {
       "types": "./src/v2/post-field.tsx",
       "default": "./src/v2/post-field.tsx"
-    },
-    "./post-editor": {
-      "types": "./src/v2/post-editor.tsx",
-      "default": "./src/v2/post-editor.tsx"
-    },
-    "./upvote-toggle": {
-      "types": "./src/v2/upvote-toggle.tsx",
-      "default": "./src/v2/upvote-toggle.tsx"
     },
     "./post-create-dialog": {
       "types": "./src/v2/dialogs/post-create-dialog.tsx",
@@ -32,10 +21,6 @@
       "types": "./src/v2/dialogs/post-delete-dialog.tsx",
       "default": "./src/v2/dialogs/post-delete-dialog.tsx"
     },
-    "./comment-display": {
-      "types": "./src/v2/comment-display.tsx",
-      "default": "./src/v2/comment-display.tsx"
-    },
     "./comment-delete-dialog": {
       "types": "./src/v2/dialogs/comment-delete-dialog.tsx",
       "default": "./src/v2/dialogs/comment-delete-dialog.tsx"
@@ -44,9 +29,9 @@
       "types": "./src/v2/providers/post-collections-provider.tsx",
       "default": "./src/v2/providers/post-collections-provider.tsx"
     },
-    "./post-collection": {
-      "types": "./src/v2/post-collection.tsx",
-      "default": "./src/v2/post-collection.tsx"
+    "./comment-display": {
+      "types": "./src/v2/comment-display.tsx",
+      "default": "./src/v2/comment-display.tsx"
     },
     "./dialogs": {
       "types": "./src/v2/dialogs/index.ts",
@@ -56,41 +41,43 @@
       "types": "./src/v2/dialog-stores/index.ts",
       "default": "./src/v2/dialog-stores/index.ts"
     },
+    "./post-collection": {
+      "types": "./src/v2/post-collection.tsx",
+      "default": "./src/v2/post-collection.tsx"
+    },
+    "./post-dialog-stores": {
+      "types": "./src/v2/dialog-stores/post.ts",
+      "default": "./src/v2/dialog-stores/post.ts"
+    },
+    "./post-editor": {
+      "types": "./src/v2/post-editor.tsx",
+      "default": "./src/v2/post-editor.tsx"
+    },
     "./post-comment-composer": {
       "types": "./src/post/post-comment-composer.tsx",
       "default": "./src/post/post-comment-composer.tsx"
     },
-    "./post-comment-list": {
-      "types": "./src/post/post-comment-list.tsx",
-      "default": "./src/post/post-comment-list.tsx"
-    },
+
     "./post-content": {
       "types": "./src/post/post-content.tsx",
       "default": "./src/post/post-content.tsx"
     },
-    "./post-engagement-bar": {
-      "types": "./src/post/post-engagement-bar.tsx",
-      "default": "./src/post/post-engagement-bar.tsx"
+
+    "./reaction-picker": {
+      "types": "./src/v2/reaction-picker.tsx",
+      "default": "./src/v2/reaction-picker.tsx"
     },
-    "./post-reaction-section": {
-      "types": "./src/post/post-reaction-section.tsx",
-      "default": "./src/post/post-reaction-section.tsx"
+    "./upvote-toggle": {
+      "types": "./src/v2/upvote-toggle.tsx",
+      "default": "./src/v2/upvote-toggle.tsx"
     },
     "./post-title-input": {
       "types": "./src/v2/post-title-input.tsx",
       "default": "./src/v2/post-title-input.tsx"
     },
-    "./post-board-select": {
-      "types": "./src/post/post-board-select.tsx",
-      "default": "./src/post/post-board-select.tsx"
-    },
     "./comment-reaction-section": {
       "types": "./src/post/comment-reaction-section.tsx",
       "default": "./src/post/comment-reaction-section.tsx"
-    },
-    "./reaction-picker": {
-      "types": "./src/v2/reaction-picker.tsx",
-      "default": "./src/v2/reaction-picker.tsx"
     },
     "./social-auth-buttons": {
       "types": "./src/auth/social-auth-buttons.tsx",
