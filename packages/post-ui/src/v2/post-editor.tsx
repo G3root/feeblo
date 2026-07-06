@@ -1,8 +1,20 @@
 import { Button } from "@feeblo/ui/button";
-import { Editor, EditorProvider } from "@feeblo/ui/editor";
-import { createContext, type ReactNode, use, useRef, useState } from "react";
+import { EditorProvider } from "@feeblo/ui/editor/editor-store";
+import {
+  createContext,
+  lazy,
+  type ReactNode,
+  Suspense,
+  use,
+  useRef,
+  useState,
+} from "react";
 import { usePostCollectionData } from "./post-collection";
 import { usePostCollections } from "./providers/post-collections-provider";
+
+const Editor = lazy(() =>
+  import("@feeblo/ui/editor").then((mod) => ({ default: mod.Editor }))
+);
 
 type PostEditorState = {
   content: string;
@@ -85,16 +97,18 @@ function PostEditorEditor() {
   const { actions, state } = usePostEditor();
 
   return (
-    <EditorProvider
-      defaultValue={{ postContent: state.content }}
-      key={state.resetKey}
-    >
-      <Editor
-        onChange={(doc) => actions.onContentChange(doc)}
-        placeholder={state.placeholder}
-        readOnly={state.disabled}
-      />
-    </EditorProvider>
+    <Suspense>
+      <EditorProvider
+        defaultValue={{ postContent: state.content }}
+        key={state.resetKey}
+      >
+        <Editor
+          onChange={(doc) => actions.onContentChange(doc)}
+          placeholder={state.placeholder}
+          readOnly={state.disabled}
+        />
+      </EditorProvider>
+    </Suspense>
   );
 }
 

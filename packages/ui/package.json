@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./editor": "./src/editor/index.tsx",
+    "./editor/editor-store": "./src/editor/editor-store.ts",
     "./utils": "./src/utils.ts",
     "./hooks/*": "./src/hooks/*.tsx",
     "./*": "./src/*.tsx"

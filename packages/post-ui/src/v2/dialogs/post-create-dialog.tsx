@@ -1,6 +1,5 @@
 /** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 import { PostId } from "@feeblo/id";
-import { PostCreateLayout } from "@feeblo/post-ui/post-create-dialog-layout";
 import { FieldRow } from "@feeblo/post-ui/post-properties";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -204,7 +203,8 @@ function PostCreateForm() {
   }
 
   return (
-    <PostCreateLayout
+    <form
+      className="flex h-full flex-col gap-4 md:flex-row md:items-start"
       id="post-create-form"
       onSubmit={(event) => {
         event.preventDefault();
@@ -212,14 +212,14 @@ function PostCreateForm() {
         form.handleSubmit();
       }}
     >
-      <PostCreateLayout.Main>
+      <div className="flex h-full flex-1 flex-col gap-2">
         <PostTitleField form={form} />
         <PostContentField form={form} key={contentEditorKey} />
-      </PostCreateLayout.Main>
+      </div>
 
-      <PostCreateLayout.Sidebar>
-        <PostCreateLayout.SidebarBody>
-          <PostCreateLayout.PropertyList>
+      <aside className="flex h-full w-full flex-col rounded-xl border bg-muted/40 p-3 text-sm md:min-h-150 md:w-sm md:p-4">
+        <div className="flex flex-1 flex-col gap-4">
+          <div className="flex-1 space-y-1.5">
             <FieldRow label="Board">
               <PostBoardField boards={boards} form={form} />
             </FieldRow>
@@ -227,13 +227,13 @@ function PostCreateForm() {
             <FieldRow label="Status">
               <PostStatusField form={form} statuses={postStatuses} />
             </FieldRow>
-          </PostCreateLayout.PropertyList>
-        </PostCreateLayout.SidebarBody>
-        <PostCreateLayout.Actions>
+          </div>
+        </div>
+        <div className="mt-auto flex items-center justify-between pt-4">
           <PostCreateMoreField form={form} />
           <Button type="submit">Create Post</Button>
-        </PostCreateLayout.Actions>
-      </PostCreateLayout.Sidebar>
-    </PostCreateLayout>
+        </div>
+      </aside>
+    </form>
   );
 }

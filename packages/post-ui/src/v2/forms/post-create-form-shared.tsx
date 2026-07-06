@@ -1,5 +1,6 @@
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { EditorProps } from "@feeblo/ui/editor";
+import { FieldError } from "@feeblo/ui/field";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Label } from "@feeblo/ui/label";
 import { Switch } from "@feeblo/ui/switch";
@@ -36,14 +37,20 @@ export const PostTitleField = withForm({
     return (
       <form.AppField name="title">
         {(field) => (
-          <PostTitleInput
-            name={field.name}
-            onBlur={field.handleBlur}
-            onChange={(e) => field.handleChange(e.target.value)}
-            placeholder="Enter post title..."
-            size="sm"
-            value={field.state.value}
-          />
+          <div className="flex flex-col gap-1">
+            <PostTitleInput
+              name={field.name}
+              onBlur={field.handleBlur}
+              onChange={(e) => field.handleChange(e.target.value)}
+              placeholder="Enter post title..."
+              size="sm"
+              value={field.state.value}
+            />
+            {field.state.meta.isTouched &&
+              field.state.meta.errors.length > 0 && (
+                <FieldError errors={field.state.meta.errors} />
+              )}
+          </div>
         )}
       </form.AppField>
     );
@@ -57,11 +64,17 @@ export const PostContentField = withForm({
     return (
       <form.AppField name="content">
         {(field) => (
-          <PostEditor
-            content={field.state.value}
-            onContentChange={field.handleChange}
-            {...rest}
-          />
+          <div className="flex flex-col gap-1">
+            <PostEditor
+              content={field.state.value}
+              onContentChange={field.handleChange}
+              {...rest}
+            />
+            {field.state.meta.isTouched &&
+              field.state.meta.errors.length > 0 && (
+                <FieldError errors={field.state.meta.errors} />
+              )}
+          </div>
         )}
       </form.AppField>
     );
@@ -77,16 +90,24 @@ export const PostBoardField = withForm({
     return (
       <form.AppField name="boardId">
         {(field) => (
-          <PostBoardSelect
-            boards={boards}
-            currentBoardId={field.state.value}
-            onValueChange={(nextBoardId) => {
-              if (!nextBoardId) {
-                return;
-              }
-              field.handleChange(nextBoardId);
-            }}
-          />
+          <div className="flex flex-col gap-1">
+            <div>
+              <PostBoardSelect
+                boards={boards}
+                currentBoardId={field.state.value}
+                onValueChange={(nextBoardId) => {
+                  if (!nextBoardId) {
+                    return;
+                  }
+                  field.handleChange(nextBoardId);
+                }}
+              />
+            </div>
+            {field.state.meta.isTouched &&
+              field.state.meta.errors.length > 0 && (
+                <FieldError errors={field.state.meta.errors} />
+              )}
+          </div>
         )}
       </form.AppField>
     );
@@ -102,16 +123,24 @@ export const PostStatusField = withForm({
     return (
       <form.AppField name="statusId">
         {(field) => (
-          <StatusField
-            currentStatusId={field.state.value}
-            onValueChange={(nextPostStatus) => {
-              if (!nextPostStatus) {
-                return;
-              }
-              field.handleChange(nextPostStatus.id);
-            }}
-            statuses={statuses}
-          />
+          <div className="flex flex-col gap-1">
+            <div>
+              <StatusField
+                currentStatusId={field.state.value}
+                onValueChange={(nextPostStatus) => {
+                  if (!nextPostStatus) {
+                    return;
+                  }
+                  field.handleChange(nextPostStatus.id);
+                }}
+                statuses={statuses}
+              />
+            </div>
+            {field.state.meta.isTouched &&
+              field.state.meta.errors.length > 0 && (
+                <FieldError errors={field.state.meta.errors} />
+              )}
+          </div>
         )}
       </form.AppField>
     );

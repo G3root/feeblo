@@ -1,9 +1,20 @@
 import { Button } from "@feeblo/ui/button";
 import { ButtonGroup } from "@feeblo/ui/button-group";
-import { Editor, EditorProvider } from "@feeblo/ui/editor";
+import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 import { GlobeIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { createContext, type ReactNode, use, useState } from "react";
+import {
+  createContext,
+  lazy,
+  type ReactNode,
+  Suspense,
+  use,
+  useState,
+} from "react";
+
+const Editor = lazy(() =>
+  import("@feeblo/ui/editor").then((mod) => ({ default: mod.Editor }))
+);
 
 type CommentComposerState = {
   content: string;
@@ -99,14 +110,16 @@ function CommentComposerEditor() {
   const { actions, state } = useCommentComposer();
 
   return (
-    <EditorProvider key={state.resetKey}>
-      <Editor
-        minimal
-        onChange={(doc) => actions.onContentChange(doc)}
-        placeholder={state.placeholder}
-        readOnly={state.disabled}
-      />
-    </EditorProvider>
+    <Suspense>
+      <EditorProvider key={state.resetKey}>
+        <Editor
+          minimal
+          onChange={(doc) => actions.onContentChange(doc)}
+          placeholder={state.placeholder}
+          readOnly={state.disabled}
+        />
+      </EditorProvider>
+    </Suspense>
   );
 }
 

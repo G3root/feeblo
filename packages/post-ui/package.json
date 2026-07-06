@@ -4,11 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./post-create-dialog-layout": {
-      "types": "./src/post/post-create-dialog-layout.tsx",
-      "default": "./src/post/post-create-dialog-layout.tsx"
-    },
-
     "./post-properties": {
       "types": "./src/v2/post-field.tsx",
       "default": "./src/v2/post-field.tsx"
