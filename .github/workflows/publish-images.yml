@@ -79,7 +79,7 @@ jobs:
           flavor: |
             suffix=-${{ matrix.platform.arch }},onlatest=true
           tags: |
-            type=sha,prefix=
+            type=sha
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -94,7 +94,7 @@ jobs:
           flavor: |
             suffix=-${{ matrix.platform.arch }},onlatest=true
           tags: |
-            type=sha,prefix=
+            type=sha
             type=raw,value=${{ github.event.workflow_run.head_branch }}
             type=raw,value=nightly,enable=${{ github.event.workflow_run.head_branch == 'main' }}
 
@@ -166,7 +166,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           tags: |
-            type=sha,prefix=
+            type=sha
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -179,7 +179,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
           tags: |
-            type=sha,prefix=
+            type=sha
             type=raw,value=${{ github.event.workflow_run.head_branch }}
             type=raw,value=nightly,enable=${{ github.event.workflow_run.head_branch == 'main' }}
 
@@ -194,7 +194,7 @@ jobs:
 
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
-            tag_name="${tag#${image_ref}:}"
+            tag_name="${tag#"${image_ref}":}"
             docker buildx imagetools create \
               --tag "$tag" \
               "${image_ref}:${tag_name}-amd64" \

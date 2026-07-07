@@ -44,9 +44,8 @@ jobs:
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
         with:
           packages: feeblo-server,feeblo-web
-          use-regex: true
-          delete-tags: '^[0-9a-fA-F]{7,}$'
+          delete-tags: sha-*
           keep-n-tagged: 15
-          exclude-tags: '^(nightly|main|latest)$'
+          exclude-tags: nightly,main,latest
           token: ${{ secrets.GITHUB_TOKEN }}
 
