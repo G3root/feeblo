@@ -43,6 +43,10 @@ ENV APP_URL="${APP_URL}"
 ENV API_URL="${API_URL}"
 ENV APP_ROOT_DOMAIN="${APP_ROOT_DOMAIN}"
 
+LABEL org.opencontainers.image.source=https://github.com/g3root/feeblo
+LABEL org.opencontainers.image.description="API server of Feeblo — an open-source customer feedback platform"
+LABEL org.opencontainers.image.licenses=AGPL-3.0-or-later
+
 # Don't run production as root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 server
