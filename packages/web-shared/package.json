@@ -44,6 +44,10 @@
       "types": "./src/hooks/use-auth-state.ts",
       "default": "./src/hooks/use-auth-state.ts"
     },
+    "./use-feature-flag": {
+      "types": "./src/hooks/use-feature-flag.ts",
+      "default": "./src/hooks/use-feature-flag.ts"
+    },
     "./user-validation": {
       "types": "./src/utils/user-validation.ts",
       "default": "./src/utils/user-validation.ts"

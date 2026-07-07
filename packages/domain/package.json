@@ -111,6 +111,9 @@
     },
     "./services/s3": {
       "default": "./src/services/s3.ts"
+    },
+    "./feature-flags": {
+      "default": "./src/feature-flags.ts"
     }
   },
   "dependencies": {
