@@ -38,4 +38,10 @@ jobs:
         with:
           packages: feeblo-server,feeblo-web
           keep-n-untagged: 5
+
+      - name: Delete untagged old image
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          packages: server,web
+          delete-untagged: true
           
