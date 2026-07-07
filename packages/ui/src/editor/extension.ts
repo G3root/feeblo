@@ -9,13 +9,16 @@ import { defineImageUploadHandler } from "prosekit/extensions/image";
 import { defineMention } from "prosekit/extensions/mention";
 import { definePlaceholder } from "prosekit/extensions/placeholder";
 import { defineReadonly } from "prosekit/extensions/readonly";
-import { sampleUploader } from "./sample/sample-uploader.js";
 import { defineCodeBlockView } from "./ui/code-block-view/index.js";
 import { defineImageView } from "./ui/image-view/index.js";
+import { editorUploader } from "./uploader";
 
 export function defineExtension({
   readonly = false,
   placeholder = "Press / for commands...",
+}: {
+  readonly?: boolean | undefined;
+  placeholder?: string | undefined;
 } = {}) {
   const extensions = [
     defineBasicExtension(),
@@ -31,7 +34,7 @@ export function defineExtension({
     defineCodeBlockView(),
     defineImageView(),
     defineImageUploadHandler({
-      uploader: sampleUploader,
+      uploader: editorUploader,
     }),
   ];
 
