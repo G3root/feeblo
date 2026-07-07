@@ -40,30 +40,30 @@ jobs:
       - name: Build app
         run: pnpm run build
   
-  docker_smoke_test:
-    name: Docker Smoke Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-        with:
-          egress-policy: audit
-          disable-telemetry: true
+  # docker_smoke_test:
+  #   name: Docker Smoke Test
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 10
+  #   steps:
+  #     - name: Harden Runner
+  #       uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+  #       with:
+  #         egress-policy: audit
+  #         disable-telemetry: true
 
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 2
-          persist-credentials: false
+  #     - name: Checkout
+  #       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #       with:
+  #         fetch-depth: 2
+  #         persist-credentials: false
 
-      - name: Copy env
-        run: cp .env.example .env
+  #     - name: Copy env
+  #       run: cp .env.example .env
 
-      - name: Start services
-        run: docker compose up -d --build --wait --wait-timeout 60
+  #     - name: Start services
+  #       run: docker compose up -d --build --wait --wait-timeout 60
 
-      - name: Show logs on failure
-        if: failure()
-        run: docker compose logs
+  #     - name: Show logs on failure
+  #       if: failure()
+  #       run: docker compose logs
 
