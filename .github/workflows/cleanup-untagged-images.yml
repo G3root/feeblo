@@ -33,11 +33,21 @@ jobs:
             ghcr.io:443
             github.com:443
 
-      - name: Delete untagged server image
+      - name: Prune old untagged images
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
         with:
           packages: feeblo-server,feeblo-web
-          keep-n-untagged: 5
+          keep-n-untagged: 20
+          delete-ghost-images: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prune old commit SHA images (keep 5)
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          packages: feeblo-server,feeblo-web
+          delete-tags: sha-*
+          keep-n-tagged: 15
+          exclude-tags: nightly,main
           token: ${{ secrets.GITHUB_TOKEN }}
 
 
