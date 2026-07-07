@@ -38,27 +38,15 @@ jobs:
         with:
           packages: feeblo-server,feeblo-web
           keep-n-untagged: 20
-          delete-ghost-images: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prune old commit SHA images (keep 5)
+      - name: Prune old commit SHA images (keep 15)
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
         with:
           packages: feeblo-server,feeblo-web
-          delete-tags: sha-*
+          use-regex: true
+          delete-tags: '^[0-9a-fA-F]{7,}$'
           keep-n-tagged: 15
-          exclude-tags: nightly,main
+          exclude-tags: '^(nightly|main|latest)$'
           token: ${{ secrets.GITHUB_TOKEN }}
 
-
-      - name: Delete legacy server/web images completely
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
-        with:
-          packages: server,web
-          delete-untagged: true
-          keep-n-tagged: 0
-          delete-ghost-images: true
-          delete-partial-images: true
-          delete-orphaned-images: true
-          token: ${{ secrets.GITHUB_TOKEN }}
-          
