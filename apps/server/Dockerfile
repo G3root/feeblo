@@ -52,6 +52,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 server
 USER server
 
+COPY --from=ghcr.io/tarampampam/microcheck@sha256:c9f79cd408626de7c10f2d487d67339f49adf0ba61dde96ede65343269db1f85 /bin/httpcheck /usr/bin/httpcheck
 
 COPY --from=builder --chown=server:nodejs /app/apps/server/dist ./dist
 COPY --from=builder --chown=server:nodejs /app/packages/db/src/migrations ./migrations
@@ -61,3 +62,7 @@ COPY --from=builder --chown=server:nodejs /app/packages/db-migrator/dist ./migra
 EXPOSE 8080
 
 CMD ["sh", "-c", "export SERVER_PORT=${SERVER_PORT:-${PORT:-8080}}; node ./migrate/index.js && exec node ./dist/index.js"]
+
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD /usr/bin/httpcheck http://localhost:${SERVER_PORT:-8080}/health
