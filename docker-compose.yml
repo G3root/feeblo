@@ -1,8 +1,28 @@
 services:
+  pg:
+    image: postgres:17-alpine
+    container_name: feeblo-database
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-feeblo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-feeblo}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-feeblo} -d ${POSTGRES_DB:-feeblo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   server:
     container_name: feeblo-server
     image: ghcr.io/g3root/feeblo-server:${IMAGE_TAG:-nightly}
     restart: always
+    depends_on:
+      pg:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: ${SERVER_PORT:-8080}
@@ -11,7 +31,7 @@ services:
       API_URL: ${API_URL}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN}
       APP_RELEASE: ${IMAGE_TAG:-nightly}
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 
@@ -19,6 +39,8 @@ services:
     container_name: feeblo-web
     image: ghcr.io/g3root/feeblo-web:${IMAGE_TAG:-nightly}
     restart: always
+    depends_on:
+      - server
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -29,5 +51,6 @@ services:
       APP_RELEASE: ${IMAGE_TAG:-nightly}
     ports:
       - "${WEB_PORT:-4321}:4321"
-    depends_on:
-      - server
+
+volumes:
+  postgres:

@@ -94,6 +94,7 @@ jobs:
         run: docker compose up -d --wait --wait-timeout 60
         env:
           IMAGE_TAG: test
+          DATABASE_URL: postgres://feeblo:password@pg:5432/feeblo
 
       - name: Show logs on failure
         if: failure()
