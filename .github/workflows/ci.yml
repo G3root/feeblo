@@ -81,20 +81,24 @@ jobs:
           load: true
           tags: ghcr.io/g3root/feeblo-server:test
 
-      - name: Build web image
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          push: false
-          load: true
-          tags: ghcr.io/g3root/feeblo-web:test
+      # - name: Build web image
+      #   uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+      #   with:
+      #     context: .
+      #     file: apps/web/Dockerfile
+      #     push: false
+      #     load: true
+      #     tags: ghcr.io/g3root/feeblo-web:test
 
       - name: Start services
         run: docker compose up -d --wait --wait-timeout 60
         env:
           IMAGE_TAG: test
           DATABASE_URL: postgres://feeblo:password@pg:5432/feeblo
+          APP_URL: http://localhost:3001
+          API_URL: http://localhost:3000
+          APP_ROOT_DOMAIN: localhost
+          AUTH_ENCRYPTION_KEY: dev-key
 
       - name: Show logs on failure
         if: failure()

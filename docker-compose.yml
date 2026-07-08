@@ -27,11 +27,12 @@ services:
       NODE_ENV: production
       PORT: ${SERVER_PORT:-8080}
       SERVER_PORT: ${SERVER_PORT:-8080}
-      APP_URL: ${APP_URL}
-      API_URL: ${API_URL}
-      APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN}
+      APP_URL: ${APP_URL:-http://localhost:3001}
+      API_URL: ${API_URL:-http://localhost:3000}
+      APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
       APP_RELEASE: ${IMAGE_TAG:-nightly}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
+      AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-dev-key}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 
@@ -45,9 +46,9 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: ${WEB_PORT:-4321}
-      API_URL: ${API_URL}
-      APP_URL: ${APP_URL}
-      APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN}
+      API_URL: ${API_URL:-http://localhost:3000}
+      APP_URL: ${APP_URL:-http://localhost:3001}
+      APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
       APP_RELEASE: ${IMAGE_TAG:-nightly}
     ports:
       - "${WEB_PORT:-4321}:4321"
