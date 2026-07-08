@@ -29,11 +29,13 @@
   },
   "dependencies": {
     "@effect/sql-pg": "catalog:",
+    "@effect/sql-pglite": "catalog:",
+    "@electric-sql/pglite": "^0.5.4",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
-    "zod": "catalog:",
-    "postgres": "catalog:"
+    "postgres": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",

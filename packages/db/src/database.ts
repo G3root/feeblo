@@ -1,12 +1,13 @@
 import * as SQLPG from "@effect/sql-pg";
+import { PgliteClient } from "@effect/sql-pglite";
 import { sql } from "drizzle-orm";
+import * as PgDrizzlePglite from "drizzle-orm/effect-pglite";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import type * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { type CustomTypesConfig, types } from "pg";
@@ -24,18 +25,21 @@ const pgTypes: CustomTypesConfig = {
   },
 };
 
-export const PgClientFactory = {
-  create: (url: Config.Config<Redacted.Redacted<string>>) =>
-    SQLPG.PgClient.layerConfig({
-      url,
-      types: Config.succeed(pgTypes),
-    }),
-};
+// Detect whether the configured DATABASE_URL points at an embedded PGlite
+// instance (`memory://...`) instead of a real PostgreSQL server.
+const isPgliteUrl = (url: string): boolean => url.startsWith("memory://");
 
-// Configure the PgClient layer
-export const PgClientLive = PgClientFactory.create(
-  Config.redacted("DATABASE_URL")
-);
+// Configure the PGlite client layer. PGlite accepts the same `memory://`
+// data-directory URL the reference implementation passes straight through.
+export const PgliteClientLive = PgliteClient.layerConfig({
+  dataDir: Config.string("DATABASE_URL"),
+});
+
+// Configure the Postgres client layer.
+export const PgClientLive = SQLPG.PgClient.layerConfig({
+  url: Config.redacted("DATABASE_URL"),
+  types: Config.succeed(pgTypes),
+});
 
 /** Connection health-check that retries with jittered backoff on startup. */
 const testConnection = (db: PgDrizzle.EffectPgDatabase) =>
@@ -58,10 +62,23 @@ const testConnection = (db: PgDrizzle.EffectPgDatabase) =>
     Effect.orDie
   );
 
-// Create the DB effect with default services
-const dbEffect = PgDrizzle.make({ relations }).pipe(
+// Create the DB effect with default services for a Postgres server.
+const pgDbEffect = PgDrizzle.make({ relations }).pipe(
   Effect.provide(PgDrizzle.DefaultServices),
   Effect.tap(testConnection)
+);
+
+// Create the DB effect for an embedded PGlite instance.
+// PGlite & drizzle-orm/effect-pglite expose the same public API as the
+// server-backed Postgres variants (Execute, execute, transaction, etc.), so
+// the runtime object is compatible with `EffectPgDatabase`. Casting through
+// `unknown` is safe as long as those two drizzle packages stay API-compatible;
+// if they diverge (e.g. different `execute` return types), this will fail at
+// runtime with no compile-time guard.
+const pgliteDbEffect = PgDrizzlePglite.make({ relations }).pipe(
+  Effect.provide(PgDrizzlePglite.DefaultServices),
+  Effect.tap(testConnection),
+  Effect.map((db) => db as unknown as PgDrizzle.EffectPgDatabase)
 );
 
 // Define a DB service tag for dependency injection
@@ -70,12 +87,27 @@ export class Database extends Context.Service<
   PgDrizzle.EffectPgDatabase
 >()("@feeblo/Database") {}
 
-// Create a layer that provides the DB service
-export const DatabaseLive = Layer.effect(Database, dbEffect);
-
-export const DatabaseContextLive = DatabaseLive.pipe(
+// Postgres-backed layers
+export const PgDatabaseLive = Layer.effect(Database, pgDbEffect).pipe(
   Layer.provide(PgClientLive)
 );
+
+// PGlite-backed layers
+export const PgliteDatabaseLive = Layer.effect(Database, pgliteDbEffect).pipe(
+  Layer.provide(PgliteClientLive)
+);
+
+// Pick the appropriate database layer based on the configured DATABASE_URL.
+// `memory://` URLs (and any other PGlite-style data directory) use the
+// embedded PGlite client; everything else assumes a real Postgres server.
+export const DatabaseContextLive = Layer.unwrap(
+  Effect.map(Config.string("DATABASE_URL"), (url) =>
+    isPgliteUrl(url) ? PgliteDatabaseLive : PgDatabaseLive
+  )
+);
+
+// Backwards-compatible alias for the Postgres-only database layer.
+export const DatabaseLive = PgDatabaseLive;
 
 // Tracks the active transaction client so repository methods automatically
 // run on the current transaction when one is in progress.
