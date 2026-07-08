@@ -19,6 +19,7 @@ WORKDIR /app
 
 # First install dependencies (as they change less often)
 COPY --from=prepare /app/out/json/ .
+RUN pnpm config set node-linker hoisted
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Build the project and its dependencies
@@ -55,6 +56,7 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 astro
 USER astro
 
+COPY --from=builder --chown=astro:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=astro:nodejs /app/apps/web/dist ./dist
 
 EXPOSE 4321
