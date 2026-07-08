@@ -114,6 +114,9 @@
     },
     "./feature-flags": {
       "default": "./src/feature-flags.ts"
+    },
+    "./import-export/schema": {
+      "default": "./src/import-export/schema.ts"
     }
   },
   "dependencies": {

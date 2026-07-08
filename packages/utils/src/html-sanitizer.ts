@@ -1,8 +1,7 @@
 import DOMPurify from "dompurify";
-import { JSDOM } from "jsdom";
+import { Window } from "happy-dom";
 
-// Setup DOMPurify with JSDOM
-const window = new JSDOM("").window;
+const domWindow = new Window();
 
 // Configure DOMPurify allow-lists
 export const ALLOWED_TAGS = [
@@ -118,7 +117,7 @@ export class HtmlSanitizer {
     }
 
     // Create a custom DOMPurify instance with hooks for URL sanitization
-    const customPurify = DOMPurify(window);
+    const customPurify = DOMPurify(domWindow);
 
     // Configure DOMPurify
     customPurify.setConfig({
