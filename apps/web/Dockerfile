@@ -19,7 +19,7 @@ WORKDIR /app
 
 # First install dependencies (as they change less often)
 COPY --from=prepare /app/out/json/ .
-RUN pnpm config set node-linker hoisted
+RUN echo "node-linker=hoisted" > .npmrc
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Build the project and its dependencies
