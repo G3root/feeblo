@@ -1,3 +1,4 @@
+import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import {
   and,
   count,
@@ -8,13 +9,31 @@ import {
   useLiveQuery,
 } from "@tanstack/react-db";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import type {
   BoardPostStatusFilter,
   BoardStatusOperator,
   BoardTagOperator,
 } from "../../state/board-store-context";
 import type { BoardPostRow } from "./types";
+
+const STATUSES_BY_PRESET: Record<
+  Exclude<BoardPostStatusFilter, "all">,
+  BoardPostStatus[]
+> = {
+  active: ["PLANNED", "IN_PROGRESS"],
+  backlog: ["PENDING", "REVIEW"],
+};
+
+function filterPostStatusesByPreset(
+  statuses: ReadonlyArray<{ id: string; type: BoardPostStatus }>,
+  filter: BoardPostStatusFilter
+) {
+  if (filter === "all") {
+    return statuses.slice();
+  }
+  const allowed = STATUSES_BY_PRESET[filter];
+  return statuses.filter((s) => allowed.includes(s.type));
+}
 
 type UseBoardPostsDataOptions = {
   boardId?: string;
@@ -230,7 +249,10 @@ export function useBoardPostsData({
       boardsQuery.isLoading ||
       postsQuery.isLoading ||
       (tagIds.length > 0 && matchingTagPostsQuery.isLoading),
-    postStatuses: postStatusesQuery.data ?? [],
+    postStatuses: filterPostStatusesByPreset(
+      postStatusesQuery.data ?? [],
+      postStatusFilter
+    ),
     posts,
   };
 }
