@@ -6,26 +6,6 @@ import { cn } from "@feeblo/ui/utils";
 import { Link } from "@tanstack/react-router";
 import { formatPostStatus, getInitials, truncate } from "../../lib/utils";
 
-type FeedbackPost = {
-  id: string;
-  slug: string;
-  title: string;
-  excerpt: string;
-  upVotes: number;
-  hasUserUpVoted: boolean;
-  lockedAt: Date | null;
-  creatorId: string | null;
-  user: {
-    image: string | null;
-    name: string | null;
-  };
-};
-
-type FeedbackBoard = {
-  name: string;
-  organizationId: string;
-};
-
 const statusColors: Record<string, string> = {
   PENDING: "bg-muted-foreground/50",
   REVIEW: "bg-amber-500",

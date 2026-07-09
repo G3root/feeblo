@@ -19,7 +19,7 @@ import { cn } from "@feeblo/ui/utils";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ChatFeedback01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, toArray, useLiveQuery } from "@tanstack/react-db";
+import { and, coalesce, count, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
@@ -107,11 +107,12 @@ function HomePage() {
   const postCreateStore = usePostCreateDialogContext();
   const site = useSite();
 
-  const organizationId = site.id;
+  const organizationId = site.organizationId;
   const {
     publicBoardCollection,
     publicPostCollection,
     publicPostStatusCollection,
+    publicUpvoteCollection,
   } = usePublicCollections();
 
   const {
@@ -139,58 +140,30 @@ function HomePage() {
     [site.organizationId]
   );
 
-  const {
-    data: allPosts = [],
-    isError: allPostsError,
-    isLoading: allPostsLoading,
-  } = useLiveQuery(
-    (q) => {
-      if (
-        !site.organizationId ||
-        statusLoading ||
-        boardLoading ||
-        statusError ||
-        boardError
-      ) {
-        return undefined;
-      }
-
-      return q
+  const { data: statusCounts = [] } = useLiveQuery(
+    (q) =>
+      q
         .from({ post: publicPostCollection })
         .where(({ post }) => eq(post.organizationId, site.organizationId))
+        .groupBy(({ post }) => post.statusId)
         .select(({ post }) => ({
-          id: post.id,
-          slug: post.slug,
-          title: post.title,
-          excerpt: post.excerpt,
-          upVotes: post.upVotes,
-          hasUserUpVoted: post.hasUserUpVoted,
-          creatorId: post.creatorId,
-          createdAt: post.createdAt,
-          user: post.user,
-          board: toArray(
-            q
-              .from({ board: publicBoardCollection })
-              .where(({ board }) =>
-                and(
-                  eq(board.id, post.boardId),
-                  eq(board.organizationId, post.organizationId)
-                )
-              )
-          ),
-          status: toArray(
-            q
-              .from({ status: publicPostStatusCollection })
-              .where(({ status }) =>
-                and(
-                  eq(status.id, post.statusId),
-                  eq(status.organizationId, post.organizationId)
-                )
-              )
-          ),
-        }));
-    },
-    [site.organizationId, statusLoading, boardLoading, statusError, boardError]
+          statusId: post.statusId,
+          count: count(post.id),
+        })),
+    [site.organizationId]
+  );
+
+  const { data: boardCounts = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ post: publicPostCollection })
+        .where(({ post }) => eq(post.organizationId, site.organizationId))
+        .groupBy(({ post }) => post.boardId)
+        .select(({ post }) => ({
+          boardId: post.boardId,
+          count: count(post.id),
+        })),
+    [site.organizationId]
   );
 
   const { selectedBoard, selectedStatus, sortBy, updateFilters } =
@@ -215,6 +188,15 @@ function HomePage() {
         return undefined;
       }
 
+      const upvoteCountsSubquery = q
+        .from({ upvote: publicUpvoteCollection })
+        .where(({ upvote }) => eq(upvote.organizationId, site.organizationId))
+        .groupBy(({ upvote }) => upvote.postId)
+        .select(({ upvote }) => ({
+          postId: upvote.postId,
+          upvoteCount: count(upvote.id),
+        }));
+
       const query = q
         .from({ post: publicPostCollection })
         .join(
@@ -226,6 +208,10 @@ function HomePage() {
           { status: publicPostStatusCollection },
           ({ post, status }) => eq(status.id, post.statusId),
           "inner"
+        )
+        .leftJoin(
+          { upvoteCounts: upvoteCountsSubquery },
+          ({ post, upvoteCounts }) => eq(post.id, upvoteCounts.postId)
         )
         .where(({ post, board, status }) => {
           let condition = and(
@@ -256,19 +242,28 @@ function HomePage() {
           return condition;
         });
 
-      const projectedQuery = query.select(({ post, board, status }) => ({
-        board: {
-          ...board,
-        },
-        post: {
-          ...post,
-        },
-        status: {
-          type: status.type,
-        },
-        createdAt: post.createdAt,
-        upVotes: post.upVotes,
-      }));
+      const projectedQuery = query.select(
+        ({ post, board, status, upvoteCounts }) => ({
+          board: {
+            ...board,
+          },
+          post: {
+            ...post,
+          },
+          status: {
+            type: status.type,
+          },
+          createdAt: post.createdAt,
+          upvoteCount: coalesce(upvoteCounts.upvoteCount, 0),
+        })
+      );
+
+      if (sortBy === "upvotes") {
+        return projectedQuery.orderBy(
+          ({ $selected }) => $selected.upvoteCount,
+          "desc"
+        );
+      }
 
       if (sortBy === "newest") {
         return projectedQuery.orderBy(
@@ -284,10 +279,7 @@ function HomePage() {
         );
       }
 
-      return projectedQuery.orderBy(
-        ({ $selected }) => $selected.upVotes,
-        "desc"
-      );
+      return projectedQuery;
     },
     [
       site.organizationId,
@@ -302,50 +294,39 @@ function HomePage() {
   );
 
   const statusItems = useMemo(() => {
-    const counts = new Map<string, number>();
-
-    for (const post of allPosts) {
-      const status = post.status[0];
-
-      if (!status) {
-        continue;
-      }
-
-      counts.set(status.id, (counts.get(status.id) ?? 0) + 1);
-    }
+    const countMap = new Map(statusCounts.map((s) => [s.statusId, s.count]));
+    const totalPosts = statusCounts.reduce((sum, s) => sum + s.count, 0);
 
     return [
-      { count: allPosts.length, label: "All statuses", value: "all" },
+      { count: totalPosts, label: "All statuses", value: "all" },
       ...statuses.map((status) => ({
-        count: counts.get(status.id) ?? 0,
+        count: countMap.get(status.id) ?? 0,
         label: formatPostStatus(status.type),
         value: status.id,
       })),
     ];
-  }, [allPosts, statuses]);
+  }, [statusCounts, statuses]);
 
   const boardItems = useMemo(() => {
-    const counts = new Map<string, number>();
+    const countMap = new Map<string, number>();
 
-    for (const post of allPosts) {
-      const board = post.board[0];
-
-      if (!board) {
-        continue;
-      }
-
-      counts.set(board.slug, (counts.get(board.slug) ?? 0) + 1);
+    for (const bc of boardCounts) {
+      const board = boards.find((b) => b.id === bc.boardId);
+      if (!board) continue;
+      countMap.set(board.slug, (countMap.get(board.slug) ?? 0) + bc.count);
     }
 
+    const totalPosts = boardCounts.reduce((sum, b) => sum + b.count, 0);
+
     return [
-      { count: allPosts.length, label: "All boards", value: "all" },
+      { count: totalPosts, label: "All boards", value: "all" },
       ...boards.map((board) => ({
-        count: counts.get(board.slug) ?? 0,
+        count: countMap.get(board.slug) ?? 0,
         label: board.name,
         value: board.slug,
       })),
     ];
-  }, [allPosts, boards]);
+  }, [boardCounts, boards]);
 
   const activeBoardLabel =
     boardItems.find((item) => item.value === selectedBoard)?.label ??
@@ -355,12 +336,7 @@ function HomePage() {
       ? ""
       : (boards.find((board) => board.slug === selectedBoard)?.id ?? "");
 
-  if (
-    statusLoading ||
-    boardLoading ||
-    allPostsLoading ||
-    filteredPostsLoading
-  ) {
+  if (statusLoading || boardLoading || filteredPostsLoading) {
     return (
       <MainContent>
         <div className="space-y-6">
@@ -403,7 +379,7 @@ function HomePage() {
     );
   }
 
-  if (statusError || boardError || allPostsError || filteredPostsError) {
+  if (statusError || boardError || filteredPostsError) {
     return (
       <MainContent>
         <Empty className="border">

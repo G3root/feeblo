@@ -8,7 +8,6 @@ export const Post = S.Struct({
   slug: S.String,
   content: S.String,
   excerpt: S.String,
-  upVotes: S.Number,
   statusId: S.String,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
@@ -23,7 +22,6 @@ export const Post = S.Struct({
     name: S.NullOr(S.String),
     image: S.NullOr(S.String),
   }),
-  hasUserUpVoted: S.Boolean,
 });
 
 export type TPost = S.Schema.Type<typeof Post>;

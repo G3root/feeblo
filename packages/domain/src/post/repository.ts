@@ -3,9 +3,9 @@ import { currentDb, schema, transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as EffectArray from "effect/Array";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -69,21 +69,13 @@ const getWhereClause = (where: SQL[]) =>
         onSome: (clause) => clause,
       });
 
-const createHasUserUpVotedExpr = (userId?: string | null) =>
-  userId
-    ? sql<boolean>`exists(select 1 from ${schema.upvoteTable} where ${schema.upvoteTable.postId} = ${schema.postTable.id} and ${schema.upvoteTable.userId} = ${userId})`
-    : sql<boolean>`false`;
-
-const excerptExpr = sql<string>`coalesce(nullif(${schema.postTable.excerpt}, ''), trim(regexp_replace(regexp_replace(${schema.postTable.content}, '<[^>]+>', ' ', 'gi'), '\\s+', ' ', 'g')))`;
-
-const selectPostFields = (userId?: string | null) => ({
+const selectPostFields = () => ({
   id: schema.postTable.id,
   title: schema.postTable.title,
   boardId: schema.postTable.boardId,
   slug: schema.postTable.slug,
   content: schema.postTable.content,
-  excerpt: excerptExpr,
-  upVotes: sql<number>`coalesce((select count(*)::int from ${schema.upvoteTable} where ${schema.upvoteTable.postId} = ${schema.postTable.id}), 0)`,
+  excerpt: schema.postTable.excerpt,
   statusId: schema.postTable.statusId,
   createdAt: schema.postTable.createdAt,
   updatedAt: schema.postTable.updatedAt,
@@ -92,7 +84,6 @@ const selectPostFields = (userId?: string | null) => ({
     name: sql<string | null>`${schema.userTable.name}`,
     image: sql<string | null>`${schema.userTable.image}`,
   },
-  hasUserUpVoted: createHasUserUpVotedExpr(userId),
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
   lockedAt: schema.postTable.lockedAt,
@@ -146,7 +137,7 @@ const makePostRepository = Effect.gen(function* () {
           );
       }),
 
-    findMany: ({ boardId, organizationId, userId }: TPostFindMany) => {
+    findMany: ({ boardId, organizationId }: TPostFindMany) => {
       const where: SQL[] = [];
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
@@ -158,7 +149,7 @@ const makePostRepository = Effect.gen(function* () {
       return Effect.gen(function* () {
         const db = yield* currentDb;
         return yield* db
-          .select(selectPostFields(userId))
+          .select(selectPostFields())
           .from(schema.postTable)
           .leftJoin(
             schema.userTable,
@@ -168,7 +159,7 @@ const makePostRepository = Effect.gen(function* () {
       });
     },
 
-    findManyPublic: ({ boardId, organizationId, userId }: TPostFindMany) => {
+    findManyPublic: ({ boardId, organizationId }: TPostFindMany) => {
       const where: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
       ];
@@ -182,7 +173,7 @@ const makePostRepository = Effect.gen(function* () {
       return Effect.gen(function* () {
         const db = yield* currentDb;
         return yield* db
-          .select(selectPostFields(userId))
+          .select(selectPostFields())
           .from(schema.postTable)
           .innerJoin(
             schema.boardTable,
