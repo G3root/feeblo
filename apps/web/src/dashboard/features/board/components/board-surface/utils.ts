@@ -54,11 +54,13 @@ export const groupPostsByStatus = (
     });
   }
 
-  return [...map.entries()].map(
-    ([, lane]): BoardPostLane => ({
-      status: lane.status,
-      statusId: lane.statusId,
-      posts: lane.posts,
-    })
-  );
+  return [...map.entries()]
+    .filter(([, lane]) => lane.posts.length > 0)
+    .map(
+      ([, lane]): BoardPostLane => ({
+        status: lane.status,
+        statusId: lane.statusId,
+        posts: lane.posts,
+      })
+    );
 };
