@@ -5,6 +5,7 @@ import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import NumberFlow from "@number-flow/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
 import { usePostCollectionData } from "./post-collection";
@@ -101,9 +102,14 @@ function UpvoteToggleTrigger({
         onClick={actions.onToggle}
         type="button"
       >
-        <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
-        <span className="font-medium text-xs tabular-nums leading-none">
-          {state.upvoteCount}
+        <span className="flex items-center gap-1.5">
+          <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
+          <NumberFlow
+            className="font-medium text-xs tabular-nums leading-none"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+            value={state.upvoteCount}
+            willChange
+          />
         </span>
       </button>
     );
@@ -112,7 +118,7 @@ function UpvoteToggleTrigger({
   return (
     <Button
       aria-label={meta.label}
-      className="rounded-full"
+      className="gap-1.5 rounded-full"
       disabled={state.disabled}
       onClick={actions.onToggle}
       size="sm"
@@ -120,7 +126,11 @@ function UpvoteToggleTrigger({
       variant={state.isUpvoted ? "default" : "outline"}
     >
       <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} />
-      <span>{state.upvoteCount}</span>
+      <NumberFlow
+        style={{ fontVariantNumeric: "tabular-nums" }}
+        value={state.upvoteCount}
+        willChange
+      />
     </Button>
   );
 }

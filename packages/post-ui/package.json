@@ -52,12 +52,10 @@
       "types": "./src/post/post-comment-composer.tsx",
       "default": "./src/post/post-comment-composer.tsx"
     },
-
     "./post-content": {
       "types": "./src/post/post-content.tsx",
       "default": "./src/post/post-content.tsx"
     },
-
     "./reaction-picker": {
       "types": "./src/v2/reaction-picker.tsx",
       "default": "./src/v2/reaction-picker.tsx"
@@ -121,6 +119,7 @@
     "@feeblo/web-shared": "workspace:*",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
+    "@number-flow/react": "^0.6.1",
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-form": "^1.28.6",
     "react": "catalog:",
