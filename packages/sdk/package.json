@@ -2,6 +2,10 @@
   "name": "@feeblo/sdk",
   "version": "0.0.1",
   "type": "module",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Embeddable feedback widget SDK for Feeblo.",
   "license": "AGPL-3.0-only",
   "sideEffects": true,

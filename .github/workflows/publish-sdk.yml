@@ -1,0 +1,54 @@
+name: Publish SDK
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    if: ${{ startsWith(github.event.release.tag_name, 'sdk@') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            registry.npmjs.org:443
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js, pnpm, and dependencies
+        uses: ./.github/actions/setup-node
+
+      - name: Verify version matches tag
+        working-directory: packages/sdk
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${RELEASE_TAG#sdk@}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Release tag version $VERSION does not match packages/sdk version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Build
+        run: pnpm --filter @feeblo/sdk build
+
+      - name: Publish to npm
+        working-directory: packages/sdk
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
