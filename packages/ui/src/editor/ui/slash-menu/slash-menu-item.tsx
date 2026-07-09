@@ -1,14 +1,21 @@
-import { AutocompleteItem } from 'prosekit/react/autocomplete'
+import { AutocompleteItem } from "prosekit/react/autocomplete";
 
 export default function SlashMenuItem(props: {
-  label: string
-  kbd?: string
-  onSelect: () => void
+  label: string;
+  kbd?: string;
+  onSelect: () => void;
 }) {
   return (
-    <AutocompleteItem onSelect={props.onSelect} className="relative flex items-center justify-between min-w-32 scroll-my-1 rounded-md px-3 py-1.5 text-sm box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800">
+    <AutocompleteItem
+      className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between whitespace-nowrap rounded-md px-3 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+      onSelect={props.onSelect}
+    >
       <span>{props.label}</span>
-      {props.kbd && <kbd className="text-xs font-mono text-gray-400 dark:text-gray-500">{props.kbd}</kbd>}
+      {props.kbd && (
+        <kbd className="font-mono text-muted-foreground text-xs">
+          {props.kbd}
+        </kbd>
+      )}
     </AutocompleteItem>
-  )
+  );
 }

@@ -1,44 +1,44 @@
-'use client'
-
-import type { BasicExtension } from 'prosekit/basic'
-import type { Union } from 'prosekit/core'
-import type { MentionExtension } from 'prosekit/extensions/mention'
-import { useEditor } from 'prosekit/react'
+import type { BasicExtension } from "prosekit/basic";
+import type { Union } from "prosekit/core";
+import type { MentionExtension } from "prosekit/extensions/mention";
+import { useEditor } from "prosekit/react";
 import {
   AutocompleteEmpty,
   AutocompleteItem,
   AutocompletePopup,
   AutocompletePositioner,
   AutocompleteRoot,
-} from 'prosekit/react/autocomplete'
+} from "prosekit/react/autocomplete";
 
-const regex = /#[\da-z]*$/i
+const regex = /#[\da-z]*$/i;
 
-export default function TagMenu(props: { tags: { id: number; label: string }[] }) {
-  const editor = useEditor<Union<[MentionExtension, BasicExtension]>>()
+export default function TagMenu(props: {
+  tags: { id: number; label: string }[];
+}) {
+  const editor = useEditor<Union<[MentionExtension, BasicExtension]>>();
 
   const handleTagInsert = (id: number, label: string) => {
     editor.commands.insertMention({
       id: id.toString(),
-      value: '#' + label,
-      kind: 'tag',
-    })
-    editor.commands.insertText({ text: ' ' })
-  }
+      value: "#" + label,
+      kind: "tag",
+    });
+    editor.commands.insertText({ text: " " });
+  };
 
   return (
     <AutocompleteRoot regex={regex}>
-      <AutocompletePositioner className="block overflow-visible w-min h-min z-50 ease-out transition-transform duration-100 motion-reduce:transition-none">
-        <AutocompletePopup className="box-border origin-(--transform-origin) transition-[opacity,scale] transition-discrete motion-reduce:transition-none data-[state=closed]:duration-150 data-[state=closed]:opacity-0 starting:opacity-0 data-[state=closed]:scale-95 starting:scale-95 duration-40 rounded-xl border border-gray-200 dark:border-gray-800 shadow-lg bg-[canvas] flex flex-col relative max-h-100 min-h-0 min-w-60 select-none overflow-hidden whitespace-nowrap">
-          <div className="flex flex-col flex-1 min-h-0 overflow-y-auto p-1 bg-[canvas] overscroll-contain">
-            <AutocompleteEmpty className="relative flex items-center justify-between min-w-32 scroll-my-1 rounded-md px-3 py-1.5 text-sm box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800">
+      <AutocompletePositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
+        <AutocompletePopup className="relative box-border flex max-h-100 min-h-0 min-w-60 origin-(--transform-origin) starting:scale-95 select-none flex-col overflow-hidden whitespace-nowrap rounded-xl border border-border bg-popover text-popover-foreground starting:opacity-0 shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-1">
+            <AutocompleteEmpty className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between whitespace-nowrap rounded-md px-3 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground">
               No results
             </AutocompleteEmpty>
 
             {props.tags.map((tag) => (
               <AutocompleteItem
+                className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between whitespace-nowrap rounded-md px-3 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground"
                 key={tag.id}
-                className="relative flex items-center justify-between min-w-32 scroll-my-1 rounded-md px-3 py-1.5 text-sm box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
                 onSelect={() => handleTagInsert(tag.id, tag.label)}
               >
                 #{tag.label}
@@ -48,5 +48,5 @@ export default function TagMenu(props: { tags: { id: number; label: string }[] }
         </AutocompletePopup>
       </AutocompletePositioner>
     </AutocompleteRoot>
-  )
+  );
 }

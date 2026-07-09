@@ -46,8 +46,8 @@ export default function SlashMenu() {
       />
       <AutocompleteRoot regex={regex}>
         <AutocompletePositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
-          <AutocompletePopup className="relative box-border flex max-h-100 min-h-0 min-w-60 origin-(--transform-origin) starting:scale-95 select-none flex-col overflow-hidden whitespace-nowrap rounded-xl border border-gray-200 bg-[canvas] starting:opacity-0 shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none dark:border-gray-800">
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-[canvas] p-1">
+          <AutocompletePopup className="relative box-border flex max-h-100 min-h-0 min-w-60 origin-(--transform-origin) starting:scale-95 select-none flex-col overflow-hidden whitespace-nowrap rounded-xl border border-border bg-popover text-popover-foreground starting:opacity-0 shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-1">
               <SlashMenuItem
                 label="Text"
                 onSelect={() => editor.commands.setParagraph()}

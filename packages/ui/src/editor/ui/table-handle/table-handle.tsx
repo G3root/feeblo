@@ -1,7 +1,7 @@
-import type { Editor } from 'prosekit/core'
-import type { TableExtension } from 'prosekit/extensions/table'
-import { useEditorDerivedValue } from 'prosekit/react'
-import { MenuItem, MenuPopup, MenuPositioner } from 'prosekit/react/menu'
+import type { Editor } from "prosekit/core";
+import type { TableExtension } from "prosekit/extensions/table";
+import { useEditorDerivedValue } from "prosekit/react";
+import { MenuItem, MenuPopup, MenuPositioner } from "prosekit/react/menu";
 import {
   TableHandleColumnMenuRoot,
   TableHandleColumnMenuTrigger,
@@ -14,7 +14,7 @@ import {
   TableHandleRowMenuTrigger,
   TableHandleRowPopup,
   TableHandleRowPositioner,
-} from 'prosekit/react/table-handle'
+} from "prosekit/react/table-handle";
 
 function getTableHandleState(editor: Editor<TableExtension>) {
   return {
@@ -50,31 +50,31 @@ function getTableHandleState(editor: Editor<TableExtension>) {
       canExec: editor.commands.deleteTable.canExec(),
       command: () => editor.commands.deleteTable(),
     },
-  }
+  };
 }
 
 interface Props {
-  dir?: 'ltr' | 'rtl'
+  dir?: "ltr" | "rtl";
 }
 
 export default function TableHandle(props: Props) {
-  const state = useEditorDerivedValue(getTableHandleState)
+  const state = useEditorDerivedValue(getTableHandleState);
 
   return (
     <TableHandleRoot>
       <TableHandleDragPreview />
       <TableHandleDropIndicator />
-      <TableHandleColumnPositioner className="block overflow-visible w-min h-min z-50 ease-out transition-transform duration-100 motion-reduce:transition-none">
-        <TableHandleColumnPopup className="translate-y-[50%] flex box-border origin-(--transform-origin) transition-[opacity,scale] transition-discrete motion-reduce:transition-none duration-100 data-[state=closed]:duration-150 data-[state=closed]:opacity-0 starting:opacity-0 data-[state=closed]:scale-95 starting:scale-95">
+      <TableHandleColumnPositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
+        <TableHandleColumnPopup className="box-border flex origin-(--transform-origin) translate-y-[50%] starting:scale-95 starting:opacity-0 transition-[opacity,scale] transition-discrete duration-100 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none">
           <TableHandleColumnMenuRoot>
-            <TableHandleColumnMenuTrigger className="h-4.5 w-6 flex items-center box-border justify-center bg-[canvas] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-sm text-gray-500/50 dark:text-gray-400/50 border border-gray-200 dark:border-gray-800 border-solid p-0 transition-colors overflow-clip">
-              <div className="i-lucide-grip-horizontal size-5 min-h-5 min-w-5 block"></div>
+            <TableHandleColumnMenuTrigger className="box-border flex h-4.5 w-6 items-center justify-center overflow-clip rounded-sm border border-border border-solid bg-background p-0 text-muted-foreground/50 transition-colors hover:bg-accent hover:text-accent-foreground">
+              <div className="i-lucide-grip-horizontal block size-5 min-h-5 min-w-5" />
             </TableHandleColumnMenuTrigger>
-            <MenuPositioner className="block overflow-visible w-min h-min z-50 ease-out transition-transform duration-100 motion-reduce:transition-none">
-              <MenuPopup className="box-border origin-(--transform-origin) transition-[opacity,scale] transition-discrete motion-reduce:transition-none data-[state=closed]:duration-150 data-[state=closed]:opacity-0 starting:opacity-0 data-[state=closed]:scale-95 starting:scale-95 duration-40 rounded-xl border border-gray-200 dark:border-gray-800 shadow-lg bg-[canvas] relative flex flex-col max-h-100 min-w-32 select-none overflow-auto whitespace-nowrap p-1 outline-none">
+            <MenuPositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
+              <MenuPopup className="relative box-border flex max-h-100 min-w-32 origin-(--transform-origin) starting:scale-95 select-none flex-col overflow-auto whitespace-nowrap rounded-xl border border-border bg-popover p-1 text-popover-foreground starting:opacity-0 shadow-lg outline-none transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none">
                 {state.addTableColumnBefore.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.addTableColumnBefore.command}
                   >
                     <span>Insert Left</span>
@@ -82,7 +82,7 @@ export default function TableHandle(props: Props) {
                 )}
                 {state.addTableColumnAfter.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.addTableColumnAfter.command}
                   >
                     <span>Insert Right</span>
@@ -90,16 +90,18 @@ export default function TableHandle(props: Props) {
                 )}
                 {state.deleteCellSelection.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.deleteCellSelection.command}
                   >
                     <span>Clear Contents</span>
-                    <span className="text-xs tracking-widest text-gray-500 dark:text-gray-500">Del</span>
+                    <span className="text-muted-foreground text-xs tracking-widest">
+                      Del
+                    </span>
                   </MenuItem>
                 )}
                 {state.deleteTableColumn.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.deleteTableColumn.command}
                   >
                     <span>Delete Column</span>
@@ -107,7 +109,7 @@ export default function TableHandle(props: Props) {
                 )}
                 {state.deleteTable.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     data-danger=""
                     onSelect={state.deleteTable.command}
                   >
@@ -120,19 +122,19 @@ export default function TableHandle(props: Props) {
         </TableHandleColumnPopup>
       </TableHandleColumnPositioner>
       <TableHandleRowPositioner
-        placement={props.dir === 'rtl' ? 'right' : 'left'}
-        className="block overflow-visible w-min h-min z-50 ease-out transition-transform duration-100 motion-reduce:transition-none"
+        className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none"
+        placement={props.dir === "rtl" ? "right" : "left"}
       >
-        <TableHandleRowPopup className="ltr:translate-x-[50%] rtl:translate-x-[-50%] flex box-border origin-(--transform-origin) transition-[opacity,scale] transition-discrete motion-reduce:transition-none duration-100 data-[state=closed]:duration-150 data-[state=closed]:opacity-0 starting:opacity-0 data-[state=closed]:scale-95 starting:scale-95">
+        <TableHandleRowPopup className="box-border flex origin-(--transform-origin) starting:scale-95 starting:opacity-0 transition-[opacity,scale] transition-discrete duration-100 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none ltr:translate-x-[50%] rtl:translate-x-[-50%]">
           <TableHandleRowMenuRoot>
-            <TableHandleRowMenuTrigger className="h-6 w-4.5 flex items-center box-border justify-center bg-[canvas] hover:bg-gray-100 dark:hover:bg-gray-800 rounded-sm text-gray-500/50 dark:text-gray-400/50 border border-gray-200 dark:border-gray-800 border-solid p-0 transition-colors overflow-clip">
-              <div className="i-lucide-grip-vertical size-5 min-h-5 min-w-5 block"></div>
+            <TableHandleRowMenuTrigger className="box-border flex h-6 w-4.5 items-center justify-center overflow-clip rounded-sm border border-border border-solid bg-background p-0 text-muted-foreground/50 transition-colors hover:bg-accent hover:text-accent-foreground">
+              <div className="i-lucide-grip-vertical block size-5 min-h-5 min-w-5" />
             </TableHandleRowMenuTrigger>
-            <MenuPositioner className="block overflow-visible w-min h-min z-50 ease-out transition-transform duration-100 motion-reduce:transition-none">
-              <MenuPopup className="box-border origin-(--transform-origin) transition-[opacity,scale] transition-discrete motion-reduce:transition-none data-[state=closed]:duration-150 data-[state=closed]:opacity-0 starting:opacity-0 data-[state=closed]:scale-95 starting:scale-95 duration-40 rounded-xl border border-gray-200 dark:border-gray-800 shadow-lg bg-[canvas] relative flex flex-col max-h-100 min-w-32 select-none overflow-auto whitespace-nowrap p-1 outline-none">
+            <MenuPositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
+              <MenuPopup className="relative box-border flex max-h-100 min-w-32 origin-(--transform-origin) starting:scale-95 select-none flex-col overflow-auto whitespace-nowrap rounded-xl border border-border bg-popover p-1 text-popover-foreground starting:opacity-0 shadow-lg outline-none transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none">
                 {state.addTableRowAbove.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.addTableRowAbove.command}
                   >
                     <span>Insert Above</span>
@@ -140,7 +142,7 @@ export default function TableHandle(props: Props) {
                 )}
                 {state.addTableRowBelow.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.addTableRowBelow.command}
                   >
                     <span>Insert Below</span>
@@ -148,16 +150,18 @@ export default function TableHandle(props: Props) {
                 )}
                 {state.deleteCellSelection.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.deleteCellSelection.command}
                   >
                     <span>Clear Contents</span>
-                    <span className="text-xs tracking-widest text-gray-500 dark:text-gray-500">Del</span>
+                    <span className="text-muted-foreground text-xs tracking-widest">
+                      Del
+                    </span>
                   </MenuItem>
                 )}
                 {state.deleteTableRow.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     onSelect={state.deleteTableRow.command}
                   >
                     <span>Delete Row</span>
@@ -165,7 +169,7 @@ export default function TableHandle(props: Props) {
                 )}
                 {state.deleteTable.canExec && (
                   <MenuItem
-                    className="relative min-w-32 scroll-my-1 rounded-sm px-3 py-1.5 flex items-center justify-between gap-8 data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50 data-danger:text-red-500 box-border cursor-default select-none whitespace-nowrap outline-hidden data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+                    className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between gap-8 whitespace-nowrap rounded-sm px-3 py-1.5 outline-hidden data-[disabled=true]:pointer-events-none data-highlighted:bg-accent data-danger:text-destructive data-highlighted:text-accent-foreground data-[disabled=true]:opacity-50 hover:data-[disabled=true]:opacity-50"
                     data-danger=""
                     onSelect={state.deleteTable.command}
                   >
@@ -178,5 +182,5 @@ export default function TableHandle(props: Props) {
         </TableHandleRowPopup>
       </TableHandleRowPositioner>
     </TableHandleRoot>
-  )
+  );
 }

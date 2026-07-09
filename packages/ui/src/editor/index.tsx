@@ -59,7 +59,7 @@ export function Editor(props: EditorProps) {
     <ProseKit editor={editor}>
       <div
         className={cn(
-          'ProseMirror box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-violet-500'
+          'ProseMirror box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-primary'
         )}
         ref={editor.mount}
       />

@@ -1,4 +1,4 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
@@ -123,7 +123,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
               Predicate.isTagged(e, "LegidError"),
             () =>
               Effect.fail(
-                new InternalServerError({ message: "Failed to create feedback" })
+                new InternalServerError({
+                  message: "Failed to create feedback",
+                })
               )
           )
         )
