@@ -5,6 +5,10 @@ import { makeId } from "./legid";
 
 const approximateLength = 12;
 
+export const JwtSecretId = makeId("jwt_secret", "jwt", {
+  approximateLength,
+});
+
 export const OrganizationId = makeId("organization", "org", {
   approximateLength,
 });

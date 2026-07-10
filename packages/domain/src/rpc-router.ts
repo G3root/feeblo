@@ -8,6 +8,7 @@ import { BoardRpcHandlers } from "./board/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
+import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { OrganizationRpcHandlers } from "./organization/handlers";
 import { PostRpcHandlers } from "./post/handlers";
@@ -33,6 +34,7 @@ export const RpcRoute = RpcServer.layerHttp({
   Layer.provide(BillingRpcHandlers),
   Layer.provide(BoardRpcHandlers),
   Layer.provide(ChangelogRpcHandlers),
+  Layer.provide(JwtSecretRpcHandlers),
   Layer.provide(MembershipRpcHandlers),
   Layer.provide(OrganizationRpcHandlers),
   Layer.provide(CommentReactionRpcHandlers),

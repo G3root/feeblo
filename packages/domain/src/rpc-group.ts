@@ -3,6 +3,7 @@ import { BoardRpcs } from "./board/rpcs";
 import { ChangelogRpcs } from "./changelog/rpcs";
 import { CommentReactionRpcs } from "./comment-reaction/rpcs";
 import { CommentRpcs } from "./comments/rpcs";
+import { JwtSecretRpcs } from "./jwt-secret/rpcs";
 import { MembershipRpcs } from "./membership/rpcs";
 import { OrganizationRpcs } from "./organization/rpcs";
 import { PostRpcs } from "./post/rpcs";
@@ -18,6 +19,7 @@ export const AllRpcs = PostRpcs.merge(
   BillingRpcs,
   BoardRpcs,
   ChangelogRpcs,
+  JwtSecretRpcs,
   MembershipRpcs,
   OrganizationRpcs,
   CommentReactionRpcs,

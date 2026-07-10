@@ -904,6 +904,27 @@ export const postSubscriptionCollection = createCollection(
   })
 );
 
+export const jwtSecretCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("jwt-secret"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.JwtSecretList({ organizationId }),
+        { signal: ctx.signal }
+      );
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const dashboardCollections = {
   boardCollection,
   changelogCollection,
@@ -911,6 +932,7 @@ export const dashboardCollections = {
   commentCollection,
   commentReactionCollection,
   invitationsCollection,
+  jwtSecretCollection,
   membersCollection,
   membershipCollection,
   organizationCollection,

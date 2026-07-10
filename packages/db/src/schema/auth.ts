@@ -7,6 +7,7 @@ import {
   real,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
@@ -276,6 +277,27 @@ export const productTable = pgTable("product", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
+
+export const jwtSecretTable = pgTable(
+  "jwt_secret",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    secret: text("secret").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("jwt_secret_organizationId_idx").on(table.organizationId),
+    unique("jwt_secret_organizationId_secret_revokedAt_uidx")
+      .on(table.organizationId, table.secret, table.revokedAt)
+      .nullsNotDistinct(),
+  ]
+);
 
 export type Organization = typeof organizationTable.$inferSelect;
 export type NewOrganization = typeof organizationTable.$inferInsert;

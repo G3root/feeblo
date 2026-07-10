@@ -7,6 +7,7 @@ import {
   commentReactionTable,
   commentTable,
   invitationTable,
+  jwtSecretTable,
   memberTable,
   organizationTable,
   postReactionTable,
@@ -30,6 +31,7 @@ export const relations = defineRelations(
     sessionTable,
     accountTable,
     twoFactorTable,
+    jwtSecretTable,
     organizationTable,
     memberTable,
     invitationTable,
@@ -122,7 +124,17 @@ export const relations = defineRelations(
         to: r.userTable.id,
       }),
     },
+    jwtSecretTable: {
+      organization: r.one.organizationTable({
+        from: r.jwtSecretTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
     organizationTable: {
+      jwtSecrets: r.many.jwtSecretTable({
+        from: r.organizationTable.id,
+        to: r.jwtSecretTable.organizationId,
+      }),
       members: r.many.memberTable({
         from: r.organizationTable.id,
         to: r.memberTable.organizationId,
