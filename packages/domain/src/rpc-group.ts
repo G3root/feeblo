@@ -13,6 +13,7 @@ import { PostSubscriptionRpcs } from "./post-subscription/rpcs";
 import { SiteRpcs } from "./site/rpcs";
 import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
+import { ContactRpcs } from "./contact/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
 export const AllRpcs = PostRpcs.merge(
@@ -30,5 +31,6 @@ export const AllRpcs = PostRpcs.merge(
   PostReactionRpcs,
   PostStatusRpcs,
   PostSubscriptionRpcs,
-  WorkspaceRpcs
+  WorkspaceRpcs,
+  ContactRpcs
 );

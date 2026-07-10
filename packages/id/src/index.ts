@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
+/** biome-ignore-all lint/performance/noBarrelFile: exposes id factories from a single entrypoint */
 export * from "./legid";
 
 import { makeId } from "./legid";
@@ -69,3 +69,43 @@ export const PostTagId = makeId("post_tag", "ptg", {
 export const ChangelogTagId = makeId("changelog_tag", "ctg", {
   approximateLength,
 });
+
+export const ContactId = makeId("contact", "cnt", {
+  approximateLength,
+});
+
+export const CompanyId = makeId("company", "cmp", {
+  approximateLength,
+});
+
+export const ContactAttributeDefinitionId = makeId(
+  "contact_attribute_definition",
+  "cad",
+  {
+    approximateLength,
+  }
+);
+
+export const ContactAttributeValueId = makeId(
+  "contact_attribute_value",
+  "cav",
+  {
+    approximateLength,
+  }
+);
+
+export const CompanyAttributeDefinitionId = makeId(
+  "company_attribute_definition",
+  "yad",
+  {
+    approximateLength,
+  }
+);
+
+export const CompanyAttributeValueId = makeId(
+  "company_attribute_value",
+  "yav",
+  {
+    approximateLength,
+  }
+);

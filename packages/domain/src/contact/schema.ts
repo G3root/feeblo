@@ -1,5 +1,14 @@
-import { CompanyId, ContactId } from "@feeblo/id";
+import {
+  CompanyAttributeDefinitionId,
+  CompanyAttributeValueId,
+  CompanyId,
+  ContactAttributeDefinitionId,
+  ContactAttributeValueId,
+  ContactId,
+} from "@feeblo/id";
 import * as S from "effect/Schema";
+
+export const CommonContactFields = S.Struct({});
 
 export const ContactUpsert = S.Struct({
   organizationId: S.String,
@@ -46,3 +55,223 @@ export const Company = S.Struct({
 });
 
 export type TCompany = S.Schema.Type<typeof Company>;
+
+export const ContactList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TContactList = S.Schema.Type<typeof ContactList>;
+
+export const ContactGet = S.Struct({
+  id: S.String,
+});
+
+export type TContactGet = S.Schema.Type<typeof ContactGet>;
+
+export const ContactDelete = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+});
+
+export type TContactDelete = S.Schema.Type<typeof ContactDelete>;
+
+export const CompanyList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TCompanyList = S.Schema.Type<typeof CompanyList>;
+
+export const CompanyGet = S.Struct({
+  id: S.String,
+});
+
+export type TCompanyGet = S.Schema.Type<typeof CompanyGet>;
+
+export const CompanyDelete = S.Struct({
+  id: S.String,
+  organizationId: S.String,
+});
+
+export type TCompanyDelete = S.Schema.Type<typeof CompanyDelete>;
+
+export const AttributeType = S.Literals([
+  "TEXT",
+  "INTEGER",
+  "DECIMAL",
+  "BOOLEAN",
+  "DATE",
+]);
+
+export const AttributeConfig = S.Struct({
+  min: S.optional(S.Number),
+  max: S.optional(S.Number),
+  pattern: S.optional(S.String),
+});
+
+export const ContactAttributeDefinitionUpsert = S.Struct({
+  id: S.optional(S.String),
+  organizationId: S.String,
+  name: S.String,
+  key: S.String,
+  description: S.optional(S.String),
+  type: AttributeType,
+  config: S.optional(AttributeConfig),
+  isRequired: S.optional(S.Boolean),
+});
+
+export type TContactAttributeDefinitionUpsert = S.Schema.Type<
+  typeof ContactAttributeDefinitionUpsert
+>;
+
+export const ContactAttributeDefinitionList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TContactAttributeDefinitionList = S.Schema.Type<
+  typeof ContactAttributeDefinitionList
+>;
+
+export const ContactAttributeDefinitionDelete = S.Struct({
+  id: S.String,
+});
+
+export type TContactAttributeDefinitionDelete = S.Schema.Type<
+  typeof ContactAttributeDefinitionDelete
+>;
+
+export const ContactAttributeDefinition = S.Struct({
+  id: ContactAttributeDefinitionId.schema,
+  name: S.String,
+  key: S.String,
+  description: S.NullOr(S.String),
+  type: AttributeType,
+  config: S.NullOr(AttributeConfig),
+  isRequired: S.Boolean,
+  organizationId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
+
+export type TContactAttributeDefinition = S.Schema.Type<
+  typeof ContactAttributeDefinition
+>;
+
+export const CompanyAttributeDefinitionUpsert = S.Struct({
+  id: S.optional(S.String),
+  organizationId: S.String,
+  name: S.String,
+  key: S.String,
+  description: S.optional(S.String),
+  type: AttributeType,
+  config: S.optional(AttributeConfig),
+  isRequired: S.optional(S.Boolean),
+});
+
+export type TCompanyAttributeDefinitionUpsert = S.Schema.Type<
+  typeof CompanyAttributeDefinitionUpsert
+>;
+
+export const CompanyAttributeDefinitionList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TCompanyAttributeDefinitionList = S.Schema.Type<
+  typeof CompanyAttributeDefinitionList
+>;
+
+export const CompanyAttributeDefinitionDelete = S.Struct({
+  id: S.String,
+});
+
+export type TCompanyAttributeDefinitionDelete = S.Schema.Type<
+  typeof CompanyAttributeDefinitionDelete
+>;
+
+export const CompanyAttributeDefinition = S.Struct({
+  id: CompanyAttributeDefinitionId.schema,
+  name: S.String,
+  key: S.String,
+  description: S.NullOr(S.String),
+  type: AttributeType,
+  config: S.NullOr(AttributeConfig),
+  isRequired: S.Boolean,
+  organizationId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
+
+export type TCompanyAttributeDefinition = S.Schema.Type<
+  typeof CompanyAttributeDefinition
+>;
+
+export const ContactAttributeValueUpsert = S.Struct({
+  id: S.optional(S.String),
+  contactId: S.String,
+  attributeId: S.String,
+  value: S.NullOr(S.Union([S.String, S.Number, S.Boolean, S.DateFromString])),
+});
+
+export type TContactAttributeValueUpsert = S.Schema.Type<
+  typeof ContactAttributeValueUpsert
+>;
+
+export const ContactAttributeValueList = S.Struct({
+  contactId: S.String,
+});
+
+export type TContactAttributeValueList = S.Schema.Type<
+  typeof ContactAttributeValueList
+>;
+
+export const ContactAttributeValue = S.Struct({
+  id: ContactAttributeValueId.schema,
+  contactId: S.String,
+  attributeId: S.String,
+  valueText: S.NullOr(S.String),
+  valueInteger: S.NullOr(S.Number),
+  valueDecimal: S.NullOr(S.Number),
+  valueBoolean: S.NullOr(S.Boolean),
+  valueDate: S.NullOr(S.DateFromString),
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
+
+export type TContactAttributeValue = S.Schema.Type<
+  typeof ContactAttributeValue
+>;
+
+export const CompanyAttributeValueUpsert = S.Struct({
+  id: S.optional(S.String),
+  companyId: S.String,
+  attributeId: S.String,
+  value: S.NullOr(S.Union([S.String, S.Number, S.Boolean, S.DateFromString])),
+});
+
+export type TCompanyAttributeValueUpsert = S.Schema.Type<
+  typeof CompanyAttributeValueUpsert
+>;
+
+export const CompanyAttributeValueList = S.Struct({
+  companyId: S.String,
+});
+
+export type TCompanyAttributeValueList = S.Schema.Type<
+  typeof CompanyAttributeValueList
+>;
+
+export const CompanyAttributeValue = S.Struct({
+  id: CompanyAttributeValueId.schema,
+  companyId: S.String,
+  attributeId: S.String,
+  valueText: S.NullOr(S.String),
+  valueInteger: S.NullOr(S.Number),
+  valueDecimal: S.NullOr(S.Number),
+  valueBoolean: S.NullOr(S.Boolean),
+  valueDate: S.NullOr(S.DateFromString),
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
+
+export type TCompanyAttributeValue = S.Schema.Type<
+  typeof CompanyAttributeValue
+>;

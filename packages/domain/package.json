@@ -126,6 +126,21 @@
     },
     "./jwt-secret/repository": {
       "default": "./src/jwt-secret/repository.ts"
+    },
+    "./contact/schema": {
+      "default": "./src/contact/schema.ts"
+    },
+    "./contact/rpcs": {
+      "default": "./src/contact/rpcs.ts"
+    },
+    "./contact/handlers": {
+      "default": "./src/contact/handlers.ts"
+    },
+    "./contact/errors": {
+      "default": "./src/contact/errors.ts"
+    },
+    "./contact/repository": {
+      "default": "./src/contact/repository.ts"
     }
   },
   "dependencies": {

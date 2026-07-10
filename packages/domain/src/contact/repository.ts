@@ -1,11 +1,28 @@
 import { currentDb, schema } from "@feeblo/db";
-import { CompanyId, ContactId } from "@feeblo/id";
+import {
+  CompanyAttributeDefinitionId,
+  CompanyAttributeValueId,
+  CompanyId,
+  ContactAttributeDefinitionId,
+  ContactAttributeValueId,
+  ContactId,
+} from "@feeblo/id";
 import { and, eq, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import type { TCompanyUpsert, TContactUpsert } from "./schema";
+import type {
+  TCompanyAttributeDefinitionUpsert,
+  TCompanyAttributeValueUpsert,
+  TCompanyUpsert,
+  TContactAttributeDefinitionUpsert,
+  TContactAttributeValueUpsert,
+  TContactDelete,
+  TContactUpsert,
+} from "./schema";
+
+import { buildAttributeValueColumns, toMutableConfig } from "./utils";
 
 export type Company = typeof schema.companyTable.$inferSelect;
 export type Contact = typeof schema.contactTable.$inferSelect;
@@ -74,6 +91,22 @@ const makeContactRepository = Effect.gen(function* () {
         }
         return created;
       }),
+
+    findManyCompanies: (organizationId: string) =>
+      db
+        .select()
+        .from(schema.companyTable)
+        .where(eq(schema.companyTable.organizationId, organizationId)),
+
+    deleteCompany: (args: { id: string; organizationId: string }) =>
+      db
+        .delete(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.id, args.id),
+            eq(schema.companyTable.organizationId, args.organizationId)
+          )
+        ),
 
     upsertContact: (args: TContactUpsert) =>
       Effect.gen(function* () {
@@ -151,6 +184,260 @@ const makeContactRepository = Effect.gen(function* () {
           );
         }
         return Option.some(created);
+      }),
+
+    findManyContacts: (organizationId: string) =>
+      db
+        .select()
+        .from(schema.contactTable)
+        .where(eq(schema.contactTable.organizationId, organizationId)),
+
+    deleteContact: (args: TContactDelete) =>
+      db
+        .delete(schema.contactTable)
+        .where(
+          and(
+            eq(schema.contactTable.id, args.id),
+            eq(schema.contactTable.organizationId, args.organizationId)
+          )
+        ),
+
+    findContactAttributeDefinitions: (organizationId: string) =>
+      db
+        .select()
+        .from(schema.contactAttributeDefinitionTable)
+        .where(
+          eq(
+            schema.contactAttributeDefinitionTable.organizationId,
+            organizationId
+          )
+        ),
+
+    upsertContactAttributeDefinition: (
+      args: TContactAttributeDefinitionUpsert
+    ) =>
+      Effect.gen(function* () {
+        if (args.id) {
+          const [updated = null] = yield* db
+            .update(schema.contactAttributeDefinitionTable)
+            .set({
+              name: args.name,
+              key: args.key,
+              description: args.description ?? null,
+              type: args.type,
+              config: toMutableConfig(args.config),
+              isRequired: args.isRequired ?? false,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.contactAttributeDefinitionTable.id, args.id))
+            .returning();
+          if (!updated) {
+            return yield* Effect.die(
+              new Error(
+                "Contact attribute definition update did not return a row"
+              )
+            );
+          }
+          return updated;
+        }
+
+        const id = yield* ContactAttributeDefinitionId.generate;
+        const now = new Date();
+        const [created = null] = yield* db
+          .insert(schema.contactAttributeDefinitionTable)
+          .values({
+            id,
+            organizationId: args.organizationId,
+            name: args.name,
+            key: args.key,
+            description: args.description ?? null,
+            type: args.type,
+            config: toMutableConfig(args.config),
+            isRequired: args.isRequired ?? false,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        if (!created) {
+          return yield* Effect.die(
+            new Error(
+              "Contact attribute definition insert did not return a row"
+            )
+          );
+        }
+        return created;
+      }),
+
+    deleteContactAttributeDefinition: (id: string) =>
+      db
+        .delete(schema.contactAttributeDefinitionTable)
+        .where(eq(schema.contactAttributeDefinitionTable.id, id)),
+
+    findCompanyAttributeDefinitions: (organizationId: string) =>
+      db
+        .select()
+        .from(schema.companyAttributeDefinitionTable)
+        .where(
+          eq(
+            schema.companyAttributeDefinitionTable.organizationId,
+            organizationId
+          )
+        ),
+
+    upsertCompanyAttributeDefinition: (
+      args: TCompanyAttributeDefinitionUpsert
+    ) =>
+      Effect.gen(function* () {
+        if (args.id) {
+          const [updated = null] = yield* db
+            .update(schema.companyAttributeDefinitionTable)
+            .set({
+              name: args.name,
+              key: args.key,
+              description: args.description ?? null,
+              type: args.type,
+              config: toMutableConfig(args.config),
+              isRequired: args.isRequired ?? false,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.companyAttributeDefinitionTable.id, args.id))
+            .returning();
+          if (!updated) {
+            return yield* Effect.die(
+              new Error(
+                "Company attribute definition update did not return a row"
+              )
+            );
+          }
+          return updated;
+        }
+
+        const id = yield* CompanyAttributeDefinitionId.generate;
+        const now = new Date();
+        const [created = null] = yield* db
+          .insert(schema.companyAttributeDefinitionTable)
+          .values({
+            id,
+            organizationId: args.organizationId,
+            name: args.name,
+            key: args.key,
+            description: args.description ?? null,
+            type: args.type,
+            config: toMutableConfig(args.config),
+            isRequired: args.isRequired ?? false,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        if (!created) {
+          return yield* Effect.die(
+            new Error(
+              "Company attribute definition insert did not return a row"
+            )
+          );
+        }
+        return created;
+      }),
+
+    deleteCompanyAttributeDefinition: (id: string) =>
+      db
+        .delete(schema.companyAttributeDefinitionTable)
+        .where(eq(schema.companyAttributeDefinitionTable.id, id)),
+
+    findContactAttributeValues: (contactId: string) =>
+      db
+        .select()
+        .from(schema.contactAttributeValueTable)
+        .where(eq(schema.contactAttributeValueTable.contactId, contactId)),
+
+    upsertContactAttributeValue: (args: TContactAttributeValueUpsert) =>
+      Effect.gen(function* () {
+        const valueMap = buildAttributeValueColumns(args.value);
+
+        if (args.id) {
+          const [updated = null] = yield* db
+            .update(schema.contactAttributeValueTable)
+            .set({
+              ...valueMap,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.contactAttributeValueTable.id, args.id))
+            .returning();
+          if (!updated) {
+            return yield* Effect.die(
+              new Error("Contact attribute value update did not return a row")
+            );
+          }
+          return updated;
+        }
+
+        const id = yield* ContactAttributeValueId.generate;
+        const now = new Date();
+        const [created = null] = yield* db
+          .insert(schema.contactAttributeValueTable)
+          .values({
+            id,
+            contactId: args.contactId,
+            attributeId: args.attributeId,
+            ...valueMap,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        if (!created) {
+          return yield* Effect.die(
+            new Error("Contact attribute value insert did not return a row")
+          );
+        }
+        return created;
+      }),
+
+    findCompanyAttributeValues: (companyId: string) =>
+      db
+        .select()
+        .from(schema.companyAttributeValueTable)
+        .where(eq(schema.companyAttributeValueTable.companyId, companyId)),
+
+    upsertCompanyAttributeValue: (args: TCompanyAttributeValueUpsert) =>
+      Effect.gen(function* () {
+        const valueMap = buildAttributeValueColumns(args.value);
+
+        if (args.id) {
+          const [updated = null] = yield* db
+            .update(schema.companyAttributeValueTable)
+            .set({
+              ...valueMap,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.companyAttributeValueTable.id, args.id))
+            .returning();
+          if (!updated) {
+            return yield* Effect.die(
+              new Error("Company attribute value update did not return a row")
+            );
+          }
+          return updated;
+        }
+
+        const id = yield* CompanyAttributeValueId.generate;
+        const now = new Date();
+        const [created = null] = yield* db
+          .insert(schema.companyAttributeValueTable)
+          .values({
+            id,
+            companyId: args.companyId,
+            attributeId: args.attributeId,
+            ...valueMap,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+        if (!created) {
+          return yield* Effect.die(
+            new Error("Company attribute value insert did not return a row")
+          );
+        }
+        return created;
       }),
   };
 });
