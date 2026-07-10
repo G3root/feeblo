@@ -10,6 +10,8 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { BoardRepository } from "../board/repository";
 import { Api } from "../http/api";
+import { JwtSecretRepository } from "../jwt-secret/repository";
+import { verifyJwt } from "../jwt-secret/verification";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   BadRequestError,
@@ -47,10 +49,23 @@ export const WidgetApiLive = HttpApiBuilder.group(
       )
       .handle("createFeedback", ({ payload }) =>
         Effect.gen(function* () {
-          const { boardId, organizationId, title, content } = payload;
+          const { boardId, organizationId, title, content, token } = payload;
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
           const db = yield* currentDb;
+
+          if (token) {
+            const jwtRepository = yield* JwtSecretRepository;
+            const secrets = yield* jwtRepository.getSecretsForOrg({
+              organizationId,
+            });
+            if (secrets.length > 0) {
+              yield* verifyJwt(
+                token,
+                secrets.map((s) => s.secret)
+              );
+            }
+          }
 
           const board = yield* boardRepository.getById({
             id: boardId,
@@ -115,7 +130,11 @@ export const WidgetApiLive = HttpApiBuilder.group(
 
           return row;
         }).pipe(
-          Effect.provide([BoardRepository.layer, PostStatusRepository.layer]),
+          Effect.provide([
+            BoardRepository.layer,
+            JwtSecretRepository.layer,
+            PostStatusRepository.layer,
+          ]),
           Effect.catchIf(
             (e) =>
               Predicate.isTagged(e, "EffectDrizzleQueryError") ||

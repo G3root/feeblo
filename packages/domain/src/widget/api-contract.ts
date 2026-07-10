@@ -9,6 +9,7 @@ import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
+  UnauthorizedError,
 } from "../rpc-errors";
 import {
   WidgetBoard,
@@ -25,6 +26,7 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
         BadRequestError,
         NotFoundError,
         InternalServerError,
+        UnauthorizedError,
       ]),
     })
       .annotate(OpenApi.Title, "Create Feedback")
