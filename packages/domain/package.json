@@ -117,6 +117,15 @@
     },
     "./import-export/schema": {
       "default": "./src/import-export/schema.ts"
+    },
+    "./jwt-secret/schema": {
+      "default": "./src/jwt-secret/schema.ts"
+    },
+    "./jwt-secret/verification": {
+      "default": "./src/jwt-secret/verification.ts"
+    },
+    "./jwt-secret/repository": {
+      "default": "./src/jwt-secret/repository.ts"
     }
   },
   "dependencies": {
@@ -129,7 +138,8 @@
     "better-auth": "catalog:",
     "cookie-es": "^3.1.1",
     "drizzle-orm": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "jose": "catalog:"
   },
   "scripts": {
     "check-types": "tsc --noEmit"

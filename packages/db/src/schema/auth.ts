@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -296,6 +297,9 @@ export const jwtSecretTable = pgTable(
     unique("jwt_secret_organizationId_secret_revokedAt_uidx")
       .on(table.organizationId, table.secret, table.revokedAt)
       .nullsNotDistinct(),
+    uniqueIndex("jwt_secret_organizationId_active_uidx")
+      .on(table.organizationId)
+      .where(sql`${table.revokedAt} is null`),
   ]
 );
 

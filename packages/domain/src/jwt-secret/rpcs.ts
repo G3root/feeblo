@@ -19,7 +19,7 @@ export class JwtSecretRpcs extends RpcGroup.make(
     error: JwtSecretServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("JwtSecretRotate", {
-    success: JwtSecretWithSecret,
+    success: Schema.Void,
     payload: JwtSecretRotate,
     error: JwtSecretServiceErrors,
   }).middleware(AuthMiddleware),
