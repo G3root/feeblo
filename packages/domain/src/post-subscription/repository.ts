@@ -31,6 +31,8 @@ interface TFindSubscribers {
 }
 
 const makePostSubscriptionRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     /**
      * Subscribe a user to a post. Idempotent: inserting when a subscription
@@ -40,7 +42,6 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
     subscribe: ({ organizationId, postId, userId, memberId }: TSubscribe) =>
       Effect.gen(function* () {
         const id = yield* PostSubscriptionId.generate;
-        const db = yield* currentDb;
         return yield* db
           .insert(schema.postSubscriptionTable)
           .values({
@@ -60,57 +61,48 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
       }),
 
     unsubscribe: ({ postId, userId }: TUnsubscribe) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .delete(schema.postSubscriptionTable)
-          .where(
-            and(
-              eq(schema.postSubscriptionTable.postId, postId),
-              eq(schema.postSubscriptionTable.userId, userId)
-            )
+      db
+        .delete(schema.postSubscriptionTable)
+        .where(
+          and(
+            eq(schema.postSubscriptionTable.postId, postId),
+            eq(schema.postSubscriptionTable.userId, userId)
           )
-          .pipe(Effect.asVoid);
-      }),
+        )
+        .pipe(Effect.asVoid),
 
     isSubscribed: ({ organizationId, postId, userId }: TIsSubscribed) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({ id: schema.postSubscriptionTable.id })
-          .from(schema.postSubscriptionTable)
-          .where(
-            and(
-              eq(schema.postSubscriptionTable.organizationId, organizationId),
-              eq(schema.postSubscriptionTable.postId, postId),
-              eq(schema.postSubscriptionTable.userId, userId)
-            )
+      db
+        .select({ id: schema.postSubscriptionTable.id })
+        .from(schema.postSubscriptionTable)
+        .where(
+          and(
+            eq(schema.postSubscriptionTable.organizationId, organizationId),
+            eq(schema.postSubscriptionTable.postId, postId),
+            eq(schema.postSubscriptionTable.userId, userId)
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)), Effect.map(Option.isSome));
-      }),
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0)), Effect.map(Option.isSome)),
 
     findSubscribers: ({ organizationId, postId }: TFindSubscribers) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.postSubscriptionTable.id,
-            postId: schema.postSubscriptionTable.postId,
-            organizationId: schema.postSubscriptionTable.organizationId,
-            userId: schema.postSubscriptionTable.userId,
-            memberId: schema.postSubscriptionTable.memberId,
-            createdAt: schema.postSubscriptionTable.createdAt,
-            updatedAt: schema.postSubscriptionTable.updatedAt,
-          })
-          .from(schema.postSubscriptionTable)
-          .where(
-            and(
-              eq(schema.postSubscriptionTable.organizationId, organizationId),
-              eq(schema.postSubscriptionTable.postId, postId)
-            )
-          );
-      }),
+      db
+        .select({
+          id: schema.postSubscriptionTable.id,
+          postId: schema.postSubscriptionTable.postId,
+          organizationId: schema.postSubscriptionTable.organizationId,
+          userId: schema.postSubscriptionTable.userId,
+          memberId: schema.postSubscriptionTable.memberId,
+          createdAt: schema.postSubscriptionTable.createdAt,
+          updatedAt: schema.postSubscriptionTable.updatedAt,
+        })
+        .from(schema.postSubscriptionTable)
+        .where(
+          and(
+            eq(schema.postSubscriptionTable.organizationId, organizationId),
+            eq(schema.postSubscriptionTable.postId, postId)
+          )
+        ),
   };
 });
 

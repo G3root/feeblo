@@ -25,87 +25,80 @@ interface TFindByCreatorId {
 }
 
 const makeChangelogRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     findByCreatorId: ({ id, organizationId, memberId }: TFindByCreatorId) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({ id: schema.changelogTable.id })
-          .from(schema.changelogTable)
-          .where(
-            and(
-              eq(schema.changelogTable.id, id),
-              eq(schema.changelogTable.organizationId, organizationId),
-              eq(schema.changelogTable.creatorMemberId, memberId)
-            )
+      db
+        .select({ id: schema.changelogTable.id })
+        .from(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, id),
+            eq(schema.changelogTable.organizationId, organizationId),
+            eq(schema.changelogTable.creatorMemberId, memberId)
           )
-          .pipe(Effect.map(EffectArray.get(0)));
-      }),
+        )
+        .pipe(Effect.map(EffectArray.get(0))),
 
     findMany: ({ organizationId }: TChangelogList) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.changelogTable.id,
-            title: schema.changelogTable.title,
-            slug: schema.changelogTable.slug,
-            content: schema.changelogTable.content,
-            status: schema.changelogTable.status,
-            scheduledAt: schema.changelogTable.scheduledAt,
-            publishedAt: schema.changelogTable.publishedAt,
-            organizationId: schema.changelogTable.organizationId,
-            creatorMemberId: schema.changelogTable.creatorMemberId,
-            creatorId: schema.changelogTable.creatorId,
-            createdAt: schema.changelogTable.createdAt,
-            updatedAt: schema.changelogTable.updatedAt,
-            user: {
-              name: sql<string | null>`${schema.userTable.name}`,
-              image: sql<string | null>`${schema.userTable.image}`,
-            },
-          })
-          .from(schema.changelogTable)
-          .leftJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.changelogTable.creatorId)
-          )
-          .where(eq(schema.changelogTable.organizationId, organizationId));
-      }),
+      db
+        .select({
+          id: schema.changelogTable.id,
+          title: schema.changelogTable.title,
+          slug: schema.changelogTable.slug,
+          content: schema.changelogTable.content,
+          status: schema.changelogTable.status,
+          scheduledAt: schema.changelogTable.scheduledAt,
+          publishedAt: schema.changelogTable.publishedAt,
+          organizationId: schema.changelogTable.organizationId,
+          creatorMemberId: schema.changelogTable.creatorMemberId,
+          creatorId: schema.changelogTable.creatorId,
+          createdAt: schema.changelogTable.createdAt,
+          updatedAt: schema.changelogTable.updatedAt,
+          user: {
+            name: sql<string | null>`${schema.userTable.name}`,
+            image: sql<string | null>`${schema.userTable.image}`,
+          },
+        })
+        .from(schema.changelogTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.changelogTable.creatorId)
+        )
+        .where(eq(schema.changelogTable.organizationId, organizationId)),
 
     findManyPublished: ({ organizationId }: TChangelogList) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.changelogTable.id,
-            title: schema.changelogTable.title,
-            slug: schema.changelogTable.slug,
-            content: schema.changelogTable.content,
-            status: schema.changelogTable.status,
-            scheduledAt: schema.changelogTable.scheduledAt,
-            publishedAt: schema.changelogTable.publishedAt,
-            organizationId: schema.changelogTable.organizationId,
-            creatorMemberId: schema.changelogTable.creatorMemberId,
-            creatorId: schema.changelogTable.creatorId,
-            createdAt: schema.changelogTable.createdAt,
-            updatedAt: schema.changelogTable.updatedAt,
-            user: {
-              name: sql<string | null>`${schema.userTable.name}`,
-              image: sql<string | null>`${schema.userTable.image}`,
-            },
-          })
-          .from(schema.changelogTable)
-          .leftJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.changelogTable.creatorId)
+      db
+        .select({
+          id: schema.changelogTable.id,
+          title: schema.changelogTable.title,
+          slug: schema.changelogTable.slug,
+          content: schema.changelogTable.content,
+          status: schema.changelogTable.status,
+          scheduledAt: schema.changelogTable.scheduledAt,
+          publishedAt: schema.changelogTable.publishedAt,
+          organizationId: schema.changelogTable.organizationId,
+          creatorMemberId: schema.changelogTable.creatorMemberId,
+          creatorId: schema.changelogTable.creatorId,
+          createdAt: schema.changelogTable.createdAt,
+          updatedAt: schema.changelogTable.updatedAt,
+          user: {
+            name: sql<string | null>`${schema.userTable.name}`,
+            image: sql<string | null>`${schema.userTable.image}`,
+          },
+        })
+        .from(schema.changelogTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.changelogTable.creatorId)
+        )
+        .where(
+          and(
+            eq(schema.changelogTable.organizationId, organizationId),
+            eq(schema.changelogTable.status, "published")
           )
-          .where(
-            and(
-              eq(schema.changelogTable.organizationId, organizationId),
-              eq(schema.changelogTable.status, "published")
-            )
-          );
-      }),
+        ),
 
     create: ({
       id,
@@ -119,9 +112,9 @@ const makeChangelogRepository = Effect.gen(function* () {
       creatorId,
       creatorMemberId,
     }: TChangelogCreateInternal) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        yield* db.insert(schema.changelogTable).values({
+      db
+        .insert(schema.changelogTable)
+        .values({
           id,
           title,
           slug: slug || slugify(title),
@@ -134,8 +127,8 @@ const makeChangelogRepository = Effect.gen(function* () {
           ...(creatorMemberId ? { creatorMemberId } : {}),
           createdAt: new Date(),
           updatedAt: new Date(),
-        });
-      }).pipe(Effect.asVoid),
+        })
+        .pipe(Effect.asVoid),
 
     update: ({
       id,
@@ -147,39 +140,35 @@ const makeChangelogRepository = Effect.gen(function* () {
       publishedAt,
       organizationId,
     }: TChangelogUpdate) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        yield* db
-          .update(schema.changelogTable)
-          .set({
-            title,
-            slug: slug || slugify(title),
-            content,
-            status,
-            scheduledAt,
-            publishedAt,
-            updatedAt: new Date(),
-          })
-          .where(
-            and(
-              eq(schema.changelogTable.id, id),
-              eq(schema.changelogTable.organizationId, organizationId)
-            )
-          );
-      }).pipe(Effect.asVoid),
+      db
+        .update(schema.changelogTable)
+        .set({
+          title,
+          slug: slug || slugify(title),
+          content,
+          status,
+          scheduledAt,
+          publishedAt,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.changelogTable.id, id),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
 
     delete: ({ id, organizationId }: TChangelogDelete) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        yield* db
-          .delete(schema.changelogTable)
-          .where(
-            and(
-              eq(schema.changelogTable.id, id),
-              eq(schema.changelogTable.organizationId, organizationId)
-            )
-          );
-      }).pipe(Effect.asVoid),
+      db
+        .delete(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, id),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
   };
 });
 

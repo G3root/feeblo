@@ -1,9 +1,9 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UpvoteId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as EffectArray from "effect/Array";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -20,31 +20,30 @@ interface TUpvoteToggle {
 }
 
 const makeUpvoteRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     list: ({ organizationId }: TUpvoteList) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.upvoteTable.id,
-            postId: schema.upvoteTable.postId,
-            organizationId: schema.upvoteTable.organizationId,
-            userId: schema.upvoteTable.userId,
-            user: {
-              name: schema.userTable.name,
-              image: schema.userTable.image,
-            },
-            memberId: schema.upvoteTable.memberId,
-            createdAt: schema.upvoteTable.createdAt,
-            updatedAt: schema.upvoteTable.updatedAt,
-          })
-          .from(schema.upvoteTable)
-          .innerJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.upvoteTable.userId)
-          )
-          .where(and(eq(schema.upvoteTable.organizationId, organizationId)));
-      }),
+      db
+        .select({
+          id: schema.upvoteTable.id,
+          postId: schema.upvoteTable.postId,
+          organizationId: schema.upvoteTable.organizationId,
+          userId: schema.upvoteTable.userId,
+          user: {
+            name: schema.userTable.name,
+            image: schema.userTable.image,
+          },
+          memberId: schema.upvoteTable.memberId,
+          createdAt: schema.upvoteTable.createdAt,
+          updatedAt: schema.upvoteTable.updatedAt,
+        })
+        .from(schema.upvoteTable)
+        .innerJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.upvoteTable.userId)
+        )
+        .where(and(eq(schema.upvoteTable.organizationId, organizationId))),
 
     toggle: ({ organizationId, postId, userId, visibility }: TUpvoteToggle) =>
       Effect.gen(function* () {
@@ -53,7 +52,6 @@ const makeUpvoteRepository = Effect.gen(function* () {
           eq(schema.postTable.organizationId, organizationId),
           ...(visibility ? [eq(schema.boardTable.visibility, visibility)] : []),
         ];
-        const db = yield* currentDb;
         const post = yield* db
           .select({ id: schema.postTable.id })
           .from(schema.postTable)

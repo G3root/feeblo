@@ -44,56 +44,48 @@ interface TBoardDelete {
 }
 
 const makeBoardRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     findById: ({ id, organizationId, memberId }: TBoardFindById) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({ id: schema.boardTable.id })
-          .from(schema.boardTable)
-          .where(
-            and(
-              eq(schema.boardTable.id, id),
-              eq(schema.boardTable.organizationId, organizationId),
-              eq(schema.boardTable.creatorMemberId, memberId)
-            )
+      db
+        .select({ id: schema.boardTable.id })
+        .from(schema.boardTable)
+        .where(
+          and(
+            eq(schema.boardTable.id, id),
+            eq(schema.boardTable.organizationId, organizationId),
+            eq(schema.boardTable.creatorMemberId, memberId)
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-      }),
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0))),
     getById: ({ id, organizationId }: TBoardGetById) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.boardTable.id,
-            visibility: schema.boardTable.visibility,
-          })
-          .from(schema.boardTable)
-          .where(
-            and(
-              eq(schema.boardTable.id, id),
-              eq(schema.boardTable.organizationId, organizationId)
-            )
+      db
+        .select({
+          id: schema.boardTable.id,
+          visibility: schema.boardTable.visibility,
+        })
+        .from(schema.boardTable)
+        .where(
+          and(
+            eq(schema.boardTable.id, id),
+            eq(schema.boardTable.organizationId, organizationId)
           )
-          .pipe(Effect.map(EffectArray.get(0)));
-      }),
+        )
+        .pipe(Effect.map(EffectArray.get(0))),
     create: (args: TBoardCreate) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .insert(schema.boardTable)
-          .values({
-            ...args,
-            slug: slugify(args.name),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .returning();
-      }),
+      db
+        .insert(schema.boardTable)
+        .values({
+          ...args,
+          slug: slugify(args.name),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning(),
     findMany: ({ organizationId, visibility }: TBoardFindMany) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const where: SQL[] = [];
         if (visibility) {
           where.push(eq(schema.boardTable.visibility, visibility));
@@ -119,31 +111,24 @@ const makeBoardRepository = Effect.gen(function* () {
         return boards;
       }),
     countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const boards = yield* db
-          .select({ id: schema.boardTable.id })
-          .from(schema.boardTable)
-          .where(eq(schema.boardTable.organizationId, organizationId));
-
-        return boards.length;
-      }),
+      db
+        .select({ id: schema.boardTable.id })
+        .from(schema.boardTable)
+        .where(eq(schema.boardTable.organizationId, organizationId))
+        .pipe(Effect.map((boards) => boards.length)),
 
     delete: ({ id, organizationId }: TBoardDelete) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        yield* db
-          .delete(schema.boardTable)
-          .where(
-            and(
-              eq(schema.boardTable.id, id),
-              eq(schema.boardTable.organizationId, organizationId)
-            )
-          );
-      }).pipe(Effect.asVoid),
+      db
+        .delete(schema.boardTable)
+        .where(
+          and(
+            eq(schema.boardTable.id, id),
+            eq(schema.boardTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
     update: (args: TBoardUpdate) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const { id, organizationId, ...rest } = args;
         const input = { id, organizationId, ...rest };
 

@@ -133,10 +133,11 @@ const toProductValues = (payload: ProductPayload): ProductInsert => ({
 });
 
 const makeBillingRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     createSubscription: (payload: SubscriptionPayload) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const id = yield* SubscriptionId.generate;
         yield* db
           .insert(schema.subscriptionTable)
@@ -145,7 +146,6 @@ const makeBillingRepository = Effect.gen(function* () {
       }),
     upsertSubscription: (payload: SubscriptionPayload) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const id = yield* SubscriptionId.generate;
         const values = toSubscriptionValues(payload, id);
         const { id: _id, ...updateValues } = values;
@@ -161,42 +161,35 @@ const makeBillingRepository = Effect.gen(function* () {
           });
       }),
     createProduct: (payload: ProductPayload) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        yield* db
-          .insert(schema.productTable)
-          .values(toProductValues(payload))
-          .onConflictDoNothing();
-      }),
+      db
+        .insert(schema.productTable)
+        .values(toProductValues(payload))
+        .onConflictDoNothing()
+        .pipe(Effect.asVoid),
     upsertProduct: (payload: ProductPayload) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        yield* db
-          .insert(schema.productTable)
-          .values(toProductValues(payload))
-          .onConflictDoUpdate({
-            target: schema.productTable.id,
-            set: {
-              ...toProductValues(payload),
-              updatedAt: payload.modifiedAt ?? new Date(),
-            },
-          });
-      }),
+      db
+        .insert(schema.productTable)
+        .values(toProductValues(payload))
+        .onConflictDoUpdate({
+          target: schema.productTable.id,
+          set: {
+            ...toProductValues(payload),
+            updatedAt: payload.modifiedAt ?? new Date(),
+          },
+        })
+        .pipe(Effect.asVoid),
     findSubscriptionByOrganizationId: ({
       organizationId,
     }: TFindSubscriptionByOrganizationId) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.subscriptionTable.id,
-            customerId: schema.subscriptionTable.customerId,
-            organizationId: schema.subscriptionTable.organizationId,
-          })
-          .from(schema.subscriptionTable)
-          .where(eq(schema.subscriptionTable.organizationId, organizationId))
-          .pipe(Effect.map(EffectArray.get(0)));
-      }),
+      db
+        .select({
+          id: schema.subscriptionTable.id,
+          customerId: schema.subscriptionTable.customerId,
+          organizationId: schema.subscriptionTable.organizationId,
+        })
+        .from(schema.subscriptionTable)
+        .where(eq(schema.subscriptionTable.organizationId, organizationId))
+        .pipe(Effect.map(EffectArray.get(0))),
   };
 });
 

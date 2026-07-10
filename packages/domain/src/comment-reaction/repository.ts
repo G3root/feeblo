@@ -22,91 +22,86 @@ interface TCommentReactionToggle {
 }
 
 const makeCommentReactionRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     list: ({ organizationId, postId }: TCommentReactionList) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.commentReactionTable.id,
-            commentId: schema.commentReactionTable.commentId,
-            postId: schema.commentTable.postId,
-            organizationId: schema.commentTable.organizationId,
-            userId: schema.commentReactionTable.userId,
-            memberId: schema.commentReactionTable.memberId,
-            emoji: schema.commentReactionTable.emoji,
-            createdAt: schema.commentReactionTable.createdAt,
-            updatedAt: schema.commentReactionTable.updatedAt,
-          })
-          .from(schema.commentReactionTable)
-          .innerJoin(
-            schema.commentTable,
-            eq(schema.commentTable.id, schema.commentReactionTable.commentId)
+      db
+        .select({
+          id: schema.commentReactionTable.id,
+          commentId: schema.commentReactionTable.commentId,
+          postId: schema.commentTable.postId,
+          organizationId: schema.commentTable.organizationId,
+          userId: schema.commentReactionTable.userId,
+          memberId: schema.commentReactionTable.memberId,
+          emoji: schema.commentReactionTable.emoji,
+          createdAt: schema.commentReactionTable.createdAt,
+          updatedAt: schema.commentReactionTable.updatedAt,
+        })
+        .from(schema.commentReactionTable)
+        .innerJoin(
+          schema.commentTable,
+          eq(schema.commentTable.id, schema.commentReactionTable.commentId)
+        )
+        .where(
+          and(
+            eq(schema.commentTable.organizationId, organizationId),
+            eq(schema.commentTable.postId, postId)
           )
-          .where(
-            and(
-              eq(schema.commentTable.organizationId, organizationId),
-              eq(schema.commentTable.postId, postId)
-            )
+        )
+        .pipe(
+          Effect.map((reactions) =>
+            reactions.map((reaction) => ({
+              ...reaction,
+              emoji: reaction.emoji as ReactionEmoji,
+            }))
           )
-          .pipe(
-            Effect.map((reactions) =>
-              reactions.map((reaction) => ({
-                ...reaction,
-                emoji: reaction.emoji as ReactionEmoji,
-              }))
-            )
-          );
-      }),
+        ),
 
     listPublic: ({ organizationId, postId }: TCommentReactionList) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.commentReactionTable.id,
-            commentId: schema.commentReactionTable.commentId,
-            postId: schema.commentTable.postId,
-            organizationId: schema.commentTable.organizationId,
-            userId: schema.commentReactionTable.userId,
-            memberId: schema.commentReactionTable.memberId,
-            emoji: schema.commentReactionTable.emoji,
-            createdAt: schema.commentReactionTable.createdAt,
-            updatedAt: schema.commentReactionTable.updatedAt,
-          })
-          .from(schema.commentReactionTable)
-          .innerJoin(
-            schema.commentTable,
-            eq(schema.commentTable.id, schema.commentReactionTable.commentId)
+      db
+        .select({
+          id: schema.commentReactionTable.id,
+          commentId: schema.commentReactionTable.commentId,
+          postId: schema.commentTable.postId,
+          organizationId: schema.commentTable.organizationId,
+          userId: schema.commentReactionTable.userId,
+          memberId: schema.commentReactionTable.memberId,
+          emoji: schema.commentReactionTable.emoji,
+          createdAt: schema.commentReactionTable.createdAt,
+          updatedAt: schema.commentReactionTable.updatedAt,
+        })
+        .from(schema.commentReactionTable)
+        .innerJoin(
+          schema.commentTable,
+          eq(schema.commentTable.id, schema.commentReactionTable.commentId)
+        )
+        .innerJoin(
+          schema.postTable,
+          eq(schema.postTable.id, schema.commentTable.postId)
+        )
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .where(
+          and(
+            eq(schema.commentTable.organizationId, organizationId),
+            eq(schema.commentTable.postId, postId),
+            eq(schema.boardTable.visibility, "PUBLIC")
           )
-          .innerJoin(
-            schema.postTable,
-            eq(schema.postTable.id, schema.commentTable.postId)
+        )
+        .pipe(
+          Effect.map((reactions) =>
+            reactions.map((reaction) => ({
+              ...reaction,
+              emoji: reaction.emoji as ReactionEmoji,
+            }))
           )
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .where(
-            and(
-              eq(schema.commentTable.organizationId, organizationId),
-              eq(schema.commentTable.postId, postId),
-              eq(schema.boardTable.visibility, "PUBLIC")
-            )
-          )
-          .pipe(
-            Effect.map((reactions) =>
-              reactions.map((reaction) => ({
-                ...reaction,
-                emoji: reaction.emoji as ReactionEmoji,
-              }))
-            )
-          );
-      }),
+        ),
 
     toggle: (args: TCommentReactionToggle) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const comment = yield* db
           .select({ id: schema.commentTable.id })
           .from(schema.commentTable)
@@ -176,7 +171,6 @@ const makeCommentReactionRepository = Effect.gen(function* () {
 
     togglePublic: (args: TCommentReactionToggle) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const comment = yield* db
           .select({ id: schema.commentTable.id })
           .from(schema.commentTable)

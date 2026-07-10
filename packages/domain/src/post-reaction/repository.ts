@@ -21,10 +21,11 @@ interface TPostReactionToggle {
 }
 
 const makePostReactionRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     list: ({ postId, organizationId }: TPostReactionList) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const post = yield* db
           .select({ id: schema.postTable.id })
           .from(schema.postTable)
@@ -72,7 +73,6 @@ const makePostReactionRepository = Effect.gen(function* () {
 
     listPublic: ({ postId, organizationId }: TPostReactionList) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const post = yield* db
           .select({ id: schema.postTable.id })
           .from(schema.postTable)
@@ -125,7 +125,6 @@ const makePostReactionRepository = Effect.gen(function* () {
 
     toggle: ({ organizationId, postId, userId, emoji }: TPostReactionToggle) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const post = yield* db
           .select({ id: schema.postTable.id })
           .from(schema.postTable)
@@ -198,7 +197,6 @@ const makePostReactionRepository = Effect.gen(function* () {
       emoji,
     }: TPostReactionToggle) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const post = yield* db
           .select({ id: schema.postTable.id })
           .from(schema.postTable)

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { JwtSecretId } from "@feeblo/id";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import * as Context from "effect/Context";
@@ -28,14 +28,15 @@ function generateSecret(): string {
 }
 
 const makeJwtSecretRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     getSecretsForOrg: ({ organizationId }: TJwtSecretGetOrCreate) =>
-      transaction(
+      db.transaction((tx) =>
         Effect.gen(function* () {
-          const db = yield* currentDb;
           const now = yield* DateTime.nowAsDate;
 
-          yield* db
+          yield* tx
             .delete(schema.jwtSecretTable)
             .where(
               and(
@@ -44,7 +45,7 @@ const makeJwtSecretRepository = Effect.gen(function* () {
               )
             );
 
-          const existing = yield* db
+          const existing = yield* tx
             .select()
             .from(schema.jwtSecretTable)
             .where(eq(schema.jwtSecretTable.organizationId, organizationId))
@@ -58,7 +59,7 @@ const makeJwtSecretRepository = Effect.gen(function* () {
             const secret = generateSecret();
             const createdAt = yield* DateTime.nowAsDate;
 
-            const [created] = yield* db
+            const [created] = yield* tx
               .insert(schema.jwtSecretTable)
               .values({
                 id,
@@ -79,7 +80,7 @@ const makeJwtSecretRepository = Effect.gen(function* () {
           }
 
           if (revoked.length > 1) {
-            yield* db.delete(schema.jwtSecretTable).where(
+            yield* tx.delete(schema.jwtSecretTable).where(
               inArray(
                 schema.jwtSecretTable.id,
                 revoked.slice(1).map((s) => s.id)
@@ -91,98 +92,100 @@ const makeJwtSecretRepository = Effect.gen(function* () {
         })
       ),
     revoke: ({ organizationId, secretId }: TJwtSecretRevoke) =>
-      transaction(
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const nowUtc = yield* DateTime.now;
-          const now = DateTime.toDate(nowUtc);
-          const gracePeriod = DateTime.toDate(
-            DateTime.addDuration(nowUtc, Duration.hours(24))
-          );
-
-          const existing = yield* db
-            .select()
-            .from(schema.jwtSecretTable)
-            .where(
-              and(
-                eq(schema.jwtSecretTable.id, secretId),
-                eq(schema.jwtSecretTable.organizationId, organizationId)
-              )
+      db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const nowUtc = yield* DateTime.now;
+            const now = DateTime.toDate(nowUtc);
+            const gracePeriod = DateTime.toDate(
+              DateTime.addDuration(nowUtc, Duration.hours(24))
             );
 
-          const [secret] = existing;
+            const existing = yield* tx
+              .select()
+              .from(schema.jwtSecretTable)
+              .where(
+                and(
+                  eq(schema.jwtSecretTable.id, secretId),
+                  eq(schema.jwtSecretTable.organizationId, organizationId)
+                )
+              );
 
-          if (secret === undefined) {
-            return yield* new NotFoundError({
-              message: "JWT secret not found",
-            });
-          }
+            const [secret] = existing;
 
-          if (secret.revokedAt === null) {
-            yield* db
+            if (secret === undefined) {
+              return yield* new NotFoundError({
+                message: "JWT secret not found",
+              });
+            }
+
+            if (secret.revokedAt === null) {
+              yield* tx
+                .update(schema.jwtSecretTable)
+                .set({ revokedAt: gracePeriod })
+                .where(
+                  and(
+                    eq(schema.jwtSecretTable.id, secretId),
+                    eq(schema.jwtSecretTable.organizationId, organizationId)
+                  )
+                );
+
+              const id = yield* JwtSecretId.generate;
+              const newSecret = generateSecret();
+
+              yield* tx.insert(schema.jwtSecretTable).values({
+                id,
+                organizationId,
+                secret: newSecret,
+                createdAt: now,
+                revokedAt: null,
+              });
+            } else {
+              yield* tx
+                .delete(schema.jwtSecretTable)
+                .where(
+                  and(
+                    eq(schema.jwtSecretTable.id, secretId),
+                    eq(schema.jwtSecretTable.organizationId, organizationId)
+                  )
+                );
+            }
+          })
+        )
+        .pipe(Effect.asVoid),
+    rotate: ({ organizationId }: TJwtSecretRotate) =>
+      db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const nowUtc = yield* DateTime.now;
+            const now = DateTime.toDate(nowUtc);
+            const gracePeriod = DateTime.toDate(
+              DateTime.addDuration(nowUtc, Duration.hours(24))
+            );
+
+            yield* tx
               .update(schema.jwtSecretTable)
               .set({ revokedAt: gracePeriod })
               .where(
                 and(
-                  eq(schema.jwtSecretTable.id, secretId),
-                  eq(schema.jwtSecretTable.organizationId, organizationId)
+                  eq(schema.jwtSecretTable.organizationId, organizationId),
+                  isNull(schema.jwtSecretTable.revokedAt)
                 )
               );
 
             const id = yield* JwtSecretId.generate;
-            const newSecret = generateSecret();
+            const secret = generateSecret();
 
-            yield* db.insert(schema.jwtSecretTable).values({
+            yield* tx.insert(schema.jwtSecretTable).values({
               id,
               organizationId,
-              secret: newSecret,
+              secret,
               createdAt: now,
               revokedAt: null,
             });
-          } else {
-            yield* db
-              .delete(schema.jwtSecretTable)
-              .where(
-                and(
-                  eq(schema.jwtSecretTable.id, secretId),
-                  eq(schema.jwtSecretTable.organizationId, organizationId)
-                )
-              );
-          }
-        })
-      ).pipe(Effect.asVoid),
-    rotate: ({ organizationId }: TJwtSecretRotate) =>
-      transaction(
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const nowUtc = yield* DateTime.now;
-          const now = DateTime.toDate(nowUtc);
-          const gracePeriod = DateTime.toDate(
-            DateTime.addDuration(nowUtc, Duration.hours(24))
-          );
-
-          yield* db
-            .update(schema.jwtSecretTable)
-            .set({ revokedAt: gracePeriod })
-            .where(
-              and(
-                eq(schema.jwtSecretTable.organizationId, organizationId),
-                isNull(schema.jwtSecretTable.revokedAt)
-              )
-            );
-
-          const id = yield* JwtSecretId.generate;
-          const secret = generateSecret();
-
-          yield* db.insert(schema.jwtSecretTable).values({
-            id,
-            organizationId,
-            secret,
-            createdAt: now,
-            revokedAt: null,
-          });
-        })
-      ).pipe(Effect.asVoid),
+          })
+        )
+        .pipe(Effect.asVoid),
   };
 });
 

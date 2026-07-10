@@ -9,23 +9,22 @@ interface TFindMany {
 }
 
 const makePostStatusRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     findMany: ({ organizationId }: TFindMany) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.postStatusTable.id,
-            type: schema.postStatusTable.type,
-            orderIndex: schema.postStatusTable.orderIndex,
-            organizationId: schema.postStatusTable.organizationId,
-            createdAt: schema.postStatusTable.createdAt,
-            updatedAt: schema.postStatusTable.updatedAt,
-          })
-          .from(schema.postStatusTable)
-          .where(eq(schema.postStatusTable.organizationId, organizationId))
-          .orderBy(asc(schema.postStatusTable.orderIndex));
-      }),
+      db
+        .select({
+          id: schema.postStatusTable.id,
+          type: schema.postStatusTable.type,
+          orderIndex: schema.postStatusTable.orderIndex,
+          organizationId: schema.postStatusTable.organizationId,
+          createdAt: schema.postStatusTable.createdAt,
+          updatedAt: schema.postStatusTable.updatedAt,
+        })
+        .from(schema.postStatusTable)
+        .where(eq(schema.postStatusTable.organizationId, organizationId))
+        .orderBy(asc(schema.postStatusTable.orderIndex)),
   };
 });
 

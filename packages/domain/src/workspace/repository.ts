@@ -1,4 +1,4 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import {
   BoardId,
   MemberId,
@@ -8,9 +8,9 @@ import {
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
 import { and, desc, eq } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as EffectArray from "effect/Array";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -27,10 +27,11 @@ interface FindPlanByOrganizationIdArgs {
 }
 
 const makeWorkspaceRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
+
   return {
     isSubdomainTaken: (subdomain: string) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const results = yield* db
           .select({ id: schema.siteTable.id })
           .from(schema.siteTable)
@@ -41,7 +42,6 @@ const makeWorkspaceRepository = Effect.gen(function* () {
 
     getSubdomainSuggestion: (subdomain: string) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         for (let i = 2; i <= 12; i++) {
           const candidate = `${subdomain}-${i}`;
           const results = yield* db
@@ -57,11 +57,10 @@ const makeWorkspaceRepository = Effect.gen(function* () {
       }),
 
     createWorkspace: (args: CreateWorkspaceArgs) =>
-      transaction(
+      db.transaction((tx) =>
         Effect.gen(function* () {
-          const db = yield* currentDb;
           const workspaceId = yield* WorkspaceId.generate;
-          const organization = yield* db
+          const organization = yield* tx
             .insert(schema.organizationTable)
             .values({
               id: workspaceId,
@@ -81,7 +80,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           const organizationId = organization.value.id;
           const memberId = yield* MemberId.generate;
 
-          yield* db.insert(schema.memberTable).values({
+          yield* tx.insert(schema.memberTable).values({
             id: memberId,
             organizationId,
             role: "owner",
@@ -91,7 +90,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
 
           for (const postStatus of schema.DEFAULT_POST_STATUSES) {
             const postStatusId = yield* PostStatusId.generate;
-            yield* db.insert(schema.postStatusTable).values({
+            yield* tx.insert(schema.postStatusTable).values({
               id: postStatusId,
               organizationId,
               type: postStatus.type,
@@ -105,7 +104,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
 
           for (const boardName of defaultBoards) {
             const boardId = yield* BoardId.generate;
-            yield* db.insert(schema.boardTable).values({
+            yield* tx.insert(schema.boardTable).values({
               id: boardId,
               name: boardName,
               slug: slugify(boardName),
@@ -116,7 +115,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             });
           }
           const siteId = yield* SiteId.generate;
-          yield* db.insert(schema.siteTable).values({
+          yield* tx.insert(schema.siteTable).values({
             id: siteId,
             organizationId,
             createdAt: new Date(),
@@ -131,68 +130,62 @@ const makeWorkspaceRepository = Effect.gen(function* () {
       ),
 
     findProducts: () =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            id: schema.productTable.id,
-            name: schema.productTable.name,
-            description: schema.productTable.description,
-            trialInterval: schema.productTable.trialInterval,
-            trialIntervalCount: schema.productTable.trialIntervalCount,
-            recurringInterval: schema.productTable.recurringInterval,
-            recurringIntervalCount: schema.productTable.recurringIntervalCount,
-            isRecurring: schema.productTable.isRecurring,
-            isArchived: schema.productTable.isArchived,
-            externalOrganizationId: schema.productTable.externalOrganizationId,
-            visibility: schema.productTable.visibility,
-            prices: schema.productTable.prices,
-            metadata: schema.productTable.metadata,
-            createdAt: schema.productTable.createdAt,
-            updatedAt: schema.productTable.updatedAt,
-          })
-          .from(schema.productTable)
-          .where(eq(schema.productTable.isArchived, false));
-      }),
+      db
+        .select({
+          id: schema.productTable.id,
+          name: schema.productTable.name,
+          description: schema.productTable.description,
+          trialInterval: schema.productTable.trialInterval,
+          trialIntervalCount: schema.productTable.trialIntervalCount,
+          recurringInterval: schema.productTable.recurringInterval,
+          recurringIntervalCount: schema.productTable.recurringIntervalCount,
+          isRecurring: schema.productTable.isRecurring,
+          isArchived: schema.productTable.isArchived,
+          externalOrganizationId: schema.productTable.externalOrganizationId,
+          visibility: schema.productTable.visibility,
+          prices: schema.productTable.prices,
+          metadata: schema.productTable.metadata,
+          createdAt: schema.productTable.createdAt,
+          updatedAt: schema.productTable.updatedAt,
+        })
+        .from(schema.productTable)
+        .where(eq(schema.productTable.isArchived, false)),
 
     findPlanByOrganizationId: (args: FindPlanByOrganizationIdArgs) =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        return yield* db
-          .select({
-            organizationId: schema.subscriptionTable.organizationId,
-            plan: schema.productTable.metadata,
-          })
-          .from(schema.subscriptionTable)
-          .innerJoin(
-            schema.productTable,
-            eq(schema.productTable.id, schema.subscriptionTable.productId)
+      db
+        .select({
+          organizationId: schema.subscriptionTable.organizationId,
+          plan: schema.productTable.metadata,
+        })
+        .from(schema.subscriptionTable)
+        .innerJoin(
+          schema.productTable,
+          eq(schema.productTable.id, schema.subscriptionTable.productId)
+        )
+        .where(
+          and(
+            eq(schema.subscriptionTable.organizationId, args.organizationId),
+            eq(schema.subscriptionTable.status, "active")
           )
-          .where(
-            and(
-              eq(schema.subscriptionTable.organizationId, args.organizationId),
-              eq(schema.subscriptionTable.status, "active")
-            )
-          )
-          .orderBy(
-            desc(schema.subscriptionTable.currentPeriodEnd),
-            desc(schema.subscriptionTable.createdAt)
-          )
-          .limit(1)
-          .pipe(
-            Effect.map(EffectArray.get(0)),
-            Effect.map(
-              Option.match({
-                onNone: () => "free" as const,
-                onSome: (subscription) => subscription.plan?.plan ?? "free",
-              })
-            ),
-            Effect.map((plan) => ({
-              organizationId: args.organizationId,
-              plan,
-            }))
-          );
-      }),
+        )
+        .orderBy(
+          desc(schema.subscriptionTable.currentPeriodEnd),
+          desc(schema.subscriptionTable.createdAt)
+        )
+        .limit(1)
+        .pipe(
+          Effect.map(EffectArray.get(0)),
+          Effect.map(
+            Option.match({
+              onNone: () => "free" as const,
+              onSome: (subscription) => subscription.plan?.plan ?? "free",
+            })
+          ),
+          Effect.map((plan) => ({
+            organizationId: args.organizationId,
+            plan,
+          }))
+        ),
   };
 });
 
