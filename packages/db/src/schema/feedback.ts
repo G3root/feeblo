@@ -6,8 +6,10 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -68,6 +70,22 @@ export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
 ]);
 
 export const tagTypeEnum = pgEnum("tag_type", ["FEEDBACK", "CHANGELOG"]);
+
+export const postSourceEnum = pgEnum("post_source", [
+  "DASHBOARD",
+  "WIDGET",
+  "API",
+  "IMPORT",
+  "PUBLIC_BOARD",
+]);
+
+export const attributeDataTypeEnum = pgEnum("attribute_data_type", [
+  "TEXT",
+  "INTEGER",
+  "DECIMAL",
+  "BOOLEAN",
+  "DATE",
+]);
 
 export const boardTable = pgTable(
   "board",
@@ -231,6 +249,73 @@ export const changelogTagTable = pgTable(
   ]
 );
 
+export const companyTable = pgTable(
+  "company",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    externalId: text("external_id"),
+    domain: text("domain"),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("company_organizationId_idx").on(table.organizationId),
+    uniqueIndex("company_organizationId_externalId_uidx").on(
+      table.organizationId,
+      table.externalId
+    ),
+    uniqueIndex("company_organizationId_name_uidx").on(
+      table.organizationId,
+      table.name
+    ),
+  ]
+);
+
+export const contactTable = pgTable(
+  "contact",
+  {
+    id: text("id").primaryKey(),
+    name: text("name"),
+    email: text("email"),
+    externalId: text("external_id"),
+    phone: text("phone"),
+    companyId: text("company_id").references(() => companyTable.id, {
+      onDelete: "set null",
+    }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("contact_organizationId_idx").on(table.organizationId),
+    index("contact_companyId_idx").on(table.companyId),
+    uniqueIndex("contact_organizationId_externalId_uidx").on(
+      table.organizationId,
+      table.externalId
+    ),
+    uniqueIndex("contact_organizationId_email_uidx").on(
+      table.organizationId,
+      table.email
+    ),
+  ]
+);
+
 export const postTable = pgTable(
   "post",
   {
@@ -257,6 +342,10 @@ export const postTable = pgTable(
         onDelete: "set null",
       }
     ),
+    contactId: text("contact_id").references(() => contactTable.id, {
+      onDelete: "set null",
+    }),
+    source: postSourceEnum("source").default("DASHBOARD").notNull(),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     mergedIntoPostId: text("merged_into_post_id"),
@@ -520,6 +609,148 @@ export const changelogTable = pgTable(
     uniqueIndex("changelog_organizationId_slug_uidx").on(
       table.organizationId,
       table.slug
+    ),
+  ]
+);
+
+export const contactAttributeDefinitionTable = pgTable(
+  "contact_attribute_definition",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    key: text("key").notNull(),
+    description: text("description"),
+    type: attributeDataTypeEnum("type").notNull(),
+    config: jsonb("config").$type<{
+      min?: number;
+      max?: number;
+      pattern?: string;
+    }>(),
+    isRequired: boolean("is_required").default(false).notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("contact_attribute_definition_organizationId_idx").on(
+      table.organizationId
+    ),
+    uniqueIndex("contact_attribute_definition_organizationId_key_uidx").on(
+      table.organizationId,
+      table.key
+    ),
+  ]
+);
+
+export const contactAttributeValueTable = pgTable(
+  "contact_attribute_value",
+  {
+    id: text("id").primaryKey(),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => contactTable.id, { onDelete: "cascade" }),
+    attributeId: text("attribute_id")
+      .notNull()
+      .references(() => contactAttributeDefinitionTable.id, {
+        onDelete: "cascade",
+      }),
+    valueText: text("value_text"),
+    valueInteger: integer("value_integer"),
+    valueDecimal: real("value_decimal"),
+    valueBoolean: boolean("value_boolean"),
+    valueDate: timestamp("value_date", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("contact_attribute_value_contactId_idx").on(table.contactId),
+    index("contact_attribute_value_attributeId_idx").on(table.attributeId),
+    uniqueIndex("contact_attribute_value_contactId_attributeId_uidx").on(
+      table.contactId,
+      table.attributeId
+    ),
+  ]
+);
+
+export const companyAttributeDefinitionTable = pgTable(
+  "company_attribute_definition",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    key: text("key").notNull(),
+    description: text("description"),
+    type: attributeDataTypeEnum("type").notNull(),
+    config: jsonb("config").$type<{
+      min?: number;
+      max?: number;
+      pattern?: string;
+    }>(),
+    isRequired: boolean("is_required").default(false).notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("company_attribute_definition_organizationId_idx").on(
+      table.organizationId
+    ),
+    uniqueIndex("company_attribute_definition_organizationId_key_uidx").on(
+      table.organizationId,
+      table.key
+    ),
+  ]
+);
+
+export const companyAttributeValueTable = pgTable(
+  "company_attribute_value",
+  {
+    id: text("id").primaryKey(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companyTable.id, { onDelete: "cascade" }),
+    attributeId: text("attribute_id")
+      .notNull()
+      .references(() => companyAttributeDefinitionTable.id, {
+        onDelete: "cascade",
+      }),
+    valueText: text("value_text"),
+    valueInteger: integer("value_integer"),
+    valueDecimal: real("value_decimal"),
+    valueBoolean: boolean("value_boolean"),
+    valueDate: timestamp("value_date", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("company_attribute_value_companyId_idx").on(table.companyId),
+    index("company_attribute_value_attributeId_idx").on(table.attributeId),
+    uniqueIndex("company_attribute_value_companyId_attributeId_uidx").on(
+      table.companyId,
+      table.attributeId
     ),
   ]
 );

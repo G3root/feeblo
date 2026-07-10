@@ -6,6 +6,12 @@ import {
   changelogTagTable,
   commentReactionTable,
   commentTable,
+  companyAttributeDefinitionTable,
+  companyAttributeValueTable,
+  companyTable,
+  contactAttributeDefinitionTable,
+  contactAttributeValueTable,
+  contactTable,
   invitationTable,
   jwtSecretTable,
   memberTable,
@@ -50,6 +56,12 @@ export const relations = defineRelations(
     siteTable,
     changelogTable,
     changelogTagTable,
+    companyTable,
+    contactTable,
+    companyAttributeDefinitionTable,
+    companyAttributeValueTable,
+    contactAttributeDefinitionTable,
+    contactAttributeValueTable,
   },
   (r) => ({
     userTable: {
@@ -175,6 +187,22 @@ export const relations = defineRelations(
         from: r.organizationTable.id,
         to: r.changelogTagTable.organizationId,
       }),
+      companies: r.many.companyTable({
+        from: r.organizationTable.id,
+        to: r.companyTable.organizationId,
+      }),
+      contacts: r.many.contactTable({
+        from: r.organizationTable.id,
+        to: r.contactTable.organizationId,
+      }),
+      contactAttributeDefinitions: r.many.contactAttributeDefinitionTable({
+        from: r.organizationTable.id,
+        to: r.contactAttributeDefinitionTable.organizationId,
+      }),
+      companyAttributeDefinitions: r.many.companyAttributeDefinitionTable({
+        from: r.organizationTable.id,
+        to: r.companyAttributeDefinitionTable.organizationId,
+      }),
       site: r.one.siteTable({
         from: r.organizationTable.id,
         to: r.siteTable.organizationId,
@@ -281,6 +309,10 @@ export const relations = defineRelations(
         from: r.postTable.creatorMemberId,
         to: r.memberTable.id,
       }),
+      contact: r.one.contactTable({
+        from: r.postTable.contactId,
+        to: r.contactTable.id,
+      }),
       upvotes: r.many.upvoteTable({
         from: r.postTable.id,
         to: r.upvoteTable.postId,
@@ -374,6 +406,78 @@ export const relations = defineRelations(
       comment: r.one.commentTable({
         from: r.commentReactionTable.commentId,
         to: r.commentTable.id,
+      }),
+    },
+    companyTable: {
+      organization: r.one.organizationTable({
+        from: r.companyTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      contacts: r.many.contactTable({
+        from: r.companyTable.id,
+        to: r.contactTable.companyId,
+      }),
+      attributeValues: r.many.companyAttributeValueTable({
+        from: r.companyTable.id,
+        to: r.companyAttributeValueTable.companyId,
+      }),
+    },
+    contactTable: {
+      organization: r.one.organizationTable({
+        from: r.contactTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      company: r.one.companyTable({
+        from: r.contactTable.companyId,
+        to: r.companyTable.id,
+      }),
+      posts: r.many.postTable({
+        from: r.contactTable.id,
+        to: r.postTable.contactId,
+      }),
+      attributeValues: r.many.contactAttributeValueTable({
+        from: r.contactTable.id,
+        to: r.contactAttributeValueTable.contactId,
+      }),
+    },
+    contactAttributeDefinitionTable: {
+      organization: r.one.organizationTable({
+        from: r.contactAttributeDefinitionTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      values: r.many.contactAttributeValueTable({
+        from: r.contactAttributeDefinitionTable.id,
+        to: r.contactAttributeValueTable.attributeId,
+      }),
+    },
+    contactAttributeValueTable: {
+      contact: r.one.contactTable({
+        from: r.contactAttributeValueTable.contactId,
+        to: r.contactTable.id,
+      }),
+      attribute: r.one.contactAttributeDefinitionTable({
+        from: r.contactAttributeValueTable.attributeId,
+        to: r.contactAttributeDefinitionTable.id,
+      }),
+    },
+    companyAttributeDefinitionTable: {
+      organization: r.one.organizationTable({
+        from: r.companyAttributeDefinitionTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      values: r.many.companyAttributeValueTable({
+        from: r.companyAttributeDefinitionTable.id,
+        to: r.companyAttributeValueTable.attributeId,
+      }),
+    },
+    companyAttributeValueTable: {
+      company: r.one.companyTable({
+        from: r.companyAttributeValueTable.companyId,
+        to: r.companyTable.id,
+      }),
+      attribute: r.one.companyAttributeDefinitionTable({
+        from: r.companyAttributeValueTable.attributeId,
+        to: r.companyAttributeDefinitionTable.id,
       }),
     },
     siteTable: {
