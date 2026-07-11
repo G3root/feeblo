@@ -2,10 +2,17 @@ import * as Schema from "effect/Schema";
 
 import { PolicyDeniedError } from "../policy";
 import {
-  BadRequestError,
   InternalServerError,
   UnauthorizedError,
 } from "../rpc-errors";
+
+export class DataValidationError extends Schema.TaggedErrorClass<DataValidationError>()(
+  "DataValidationError",
+  {
+    message: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 400, identifier: "DataValidationError" }
+) {}
 
 export class ContactNotFoundError extends Schema.TaggedErrorClass<ContactNotFoundError>()(
   "ContactNotFoundError",
@@ -95,6 +102,7 @@ export const ContactServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  DataValidationError,
   ContactNotFoundError,
   CompanyNotFoundError,
   AttributeDefinitionNotFoundError,
@@ -108,5 +116,4 @@ export const ContactServiceErrors = Schema.Union([
   FailedToUpdateAttributeDefinitionError,
   FailedToDeleteAttributeDefinitionError,
   FailedToUpsertAttributeValueError,
-  BadRequestError,
 ]);

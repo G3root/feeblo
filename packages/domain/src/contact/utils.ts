@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 
-import { BadRequestError } from "../rpc-errors";
+import { DataValidationError } from "./errors";
 import type {
   TCommonCompanyFields,
   TCommonContactFields,
@@ -213,11 +213,11 @@ const valueSchemaForDefinition = (
 const validateSingleAttribute = (
   definition: AttributeDefinition,
   raw: unknown
-): Effect.Effect<AttributeValue, BadRequestError> =>
+): Effect.Effect<AttributeValue, DataValidationError> =>
   Effect.gen(function* () {
     if (raw === null || raw === undefined) {
       if (definition.isRequired) {
-        return yield* new BadRequestError({
+        return yield* new DataValidationError({
           message: `Missing required attribute "${definition.key}"`,
         });
       }
@@ -228,7 +228,7 @@ const validateSingleAttribute = (
     return yield* S.decodeUnknownEffect(schema)(raw).pipe(
       Effect.mapError(
         (error: S.SchemaError) =>
-          new BadRequestError({
+          new DataValidationError({
             message: `Invalid value for attribute "${definition.key}": ${error.message}`,
           })
       )
@@ -238,12 +238,12 @@ const validateSingleAttribute = (
 const validateRequiredAttributes = (
   definitions: readonly AttributeDefinition[],
   data: Record<string, unknown>
-): Effect.Effect<void, BadRequestError> => {
+): Effect.Effect<void, DataValidationError> => {
   const missing = definitions
     .filter((d) => d.isRequired && !(d.key in data))
     .map((d) => `Missing required attribute "${d.key}"`);
   return missing.length > 0
-    ? Effect.fail(new BadRequestError({ message: missing.join("; ") }))
+    ? Effect.fail(new DataValidationError({ message: missing.join("; ") }))
     : Effect.void;
 };
 
@@ -251,12 +251,12 @@ const parseCustomAttributes = (
   data: Record<string, unknown>,
   definitions: readonly AttributeDefinition[],
   knownFields: ReadonlySet<string>
-): Effect.Effect<ParsedAttribute[], BadRequestError> =>
+): Effect.Effect<ParsedAttribute[], DataValidationError> =>
   Effect.gen(function* () {
     yield* validateRequiredAttributes(definitions, data);
 
     const defMap = new Map(definitions.map((d) => [d.key, d]));
-    const effects: Effect.Effect<ParsedAttribute, BadRequestError>[] = [];
+    const effects: Effect.Effect<ParsedAttribute, DataValidationError>[] = [];
 
     for (const [key, raw] of Object.entries(data)) {
       if (knownFields.has(key)) {
@@ -287,24 +287,24 @@ const parseCustomAttributes = (
 export const parseContactCustomAttributes = (
   data: Record<string, unknown>,
   definitions: readonly TContactAttributeDefinition[]
-): Effect.Effect<ParsedAttribute[], BadRequestError> =>
+): Effect.Effect<ParsedAttribute[], DataValidationError> =>
   parseCustomAttributes(data, definitions, KNOWN_CONTACT_FIELDS);
 
 export const parseCompanyCustomAttributes = (
   data: Record<string, unknown>,
   definitions: readonly TCompanyAttributeDefinition[]
-): Effect.Effect<ParsedAttribute[], BadRequestError> =>
+): Effect.Effect<ParsedAttribute[], DataValidationError> =>
   parseCustomAttributes(data, definitions, KNOWN_COMPANY_FIELDS);
 
 const decodeCommonFields = <A>(
   schema: S.Codec<A>,
   kind: string,
   fields: Record<string, unknown>
-): Effect.Effect<A, BadRequestError> =>
+): Effect.Effect<A, DataValidationError> =>
   S.decodeUnknownEffect(schema)(fields, { onExcessProperty: "ignore" }).pipe(
     Effect.mapError(
       (error: S.SchemaError) =>
-        new BadRequestError({
+        new DataValidationError({
           message: `Invalid ${kind} fields: ${error.message}`,
         })
     )
@@ -318,7 +318,7 @@ const asRecord = (raw: unknown): Record<string, unknown> =>
 const parseSingleCompany = (
   raw: unknown,
   definitions: readonly TCompanyAttributeDefinition[]
-): Effect.Effect<ParsedCompanyAttributes, BadRequestError> =>
+): Effect.Effect<ParsedCompanyAttributes, DataValidationError> =>
   Effect.gen(function* () {
     const input = asRecord(raw);
 
@@ -339,7 +339,7 @@ const parseSingleCompany = (
 const parseCompanies = (
   companies: unknown,
   definitions: readonly TCompanyAttributeDefinition[]
-): Effect.Effect<ParsedCompanyAttributes[], BadRequestError> =>
+): Effect.Effect<ParsedCompanyAttributes[], DataValidationError> =>
   Array.isArray(companies) && companies.length > 0
     ? Effect.all(
         companies.map((company) => parseSingleCompany(company, definitions)),
@@ -351,7 +351,7 @@ export function parsePersonAttributes(
   data: unknown,
   contactAttributeDefinitions: readonly TContactAttributeDefinition[],
   companyAttributeDefinitions: readonly TCompanyAttributeDefinition[]
-): Effect.Effect<ParsedPersonAttributes, BadRequestError> {
+): Effect.Effect<ParsedPersonAttributes, DataValidationError> {
   return Effect.gen(function* () {
     const input = asRecord(data);
 

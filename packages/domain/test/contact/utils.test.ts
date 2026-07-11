@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import { DataValidationError } from "../../src/contact/errors";
 import type {
   TCompanyAttributeDefinition,
   TContactAttributeDefinition,
@@ -11,7 +12,6 @@ import {
   parsePersonAttributes,
   toMutableConfig,
 } from "../../src/contact/utils";
-import { BadRequestError } from "../../src/rpc-errors";
 
 const now = new Date();
 
@@ -246,8 +246,8 @@ describe("parseContactCustomAttributes", () => {
       await Effect.runPromise(parseContactCustomAttributes({}, [def]));
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).message).toContain(
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect((error as DataValidationError).message).toContain(
         'Missing required attribute "requiredField"'
       );
     }
@@ -264,8 +264,8 @@ describe("parseContactCustomAttributes", () => {
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).message).toContain(
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect((error as DataValidationError).message).toContain(
         'Invalid value for attribute "age"'
       );
     }
@@ -297,7 +297,7 @@ describe("parseContactCustomAttributes", () => {
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
+      expect(error).toBeInstanceOf(DataValidationError);
     }
   });
 
@@ -390,7 +390,7 @@ describe("parseContactCustomAttributes", () => {
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
+      expect(error).toBeInstanceOf(DataValidationError);
     }
   });
 });
@@ -449,7 +449,7 @@ describe("parseCompanyCustomAttributes", () => {
       await Effect.runPromise(parseCompanyCustomAttributes({}, [def]));
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
+      expect(error).toBeInstanceOf(DataValidationError);
     }
   });
 });
@@ -482,8 +482,8 @@ describe("parsePersonAttributes", () => {
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).message).toContain(
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect((error as DataValidationError).message).toContain(
         "Invalid contact fields"
       );
     }
@@ -496,8 +496,8 @@ describe("parsePersonAttributes", () => {
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
-      expect((error as BadRequestError).message).toContain(
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect((error as DataValidationError).message).toContain(
         "Invalid contact fields"
       );
     }
@@ -615,7 +615,7 @@ describe("parsePersonAttributes", () => {
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestError);
+      expect(error).toBeInstanceOf(DataValidationError);
     }
   });
 
