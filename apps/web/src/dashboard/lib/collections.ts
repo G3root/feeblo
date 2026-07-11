@@ -925,12 +925,180 @@ export const jwtSecretCollection = createCollection(
   })
 );
 
+export const contactCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("contact"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ContactList({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const companyCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("company"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.CompanyList({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+//Todo scope
+export const contactAttributeDefinitionCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () =>
+      getOrganizationScopedQueryKey("contact-attribute-definition"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ContactAttributeDefinitionList({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+//Todo scope
+export const companyAttributeDefinitionCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () =>
+      getOrganizationScopedQueryKey("company-attribute-definition"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.CompanyAttributeDefinitionList({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const contactAttributeValueCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const contactId = getEqFilterValue(parsed.filters, "contactId");
+
+      return contactId
+        ? getOrganizationScopedQueryKey(
+            "contact-attribute-value",
+            "contactId",
+            contactId
+          )
+        : getOrganizationScopedQueryKey("contact-attribute-value");
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const contactId = getEqFilterValue(parsed.filters, "contactId");
+
+      if (!contactId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ContactAttributeValueList({ contactId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const companyAttributeValueCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const companyId = getEqFilterValue(parsed.filters, "companyId");
+
+      return companyId
+        ? getOrganizationScopedQueryKey(
+            "company-attribute-value",
+            "companyId",
+            companyId
+          )
+        : getOrganizationScopedQueryKey("company-attribute-value");
+    },
+    syncMode: "on-demand",
+    queryFn: async (ctx) => {
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const companyId = getEqFilterValue(parsed.filters, "companyId");
+
+      if (!companyId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.CompanyAttributeValueList({ companyId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const dashboardCollections = {
   boardCollection,
   changelogCollection,
   changelogTagCollection,
   commentCollection,
   commentReactionCollection,
+  companyCollection,
+  companyAttributeDefinitionCollection,
+  companyAttributeValueCollection,
+  contactAttributeDefinitionCollection,
+  contactAttributeValueCollection,
+  contactCollection,
   invitationsCollection,
   jwtSecretCollection,
   membersCollection,

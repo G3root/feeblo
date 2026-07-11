@@ -63,7 +63,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
         repository
           .findManyContacts(args.organizationId)
           .pipe(
-            Effect.flatMap(decodeDbRows(Contact)),
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
             withRemapDbErrors("Contact", "select")
           ),
@@ -90,7 +89,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
         repository
           .findManyCompanies(args.organizationId)
           .pipe(
-            Effect.flatMap(decodeDbRows(Company)),
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
             withRemapDbErrors("Company", "select")
           ),
@@ -108,7 +106,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
         repository
           .findContactAttributeDefinitions(args.organizationId)
           .pipe(
-            Effect.flatMap(decodeDbRows(ContactAttributeDefinition)),
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
             withRemapDbErrors("ContactAttributeDefinition", "select")
           ),
@@ -138,7 +135,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
         repository
           .findCompanyAttributeDefinitions(args.organizationId)
           .pipe(
-            Effect.flatMap(decodeDbRows(CompanyAttributeDefinition)),
             Policy.withPolicy(Policy.hasMembership(args.organizationId)),
             withRemapDbErrors("CompanyAttributeDefinition", "select")
           ),
