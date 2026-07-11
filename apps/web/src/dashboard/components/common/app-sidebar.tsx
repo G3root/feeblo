@@ -20,8 +20,9 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-
+import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
+  Building06Icon,
   Delete02Icon,
   Edit,
   Ellipsis,
@@ -33,6 +34,7 @@ import {
   Plus,
   PreferenceVerticalIcon,
   SparklesIcon,
+  Users,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -45,7 +47,6 @@ import {
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { NavUser } from "./nav-user";
@@ -146,6 +147,36 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   >
                     <HugeiconsIcon icon={LayoutThreeColumnIcon} />
                     <span>Roadmap</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/contact`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/contact"
+                  >
+                    <HugeiconsIcon icon={Users} />
+                    <span>Contacts</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/company`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/company"
+                  >
+                    <HugeiconsIcon icon={Building06Icon} />
+                    <span>Companies</span>
                   </Link>
                 )}
               />

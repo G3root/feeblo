@@ -1,4 +1,4 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
@@ -14,12 +14,18 @@ import type {
   TCompanyAttributeDefinition,
   TContactAttributeDefinition,
 } from "../contact/schema";
+import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
+import { PostRepository } from "../post/repository";
 import { PostStatusRepository } from "../post-status/repository";
-import { InternalServerError, NotFoundError } from "../rpc-errors";
+import {
+  InternalServerError,
+  NotFoundError,
+  withRemapDbErrors,
+} from "../rpc-errors";
 
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
@@ -52,15 +58,19 @@ export const WidgetApiLive = HttpApiBuilder.group(
       .handle("createFeedback", ({ payload }) =>
         Effect.gen(function* () {
           const { boardId, organizationId, title, content, token } = payload;
+
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
+          const jwtSecretRepository = yield* JwtSecretRepository;
+          const contactRepository = yield* ContactRepository;
+          const postRepository = yield* PostRepository;
 
           const board = yield* boardRepository.getById({
             id: boardId,
             organizationId,
           });
 
-          if (board._tag === "None") {
+          if (Option.isNone(board)) {
             return yield* new NotFoundError({ message: "Board not found" });
           }
 
@@ -85,136 +95,116 @@ export const WidgetApiLive = HttpApiBuilder.group(
             sanitizeMarkdown(content);
           const id = yield* PostId.generate;
           const now = new Date();
+          const excerpt = htmlToExcerpt(sanitizedHtml);
+          const slug = slugify(title);
 
-          return yield* transaction(
+          let parsedContact: ParsedPersonAttributes | undefined;
+
+          if (token) {
+            const secrets = yield* jwtSecretRepository.getSecretsForOrg({
+              organizationId,
+            });
+
+            if (secrets.length > 0) {
+              const jwtPayload = yield* verifyJwt(
+                token,
+                secrets.map((s) => s.secret)
+              );
+
+              const contactDefs =
+                (yield* contactRepository.findContactAttributeDefinitions(
+                  organizationId
+                )) as unknown as readonly TContactAttributeDefinition[];
+              const companyDefs =
+                (yield* contactRepository.findCompanyAttributeDefinitions(
+                  organizationId
+                )) as unknown as readonly TCompanyAttributeDefinition[];
+
+              parsedContact = yield* parsePersonAttributes(
+                jwtPayload,
+                contactDefs,
+                companyDefs
+              );
+            }
+          }
+
+          yield* transaction(
             Effect.gen(function* () {
-              const contactRepository = yield* ContactRepository;
               let contactId: string | undefined;
 
-              if (token) {
-                const jwtRepository = yield* JwtSecretRepository;
-                const secrets = yield* jwtRepository.getSecretsForOrg({
-                  organizationId,
-                });
-                if (secrets.length > 0) {
-                  const jwtPayload = yield* verifyJwt(
-                    token,
-                    secrets.map((s) => s.secret)
-                  );
+              if (parsedContact) {
+                let linkedCompanyId: string | undefined;
 
-                  const contactDefs =
-                    (yield* contactRepository.findContactAttributeDefinitions(
-                      organizationId
-                    )) as unknown as readonly TContactAttributeDefinition[];
-                  const companyDefs =
-                    (yield* contactRepository.findCompanyAttributeDefinitions(
-                      organizationId
-                    )) as unknown as readonly TCompanyAttributeDefinition[];
-
-                  const parsed = yield* parsePersonAttributes(
-                    jwtPayload,
-                    contactDefs,
-                    companyDefs
-                  );
-
-                  let linkedCompanyId: string | undefined;
-
-                  for (const company of parsed.companies) {
-                    const upsertedCompany =
-                      yield* contactRepository.upsertCompany({
-                        organizationId,
-                        externalId: company.commonFields.id,
-                        name: company.commonFields.name,
-                      });
-                    linkedCompanyId = upsertedCompany.id;
-
-                    for (const attr of company.customAttributes) {
-                      yield* contactRepository.upsertCompanyAttributeValue({
-                        companyId: upsertedCompany.id,
-                        attributeId: attr.definitionId,
-                        value: attr.value,
-                      });
-                    }
-                  }
-
-                  const contactOption =
-                    yield* contactRepository.upsertContact({
+                for (const company of parsedContact.companies) {
+                  const upsertedCompany =
+                    yield* contactRepository.upsertCompany({
                       organizationId,
-                      externalId: parsed.commonFields.userId,
-                      email: parsed.commonFields.email,
-                      name: parsed.commonFields.name,
-                      companyId: linkedCompanyId ?? null,
+                      externalId: company.commonFields.id,
+                      name: company.commonFields.name,
                     });
+                  linkedCompanyId = upsertedCompany.id;
 
-                  if (Option.isSome(contactOption)) {
-                    contactId = contactOption.value.id;
+                  for (const attr of company.customAttributes) {
+                    yield* contactRepository.upsertCompanyAttributeValue({
+                      companyId: upsertedCompany.id,
+                      attributeId: attr.definitionId,
+                      value: attr.value,
+                    });
+                  }
+                }
 
-                    for (const attr of parsed.customAttributes) {
-                      yield* contactRepository.upsertContactAttributeValue({
-                        contactId: contactOption.value.id,
-                        attributeId: attr.definitionId,
-                        value: attr.value,
-                      });
-                    }
+                const contactOption = yield* contactRepository.upsertContact({
+                  organizationId,
+                  externalId: parsedContact.commonFields.userId,
+                  email: parsedContact.commonFields.email,
+                  name: parsedContact.commonFields.name,
+                  companyId: linkedCompanyId ?? null,
+                });
+
+                if (Option.isSome(contactOption)) {
+                  contactId = contactOption.value.id;
+
+                  for (const attr of parsedContact.customAttributes) {
+                    yield* contactRepository.upsertContactAttributeValue({
+                      contactId: contactOption.value.id,
+                      attributeId: attr.definitionId,
+                      value: attr.value,
+                    });
                   }
                 }
               }
 
-              const db = yield* currentDb;
-              const created = yield* db
-                .insert(schema.postTable)
-                .values({
-                  id,
-                  boardId,
-                  organizationId,
-                  title,
-                  content: sanitizedContent,
-                  excerpt: htmlToExcerpt(sanitizedHtml),
-                  statusId: defaultStatus.id,
-                  slug: slugify(title),
-                  source: "WIDGET",
-                  ...(contactId && { contactId }),
-                  createdAt: now,
-                  updatedAt: now,
-                })
-                .returning({
-                  id: schema.postTable.id,
-                  slug: schema.postTable.slug,
-                  title: schema.postTable.title,
-                  boardId: schema.postTable.boardId,
-                  organizationId: schema.postTable.organizationId,
-                  createdAt: schema.postTable.createdAt,
-                });
-
-              const row = created[0];
-              if (!row) {
-                return yield* new InternalServerError({
-                  message: "Failed to create feedback",
-                });
-              }
-
-              return row;
+              yield* postRepository.create({
+                id,
+                boardId,
+                organizationId,
+                title,
+                content: sanitizedContent,
+                statusId: defaultStatus.id,
+                excerpt,
+                contactId: contactId ?? null,
+                source: "WIDGET",
+              });
             })
           );
+
+          return {
+            id,
+            slug,
+            title,
+            boardId,
+            organizationId,
+            createdAt: now,
+          };
         }).pipe(
           Effect.provide([
             BoardRepository.layer,
             ContactRepository.layer,
             JwtSecretRepository.layer,
+            PostRepository.layer,
             PostStatusRepository.layer,
           ]),
-          Effect.catchIf(
-            (e) =>
-              Predicate.isTagged(e, "EffectDrizzleQueryError") ||
-              Predicate.isTagged(e, "SqlError") ||
-              Predicate.isTagged(e, "LegidError"),
-            () =>
-              Effect.fail(
-                new InternalServerError({
-                  message: "Failed to create feedback",
-                })
-              )
-          )
+          withRemapDbErrors("Feedback", "create")
         )
       )
 );

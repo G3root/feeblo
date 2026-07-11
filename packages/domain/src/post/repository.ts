@@ -26,12 +26,14 @@ interface TPostDelete {
 
 interface TPostCreate {
   boardId: string;
+  contactId?: string | null;
   content: string;
-  creatorId: string;
-  creatorMemberId?: string;
+  creatorId?: string | null;
+  creatorMemberId?: string | null;
   excerpt?: string;
   id: string;
   organizationId: string;
+  source?: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "PUBLIC_BOARD";
   statusId: string;
   title: string;
 }
@@ -305,28 +307,34 @@ const makePostRepository = Effect.gen(function* () {
       statusId,
       creatorId,
       creatorMemberId,
+      contactId,
+      source,
       excerpt: inputExcerpt,
-    }: TPostCreate) => {
-      const excerpt = inputExcerpt ?? htmlToExcerpt(content);
+    }: TPostCreate) =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const excerpt = inputExcerpt ?? htmlToExcerpt(content);
 
-      return db
-        .insert(schema.postTable)
-        .values({
-          id,
-          boardId,
-          organizationId,
-          title,
-          content,
-          excerpt,
-          statusId,
-          creatorId,
-          ...(creatorMemberId ? { creatorMemberId } : {}),
-          createdAt: new Date(),
-          slug: slugify(title),
-          updatedAt: new Date(),
-        })
-        .pipe(Effect.asVoid);
-    },
+        return yield* db
+          .insert(schema.postTable)
+          .values({
+            id,
+            boardId,
+            organizationId,
+            title,
+            content,
+            excerpt,
+            statusId,
+            creatorId: creatorId ?? null,
+            creatorMemberId: creatorMemberId ?? null,
+            contactId: contactId ?? null,
+            source: source ?? "DASHBOARD",
+            createdAt: new Date(),
+            slug: slugify(title),
+            updatedAt: new Date(),
+          })
+          .pipe(Effect.asVoid);
+      }),
 
     merge: ({ organizationId, sourcePostId, targetPostId }: TPostMerge) =>
       db.transaction((tx) =>
@@ -507,6 +515,9 @@ const makePostRepository = Effect.gen(function* () {
   };
 });
 
+/**
+ * @effect-expect-leaking Database
+ */
 export class PostRepository extends Context.Service<PostRepository>()(
   "PostRepository",
   {

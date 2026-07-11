@@ -115,6 +115,9 @@ export interface TransactionService {
   readonly db: PgDrizzle.EffectPgDatabase;
 }
 
+/**
+ * @effect-leakable-service
+ */
 export class TransactionContext extends Context.Service<
   TransactionContext,
   TransactionService
@@ -126,7 +129,7 @@ export class TransactionContext extends Context.Service<
 export const currentDb: Effect.Effect<
   PgDrizzle.EffectPgDatabase,
   never,
-  Database
+  Database | TransactionContext
 > = Effect.gen(function* () {
   const maybeTx = yield* Effect.serviceOption(TransactionContext);
   if (Option.isSome(maybeTx)) {
