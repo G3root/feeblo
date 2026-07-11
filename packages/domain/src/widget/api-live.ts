@@ -1,23 +1,25 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
-
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-
 import { BoardRepository } from "../board/repository";
+import { DataValidationError } from "../contact/errors";
+import { ContactRepository } from "../contact/repository";
+import type {
+  TCompanyAttributeDefinition,
+  TContactAttributeDefinition,
+} from "../contact/schema";
+import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import { PostStatusRepository } from "../post-status/repository";
-import {
-  BadRequestError,
-  InternalServerError,
-  NotFoundError,
-} from "../rpc-errors";
+import { InternalServerError, NotFoundError } from "../rpc-errors";
 
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
@@ -52,20 +54,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const { boardId, organizationId, title, content, token } = payload;
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
-          const db = yield* currentDb;
-
-          if (token) {
-            const jwtRepository = yield* JwtSecretRepository;
-            const secrets = yield* jwtRepository.getSecretsForOrg({
-              organizationId,
-            });
-            if (secrets.length > 0) {
-              yield* verifyJwt(
-                token,
-                secrets.map((s) => s.secret)
-              );
-            }
-          }
 
           const board = yield* boardRepository.getById({
             id: boardId,
@@ -77,7 +65,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           }
 
           if (board.value.visibility !== "PUBLIC") {
-            return yield* new BadRequestError({
+            return yield* new DataValidationError({
               message: "Board is not public",
             });
           }
@@ -98,40 +86,120 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const id = yield* PostId.generate;
           const now = new Date();
 
-          const created = yield* db
-            .insert(schema.postTable)
-            .values({
-              id,
-              boardId,
-              organizationId,
-              title,
-              content: sanitizedContent,
-              excerpt: htmlToExcerpt(sanitizedHtml),
-              statusId: defaultStatus.id,
-              slug: slugify(title),
-              createdAt: now,
-              updatedAt: now,
+          return yield* transaction(
+            Effect.gen(function* () {
+              const contactRepository = yield* ContactRepository;
+              let contactId: string | undefined;
+
+              if (token) {
+                const jwtRepository = yield* JwtSecretRepository;
+                const secrets = yield* jwtRepository.getSecretsForOrg({
+                  organizationId,
+                });
+                if (secrets.length > 0) {
+                  const jwtPayload = yield* verifyJwt(
+                    token,
+                    secrets.map((s) => s.secret)
+                  );
+
+                  const contactDefs =
+                    (yield* contactRepository.findContactAttributeDefinitions(
+                      organizationId
+                    )) as unknown as readonly TContactAttributeDefinition[];
+                  const companyDefs =
+                    (yield* contactRepository.findCompanyAttributeDefinitions(
+                      organizationId
+                    )) as unknown as readonly TCompanyAttributeDefinition[];
+
+                  const parsed = yield* parsePersonAttributes(
+                    jwtPayload,
+                    contactDefs,
+                    companyDefs
+                  );
+
+                  let linkedCompanyId: string | undefined;
+
+                  for (const company of parsed.companies) {
+                    const upsertedCompany =
+                      yield* contactRepository.upsertCompany({
+                        organizationId,
+                        externalId: company.commonFields.id,
+                        name: company.commonFields.name,
+                      });
+                    linkedCompanyId = upsertedCompany.id;
+
+                    for (const attr of company.customAttributes) {
+                      yield* contactRepository.upsertCompanyAttributeValue({
+                        companyId: upsertedCompany.id,
+                        attributeId: attr.definitionId,
+                        value: attr.value,
+                      });
+                    }
+                  }
+
+                  const contactOption =
+                    yield* contactRepository.upsertContact({
+                      organizationId,
+                      externalId: parsed.commonFields.userId,
+                      email: parsed.commonFields.email,
+                      name: parsed.commonFields.name,
+                      companyId: linkedCompanyId ?? null,
+                    });
+
+                  if (Option.isSome(contactOption)) {
+                    contactId = contactOption.value.id;
+
+                    for (const attr of parsed.customAttributes) {
+                      yield* contactRepository.upsertContactAttributeValue({
+                        contactId: contactOption.value.id,
+                        attributeId: attr.definitionId,
+                        value: attr.value,
+                      });
+                    }
+                  }
+                }
+              }
+
+              const db = yield* currentDb;
+              const created = yield* db
+                .insert(schema.postTable)
+                .values({
+                  id,
+                  boardId,
+                  organizationId,
+                  title,
+                  content: sanitizedContent,
+                  excerpt: htmlToExcerpt(sanitizedHtml),
+                  statusId: defaultStatus.id,
+                  slug: slugify(title),
+                  source: "WIDGET",
+                  ...(contactId && { contactId }),
+                  createdAt: now,
+                  updatedAt: now,
+                })
+                .returning({
+                  id: schema.postTable.id,
+                  slug: schema.postTable.slug,
+                  title: schema.postTable.title,
+                  boardId: schema.postTable.boardId,
+                  organizationId: schema.postTable.organizationId,
+                  createdAt: schema.postTable.createdAt,
+                });
+
+              const row = created[0];
+              if (!row) {
+                return yield* new InternalServerError({
+                  message: "Failed to create feedback",
+                });
+              }
+
+              return row;
             })
-            .returning({
-              id: schema.postTable.id,
-              slug: schema.postTable.slug,
-              title: schema.postTable.title,
-              boardId: schema.postTable.boardId,
-              organizationId: schema.postTable.organizationId,
-              createdAt: schema.postTable.createdAt,
-            });
-
-          const row = created[0];
-          if (!row) {
-            return yield* new InternalServerError({
-              message: "Failed to create feedback",
-            });
-          }
-
-          return row;
+          );
         }).pipe(
           Effect.provide([
             BoardRepository.layer,
+            ContactRepository.layer,
             JwtSecretRepository.layer,
             PostStatusRepository.layer,
           ]),

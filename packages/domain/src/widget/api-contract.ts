@@ -6,11 +6,11 @@ import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 
 import {
-  BadRequestError,
   InternalServerError,
   NotFoundError,
   UnauthorizedError,
 } from "../rpc-errors";
+import { DataValidationError } from "../contact/errors";
 import {
   WidgetBoard,
   WidgetFeedbackCreate,
@@ -23,7 +23,7 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
       payload: WidgetFeedbackCreate,
       success: WidgetFeedbackResponse,
       error: Schema.Union([
-        BadRequestError,
+        DataValidationError,
         NotFoundError,
         InternalServerError,
         UnauthorizedError,
@@ -42,7 +42,7 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
         organizationId: Schema.String,
       },
       success: Schema.Array(WidgetBoard),
-      error: Schema.Union([BadRequestError, InternalServerError]),
+      error: Schema.Union([DataValidationError, InternalServerError]),
     })
       .annotate(OpenApi.Title, "List Boards")
       .annotate(OpenApi.Summary, "List all public boards")
