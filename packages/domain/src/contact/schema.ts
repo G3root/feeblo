@@ -8,7 +8,20 @@ import {
 } from "@feeblo/id";
 import * as S from "effect/Schema";
 
-export const CommonContactFields = S.Struct({});
+export const CommonContactFields = S.Struct({
+  userId: S.String,
+  email: S.String,
+  name: S.String,
+});
+
+export type TCommonContactFields = S.Schema.Type<typeof CommonContactFields>;
+
+export const CommonCompanyFields = S.Struct({
+  id: S.String,
+  name: S.String,
+});
+
+export type TCommonCompanyFields = S.Schema.Type<typeof CommonCompanyFields>;
 
 export const ContactUpsert = S.Struct({
   organizationId: S.String,

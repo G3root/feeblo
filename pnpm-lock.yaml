@@ -655,12 +655,18 @@ importers:
         specifier: 'catalog:'
         version: 6.2.3
     devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.66)(vitest@3.2.6(@types/debug@4.1.13)(@types/node@25.6.0)(happy-dom@20.10.6)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.2(@types/node@25.6.0)(typescript@6.0.3))(tsx@4.21.0)(yaml@2.8.4))
       '@feeblo/config':
         specifier: workspace:*
         version: link:../config
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/debug@4.1.13)(@types/node@25.6.0)(happy-dom@20.10.6)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.2(@types/node@25.6.0)(typescript@6.0.3))(tsx@4.21.0)(yaml@2.8.4)
 
   packages/feedback-widget:
     dependencies:
@@ -1961,6 +1967,12 @@ packages:
     resolution: {integrity: sha512-PEw/R5htFb16KRDwIbp1uRs6STQpj08HAtOTSH9KyZOTsKxO4Qsn01x7g0bqNWNMnBTOAxogqcnbDLHOA+rNFg==}
     peerDependencies:
       effect: ^4.0.0-beta.93
+
+  '@effect/vitest@4.0.0-beta.94':
+    resolution: {integrity: sha512-pCjcUMTBizn2wibiyP9Tl3VvGEkplvIA33iCvmK3y/toi54IWE3PNL7d0JkZvEaKV2OoaKVTaH1dOybRtpBuQw==}
+    peerDependencies:
+      effect: ^4.0.0-beta.94
+      vitest: ^3.0.0 || ^4.0.0
 
   '@egoist/tailwindcss-icons@1.9.2':
     resolution: {integrity: sha512-I6XsSykmhu2cASg5Hp/ICLsJ/K/1aXPaSKjgbWaNp2xYnb4We/arWMmkhhV+9CglOFCUbqx0A3mM2kWV32ZIhw==}
@@ -11289,6 +11301,11 @@ snapshots:
     dependencies:
       '@electric-sql/pglite': 0.4.6
       effect: 4.0.0-beta.66
+
+  '@effect/vitest@4.0.0-beta.94(effect@4.0.0-beta.66)(vitest@3.2.6(@types/debug@4.1.13)(@types/node@25.6.0)(happy-dom@20.10.6)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.2(@types/node@25.6.0)(typescript@6.0.3))(tsx@4.21.0)(yaml@2.8.4))':
+    dependencies:
+      effect: 4.0.0-beta.66
+      vitest: 3.2.6(@types/debug@4.1.13)(@types/node@25.6.0)(happy-dom@20.10.6)(jiti@2.7.0)(lightningcss@1.32.0)(msw@2.14.2(@types/node@25.6.0)(typescript@6.0.3))(tsx@4.21.0)(yaml@2.8.4)
 
   '@egoist/tailwindcss-icons@1.9.2(tailwindcss@4.2.4)':
     dependencies:

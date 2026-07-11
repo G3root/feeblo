@@ -157,10 +157,14 @@
     "jose": "catalog:"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.94",
     "@feeblo/config": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^3.2.6"
   }
 }
