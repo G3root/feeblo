@@ -5,6 +5,7 @@ export const CommonContactFields = S.Struct({
   userId: S.String,
   email: S.String,
   name: S.String,
+  avatar: S.optional(S.String),
 });
 
 export type TCommonContactFields = S.Schema.Type<typeof CommonContactFields>;
@@ -12,6 +13,8 @@ export type TCommonContactFields = S.Schema.Type<typeof CommonContactFields>;
 export const CommonCompanyFields = S.Struct({
   id: S.String,
   name: S.String,
+  avatar: S.optional(S.String),
+  externalCreatedAt: S.optional(S.DateFromString),
 });
 
 export type TCommonCompanyFields = S.Schema.Type<typeof CommonCompanyFields>;
@@ -22,6 +25,7 @@ export const ContactUpsert = S.Struct({
   email: S.optional(S.String),
   name: S.optional(S.String),
   phone: S.optional(S.String),
+  avatar: S.optional(S.String),
   companyId: S.optional(S.NullOr(S.String)),
   userId: S.optional(S.NullOr(S.String)),
 });
@@ -35,6 +39,7 @@ export const Contact = S.Struct({
   email: S.NullOr(S.String),
   name: S.NullOr(S.String),
   phone: S.NullOr(S.String),
+  avatar: S.NullOr(S.String),
   companyId: S.NullOr(S.String),
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
@@ -46,7 +51,8 @@ export const CompanyUpsert = S.Struct({
   organizationId: S.String,
   externalId: S.optional(S.String),
   name: S.String,
-  domain: S.optional(S.String),
+  avatar: S.optional(S.String),
+  externalCreatedAt: S.optional(S.DateFromString),
 });
 
 export type TCompanyUpsert = S.Schema.Type<typeof CompanyUpsert>;
@@ -56,7 +62,8 @@ export const Company = S.Struct({
   organizationId: S.String,
   externalId: S.NullOr(S.String),
   name: S.String,
-  domain: S.NullOr(S.String),
+  avatar: S.NullOr(S.String),
+  externalCreatedAt: S.NullOr(S.DateFromString),
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

@@ -25,19 +25,21 @@ describe("JWT payload parsing", () => {
         userId: "user_123",
         email: "test@example.com",
         name: "Alice",
-        profilePicture: "https://example.com/avatar.png",
-        title: "Product Manager",
-        plan: "Premium",
-        tags: ["Tag name1"],
-        locale: "en",
+        avatar: "https://example.com/avatar.png",
+        customFields: {
+          title: "Product Manager",
+          plan: "Premium",
+        },
         companies: [
           {
             id: "987654321",
             name: "Business Inc. 23",
-            monthlySpend: 500,
+            avatar: "https://example.com/company.png",
             createdAt: "2023-05-19T15:35:49.915Z",
-            industry: "Fintech",
-            location: "Canada",
+            customFields: {
+              industry: "Fintech",
+              location: "Canada",
+            },
           },
         ],
       };
@@ -50,12 +52,15 @@ describe("JWT payload parsing", () => {
         userId: "user_123",
         email: "test@example.com",
         name: "Alice",
+        avatar: "https://example.com/avatar.png",
       });
       expect(result.customAttributes).toEqual([]);
       expect(result.companies).toHaveLength(1);
       expect(result.companies[0]?.commonFields).toEqual({
         id: "987654321",
         name: "Business Inc. 23",
+        avatar: "https://example.com/company.png",
+        externalCreatedAt: new Date("2023-05-19T15:35:49.915Z"),
       });
     })
   );

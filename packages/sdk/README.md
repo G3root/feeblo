@@ -18,7 +18,7 @@ For a no-build setup, load it from a CDN as a regular script tag (see [Auto-init
 import { Feeblo } from "@feeblo/sdk";
 
 Feeblo.init("org_123", {
-  user: { id: "u_1", email: "ada@example.com", firstName: "Ada" },
+  user: { id: "u_1", email: "ada@example.com", name: "Ada Lovelace" },
 }).setBoard("roadmap");
 ```
 
@@ -50,17 +50,28 @@ import { Feeblo, type UserIdentity } from "@feeblo/sdk";
 const user: UserIdentity = {
   id: "u_1",
   email: "ada@example.com",
-  firstName: "Ada",
-  lastName: "Lovelace",
+  name: "Ada Lovelace",
   avatar: "https://example.com/ada.png",
-  companies: [{ id: "c_1", name: "Acme", monthlySpend: 500 }],
+  customFields: { title: "Product Manager" },
+  companies: [
+    {
+      id: "c_1",
+      name: "Acme",
+      avatar: "https://example.com/acme.png",
+      customFields: { industry: "SaaS" },
+    },
+  ],
 };
 
 Feeblo.identify(user);
 ```
 
-`id` is required; all other fields are optional. `token` can be used to forward a
-session token to the widget.
+`id` is required; all other fields are optional.
+
+- Use `name` for the user's full name. `firstName` and `lastName` are still
+  accepted but deprecated; they are normalized into `name` when provided.
+- `token` is **required** for submitting feedback. It must be a JWT signed by
+  your organization's Feeblo secret (see [Server-side JWT](#server-side-jwt)).
 
 ### Typed organization IDs
 
@@ -75,6 +86,51 @@ Feeblo.init(ORG);
 ```
 
 Plain strings remain accepted everywhere — the brand is strictly opt-in.
+
+## Server-side JWT
+
+Feedback submissions require an authenticated user. Generate a JWT on your
+server using your organization's Feeblo secret (found in Settings → Security):
+
+```ts
+import jwt from "jsonwebtoken";
+
+const token = jwt.sign(
+  {
+    userId: user.id,        // required
+    email: user.email,      // required
+    name: user.name,        // required
+    companies: [            // optional
+      { id: company.id, name: company.name },
+    ],
+  },
+  process.env.FEEBLO_ORG_SECRET,
+  { algorithm: "HS256" }
+);
+```
+
+Then pass the token to the SDK:
+
+```ts
+Feeblo.identify({
+  id: user.id,
+  email: user.email,
+  name: user.name,
+  token,
+});
+```
+
+## Public board auto-login
+
+You can also use the same JWT to sign users into your public Feeblo board
+automatically. Redirect them to:
+
+```
+https://feedback.yourdomain.com/?ssoToken=JWT
+```
+
+Feeblo will verify the token, create a session, and redirect the user back with
+the token removed from the URL.
 
 ## Triggers
 

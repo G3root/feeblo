@@ -1,7 +1,23 @@
+export type IdentityData = {
+  avatar?: string;
+  companies?: Array<{
+    id: string;
+    name: string;
+    avatar?: string;
+    customFields?: Record<string, unknown>;
+  }>;
+  customFields?: Record<string, unknown>;
+  email?: string;
+  id: string;
+  name?: string;
+  token: string;
+};
+
 export type ParentMessage =
   | { event: "SHOW" }
   | { event: "HIDE" }
-  | { event: "SET_BOARD"; data: { board: string } };
+  | { event: "SET_BOARD"; data: { board: string } }
+  | { event: "IDENTIFY"; data: IdentityData };
 
 export type ChildMessage =
   | { event: "READY" }
@@ -12,7 +28,12 @@ export type ChildMessage =
       data: { post: { boardId: string; boardName: string; title: string } };
     };
 
-const PARENT_EVENT_NAMES = new Set<string>(["SHOW", "HIDE", "SET_BOARD"]);
+const PARENT_EVENT_NAMES = new Set<string>([
+  "SHOW",
+  "HIDE",
+  "SET_BOARD",
+  "IDENTIFY",
+]);
 
 export function isParentMessage(value: unknown): value is ParentMessage {
   if (typeof value !== "object" || value === null || !("event" in value)) {

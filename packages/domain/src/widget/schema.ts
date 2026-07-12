@@ -40,3 +40,24 @@ export const WidgetFeedbackResponse = S.Struct({
 export type TWidgetFeedbackResponse = S.Schema.Type<
   typeof WidgetFeedbackResponse
 >;
+
+export const WidgetSsoSessionCreate = S.Struct({
+  organizationId: WorkspaceId.schema,
+  token: S.String,
+});
+
+export type TWidgetSsoSessionCreate = S.Schema.Type<
+  typeof WidgetSsoSessionCreate
+>;
+
+export const WidgetSsoSessionResponse = S.Struct({
+  token: S.String,
+  user: S.Struct({
+    id: S.String,
+    name: S.String,
+  }),
+});
+
+export type TWidgetSsoSessionResponse = S.Schema.Type<
+  typeof WidgetSsoSessionResponse
+>;

@@ -119,17 +119,17 @@ const KNOWN_CONTACT_FIELDS = new Set([
   "userId",
   "email",
   "name",
+  "avatar",
   "companies",
-  "profilePicture",
-  "tags",
-  "locale",
+  "customFields",
 ]);
 
 const KNOWN_COMPANY_FIELDS = new Set([
   "id",
   "name",
-  "monthlySpend",
+  "avatar",
   "createdAt",
+  "customFields",
 ]);
 
 type AttributeDefinition =
@@ -248,17 +248,17 @@ const validateRequiredAttributes = (
 };
 
 const parseCustomAttributes = (
-  data: Record<string, unknown>,
+  customFields: Record<string, unknown>,
   definitions: readonly AttributeDefinition[],
   knownFields: ReadonlySet<string>
 ): Effect.Effect<ParsedAttribute[], DataValidationError> =>
   Effect.gen(function* () {
-    yield* validateRequiredAttributes(definitions, data);
+    yield* validateRequiredAttributes(definitions, customFields);
 
     const defMap = new Map(definitions.map((d) => [d.key, d]));
     const effects: Effect.Effect<ParsedAttribute, DataValidationError>[] = [];
 
-    for (const [key, raw] of Object.entries(data)) {
+    for (const [key, raw] of Object.entries(customFields)) {
       if (knownFields.has(key)) {
         continue;
       }
@@ -288,16 +288,24 @@ export const parseContactCustomAttributes = (
   data: Record<string, unknown>,
   definitions: readonly TContactAttributeDefinition[]
 ): Effect.Effect<ParsedAttribute[], DataValidationError> =>
-  parseCustomAttributes(data, definitions, KNOWN_CONTACT_FIELDS);
+  parseCustomAttributes(
+    asRecord(data.customFields),
+    definitions,
+    KNOWN_CONTACT_FIELDS
+  );
 
 export const parseCompanyCustomAttributes = (
   data: Record<string, unknown>,
   definitions: readonly TCompanyAttributeDefinition[]
 ): Effect.Effect<ParsedAttribute[], DataValidationError> =>
-  parseCustomAttributes(data, definitions, KNOWN_COMPANY_FIELDS);
+  parseCustomAttributes(
+    asRecord(data.customFields),
+    definitions,
+    KNOWN_COMPANY_FIELDS
+  );
 
 const decodeCommonFields = <A>(
-  schema: S.Codec<A>,
+  schema: S.Codec<A, any, never, never>,
   kind: string,
   fields: Record<string, unknown>
 ): Effect.Effect<A, DataValidationError> =>
@@ -325,7 +333,12 @@ const parseSingleCompany = (
     const commonFields = yield* decodeCommonFields(
       CommonCompanyFields,
       "company",
-      { id: input.id, name: input.name }
+      {
+        id: input.id,
+        name: input.name,
+        avatar: input.avatar,
+        externalCreatedAt: input.createdAt,
+      }
     );
 
     const customAttributes = yield* parseCompanyCustomAttributes(
@@ -358,7 +371,12 @@ export function parsePersonAttributes(
     const commonFields = yield* decodeCommonFields(
       CommonContactFields,
       "contact",
-      { userId: input.userId, email: input.email, name: input.name }
+      {
+        userId: input.userId,
+        email: input.email,
+        name: input.name,
+        avatar: input.avatar,
+      }
     );
 
     const [customAttributes, companies] = yield* Effect.all(

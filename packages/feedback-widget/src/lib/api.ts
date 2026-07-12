@@ -55,10 +55,19 @@ export const createFeedBackAction = action(
 
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/`;
+    const body: Record<string, string> = {
+      boardId,
+      content,
+      title,
+      organizationId,
+    };
+    if (token) {
+      body.token = token;
+    }
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ boardId, content, title, organizationId, token }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

@@ -54,7 +54,8 @@ describe("normalizeUserIdentity", () => {
         {
           id: "comp_1",
           name: "Acme Inc",
-          monthlySpend: 1000,
+          avatar: "https://example.com/acme.png",
+          customFields: { industry: "Fintech" },
           extraField: "should be stripped",
         } as any,
       ],
@@ -64,7 +65,11 @@ describe("normalizeUserIdentity", () => {
     const company = result.companies?.[0]!;
     expect(company).toHaveProperty("id", "comp_1");
     expect(company).toHaveProperty("name", "Acme Inc");
-    expect(company).toHaveProperty("monthlySpend", 1000);
+    expect(company).toHaveProperty(
+      "avatar",
+      "https://example.com/acme.png"
+    );
+    expect(company).toHaveProperty("customFields", { industry: "Fintech" });
     expect(company).not.toHaveProperty("extraField");
   });
 
@@ -75,12 +80,25 @@ describe("normalizeUserIdentity", () => {
         {
           id: "comp_1",
           name: "Acme",
-          monthlySpend: undefined,
+          avatar: undefined,
+          customFields: undefined,
         },
       ],
     });
 
-    expect(result.companies?.[0]!).not.toHaveProperty("monthlySpend");
+    expect(result.companies?.[0]!).not.toHaveProperty("avatar");
+    expect(result.companies?.[0]!).not.toHaveProperty("customFields");
+  });
+
+  it("preserves user customFields", () => {
+    const result = normalizeUserIdentity({
+      id: "user_1",
+      customFields: { title: "Product Manager" },
+    });
+
+    expect(result).toHaveProperty("customFields", {
+      title: "Product Manager",
+    });
   });
 
   it("omits companies when not provided", () => {

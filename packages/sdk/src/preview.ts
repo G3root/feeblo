@@ -7,12 +7,20 @@ const baseUrl = params.get("baseUrl") ?? "http://localhost:3001";
 const theme = params.get("theme") ?? undefined;
 
 const userId = params.get("userId") ?? undefined;
+const firstName = params.get("firstName") ?? undefined;
+const lastName = params.get("lastName") ?? undefined;
+const nameParam = params.get("name") ?? undefined;
+const name =
+  nameParam ??
+  (firstName || lastName
+    ? [firstName, lastName].filter(Boolean).join(" ")
+    : undefined);
+
 const user: UserIdentity | undefined = userId
   ? {
       id: userId,
       email: params.get("email") ?? undefined,
-      firstName: params.get("firstName") ?? undefined,
-      lastName: params.get("lastName") ?? undefined,
+      name,
       avatar: params.get("avatar") ?? undefined,
     }
   : undefined;

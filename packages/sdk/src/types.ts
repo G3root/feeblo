@@ -16,13 +16,15 @@ export type OrganizationId = string & {
 
 export interface WidgetCompany {
   id: string;
-  monthlySpend?: number | undefined;
   name: string;
+  avatar?: string | undefined;
+  customFields?: Record<string, unknown> | undefined;
 }
 
 export interface UserIdentity {
   avatar?: string | undefined;
   companies?: WidgetCompany[] | undefined;
+  customFields?: Record<string, unknown> | undefined;
   email?: string | undefined;
   id: string;
   name?: string | undefined;
@@ -32,6 +34,7 @@ export interface UserIdentity {
 export interface NormalizedUserIdentity {
   avatar?: string | undefined;
   companies?: WidgetCompany[] | undefined;
+  customFields?: Record<string, unknown> | undefined;
   email?: string | undefined;
   id: string;
   name?: string | undefined;

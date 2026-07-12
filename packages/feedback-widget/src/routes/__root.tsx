@@ -42,6 +42,7 @@ export function RootComponent(props: RouteSectionProps) {
           name: message.data.name,
           email: message.data.email,
           avatar: message.data.avatar,
+          customFields: message.data.customFields,
           companies: message.data.companies,
           token: message.data.token,
         });

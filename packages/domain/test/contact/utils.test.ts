@@ -204,7 +204,7 @@ describe("parseContactCustomAttributes", () => {
     Effect.gen(function* () {
       const def = makeContactDef({ key: "email" });
       const result = yield* parseContactCustomAttributes(
-        { email: "test@test.com" },
+        { customFields: { email: "test@test.com" } },
         [def]
       );
       expect(result).toEqual([]);
@@ -218,7 +218,7 @@ describe("parseContactCustomAttributes", () => {
         type: "TEXT",
       });
       const result = yield* parseContactCustomAttributes(
-        { customField: "hello" },
+        { customFields: { customField: "hello" } },
         [def]
       );
       expect(result).toEqual([
@@ -230,7 +230,7 @@ describe("parseContactCustomAttributes", () => {
   it.effect("skips unknown keys not in definitions", () =>
     Effect.gen(function* () {
       const result = yield* parseContactCustomAttributes(
-        { randomKey: "value" },
+        { customFields: { randomKey: "value" } },
         []
       );
       expect(result).toEqual([]);
@@ -260,7 +260,10 @@ describe("parseContactCustomAttributes", () => {
     });
     try {
       await Effect.runPromise(
-        parseContactCustomAttributes({ age: "not-a-number" }, [def])
+        parseContactCustomAttributes(
+          { customFields: { age: "not-a-number" } },
+          [def]
+        )
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
@@ -278,7 +281,10 @@ describe("parseContactCustomAttributes", () => {
         type: "INTEGER",
         config: { min: 1, max: 100 },
       });
-      const result = yield* parseContactCustomAttributes({ score: 50 }, [def]);
+      const result = yield* parseContactCustomAttributes(
+        { customFields: { score: 50 } },
+        [def]
+      );
       expect(result).toEqual([
         { definitionId: def.id, key: "score", value: 50 },
       ]);
@@ -293,7 +299,7 @@ describe("parseContactCustomAttributes", () => {
     });
     try {
       await Effect.runPromise(
-        parseContactCustomAttributes({ score: 101 }, [def])
+        parseContactCustomAttributes({ customFields: { score: 101 } }, [def])
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
@@ -307,9 +313,10 @@ describe("parseContactCustomAttributes", () => {
         key: "subscribed",
         type: "BOOLEAN",
       });
-      const result = yield* parseContactCustomAttributes({ subscribed: true }, [
-        def,
-      ]);
+      const result = yield* parseContactCustomAttributes(
+        { customFields: { subscribed: true } },
+        [def]
+      );
       expect(result).toEqual([
         { definitionId: def.id, key: "subscribed", value: true },
       ]);
@@ -323,7 +330,7 @@ describe("parseContactCustomAttributes", () => {
         type: "DATE",
       });
       const result = yield* parseContactCustomAttributes(
-        { birthday: "2024-01-15" },
+        { customFields: { birthday: "2024-01-15" } },
         [def]
       );
       expect(result).toHaveLength(1);
@@ -340,7 +347,7 @@ describe("parseContactCustomAttributes", () => {
         isRequired: false,
       });
       const result = yield* parseContactCustomAttributes(
-        { optionalField: null },
+        { customFields: { optionalField: null } },
         [def]
       );
       expect(result).toEqual([
@@ -354,7 +361,7 @@ describe("parseContactCustomAttributes", () => {
       const def1 = makeContactDef({ key: "city", type: "TEXT" });
       const def2 = makeContactDef({ key: "age", type: "INTEGER" });
       const result = yield* parseContactCustomAttributes(
-        { city: "Paris", age: 30 },
+        { customFields: { city: "Paris", age: 30 } },
         [def1, def2]
       );
       expect(result).toHaveLength(2);
@@ -369,9 +376,10 @@ describe("parseContactCustomAttributes", () => {
         type: "TEXT",
         config: { pattern: "^[A-Z]{3}$" },
       });
-      const result = yield* parseContactCustomAttributes({ code: "ABC" }, [
-        def,
-      ]);
+      const result = yield* parseContactCustomAttributes(
+        { customFields: { code: "ABC" } },
+        [def]
+      );
       expect(result).toEqual([
         { definitionId: def.id, key: "code", value: "ABC" },
       ]);
@@ -386,7 +394,7 @@ describe("parseContactCustomAttributes", () => {
     });
     try {
       await Effect.runPromise(
-        parseContactCustomAttributes({ code: "abc" }, [def])
+        parseContactCustomAttributes({ customFields: { code: "abc" } }, [def])
       );
       expect.fail("Expected error was not thrown");
     } catch (error) {
@@ -407,18 +415,29 @@ describe("parseCompanyCustomAttributes", () => {
     Effect.gen(function* () {
       const def = makeCompanyDef({ key: "name" });
       const result = yield* parseCompanyCustomAttributes(
-        { id: "123", name: "Acme" },
+        { customFields: { id: "123", name: "Acme" } },
         [def]
       );
       expect(result).toEqual([]);
     })
   );
 
-  it.effect("skips known company fields (monthlySpend, createdAt)", () =>
+  it.effect("skips known company fields (avatar)", () =>
     Effect.gen(function* () {
-      const def = makeCompanyDef({ key: "monthlySpend" });
+      const def = makeCompanyDef({ key: "avatar" });
       const result = yield* parseCompanyCustomAttributes(
-        { monthlySpend: 500 },
+        { customFields: { avatar: "https://example.com/acme.png" } },
+        [def]
+      );
+      expect(result).toEqual([]);
+    })
+  );
+
+  it.effect("skips known company fields (createdAt)", () =>
+    Effect.gen(function* () {
+      const def = makeCompanyDef({ key: "createdAt" });
+      const result = yield* parseCompanyCustomAttributes(
+        { customFields: { createdAt: "2023-05-19T15:35:49.915Z" } },
         [def]
       );
       expect(result).toEqual([]);
@@ -431,9 +450,10 @@ describe("parseCompanyCustomAttributes", () => {
         key: "revenue",
         type: "DECIMAL",
       });
-      const result = yield* parseCompanyCustomAttributes({ revenue: 99.99 }, [
-        def,
-      ]);
+      const result = yield* parseCompanyCustomAttributes(
+        { customFields: { revenue: 99.99 } },
+        [def]
+      );
       expect(result).toEqual([
         { definitionId: def.id, key: "revenue", value: 99.99 },
       ]);
@@ -507,7 +527,12 @@ describe("parsePersonAttributes", () => {
     Effect.gen(function* () {
       const def = makeContactDef({ key: "city", type: "TEXT" });
       const result = yield* parsePersonAttributes(
-        { userId: "user_1", email: "a@b.com", name: "Alice", city: "London" },
+        {
+          userId: "user_1",
+          email: "a@b.com",
+          name: "Alice",
+          customFields: { city: "London" },
+        },
         [def],
         companyDefs
       );
@@ -559,7 +584,13 @@ describe("parsePersonAttributes", () => {
           userId: "user_1",
           email: "a@b.com",
           name: "Alice",
-          companies: [{ id: "comp_1", name: "Acme", industry: "tech" }],
+          companies: [
+            {
+              id: "comp_1",
+              name: "Acme",
+              customFields: { industry: "tech" },
+            },
+          ],
         },
         contactDefs,
         [companyDef]
@@ -627,7 +658,6 @@ describe("parsePersonAttributes", () => {
           email: "a@b.com",
           name: "Alice",
           extra: "should-be-ignored",
-          profilePicture: "pic.jpg",
         },
         contactDefs,
         companyDefs

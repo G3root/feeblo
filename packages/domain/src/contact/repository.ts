@@ -56,7 +56,10 @@ const makeContactRepository = Effect.succeed({
           .update(schema.companyTable)
           .set({
             ...(args.externalId && { externalId: args.externalId }),
-            ...(args.domain && { domain: args.domain }),
+            ...(args.avatar !== undefined && { avatar: args.avatar }),
+            ...(args.externalCreatedAt !== undefined && {
+              externalCreatedAt: args.externalCreatedAt,
+            }),
             updatedAt: new Date(),
           })
           .where(eq(schema.companyTable.id, existing.id))
@@ -78,7 +81,8 @@ const makeContactRepository = Effect.succeed({
           organizationId: args.organizationId,
           name: args.name,
           externalId: args.externalId,
-          domain: args.domain,
+          avatar: args.avatar ?? null,
+          externalCreatedAt: args.externalCreatedAt ?? null,
           createdAt: now,
           updatedAt: now,
         })
@@ -154,6 +158,7 @@ const makeContactRepository = Effect.succeed({
             ...(args.name && { name: args.name }),
             ...(args.email && { email: args.email }),
             ...(args.phone && { phone: args.phone }),
+            ...(args.avatar !== undefined && { avatar: args.avatar }),
             ...(args.companyId !== undefined && {
               companyId: args.companyId,
             }),
@@ -180,6 +185,7 @@ const makeContactRepository = Effect.succeed({
           name: args.name,
           email: args.email,
           phone: args.phone,
+          avatar: args.avatar ?? null,
           externalId: args.externalId,
           companyId: args.companyId,
           userId: args.userId,

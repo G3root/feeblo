@@ -255,10 +255,11 @@ export const companyTable = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     externalId: text("external_id"),
-    domain: text("domain"),
+    avatar: text("avatar"),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
+    externalCreatedAt: timestamp("external_created_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -286,8 +287,9 @@ export const contactTable = pgTable(
     id: text("id").primaryKey(),
     name: text("name"),
     email: text("email"),
-    externalId: text("external_id"),
     phone: text("phone"),
+    externalId: text("external_id"),
+    avatar: text("avatar"),
     companyId: text("company_id").references(() => companyTable.id, {
       onDelete: "set null",
     }),
