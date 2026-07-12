@@ -12,26 +12,32 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const userTable = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").default(false).notNull(),
-  image: text("image"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-  role: text("role"),
-  banned: boolean("banned").default(false),
-  banReason: text("ban_reason"),
-  banExpires: timestamp("ban_expires", { withTimezone: true }),
-  twoFactorEnabled: boolean("two_factor_enabled").default(false),
-  lastLoginMethod: text("last_login_method"),
-});
+export const userTable = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    image: text("image"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    role: text("role"),
+    banned: boolean("banned").default(false),
+    banReason: text("ban_reason"),
+    banExpires: timestamp("ban_expires", { withTimezone: true }),
+    twoFactorEnabled: boolean("two_factor_enabled").default(false),
+    lastLoginMethod: text("last_login_method"),
+    ssoLoginAt: timestamp("sso_login_at", { withTimezone: true }),
+    emailHash: text("email_hash"),
+  },
+  (table) => [index("user_emailHash_idx").on(table.emailHash)]
+);
 
 export const sessionTable = pgTable(
   "session",

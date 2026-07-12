@@ -3,16 +3,19 @@ export * from "./legid";
 
 import { makeId } from "./legid";
 
-const approximateLength = 12;
+const approximateLength = 18;
 
 export const JwtSecretId = makeId("jwt_secret", "jwt", {
   approximateLength,
 });
 
-export const OrganizationId = makeId("organization", "org", {
+export const WorkspaceId = makeId("workspace", "org", {
+  approximateLength: 12,
+});
+export const UserId = makeId("user", "usr", {
   approximateLength,
 });
-export const WorkspaceId = makeId("workspace", "org", {
+export const SessionId = makeId("session", "ses", {
   approximateLength,
 });
 export const ProjectId = makeId("project", "prj", {

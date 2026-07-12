@@ -291,6 +291,9 @@ export const contactTable = pgTable(
     companyId: text("company_id").references(() => companyTable.id, {
       onDelete: "set null",
     }),
+    userId: text("user_id").references(() => userTable.id, {
+      onDelete: "set null",
+    }),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -305,6 +308,7 @@ export const contactTable = pgTable(
   (table) => [
     index("contact_organizationId_idx").on(table.organizationId),
     index("contact_companyId_idx").on(table.companyId),
+    index("contact_userId_idx").on(table.userId),
     uniqueIndex("contact_organizationId_externalId_uidx").on(
       table.organizationId,
       table.externalId
