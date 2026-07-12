@@ -5,18 +5,18 @@ import type {
   WidgetCompany,
 } from "./types";
 
-const COMPANY_KEYS = ["id", "name", "monthlySpend"] as const;
+const COMPANY_KEYS = ["id", "name"] as const;
 
 function normalizeCompany(
   company: WidgetCompany
-): Pick<WidgetCompany, "id" | "name" | "monthlySpend"> {
+): Pick<WidgetCompany, "id" | "name"> {
   const result: Record<string, unknown> = {};
   for (const key of COMPANY_KEYS) {
     if (company[key] !== undefined) {
       result[key] = company[key];
     }
   }
-  return result as Pick<WidgetCompany, "id" | "name" | "monthlySpend">;
+  return result as Pick<WidgetCompany, "id" | "name">;
 }
 
 export function normalizeUserIdentity(
@@ -31,13 +31,7 @@ export function normalizeUserIdentity(
   }
 
   const base: Record<string, unknown> = {};
-  for (const key of [
-    "email",
-    "firstName",
-    "lastName",
-    "avatar",
-    "token",
-  ] as const) {
+  for (const key of ["email", "name", "avatar", "token"] as const) {
     if (rest[key] !== undefined) {
       base[key] = rest[key];
     }

@@ -24,29 +24,25 @@ describe("normalizeUserIdentity", () => {
     const result = normalizeUserIdentity({
       id: "user_1",
       email: undefined,
-      firstName: undefined,
-      lastName: "Doe",
+      name: "Doe",
     });
 
     expect(result).not.toHaveProperty("email");
-    expect(result).not.toHaveProperty("firstName");
-    expect(result).toHaveProperty("lastName", "Doe");
+    expect(result).toHaveProperty("name", "Doe");
   });
 
   it("preserves defined optional fields", () => {
     const user = {
       id: "user_1",
       email: "test@example.com",
-      firstName: "John",
-      lastName: "Doe",
+      name: "John Doe",
       avatar: "https://example.com/avatar.png",
       token: "tok_123",
     };
     const result = normalizeUserIdentity(user);
 
     expect(result.email).toBe("test@example.com");
-    expect(result.firstName).toBe("John");
-    expect(result.lastName).toBe("Doe");
+    expect(result.name).toBe("John Doe");
     expect(result.avatar).toBe("https://example.com/avatar.png");
     expect(result.token).toBe("tok_123");
   });

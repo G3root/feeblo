@@ -24,9 +24,8 @@ export interface UserIdentity {
   avatar?: string | undefined;
   companies?: WidgetCompany[] | undefined;
   email?: string | undefined;
-  firstName?: string | undefined;
   id: string;
-  lastName?: string | undefined;
+  name?: string | undefined;
   token?: string | undefined;
 }
 
@@ -34,9 +33,8 @@ export interface NormalizedUserIdentity {
   avatar?: string | undefined;
   companies?: WidgetCompany[] | undefined;
   email?: string | undefined;
-  firstName?: string | undefined;
   id: string;
-  lastName?: string | undefined;
+  name?: string | undefined;
   token?: string | undefined;
 }
 

@@ -10,6 +10,7 @@ import {
 import { ErrorFallback } from "../components/error-fallback";
 import { Button } from "../components/ui/button";
 import { Icon } from "../components/ui/icon";
+import { setWidgetIdentity } from "../lib/identity";
 import {
   type ParentMessage,
   sendToParent,
@@ -34,6 +35,16 @@ export function RootComponent(props: RouteSectionProps) {
         if (message.data?.board) {
           navigate(`/board/${message.data.board}`);
         }
+        break;
+      case "IDENTIFY":
+        setWidgetIdentity({
+          id: message.data.id,
+          name: message.data.name,
+          email: message.data.email,
+          avatar: message.data.avatar,
+          companies: message.data.companies,
+          token: message.data.token,
+        });
         break;
     }
   };

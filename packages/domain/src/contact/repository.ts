@@ -157,6 +157,7 @@ const makeContactRepository = Effect.succeed({
             ...(args.companyId !== undefined && {
               companyId: args.companyId,
             }),
+            ...(args.userId !== undefined && { userId: args.userId }),
             updatedAt: new Date(),
           })
           .where(eq(schema.contactTable.id, existing.id))
@@ -181,6 +182,7 @@ const makeContactRepository = Effect.succeed({
           phone: args.phone,
           externalId: args.externalId,
           companyId: args.companyId,
+          userId: args.userId,
           createdAt: now,
           updatedAt: now,
         })

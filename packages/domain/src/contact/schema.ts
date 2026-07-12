@@ -23,6 +23,7 @@ export const ContactUpsert = S.Struct({
   name: S.optional(S.String),
   phone: S.optional(S.String),
   companyId: S.optional(S.NullOr(S.String)),
+  userId: S.optional(S.NullOr(S.String)),
 });
 
 export type TContactUpsert = S.Schema.Type<typeof ContactUpsert>;

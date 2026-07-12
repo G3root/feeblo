@@ -1,4 +1,5 @@
 import { action, query, type RoutePreloadFuncArgs } from "@solidjs/router";
+import { getWidgetToken } from "./identity";
 import { sendToParent } from "./messages";
 
 export interface WidgetBoard {
@@ -50,12 +51,14 @@ export const createFeedBackAction = action(
     const content = data.get("content");
     const organizationId = getOrganizationId();
 
+    const token = getWidgetToken();
+
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/`;
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ boardId, content, title, organizationId }),
+      body: JSON.stringify({ boardId, content, title, organizationId, token }),
     });
 
     if (!response.ok) {
