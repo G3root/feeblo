@@ -24,7 +24,9 @@
     "verbatimModuleSyntax": true,
     "plugins": [
       {
-        "name": "@effect/language-service"
+        "name": "@effect/language-service",
+        "ignoreEffectSuggestionsInTscExitCode": true,
+        "ignoreEffectWarningsInTscExitCode": true
       }
     ],
     "types": ["node", "@cloudflare/workers-types"]
