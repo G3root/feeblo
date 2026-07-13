@@ -36,8 +36,8 @@ const SSO_ERROR_STATUS: Record<
   FAILED_TO_CREATE_SSO_CONTACT: "INTERNAL_SERVER_ERROR",
 };
 
-const id = "jwt-auto-login" as const;
-const SIGN_IN_PATH = `/sign-in/${id}` as const;
+export const ID = "jwt-auto-login" as const;
+export const SIGN_IN_PATH = `/sign-in/${ID}` as const;
 
 async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -88,7 +88,7 @@ async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
 
 export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
   return {
-    id,
+    id: ID,
     endpoints: {
       signInAutoLogin: createAuthEndpoint(
         SIGN_IN_PATH,
