@@ -734,6 +734,7 @@ describe("jwtAutoLogin", async () => {
       const { getSessionFromCtx, addOAuthServerContext } = await import(
         "better-auth/api"
       );
+      addOAuthServerContext.mockClear();
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
@@ -751,6 +752,7 @@ describe("jwtAutoLogin", async () => {
       const { getSessionFromCtx, addOAuthServerContext } = await import(
         "better-auth/api"
       );
+      addOAuthServerContext.mockClear();
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
@@ -907,6 +909,9 @@ describe("jwtAutoLogin", async () => {
 
   describe("endpoint error mapping", () => {
     it("should return FAILED_TO_CREATE_SSO_CONTACT when createSsoUser reports a contact failure", async () => {
+      const { getSessionFromCtx } = await import("better-auth/api");
+      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+
       const { client: localClient } = await getTestInstance(
         {
           plugins: [
@@ -935,6 +940,9 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("should return FAILED_TO_CREATE_SSO_USER when the created user cannot be found", async () => {
+      const { getSessionFromCtx } = await import("better-auth/api");
+      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+
       const { client: localClient } = await getTestInstance(
         {
           plugins: [
@@ -960,6 +968,9 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("should return COULD_NOT_CREATE_SESSION when session creation fails", async () => {
+      const { getSessionFromCtx } = await import("better-auth/api");
+      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+
       let _localAuth: any = null;
       const { client: localClient, auth: localAuth } = await getTestInstance(
         {

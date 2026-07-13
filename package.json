@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "test": "turbo run test --filter=!@feeblo/e2e",
     "check-types": "turbo check-types",
     "typecheck": "turbo check-types",
     "prepare": "effect-language-service patch",

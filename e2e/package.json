@@ -4,15 +4,13 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "test:headed": "playwright test --headed",
-    "codegen": "playwright codegen",
-    "check-types": "tsc --noEmit"
+    "test:browser": "vitest"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
-    "@playwright/test": "^1.61.1",
-    "typescript": "catalog:"
+    "@testing-library/dom": "^10.4.1",
+    "@vitest/browser-playwright": "^4.1.10",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

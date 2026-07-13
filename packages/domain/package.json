@@ -168,6 +168,6 @@
     "@effect/vitest": "4.0.0-beta.94",
     "@feeblo/config": "workspace:*",
     "typescript": "catalog:",
-    "vitest": "^3.2.6"
+    "vitest": "catalog:"
   }
 }
