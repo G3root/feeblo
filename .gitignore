@@ -57,3 +57,8 @@ temp
 
 # Generated assets
 packages/feedback-widget/src/icons/sprite.svg
+
+# playwright e2e artifacts
+test-results/
+playwright-report/
+.last-run.json

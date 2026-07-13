@@ -21,3 +21,4 @@ tmp
 temp
 *.tsbuildinfo
 out
+e2e
