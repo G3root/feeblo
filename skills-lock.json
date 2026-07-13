@@ -18,6 +18,12 @@
       "skillPath": "skills/make-interfaces-feel-better/SKILL.md",
       "computedHash": "54b6e221bbe4e2d1a8461c3f9ecabe69daf891f964e9ee5e699c323daa018f2e"
     },
+    "playwright-best-practices": {
+      "source": "octalign/playwright-best-practices-skill",
+      "sourceType": "github",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "computedHash": "d4beb67ed0ecd6e9f61d9715e038a33beb15322662ed9a6acb9a3787da2dc915"
+    },
     "tdd": {
       "source": "mattpocock/skills",
       "sourceType": "github",
