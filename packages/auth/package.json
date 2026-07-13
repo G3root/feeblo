@@ -25,6 +25,7 @@
     "@feeblo/config": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/db": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@polar-sh/better-auth": "catalog:",

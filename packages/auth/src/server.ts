@@ -9,6 +9,12 @@ import {
   isPrivilegedMemberRole,
   PLAN_ENTITLEMENTS,
 } from "@feeblo/domain/plan-entitlements";
+import {
+  createSsoSession,
+  linkAnonymousAccount,
+  SsoError,
+  SsoRepositoriesLive,
+} from "@feeblo/domain/widget/sso";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { Mailer } from "@feeblo/transactional/mailer";
 import { polar, webhooks } from "@polar-sh/better-auth";
@@ -28,10 +34,10 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
-
 import { drizzleAdapter } from "./adapter/drizzzle-adapter";
 import { AuthConfig } from "./config";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
+import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
 
 const loadPasswordResetEmail = () =>
@@ -42,10 +48,6 @@ const loadOrganizationInvitationEmail = () =>
 
 const loadVerificationOtpEmail = () =>
   import("@feeblo/transactional/templates/verification-otp");
-
-const baseConfig = {
-  plugins: [jwtAutoLogin()],
-} satisfies BetterAuthOptions;
 
 export const initAuthHandler = () =>
   Effect.gen(function* () {
@@ -77,9 +79,37 @@ export const initAuthHandler = () =>
         BillingRepository.layer,
         MembershipRepository.layer,
         Mailer.layer,
-        WorkspaceRepository.layer
+        WorkspaceRepository.layer,
+        SsoRepositoriesLive
       ).pipe(Layer.provide(dbLayer))
     );
+
+    const ssoOptions: JwtAutoLoginOptions = {
+      createSsoUser: async ({ organizationId, token }) => {
+        try {
+          return await callbackRuntime.runPromise(
+            createSsoSession({ organizationId, token })
+          );
+        } catch (error) {
+          if (error instanceof SsoError) {
+            return { code: error.code, message: error.message };
+          }
+          return { code: "FAILED_TO_CREATE_SSO_USER" };
+        }
+      },
+      async onLinkAccount({ anonymousUser, newUser }) {
+        await callbackRuntime.runPromise(
+          linkAnonymousAccount({
+            anonymousUserId: anonymousUser.user.id,
+            newUserId: newUser.user.id,
+          })
+        );
+      },
+    };
+
+    const baseConfig = {
+      plugins: [jwtAutoLogin(ssoOptions)],
+    } satisfies BetterAuthOptions;
 
     const config = {
       ...baseConfig,

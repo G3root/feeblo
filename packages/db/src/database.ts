@@ -129,7 +129,7 @@ export class TransactionContext extends Context.Service<
 export const currentDb: Effect.Effect<
   PgDrizzle.EffectPgDatabase,
   never,
-  Database | TransactionContext
+  Database
 > = Effect.gen(function* () {
   const maybeTx = yield* Effect.serviceOption(TransactionContext);
   if (Option.isSome(maybeTx)) {

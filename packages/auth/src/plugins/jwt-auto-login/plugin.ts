@@ -1,6 +1,5 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 /** biome-ignore-all lint/suspicious/noNonNullAssertedOptionalChain: <explanation> */
-import { createHash, randomBytes } from "node:crypto";
 import type {
   BetterAuthPlugin,
   GenericEndpointContext,
@@ -19,16 +18,23 @@ import { parseUserOutput } from "better-auth/db";
 import * as z from "zod";
 import { JWT_AUTO_LOGIN_ERROR_CODES } from "./error-codes";
 import { schema } from "./schema";
-import type { JwtAutoLoginSession, UserWithJwtAutoLogin } from "./types";
+import type {
+  JwtAutoLoginOptions,
+  JwtAutoLoginSession,
+  SsoUserError,
+  UserWithJwtAutoLogin,
+} from "./types";
 
-function hashEmail(email: string): string {
-  return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
-}
-
-function generateRandomEmail(): string {
-  const suffix = randomBytes(8).toString("hex");
-  return `sso-${suffix}@feeblo.com`;
-}
+const SSO_ERROR_STATUS: Record<
+  SsoUserError["code"],
+  "UNAUTHORIZED" | "BAD_REQUEST" | "INTERNAL_SERVER_ERROR"
+> = {
+  ORGANIZATION_HAS_NO_JWT_SECRET: "UNAUTHORIZED",
+  INVALID_JWT: "UNAUTHORIZED",
+  SSO_TOKEN_MISSING_EMAIL_OR_NAME: "BAD_REQUEST",
+  FAILED_TO_CREATE_SSO_USER: "INTERNAL_SERVER_ERROR",
+  FAILED_TO_CREATE_SSO_CONTACT: "INTERNAL_SERVER_ERROR",
+};
 
 const id = "jwt-auto-login" as const;
 const SIGN_IN_PATH = `/sign-in/${id}` as const;
@@ -80,7 +86,7 @@ async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
   };
 }
 
-export const jwtAutoLogin = () => {
+export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
   return {
     id,
     endpoints: {
@@ -94,10 +100,11 @@ export const jwtAutoLogin = () => {
           }),
           metadata: {
             openapi: {
-              description: "Sign in auto login",
+              description:
+                "Verify an organization JWT and create a restricted widget-portal session (SSO auto-login).",
               responses: {
                 200: {
-                  description: "Sign in auto login",
+                  description: "SSO session created",
                   content: {
                     "application/json": {
                       schema: {
@@ -119,12 +126,12 @@ export const jwtAutoLogin = () => {
           },
         },
         async (ctx) => {
-          // If the current request already has a valid anonymous session, we should
-          // reject any further attempts to create another anonymous user. This
-          // prevents an anonymous user from signing in anonymously again while they
-          // are already authenticated.
+          // If the current request already has a valid restricted (anonymous)
+          // widget session, reject any further attempts to create another one.
+          // This prevents a widget user from signing in anonymously again while
+          // they are already authenticated.
           const existingSession = await getSessionFromCtx<{
-            restrictedToOrganizationId: boolean | null;
+            restrictedToOrganizationId: string | null;
           }>(ctx, { disableRefresh: true });
 
           if (existingSession?.user.restrictedToOrganizationId) {
@@ -133,33 +140,35 @@ export const jwtAutoLogin = () => {
               JWT_AUTO_LOGIN_ERROR_CODES.ANONYMOUS_USERS_CANNOT_SIGN_IN_AGAIN_ANONYMOUSLY
             );
           }
-          const email = generateRandomEmail();
-          const name = "Anonymous";
-          const emailHash = hashEmail(email);
 
-          const newUser = await ctx.context.internalAdapter.createUser(
-            {
-              email,
-              emailVerified: false,
-              restrictedToOrganizationId: ctx.body.organizationId,
-              name,
-              emailHash,
-              jwtAutoLoginAt: new Date(),
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-            { method: id }
+          // Verify the organization JWT, upsert the restricted widget user and
+          // linked contact. The Effect-based implementation lives in the domain
+          // package and is injected via `options.createSsoUser` so this plugin
+          // stays better-auth-only.
+          const result = await options.createSsoUser({
+            organizationId: ctx.body.organizationId,
+            token: ctx.body.token,
+          });
+
+          if ("code" in result) {
+            throw APIError.from(
+              SSO_ERROR_STATUS[result.code],
+              JWT_AUTO_LOGIN_ERROR_CODES[result.code]
+            );
+          }
+
+          const user = await ctx.context.internalAdapter.findUserById(
+            result.userId
           );
-
-          if (!newUser) {
+          if (!user) {
             throw APIError.from(
               "INTERNAL_SERVER_ERROR",
-              JWT_AUTO_LOGIN_ERROR_CODES.FAILED_TO_CREATE_USER
+              JWT_AUTO_LOGIN_ERROR_CODES.FAILED_TO_CREATE_SSO_USER
             );
           }
 
           const session = await ctx.context.internalAdapter.createSession(
-            newUser.id
+            user.id
           );
 
           if (!session) {
@@ -171,11 +180,11 @@ export const jwtAutoLogin = () => {
 
           await setSessionCookie(ctx, {
             session,
-            user: newUser,
+            user,
           });
           return ctx.json({
             token: session.token,
-            user: parseUserOutput(ctx.context.options, newUser),
+            user: parseUserOutput(ctx.context.options, user),
           });
         }
       ),
@@ -262,21 +271,11 @@ export const jwtAutoLogin = () => {
               return;
             }
 
-            // At this point the user is linking their previous anonymous account with a
-            // new credential (email / social). Invoke the provided callback so that the
-            // integrator can perform any additional logic such as transferring data
-            // from the anonymous user to the new user.
-            //TODO: LINK here
-            // if (options?.onLinkAccount) {
-            //   await options.onLinkAccount({
-            //     anonymousUser: {
-            //       session: session.session,
-            //       user: session.user,
-            //     },
-            //     newUser: newSession,
-            //     ctx,
-            //   });
-            // }
+            // The user is linking their previous anonymous (restricted widget)
+            // account with a real credential (email / password / social) from
+            // the global app. Give the integrator a chance to transfer data
+            // (contacts, posts) from the anonymous user to the new user before
+            // the anonymous user is cleaned up below.
             const newSessionUser = newSession.user as
               // biome-ignore lint/suspicious/noExplicitAny: <explanation>
               (UserWithJwtAutoLogin & Record<string, any>) | undefined;
@@ -286,6 +285,32 @@ export const jwtAutoLogin = () => {
             if (isSameUser || newSessionIsAnonymous) {
               return;
             }
+
+            if (options?.onLinkAccount) {
+              try {
+                await options.onLinkAccount({
+                  anonymousUser: {
+                    session: session.session,
+                    user: session.user,
+                  },
+                  newUser: newSession,
+                  ctx,
+                });
+              } catch (error) {
+                // Skip cleanup so the anonymous user's data is preserved for a
+                // later retry instead of being orphaned by the cascade below.
+                ctx.context.logger.error(
+                  "Failed to link anonymous user data to the new user; skipping cleanup",
+                  {
+                    anonymousUserId: session.user.id,
+                    newUserId: newSessionUser?.id,
+                    error,
+                  }
+                );
+                return;
+              }
+            }
+
             try {
               await ctx.context.internalAdapter.deleteUserSessions(
                 session.user.id

@@ -39,7 +39,7 @@ export const userTable = pgTable(
   },
   (table) => [
     index("user_emailHash_idx").on(table.emailHash),
-    index("session_restricted_to_organization_id_idx").on(
+    index("user_restricted_to_organization_id_idx").on(
       table.restrictedToOrganizationId
     ),
   ]

@@ -500,6 +500,9 @@ importers:
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../domain
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../id
       '@feeblo/transactional':
         specifier: workspace:*
         version: link:../transactional

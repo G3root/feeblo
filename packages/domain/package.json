@@ -28,6 +28,9 @@
     "./widget/api-live": {
       "default": "./src/widget/api-live.ts"
     },
+    "./widget/sso": {
+      "default": "./src/widget/sso.ts"
+    },
     "./billing/service": {
       "default": "./src/billing/service.ts"
     },

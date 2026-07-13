@@ -4,19 +4,16 @@ import * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as OpenApi from "effect/unstable/httpapi/OpenApi";
-
+import { DataValidationError } from "../contact/errors";
 import {
   InternalServerError,
   NotFoundError,
   UnauthorizedError,
 } from "../rpc-errors";
-import { DataValidationError } from "../contact/errors";
 import {
   WidgetBoard,
   WidgetFeedbackCreate,
   WidgetFeedbackResponse,
-  WidgetSsoSessionCreate,
-  WidgetSsoSessionResponse,
 } from "./schema";
 
 export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
@@ -51,24 +48,6 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
       .annotate(
         OpenApi.Description,
         "Returns all public boards for a given organization."
-      )
-  )
-  .add(
-    HttpApiEndpoint.post("createSsoSession", "/sso/session", {
-      payload: WidgetSsoSessionCreate,
-      success: WidgetSsoSessionResponse,
-      error: Schema.Union([
-        DataValidationError,
-        NotFoundError,
-        InternalServerError,
-        UnauthorizedError,
-      ]),
-    })
-      .annotate(OpenApi.Title, "Create SSO Session")
-      .annotate(OpenApi.Summary, "Create a Better-Auth session from an SSO token")
-      .annotate(
-        OpenApi.Description,
-        "Verifies an organization JWT token and creates a Better-Auth session for the public board."
       )
   ) {}
 

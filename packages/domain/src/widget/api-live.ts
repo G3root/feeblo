@@ -14,76 +14,19 @@ import type {
   TCompanyAttributeDefinition,
   TContactAttributeDefinition,
 } from "../contact/schema";
-import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import { PostRepository } from "../post/repository";
 import { PostStatusRepository } from "../post-status/repository";
-import { SessionRepository } from "../session/repository";
 import {
   InternalServerError,
   NotFoundError,
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { UserRepository } from "../user/repository";
-
-function upsertContactFromParsed(
-  organizationId: string,
-  parsedContact: ParsedPersonAttributes,
-  userId?: string
-) {
-  return Effect.gen(function* () {
-    const contactRepository = yield* ContactRepository;
-    let linkedCompanyId: string | undefined;
-
-    for (const company of parsedContact.companies) {
-      const upsertedCompany = yield* contactRepository.upsertCompany({
-        organizationId,
-        externalId: company.commonFields.id,
-        name: company.commonFields.name,
-        avatar: company.commonFields.avatar,
-        externalCreatedAt: company.commonFields.externalCreatedAt,
-      });
-      linkedCompanyId = upsertedCompany.id;
-
-      for (const attr of company.customAttributes) {
-        yield* contactRepository.upsertCompanyAttributeValue({
-          companyId: upsertedCompany.id,
-          attributeId: attr.definitionId,
-          value: attr.value,
-        });
-      }
-    }
-
-    const contactOption = yield* contactRepository.upsertContact({
-      organizationId,
-      externalId: parsedContact.commonFields.userId,
-      email: parsedContact.commonFields.email,
-      name: parsedContact.commonFields.name,
-      avatar: parsedContact.commonFields.avatar,
-      companyId: linkedCompanyId ?? null,
-      userId: userId ?? null,
-    });
-
-    let contactId: string | undefined;
-    if (Option.isSome(contactOption)) {
-      contactId = contactOption.value.id;
-
-      for (const attr of parsedContact.customAttributes) {
-        yield* contactRepository.upsertContactAttributeValue({
-          contactId: contactOption.value.id,
-          attributeId: attr.definitionId,
-          value: attr.value,
-        });
-      }
-    }
-
-    return contactId;
-  });
-}
+import { upsertContactFromParsed } from "./sso";
 
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
@@ -244,85 +187,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
             PostStatusRepository.layer,
           ]),
           withRemapDbErrors("Feedback", "create")
-        )
-      )
-      .handle("createSsoSession", ({ payload }) =>
-        Effect.gen(function* () {
-          const { organizationId, token } = payload;
-
-          const jwtSecretRepository = yield* JwtSecretRepository;
-          const contactRepository = yield* ContactRepository;
-          const userRepository = yield* UserRepository;
-          const sessionRepository = yield* SessionRepository;
-
-          const secrets = yield* jwtSecretRepository.getSecretsForOrg({
-            organizationId,
-          });
-
-          if (secrets.length === 0) {
-            return yield* new UnauthorizedError({
-              message: "Organization has no JWT secret configured",
-            });
-          }
-
-          const jwtPayload = yield* verifyJwt(
-            token,
-            secrets.map((s) => s.secret)
-          );
-
-          const contactDefs =
-            (yield* contactRepository.findContactAttributeDefinitions(
-              organizationId
-            )) as unknown as readonly TContactAttributeDefinition[];
-          const companyDefs =
-            (yield* contactRepository.findCompanyAttributeDefinitions(
-              organizationId
-            )) as unknown as readonly TCompanyAttributeDefinition[];
-
-          const parsedContact = yield* parsePersonAttributes(
-            jwtPayload,
-            contactDefs,
-            companyDefs
-          );
-
-          const { email, name } = parsedContact.commonFields;
-
-          if (!email || !name) {
-            return yield* new DataValidationError({
-              message: "SSO token must include email and name",
-            });
-          }
-
-          const user = yield* userRepository.upsertSsoUser({ name, email });
-          const userId = user.id;
-
-          const contactId = yield* transaction(
-            upsertContactFromParsed(organizationId, parsedContact, userId)
-          );
-
-          if (!contactId) {
-            return yield* new InternalServerError({
-              message: "Failed to create contact for SSO session",
-            });
-          }
-
-          const session = yield* sessionRepository.createSession({ userId });
-
-          return {
-            token: session.token,
-            user: {
-              id: userId,
-              name,
-            },
-          };
-        }).pipe(
-          Effect.provide([
-            ContactRepository.layer,
-            JwtSecretRepository.layer,
-            SessionRepository.layer,
-            UserRepository.layer,
-          ]),
-          withRemapDbErrors("SsoSession", "create")
         )
       )
 );

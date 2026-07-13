@@ -20,6 +20,12 @@ function generateRandomEmail(): string {
 interface UpsertSsoUserInput {
   email: string;
   name: string;
+  /**
+   * When set, the SSO user is scoped to a single organization (widget portal
+   * user). Existing global users matched by real email are left untouched so
+   * an SSO token never expands a real account's scope.
+   */
+  restrictedToOrganizationId?: string | null;
 }
 
 const makeUserRepository = Effect.succeed({
@@ -40,7 +46,9 @@ const makeUserRepository = Effect.succeed({
       const emailHash = hashEmail(args.email);
       const normalizedEmail = args.email.toLowerCase().trim();
 
-      // Prefer linking to an existing Better-Auth user by real email.
+      // Prefer linking to an existing Better-Auth user by real email. A real
+      // account is never re-scoped to an organization by an SSO token, so
+      // `restrictedToOrganizationId` is intentionally not applied here.
       const existingByEmail = yield* db
         .select({ id: schema.userTable.id })
         .from(schema.userTable)
@@ -55,6 +63,7 @@ const makeUserRepository = Effect.succeed({
           .set({
             name: args.name,
             emailHash,
+            jwtAutoLoginAt: updatedAt,
             updatedAt,
           })
           .where(eq(schema.userTable.id, existingByEmail.id))
@@ -81,6 +90,10 @@ const makeUserRepository = Effect.succeed({
           .update(schema.userTable)
           .set({
             name: args.name,
+            ...(args.restrictedToOrganizationId !== undefined && {
+              restrictedToOrganizationId: args.restrictedToOrganizationId,
+            }),
+            jwtAutoLoginAt: updatedAt,
             updatedAt,
           })
           .where(eq(schema.userTable.id, existingByHash.id))
@@ -104,7 +117,8 @@ const makeUserRepository = Effect.succeed({
           email: generateRandomEmail(),
           emailVerified: true,
           emailHash,
-          ssoLoginAt: now,
+          jwtAutoLoginAt: now,
+          restrictedToOrganizationId: args.restrictedToOrganizationId ?? null,
           createdAt: now,
           updatedAt: now,
         })
