@@ -33,10 +33,16 @@ export const userTable = pgTable(
     banExpires: timestamp("ban_expires", { withTimezone: true }),
     twoFactorEnabled: boolean("two_factor_enabled").default(false),
     lastLoginMethod: text("last_login_method"),
-    ssoLoginAt: timestamp("sso_login_at", { withTimezone: true }),
+    jwtAutoLoginAt: timestamp("jwt_auto_login_at", { withTimezone: true }),
     emailHash: text("email_hash"),
+    restrictedToOrganizationId: text("restricted_to_organization_id"),
   },
-  (table) => [index("user_emailHash_idx").on(table.emailHash)]
+  (table) => [
+    index("user_emailHash_idx").on(table.emailHash),
+    index("session_restricted_to_organization_id_idx").on(
+      table.restrictedToOrganizationId
+    ),
+  ]
 );
 
 export const sessionTable = pgTable(
