@@ -21,6 +21,7 @@ export type Session = {
     readonly id: string;
     readonly email: string;
     readonly name: string;
+    readonly restrictedToOrganizationId: string | null;
   };
   readonly session: {
     readonly userId: string;
@@ -138,9 +139,16 @@ export const AuthMiddlewareLive = Layer.effect(
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
       return getValidatedSessionFromToken(auth, token ?? "").pipe(
-        Effect.flatMap((session) =>
-          effect.pipe(Effect.provideService(CurrentSession, session))
-        )
+        Effect.flatMap((session) => {
+          if (session.user.restrictedToOrganizationId) {
+            return Effect.fail(
+              new UnauthorizedError({
+                message: "SSO sessions cannot access dashboard endpoints",
+              })
+            );
+          }
+          return effect.pipe(Effect.provideService(CurrentSession, session));
+        })
       );
     });
   })
@@ -159,7 +167,11 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
       return getValidatedSessionFromToken(auth, token ?? "").pipe(
-        Effect.map(Option.some),
+        Effect.map((session) =>
+          session.user.restrictedToOrganizationId
+            ? Option.none()
+            : Option.some(session)
+        ),
         Effect.catch(() => Effect.succeed(Option.none())),
         Effect.flatMap((session) =>
           effect.pipe(Effect.provideService(OptionalCurrentSession, session))
@@ -190,7 +202,16 @@ export const HttpApiAuthMiddlewareLive = Layer.effect(
       cookie: (effect, { credential }) =>
         getValidatedSessionFromToken(auth, Redacted.value(credential)).pipe(
           Effect.flatMap((session) =>
-            effect.pipe(Effect.provideService(CurrentSession, session))
+            Effect.gen(function* () {
+              if (session.user.restrictedToOrganizationId) {
+                return yield* new UnauthorizedError({
+                  message: "SSO sessions cannot access dashboard endpoints",
+                });
+              }
+              return yield* effect.pipe(
+                Effect.provideService(CurrentSession, session)
+              );
+            })
           )
         ),
     };

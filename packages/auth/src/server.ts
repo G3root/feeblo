@@ -31,6 +31,7 @@ import * as Redacted from "effect/Redacted";
 
 import { drizzleAdapter } from "./adapter/drizzzle-adapter";
 import { AuthConfig } from "./config";
+import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
 
 const loadPasswordResetEmail = () =>
@@ -41,6 +42,10 @@ const loadOrganizationInvitationEmail = () =>
 
 const loadVerificationOtpEmail = () =>
   import("@feeblo/transactional/templates/verification-otp");
+
+const baseConfig = {
+  plugins: [jwtAutoLogin()],
+} satisfies BetterAuthOptions;
 
 export const initAuthHandler = () =>
   Effect.gen(function* () {
@@ -77,6 +82,7 @@ export const initAuthHandler = () =>
     );
 
     const config = {
+      ...baseConfig,
       database: drizzleAdapter(db, {
         provider: "pg",
         schema: {
@@ -166,6 +172,7 @@ export const initAuthHandler = () =>
         autoSignIn: false,
       },
       plugins: [
+        ...baseConfig.plugins,
         ...(polarService.client && polarService.webhookSecret._tag === "Some"
           ? [
               polar({
@@ -253,7 +260,7 @@ export const initAuthHandler = () =>
             user,
             session,
           };
-        }),
+        }, baseConfig),
         admin(),
 
         lastLoginMethod({
@@ -452,7 +459,21 @@ export const initAuthHandler = () =>
     )
   );
 
+export type AuthClientMembership = {
+  membershipId: string;
+  organizationId: string;
+  role: "owner" | "admin" | "member";
+  userId: string;
+};
+
+export type AuthClientOrganization = {
+  id: string;
+};
+
 export type Auth = Effect.Success<ReturnType<typeof initAuthHandler>>;
-export type Session = Auth["$Infer"]["Session"];
+export type Session = Auth["$Infer"]["Session"] & {
+  memberships: AuthClientMembership[];
+  organizations: AuthClientOrganization[];
+};
 
 export const auth: ReturnType<typeof initAuthHandler> = initAuthHandler();

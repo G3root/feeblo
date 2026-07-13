@@ -3,6 +3,7 @@ import { sequence } from "astro:middleware";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";
 import type { APIContext, MiddlewareNext } from "astro";
+import { fetchRpcServer } from "~/lib/runtime-server";
 import { authClient } from "~/lib/server-auth-client";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
 
@@ -13,6 +14,7 @@ const REGISTER_PATH = "/register";
 const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
 const FEEDBACK_WIDGET_PATH = "/feedback-widget";
+const DASHBOARD_SUBDOMAIN = "app";
 const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_SIGN_IN_PATH,
   AUTH_SIGN_UP_PATH,
@@ -45,7 +47,10 @@ function resolveSubdomain(context: APIContext) {
 }
 
 function getTargetPathPrefix(subdomain: string | null) {
-  if (!subdomain || (subdomain && subdomain.toLowerCase() === "app")) {
+  if (
+    !subdomain ||
+    (subdomain && subdomain.toLowerCase() === DASHBOARD_SUBDOMAIN)
+  ) {
     return DASHBOARD_PATH;
   }
 
@@ -66,6 +71,10 @@ function stripLeadingSegment(pathname: string, segment: string) {
   return pathname.slice(segment.length + 1);
 }
 
+function isPublicBoardSubdomain(subdomain: string | null): subdomain is string {
+  return Boolean(subdomain && subdomain.toLowerCase() !== DASHBOARD_SUBDOMAIN);
+}
+
 function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   const subdomain = resolveSubdomain(context);
   context.locals.subdomain = subdomain;
@@ -79,6 +88,30 @@ function subdomainMiddleware(context: APIContext, next: MiddlewareNext) {
   if (!hasPathPrefix(pathname, targetPathPrefix)) {
     const suffix = pathname === "/" ? "" : pathname;
     return context.rewrite(`${targetPathPrefix}${suffix}${context.url.search}`);
+  }
+
+  return next();
+}
+
+async function siteMiddleware(context: APIContext, next: MiddlewareNext) {
+  const pathname = normalizePathname(context.url.pathname);
+  if (isFeedbackWidgetPath(pathname)) {
+    return next();
+  }
+
+  const { subdomain } = context.locals;
+  if (isPublicBoardSubdomain(subdomain)) {
+    try {
+      const sites = await fetchRpcServer((rpc) =>
+        rpc.SiteListBySubdomain({ subdomain })
+      );
+      context.locals.site = sites[0] ?? null;
+    } catch (error) {
+      console.error("Failed to fetch site for subdomain", subdomain, error);
+      context.locals.site = null;
+    }
+  } else {
+    context.locals.site = null;
   }
 
   return next();
@@ -98,6 +131,24 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
   context.locals.user = sessionData?.user ?? null;
   context.locals.session = sessionData?.session ?? null;
   context.locals.organizations = sessionData?.organizations ?? null;
+
+  if (sessionData?.user.restrictedToOrganizationId) {
+    const { subdomain, site } = context.locals;
+    if (isPublicBoardSubdomain(subdomain)) {
+      if (
+        !site ||
+        site.organizationId !== sessionData.user.restrictedToOrganizationId
+      ) {
+        context.locals.user = null;
+        context.locals.session = null;
+        context.locals.organizations = null;
+      }
+    } else {
+      context.locals.user = null;
+      context.locals.session = null;
+      context.locals.organizations = null;
+    }
+  }
 
   return next();
 }
@@ -202,8 +253,9 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
 }
 
 export const onRequest = sequence(
-  authMiddleware,
   subdomainMiddleware,
+  siteMiddleware,
+  authMiddleware,
   dashboardAuthRedirectMiddleware,
   redirectMiddleware
 );

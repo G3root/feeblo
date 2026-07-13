@@ -2,19 +2,21 @@ import {
   adminClient,
   customSessionClient,
   emailOTPClient,
-  inferAdditionalFields,
   organizationClient,
   twoFactorClient,
 } from "better-auth/client/plugins";
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import { z } from "zod";
-import type { Auth } from "./server";
+import type {
+  Auth,
+  AuthClientMembership,
+  AuthClientOrganization,
+} from "./server";
 
 export const createAuthClient = (baseURL: string) => {
   return createAuthClientBase({
     plugins: [
       customSessionClient<Auth>(),
-      inferAdditionalFields<Auth>(),
       emailOTPClient(),
       organizationClient(),
       twoFactorClient(),
@@ -22,17 +24,6 @@ export const createAuthClient = (baseURL: string) => {
     ],
     baseURL,
   });
-};
-
-export type AuthClientMembership = {
-  membershipId: string;
-  organizationId: string;
-  role: "owner" | "admin" | "member";
-  userId: string;
-};
-
-export type AuthClientOrganization = {
-  id: string;
 };
 
 export type TAuthClient = ReturnType<typeof createAuthClient>;

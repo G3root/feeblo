@@ -16,7 +16,6 @@ import {
 } from "better-auth/api";
 import { parseSetCookieHeader, setSessionCookie } from "better-auth/cookies";
 import { parseUserOutput } from "better-auth/db";
-import * as Effect from "effect/Effect";
 import * as z from "zod";
 import { JWT_AUTO_LOGIN_ERROR_CODES } from "./error-codes";
 import { schema } from "./schema";
@@ -35,7 +34,9 @@ const id = "jwt-auto-login" as const;
 const SIGN_IN_PATH = `/sign-in/${id}` as const;
 
 async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   session: Session & Record<string, any>;
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   user: UserWithJwtAutoLogin & Record<string, any>;
 } | null> {
   const cookieSession = await getSessionFromCtx<{
@@ -79,7 +80,7 @@ async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
   };
 }
 
-export const jwtAutoLogin = Effect.gen(function* () {
+export const jwtAutoLogin = () => {
   return {
     id,
     endpoints: {
@@ -134,6 +135,7 @@ export const jwtAutoLogin = Effect.gen(function* () {
           }
           const email = generateRandomEmail();
           const name = "Anonymous";
+          const emailHash = hashEmail(email);
 
           const newUser = await ctx.context.internalAdapter.createUser(
             {
@@ -141,6 +143,7 @@ export const jwtAutoLogin = Effect.gen(function* () {
               emailVerified: false,
               restrictedToOrganizationId: ctx.body.organizationId,
               name,
+              emailHash,
               jwtAutoLoginAt: new Date(),
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -263,6 +266,7 @@ export const jwtAutoLogin = Effect.gen(function* () {
             // new credential (email / social). Invoke the provided callback so that the
             // integrator can perform any additional logic such as transferring data
             // from the anonymous user to the new user.
+            //TODO: LINK here
             // if (options?.onLinkAccount) {
             //   await options.onLinkAccount({
             //     anonymousUser: {
@@ -274,8 +278,8 @@ export const jwtAutoLogin = Effect.gen(function* () {
             //   });
             // }
             const newSessionUser = newSession.user as
-              | (UserWithJwtAutoLogin & Record<string, any>)
-              | undefined;
+              // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+              (UserWithJwtAutoLogin & Record<string, any>) | undefined;
             const isSameUser = newSessionUser?.id === session.user.id;
             const newSessionIsAnonymous =
               !!newSessionUser?.restrictedToOrganizationId;
@@ -303,4 +307,4 @@ export const jwtAutoLogin = Effect.gen(function* () {
     schema,
     $ERROR_CODES: JWT_AUTO_LOGIN_ERROR_CODES,
   } satisfies BetterAuthPlugin;
-});
+};
