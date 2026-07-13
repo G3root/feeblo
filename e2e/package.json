@@ -4,13 +4,10 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test:browser": "vitest"
+    "test": "playwright test"
   },
   "devDependencies": {
-    "@feeblo/config": "workspace:*",
-    "@testing-library/dom": "^10.4.1",
-    "@vitest/browser-playwright": "^4.1.10",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "@playwright/test": "^1.61.1",
+    "@types/node": "catalog:"
   }
 }
