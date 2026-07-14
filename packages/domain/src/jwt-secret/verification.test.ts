@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as jose from "jose";
-import { verifyJwt } from "../../src/jwt-secret/verification";
-import { UnauthorizedError } from "../../src/rpc-errors";
+import { verifyJwt } from "./verification";
+import { UnauthorizedError } from "../rpc-errors";
 
 const SECRET = "test-secret";
 const OTHER_SECRET = "other-secret";

@@ -3,13 +3,13 @@ import { Database } from "@feeblo/db";
 import { PostId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { BoardRepository } from "../../src/board/repository";
-import { PostRpcHandlersEffect } from "../../src/post/handlers";
-import { PostPolicy } from "../../src/post/policies";
-import { PostRepository } from "../../src/post/repository";
-import { PostSubscriptionRepository } from "../../src/post-subscription/repository";
-import { BadRequestError } from "../../src/rpc-errors";
-import { CurrentSession, type Session } from "../../src/session-middleware";
+import { BoardRepository } from "../board/repository";
+import { PostRpcHandlersEffect } from "./handlers";
+import { PostPolicy } from "./policies";
+import { PostRepository } from "./repository";
+import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { BadRequestError } from "../rpc-errors";
+import { CurrentSession, type Session } from "../session-middleware";
 
 const session: Session = {
   user: {

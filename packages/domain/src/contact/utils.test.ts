@@ -1,17 +1,17 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import { DataValidationError } from "../../src/contact/errors";
+import { DataValidationError } from "./errors";
 import type {
   TCompanyAttributeDefinition,
   TContactAttributeDefinition,
-} from "../../src/contact/schema";
+} from "./schema";
 import {
   buildAttributeValueColumns,
   parseCompanyCustomAttributes,
   parseContactCustomAttributes,
   parsePersonAttributes,
   toMutableConfig,
-} from "../../src/contact/utils";
+} from "./utils";
 
 const now = new Date();
 
