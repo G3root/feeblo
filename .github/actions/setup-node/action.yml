@@ -9,6 +9,10 @@ inputs:
     required: false
     default: ''
     description: Allow to disable `pnpm install` call
+  registry-url:
+    required: false
+    default: ''
+    description: Optional npm registry URL; enables npm auth via NODE_AUTH_TOKEN
 runs:
   using: "composite"
   steps:
@@ -20,6 +24,7 @@ runs:
       with:
         node-version-file: .node-version
         cache: ${{ inputs.cache && 'pnpm' || '' }}
+        registry-url: ${{ inputs.registry-url }}
 
     - name: Install pnpm dependencies
       if: ${{ inputs.install != 'false' }}
