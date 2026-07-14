@@ -35,7 +35,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/G3root/feeblo.git",
+    "url": "git+https://github.com/G3root/feeblo.git",
     "directory": "packages/sdk"
   },
   "homepage": "https://github.com/G3root/feeblo/tree/main/packages/sdk",
