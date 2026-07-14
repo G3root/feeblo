@@ -18,82 +18,79 @@ import type {
 const isReservedSubdomain = (subdomain: string) =>
   RESERVED_SUBDOMAINS.includes(subdomain);
 
-export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
-  Effect.gen(function* () {
-    const repository = yield* WorkspaceRepository;
+export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
+  const repository = yield* WorkspaceRepository;
 
-    return {
-      WorkspaceCreate: (args: TCreateWorkspaceInput) => {
-        return Effect.gen(function* () {
-          const session = yield* CurrentSession;
-          const workspaceName = args.workspaceName.trim();
+  return {
+    WorkspaceCreate: (args: TCreateWorkspaceInput) => {
+      return Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const workspaceName = args.workspaceName.trim();
 
-          const subdomain = slugify(workspaceName);
-          if (subdomain.length < 4) {
-            return yield* new BadRequestError({
-              message:
-                "Workspace name must produce a subdomain of at least 4 characters",
-            });
-          }
-          if (isReservedSubdomain(subdomain)) {
-            return yield* new BadRequestError({
-              message:
-                "This workspace name is reserved. Please choose another.",
-            });
-          }
+        const subdomain = slugify(workspaceName);
+        if (subdomain.length < 4) {
+          return yield* new BadRequestError({
+            message:
+              "Workspace name must produce a subdomain of at least 4 characters",
+          });
+        }
+        if (isReservedSubdomain(subdomain)) {
+          return yield* new BadRequestError({
+            message: "This workspace name is reserved. Please choose another.",
+          });
+        }
 
-          const organizationId = yield* transaction(
-            Effect.gen(function* () {
-              const isSubdomainTaken =
-                yield* repository.isSubdomainTaken(subdomain);
+        const organizationId = yield* transaction(
+          Effect.gen(function* () {
+            const isSubdomainTaken =
+              yield* repository.isSubdomainTaken(subdomain);
 
-              if (isSubdomainTaken) {
-                return yield* new BadRequestError({
-                  message: "This workspace name is already taken",
-                });
-              }
-
-              return yield* repository.createWorkspace({
-                userId: session.session.userId,
-                workspaceName,
-                subdomain,
+            if (isSubdomainTaken) {
+              return yield* new BadRequestError({
+                message: "This workspace name is already taken",
               });
-            })
-          );
+            }
 
-          return { organizationId };
-        }).pipe(withRemapDbErrors("Workspace", "create"));
-      },
-      WorkspaceProductList: () =>
-        repository
-          .findProducts()
-          .pipe(withRemapDbErrors("Workspace", "select")),
-      WorkspacePlanGet: (args: TWorkspaceInput) =>
-        repository
-          .findPlanByOrganizationId({
-            organizationId: args.organizationId,
+            return yield* repository.createWorkspace({
+              userId: session.session.userId,
+              workspaceName,
+              subdomain,
+            });
           })
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("Workspace", "select")
-          ),
-      WorkspaceSlugCheck: (args: TWorkspaceSlugCheckInput) =>
-        Effect.gen(function* () {
-          if (isReservedSubdomain(args.slug)) {
-            return { available: false, suggestion: null };
-          }
-          const taken = yield* repository.isSubdomainTaken(args.slug);
-          if (!taken) {
-            return { available: true, suggestion: null };
-          }
-          const suggestion = yield* repository.getSubdomainSuggestion(
-            args.slug
-          );
-          return {
-            available: false,
-            suggestion: Option.getOrNull(suggestion),
-          };
-        }).pipe(withRemapDbErrors("Workspace", "select")),
-    };
-  })
+        );
+
+        return { organizationId };
+      }).pipe(withRemapDbErrors("Workspace", "create"));
+    },
+    WorkspaceProductList: () =>
+      repository.findProducts().pipe(withRemapDbErrors("Workspace", "select")),
+    WorkspacePlanGet: (args: TWorkspaceInput) =>
+      repository
+        .findPlanByOrganizationId({
+          organizationId: args.organizationId,
+        })
+        .pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("Workspace", "select")
+        ),
+    WorkspaceSlugCheck: (args: TWorkspaceSlugCheckInput) =>
+      Effect.gen(function* () {
+        if (isReservedSubdomain(args.slug)) {
+          return { available: false, suggestion: null };
+        }
+        const taken = yield* repository.isSubdomainTaken(args.slug);
+        if (!taken) {
+          return { available: true, suggestion: null };
+        }
+        const suggestion = yield* repository.getSubdomainSuggestion(args.slug);
+        return {
+          available: false,
+          suggestion: Option.getOrNull(suggestion),
+        };
+      }).pipe(withRemapDbErrors("Workspace", "select")),
+  };
+});
+
+export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
+  WorkspaceRpcHandlersEffect
 ).pipe(Layer.provide(WorkspaceRepository.layer));
