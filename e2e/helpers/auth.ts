@@ -41,5 +41,8 @@ export async function logOut(page: Page, userEmail: string) {
 export async function logIn(page: Page, user: TestUser) {
   const loginPage = new LoginPage(page);
   await loginPage.goto();
-  await loginPage.login(user.email, user.password);
+  await Promise.all([
+    page.waitForURL(/\/org_/),
+    loginPage.login(user.email, user.password),
+  ]);
 }

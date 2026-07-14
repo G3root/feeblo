@@ -21,6 +21,13 @@ export class LoginPage {
   async login(email: string, password: string) {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
-    await this.submitButton.click();
+    await Promise.all([
+      this.page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/auth/sign-in/email") &&
+          response.request().method() === "POST"
+      ),
+      this.submitButton.click(),
+    ]);
   }
 }

@@ -26,7 +26,7 @@ export const uploadedEditorMediaSchema = z.object({
   url: z.url(),
 });
 
-export const authClient = createAuthClient("/api/");
+export const authClient = createAuthClient(baseUrl);
 
 export const authStateCollection = createCollection(
   localOnlyCollectionOptions({

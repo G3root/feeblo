@@ -1,10 +1,19 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { logIn, logOut, signUpAndCreateWorkspace } from "../helpers/auth";
 import { createTestUser } from "../helpers/test-users";
 
-test.describe.configure({ mode: "serial" });
-
 test.describe("authentication", () => {
+  test.beforeEach(({ page }) => {
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        console.error(`[browser console] ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => {
+      console.error(`[browser pageerror] ${error.message}`);
+    });
+  });
+
   test("user can sign up and create a workspace", async ({ page }) => {
     const user = createTestUser();
     const { organizationUrl } = await signUpAndCreateWorkspace(page, user);
@@ -20,7 +29,7 @@ test.describe("authentication", () => {
     await logOut(page, user.email);
     await logIn(page, user);
 
-    await page.waitForURL(organizationUrl);
+    await expect(page).toHaveURL(organizationUrl);
     await expect(page.getByRole("button", { name: user.email })).toBeVisible();
   });
 });

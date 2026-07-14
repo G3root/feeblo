@@ -1,4 +1,5 @@
 import path from "node:path";
+import { mkdir } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
@@ -12,6 +13,8 @@ if (!databaseUrl) {
 const dataDir = databaseUrl.startsWith("pglite:")
   ? databaseUrl.slice("pglite:".length)
   : databaseUrl;
+
+await mkdir(dataDir, { recursive: true });
 
 const pglite = new PGlite(dataDir);
 const db = drizzle({ client: pglite });
