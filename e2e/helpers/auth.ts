@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { LoginPage } from "../page-objects/LoginPage";
 import { RegisterPage } from "../page-objects/RegisterPage";
 import { SignUpPage } from "../page-objects/SignUpPage";
@@ -7,6 +7,23 @@ import { createTestUser, type TestUser } from "./test-users";
 export type AuthenticatedUser = TestUser & {
   organizationUrl: string;
 };
+
+const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
+
+export async function signUpProgrammatically(page: Page, user: TestUser) {
+  const response = await page.context().request.post(
+    `${apiURL}/api/auth/sign-up/email`,
+    {
+      data: {
+        name: user.name,
+        email: user.email,
+        password: user.password,
+      },
+    }
+  );
+
+  expect(response.ok()).toBeTruthy();
+}
 
 export async function signUpAndCreateWorkspace(
   page: Page,
@@ -29,6 +46,23 @@ export async function signUpAndCreateWorkspace(
   const organizationUrl = page.url();
 
   return { ...user, organizationUrl };
+}
+
+export async function createAuthenticatedWorkspace(
+  page: Page,
+  user: TestUser = createTestUser()
+): Promise<AuthenticatedUser> {
+  await signUpProgrammatically(page, user);
+
+  const registerPage = new RegisterPage(page);
+  await registerPage.goto();
+
+  await Promise.all([
+    page.waitForURL(/\/org_/),
+    registerPage.createWorkspace(user.workspaceName),
+  ]);
+
+  return { ...user, organizationUrl: page.url() };
 }
 
 export async function logOut(page: Page, userEmail: string) {

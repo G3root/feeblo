@@ -4,11 +4,10 @@ import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
+import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
-import {
-  isPrivilegedMemberRole,
-  PLAN_ENTITLEMENTS,
-} from "@feeblo/domain/plan-entitlements";
+import { isPrivilegedMemberRole } from "@feeblo/domain/plan-entitlements";
+import { PolicyDeniedError } from "@feeblo/domain/policy";
 import {
   createSsoSession,
   linkAnonymousAccount,
@@ -18,7 +17,11 @@ import {
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { Mailer } from "@feeblo/transactional/mailer";
 import { polar, webhooks } from "@polar-sh/better-auth";
-import { type BetterAuthOptions, betterAuth } from "better-auth";
+import {
+  type BetterAuthOptions,
+  type BetterAuthPlugin,
+  betterAuth,
+} from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import {
   admin,
@@ -27,6 +30,7 @@ import {
   emailOTP,
   lastLoginMethod,
   organization,
+  testUtils,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
@@ -49,6 +53,9 @@ const loadOrganizationInvitationEmail = () =>
 const loadVerificationOtpEmail = () =>
   import("@feeblo/transactional/templates/verification-otp");
 
+const createTestUtilsPlugin = (): BetterAuthPlugin =>
+  testUtils({ captureOTP: true }) as unknown as BetterAuthPlugin;
+
 export const initAuthHandler = () =>
   Effect.gen(function* () {
     const {
@@ -69,6 +76,8 @@ export const initAuthHandler = () =>
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
+    const isTest = nodeEnv === "test";
+
     const trustedOrigins = yield* getTrustedOrigins;
     const db = yield* Database.Database;
 
@@ -79,6 +88,7 @@ export const initAuthHandler = () =>
         dbLayer,
         PolarService.layer,
         BillingRepository.layer,
+        EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
         MembershipRepository.layer,
         Mailer.layer,
         WorkspaceRepository.layer,
@@ -108,6 +118,48 @@ export const initAuthHandler = () =>
         );
       },
     };
+
+    const mapPolicyDeniedToApiError = (error: unknown) => {
+      if (error instanceof PolicyDeniedError) {
+        return new APIError("FORBIDDEN", {
+          message: error.reason ?? "Forbidden",
+        });
+      }
+
+      return error;
+    };
+
+    const runCallbackPolicy = async (
+      effect: Parameters<typeof callbackRuntime.runPromise>[0]
+    ) => {
+      try {
+        await callbackRuntime.runPromise(effect);
+      } catch (error) {
+        throw mapPolicyDeniedToApiError(error);
+      }
+    };
+
+    const canAssignPrivilegedRole = (organizationId: string) =>
+      Effect.gen(function* () {
+        const entitlementPolicy = yield* EntitlementPolicy;
+        const membershipRepository = yield* MembershipRepository;
+
+        yield* entitlementPolicy.canAssignPrivilegedRole({
+          organizationId,
+          privilegedRoleCount: Effect.gen(function* () {
+            const privilegedMembersCount =
+              yield* membershipRepository.countPrivilegedMembers({
+                organizationId,
+              });
+            const pendingPrivilegedInvitationsCount =
+              yield* membershipRepository.countPendingPrivilegedInvitations({
+                organizationId,
+              });
+
+            return privilegedMembersCount + pendingPrivilegedInvitationsCount;
+          }),
+        });
+      });
 
     const baseConfig = {
       plugins: [jwtAutoLogin(ssoOptions)],
@@ -305,44 +357,8 @@ export const initAuthHandler = () =>
                 return;
               }
 
-              await callbackRuntime.runPromise(
-                Effect.gen(function* () {
-                  const workspaceRepository = yield* WorkspaceRepository;
-                  const membershipRepository = yield* MembershipRepository;
-
-                  const planState =
-                    yield* workspaceRepository.findPlanByOrganizationId({
-                      organizationId: data.organization.id,
-                    });
-                  const entitlements = PLAN_ENTITLEMENTS[planState.plan];
-
-                  if (entitlements.privilegedRoleLimit === null) {
-                    return;
-                  }
-
-                  const privilegedMembersCount =
-                    yield* membershipRepository.countPrivilegedMembers({
-                      organizationId: data.organization.id,
-                    });
-                  const pendingPrivilegedInvitationsCount =
-                    yield* membershipRepository.countPendingPrivilegedInvitations(
-                      {
-                        organizationId: data.organization.id,
-                      }
-                    );
-
-                  if (
-                    privilegedMembersCount +
-                      pendingPrivilegedInvitationsCount >=
-                    entitlements.privilegedRoleLimit
-                  ) {
-                    return yield* Effect.fail(
-                      new APIError("FORBIDDEN", {
-                        message: `The ${planState.plan} plan allows up to ${entitlements.privilegedRoleLimit} admin roles.`,
-                      })
-                    );
-                  }
-                })
+              await runCallbackPolicy(
+                canAssignPrivilegedRole(data.organization.id)
               );
             },
             async beforeUpdateMemberRole(data) {
@@ -353,44 +369,8 @@ export const initAuthHandler = () =>
                 return;
               }
 
-              await callbackRuntime.runPromise(
-                Effect.gen(function* () {
-                  const workspaceRepository = yield* WorkspaceRepository;
-                  const membershipRepository = yield* MembershipRepository;
-
-                  const planState =
-                    yield* workspaceRepository.findPlanByOrganizationId({
-                      organizationId: data.organization.id,
-                    });
-                  const entitlements = PLAN_ENTITLEMENTS[planState.plan];
-
-                  if (entitlements.privilegedRoleLimit === null) {
-                    return;
-                  }
-
-                  const privilegedMembersCount =
-                    yield* membershipRepository.countPrivilegedMembers({
-                      organizationId: data.organization.id,
-                    });
-                  const pendingPrivilegedInvitationsCount =
-                    yield* membershipRepository.countPendingPrivilegedInvitations(
-                      {
-                        organizationId: data.organization.id,
-                      }
-                    );
-
-                  if (
-                    privilegedMembersCount +
-                      pendingPrivilegedInvitationsCount >=
-                    entitlements.privilegedRoleLimit
-                  ) {
-                    return yield* Effect.fail(
-                      new APIError("FORBIDDEN", {
-                        message: `The ${planState.plan} plan allows up to ${entitlements.privilegedRoleLimit} admin roles.`,
-                      })
-                    );
-                  }
-                })
+              await runCallbackPolicy(
+                canAssignPrivilegedRole(data.organization.id)
               );
             },
           },
@@ -441,6 +421,8 @@ export const initAuthHandler = () =>
             );
           },
         }),
+
+        ...(isTest ? [createTestUtilsPlugin()] : []),
       ],
 
       hooks: {

@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -123,6 +124,7 @@ export const BoardRpcHandlers = BoardRpcs.toLayer(
   })
 ).pipe(
   Layer.provide(BoardPolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(BoardRepository.layer)
 );

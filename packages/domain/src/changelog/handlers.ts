@@ -1,6 +1,7 @@
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -98,6 +99,7 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   })
 ).pipe(
   Layer.provide(SitePolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(ChangelogPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),

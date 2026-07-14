@@ -3,9 +3,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
-import { WorkspaceRepository } from "../workspace/repository";
 import { SiteRepository } from "./repository";
 
 type TCanHidePoweredByBranding = {
@@ -14,26 +13,11 @@ type TCanHidePoweredByBranding = {
 };
 
 const makeSitePolicy = Effect.gen(function* () {
-  const workspaceRepository = yield* WorkspaceRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const siteRepository = yield* SiteRepository;
 
   const canHidePoweredByBranding = (args: TCanHidePoweredByBranding) =>
-    Effect.gen(function* () {
-      if (!args.hidePoweredBy) {
-        return;
-      }
-
-      const planState = yield* workspaceRepository.findPlanByOrganizationId({
-        organizationId: args.organizationId,
-      });
-
-      if (!PLAN_ENTITLEMENTS[planState.plan].whitelist) {
-        return yield* new Policy.PolicyDeniedError({
-          reason:
-            "Hiding powered by branding requires the Starter plan or higher.",
-        });
-      }
-    });
+    entitlementPolicy.canHidePoweredByBranding(args);
 
   const canViewRoadmap = (organizationId: string) =>
     Effect.gen(function* () {

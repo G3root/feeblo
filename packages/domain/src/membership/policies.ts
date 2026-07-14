@@ -4,12 +4,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import {
-  isPrivilegedMemberRole,
-  PLAN_ENTITLEMENTS,
-} from "../plan-entitlements";
+import { EntitlementPolicy } from "../entitlement/policies";
+import { isPrivilegedMemberRole } from "../plan-entitlements";
 import * as Policy from "../policy";
-import { WorkspaceRepository } from "../workspace/repository";
 import { MembershipRepository } from "./repository";
 
 type TIsNotMember = {
@@ -35,7 +32,7 @@ type TCanAssignRoleWithinPlan = {
 
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
-  const workspaceRepository = yield* WorkspaceRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const isNotMember = (args: TIsNotMember) =>
     repository
@@ -81,31 +78,21 @@ const makeMembershipPolicy = Effect.gen(function* () {
         return;
       }
 
-      const planState = yield* workspaceRepository.findPlanByOrganizationId({
+      yield* entitlementPolicy.canAssignPrivilegedRole({
         organizationId: args.organizationId,
+        privilegedRoleCount: Effect.gen(function* () {
+          const privilegedMembersCount =
+            yield* repository.countPrivilegedMembers({
+              organizationId: args.organizationId,
+            });
+          const pendingPrivilegedInvitationsCount =
+            yield* repository.countPendingPrivilegedInvitations({
+              organizationId: args.organizationId,
+            });
+
+          return privilegedMembersCount + pendingPrivilegedInvitationsCount;
+        }),
       });
-      const entitlements = PLAN_ENTITLEMENTS[planState.plan];
-
-      if (entitlements.privilegedRoleLimit === null) {
-        return;
-      }
-
-      const privilegedMembersCount = yield* repository.countPrivilegedMembers({
-        organizationId: args.organizationId,
-      });
-      const pendingPrivilegedInvitationsCount =
-        yield* repository.countPendingPrivilegedInvitations({
-          organizationId: args.organizationId,
-        });
-
-      if (
-        privilegedMembersCount + pendingPrivilegedInvitationsCount >=
-        entitlements.privilegedRoleLimit
-      ) {
-        return yield* new Policy.PolicyDeniedError({
-          reason: `The ${planState.plan} plan allows up to ${entitlements.privilegedRoleLimit} admin roles.`,
-        });
-      }
     });
 
   return {

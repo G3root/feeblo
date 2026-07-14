@@ -2,6 +2,8 @@ import { transaction } from "@feeblo/db";
 import { APIError as BetterAuthApiError } from "better-auth";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import {
   BadRequestError,
@@ -175,6 +177,7 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
   })
 ).pipe(
   Layer.provide(MembershipPolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(MembershipRepository.layer),
   Layer.provide(WorkspaceRepository.layer)
 );

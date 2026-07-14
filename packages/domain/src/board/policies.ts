@@ -3,9 +3,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
-import { WorkspaceRepository } from "../workspace/repository";
 import { BoardRepository } from "./repository";
 
 type TIsCreator = {
@@ -26,7 +25,7 @@ type TCanUpdate = {
 
 const makeBoardPolicy = Effect.gen(function* () {
   const repository = yield* BoardRepository;
-  const workspaceRepository = yield* WorkspaceRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const isCreator = (args: TIsCreator) =>
     Policy.policy((user) =>
@@ -55,29 +54,11 @@ const makeBoardPolicy = Effect.gen(function* () {
     );
 
   const canCreate = (args: TCanCreate) =>
-    Effect.gen(function* () {
-      const planState = yield* workspaceRepository.findPlanByOrganizationId({
+    entitlementPolicy.canCreateBoard({
+      ...args,
+      boardCount: repository.countByOrganizationId({
         organizationId: args.organizationId,
-      });
-      const entitlements = PLAN_ENTITLEMENTS[planState.plan];
-
-      if (args.visibility === "PRIVATE" && !entitlements.privateBoards) {
-        return yield* new Policy.PolicyDeniedError({
-          reason: "Private boards require the Starter plan or higher.",
-        });
-      }
-
-      if (entitlements.boardLimit !== null) {
-        const boardCount = yield* repository.countByOrganizationId({
-          organizationId: args.organizationId,
-        });
-
-        if (boardCount >= entitlements.boardLimit) {
-          return yield* new Policy.PolicyDeniedError({
-            reason: `The ${planState.plan} plan allows up to ${entitlements.boardLimit} feedback boards.`,
-          });
-        }
-      }
+      }),
     });
 
   const canUpdate = (args: TCanUpdate) =>
@@ -95,15 +76,9 @@ const makeBoardPolicy = Effect.gen(function* () {
         return;
       }
 
-      const planState = yield* workspaceRepository.findPlanByOrganizationId({
+      yield* entitlementPolicy.canUpdateBoardVisibility({
         organizationId: args.organizationId,
       });
-
-      if (!PLAN_ENTITLEMENTS[planState.plan].privateBoards) {
-        return yield* new Policy.PolicyDeniedError({
-          reason: "Private boards require the Starter plan or higher.",
-        });
-      }
     });
 
   return { isOwner, canCreate, canUpdate };

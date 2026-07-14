@@ -46,6 +46,12 @@
     "./plan-entitlements": {
       "default": "./src/plan-entitlements.ts"
     },
+    "./entitlement/policies": {
+      "default": "./src/entitlement/policies.ts"
+    },
+    "./policy": {
+      "default": "./src/policy.ts"
+    },
     "./session-middleware": {
       "default": "./src/session-middleware.ts"
     },
