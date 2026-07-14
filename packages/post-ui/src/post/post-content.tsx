@@ -1,10 +1,6 @@
 import type { EditorProps } from "@feeblo/ui/editor";
+import { Editor } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
-import { lazy, Suspense } from "react";
-
-const Editor = lazy(() =>
-  import("@feeblo/ui/editor").then((mod) => ({ default: mod.Editor }))
-);
 
 interface PostContentEditorProps extends EditorProps {
   onChange: (value: string) => void;
@@ -19,18 +15,16 @@ export function PostContentEditor({
 }: PostContentEditorProps) {
   return (
     <div className="space-y-3">
-      <Suspense>
-        <EditorProvider defaultValue={{ postContent: value }}>
-          <Editor
-            onChange={(doc) => {
-              onChange(doc);
-            }}
-            placeholder="Add description..."
-            readOnly={readOnly}
-            {...rest}
-          />
-        </EditorProvider>
-      </Suspense>
+      <EditorProvider defaultValue={{ postContent: value }}>
+        <Editor
+          onChange={(doc) => {
+            onChange(doc);
+          }}
+          placeholder="Add description..."
+          readOnly={readOnly}
+          {...rest}
+        />
+      </EditorProvider>
 
       {
         //TODO: Add image upload button when editor is not readOnly
