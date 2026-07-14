@@ -19,38 +19,57 @@ export const PostSubscriptionRpcHandlers = PostSubscriptionRpcs.toLayer(
     const repository = yield* PostSubscriptionRepository;
     const postPolicy = yield* PostPolicy;
 
+    // -- Shared effect helpers (no policy applied) --
+
+    const listSubscribersEffect = (args: TPostSubscriptionList) =>
+      repository.findSubscribers({
+        organizationId: args.organizationId,
+        postId: args.postId,
+      });
+
+    const subscribeEffect = (args: TPostSubscriptionCreate) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+
+        yield* repository.subscribe({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          userId: session.session.userId,
+          ...(membership ? { memberId: membership.membershipId } : {}),
+        });
+
+        return { subscribed: true };
+      });
+
+    const unsubscribeEffect = (args: TPostSubscriptionDelete) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+
+        yield* repository.unsubscribe({
+          postId: args.postId,
+          userId: session.session.userId,
+        });
+
+        return { subscribed: false };
+      });
+
+    // -- RPC handlers --
+
     return {
       PostSubscriptionList: (args: TPostSubscriptionList) =>
-        repository
-          .findSubscribers({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("PostSubscription", "select")
-          ),
+        listSubscribersEffect(args).pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("PostSubscription", "select")
+        ),
+
       PostSubscriptionListPublic: (args: TPostSubscriptionList) =>
-        repository
-          .findSubscribers({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
-          .pipe(withRemapDbErrors("PostSubscription", "select")),
+        listSubscribersEffect(args).pipe(
+          withRemapDbErrors("PostSubscription", "select")
+        ),
+
       PostSubscriptionCreate: (args: TPostSubscriptionCreate) =>
-        Effect.gen(function* () {
-          const session = yield* CurrentSession;
-          const membership = Policy.getMembership(session, args.organizationId);
-
-          yield* repository.subscribe({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-            ...(membership ? { memberId: membership.membershipId } : {}),
-          });
-
-          return { subscribed: true };
-        }).pipe(
+        subscribeEffect(args).pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
@@ -62,20 +81,9 @@ export const PostSubscriptionRpcHandlers = PostSubscriptionRpcs.toLayer(
           ),
           withRemapDbErrors("PostSubscription", "create")
         ),
+
       PostSubscriptionCreatePublic: (args: TPostSubscriptionCreate) =>
-        Effect.gen(function* () {
-          const session = yield* CurrentSession;
-          const membership = Policy.getMembership(session, args.organizationId);
-
-          yield* repository.subscribe({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-            ...(membership ? { memberId: membership.membershipId } : {}),
-          });
-
-          return { subscribed: true };
-        }).pipe(
+        subscribeEffect(args).pipe(
           Policy.withPolicy(
             postPolicy.isUnlockedPublic({
               organizationId: args.organizationId,
@@ -84,17 +92,9 @@ export const PostSubscriptionRpcHandlers = PostSubscriptionRpcs.toLayer(
           ),
           withRemapDbErrors("PostSubscription", "create")
         ),
+
       PostSubscriptionDelete: (args: TPostSubscriptionDelete) =>
-        Effect.gen(function* () {
-          const session = yield* CurrentSession;
-
-          yield* repository.unsubscribe({
-            postId: args.postId,
-            userId: session.session.userId,
-          });
-
-          return { subscribed: false };
-        }).pipe(
+        unsubscribeEffect(args).pipe(
           Policy.withPolicy(
             Policy.all(
               Policy.hasMembership(args.organizationId),
@@ -106,17 +106,9 @@ export const PostSubscriptionRpcHandlers = PostSubscriptionRpcs.toLayer(
           ),
           withRemapDbErrors("PostSubscription", "delete")
         ),
+
       PostSubscriptionDeletePublic: (args: TPostSubscriptionDelete) =>
-        Effect.gen(function* () {
-          const session = yield* CurrentSession;
-
-          yield* repository.unsubscribe({
-            postId: args.postId,
-            userId: session.session.userId,
-          });
-
-          return { subscribed: false };
-        }).pipe(
+        unsubscribeEffect(args).pipe(
           Policy.withPolicy(
             postPolicy.isUnlockedPublic({
               organizationId: args.organizationId,
