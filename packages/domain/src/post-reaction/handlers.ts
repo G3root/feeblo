@@ -10,77 +10,79 @@ import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
 import type { TPostReactionList, TPostReactionToggle } from "./schema";
 
-export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
-  Effect.gen(function* () {
-    const repository = yield* PostReactionRepository;
-    const postPolicy = yield* PostPolicy;
-    // const sitePolicy = yield* SitePolicy;
+export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
+  const repository = yield* PostReactionRepository;
+  const postPolicy = yield* PostPolicy;
+  // const sitePolicy = yield* SitePolicy;
 
-    return {
-      PostReactionList: (args: TPostReactionList) =>
-        repository
-          .list({
-            postId: args.postId,
-            organizationId: args.organizationId,
-          })
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("PostReaction", "select")
-          ),
-      PostReactionToggle: (args: TPostReactionToggle) =>
-        Effect.gen(function* () {
-          const session = yield* CurrentSession;
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
-
-          return yield* repository.toggle({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-            emoji: args.emoji,
-          });
-        }).pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(args.organizationId),
-              postPolicy.isUnlocked({
-                organizationId: args.organizationId,
-                postId: args.postId,
-              })
-            )
-          ),
-          withRemapDbErrors("PostReaction", "update")
+  return {
+    PostReactionList: (args: TPostReactionList) =>
+      repository
+        .list({
+          postId: args.postId,
+          organizationId: args.organizationId,
+        })
+        .pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("PostReaction", "select")
         ),
-      PostReactionListPublic: (args: TPostReactionList) =>
-        repository
-          .listPublic({
-            postId: args.postId,
-            organizationId: args.organizationId,
-          })
-          .pipe(withRemapDbErrors("PostReaction", "select")),
-      PostReactionTogglePublic: (args: TPostReactionToggle) =>
-        Effect.gen(function* () {
-          const session = yield* CurrentSession;
-          //TODO: comeback later
-          // yield* sitePolicy.canViewRoadmap(args.organizationId);
+    PostReactionToggle: (args: TPostReactionToggle) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        //TODO: comeback later
+        // yield* sitePolicy.canViewRoadmap(args.organizationId);
 
-          return yield* repository.togglePublic({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-            emoji: args.emoji,
-          });
-        }).pipe(
-          Policy.withPolicy(
-            postPolicy.isUnlockedPublic({
+        return yield* repository.toggle({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          userId: session.session.userId,
+          emoji: args.emoji,
+        });
+      }).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasMembership(args.organizationId),
+            postPolicy.isUnlocked({
               organizationId: args.organizationId,
               postId: args.postId,
             })
-          ),
-          withRemapDbErrors("PostReaction", "update")
+          )
         ),
-    };
-  })
+        withRemapDbErrors("PostReaction", "update")
+      ),
+    PostReactionListPublic: (args: TPostReactionList) =>
+      repository
+        .listPublic({
+          postId: args.postId,
+          organizationId: args.organizationId,
+        })
+        .pipe(withRemapDbErrors("PostReaction", "select")),
+    PostReactionTogglePublic: (args: TPostReactionToggle) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        //TODO: comeback later
+        // yield* sitePolicy.canViewRoadmap(args.organizationId);
+
+        return yield* repository.togglePublic({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          userId: session.session.userId,
+          emoji: args.emoji,
+        });
+      }).pipe(
+        Policy.withPolicy(
+          postPolicy.isUnlockedPublic({
+            organizationId: args.organizationId,
+            postId: args.postId,
+          })
+        ),
+        withRemapDbErrors("PostReaction", "update")
+      ),
+  };
+});
+
+export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
+  PostReactionRpcHandlersEffect
 ).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),

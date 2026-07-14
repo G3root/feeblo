@@ -86,125 +86,128 @@ const validateChangelog = ({
     }
   });
 
-export const TagRpcHandlers = TagRpcs.toLayer(
-  Effect.gen(function* () {
-    const repository = yield* TagRepository;
-    const tagPolicy = yield* TagPolicy;
+export const TagRpcHandlersEffect = Effect.gen(function* () {
+  const repository = yield* TagRepository;
+  const tagPolicy = yield* TagPolicy;
 
-    return {
-      TagList: (args: TTagList) =>
-        repository
-          .findMany(args)
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("Tag", "select")
-          ),
-
-      TagListPublic: (args: TTagList) =>
-        repository.findMany(args).pipe(withRemapDbErrors("Tag", "select")),
-
-      PostTagList: (args: TPostTagList) =>
-        repository
-          .findPostTags(args)
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("Tag", "select")
-          ),
-
-      PostTagListPublic: (args: TPostTagList) =>
-        repository.findPostTags(args).pipe(withRemapDbErrors("Tag", "select")),
-
-      ChangelogTagList: (args: TChangelogTagList) =>
-        repository
-          .findChangelogTags(args)
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("Tag", "select")
-          ),
-
-      ChangelogTagListPublic: (args: TChangelogTagList) =>
-        repository
-          .findChangelogTags(args)
-          .pipe(withRemapDbErrors("Tag", "select")),
-
-      TagCreate: (args: TTagCreate) =>
-        Effect.gen(function* () {
-          const session = yield* CurrentSession;
-          const membership = session.memberships.find(
-            (entry) => entry.organizationId === args.organizationId
-          );
-
-          yield* repository.create({
-            ...args,
-            creatorId: session.session.userId,
-            ...(membership ? { creatorMemberId: membership.membershipId } : {}),
-          });
-        }).pipe(
+  return {
+    TagList: (args: TTagList) =>
+      repository
+        .findMany(args)
+        .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Tag", "create")
+          withRemapDbErrors("Tag", "select")
         ),
 
-      TagUpdate: (args: TTagUpdate) =>
-        repository.update(args).pipe(
-          Policy.withPolicy(
-            tagPolicy.isOwner({
-              organizationId: args.organizationId,
-              tagId: args.id,
-            })
-          ),
-          withRemapDbErrors("Tag", "update")
-        ),
+    TagListPublic: (args: TTagList) =>
+      repository.findMany(args).pipe(withRemapDbErrors("Tag", "select")),
 
-      TagDelete: (args: TTagDelete) =>
-        repository.delete(args).pipe(
-          Policy.withPolicy(
-            tagPolicy.isOwner({
-              organizationId: args.organizationId,
-              tagId: args.id,
-            })
-          ),
-          withRemapDbErrors("Tag", "delete")
-        ),
-
-      PostTagSet: (args: TPostTagSet) =>
-        Effect.gen(function* () {
-          //TODO add ownership Policy
-          const tagIds = normalizeTagIds(args.tagIds);
-          yield* validatePost({
-            postId: args.postId,
-            organizationId: args.organizationId,
-          });
-          yield* validateTagIds({
-            organizationId: args.organizationId,
-            tagIds,
-            type: "FEEDBACK",
-          });
-
-          yield* repository.setPostTags({ ...args, tagIds });
-        }).pipe(
+    PostTagList: (args: TPostTagList) =>
+      repository
+        .findPostTags(args)
+        .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Tag", "update")
+          withRemapDbErrors("Tag", "select")
         ),
 
-      ChangelogTagSet: (args: TChangelogTagSet) =>
-        Effect.gen(function* () {
-          //TODO add ownership Policy
-          const tagIds = normalizeTagIds(args.tagIds);
-          yield* validateChangelog({
-            changelogId: args.changelogId,
-            organizationId: args.organizationId,
-          });
-          yield* validateTagIds({
-            organizationId: args.organizationId,
-            tagIds,
-            type: "CHANGELOG",
-          });
+    PostTagListPublic: (args: TPostTagList) =>
+      repository.findPostTags(args).pipe(withRemapDbErrors("Tag", "select")),
 
-          yield* repository.setChangelogTags({ ...args, tagIds });
-        }).pipe(
+    ChangelogTagList: (args: TChangelogTagList) =>
+      repository
+        .findChangelogTags(args)
+        .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Tag", "update")
+          withRemapDbErrors("Tag", "select")
         ),
-    };
-  })
-).pipe(Layer.provide(TagPolicy.layer), Layer.provide(TagRepository.layer));
+
+    ChangelogTagListPublic: (args: TChangelogTagList) =>
+      repository
+        .findChangelogTags(args)
+        .pipe(withRemapDbErrors("Tag", "select")),
+
+    TagCreate: (args: TTagCreate) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = session.memberships.find(
+          (entry) => entry.organizationId === args.organizationId
+        );
+
+        yield* repository.create({
+          ...args,
+          creatorId: session.session.userId,
+          ...(membership ? { creatorMemberId: membership.membershipId } : {}),
+        });
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Tag", "create")
+      ),
+
+    TagUpdate: (args: TTagUpdate) =>
+      repository.update(args).pipe(
+        Policy.withPolicy(
+          tagPolicy.isOwner({
+            organizationId: args.organizationId,
+            tagId: args.id,
+          })
+        ),
+        withRemapDbErrors("Tag", "update")
+      ),
+
+    TagDelete: (args: TTagDelete) =>
+      repository.delete(args).pipe(
+        Policy.withPolicy(
+          tagPolicy.isOwner({
+            organizationId: args.organizationId,
+            tagId: args.id,
+          })
+        ),
+        withRemapDbErrors("Tag", "delete")
+      ),
+
+    PostTagSet: (args: TPostTagSet) =>
+      Effect.gen(function* () {
+        //TODO add ownership Policy
+        const tagIds = normalizeTagIds(args.tagIds);
+        yield* validatePost({
+          postId: args.postId,
+          organizationId: args.organizationId,
+        });
+        yield* validateTagIds({
+          organizationId: args.organizationId,
+          tagIds,
+          type: "FEEDBACK",
+        });
+
+        yield* repository.setPostTags({ ...args, tagIds });
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Tag", "update")
+      ),
+
+    ChangelogTagSet: (args: TChangelogTagSet) =>
+      Effect.gen(function* () {
+        //TODO add ownership Policy
+        const tagIds = normalizeTagIds(args.tagIds);
+        yield* validateChangelog({
+          changelogId: args.changelogId,
+          organizationId: args.organizationId,
+        });
+        yield* validateTagIds({
+          organizationId: args.organizationId,
+          tagIds,
+          type: "CHANGELOG",
+        });
+
+        yield* repository.setChangelogTags({ ...args, tagIds });
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Tag", "update")
+      ),
+  };
+});
+
+export const TagRpcHandlers = TagRpcs.toLayer(TagRpcHandlersEffect).pipe(
+  Layer.provide(TagPolicy.layer),
+  Layer.provide(TagRepository.layer)
+);
