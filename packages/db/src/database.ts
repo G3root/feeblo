@@ -1,5 +1,6 @@
 import * as SQLPG from "@effect/sql-pg";
 import { PgliteClient } from "@effect/sql-pglite";
+import { PGlite } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
 import * as PgDrizzlePglite from "drizzle-orm/effect-pglite";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
@@ -40,9 +41,16 @@ const pgliteDataDir = (url: string): string => {
 
 // Configure the PGlite client layer. PGlite accepts the same `memory://`
 // data-directory URL the reference implementation passes straight through.
-export const PgliteClientLive = PgliteClient.layerConfig({
-  dataDir: Config.string("DATABASE_URL").pipe(Config.map(pgliteDataDir)),
-});
+export const PgliteClientLive = PgliteClient.layerFrom(
+  Effect.acquireRelease(
+    Effect.map(Config.string("DATABASE_URL"), (url) =>
+      new PGlite(pgliteDataDir(url))
+    ),
+    (pglite) => Effect.promise(() => pglite.close())
+  ).pipe(
+    Effect.flatMap((liveClient) => PgliteClient.fromClient({ liveClient }))
+  )
+);
 
 // Configure the Postgres client layer.
 export const PgClientLive = SQLPG.PgClient.layerConfig({

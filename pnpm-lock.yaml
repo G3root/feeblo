@@ -494,18 +494,12 @@ importers:
 
   e2e:
     devDependencies:
-      '@electric-sql/pglite':
-        specifier: 0.4.6
-        version: 0.4.6
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 1.0.0-rc.4(@cloudflare/workers-types@4.20260505.1)(@effect/sql-pglite@4.0.0-beta.93(effect@4.0.0-beta.66))(@electric-sql/pglite@0.4.6)(@types/pg@8.20.0)(effect@4.0.0-beta.66)(pg@8.20.0)(postgres@3.4.9)(zod@4.4.3)
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
@@ -15565,17 +15559,6 @@ snapshots:
       '@effect/sql-pg': 4.0.0-beta.66(effect@4.0.0-beta.66)
       '@effect/sql-pglite': 4.0.0-beta.93(effect@4.0.0-beta.66)
       '@electric-sql/pglite': 0.5.4
-      '@types/pg': 8.20.0
-      effect: 4.0.0-beta.66
-      pg: 8.20.0
-      postgres: 3.4.9
-      zod: 4.4.3
-
-  drizzle-orm@1.0.0-rc.4(@cloudflare/workers-types@4.20260505.1)(@effect/sql-pglite@4.0.0-beta.93(effect@4.0.0-beta.66))(@electric-sql/pglite@0.4.6)(@types/pg@8.20.0)(effect@4.0.0-beta.66)(pg@8.20.0)(postgres@3.4.9)(zod@4.4.3):
-    optionalDependencies:
-      '@cloudflare/workers-types': 4.20260505.1
-      '@effect/sql-pglite': 4.0.0-beta.93(effect@4.0.0-beta.66)
-      '@electric-sql/pglite': 0.4.6
       '@types/pg': 8.20.0
       effect: 4.0.0-beta.66
       pg: 8.20.0

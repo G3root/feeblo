@@ -21,7 +21,7 @@ export type Session = {
     readonly id: string;
     readonly email: string;
     readonly name: string;
-    readonly restrictedToOrganizationId: string | null | undefined;
+    readonly restrictedToOrganizationId?: string | null | undefined;
   };
   readonly session: {
     readonly userId: string;

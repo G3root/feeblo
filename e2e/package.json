@@ -11,10 +11,8 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.4.6",
     "@playwright/test": "^1.61.1",
     "@types/node": "catalog:",
-    "drizzle-orm": "catalog:",
     "tsx": "catalog:"
   }
 }
