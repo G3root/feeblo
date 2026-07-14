@@ -31,6 +31,13 @@ export class CommentRpcs extends RpcGroup.make(
     error: CommentServiceErrors,
     payload: CommentCreate,
   }).middleware(AuthMiddleware),
+  Rpc.make("CommentCreatePublic", {
+    success: Schema.Struct({
+      message: Schema.String,
+    }),
+    error: CommentServiceErrors,
+    payload: CommentCreate,
+  }).middleware(AuthMiddleware),
   Rpc.make("CommentDelete", {
     success: Schema.Struct({
       message: Schema.String,
@@ -38,7 +45,21 @@ export class CommentRpcs extends RpcGroup.make(
     error: CommentServiceErrors,
     payload: CommentDelete,
   }).middleware(AuthMiddleware),
+  Rpc.make("CommentDeletePublic", {
+    success: Schema.Struct({
+      message: Schema.String,
+    }),
+    error: CommentServiceErrors,
+    payload: CommentDelete,
+  }).middleware(AuthMiddleware),
   Rpc.make("CommentUpdate", {
+    success: Schema.Struct({
+      message: Schema.String,
+    }),
+    error: CommentServiceErrors,
+    payload: CommentUpdate,
+  }).middleware(AuthMiddleware),
+  Rpc.make("CommentUpdatePublic", {
     success: Schema.Struct({
       message: Schema.String,
     }),

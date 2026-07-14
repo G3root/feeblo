@@ -34,13 +34,31 @@ export class PostRpcs extends RpcGroup.make(
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
+  Rpc.make("PostCreatePublic", {
+    success: Schema.Void,
+    payload: PostCreate,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
   Rpc.make("PostDelete", {
     success: Schema.Void,
     payload: PostDelete,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
+  Rpc.make("PostDeletePublic", {
+    success: Schema.Void,
+    payload: PostDelete,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
   Rpc.make("PostUpdate", {
+    success: Schema.Void,
+    payload: PostUpdate,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUpdatePublic", {
     success: Schema.Void,
     payload: PostUpdate,
     error: PostServiceErrors,

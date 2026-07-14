@@ -97,7 +97,7 @@ export const publicPostCollection = createCollection(
       const { modified: newPost } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.PostCreate({
+        rpc.PostCreatePublic({
           id: newPost.id,
           boardId: newPost.boardId,
           organizationId: newPost.organizationId,
@@ -112,7 +112,7 @@ export const publicPostCollection = createCollection(
       const { modified: updatedPost } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.PostUpdate({
+        rpc.PostUpdatePublic({
           id: updatedPost.id,
           statusId: updatedPost.statusId,
           content: updatedPost.content,
@@ -127,7 +127,7 @@ export const publicPostCollection = createCollection(
       const { modified: deletedPost } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.PostDelete({
+        rpc.PostDeletePublic({
           organizationId: deletedPost.organizationId,
           boardId: deletedPost.boardId,
           id: deletedPost.id,
@@ -325,7 +325,7 @@ export const publicCommentCollection = createCollection(
       const { modified: newComment } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.CommentCreate({
+        rpc.CommentCreatePublic({
           organizationId: newComment.organizationId,
           visibility: newComment.visibility,
           content: newComment.content,
@@ -340,7 +340,7 @@ export const publicCommentCollection = createCollection(
       const { modified: updatedComment } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.CommentUpdate({
+        rpc.CommentUpdatePublic({
           id: updatedComment.id,
           organizationId: updatedComment.organizationId,
           postId: updatedComment.postId,
@@ -354,7 +354,7 @@ export const publicCommentCollection = createCollection(
       const { original: deletedComment } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.CommentDelete({
+        rpc.CommentDeletePublic({
           id: deletedComment.id,
           organizationId: deletedComment.organizationId,
           postId: deletedComment.postId,
@@ -565,7 +565,7 @@ export const publicPostSubscriptionCollection = createCollection(
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.PostSubscriptionList({ organizationId, postId }),
+        (rpc) => rpc.PostSubscriptionListPublic({ organizationId, postId }),
         {
           signal: ctx.signal,
         }
@@ -581,7 +581,7 @@ export const publicPostSubscriptionCollection = createCollection(
       const { modified: newSubscription } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.PostSubscriptionCreate({
+        rpc.PostSubscriptionCreatePublic({
           organizationId: newSubscription.organizationId,
           postId: newSubscription.postId,
         })
@@ -592,7 +592,7 @@ export const publicPostSubscriptionCollection = createCollection(
       const { original: deletedSubscription } = mutation;
 
       await fetchRpc((rpc) =>
-        rpc.PostSubscriptionDelete({
+        rpc.PostSubscriptionDeletePublic({
           organizationId: deletedSubscription.organizationId,
           postId: deletedSubscription.postId,
         })

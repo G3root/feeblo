@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
-import { AuthMiddleware } from "../session-middleware";
+import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { PostSubscriptionServiceErrors } from "./errors";
 import {
   PostSubscription,
@@ -18,6 +18,11 @@ export class PostSubscriptionRpcs extends RpcGroup.make(
     success: Schema.Array(PostSubscription),
     error: PostSubscriptionServiceErrors,
   }).middleware(AuthMiddleware),
+  Rpc.make("PostSubscriptionListPublic", {
+    payload: PostSubscriptionList,
+    success: Schema.Array(PostSubscription),
+    error: PostSubscriptionServiceErrors,
+  }).middleware(OptionalAuthMiddleware),
   Rpc.make("PostSubscriptionCreate", {
     payload: PostSubscriptionCreate,
     success: Schema.Struct({
@@ -25,7 +30,21 @@ export class PostSubscriptionRpcs extends RpcGroup.make(
     }),
     error: PostSubscriptionServiceErrors,
   }).middleware(AuthMiddleware),
+  Rpc.make("PostSubscriptionCreatePublic", {
+    payload: PostSubscriptionCreate,
+    success: Schema.Struct({
+      subscribed: Schema.Boolean,
+    }),
+    error: PostSubscriptionServiceErrors,
+  }).middleware(AuthMiddleware),
   Rpc.make("PostSubscriptionDelete", {
+    payload: PostSubscriptionDelete,
+    success: Schema.Struct({
+      subscribed: Schema.Boolean,
+    }),
+    error: PostSubscriptionServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("PostSubscriptionDeletePublic", {
     payload: PostSubscriptionDelete,
     success: Schema.Struct({
       subscribed: Schema.Boolean,
