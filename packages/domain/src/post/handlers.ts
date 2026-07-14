@@ -21,8 +21,7 @@ import type {
   TPostUpdate,
 } from "./schema";
 
-export const PostRpcHandlers = PostRpcs.toLayer(
-  Effect.gen(function* () {
+export const PostRpcHandlersEffect = Effect.gen(function* () {
     const boardRepository = yield* BoardRepository;
     const repository = yield* PostRepository;
     const postPolicy = yield* PostPolicy;
@@ -172,8 +171,9 @@ export const PostRpcHandlers = PostRpcs.toLayer(
           withRemapDbErrors("Post", "update")
         ),
     };
-  })
-).pipe(
+  });
+
+export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
   Layer.provide(BoardRepository.layer),

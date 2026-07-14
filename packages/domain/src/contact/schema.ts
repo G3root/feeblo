@@ -1,4 +1,4 @@
-import { ContactAttributeValueId, WorkspaceId } from "@feeblo/id";
+import { WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const CommonContactFields = S.Struct({
@@ -76,37 +76,11 @@ export const ContactList = S.Struct({
 
 export type TContactList = S.Schema.Type<typeof ContactList>;
 
-export const ContactGet = S.Struct({
-  id: S.String,
-});
-
-export type TContactGet = S.Schema.Type<typeof ContactGet>;
-
-export const ContactDelete = S.Struct({
-  id: S.String,
-  organizationId: S.String,
-});
-
-export type TContactDelete = S.Schema.Type<typeof ContactDelete>;
-
 export const CompanyList = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
 export type TCompanyList = S.Schema.Type<typeof CompanyList>;
-
-export const CompanyGet = S.Struct({
-  id: S.String,
-});
-
-export type TCompanyGet = S.Schema.Type<typeof CompanyGet>;
-
-export const CompanyDelete = S.Struct({
-  id: S.String,
-  organizationId: S.String,
-});
-
-export type TCompanyDelete = S.Schema.Type<typeof CompanyDelete>;
 
 export const AttributeType = S.Literals([
   "TEXT",
@@ -122,35 +96,12 @@ export const AttributeConfig = S.Struct({
   pattern: S.optional(S.String),
 });
 
-export const ContactAttributeDefinitionUpsert = S.Struct({
-  id: S.optional(S.String),
-  organizationId: S.String,
-  name: S.String,
-  key: S.String,
-  description: S.optional(S.String),
-  type: AttributeType,
-  config: S.optional(AttributeConfig),
-  isRequired: S.optional(S.Boolean),
-});
-
-export type TContactAttributeDefinitionUpsert = S.Schema.Type<
-  typeof ContactAttributeDefinitionUpsert
->;
-
 export const ContactAttributeDefinitionList = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
 export type TContactAttributeDefinitionList = S.Schema.Type<
   typeof ContactAttributeDefinitionList
->;
-
-export const ContactAttributeDefinitionDelete = S.Struct({
-  id: S.String,
-});
-
-export type TContactAttributeDefinitionDelete = S.Schema.Type<
-  typeof ContactAttributeDefinitionDelete
 >;
 
 export const ContactAttributeDefinition = S.Struct({
@@ -170,35 +121,12 @@ export type TContactAttributeDefinition = S.Schema.Type<
   typeof ContactAttributeDefinition
 >;
 
-export const CompanyAttributeDefinitionUpsert = S.Struct({
-  id: S.optional(S.String),
-  organizationId: S.String,
-  name: S.String,
-  key: S.String,
-  description: S.optional(S.String),
-  type: AttributeType,
-  config: S.optional(AttributeConfig),
-  isRequired: S.optional(S.Boolean),
-});
-
-export type TCompanyAttributeDefinitionUpsert = S.Schema.Type<
-  typeof CompanyAttributeDefinitionUpsert
->;
-
 export const CompanyAttributeDefinitionList = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
 export type TCompanyAttributeDefinitionList = S.Schema.Type<
   typeof CompanyAttributeDefinitionList
->;
-
-export const CompanyAttributeDefinitionDelete = S.Struct({
-  id: S.String,
-});
-
-export type TCompanyAttributeDefinitionDelete = S.Schema.Type<
-  typeof CompanyAttributeDefinitionDelete
 >;
 
 export const CompanyAttributeDefinition = S.Struct({
@@ -238,7 +166,7 @@ export type TContactAttributeValueList = S.Schema.Type<
 >;
 
 export const ContactAttributeValue = S.Struct({
-  id: ContactAttributeValueId.schema,
+  id: S.String,
   contactId: S.String,
   attributeId: S.String,
   valueText: S.NullOr(S.String),

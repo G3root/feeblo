@@ -1,9 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import {
-  CompanyAttributeDefinitionId,
   CompanyAttributeValueId,
   CompanyId,
-  ContactAttributeDefinitionId,
   ContactAttributeValueId,
   ContactId,
 } from "@feeblo/id";
@@ -13,16 +11,13 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type {
-  TCompanyAttributeDefinitionUpsert,
   TCompanyAttributeValueUpsert,
   TCompanyUpsert,
-  TContactAttributeDefinitionUpsert,
   TContactAttributeValueUpsert,
-  TContactDelete,
   TContactUpsert,
 } from "./schema";
 
-import { buildAttributeValueColumns, toMutableConfig } from "./utils";
+import { buildAttributeValueColumns } from "./utils";
 
 export type Company = typeof schema.companyTable.$inferSelect;
 export type Contact = typeof schema.contactTable.$inferSelect;
@@ -102,19 +97,6 @@ const makeContactRepository = Effect.succeed({
         .select()
         .from(schema.companyTable)
         .where(eq(schema.companyTable.organizationId, organizationId));
-    }),
-
-  deleteCompany: (args: { id: string; organizationId: string }) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      return yield* db
-        .delete(schema.companyTable)
-        .where(
-          and(
-            eq(schema.companyTable.id, args.id),
-            eq(schema.companyTable.organizationId, args.organizationId)
-          )
-        );
     }),
 
   upsertContact: (args: TContactUpsert) =>
@@ -210,19 +192,6 @@ const makeContactRepository = Effect.succeed({
         .where(eq(schema.contactTable.organizationId, organizationId));
     }),
 
-  deleteContact: (args: TContactDelete) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      return yield* db
-        .delete(schema.contactTable)
-        .where(
-          and(
-            eq(schema.contactTable.id, args.id),
-            eq(schema.contactTable.organizationId, args.organizationId)
-          )
-        );
-    }),
-
   findContactAttributeDefinitions: (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -237,67 +206,6 @@ const makeContactRepository = Effect.succeed({
         );
     }),
 
-  upsertContactAttributeDefinition: (args: TContactAttributeDefinitionUpsert) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-
-      if (args.id) {
-        const [updated = null] = yield* db
-          .update(schema.contactAttributeDefinitionTable)
-          .set({
-            name: args.name,
-            key: args.key,
-            description: args.description ?? null,
-            type: args.type,
-            config: toMutableConfig(args.config),
-            isRequired: args.isRequired ?? false,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.contactAttributeDefinitionTable.id, args.id))
-          .returning();
-        if (!updated) {
-          return yield* Effect.die(
-            new Error(
-              "Contact attribute definition update did not return a row"
-            )
-          );
-        }
-        return updated;
-      }
-
-      const id = yield* ContactAttributeDefinitionId.generate;
-      const now = new Date();
-      const [created = null] = yield* db
-        .insert(schema.contactAttributeDefinitionTable)
-        .values({
-          id,
-          organizationId: args.organizationId,
-          name: args.name,
-          key: args.key,
-          description: args.description ?? null,
-          type: args.type,
-          config: toMutableConfig(args.config),
-          isRequired: args.isRequired ?? false,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      if (!created) {
-        return yield* Effect.die(
-          new Error("Contact attribute definition insert did not return a row")
-        );
-      }
-      return created;
-    }),
-
-  deleteContactAttributeDefinition: (id: string) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      return yield* db
-        .delete(schema.contactAttributeDefinitionTable)
-        .where(eq(schema.contactAttributeDefinitionTable.id, id));
-    }),
-
   findCompanyAttributeDefinitions: (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -310,67 +218,6 @@ const makeContactRepository = Effect.succeed({
             organizationId
           )
         );
-    }),
-
-  upsertCompanyAttributeDefinition: (args: TCompanyAttributeDefinitionUpsert) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-
-      if (args.id) {
-        const [updated = null] = yield* db
-          .update(schema.companyAttributeDefinitionTable)
-          .set({
-            name: args.name,
-            key: args.key,
-            description: args.description ?? null,
-            type: args.type,
-            config: toMutableConfig(args.config),
-            isRequired: args.isRequired ?? false,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.companyAttributeDefinitionTable.id, args.id))
-          .returning();
-        if (!updated) {
-          return yield* Effect.die(
-            new Error(
-              "Company attribute definition update did not return a row"
-            )
-          );
-        }
-        return updated;
-      }
-
-      const id = yield* CompanyAttributeDefinitionId.generate;
-      const now = new Date();
-      const [created = null] = yield* db
-        .insert(schema.companyAttributeDefinitionTable)
-        .values({
-          id,
-          organizationId: args.organizationId,
-          name: args.name,
-          key: args.key,
-          description: args.description ?? null,
-          type: args.type,
-          config: toMutableConfig(args.config),
-          isRequired: args.isRequired ?? false,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      if (!created) {
-        return yield* Effect.die(
-          new Error("Company attribute definition insert did not return a row")
-        );
-      }
-      return created;
-    }),
-
-  deleteCompanyAttributeDefinition: (id: string) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      return yield* db
-        .delete(schema.companyAttributeDefinitionTable)
-        .where(eq(schema.companyAttributeDefinitionTable.id, id));
     }),
 
   findContactAttributeValues: (contactId: string) =>

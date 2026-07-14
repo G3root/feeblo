@@ -50,12 +50,6 @@ export class FailedToUpdateContactError extends Schema.TaggedErrorClass<FailedTo
   { httpApiStatus: 500, identifier: "FailedToUpdateContactError" }
 ) {}
 
-export class FailedToDeleteContactError extends Schema.TaggedErrorClass<FailedToDeleteContactError>()(
-  "FailedToDeleteContactError",
-  {},
-  { httpApiStatus: 500, identifier: "FailedToDeleteContactError" }
-) {}
-
 export class FailedToCreateCompanyError extends Schema.TaggedErrorClass<FailedToCreateCompanyError>()(
   "FailedToCreateCompanyError",
   {},
@@ -66,30 +60,6 @@ export class FailedToUpdateCompanyError extends Schema.TaggedErrorClass<FailedTo
   "FailedToUpdateCompanyError",
   {},
   { httpApiStatus: 500, identifier: "FailedToUpdateCompanyError" }
-) {}
-
-export class FailedToDeleteCompanyError extends Schema.TaggedErrorClass<FailedToDeleteCompanyError>()(
-  "FailedToDeleteCompanyError",
-  {},
-  { httpApiStatus: 500, identifier: "FailedToDeleteCompanyError" }
-) {}
-
-export class FailedToCreateAttributeDefinitionError extends Schema.TaggedErrorClass<FailedToCreateAttributeDefinitionError>()(
-  "FailedToCreateAttributeDefinitionError",
-  {},
-  { httpApiStatus: 500, identifier: "FailedToCreateAttributeDefinitionError" }
-) {}
-
-export class FailedToUpdateAttributeDefinitionError extends Schema.TaggedErrorClass<FailedToUpdateAttributeDefinitionError>()(
-  "FailedToUpdateAttributeDefinitionError",
-  {},
-  { httpApiStatus: 500, identifier: "FailedToUpdateAttributeDefinitionError" }
-) {}
-
-export class FailedToDeleteAttributeDefinitionError extends Schema.TaggedErrorClass<FailedToDeleteAttributeDefinitionError>()(
-  "FailedToDeleteAttributeDefinitionError",
-  {},
-  { httpApiStatus: 500, identifier: "FailedToDeleteAttributeDefinitionError" }
 ) {}
 
 export class FailedToUpsertAttributeValueError extends Schema.TaggedErrorClass<FailedToUpsertAttributeValueError>()(
@@ -108,12 +78,7 @@ export const ContactServiceErrors = Schema.Union([
   AttributeDefinitionNotFoundError,
   FailedToCreateContactError,
   FailedToUpdateContactError,
-  FailedToDeleteContactError,
   FailedToCreateCompanyError,
   FailedToUpdateCompanyError,
-  FailedToDeleteCompanyError,
-  FailedToCreateAttributeDefinitionError,
-  FailedToUpdateAttributeDefinitionError,
-  FailedToDeleteAttributeDefinitionError,
   FailedToUpsertAttributeValueError,
 ]);
