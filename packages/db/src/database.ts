@@ -26,13 +26,22 @@ const pgTypes: CustomTypesConfig = {
 };
 
 // Detect whether the configured DATABASE_URL points at an embedded PGlite
-// instance (`memory://...`) instead of a real PostgreSQL server.
-const isPgliteUrl = (url: string): boolean => url.startsWith("memory://");
+// instance (`pglite:/path/...`) instead of a real PostgreSQL server.
+const isPgliteUrl = (url: string): boolean => url.startsWith("pglite:");
+
+// We support `pglite:<path>` as a test-friendly way to point
+// at a file-backed PGlite database while still selecting the PGlite client.
+const pgliteDataDir = (url: string): string => {
+  if (url.startsWith("pglite:")) {
+    return url.slice("pglite:".length);
+  }
+  return url;
+};
 
 // Configure the PGlite client layer. PGlite accepts the same `memory://`
 // data-directory URL the reference implementation passes straight through.
 export const PgliteClientLive = PgliteClient.layerConfig({
-  dataDir: Config.string("DATABASE_URL"),
+  dataDir: Config.string("DATABASE_URL").pipe(Config.map(pgliteDataDir)),
 });
 
 // Configure the Postgres client layer.

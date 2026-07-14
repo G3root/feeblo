@@ -4,10 +4,14 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.4.6",
     "@playwright/test": "^1.61.1",
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "drizzle-orm": "catalog:",
+    "tsx": "catalog:"
   }
 }

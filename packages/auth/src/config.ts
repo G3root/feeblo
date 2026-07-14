@@ -23,6 +23,12 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const signUpEnabled = yield* Config.boolean("AUTH_SIGN_UP_ENABLED").pipe(
       Config.withDefault(true)
     );
+    const emailVerificationRequired = yield* Config.boolean(
+      "AUTH_EMAIL_VERIFICATION_REQUIRED"
+    ).pipe(Config.withDefault(true));
+    const autoSignInAfterSignUp = yield* Config.boolean(
+      "AUTH_AUTO_SIGN_IN_AFTER_SIGN_UP"
+    ).pipe(Config.withDefault(false));
 
     return {
       apiUrl,
@@ -33,6 +39,8 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
       googleClientSecret,
       secret,
       signUpEnabled,
+      emailVerificationRequired,
+      autoSignInAfterSignUp,
       trustedOrigins,
       turnstileKey,
       allowedEmails,

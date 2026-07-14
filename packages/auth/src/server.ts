@@ -64,6 +64,8 @@ export const initAuthHandler = () =>
       allowedEmails,
       nodeEnv,
       appRootDomain,
+      emailVerificationRequired,
+      autoSignInAfterSignUp,
     } = yield* AuthConfig;
     const polarService = yield* PolarService;
 
@@ -182,6 +184,8 @@ export const initAuthHandler = () =>
       emailAndPassword: {
         enabled: signUpEnabled,
         disableSignUp: !signUpEnabled,
+        requireEmailVerification: emailVerificationRequired,
+        autoSignIn: autoSignInAfterSignUp,
 
         async sendResetPassword(data) {
           const { createPasswordResetEmail } = await loadPasswordResetEmail();
@@ -197,9 +201,6 @@ export const initAuthHandler = () =>
             )
           );
         },
-
-        requireEmailVerification: true,
-        autoSignIn: false,
       },
       plugins: [
         ...baseConfig.plugins,
