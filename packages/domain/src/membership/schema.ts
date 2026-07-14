@@ -42,11 +42,15 @@ export const OrganizationId = S.Struct({
   organizationId: S.String,
 });
 
+export type TOrganizationId = S.Schema.Type<typeof OrganizationId>;
+
 export const InviteMember = S.Struct({
   organizationId: WorkspaceId.schema,
   email: S.String,
   role: ROLE_LITERAL,
 });
+
+export type TInviteMember = S.Schema.Type<typeof InviteMember>;
 
 export const UpdateMemberRole = S.Struct({
   organizationId: WorkspaceId.schema,
@@ -54,12 +58,18 @@ export const UpdateMemberRole = S.Struct({
   role: ROLE_LITERAL,
 });
 
+export type TUpdateMemberRole = S.Schema.Type<typeof UpdateMemberRole>;
+
 export const RemoveMember = S.Struct({
   organizationId: WorkspaceId.schema,
   memberId: MemberId.schema,
 });
 
+export type TRemoveMember = S.Schema.Type<typeof RemoveMember>;
+
 export const CancelInvitation = S.Struct({
   organizationId: WorkspaceId.schema,
   invitationId: S.String,
 });
+
+export type TCancelInvitation = S.Schema.Type<typeof CancelInvitation>;
