@@ -58,12 +58,10 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
           .pipe(withRemapDbErrors("ContactAttributeValue", "select")),
 
       CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
-        repository
-          .findCompanyAttributeValues(args.companyId)
-          .pipe(
-            Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-            withRemapDbErrors("CompanyAttributeValue", "select")
-          ),
+        repository.findCompanyAttributeValues(args.companyId).pipe(
+          //TODOO add permission
+          withRemapDbErrors("CompanyAttributeValue", "select")
+        ),
     };
   })
 ).pipe(Layer.provide(ContactRepository.layer));
