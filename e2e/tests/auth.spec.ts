@@ -14,7 +14,9 @@ test.describe("authentication", () => {
     });
   });
 
-  test("user can sign up and create a workspace", async ({ page }) => {
+  test("user can sign up and create a workspace", { tag: "@critical" }, async ({
+    page,
+  }) => {
     const user = createTestUser();
     const { organizationUrl } = await signUpAndCreateWorkspace(page, user);
 
@@ -22,7 +24,9 @@ test.describe("authentication", () => {
     await expect(page.getByRole("button", { name: user.email })).toBeVisible();
   });
 
-  test("user can sign in after signing out", async ({ page }) => {
+  test("user can sign in after signing out", { tag: "@critical" }, async ({
+    page,
+  }) => {
     const user = createTestUser();
     const { organizationUrl } = await signUpAndCreateWorkspace(page, user);
 

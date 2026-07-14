@@ -181,7 +181,7 @@ describe("PostRpcHandlers", () => {
       );
     });
 
-    describe("PostCreate", () => {
+    describe("PostCreatePublic", () => {
       it.effect(
         "allows non-members to create on public boards and exposes the post publicly",
         () =>
@@ -191,7 +191,7 @@ describe("PostRpcHandlers", () => {
             const postId = yield* PostId.generate;
 
             yield* handlers
-              .PostCreate(
+              .PostCreatePublic(
                 postCreateInput(
                   fixture,
                   postId,
@@ -233,13 +233,37 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
           const error = yield* Effect.flip(
             handlers
-              .PostCreate(
+              .PostCreatePublic(
                 postCreateInput(
                   fixture,
                   postId,
                   "Private feedback",
                   "A private idea",
                 ),
+              )
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null),
+                ),
+              ),
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        }),
+      );
+    });
+
+    describe("PostCreate", () => {
+      it.effect("rejects non-members, including on public boards", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const error = yield* Effect.flip(
+            handlers
+              .PostCreate(
+                postCreateInput(fixture, postId, "Member-only feedback"),
               )
               .pipe(
                 Effect.provideService(
@@ -329,6 +353,103 @@ describe("PostRpcHandlers", () => {
 
           expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
           expect(post?.content).toContain("Updated content");
+        }),
+      );
+    });
+
+    describe("PostUpdatePublic", () => {
+      it.effect("lets non-members update their own unlocked public posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Original feedback"),
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const memberOnlyError = yield* Effect.flip(
+            handlers
+              .PostUpdate({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: fixture.statusId,
+                title: "Member-only update",
+                content: "Member-only content",
+              })
+              .pipe(Effect.provideService(CurrentSession, session)),
+          );
+          expect(memberOnlyError._tag).toBe("PolicyDenied");
+
+          yield* handlers
+            .PostUpdatePublic({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              statusId: fixture.statusId,
+              title: "Updated feedback",
+              content: "Updated content",
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const [post] = yield* handlers
+            .PostListPublic({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
+          expect(post?.content).toContain("Updated content");
+        }),
+      );
+    });
+
+    describe("PostDeletePublic", () => {
+      it.effect("lets non-members delete their own public posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Feedback to delete"),
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const memberOnlyError = yield* Effect.flip(
+            handlers
+              .PostDelete({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session)),
+          );
+          expect(memberOnlyError._tag).toBe("PolicyDenied");
+
+          yield* handlers
+            .PostDeletePublic({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const posts = yield* handlers
+            .PostListPublic({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(posts).toHaveLength(0);
         }),
       );
     });

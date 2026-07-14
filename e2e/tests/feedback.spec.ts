@@ -73,46 +73,48 @@ test.describe("feedback workflow", () => {
     await expect(page.getByText("Have feedback?")).toBeVisible();
   });
 
-  test("user can create posts, comments, reactions, and upvotes", async ({
-    page,
-  }) => {
-    await createWorkspace(page);
+  test(
+    "user can create posts, comments, reactions, and upvotes",
+    { tag: "@critical" },
+    async ({ page }) => {
+      await createWorkspace(page);
 
-    const title = `E2E post ${randomUUID().slice(0, 8)}`;
-    const postContent = "This is a product feedback post from Playwright.";
-    const comment = "This is a Playwright comment.";
+      const title = `E2E post ${randomUUID().slice(0, 8)}`;
+      const postContent = "This is a product feedback post from Playwright.";
+      const comment = "This is a Playwright comment.";
 
-    await createPost(page, title, postContent);
-    await openPost(page, title);
+      await createPost(page, title, postContent);
+      await openPost(page, title);
 
-    const upvoteButton = page.getByRole("button", { name: "Upvote" });
-    await expect(upvoteButton).toContainText("0");
-    await upvoteButton.click();
-    await expect(upvoteButton).toContainText("1");
+      const upvoteButton = page.getByRole("button", { name: "Upvote" });
+      await expect(upvoteButton).toContainText("0");
+      await upvoteButton.click();
+      await expect(upvoteButton).toContainText("1");
 
-    await chooseFirstReaction(page);
-    await expect(
-      page
-        .getByRole("button")
-        .filter({ hasText: "👍️" })
-        .filter({ hasText: "1" })
-    ).toBeVisible();
+      await chooseFirstReaction(page);
+      await expect(
+        page
+          .getByRole("button")
+          .filter({ hasText: "👍️" })
+          .filter({ hasText: "1" })
+      ).toBeVisible();
 
-    await fillEditor(page, comment, { index: 1 });
-    await page.getByRole("button", { name: "Comment Public" }).click();
-    const commentBody = page.getByText(comment).last();
-    await expect(commentBody).toBeVisible();
+      await fillEditor(page, comment, { index: 1 });
+      await page.getByRole("button", { name: "Comment Public" }).click();
+      const commentBody = page.getByText(comment).last();
+      await expect(commentBody).toBeVisible();
 
-    const commentCard = commentBody.locator(
-      "xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]"
-    );
-    await commentCard.getByRole("button", { name: "Add reaction" }).click();
-    await page.getByRole("button", { name: "👍️", exact: true }).click();
-    await expect(
-      commentCard
-        .getByRole("button")
-        .filter({ hasText: "👍️" })
-        .filter({ hasText: "1" })
-    ).toBeVisible();
-  });
+      const commentCard = commentBody.locator(
+        "xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]"
+      );
+      await commentCard.getByRole("button", { name: "Add reaction" }).click();
+      await page.getByRole("button", { name: "👍️", exact: true }).click();
+      await expect(
+        commentCard
+          .getByRole("button")
+          .filter({ hasText: "👍️" })
+          .filter({ hasText: "1" })
+      ).toBeVisible();
+    }
+  );
 });

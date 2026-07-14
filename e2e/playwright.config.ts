@@ -1,14 +1,14 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
-const e2eDir = path.dirname(fileURLToPath(import.meta.url));
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const serverPort = new URL(apiURL).port || "3100";
 const databaseURL =
   process.env.E2E_DATABASE_URL ??
-  `pglite:${path.join(e2eDir, ".pglite-data", "e2e")}`;
+  `pglite:${mkdtempSync(path.join(tmpdir(), "feeblo-e2e-"))}`;
 
 const e2eEnv = {
   APP_ROOT_DOMAIN: "localhost",
