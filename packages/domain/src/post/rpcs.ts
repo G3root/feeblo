@@ -10,6 +10,7 @@ import {
   PostAdminUpdate,
   PostCreate,
   PostDelete,
+  PostDeletePublic,
   PostList,
   PostMerge,
   PostUpdate,
@@ -48,7 +49,7 @@ export class PostRpcs extends RpcGroup.make(
 
   Rpc.make("PostDeletePublic", {
     success: Schema.Void,
-    payload: PostDelete,
+    payload: PostDeletePublic,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 

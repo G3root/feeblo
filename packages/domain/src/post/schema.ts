@@ -41,7 +41,15 @@ export const PostDelete = S.Struct({
   organizationId: WorkspaceId.schema,
 });
 
+export const PostDeletePublic = S.Struct({
+  id: PostId.schema,
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
 export type TPostDelete = S.Schema.Type<typeof PostDelete>;
+
+export type TPostDeletePublic = S.Schema.Type<typeof PostDeletePublic>;
 
 export const PostUpdate = S.Struct({
   id: PostId.schema,

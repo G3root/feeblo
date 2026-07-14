@@ -94,7 +94,63 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         }).pipe(
           Policy.withPolicy(
             Policy.all(
+              Policy.hasMembership(args.organizationId),
               postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              }),
+              commentPolicy.canCreate({
+                organizationId: args.organizationId,
+                visibility: args.visibility,
+              })
+            )
+          ),
+          withRemapDbErrors("Comment", "create")
+        );
+      },
+      CommentCreatePublic: (args: TCommentCreate) => {
+        const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
+        return Effect.gen(function* () {
+          const session = yield* CurrentSession;
+          const membership = Policy.getMembership(session, args.organizationId);
+
+          const isPublicPost = yield* postRepository.isPublicPost({
+            id: args.postId,
+            organizationId: args.organizationId,
+          });
+
+          if (args.visibility !== "PUBLIC" || !isPublicPost) {
+            return yield* new Policy.PolicyDeniedError({
+              reason: "You are not allowed to comment on this post.",
+            });
+          }
+
+          yield* transaction(
+            Effect.gen(function* () {
+              yield* repository.create({
+                ...args,
+                content: sanitizedMarkdown,
+                userId: session.session.userId,
+                ...(membership ? { memberId: membership.membershipId } : {}),
+              });
+
+              // Commenting on a post automatically subscribes the user to it.
+              yield* subscriptionRepository.subscribe({
+                organizationId: args.organizationId,
+                postId: args.postId,
+                userId: session.session.userId,
+                ...(membership ? { memberId: membership.membershipId } : {}),
+              });
+            })
+          );
+
+          return {
+            message: "Comment created successfully",
+          };
+        }).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              postPolicy.isUnlockedPublic({
                 organizationId: args.organizationId,
                 postId: args.postId,
               }),
@@ -130,7 +186,45 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         }).pipe(
           Policy.withPolicy(
             Policy.all(
+              Policy.hasMembership(args.organizationId),
               postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              }),
+              commentPolicy.isOwner({
+                organizationId: args.organizationId,
+                commentId: args.id,
+                postId: args.postId,
+              })
+            )
+          ),
+          withRemapDbErrors("Comment", "delete")
+        );
+      },
+      CommentDeletePublic: (args: TCommentDelete) => {
+        return Effect.gen(function* () {
+          const session = yield* CurrentSession;
+
+          const deletedComment = yield* repository.delete({
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+            userId: session.session.userId,
+          });
+
+          if (!deletedComment) {
+            return yield* new FailedToDeleteCommentError({
+              message: "Failed to delete comment",
+            });
+          }
+
+          return {
+            message: "Comment deleted successfully",
+          };
+        }).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              postPolicy.isUnlockedPublic({
                 organizationId: args.organizationId,
                 postId: args.postId,
               }),
@@ -189,7 +283,47 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
         }).pipe(
           Policy.withPolicy(
             Policy.all(
+              Policy.hasMembership(args.organizationId),
               postPolicy.isUnlocked({
+                organizationId: args.organizationId,
+                postId: args.postId,
+              }),
+              commentPolicy.isOwner({
+                organizationId: args.organizationId,
+                commentId: args.id,
+                postId: args.postId,
+              })
+            )
+          ),
+          withRemapDbErrors("Comment", "update")
+        );
+      },
+      CommentUpdatePublic: (args: TCommentUpdate) => {
+        const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
+        return Effect.gen(function* () {
+          const session = yield* CurrentSession;
+
+          const updatedComment = yield* repository.update({
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+            content: sanitizedMarkdown,
+            userId: session.session.userId,
+          });
+
+          if (!updatedComment) {
+            return yield* new FailedToUpdateCommentError({
+              message: "Failed to update comment",
+            });
+          }
+
+          return {
+            message: "Comment updated successfully",
+          };
+        }).pipe(
+          Policy.withPolicy(
+            Policy.all(
+              postPolicy.isUnlockedPublic({
                 organizationId: args.organizationId,
                 postId: args.postId,
               }),

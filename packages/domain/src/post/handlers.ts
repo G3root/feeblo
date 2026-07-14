@@ -16,6 +16,7 @@ import type {
   TPostAdminUpdate,
   TPostCreate,
   TPostDelete,
+  TPostDeletePublic,
   TPostList,
   TPostMerge,
   TPostUpdate,
@@ -65,11 +66,34 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         })
         .pipe(
           Policy.withPolicy(
-            postPolicy.isOwner({
-              organizationId: args.organizationId,
-              postId: args.id,
-              boardId: args.boardId,
-            })
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
+            )
+          ),
+          withRemapDbErrors("Post", "delete")
+        );
+    },
+    PostDeletePublic: (args: TPostDeletePublic) => {
+      return repository
+        .delete({
+          id: args.id,
+          organizationId: args.organizationId,
+          boardId: args.boardId,
+        })
+        .pipe(
+          Policy.withPolicy(
+            Policy.all(
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
+            )
           ),
           withRemapDbErrors("Post", "delete")
         );
@@ -86,11 +110,41 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         })
         .pipe(
           Policy.withPolicy(
-            postPolicy.isOwner({
-              organizationId: args.organizationId,
-              postId: args.id,
-              boardId: args.boardId,
-            })
+            Policy.all(
+              Policy.hasMembership(args.organizationId),
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
+            )
+          ),
+          withRemapDbErrors("Post", "update")
+        );
+    },
+    PostUpdatePublic: (args: TPostUpdate) => {
+      const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+        args.content
+      );
+      return repository
+        .update({
+          ...args,
+          content: sanitizedMarkdown,
+          excerpt: htmlToExcerpt(sanitizedHtml),
+        })
+        .pipe(
+          Policy.withPolicy(
+            Policy.all(
+              postPolicy.isUnlockedPublic({
+                organizationId: args.organizationId,
+                postId: args.id,
+              }),
+              postPolicy.isOwner({
+                organizationId: args.organizationId,
+                postId: args.id,
+                boardId: args.boardId,
+              })
+            )
           ),
           withRemapDbErrors("Post", "update")
         );
@@ -128,6 +182,59 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               content: sanitizedMarkdown,
               excerpt: htmlToExcerpt(sanitizedHtml),
               creatorId: session.session.userId,
+              ...(membership
+                ? { creatorMemberId: membership.membershipId }
+                : {}),
+            });
+
+            // The creator of a post is automatically subscribed to it.
+            yield* subscriptionRepository.subscribe({
+              organizationId: args.organizationId,
+              postId: args.id,
+              userId: session.session.userId,
+              ...(membership ? { memberId: membership.membershipId } : {}),
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Post", "create")
+      );
+    },
+    PostCreatePublic: (args: TPostCreate) => {
+      return Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+        const subscriptionRepository = yield* PostSubscriptionRepository;
+        const board = yield* boardRepository.getById({
+          id: args.boardId,
+          organizationId: args.organizationId,
+        });
+
+        if (board._tag === "None") {
+          return yield* new Policy.PolicyDeniedError({
+            reason: "Board not found.",
+          });
+        }
+
+        if (board.value.visibility !== "PUBLIC") {
+          return yield* new Policy.PolicyDeniedError({
+            reason: "You are not allowed to post to this board.",
+          });
+        }
+
+        const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+          args.content
+        );
+
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.create({
+              ...args,
+              content: sanitizedMarkdown,
+              excerpt: htmlToExcerpt(sanitizedHtml),
+              creatorId: session.session.userId,
+              source: "PUBLIC_BOARD",
               ...(membership
                 ? { creatorMemberId: membership.membershipId }
                 : {}),
