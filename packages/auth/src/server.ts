@@ -457,6 +457,14 @@ export const initAuthHandler = () =>
           }
         }),
       },
+      user: {
+        additionalFields: {
+          restrictedToOrganizationId: {
+            type: "string",
+            required: false,
+          },
+        },
+      },
     } satisfies BetterAuthOptions;
     return betterAuth(config);
   }).pipe(
