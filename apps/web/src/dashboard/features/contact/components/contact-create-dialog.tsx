@@ -57,12 +57,14 @@ function ContactCreateForm() {
     defaultValues: {
       attributes: {},
       email: "",
+      externalId: "",
       name: "",
       phone: "",
     },
     validators: {
       onSubmit: z.object({
         email: z.email(),
+        externalId: z.string(),
         name: z.string(),
         phone: z.string(),
         attributes: z.record(z.string(), z.any()),
@@ -75,7 +77,7 @@ function ContactCreateForm() {
         const contact = {
           id: contactId,
           organizationId,
-          externalId: null,
+          externalId: data.value.externalId || null,
           email: data.value.email,
           name: data.value.name || null,
           phone: data.value.phone || null,
@@ -128,6 +130,10 @@ function ContactCreateForm() {
         <form.AppField
           children={(field) => <field.TextField label="Email" type="email" />}
           name="email"
+        />
+        <form.AppField
+          children={(field) => <field.TextField label="External ID" />}
+          name="externalId"
         />
         <form.AppField
           children={(field) => <field.TextField label="Phone" type="tel" />}

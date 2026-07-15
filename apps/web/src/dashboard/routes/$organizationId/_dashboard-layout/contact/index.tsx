@@ -145,6 +145,7 @@ function ContactPage() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>External ID</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
@@ -191,6 +192,7 @@ function ContactTableRow({
 }: {
   contact: {
     email: string | null;
+    externalId: string | null;
     id: string;
     name: string | null;
     phone: string | null;
@@ -219,6 +221,7 @@ function ContactTableRow({
       </TableCell>
       <TableCell>{contact.email ?? "—"}</TableCell>
       <TableCell>{contact.phone ?? "—"}</TableCell>
+      <TableCell>{contact.externalId ?? "—"}</TableCell>
       {definitions.map((definition) => (
         <TableCell key={definition.id}>
           {formatCustomAttributeValue(valuesByAttributeId.get(definition.id))}

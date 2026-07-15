@@ -112,10 +112,12 @@ function CompanyEditForm({
   const form = useAppForm({
     defaultValues: {
       attributes: getCustomAttributeInputValues(definitions, existingValues),
+      externalId: company.externalId ?? "",
       name: company.name,
     },
     validators: {
       onSubmit: z.object({
+        externalId: z.string(),
         name: z.string().trim().min(1, "Enter a company name"),
         attributes: z.record(z.string(), z.any()),
       }),
@@ -146,6 +148,7 @@ function CompanyEditForm({
         await createCompanyAction({
           company: {
             ...company,
+            externalId: data.value.externalId || null,
             name: data.value.name,
             updatedAt: new Date(),
           },
@@ -173,6 +176,10 @@ function CompanyEditForm({
         <form.AppField
           children={(field) => <field.TextField label="Name" />}
           name="name"
+        />
+        <form.AppField
+          children={(field) => <field.TextField label="External ID" />}
+          name="externalId"
         />
         <form.Subscribe selector={(state) => state.values.attributes}>
           {(attributes) => (

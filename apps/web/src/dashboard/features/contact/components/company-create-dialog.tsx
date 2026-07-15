@@ -56,9 +56,10 @@ function CompanyCreateForm() {
   );
   const definitions = definitionsQuery.data ?? [];
   const form = useAppForm({
-    defaultValues: { attributes: {}, name: "" },
+    defaultValues: { attributes: {}, externalId: "", name: "" },
     validators: {
       onSubmit: z.object({
+        externalId: z.string(),
         name: z.string().trim().min(1, "Enter a company name"),
         attributes: z.record(z.string(), z.any()),
       }),
@@ -83,7 +84,7 @@ function CompanyCreateForm() {
         const company = {
           id: companyId,
           organizationId,
-          externalId: null,
+          externalId: data.value.externalId || null,
           name: data.value.name,
           avatar: null,
           externalCreatedAt: null,
@@ -130,6 +131,10 @@ function CompanyCreateForm() {
         <form.AppField
           children={(field) => <field.TextField label="Name" />}
           name="name"
+        />
+        <form.AppField
+          children={(field) => <field.TextField label="External ID" />}
+          name="externalId"
         />
         <form.Subscribe selector={(state) => state.values.attributes}>
           {(attributes) => (

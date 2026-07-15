@@ -122,12 +122,14 @@ function ContactEditFormFields({
     defaultValues: {
       attributes: getCustomAttributeInputValues(definitions, existingValues),
       email: contact.email ?? "",
+      externalId: contact.externalId ?? "",
       name: contact.name ?? "",
       phone: contact.phone ?? "",
     },
     validators: {
       onSubmit: z.object({
         email: z.email("Enter a valid email address"),
+        externalId: z.string(),
         name: z.string(),
         phone: z.string(),
         attributes: z.record(z.string(), z.any()),
@@ -148,6 +150,7 @@ function ContactEditFormFields({
           contact: {
             ...contact,
             email: data.value.email,
+            externalId: data.value.externalId || null,
             name: data.value.name || null,
             phone: data.value.phone || null,
             updatedAt: new Date(),
@@ -180,6 +183,10 @@ function ContactEditFormFields({
         <form.AppField
           children={(field) => <field.TextField label="Email" type="email" />}
           name="email"
+        />
+        <form.AppField
+          children={(field) => <field.TextField label="External ID" />}
+          name="externalId"
         />
         <form.AppField
           children={(field) => <field.TextField label="Phone" type="tel" />}
