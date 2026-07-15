@@ -6,6 +6,12 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import {
+  CompanyAlreadyExistsError,
+  FailedToCreateCompanyError,
+  FailedToUpdateCompanyError,
+} from "./errors";
+
 import type {
   TCompanyCreate,
   TCompanyDelete,
@@ -35,12 +41,18 @@ const makeCompanyRepository = Effect.gen(function* () {
             createdAt: now,
             updatedAt: now,
           })
+          .onConflictDoNothing({
+            target: [
+              schema.companyTable.organizationId,
+              schema.companyTable.name,
+            ],
+          })
           .returning();
 
         if (!created) {
-          return yield* Effect.die(
-            new Error("Company insert did not return a row")
-          );
+          return yield* new CompanyAlreadyExistsError({
+            message: "A company with this name already exists",
+          });
         }
         return created;
       }),
@@ -134,9 +146,7 @@ const makeCompanyRepository = Effect.gen(function* () {
             .where(eq(schema.companyTable.id, existing.id))
             .returning();
           if (!updated) {
-            return yield* Effect.die(
-              new Error("Company update did not return a row")
-            );
+            return yield* new FailedToUpdateCompanyError();
           }
           return updated;
         }
@@ -157,9 +167,7 @@ const makeCompanyRepository = Effect.gen(function* () {
           })
           .returning();
         if (!created) {
-          return yield* Effect.die(
-            new Error("Company insert did not return a row")
-          );
+          return yield* new FailedToCreateCompanyError();
         }
         return created;
       }),

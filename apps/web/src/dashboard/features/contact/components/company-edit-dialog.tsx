@@ -2,6 +2,7 @@ import type {
   TCompanyAttributeDefinition,
   TCompanyAttributeValue,
 } from "@feeblo/domain/attribute-definition/schema";
+import type { TCompany } from "@feeblo/domain/company/schema";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
@@ -16,9 +17,10 @@ import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
   CustomAttributeFields,
+  createCompanyAction,
+  getCompanyCustomAttributeValueChanges,
   getCustomAttributeInputValues,
   hasMissingRequiredCustomAttributeValues,
-  saveCompanyCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -89,8 +91,7 @@ function CompanyEditFormLoader() {
 
   return (
     <CompanyEditForm
-      companyId={companyId}
-      companyName={company.name}
+      company={company}
       definitions={definitionsQuery.data ?? []}
       existingValues={valuesQuery.data ?? []}
     />
@@ -98,23 +99,20 @@ function CompanyEditFormLoader() {
 }
 
 function CompanyEditForm({
-  companyId,
-  companyName,
+  company,
   definitions,
   existingValues,
 }: {
-  companyId: string;
-  companyName: string;
+  company: TCompany;
   definitions: readonly TCompanyAttributeDefinition[];
   existingValues: readonly TCompanyAttributeValue[];
 }) {
   const organizationId = useOrganizationId();
-  const { companyCollection } = useDashboardCollections();
   const store = useCompanyEditDialogContext();
   const form = useAppForm({
     defaultValues: {
       attributes: getCustomAttributeInputValues(definitions, existingValues),
-      name: companyName,
+      name: company.name,
     },
     validators: {
       onSubmit: z.object({
@@ -137,18 +135,23 @@ function CompanyEditForm({
       }
 
       try {
-        const tx = companyCollection.update(companyId, (draft) => {
-          draft.name = data.value.name;
-          draft.updatedAt = new Date();
-        });
-
-        await tx.isPersisted.promise;
-        await saveCompanyCustomAttributeValues({
-          companyId,
-          definitions,
-          existingValues,
-          organizationId,
-          values: data.value.attributes,
+        const { createAttribute, upsertAttribute } =
+          await getCompanyCustomAttributeValueChanges({
+            companyId: company.id,
+            definitions,
+            existingValues,
+            organizationId,
+            values: data.value.attributes,
+          });
+        await createCompanyAction({
+          company: {
+            ...company,
+            name: data.value.name,
+            updatedAt: new Date(),
+          },
+          createAttribute,
+          operation: "update",
+          upsertAttribute,
         });
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company updated", type: "success" });

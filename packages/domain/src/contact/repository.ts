@@ -5,6 +5,11 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import {
+  ContactAlreadyExistsError,
+  FailedToCreateContactError,
+  FailedToUpdateContactError,
+} from "./errors";
 import type {
   TContactCreate,
   TContactDelete,
@@ -37,12 +42,18 @@ const makeContactRepository = Effect.gen(function* () {
             createdAt: now,
             updatedAt: now,
           })
+          .onConflictDoNothing({
+            target: [
+              schema.contactTable.organizationId,
+              schema.contactTable.email,
+            ],
+          })
           .returning();
 
         if (!created) {
-          return yield* Effect.die(
-            new Error("Contact insert did not return a row")
-          );
+          return yield* new ContactAlreadyExistsError({
+            message: "A contact with this email already exists",
+          });
         }
         return created;
       }),
@@ -153,9 +164,7 @@ const makeContactRepository = Effect.gen(function* () {
             .where(eq(schema.contactTable.id, existing.id))
             .returning();
           if (!updated) {
-            return yield* Effect.die(
-              new Error("Contact update did not return a row")
-            );
+            return yield* new FailedToUpdateContactError();
           }
           return Option.some(updated);
         }
@@ -179,9 +188,7 @@ const makeContactRepository = Effect.gen(function* () {
           })
           .returning();
         if (!created) {
-          return yield* Effect.die(
-            new Error("Contact insert did not return a row")
-          );
+          return yield* new FailedToCreateContactError();
         }
         return Option.some(created);
       }),

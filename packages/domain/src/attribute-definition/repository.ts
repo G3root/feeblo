@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { buildAttributeValueColumns } from "../contact/utils";
+import { FailedToUpsertAttributeValueError } from "./errors";
 import type {
   TCompanyAttributeDefinitionCreate,
   TCompanyAttributeDefinitionDelete,
@@ -32,7 +33,6 @@ const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3>(
       valueMap: ReturnType<typeof buildAttributeValueColumns>
     ) => Effect.Effect<T | undefined, E2, R2>;
     generateId: Effect.Effect<string, E3, R3>;
-    errorMessage: string;
   }
 ) =>
   Effect.gen(function* () {
@@ -48,7 +48,7 @@ const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3>(
     const id = args.id ?? (yield* options.generateId);
     const created = yield* options.create(id, valueMap);
     if (!created) {
-      return yield* Effect.die(new Error(options.errorMessage));
+      return yield* new FailedToUpsertAttributeValueError();
     }
     return created;
   });
@@ -279,7 +279,6 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
             .pipe(Effect.map(([created]) => created));
         },
         generateId: ContactAttributeValueId.generate,
-        errorMessage: "Contact attribute value insert did not return a row",
       }),
 
     findCompanyAttributeValues: (organizationId: string) =>
@@ -338,7 +337,6 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
             .pipe(Effect.map(([created]) => created));
         },
         generateId: CompanyAttributeValueId.generate,
-        errorMessage: "Company attribute value insert did not return a row",
       }),
   };
 });

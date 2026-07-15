@@ -2,6 +2,7 @@ import type {
   TContactAttributeDefinition,
   TContactAttributeValue,
 } from "@feeblo/domain/attribute-definition/schema";
+import type { TContact } from "@feeblo/domain/contact/schema";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
@@ -16,8 +17,9 @@ import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
   CustomAttributeFields,
+  createContactAction,
+  getContactCustomAttributeValueChanges,
   getCustomAttributeInputValues,
-  saveContactCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -103,12 +105,7 @@ function ContactEditForm() {
 }
 
 type ContactEditFormFieldsProps = {
-  contact: {
-    email: string | null;
-    id: string;
-    name: string | null;
-    phone: string | null;
-  };
+  contact: TContact;
 };
 
 function ContactEditFormFields({
@@ -120,7 +117,6 @@ function ContactEditFormFields({
   definitions: readonly TContactAttributeDefinition[];
 }) {
   const organizationId = useOrganizationId();
-  const { contactCollection } = useDashboardCollections();
   const store = useContactEditDialogContext();
   const form = useAppForm({
     defaultValues: {
@@ -139,20 +135,26 @@ function ContactEditFormFields({
     },
     onSubmit: async (data) => {
       try {
-        const tx = contactCollection.update(contact.id, (draft) => {
-          draft.email = data.value.email;
-          draft.name = data.value.name || null;
-          draft.phone = data.value.phone || null;
-          draft.updatedAt = new Date();
-        });
-
-        await tx.isPersisted.promise;
-        await saveContactCustomAttributeValues({
-          contactId: contact.id,
-          definitions,
-          existingValues,
-          organizationId,
-          values: data.value.attributes,
+        const { createAttribute, upsertAttribute } =
+          await getContactCustomAttributeValueChanges({
+            contactId: contact.id,
+            definitions,
+            existingValues,
+            organizationId,
+            values: data.value.attributes,
+          });
+        //TODO add error validation
+        await createContactAction({
+          contact: {
+            ...contact,
+            email: data.value.email,
+            name: data.value.name || null,
+            phone: data.value.phone || null,
+            updatedAt: new Date(),
+          },
+          createAttribute,
+          operation: "update",
+          upsertAttribute,
         });
         store.send({ type: "setOpen", open: false });
         toastManager.add({ title: "Contact updated", type: "success" });

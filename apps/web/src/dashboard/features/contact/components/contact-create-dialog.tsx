@@ -13,7 +13,8 @@ import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
   CustomAttributeFields,
-  saveContactCustomAttributeValues,
+  createContactAction,
+  getContactCustomAttributeValueChanges,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -40,10 +41,7 @@ export function ContactCreateDialog() {
 
 function ContactCreateForm() {
   const organizationId = useOrganizationId();
-  const {
-    contactAttributeDefinitionCollection,
-    contactCollection,
-  } = useDashboardCollections();
+  const { contactAttributeDefinitionCollection } = useDashboardCollections();
   const store = useContactCreateDialogContext();
   const { data: definitions = [] } = useLiveQuery(
     (q) =>
@@ -73,7 +71,8 @@ function ContactCreateForm() {
     onSubmit: async (data) => {
       try {
         const contactId = await ContactId.unsafeGenerate();
-        const tx = contactCollection.insert({
+        const now = new Date();
+        const contact = {
           id: contactId,
           organizationId,
           externalId: null,
@@ -82,23 +81,34 @@ function ContactCreateForm() {
           phone: data.value.phone || null,
           avatar: null,
           companyId: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        await tx.isPersisted.promise;
-        await saveContactCustomAttributeValues({
-          contactId,
-          definitions,
-          existingValues: [],
-          organizationId,
-          values: data.value.attributes,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const { createAttribute, upsertAttribute } =
+          await getContactCustomAttributeValueChanges({
+            contactId,
+            definitions,
+            existingValues: [],
+            organizationId,
+            values: data.value.attributes,
+          });
+        //TODO add error validation
+        await createContactAction({
+          contact,
+          createAttribute,
+          operation: "create",
+          upsertAttribute,
         });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Contact created", type: "success" });
-      } catch (_error) {
-        toastManager.add({ title: "Failed to create contact", type: "error" });
+      } catch (error) {
+        toastManager.add({
+          title: hasExistingRecordError(error)
+            ? "A contact with this email already exists"
+            : "Failed to create contact",
+          type: "error",
+        });
       }
     },
   });
@@ -142,4 +152,8 @@ function ContactCreateForm() {
       </div>
     </form>
   );
+}
+
+function hasExistingRecordError(error: unknown) {
+  return String(error).includes("ContactAlreadyExistsError");
 }

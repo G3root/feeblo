@@ -9,6 +9,12 @@ export class CompanyNotFoundError extends Schema.TaggedErrorClass<CompanyNotFoun
   { httpApiStatus: 404, identifier: "CompanyNotFoundError" }
 ) {}
 
+export class CompanyAlreadyExistsError extends Schema.TaggedErrorClass<CompanyAlreadyExistsError>()(
+  "CompanyAlreadyExistsError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 409, identifier: "CompanyAlreadyExistsError" }
+) {}
+
 export class FailedToCreateCompanyError extends Schema.TaggedErrorClass<FailedToCreateCompanyError>()(
   "FailedToCreateCompanyError",
   {},
@@ -31,6 +37,7 @@ export const CompanyServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  CompanyAlreadyExistsError,
   CompanyNotFoundError,
   FailedToCreateCompanyError,
   FailedToUpdateCompanyError,

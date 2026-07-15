@@ -19,6 +19,12 @@ export class ContactNotFoundError extends Schema.TaggedErrorClass<ContactNotFoun
   { httpApiStatus: 404, identifier: "ContactNotFoundError" }
 ) {}
 
+export class ContactAlreadyExistsError extends Schema.TaggedErrorClass<ContactAlreadyExistsError>()(
+  "ContactAlreadyExistsError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 409, identifier: "ContactAlreadyExistsError" }
+) {}
+
 export class FailedToCreateContactError extends Schema.TaggedErrorClass<FailedToCreateContactError>()(
   "FailedToCreateContactError",
   {},
@@ -42,6 +48,7 @@ export const ContactServiceErrors = Schema.Union([
   InternalServerError,
   PolicyDeniedError,
   DataValidationError,
+  ContactAlreadyExistsError,
   ContactNotFoundError,
   FailedToCreateContactError,
   FailedToUpdateContactError,

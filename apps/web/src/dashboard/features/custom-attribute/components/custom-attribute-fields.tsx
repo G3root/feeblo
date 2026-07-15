@@ -5,15 +5,20 @@ import type {
   TContactAttributeValue,
   TContactAttributeValueUpsert,
 } from "@feeblo/domain/attribute-definition/schema";
+import type { TCompany } from "@feeblo/domain/company/schema";
+import type { TContact } from "@feeblo/domain/contact/schema";
 import { CompanyAttributeValueId, ContactAttributeValueId } from "@feeblo/id";
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
-import { createTransaction } from "@tanstack/react-db";
+import { createOptimisticAction } from "@tanstack/react-db";
 import {
   companyAttributeValueCollection,
+  companyCollection,
   contactAttributeValueCollection,
+  contactCollection,
 } from "~/lib/collections";
+
 import { fetchRpc } from "~/lib/runtime";
 
 export type CustomAttributeDefinition = {
@@ -261,7 +266,7 @@ function getCustomAttributeValueChanges<
   return { inserts, updates };
 }
 
-export async function saveContactCustomAttributeValues({
+export async function getContactCustomAttributeValueChanges({
   contactId,
   definitions,
   existingValues,
@@ -278,7 +283,10 @@ export async function saveContactCustomAttributeValues({
   })[];
   organizationId: string;
   values: CustomAttributeInputValues;
-}) {
+}): Promise<{
+  createAttribute: TContactAttributeValue[];
+  upsertAttribute: TContactAttributeValue[];
+}> {
   const { inserts, updates } = getCustomAttributeValueChanges({
     definitions,
     existingValues,
@@ -295,66 +303,17 @@ export async function saveContactCustomAttributeValues({
       ...valueColumns,
     }))
   );
-  const persistencePromises: Promise<unknown>[] = [];
-
-  if (insertValues.length > 0) {
-    const transaction = createTransaction<TContactAttributeValue>({
-      autoCommit: false,
-      mutationFn: ({ transaction }) =>
-        Promise.all(
-          transaction.mutations.map(({ modified: value }) =>
-            fetchRpc((rpc) =>
-              rpc.ContactAttributeValueUpsert({
-                id: value.id,
-                attributeId: value.attributeId,
-                contactId: value.contactId,
-                organizationId: value.organizationId,
-                value: getAttributeValue(value),
-              })
-            )
-          )
-        ),
-    });
-    transaction.mutate(() => {
-      for (const value of insertValues) {
-        contactAttributeValueCollection.insert(value);
-      }
-    });
-    persistencePromises.push(transaction.commit());
-  }
-
-  if (updates.length > 0) {
-    const transaction = createTransaction<TContactAttributeValue>({
-      autoCommit: false,
-      mutationFn: ({ transaction }) =>
-        Promise.all(
-          transaction.mutations.map(({ modified: value }) =>
-            fetchRpc((rpc) =>
-              rpc.ContactAttributeValueUpsert({
-                id: value.id,
-                attributeId: value.attributeId,
-                contactId: value.contactId,
-                organizationId: value.organizationId,
-                value: getAttributeValue(value),
-              })
-            )
-          )
-        ),
-    });
-    transaction.mutate(() => {
-      for (const { existingValue, valueColumns } of updates) {
-        contactAttributeValueCollection.update(existingValue.id, (draft) => {
-          Object.assign(draft, valueColumns, { updatedAt: new Date() });
-        });
-      }
-    });
-    persistencePromises.push(transaction.commit());
-  }
-
-  await Promise.all(persistencePromises);
+  return {
+    createAttribute: insertValues,
+    upsertAttribute: updates.map(({ existingValue, valueColumns }) => ({
+      ...existingValue,
+      ...valueColumns,
+      updatedAt: new Date(),
+    })),
+  };
 }
 
-export async function saveCompanyCustomAttributeValues({
+export async function getCompanyCustomAttributeValueChanges({
   companyId,
   definitions,
   existingValues,
@@ -371,7 +330,10 @@ export async function saveCompanyCustomAttributeValues({
   })[];
   organizationId: string;
   values: CustomAttributeInputValues;
-}) {
+}): Promise<{
+  createAttribute: TCompanyAttributeValue[];
+  upsertAttribute: TCompanyAttributeValue[];
+}> {
   const { inserts, updates } = getCustomAttributeValueChanges({
     definitions,
     existingValues,
@@ -388,63 +350,14 @@ export async function saveCompanyCustomAttributeValues({
       ...valueColumns,
     }))
   );
-  const persistencePromises: Promise<unknown>[] = [];
-
-  if (insertValues.length > 0) {
-    const transaction = createTransaction<TCompanyAttributeValue>({
-      autoCommit: false,
-      mutationFn: ({ transaction }) =>
-        Promise.all(
-          transaction.mutations.map(({ modified: value }) =>
-            fetchRpc((rpc) =>
-              rpc.CompanyAttributeValueUpsert({
-                id: value.id,
-                attributeId: value.attributeId,
-                companyId: value.companyId,
-                organizationId: value.organizationId,
-                value: getAttributeValue(value),
-              })
-            )
-          )
-        ),
-    });
-    transaction.mutate(() => {
-      for (const value of insertValues) {
-        companyAttributeValueCollection.insert(value);
-      }
-    });
-    persistencePromises.push(transaction.commit());
-  }
-
-  if (updates.length > 0) {
-    const transaction = createTransaction<TCompanyAttributeValue>({
-      autoCommit: false,
-      mutationFn: ({ transaction }) =>
-        Promise.all(
-          transaction.mutations.map(({ modified: value }) =>
-            fetchRpc((rpc) =>
-              rpc.CompanyAttributeValueUpsert({
-                id: value.id,
-                attributeId: value.attributeId,
-                companyId: value.companyId,
-                organizationId: value.organizationId,
-                value: getAttributeValue(value),
-              })
-            )
-          )
-        ),
-    });
-    transaction.mutate(() => {
-      for (const { existingValue, valueColumns } of updates) {
-        companyAttributeValueCollection.update(existingValue.id, (draft) => {
-          Object.assign(draft, valueColumns, { updatedAt: new Date() });
-        });
-      }
-    });
-    persistencePromises.push(transaction.commit());
-  }
-
-  await Promise.all(persistencePromises);
+  return {
+    createAttribute: insertValues,
+    upsertAttribute: updates.map(({ existingValue, valueColumns }) => ({
+      ...existingValue,
+      ...valueColumns,
+      updatedAt: new Date(),
+    })),
+  };
 }
 
 function defaultInputValue(definition: CustomAttributeDefinition) {
@@ -476,3 +389,158 @@ function getAttributeValue(value: CustomAttributeValue): AttributeValueUpsert {
     value.valueDate
   );
 }
+
+export const createContactAction = createOptimisticAction<{
+  contact: TContact;
+  operation: "create" | "update";
+  upsertAttribute?: TContactAttributeValue[];
+  createAttribute?: TContactAttributeValue[];
+}>({
+  onMutate: ({ contact, createAttribute, operation, upsertAttribute }) => {
+    if (operation === "create") {
+      contactCollection.insert(contact);
+    } else {
+      contactCollection.update(contact.id, (draft) => {
+        Object.assign(draft, contact);
+      });
+    }
+
+    if (upsertAttribute) {
+      for (const attribute of upsertAttribute) {
+        contactAttributeValueCollection.update(attribute.id, (draft) => {
+          Object.assign(draft, attribute, { updatedAt: new Date() });
+        });
+      }
+    }
+
+    if (createAttribute) {
+      for (const attribute of createAttribute) {
+        contactAttributeValueCollection.insert({
+          ...attribute,
+          contactId: contact.id,
+        });
+      }
+    }
+  },
+  mutationFn: async ({
+    contact,
+    createAttribute,
+    operation,
+    upsertAttribute,
+  }) => {
+    const promises: Promise<unknown>[] = [
+      fetchRpc((rpc) =>
+        operation === "create"
+          ? rpc.ContactCreate(contact)
+          : rpc.ContactUpdate(contact)
+      ),
+    ];
+
+    if (createAttribute) {
+      promises.push(
+        ...createAttribute.map((attribute) =>
+          fetchRpc((rpc) =>
+            rpc.ContactAttributeValueUpsert({
+              id: attribute.id,
+              attributeId: attribute.attributeId,
+              contactId: attribute.contactId,
+              organizationId: attribute.organizationId,
+              value: getAttributeValue(attribute),
+            })
+          )
+        )
+      );
+    }
+
+    if (upsertAttribute) {
+      promises.push(
+        ...upsertAttribute.map((attribute) =>
+          fetchRpc((rpc) =>
+            rpc.ContactAttributeValueUpsert({
+              id: attribute.id,
+              attributeId: attribute.attributeId,
+              contactId: attribute.contactId,
+              organizationId: attribute.organizationId,
+              value: getAttributeValue(attribute),
+            })
+          )
+        )
+      );
+    }
+
+    await Promise.all(promises);
+    await Promise.all([
+      contactCollection.utils.refetch(),
+      contactAttributeValueCollection.utils.refetch(),
+    ]);
+  },
+});
+
+export const createCompanyAction = createOptimisticAction<{
+  company: TCompany;
+  operation: "create" | "update";
+  upsertAttribute?: TCompanyAttributeValue[];
+  createAttribute?: TCompanyAttributeValue[];
+}>({
+  onMutate: ({ company, createAttribute, operation, upsertAttribute }) => {
+    if (operation === "create") {
+      companyCollection.insert(company);
+    } else {
+      companyCollection.update(company.id, (draft) => {
+        Object.assign(draft, company);
+      });
+    }
+
+    for (const attribute of upsertAttribute ?? []) {
+      companyAttributeValueCollection.update(attribute.id, (draft) => {
+        Object.assign(draft, attribute);
+      });
+    }
+
+    for (const attribute of createAttribute ?? []) {
+      companyAttributeValueCollection.insert(attribute);
+    }
+  },
+  mutationFn: async ({
+    company,
+    createAttribute,
+    operation,
+    upsertAttribute,
+  }) => {
+    const promises: Promise<unknown>[] = [
+      fetchRpc((rpc) =>
+        operation === "create"
+          ? rpc.CompanyCreate(company)
+          : rpc.CompanyUpdate(company)
+      ),
+      ...(createAttribute ?? []).map((attribute) =>
+        fetchRpc((rpc) =>
+          rpc.CompanyAttributeValueUpsert({
+            id: attribute.id,
+            attributeId: attribute.attributeId,
+            companyId: attribute.companyId,
+            organizationId: attribute.organizationId,
+            value: getAttributeValue(attribute),
+          })
+        )
+      ),
+      ...(upsertAttribute ?? []).map((attribute) =>
+        fetchRpc((rpc) =>
+          rpc.CompanyAttributeValueUpsert({
+            id: attribute.id,
+            attributeId: attribute.attributeId,
+            companyId: attribute.companyId,
+            organizationId: attribute.organizationId,
+            value: getAttributeValue(attribute),
+          })
+        )
+      ),
+    ];
+
+    await Promise.all(promises);
+    await Promise.all([
+      companyCollection.utils.refetch(),
+      companyAttributeValueCollection.utils.refetch(),
+    ]);
+  },
+});

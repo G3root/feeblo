@@ -7,6 +7,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { UserPersistenceError } from "./errors";
 
 function hashEmail(email: string): string {
   return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
@@ -70,9 +71,9 @@ const makeUserRepository = Effect.gen(function* () {
             .where(eq(schema.userTable.id, existingByEmail.id))
             .returning();
           if (!updated) {
-            return yield* Effect.die(
-              new Error("SSO user update did not return a row")
-            );
+            return yield* new UserPersistenceError({
+              message: "SSO user update did not return a row",
+            });
           }
           return updated;
         }
@@ -100,9 +101,9 @@ const makeUserRepository = Effect.gen(function* () {
             .where(eq(schema.userTable.id, existingByHash.id))
             .returning();
           if (!updated) {
-            return yield* Effect.die(
-              new Error("SSO user update did not return a row")
-            );
+            return yield* new UserPersistenceError({
+              message: "SSO user update did not return a row",
+            });
           }
           return updated;
         }
@@ -125,9 +126,9 @@ const makeUserRepository = Effect.gen(function* () {
           })
           .returning();
         if (!created) {
-          return yield* Effect.die(
-            new Error("SSO user insert did not return a row")
-          );
+          return yield* new UserPersistenceError({
+            message: "SSO user insert did not return a row",
+          });
         }
         return created;
       }),

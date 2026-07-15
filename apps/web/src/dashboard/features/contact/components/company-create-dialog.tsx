@@ -13,8 +13,9 @@ import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
   CustomAttributeFields,
+  createCompanyAction,
+  getCompanyCustomAttributeValueChanges,
   hasMissingRequiredCustomAttributeValues,
-  saveCompanyCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -41,10 +42,7 @@ export function CompanyCreateDialog() {
 
 function CompanyCreateForm() {
   const organizationId = useOrganizationId();
-  const {
-    companyAttributeDefinitionCollection,
-    companyCollection,
-  } = useDashboardCollections();
+  const { companyAttributeDefinitionCollection } = useDashboardCollections();
   const store = useCompanyCreateDialogContext();
   const definitionsQuery = useLiveQuery(
     (q) =>
@@ -81,30 +79,42 @@ function CompanyCreateForm() {
 
       try {
         const companyId = await CompanyId.unsafeGenerate();
-        const tx = companyCollection.insert({
+        const now = new Date();
+        const company = {
           id: companyId,
           organizationId,
           externalId: null,
           name: data.value.name,
           avatar: null,
           externalCreatedAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        await tx.isPersisted.promise;
-        await saveCompanyCustomAttributeValues({
-          companyId,
-          definitions,
-          existingValues: [],
-          organizationId,
-          values: data.value.attributes,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const { createAttribute, upsertAttribute } =
+          await getCompanyCustomAttributeValueChanges({
+            companyId,
+            definitions,
+            existingValues: [],
+            organizationId,
+            values: data.value.attributes,
+          });
+        //TODO add error validation
+        await createCompanyAction({
+          company,
+          createAttribute,
+          operation: "create",
+          upsertAttribute,
         });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company created", type: "success" });
-      } catch (_error) {
-        toastManager.add({ title: "Failed to create company", type: "error" });
+      } catch (error) {
+        toastManager.add({
+          title: hasExistingRecordError(error)
+            ? "A company with this name already exists"
+            : "Failed to create company",
+          type: "error",
+        });
       }
     },
   });
@@ -140,4 +150,8 @@ function CompanyCreateForm() {
       </div>
     </form>
   );
+}
+
+function hasExistingRecordError(error: unknown) {
+  return String(error).includes("AlreadyExistsError");
 }
