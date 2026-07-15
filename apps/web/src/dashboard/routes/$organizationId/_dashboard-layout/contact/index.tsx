@@ -1,3 +1,18 @@
+import { Button } from "@feeblo/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@feeblo/ui/dropdown-menu";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@feeblo/ui/empty";
 import {
   Table,
   TableBody,
@@ -6,14 +21,25 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
-import { UserAdd01Icon } from "@hugeicons/core-free-icons";
+import {
+  Delete02Icon,
+  Edit,
+  Ellipsis,
+  UserAdd01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { ContactCreateDialog } from "~/features/contact/components/contact-create-dialog";
+import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
+import { ContactEditDialog } from "~/features/contact/components/contact-edit-dialog";
 import {
   ContactCreateDialogProvider,
+  ContactDeleteDialogProvider,
+  ContactEditDialogProvider,
   useContactCreateDialogContext,
+  useContactDeleteDialogContext,
+  useContactEditDialogContext,
 } from "~/features/contact/dialog-stores";
 import { contactCollection } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -31,8 +57,14 @@ export const Route = createFileRoute(
 function RouteComponent() {
   return (
     <ContactCreateDialogProvider>
-      <ContactPage />
-      <ContactCreateDialog />
+      <ContactEditDialogProvider>
+        <ContactDeleteDialogProvider>
+          <ContactPage />
+          <ContactCreateDialog />
+          <ContactEditDialog />
+          <ContactDeleteDialog />
+        </ContactDeleteDialogProvider>
+      </ContactEditDialogProvider>
     </ContactCreateDialogProvider>
   );
 }
@@ -41,6 +73,8 @@ function ContactPage() {
   const { organizationId } = Route.useParams();
   const { contactCollection } = useDashboardCollections();
   const createDialogStore = useContactCreateDialogContext();
+  const editDialogStore = useContactEditDialogContext();
+  const deleteDialogStore = useContactDeleteDialogContext();
   const contactsQuery = useLiveQuery(
     (q) =>
       q
@@ -92,6 +126,9 @@ function ContactPage() {
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
             <TableHead>Updated</TableHead>
+            <TableHead className="w-16 text-right">
+              <span className="sr-only">Actions</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -103,6 +140,53 @@ function ContactPage() {
               <TableCell>{contact.email ?? "—"}</TableCell>
               <TableCell>{contact.phone ?? "—"}</TableCell>
               <TableCell>{formatDate(contact.updatedAt)}</TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={(triggerProps) => (
+                      <Button
+                        {...triggerProps}
+                        size="icon-sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <HugeiconsIcon icon={Ellipsis} />
+                        <span className="sr-only">
+                          Open actions for {contact.name ?? "contact"}
+                        </span>
+                      </Button>
+                    )}
+                  />
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        editDialogStore.send({
+                          type: "toggle",
+                          data: { contactId: contact.id },
+                        })
+                      }
+                    >
+                      <HugeiconsIcon
+                        className="text-muted-foreground"
+                        icon={Edit}
+                      />
+                      <span>Edit</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        deleteDialogStore.send({
+                          type: "toggle",
+                          data: { contactId: contact.id },
+                        })
+                      }
+                      variant="destructive"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} />
+                      <span>Delete</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -116,13 +200,3 @@ function formatDate(date: Date) {
     dateStyle: "medium",
   }).format(date);
 }
-
-import { Button } from "@feeblo/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@feeblo/ui/empty";

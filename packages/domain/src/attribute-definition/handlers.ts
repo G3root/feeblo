@@ -111,9 +111,8 @@ export const AttributeDefinitionRpcHandlers = AttributeDefinitionRpcs.toLayer(
   AttributeDefinitionRpcHandlersEffect
 ).pipe(
   Layer.provide(
-    Layer.mergeAll(
-      AttributeDefinitionPolicy.layer,
-      AttributeDefinitionRepository.layer
+    AttributeDefinitionPolicy.layer.pipe(
+      Layer.provideMerge(AttributeDefinitionRepository.layer)
     )
   )
 );

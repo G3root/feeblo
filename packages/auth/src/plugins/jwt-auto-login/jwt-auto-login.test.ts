@@ -132,8 +132,6 @@ describe("jwtAutoLogin", async () => {
 
   _auth = auth;
 
-  const headers = new Headers();
-
   it("should sign in via JWT auto login", async () => {
     const testHeaders = new Headers();
     await client.signIn.jwtAutoLogin({
@@ -734,7 +732,7 @@ describe("jwtAutoLogin", async () => {
       const { getSessionFromCtx, addOAuthServerContext } = await import(
         "better-auth/api"
       );
-      addOAuthServerContext.mockClear();
+      vi.mocked(addOAuthServerContext).mockClear();
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
@@ -752,7 +750,7 @@ describe("jwtAutoLogin", async () => {
       const { getSessionFromCtx, addOAuthServerContext } = await import(
         "better-auth/api"
       );
-      addOAuthServerContext.mockClear();
+      vi.mocked(addOAuthServerContext).mockClear();
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
