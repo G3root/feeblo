@@ -70,11 +70,14 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           emoji: args.emoji,
         });
       }).pipe(
-        Policy.withPublicPolicy(
-          postPolicy.isUnlockedPublic({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          )
         ),
         withRemapDbErrors("CommentReaction", "update")
       ),

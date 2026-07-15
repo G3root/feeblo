@@ -71,10 +71,13 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
         });
       }).pipe(
         Policy.withPolicy(
-          postPolicy.isUnlockedPublic({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          )
         ),
         withRemapDbErrors("PostReaction", "update")
       ),

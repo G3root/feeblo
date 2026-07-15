@@ -84,10 +84,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     PostSubscriptionCreatePublic: (args: TPostSubscriptionCreate) =>
       subscribeEffect(args).pipe(
         Policy.withPolicy(
-          postPolicy.isUnlockedPublic({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          )
         ),
         withRemapDbErrors("PostSubscription", "create")
       ),
@@ -109,10 +112,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     PostSubscriptionDeletePublic: (args: TPostSubscriptionDelete) =>
       unsubscribeEffect(args).pipe(
         Policy.withPolicy(
-          postPolicy.isUnlockedPublic({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          )
         ),
         withRemapDbErrors("PostSubscription", "delete")
       ),

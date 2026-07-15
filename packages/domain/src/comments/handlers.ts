@@ -219,6 +219,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       createCommentEffect(args, { allowNonMemberPublic: true }).pipe(
         Policy.withPolicy(
           Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
             postPolicy.isUnlockedPublic({
               organizationId: args.organizationId,
               postId: args.postId,
@@ -255,6 +256,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       deleteCommentEffect(args).pipe(
         Policy.withPolicy(
           Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
             postPolicy.isUnlockedPublic({
               organizationId: args.organizationId,
               postId: args.postId,
@@ -292,6 +294,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       updateCommentEffect(args, { allowNonMemberPublic: true }).pipe(
         Policy.withPolicy(
           Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
             postPolicy.isUnlockedPublic({
               organizationId: args.organizationId,
               postId: args.postId,

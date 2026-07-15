@@ -107,10 +107,13 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         return result;
       }).pipe(
         Policy.withPolicy(
-          postPolicy.isUnlockedPublic({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
+            postPolicy.isUnlockedPublic({
+              organizationId: args.organizationId,
+              postId: args.postId,
+            })
+          )
         ),
         withRemapDbErrors("Upvote", "update")
       ),

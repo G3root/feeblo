@@ -71,7 +71,7 @@ const makePostPolicy = Effect.gen(function* () {
     );
 
   const isUnlockedPublic = (args: TIsUnlocked) =>
-    Policy.publicPolicy(() =>
+    Policy.policy(() =>
       repository.isUnlockedPublic({
         id: args.postId,
         organizationId: args.organizationId,

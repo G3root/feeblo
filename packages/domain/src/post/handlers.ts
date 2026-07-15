@@ -150,11 +150,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostDeletePublic: (args: TPostDelete) =>
       deletePostEffect(args).pipe(
         Policy.withPolicy(
-          postPolicy.isOwner({
-            organizationId: args.organizationId,
-            postId: args.id,
-            boardId: args.boardId,
-          })
+          Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
+            postPolicy.isOwner({
+              organizationId: args.organizationId,
+              postId: args.id,
+              boardId: args.boardId,
+            })
+          )
         ),
         withRemapDbErrors("Post", "delete")
       ),
@@ -178,6 +181,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       updatePostEffect(args).pipe(
         Policy.withPolicy(
           Policy.all(
+            Policy.hasRestrictedOrganizationScope(args.organizationId),
             postPolicy.isUnlockedPublic({
               organizationId: args.organizationId,
               postId: args.id,
@@ -200,6 +204,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostCreatePublic: (args: TPostCreate) =>
       createPostEffect(args, { source: "PUBLIC_BOARD" }).pipe(
+        Policy.withPolicy(Policy.hasRestrictedOrganizationScope(args.organizationId)),
         withRemapDbErrors("Post", "create")
       ),
 
