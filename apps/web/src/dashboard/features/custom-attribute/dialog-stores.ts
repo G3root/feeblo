@@ -10,3 +10,27 @@ export const [
   hookName: "useCustomAttributeCreateDialogContext",
   providerName: "CustomAttributeCreateDialogProvider",
 });
+
+export const [
+  CustomAttributeEditDialogProvider,
+  useCustomAttributeEditDialogContext,
+] = createModalStoreContext<{
+  attributeId: string;
+  entityType: CustomAttributeEntityType;
+}>({
+  name: "CustomAttributeEditDialogContext",
+  hookName: "useCustomAttributeEditDialogContext",
+  providerName: "CustomAttributeEditDialogProvider",
+});
+
+export const [
+  CustomAttributeDeleteDialogProvider,
+  useCustomAttributeDeleteDialogContext,
+] = createModalStoreContext<{
+  attributeId: string;
+  entityType: CustomAttributeEntityType;
+}>({
+  name: "CustomAttributeDeleteDialogContext",
+  hookName: "useCustomAttributeDeleteDialogContext",
+  providerName: "CustomAttributeDeleteDialogProvider",
+});

@@ -1,6 +1,12 @@
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@feeblo/ui/dropdown-menu";
+import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -21,6 +27,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@feeblo/ui/tabs";
 import {
   Building03Icon,
   Contact01Icon,
+  Delete02Icon,
+  Edit,
+  Ellipsis,
   Plus,
   PropertyNewIcon,
 } from "@hugeicons/core-free-icons";
@@ -32,6 +41,8 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 import {
   type CustomAttributeEntityType,
   useCustomAttributeCreateDialogContext,
+  useCustomAttributeDeleteDialogContext,
+  useCustomAttributeEditDialogContext,
 } from "../dialog-stores";
 
 type AttributeDefinition = {
@@ -49,14 +60,14 @@ export function CustomAttributesSettings() {
     contactAttributeDefinitionCollection,
   } = useDashboardCollections();
   const dialogStore = useCustomAttributeCreateDialogContext();
+  const editDialogStore = useCustomAttributeEditDialogContext();
+  const deleteDialogStore = useCustomAttributeDeleteDialogContext();
 
   const contactAttributesQuery = useLiveQuery(
     (query) =>
       query
         .from({ attribute: contactAttributeDefinitionCollection })
-        .where(({ attribute }) =>
-          eq(attribute.organizationId, organizationId)
-        )
+        .where(({ attribute }) => eq(attribute.organizationId, organizationId))
         .orderBy(({ attribute }) => attribute.createdAt, "asc"),
     [organizationId]
   );
@@ -64,15 +75,28 @@ export function CustomAttributesSettings() {
     (query) =>
       query
         .from({ attribute: companyAttributeDefinitionCollection })
-        .where(({ attribute }) =>
-          eq(attribute.organizationId, organizationId)
-        )
+        .where(({ attribute }) => eq(attribute.organizationId, organizationId))
         .orderBy(({ attribute }) => attribute.createdAt, "asc"),
     [organizationId]
   );
 
   const openCreateDialog = (entityType: CustomAttributeEntityType) =>
     dialogStore.send({ type: "toggle", data: { entityType } });
+
+  const openEditDialog = (
+    attributeId: string,
+    entityType: CustomAttributeEntityType
+  ) =>
+    editDialogStore.send({ type: "toggle", data: { attributeId, entityType } });
+
+  const openDeleteDialog = (
+    attributeId: string,
+    entityType: CustomAttributeEntityType
+  ) =>
+    deleteDialogStore.send({
+      type: "toggle",
+      data: { attributeId, entityType },
+    });
 
   return (
     <Tabs defaultValue="contact">
@@ -93,6 +117,8 @@ export function CustomAttributesSettings() {
           isError={contactAttributesQuery.isError}
           isLoading={contactAttributesQuery.isLoading}
           onCreate={() => openCreateDialog("contact")}
+          onDelete={(id) => openDeleteDialog(id, "contact")}
+          onEdit={(id) => openEditDialog(id, "contact")}
         />
       </TabsContent>
       <TabsContent className="pt-4" value="company">
@@ -102,6 +128,8 @@ export function CustomAttributesSettings() {
           isError={companyAttributesQuery.isError}
           isLoading={companyAttributesQuery.isLoading}
           onCreate={() => openCreateDialog("company")}
+          onDelete={(id) => openDeleteDialog(id, "company")}
+          onEdit={(id) => openEditDialog(id, "company")}
         />
       </TabsContent>
     </Tabs>
@@ -113,12 +141,16 @@ function AttributeList({
   entityType,
   isError,
   isLoading,
+  onDelete,
+  onEdit,
   onCreate,
 }: {
   attributes: readonly AttributeDefinition[] | undefined;
   entityType: CustomAttributeEntityType;
   isError: boolean;
   isLoading: boolean;
+  onDelete: (attributeId: string) => void;
+  onEdit: (attributeId: string) => void;
   onCreate: () => void;
 }) {
   const pluralEntity = entityType === "contact" ? "contacts" : "companies";
@@ -168,7 +200,8 @@ function AttributeList({
             </EmptyMedia>
             <EmptyTitle>No {entityType} attributes yet</EmptyTitle>
             <EmptyDescription>
-              Add a custom field to capture details that matter across your {pluralEntity}.
+              Add a custom field to capture details that matter across your{" "}
+              {pluralEntity}.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -200,6 +233,41 @@ function AttributeList({
             <TableCell className="text-muted-foreground">
               {attribute.isRequired ? "Required" : "Optional"}
             </TableCell>
+            <TableCell className="text-right">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={(triggerProps) => (
+                    <Button
+                      {...triggerProps}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <HugeiconsIcon icon={Ellipsis} />
+                      <span className="sr-only">
+                        Open actions for {attribute.name}
+                      </span>
+                    </Button>
+                  )}
+                />
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => onEdit(attribute.id)}>
+                    <HugeiconsIcon
+                      className="text-muted-foreground"
+                      icon={Edit}
+                    />
+                    <span>Edit</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onDelete(attribute.id)}
+                    variant="destructive"
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </TableCell>
           </TableRow>
         ))}
       </AttributeTable>
@@ -230,6 +298,7 @@ function AttributeTable({ children }: { children: ReactNode }) {
             <TableHead>Key</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Requirement</TableHead>
+            <TableHead className="w-16 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>{children}</TableBody>
@@ -245,6 +314,12 @@ function AttributeLoadingRow() {
       <TableCell>attribute_key</TableCell>
       <TableCell>Text</TableCell>
       <TableCell>Optional</TableCell>
+      <TableCell className="text-right">
+        <Button size="icon-sm" type="button" variant="ghost">
+          <HugeiconsIcon icon={Ellipsis} />
+          <span className="sr-only">Open actions</span>
+        </Button>
+      </TableCell>
     </TableRow>
   );
 }
