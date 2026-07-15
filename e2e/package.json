@@ -6,7 +6,7 @@
   "scripts": {
     "db:migrate": "tsx scripts/migrate-pglite.ts",
     "dev:server:e2e": "pnpm run db:migrate && pnpm --dir ../apps/server exec tsx watch src/index.ts",
-    "dev:web:e2e": "pnpm --dir ../apps/web exec astro build && pnpm --dir ../apps/web exec astro preview --host 127.0.0.1 --port 3101",
+    "dev:web:e2e": "pnpm --dir ../packages/sdk build && pnpm --dir ../apps/web exec astro build && pnpm --dir ../apps/web exec astro preview --host 127.0.0.1 --port 3101",
     "test": "playwright test",
     "check-types": "tsc --noEmit"
   },

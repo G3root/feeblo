@@ -54,7 +54,7 @@ export const createFeedBackAction = action(
     const token = getWidgetToken();
 
     const baseUrl = getApiBaseUrl();
-    const url = `${baseUrl}/`;
+    const url = `${baseUrl}/feedback`;
     const body: Record<string, string> = {
       boardId,
       content,
