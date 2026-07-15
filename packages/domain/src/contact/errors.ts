@@ -31,6 +31,12 @@ export class FailedToUpdateContactError extends Schema.TaggedErrorClass<FailedTo
   { httpApiStatus: 500, identifier: "FailedToUpdateContactError" }
 ) {}
 
+export class FailedToDeleteContactError extends Schema.TaggedErrorClass<FailedToDeleteContactError>()(
+  "FailedToDeleteContactError",
+  {},
+  { httpApiStatus: 500, identifier: "FailedToDeleteContactError" }
+) {}
+
 export const ContactServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
@@ -39,4 +45,5 @@ export const ContactServiceErrors = Schema.Union([
   ContactNotFoundError,
   FailedToCreateContactError,
   FailedToUpdateContactError,
+  FailedToDeleteContactError,
 ]);

@@ -52,9 +52,8 @@ function ContactCreateForm() {
     },
     onSubmit: async (data) => {
       try {
-        //TODO fix insertation
         const contact = await fetchRpc((rpc) =>
-          rpc.ContactUpsert({
+          rpc.ContactCreate({
             organizationId,
             email: data.value.email,
             name: data.value.name || undefined,

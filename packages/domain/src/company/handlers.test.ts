@@ -1,11 +1,12 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { WorkspaceId } from "@feeblo/id";
+import { CompanyId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { CurrentSession, type Session } from "../session-middleware";
 import { CompanyRpcHandlersEffect } from "./handlers";
+import { CompanyPolicy } from "./policies";
 import { CompanyRepository } from "./repository";
 
 describe("CompanyRpcHandlers", () => {
@@ -63,10 +64,11 @@ describe("CompanyRpcHandlers", () => {
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
-  const TestLayer = Layer.merge(
+  const Repositories = Layer.merge(
     CompanyRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
+  const TestLayer = CompanyPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
   layer(TestLayer)("handlers", (it) => {
     it.effect("lists companies for organization members", () =>
@@ -102,6 +104,46 @@ describe("CompanyRpcHandlers", () => {
             )
         );
         expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("creates, updates, and deletes a company", () =>
+      Effect.gen(function* () {
+        const handlers = yield* CompanyRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+
+        const created = yield* handlers
+          .CompanyCreate({
+            organizationId: fixture.organizationId,
+            name: "Acme",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+        const companyId = yield* CompanyId.parse(created.id);
+
+        const updated = yield* handlers
+          .CompanyUpdate({
+            id: companyId,
+            organizationId: fixture.organizationId,
+            name: "Acme Inc.",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(updated).toMatchObject({
+          id: created.id,
+          name: "Acme Inc.",
+        });
+
+        yield* handlers
+          .CompanyDelete({
+            id: companyId,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const companies = yield* handlers
+          .CompanyList({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(companies).toHaveLength(0);
       })
     );
   });

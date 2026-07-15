@@ -1,10 +1,11 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { WorkspaceId } from "@feeblo/id";
+import { ContactId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
 import { ContactRpcHandlersEffect } from "./handlers";
+import { ContactPolicy } from "./policies";
 import { ContactRepository } from "./repository";
 
 describe("ContactRpcHandlers", () => {
@@ -62,10 +63,11 @@ describe("ContactRpcHandlers", () => {
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
-  const TestLayer = Layer.merge(
+  const Repositories = Layer.merge(
     ContactRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
+  const TestLayer = ContactPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
   layer(TestLayer)("handlers", (it) => {
     it.effect("lists contacts for organization members", () =>
@@ -90,6 +92,49 @@ describe("ContactRpcHandlers", () => {
           name: "Ada",
           email: "ada@example.com",
         });
+      })
+    );
+
+    it.effect("creates, updates, and deletes a contact", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+
+        const created = yield* handlers
+          .ContactCreate({
+            organizationId: fixture.organizationId,
+            name: "Ada",
+            email: "ada@example.com",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+        const contactId = yield* ContactId.parse(created.id);
+
+        const updated = yield* handlers
+          .ContactUpdate({
+            id: contactId,
+            organizationId: fixture.organizationId,
+            name: "Ada Lovelace",
+            phone: "+44 20 0000 0000",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(updated).toMatchObject({
+          id: created.id,
+          name: "Ada Lovelace",
+          phone: "+44 20 0000 0000",
+        });
+
+        yield* handlers
+          .ContactDelete({
+            id: contactId,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const contacts = yield* handlers
+          .ContactList({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(contacts).toHaveLength(0);
       })
     );
   });

@@ -1,4 +1,4 @@
-import { WorkspaceId } from "@feeblo/id";
+import { ContactId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const CommonContactFields = S.Struct({
@@ -22,6 +22,38 @@ export const ContactUpsert = S.Struct({
 });
 
 export type TContactUpsert = S.Schema.Type<typeof ContactUpsert>;
+
+export const ContactCreate = S.Struct({
+  organizationId: WorkspaceId.schema,
+  externalId: S.optional(S.String),
+  email: S.optional(S.String),
+  name: S.optional(S.String),
+  phone: S.optional(S.String),
+  avatar: S.optional(S.String),
+  companyId: S.optional(S.NullOr(S.String)),
+  userId: S.optional(S.NullOr(S.String)),
+});
+
+export const ContactUpdate = S.Struct({
+  id: ContactId.schema,
+  organizationId: WorkspaceId.schema,
+  externalId: S.optional(S.NullOr(S.String)),
+  email: S.optional(S.NullOr(S.String)),
+  name: S.optional(S.NullOr(S.String)),
+  phone: S.optional(S.NullOr(S.String)),
+  avatar: S.optional(S.NullOr(S.String)),
+  companyId: S.optional(S.NullOr(S.String)),
+  userId: S.optional(S.NullOr(S.String)),
+});
+
+export const ContactDelete = S.Struct({
+  id: ContactId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TContactCreate = S.Schema.Type<typeof ContactCreate>;
+export type TContactUpdate = S.Schema.Type<typeof ContactUpdate>;
+export type TContactDelete = S.Schema.Type<typeof ContactDelete>;
 
 export const Contact = S.Struct({
   id: S.String,

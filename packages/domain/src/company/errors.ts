@@ -21,6 +21,12 @@ export class FailedToUpdateCompanyError extends Schema.TaggedErrorClass<FailedTo
   { httpApiStatus: 500, identifier: "FailedToUpdateCompanyError" }
 ) {}
 
+export class FailedToDeleteCompanyError extends Schema.TaggedErrorClass<FailedToDeleteCompanyError>()(
+  "FailedToDeleteCompanyError",
+  {},
+  { httpApiStatus: 500, identifier: "FailedToDeleteCompanyError" }
+) {}
+
 export const CompanyServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
@@ -28,4 +34,5 @@ export const CompanyServiceErrors = Schema.Union([
   CompanyNotFoundError,
   FailedToCreateCompanyError,
   FailedToUpdateCompanyError,
+  FailedToDeleteCompanyError,
 ]);

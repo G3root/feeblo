@@ -46,9 +46,8 @@ function CompanyCreateForm() {
     },
     onSubmit: async (data) => {
       try {
-        //TODO fix insertation
         const company = await fetchRpc((rpc) =>
-          rpc.CompanyUpsert({
+          rpc.CompanyCreate({
             organizationId,
             name: data.value.name,
           })

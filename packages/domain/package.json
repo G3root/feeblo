@@ -151,6 +151,9 @@
     "./contact/repository": {
       "default": "./src/contact/repository.ts"
     },
+    "./contact/policies": {
+      "default": "./src/contact/policies.ts"
+    },
     "./company/schema": {
       "default": "./src/company/schema.ts"
     },
@@ -165,6 +168,9 @@
     },
     "./company/repository": {
       "default": "./src/company/repository.ts"
+    },
+    "./company/policies": {
+      "default": "./src/company/policies.ts"
     },
     "./attribute-definition/schema": {
       "default": "./src/attribute-definition/schema.ts"
