@@ -1,4 +1,5 @@
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { CompanyId } from "@feeblo/id";
 import {
   Sheet,
   SheetContent,
@@ -10,7 +11,6 @@ import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useCompanyCreateDialogContext } from "../dialog-stores";
 
@@ -46,14 +46,18 @@ function CompanyCreateForm() {
     },
     onSubmit: async (data) => {
       try {
-        const company = await fetchRpc((rpc) =>
-          rpc.CompanyCreate({
-            organizationId,
-            name: data.value.name,
-          })
-        );
+        const tx = companyCollection.insert({
+          id: await CompanyId.unsafeGenerate(),
+          organizationId,
+          externalId: null,
+          name: data.value.name,
+          avatar: null,
+          externalCreatedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
-        companyCollection.insert(company);
+        await tx.isPersisted.promise;
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company created", type: "success" });

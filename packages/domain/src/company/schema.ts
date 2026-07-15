@@ -21,19 +21,20 @@ export const CompanyUpsert = S.Struct({
 export type TCompanyUpsert = S.Schema.Type<typeof CompanyUpsert>;
 
 export const CompanyCreate = S.Struct({
+  id: CompanyId.schema,
   organizationId: WorkspaceId.schema,
-  externalId: S.optional(S.String),
+  externalId: S.NullOr(S.String),
   name: S.String,
-  avatar: S.optional(S.String),
-  externalCreatedAt: S.optional(S.DateFromString),
+  avatar: S.NullOr(S.String),
+  externalCreatedAt: S.optional(S.NullOr(S.DateFromString)),
 });
 
 export const CompanyUpdate = S.Struct({
   id: CompanyId.schema,
   organizationId: WorkspaceId.schema,
-  externalId: S.optional(S.NullOr(S.String)),
-  name: S.optional(S.String),
-  avatar: S.optional(S.NullOr(S.String)),
+  externalId: S.NullOr(S.String),
+  name: S.NullOr(S.String),
+  avatar: S.NullOr(S.String),
   externalCreatedAt: S.optional(S.NullOr(S.DateFromString)),
 });
 

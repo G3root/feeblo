@@ -944,6 +944,51 @@ export const contactCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedContact } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactUpdate({
+          id: updatedContact.id,
+          organizationId: updatedContact.organizationId,
+          externalId: updatedContact.externalId,
+          email: updatedContact.email,
+          name: updatedContact.name,
+          phone: updatedContact.phone,
+          avatar: updatedContact.avatar,
+          companyId: updatedContact.companyId,
+        })
+      );
+    },
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newContact } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactCreate({
+          id: newContact.id,
+          organizationId: newContact.organizationId,
+          externalId: newContact.externalId,
+          email: newContact.email,
+          name: newContact.name,
+          phone: newContact.phone,
+          avatar: newContact.avatar,
+          companyId: newContact.companyId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedContact } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactDelete({
+          id: deletedContact.id,
+          organizationId: deletedContact.organizationId,
+        })
+      );
+    },
   })
 );
 
@@ -966,6 +1011,47 @@ export const companyCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedCompany } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyUpdate({
+          id: updatedCompany.id,
+          organizationId: updatedCompany.organizationId,
+          externalId: updatedCompany.externalId,
+          name: updatedCompany.name,
+          avatar: updatedCompany.avatar,
+          externalCreatedAt: updatedCompany.externalCreatedAt,
+        })
+      );
+    },
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newCompany } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyCreate({
+          id: newCompany.id,
+          organizationId: newCompany.organizationId,
+          externalId: newCompany.externalId,
+          name: newCompany.name,
+          avatar: newCompany.avatar,
+          externalCreatedAt: newCompany.externalCreatedAt,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedCompany } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyDelete({
+          id: deletedCompany.id,
+          organizationId: deletedCompany.organizationId,
+        })
+      );
+    },
   })
 );
 

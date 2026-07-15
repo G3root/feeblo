@@ -1,4 +1,5 @@
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { ContactId } from "@feeblo/id";
 import {
   Sheet,
   SheetContent,
@@ -10,7 +11,6 @@ import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useContactCreateDialogContext } from "../dialog-stores";
 
@@ -52,20 +52,20 @@ function ContactCreateForm() {
     },
     onSubmit: async (data) => {
       try {
-        const contact = await fetchRpc((rpc) =>
-          rpc.ContactCreate({
-            organizationId,
-            email: data.value.email,
-            name: data.value.name || undefined,
-            phone: data.value.phone || undefined,
-          })
-        );
+        const tx = contactCollection.insert({
+          id: await ContactId.unsafeGenerate(),
+          organizationId,
+          externalId: null,
+          email: data.value.email,
+          name: data.value.name || null,
+          phone: data.value.phone || null,
+          avatar: null,
+          companyId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
-        if (!contact) {
-          throw new Error("Contact was not created");
-        }
-
-        contactCollection.insert(contact);
+        await tx.isPersisted.promise;
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Contact created", type: "success" });
