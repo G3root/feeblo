@@ -8,7 +8,6 @@ import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 import { type CustomTypesConfig, types } from "pg";
@@ -126,50 +125,24 @@ export const DatabaseContextLive = Layer.unwrap(
 // Backwards-compatible alias for the Postgres-only database layer.
 export const DatabaseLive = PgDatabaseLive;
 
-// Tracks the active transaction client so repository methods automatically
-// run on the current transaction when one is in progress.
-export interface TransactionService {
-  readonly db: PgDrizzle.EffectPgDatabase;
-}
-
-/**
- * @effect-leakable-service
- */
-export class TransactionContext extends Context.Service<
-  TransactionContext,
-  TransactionService
->()("@feeblo/TransactionContext") {}
-
-// Resolve the drizzle database to use for the current scope: the in-flight
-// transaction client when inside a `transaction` block, otherwise the main
-// `Database` service.
+// Effect SQL keeps the active transaction connection in fiber-local context,
+// so queries made through this database automatically join the current
+// transaction (including queries from repositories that captured the database
+// when their layer was built).
 export const currentDb: Effect.Effect<
   PgDrizzle.EffectPgDatabase,
   never,
   Database
-> = Effect.gen(function* () {
-  const maybeTx = yield* Effect.serviceOption(TransactionContext);
-  if (Option.isSome(maybeTx)) {
-    return maybeTx.value.db;
-  }
-  return yield* Database;
-});
+> = Database;
 
-// Run an effect inside a database transaction. The transaction client is
-// provided via `TransactionContext` so any `currentDb` usage within `effect`
-// (including by repository methods) automatically participates in the tx.
+// Run an effect inside a database transaction. Effect SQL routes every query
+// using this client's fiber-local transaction connection and turns nested
+// calls into savepoints.
 export function transaction<A, E, R>(
   effect: Effect.Effect<A, E, R>
 ): Effect.Effect<A, E | SqlError, R | Database> {
   return Effect.gen(function* () {
     const db = yield* Database;
-    return yield* db.transaction((tx) =>
-      effect.pipe(
-        Effect.provideService(
-          TransactionContext,
-          TransactionContext.of({ db: tx })
-        )
-      )
-    );
+    return yield* db.transaction(() => effect);
   });
 }

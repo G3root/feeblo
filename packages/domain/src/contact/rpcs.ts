@@ -8,16 +8,20 @@ import { ContactServiceErrors } from "./errors";
 import {
   Company,
   CompanyAttributeDefinition,
+  CompanyAttributeDefinitionCreate,
   CompanyAttributeDefinitionList,
   CompanyAttributeValue,
   CompanyAttributeValueList,
   CompanyList,
+  CompanyUpsert,
   Contact,
   ContactAttributeDefinition,
+  ContactAttributeDefinitionCreate,
   ContactAttributeDefinitionList,
   ContactAttributeValue,
   ContactAttributeValueList,
   ContactList,
+  ContactUpsert,
 } from "./schema";
 
 export class ContactRpcs extends RpcGroup.make(
@@ -33,15 +37,39 @@ export class ContactRpcs extends RpcGroup.make(
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 
+  Rpc.make("ContactUpsert", {
+    success: Schema.NullOr(Contact),
+    payload: ContactUpsert,
+    error: ContactServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("CompanyUpsert", {
+    success: Company,
+    payload: CompanyUpsert,
+    error: ContactServiceErrors,
+  }).middleware(AuthMiddleware),
+
   Rpc.make("ContactAttributeDefinitionList", {
     success: Schema.Array(ContactAttributeDefinition),
     payload: ContactAttributeDefinitionList,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 
+  Rpc.make("ContactAttributeDefinitionCreate", {
+    success: Schema.Void,
+    payload: ContactAttributeDefinitionCreate,
+    error: ContactServiceErrors,
+  }).middleware(AuthMiddleware),
+
   Rpc.make("CompanyAttributeDefinitionList", {
     success: Schema.Array(CompanyAttributeDefinition),
     payload: CompanyAttributeDefinitionList,
+    error: ContactServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("CompanyAttributeDefinitionCreate", {
+    success: Schema.Void,
+    payload: CompanyAttributeDefinitionCreate,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 

@@ -26,6 +26,7 @@ import { Route as OrganizationIdSettingsPreferencesRouteImport } from "./routes/
 import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
 import { Route as OrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/$organizationId/settings/feedback-tags"
 import { Route as OrganizationIdSettingsCustomizeRouteImport } from "./routes/$organizationId/settings/customize"
+import { Route as OrganizationIdSettingsCustomAttributesRouteImport } from "./routes/$organizationId/settings/custom-attributes"
 import { Route as OrganizationIdSettingsChangelogTagsRouteImport } from "./routes/$organizationId/settings/changelog-tags"
 import { Route as OrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/$organizationId/settings/changelog-privacy"
 import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
@@ -137,6 +138,12 @@ const OrganizationIdSettingsCustomizeRoute =
   OrganizationIdSettingsCustomizeRouteImport.update({
     id: "/customize",
     path: "/customize",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsCustomAttributesRoute =
+  OrganizationIdSettingsCustomAttributesRouteImport.update({
+    id: "/custom-attributes",
+    path: "/custom-attributes",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdSettingsChangelogTagsRoute =
@@ -253,6 +260,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
+  "/$organizationId/settings/custom-attributes": typeof OrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
@@ -287,6 +295,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
+  "/$organizationId/settings/custom-attributes": typeof OrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
@@ -323,6 +332,7 @@ export interface FileRoutesById {
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
+  "/$organizationId/settings/custom-attributes": typeof OrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
@@ -360,6 +370,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
+    | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
@@ -394,6 +405,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
+    | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
@@ -429,6 +441,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
+    | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
@@ -581,6 +594,13 @@ declare module "@tanstack/react-router" {
       path: "/customize"
       fullPath: "/$organizationId/settings/customize"
       preLoaderRoute: typeof OrganizationIdSettingsCustomizeRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/custom-attributes": {
+      id: "/$organizationId/settings/custom-attributes"
+      path: "/custom-attributes"
+      fullPath: "/$organizationId/settings/custom-attributes"
+      preLoaderRoute: typeof OrganizationIdSettingsCustomAttributesRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/settings/changelog-tags": {
@@ -766,6 +786,7 @@ interface OrganizationIdSettingsRouteChildren {
   OrganizationIdSettingsBillingRoute: typeof OrganizationIdSettingsBillingRoute
   OrganizationIdSettingsChangelogPrivacyRoute: typeof OrganizationIdSettingsChangelogPrivacyRoute
   OrganizationIdSettingsChangelogTagsRoute: typeof OrganizationIdSettingsChangelogTagsRoute
+  OrganizationIdSettingsCustomAttributesRoute: typeof OrganizationIdSettingsCustomAttributesRoute
   OrganizationIdSettingsCustomizeRoute: typeof OrganizationIdSettingsCustomizeRoute
   OrganizationIdSettingsFeedbackTagsRoute: typeof OrganizationIdSettingsFeedbackTagsRoute
   OrganizationIdSettingsMembersRoute: typeof OrganizationIdSettingsMembersRoute
@@ -784,6 +805,8 @@ const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
       OrganizationIdSettingsChangelogPrivacyRoute,
     OrganizationIdSettingsChangelogTagsRoute:
       OrganizationIdSettingsChangelogTagsRoute,
+    OrganizationIdSettingsCustomAttributesRoute:
+      OrganizationIdSettingsCustomAttributesRoute,
     OrganizationIdSettingsCustomizeRoute: OrganizationIdSettingsCustomizeRoute,
     OrganizationIdSettingsFeedbackTagsRoute:
       OrganizationIdSettingsFeedbackTagsRoute,

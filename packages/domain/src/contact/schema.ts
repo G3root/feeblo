@@ -1,4 +1,8 @@
-import { WorkspaceId } from "@feeblo/id";
+import {
+  CompanyAttributeDefinitionId,
+  ContactAttributeDefinitionId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const CommonContactFields = S.Struct({
@@ -104,6 +108,20 @@ export type TContactAttributeDefinitionList = S.Schema.Type<
   typeof ContactAttributeDefinitionList
 >;
 
+export const ContactAttributeDefinitionCreate = S.Struct({
+  id: ContactAttributeDefinitionId.schema,
+  name: S.NonEmptyString,
+  key: S.NonEmptyString,
+  description: S.NullOr(S.String),
+  type: AttributeType,
+  isRequired: S.Boolean,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TContactAttributeDefinitionCreate = S.Schema.Type<
+  typeof ContactAttributeDefinitionCreate
+>;
+
 export const ContactAttributeDefinition = S.Struct({
   id: S.String,
   name: S.String,
@@ -127,6 +145,20 @@ export const CompanyAttributeDefinitionList = S.Struct({
 
 export type TCompanyAttributeDefinitionList = S.Schema.Type<
   typeof CompanyAttributeDefinitionList
+>;
+
+export const CompanyAttributeDefinitionCreate = S.Struct({
+  id: CompanyAttributeDefinitionId.schema,
+  name: S.NonEmptyString,
+  key: S.NonEmptyString,
+  description: S.NullOr(S.String),
+  type: AttributeType,
+  isRequired: S.Boolean,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TCompanyAttributeDefinitionCreate = S.Schema.Type<
+  typeof CompanyAttributeDefinitionCreate
 >;
 
 export const CompanyAttributeDefinition = S.Struct({

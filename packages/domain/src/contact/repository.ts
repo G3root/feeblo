@@ -11,8 +11,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type {
+  TCompanyAttributeDefinitionCreate,
   TCompanyAttributeValueUpsert,
   TCompanyUpsert,
+  TContactAttributeDefinitionCreate,
   TContactAttributeValueUpsert,
   TContactUpsert,
 } from "./schema";
@@ -206,6 +208,18 @@ const makeContactRepository = Effect.succeed({
         );
     }),
 
+  createContactAttributeDefinition: (args: TContactAttributeDefinitionCreate) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      yield* db.insert(schema.contactAttributeDefinitionTable).values({
+        ...args,
+        description: args.description ?? null,
+        config: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }),
+
   findCompanyAttributeDefinitions: (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -218,6 +232,18 @@ const makeContactRepository = Effect.succeed({
             organizationId
           )
         );
+    }),
+
+  createCompanyAttributeDefinition: (args: TCompanyAttributeDefinitionCreate) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      yield* db.insert(schema.companyAttributeDefinitionTable).values({
+        ...args,
+        description: args.description ?? null,
+        config: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     }),
 
   findContactAttributeValues: (contactId: string) =>

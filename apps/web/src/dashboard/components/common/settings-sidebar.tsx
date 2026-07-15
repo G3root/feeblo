@@ -16,6 +16,7 @@ import {
   LayoutThreeColumnIcon,
   LockIcon,
   PaintBrush04Icon,
+  PropertyNewIcon,
   Settings05Icon,
   Shield01Icon,
   Tag01Icon,
@@ -60,6 +61,11 @@ const settingsItems = [
         label: "Members",
         icon: UserMultipleIcon,
         to: "/$organizationId/settings/members" as const,
+      },
+      {
+        label: "Custom Attributes",
+        icon: PropertyNewIcon,
+        to: "/$organizationId/settings/custom-attributes" as const,
       },
       {
         label: "Billing",

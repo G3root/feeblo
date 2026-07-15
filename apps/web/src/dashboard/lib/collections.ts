@@ -990,6 +990,22 @@ export const contactAttributeDefinitionCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: definition } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactAttributeDefinitionCreate({
+          id: definition.id,
+          name: definition.name,
+          key: definition.key,
+          description: definition.description,
+          type: definition.type,
+          isRequired: definition.isRequired,
+          organizationId: definition.organizationId,
+        })
+      );
+    },
   })
 );
 
@@ -1014,9 +1030,26 @@ export const companyAttributeDefinitionCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: definition } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyAttributeDefinitionCreate({
+          id: definition.id,
+          name: definition.name,
+          key: definition.key,
+          description: definition.description,
+          type: definition.type,
+          isRequired: definition.isRequired,
+          organizationId: definition.organizationId,
+        })
+      );
+    },
   })
 );
 
+//Todo scope
 export const contactAttributeValueCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
@@ -1052,6 +1085,7 @@ export const contactAttributeValueCollection = createCollection(
   })
 );
 
+//Todo scope
 export const companyAttributeValueCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
