@@ -12,7 +12,7 @@ import {
   CompanyAttributeDefinitionUpdate,
   CompanyAttributeValue,
   CompanyAttributeValueList,
-  CompanyAttributeValueUpsert,
+  CompanyAttributeValueUpdate,
   ContactAttributeDefinition,
   ContactAttributeDefinitionCreate,
   ContactAttributeDefinitionDelete,
@@ -20,7 +20,7 @@ import {
   ContactAttributeDefinitionUpdate,
   ContactAttributeValue,
   ContactAttributeValueList,
-  ContactAttributeValueUpsert,
+  ContactAttributeValueUpdate,
 } from "./schema";
 
 export class AttributeDefinitionRpcs extends RpcGroup.make(
@@ -69,9 +69,9 @@ export class AttributeDefinitionRpcs extends RpcGroup.make(
     payload: ContactAttributeValueList,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("ContactAttributeValueUpsert", {
-    success: ContactAttributeValue,
-    payload: ContactAttributeValueUpsert,
+  Rpc.make("ContactAttributeValueUpdate", {
+    success: Schema.Void,
+    payload: ContactAttributeValueUpdate,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("CompanyAttributeValueList", {
@@ -79,9 +79,9 @@ export class AttributeDefinitionRpcs extends RpcGroup.make(
     payload: CompanyAttributeValueList,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware),
-  Rpc.make("CompanyAttributeValueUpsert", {
-    success: CompanyAttributeValue,
-    payload: CompanyAttributeValueUpsert,
+  Rpc.make("CompanyAttributeValueUpdate", {
+    success: Schema.Void,
+    payload: CompanyAttributeValueUpdate,
     error: AttributeDefinitionServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

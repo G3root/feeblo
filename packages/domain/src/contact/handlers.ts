@@ -1,10 +1,12 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
-import { ContactNotFoundError } from "./errors";
+import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
 import { ContactPolicy } from "./policies";
 import { ContactRepository } from "./repository";
 import { ContactRpcs } from "./rpcs";
@@ -17,6 +19,7 @@ import type {
 
 export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
+  const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
   const contactPolicy = yield* ContactPolicy;
 
   return {
@@ -29,12 +32,38 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     ContactCreate: (args: TContactCreate) =>
-      repository
-        .create(args)
-        .pipe(
-          Policy.withPolicy(contactPolicy.canCreate(args.organizationId)),
-          withRemapDbErrors("Contact", "create")
-        ),
+      transaction(
+        Effect.gen(function* () {
+          const contact = yield* repository.create(args);
+          yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
+            attributeDefinitionRepository
+              .upsertContactAttributeValue({
+                ...attributeValue,
+                contactId: contact.id,
+                organizationId: args.organizationId,
+              })
+              .pipe(
+                Policy.withPolicy(
+                  Policy.policy(() =>
+                    attributeDefinitionRepository.contactAttributeDefinitionExists(
+                      {
+                        id: attributeValue.attributeId,
+                        organizationId: args.organizationId,
+                      }
+                    )
+                  )
+                ),
+                Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+                  Effect.fail(new FailedToCreateContactError())
+                )
+              )
+          );
+          return contact;
+        })
+      ).pipe(
+        Policy.withPolicy(contactPolicy.canCreate(args.organizationId)),
+        withRemapDbErrors("Contact", "create")
+      ),
 
     ContactUpdate: (args: TContactUpdate) =>
       Effect.gen(function* () {
@@ -69,5 +98,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
   ContactRpcHandlersEffect
 ).pipe(
   Layer.provide(ContactPolicy.layer),
-  Layer.provide(ContactRepository.layer)
+  Layer.provide(ContactRepository.layer),
+  Layer.provide(AttributeDefinitionRepository.layer)
 );

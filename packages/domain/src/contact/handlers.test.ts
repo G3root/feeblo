@@ -1,8 +1,13 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { ContactId, WorkspaceId } from "@feeblo/id";
+import {
+  ContactAttributeDefinitionId,
+  ContactId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { ContactRpcHandlersEffect } from "./handlers";
 import { ContactPolicy } from "./policies";
@@ -63,8 +68,11 @@ describe("ContactRpcHandlers", () => {
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
-  const Repositories = Layer.merge(
+  const Repositories = Layer.mergeAll(
     ContactRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+    AttributeDefinitionRepository.layer.pipe(
+      Layer.provide(Database.PgliteDatabaseLive)
+    ),
     Database.PgliteDatabaseLive
   );
   const TestLayer = ContactPolicy.layer.pipe(Layer.provideMerge(Repositories));
@@ -134,6 +142,55 @@ describe("ContactRpcHandlers", () => {
         const contacts = yield* handlers
           .ContactList({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+        expect(contacts).toHaveLength(0);
+      })
+    );
+
+    it.effect("rejects attributes from another organization when creating a contact", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const foreignOrganizationId = yield* WorkspaceId.generate;
+        const attributeId = yield* ContactAttributeDefinitionId.generate;
+        const now = new Date();
+
+        yield* db.insert(schema.organizationTable).values({
+          id: foreignOrganizationId,
+          name: "Foreign organization",
+          slug: foreignOrganizationId,
+          createdAt: now,
+        });
+        yield* db.insert(schema.contactAttributeDefinitionTable).values({
+          id: attributeId,
+          organizationId: foreignOrganizationId,
+          name: "Foreign field",
+          key: "foreignField",
+          type: "TEXT",
+          isRequired: false,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .ContactCreate({
+              organizationId: fixture.organizationId,
+              name: "Ada",
+              email: "ada@example.com",
+              attributeValues: [{ attributeId, value: "secret" }],
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture))
+            )
+        );
+        expect(error._tag).toBe("PolicyDenied");
+
+        const contacts = yield* handlers
+          .ContactList({ organizationId: fixture.organizationId })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture))
+          );
         expect(contacts).toHaveLength(0);
       })
     );

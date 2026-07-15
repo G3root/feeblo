@@ -90,7 +90,7 @@ function CompanyCreateForm() {
           createdAt: now,
           updatedAt: now,
         };
-        const { createAttribute, upsertAttribute } =
+        const { createAttribute } =
           await getCompanyCustomAttributeValueChanges({
             companyId,
             definitions,
@@ -103,7 +103,6 @@ function CompanyCreateForm() {
           company,
           createAttribute,
           operation: "create",
-          upsertAttribute,
         });
         form.reset();
         store.send({ type: "toggle" });

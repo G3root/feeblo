@@ -84,7 +84,7 @@ function ContactCreateForm() {
           createdAt: now,
           updatedAt: now,
         };
-        const { createAttribute, upsertAttribute } =
+        const { createAttribute } =
           await getContactCustomAttributeValueChanges({
             contactId,
             definitions,
@@ -97,7 +97,6 @@ function ContactCreateForm() {
           contact,
           createAttribute,
           operation: "create",
-          upsertAttribute,
         });
         form.reset();
         store.send({ type: "toggle" });

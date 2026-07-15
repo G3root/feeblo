@@ -165,6 +165,17 @@ export type TContactAttributeValueUpsert = S.Schema.Type<
   typeof ContactAttributeValueUpsert
 >;
 
+export const ContactAttributeValueUpdate = S.Struct({
+  ...AttributeValueUpsertFields,
+  id: ContactAttributeValueId.schema,
+  attributeId: ContactAttributeDefinitionId.schema,
+  contactId: S.String,
+});
+
+export type TContactAttributeValueUpdate = S.Schema.Type<
+  typeof ContactAttributeValueUpdate
+>;
+
 export const ContactAttributeValueList = S.Struct({
   organizationId: WorkspaceId.schema,
 });
@@ -192,6 +203,17 @@ export const CompanyAttributeValueUpsert = S.Struct({
 
 export type TCompanyAttributeValueUpsert = S.Schema.Type<
   typeof CompanyAttributeValueUpsert
+>;
+
+export const CompanyAttributeValueUpdate = S.Struct({
+  ...AttributeValueUpsertFields,
+  id: CompanyAttributeValueId.schema,
+  attributeId: CompanyAttributeDefinitionId.schema,
+  companyId: S.String,
+});
+
+export type TCompanyAttributeValueUpdate = S.Schema.Type<
+  typeof CompanyAttributeValueUpdate
 >;
 
 export const CompanyAttributeValueList = S.Struct({

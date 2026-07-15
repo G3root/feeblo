@@ -140,6 +140,14 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 contactId = yield* upsertContactFromParsed(
                   organizationId,
                   parsedContact
+                ).pipe(
+                  Effect.mapError(
+                    (cause) =>
+                      new InternalServerError({
+                        message: "Failed to create feedback contact",
+                        cause: String(cause),
+                      })
+                  )
                 );
 
                 yield* postRepository.create({

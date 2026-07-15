@@ -1,4 +1,9 @@
-import { ContactId, WorkspaceId } from "@feeblo/id";
+import {
+  ContactAttributeDefinitionId,
+  ContactAttributeValueId,
+  ContactId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const CommonContactFields = S.Struct({
@@ -33,6 +38,17 @@ export const ContactCreate = S.Struct({
   avatar: S.optional(S.NullOr(S.String)),
   companyId: S.optional(S.NullOr(S.String)),
   userId: S.optional(S.NullOr(S.String)),
+  attributeValues: S.optional(
+    S.Array(
+      S.Struct({
+        id: S.optional(ContactAttributeValueId.schema),
+        attributeId: ContactAttributeDefinitionId.schema,
+        value: S.NullOr(
+          S.Union([S.String, S.Number, S.Boolean, S.DateFromString])
+        ),
+      })
+    )
+  ),
 });
 
 export const ContactUpdate = S.Struct({

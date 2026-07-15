@@ -12,13 +12,13 @@ import type {
   TCompanyAttributeDefinitionList,
   TCompanyAttributeDefinitionUpdate,
   TCompanyAttributeValueList,
-  TCompanyAttributeValueUpsert,
+  TCompanyAttributeValueUpdate,
   TContactAttributeDefinitionCreate,
   TContactAttributeDefinitionDelete,
   TContactAttributeDefinitionList,
   TContactAttributeDefinitionUpdate,
   TContactAttributeValueList,
-  TContactAttributeValueUpsert,
+  TContactAttributeValueUpdate,
 } from "./schema";
 
 //TODO FIX later
@@ -106,8 +106,8 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("ContactAttributeValue", "select")
         ),
-    ContactAttributeValueUpsert: (args: TContactAttributeValueUpsert) =>
-      repository.upsertContactAttributeValue(args).pipe(
+    ContactAttributeValueUpdate: (args: TContactAttributeValueUpdate) =>
+      repository.updateContactAttributeValue(args).pipe(
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),
@@ -121,7 +121,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
             )
           )
         ),
-        withRemapDbErrors("ContactAttributeValue", "upsert")
+        withRemapDbErrors("ContactAttributeValue", "update")
       ),
     CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
       repository
@@ -130,8 +130,8 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("CompanyAttributeValue", "select")
         ),
-    CompanyAttributeValueUpsert: (args: TCompanyAttributeValueUpsert) =>
-      repository.upsertCompanyAttributeValue(args).pipe(
+    CompanyAttributeValueUpdate: (args: TCompanyAttributeValueUpdate) =>
+      repository.updateCompanyAttributeValue(args).pipe(
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),
@@ -145,13 +145,13 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
             )
           )
         ),
-        withRemapDbErrors("CompanyAttributeValue", "upsert")
+        withRemapDbErrors("CompanyAttributeValue", "update")
       ),
   };
 });
 
 function contactAttributeDefinitionReference(
-  args: TContactAttributeValueUpsert
+  args: TContactAttributeValueUpdate
 ): TContactAttributeDefinitionDelete {
   return {
     id: args.attributeId,
@@ -160,7 +160,7 @@ function contactAttributeDefinitionReference(
 }
 
 function companyAttributeDefinitionReference(
-  args: TCompanyAttributeValueUpsert
+  args: TCompanyAttributeValueUpdate
 ): TCompanyAttributeDefinitionDelete {
   return {
     id: args.attributeId,

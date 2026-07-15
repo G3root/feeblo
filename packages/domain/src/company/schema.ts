@@ -1,4 +1,9 @@
-import { CompanyId, WorkspaceId } from "@feeblo/id";
+import {
+  CompanyAttributeDefinitionId,
+  CompanyAttributeValueId,
+  CompanyId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const CommonCompanyFields = S.Struct({
@@ -27,6 +32,17 @@ export const CompanyCreate = S.Struct({
   name: S.String,
   avatar: S.optional(S.NullOr(S.String)),
   externalCreatedAt: S.optional(S.NullOr(S.DateFromString)),
+  attributeValues: S.optional(
+    S.Array(
+      S.Struct({
+        id: S.optional(CompanyAttributeValueId.schema),
+        attributeId: CompanyAttributeDefinitionId.schema,
+        value: S.NullOr(
+          S.Union([S.String, S.Number, S.Boolean, S.DateFromString])
+        ),
+      })
+    )
+  ),
 });
 
 export const CompanyUpdate = S.Struct({

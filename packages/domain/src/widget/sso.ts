@@ -1,4 +1,9 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
+import {
+  CompanyAttributeDefinitionId,
+  ContactAttributeDefinitionId,
+  WorkspaceId,
+} from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -53,6 +58,7 @@ export function upsertContactFromParsed(
   userId?: string
 ) {
   return Effect.gen(function* () {
+    const workspaceId = yield* WorkspaceId.parse(organizationId);
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const contactRepository = yield* ContactRepository;
     const companyRepository = yield* CompanyRepository;
@@ -69,10 +75,13 @@ export function upsertContactFromParsed(
       linkedCompanyId = upsertedCompany.id;
 
       for (const attr of company.customAttributes) {
+        const attributeId = yield* CompanyAttributeDefinitionId.parse(
+          attr.definitionId
+        );
         yield* attributeDefinitionRepository.upsertCompanyAttributeValue({
           companyId: upsertedCompany.id,
-          attributeId: attr.definitionId,
-          organizationId,
+          attributeId,
+          organizationId: workspaceId,
           value: attr.value,
         });
       }
@@ -93,10 +102,13 @@ export function upsertContactFromParsed(
       contactId = contactOption.value.id;
 
       for (const attr of parsedContact.customAttributes) {
+        const attributeId = yield* ContactAttributeDefinitionId.parse(
+          attr.definitionId
+        );
         yield* attributeDefinitionRepository.upsertContactAttributeValue({
           contactId: contactOption.value.id,
-          attributeId: attr.definitionId,
-          organizationId,
+          attributeId,
+          organizationId: workspaceId,
           value: attr.value,
         });
       }

@@ -13,10 +13,12 @@ import type {
   TCompanyAttributeDefinitionDelete,
   TCompanyAttributeDefinitionUpdate,
   TCompanyAttributeValueUpsert,
+  TCompanyAttributeValueUpdate,
   TContactAttributeDefinitionCreate,
   TContactAttributeDefinitionDelete,
   TContactAttributeDefinitionUpdate,
   TContactAttributeValueUpsert,
+  TContactAttributeValueUpdate,
 } from "./schema";
 
 type AttributeValue = Parameters<typeof buildAttributeValueColumns>[0];
@@ -244,6 +246,43 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0] !== undefined)),
 
+    updateContactAttributeValue: (args: TContactAttributeValueUpdate) =>
+      upsertAttributeValue(args, {
+        update: (id, valueMap) =>
+          db
+            .update(schema.contactAttributeValueTable)
+            .set({ ...valueMap, updatedAt: new Date() })
+            .where(
+              and(
+                eq(schema.contactAttributeValueTable.id, id),
+                eq(schema.contactAttributeValueTable.contactId, args.contactId),
+                eq(
+                  schema.contactAttributeValueTable.organizationId,
+                  args.organizationId
+                )
+              )
+            )
+            .returning()
+            .pipe(Effect.map(([updated]) => updated)),
+        create: (id, valueMap) => {
+          const now = new Date();
+          return db
+            .insert(schema.contactAttributeValueTable)
+            .values({
+              id,
+              organizationId: args.organizationId,
+              contactId: args.contactId,
+              attributeId: args.attributeId,
+              ...valueMap,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .returning()
+            .pipe(Effect.map(([created]) => created));
+        },
+        generateId: ContactAttributeValueId.generate,
+      }).pipe(Effect.asVoid),
+
     upsertContactAttributeValue: (args: TContactAttributeValueUpsert) =>
       upsertAttributeValue(args, {
         update: (id, valueMap) =>
@@ -301,6 +340,43 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         )
         .limit(1)
         .pipe(Effect.map((rows) => rows[0] !== undefined)),
+
+    updateCompanyAttributeValue: (args: TCompanyAttributeValueUpdate) =>
+      upsertAttributeValue(args, {
+        update: (id, valueMap) =>
+          db
+            .update(schema.companyAttributeValueTable)
+            .set({ ...valueMap, updatedAt: new Date() })
+            .where(
+              and(
+                eq(schema.companyAttributeValueTable.id, id),
+                eq(schema.companyAttributeValueTable.companyId, args.companyId),
+                eq(
+                  schema.companyAttributeValueTable.organizationId,
+                  args.organizationId
+                )
+              )
+            )
+            .returning()
+            .pipe(Effect.map(([updated]) => updated)),
+        create: (id, valueMap) => {
+          const now = new Date();
+          return db
+            .insert(schema.companyAttributeValueTable)
+            .values({
+              id,
+              organizationId: args.organizationId,
+              companyId: args.companyId,
+              attributeId: args.attributeId,
+              ...valueMap,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .returning()
+            .pipe(Effect.map(([created]) => created));
+        },
+        generateId: CompanyAttributeValueId.generate,
+      }).pipe(Effect.asVoid),
 
     upsertCompanyAttributeValue: (args: TCompanyAttributeValueUpsert) =>
       upsertAttributeValue(args, {
