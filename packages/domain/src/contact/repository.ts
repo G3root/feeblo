@@ -20,7 +20,7 @@ const makeContactRepository = Effect.gen(function* () {
   return {
     create: (args: TContactCreate) =>
       Effect.gen(function* () {
-        const id = args.id;
+        const id = args.id ?? (yield* ContactId.generate);
         const now = new Date();
         const [created] = yield* db
           .insert(schema.contactTable)

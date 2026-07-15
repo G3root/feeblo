@@ -1,6 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { WorkspaceId } from "@feeblo/id";
+import { type LegidOf, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -11,7 +11,7 @@ import { OrganizationRepository } from "./repository";
 describe("OrganizationRpcHandlers", () => {
   type Fixture = {
     membershipId: string;
-    organizationId: string;
+    organizationId: LegidOf<"WorkspaceId">;
     userId: string;
   };
 
@@ -104,8 +104,6 @@ describe("OrganizationRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* OrganizationRpcHandlersEffect;
             const db = yield* currentDb;
-            const fixture = yield* makeFixture();
-
             // Create a second user with no memberships
             const otherUserId = "user_no_membership";
             yield* db.insert(schema.userTable).values({

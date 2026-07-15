@@ -24,26 +24,26 @@ export const ContactUpsert = S.Struct({
 export type TContactUpsert = S.Schema.Type<typeof ContactUpsert>;
 
 export const ContactCreate = S.Struct({
-  id: ContactId.schema,
+  id: S.optional(ContactId.schema),
   organizationId: WorkspaceId.schema,
-  externalId: S.NullOr(S.String),
-  email: S.NullOr(S.String),
-  name: S.NullOr(S.String),
-  phone: S.NullOr(S.String),
-  avatar: S.NullOr(S.String),
-  companyId: S.NullOr(S.String),
+  externalId: S.optional(S.NullOr(S.String)),
+  email: S.optional(S.NullOr(S.String)),
+  name: S.optional(S.NullOr(S.String)),
+  phone: S.optional(S.NullOr(S.String)),
+  avatar: S.optional(S.NullOr(S.String)),
+  companyId: S.optional(S.NullOr(S.String)),
   userId: S.optional(S.NullOr(S.String)),
 });
 
 export const ContactUpdate = S.Struct({
   id: ContactId.schema,
   organizationId: WorkspaceId.schema,
-  externalId: S.NullOr(S.String),
-  email: S.NullOr(S.String),
-  name: S.NullOr(S.String),
-  phone: S.NullOr(S.String),
-  avatar: S.NullOr(S.String),
-  companyId: S.NullOr(S.String),
+  externalId: S.optional(S.NullOr(S.String)),
+  email: S.optional(S.NullOr(S.String)),
+  name: S.optional(S.NullOr(S.String)),
+  phone: S.optional(S.NullOr(S.String)),
+  avatar: S.optional(S.NullOr(S.String)),
+  companyId: S.optional(S.NullOr(S.String)),
   userId: S.optional(S.NullOr(S.String)),
 });
 

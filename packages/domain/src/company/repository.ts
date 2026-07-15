@@ -21,7 +21,7 @@ const makeCompanyRepository = Effect.gen(function* () {
   return {
     create: (args: TCompanyCreate) =>
       Effect.gen(function* () {
-        const id = args.id;
+        const id = args.id ?? (yield* CompanyId.generate);
         const now = new Date();
         const [created] = yield* db
           .insert(schema.companyTable)

@@ -142,27 +142,6 @@ describe("CommentRpcHandlers", () => {
     parentCommentId: null,
   });
 
-  const addBoard = (fixture: Fixture, visibility: "PUBLIC" | "PRIVATE") =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      const id = yield* BoardId.generate;
-      const now = new Date();
-
-      yield* db.insert(schema.boardTable).values({
-        id,
-        name: `${visibility} test board`,
-        slug: id,
-        visibility,
-        organizationId: fixture.organizationId,
-        creatorId: fixture.userId,
-        creatorMemberId: fixture.membershipId,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      return id;
-    });
-
   const addPost = (
     fixture: Fixture,
     boardId: LegidOf<"BoardId">,

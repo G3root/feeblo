@@ -3,6 +3,7 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { CurrentSession, type Session } from "../session-middleware";
 import { BillingRpcHandlersEffect } from "./handlers";
 import { BillingRepository } from "./repository";
@@ -29,7 +30,7 @@ describe("BillingRpcHandlers", () => {
   });
   const PolarServiceTest = Layer.succeed(PolarService, {
     client: undefined,
-    webhookSecret: undefined,
+    webhookSecret: Option.none(),
     createCheckout: () => Effect.die("Polar checkout should not be called"),
     createPortal: () => Effect.die("Polar portal should not be called"),
   });
