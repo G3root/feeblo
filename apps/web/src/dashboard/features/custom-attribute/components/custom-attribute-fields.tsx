@@ -1,12 +1,20 @@
 /** biome-ignore-all lint/style/useDefaultSwitchClause: <explanation> */
-import {
-  CompanyAttributeValueId,
-  ContactAttributeValueId,
-} from "@feeblo/id";
+import type {
+  TCompanyAttributeValue,
+  TCompanyAttributeValueUpsert,
+  TContactAttributeValue,
+  TContactAttributeValueUpsert,
+} from "@feeblo/domain/attribute-definition/schema";
+import { CompanyAttributeValueId, ContactAttributeValueId } from "@feeblo/id";
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
-import type { DashboardCollections } from "~/lib/collections";
+import { createTransaction } from "@tanstack/react-db";
+import {
+  companyAttributeValueCollection,
+  contactAttributeValueCollection,
+} from "~/lib/collections";
+import { fetchRpc } from "~/lib/runtime";
 
 export type CustomAttributeDefinition = {
   id: string;
@@ -29,6 +37,10 @@ export type CustomAttributeInputValues = Record<
   string,
   CustomAttributeInputValue | undefined
 >;
+
+type AttributeValueUpsert =
+  | TCompanyAttributeValueUpsert["value"]
+  | TContactAttributeValueUpsert["value"];
 
 export function CustomAttributeFields({
   definitions,
@@ -204,75 +216,58 @@ export function formatCustomAttributeValue(
   );
 }
 
-type PersistedTransaction = {
-  isPersisted: { promise: Promise<unknown> };
-};
-
-export async function saveCustomAttributeValues<
+function getCustomAttributeValueChanges<
   TExistingValue extends CustomAttributeValue & { id: string },
-  TTransaction extends PersistedTransaction,
 >({
-  createValue,
   definitions,
   existingValues,
-  updateValue,
   values,
 }: {
-  createValue: (args: {
-    definition: CustomAttributeDefinition;
-    valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
-  }) => TTransaction | Promise<TTransaction>;
   definitions: readonly CustomAttributeDefinition[];
   existingValues: readonly TExistingValue[];
-  updateValue?: (args: {
-    existingValue: TExistingValue;
-    valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
-  }) => TTransaction | Promise<TTransaction>;
   values: CustomAttributeInputValues;
 }) {
   const existingByAttributeId = new Map(
     existingValues.map((value) => [value.attributeId, value])
   );
-  const transactions = await Promise.all(
-    definitions.map((definition) => {
-      const input = values[definition.id] ?? defaultInputValue(definition);
-      const existingValue = existingByAttributeId.get(definition.id);
+  const inserts: Array<{
+    definition: CustomAttributeDefinition;
+    valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
+  }> = [];
+  const updates: Array<{
+    existingValue: TExistingValue;
+    valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
+  }> = [];
 
-      if (!existingValue && input === "" && !definition.isRequired) {
-        return null;
+  for (const definition of definitions) {
+    const input = values[definition.id] ?? defaultInputValue(definition);
+    const existingValue = existingByAttributeId.get(definition.id);
+
+    if (!existingValue && input === "" && !definition.isRequired) {
+      continue;
+    }
+
+    const valueColumns = toCustomAttributeValueColumns(definition, input);
+    if (existingValue) {
+      if (input !== getCustomAttributeInputValue(definition, existingValue)) {
+        updates.push({ existingValue, valueColumns });
       }
+      continue;
+    }
 
-      const valueColumns = toCustomAttributeValueColumns(definition, input);
-      if (existingValue) {
-        if (!updateValue) {
-          throw new Error("Missing custom attribute update handler");
-        }
-        return updateValue({ existingValue, valueColumns });
-      }
+    inserts.push({ definition, valueColumns });
+  }
 
-      return createValue({ definition, valueColumns });
-    })
-  );
-
-  await Promise.all(
-    transactions
-      .filter(
-        (transaction): transaction is NonNullable<TTransaction> =>
-          transaction !== null
-      )
-      .map((transaction) => transaction.isPersisted.promise)
-  );
+  return { inserts, updates };
 }
 
 export async function saveContactCustomAttributeValues({
-  contactAttributeValueCollection,
   contactId,
   definitions,
   existingValues,
   organizationId,
   values,
 }: {
-  contactAttributeValueCollection: DashboardCollections["contactAttributeValueCollection"];
   contactId: string;
   definitions: readonly CustomAttributeDefinition[];
   existingValues: readonly (CustomAttributeValue & {
@@ -284,36 +279,88 @@ export async function saveContactCustomAttributeValues({
   organizationId: string;
   values: CustomAttributeInputValues;
 }) {
-  await saveCustomAttributeValues({
-    createValue: async ({ definition, valueColumns }) =>
-      contactAttributeValueCollection.insert({
-        id: await ContactAttributeValueId.unsafeGenerate(),
-        contactId,
-        organizationId,
-        attributeId: definition.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        ...valueColumns,
-      }),
+  const { inserts, updates } = getCustomAttributeValueChanges({
     definitions,
     existingValues,
-    updateValue: ({ existingValue, valueColumns }) =>
-      contactAttributeValueCollection.update(existingValue.id, (draft) => {
-        Object.assign(draft, valueColumns, { updatedAt: new Date() });
-      }),
     values,
   });
+  const insertValues = await Promise.all(
+    inserts.map(async ({ definition, valueColumns }) => ({
+      id: await ContactAttributeValueId.unsafeGenerate(),
+      contactId,
+      organizationId,
+      attributeId: definition.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...valueColumns,
+    }))
+  );
+  const persistencePromises: Promise<unknown>[] = [];
+
+  if (insertValues.length > 0) {
+    const transaction = createTransaction<TContactAttributeValue>({
+      autoCommit: false,
+      mutationFn: ({ transaction }) =>
+        Promise.all(
+          transaction.mutations.map(({ modified: value }) =>
+            fetchRpc((rpc) =>
+              rpc.ContactAttributeValueUpsert({
+                id: value.id,
+                attributeId: value.attributeId,
+                contactId: value.contactId,
+                organizationId: value.organizationId,
+                value: getAttributeValue(value),
+              })
+            )
+          )
+        ),
+    });
+    transaction.mutate(() => {
+      for (const value of insertValues) {
+        contactAttributeValueCollection.insert(value);
+      }
+    });
+    persistencePromises.push(transaction.commit());
+  }
+
+  if (updates.length > 0) {
+    const transaction = createTransaction<TContactAttributeValue>({
+      autoCommit: false,
+      mutationFn: ({ transaction }) =>
+        Promise.all(
+          transaction.mutations.map(({ modified: value }) =>
+            fetchRpc((rpc) =>
+              rpc.ContactAttributeValueUpsert({
+                id: value.id,
+                attributeId: value.attributeId,
+                contactId: value.contactId,
+                organizationId: value.organizationId,
+                value: getAttributeValue(value),
+              })
+            )
+          )
+        ),
+    });
+    transaction.mutate(() => {
+      for (const { existingValue, valueColumns } of updates) {
+        contactAttributeValueCollection.update(existingValue.id, (draft) => {
+          Object.assign(draft, valueColumns, { updatedAt: new Date() });
+        });
+      }
+    });
+    persistencePromises.push(transaction.commit());
+  }
+
+  await Promise.all(persistencePromises);
 }
 
 export async function saveCompanyCustomAttributeValues({
-  companyAttributeValueCollection,
   companyId,
   definitions,
   existingValues,
   organizationId,
   values,
 }: {
-  companyAttributeValueCollection: DashboardCollections["companyAttributeValueCollection"];
   companyId: string;
   definitions: readonly CustomAttributeDefinition[];
   existingValues: readonly (CustomAttributeValue & {
@@ -325,25 +372,79 @@ export async function saveCompanyCustomAttributeValues({
   organizationId: string;
   values: CustomAttributeInputValues;
 }) {
-  await saveCustomAttributeValues({
-    createValue: async ({ definition, valueColumns }) =>
-      companyAttributeValueCollection.insert({
-        id: await CompanyAttributeValueId.unsafeGenerate(),
-        companyId,
-        organizationId,
-        attributeId: definition.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        ...valueColumns,
-      }),
+  const { inserts, updates } = getCustomAttributeValueChanges({
     definitions,
     existingValues,
-    updateValue: ({ existingValue, valueColumns }) =>
-      companyAttributeValueCollection.update(existingValue.id, (draft) => {
-        Object.assign(draft, valueColumns, { updatedAt: new Date() });
-      }),
     values,
   });
+  const insertValues = await Promise.all(
+    inserts.map(async ({ definition, valueColumns }) => ({
+      id: await CompanyAttributeValueId.unsafeGenerate(),
+      companyId,
+      organizationId,
+      attributeId: definition.id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      ...valueColumns,
+    }))
+  );
+  const persistencePromises: Promise<unknown>[] = [];
+
+  if (insertValues.length > 0) {
+    const transaction = createTransaction<TCompanyAttributeValue>({
+      autoCommit: false,
+      mutationFn: ({ transaction }) =>
+        Promise.all(
+          transaction.mutations.map(({ modified: value }) =>
+            fetchRpc((rpc) =>
+              rpc.CompanyAttributeValueUpsert({
+                id: value.id,
+                attributeId: value.attributeId,
+                companyId: value.companyId,
+                organizationId: value.organizationId,
+                value: getAttributeValue(value),
+              })
+            )
+          )
+        ),
+    });
+    transaction.mutate(() => {
+      for (const value of insertValues) {
+        companyAttributeValueCollection.insert(value);
+      }
+    });
+    persistencePromises.push(transaction.commit());
+  }
+
+  if (updates.length > 0) {
+    const transaction = createTransaction<TCompanyAttributeValue>({
+      autoCommit: false,
+      mutationFn: ({ transaction }) =>
+        Promise.all(
+          transaction.mutations.map(({ modified: value }) =>
+            fetchRpc((rpc) =>
+              rpc.CompanyAttributeValueUpsert({
+                id: value.id,
+                attributeId: value.attributeId,
+                companyId: value.companyId,
+                organizationId: value.organizationId,
+                value: getAttributeValue(value),
+              })
+            )
+          )
+        ),
+    });
+    transaction.mutate(() => {
+      for (const { existingValue, valueColumns } of updates) {
+        companyAttributeValueCollection.update(existingValue.id, (draft) => {
+          Object.assign(draft, valueColumns, { updatedAt: new Date() });
+        });
+      }
+    });
+    persistencePromises.push(transaction.commit());
+  }
+
+  await Promise.all(persistencePromises);
 }
 
 function defaultInputValue(definition: CustomAttributeDefinition) {
@@ -364,4 +465,14 @@ function inputType(type: CustomAttributeDefinition["type"]) {
 
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function getAttributeValue(value: CustomAttributeValue): AttributeValueUpsert {
+  return (
+    value.valueText ??
+    value.valueInteger ??
+    value.valueDecimal ??
+    value.valueBoolean ??
+    value.valueDate
+  );
 }

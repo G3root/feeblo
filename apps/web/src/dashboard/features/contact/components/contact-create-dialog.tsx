@@ -42,7 +42,6 @@ function ContactCreateForm() {
   const organizationId = useOrganizationId();
   const {
     contactAttributeDefinitionCollection,
-    contactAttributeValueCollection,
     contactCollection,
   } = useDashboardCollections();
   const store = useContactCreateDialogContext();
@@ -89,7 +88,6 @@ function ContactCreateForm() {
 
         await tx.isPersisted.promise;
         await saveContactCustomAttributeValues({
-          contactAttributeValueCollection,
           contactId,
           definitions,
           existingValues: [],

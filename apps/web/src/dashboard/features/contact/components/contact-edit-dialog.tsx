@@ -120,8 +120,7 @@ function ContactEditFormFields({
   definitions: readonly TContactAttributeDefinition[];
 }) {
   const organizationId = useOrganizationId();
-  const { contactAttributeValueCollection, contactCollection } =
-    useDashboardCollections();
+  const { contactCollection } = useDashboardCollections();
   const store = useContactEditDialogContext();
   const form = useAppForm({
     defaultValues: {
@@ -149,7 +148,6 @@ function ContactEditFormFields({
 
         await tx.isPersisted.promise;
         await saveContactCustomAttributeValues({
-          contactAttributeValueCollection,
           contactId: contact.id,
           definitions,
           existingValues,

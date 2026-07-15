@@ -109,8 +109,7 @@ function CompanyEditForm({
   existingValues: readonly TCompanyAttributeValue[];
 }) {
   const organizationId = useOrganizationId();
-  const { companyAttributeValueCollection, companyCollection } =
-    useDashboardCollections();
+  const { companyCollection } = useDashboardCollections();
   const store = useCompanyEditDialogContext();
   const form = useAppForm({
     defaultValues: {
@@ -145,7 +144,6 @@ function CompanyEditForm({
 
         await tx.isPersisted.promise;
         await saveCompanyCustomAttributeValues({
-          companyAttributeValueCollection,
           companyId,
           definitions,
           existingValues,

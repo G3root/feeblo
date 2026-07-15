@@ -43,7 +43,6 @@ function CompanyCreateForm() {
   const organizationId = useOrganizationId();
   const {
     companyAttributeDefinitionCollection,
-    companyAttributeValueCollection,
     companyCollection,
   } = useDashboardCollections();
   const store = useCompanyCreateDialogContext();
@@ -95,7 +94,6 @@ function CompanyCreateForm() {
 
         await tx.isPersisted.promise;
         await saveCompanyCustomAttributeValues({
-          companyAttributeValueCollection,
           companyId,
           definitions,
           existingValues: [],
