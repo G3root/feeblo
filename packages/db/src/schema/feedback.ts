@@ -659,6 +659,9 @@ export const contactAttributeValueTable = pgTable(
   "contact_attribute_value",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     contactId: text("contact_id")
       .notNull()
       .references(() => contactTable.id, { onDelete: "cascade" }),
@@ -681,6 +684,9 @@ export const contactAttributeValueTable = pgTable(
       .notNull(),
   },
   (table) => [
+    index("contact_attribute_value_organizationId_idx").on(
+      table.organizationId
+    ),
     index("contact_attribute_value_contactId_idx").on(table.contactId),
     index("contact_attribute_value_attributeId_idx").on(table.attributeId),
     uniqueIndex("contact_attribute_value_contactId_attributeId_uidx").on(
@@ -730,6 +736,9 @@ export const companyAttributeValueTable = pgTable(
   "company_attribute_value",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     companyId: text("company_id")
       .notNull()
       .references(() => companyTable.id, { onDelete: "cascade" }),
@@ -752,6 +761,9 @@ export const companyAttributeValueTable = pgTable(
       .notNull(),
   },
   (table) => [
+    index("company_attribute_value_organizationId_idx").on(
+      table.organizationId
+    ),
     index("company_attribute_value_companyId_idx").on(table.companyId),
     index("company_attribute_value_attributeId_idx").on(table.attributeId),
     uniqueIndex("company_attribute_value_companyId_attributeId_uidx").on(

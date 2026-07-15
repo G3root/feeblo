@@ -1195,7 +1195,6 @@ export const companyAttributeDefinitionCollection = createCollection(
   })
 );
 
-//Todo scope
 export const contactAttributeValueCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
@@ -1214,13 +1213,14 @@ export const contactAttributeValueCollection = createCollection(
     queryFn: async (ctx) => {
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
       const contactId = getEqFilterValue(parsed.filters, "contactId");
+      const organizationId = getCurrentOrganizationId();
 
-      if (!contactId) {
+      if (!contactId || !organizationId) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.ContactAttributeValueList({ contactId }),
+        (rpc) => rpc.ContactAttributeValueList({ contactId, organizationId }),
         { signal: ctx.signal }
       );
 
@@ -1237,7 +1237,7 @@ export const contactAttributeValueCollection = createCollection(
           id: value.id,
           attributeId: value.attributeId,
           contactId: value.contactId,
-          organizationId: getCurrentOrganizationId() ?? "",
+          organizationId: value.organizationId,
           value: getAttributeValue(value),
         })
       );
@@ -1251,7 +1251,7 @@ export const contactAttributeValueCollection = createCollection(
           id: value.id,
           attributeId: value.attributeId,
           contactId: value.contactId,
-          organizationId: getCurrentOrganizationId() ?? "",
+          organizationId: value.organizationId,
           value: getAttributeValue(value),
         })
       );
@@ -1259,7 +1259,6 @@ export const contactAttributeValueCollection = createCollection(
   })
 );
 
-//Todo scope
 export const companyAttributeValueCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
@@ -1278,13 +1277,14 @@ export const companyAttributeValueCollection = createCollection(
     queryFn: async (ctx) => {
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
       const companyId = getEqFilterValue(parsed.filters, "companyId");
+      const organizationId = getCurrentOrganizationId();
 
-      if (!companyId) {
+      if (!companyId || !organizationId) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.CompanyAttributeValueList({ companyId }),
+        (rpc) => rpc.CompanyAttributeValueList({ companyId, organizationId }),
         { signal: ctx.signal }
       );
 
@@ -1301,7 +1301,7 @@ export const companyAttributeValueCollection = createCollection(
           id: value.id,
           attributeId: value.attributeId,
           companyId: value.companyId,
-          organizationId: getCurrentOrganizationId() ?? "",
+          organizationId: value.organizationId,
           value: getAttributeValue(value),
         })
       );
@@ -1315,7 +1315,7 @@ export const companyAttributeValueCollection = createCollection(
           id: value.id,
           attributeId: value.attributeId,
           companyId: value.companyId,
-          organizationId: getCurrentOrganizationId() ?? "",
+          organizationId: value.organizationId,
           value: getAttributeValue(value),
         })
       );

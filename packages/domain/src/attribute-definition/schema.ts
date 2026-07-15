@@ -1,6 +1,8 @@
 import {
   CompanyAttributeDefinitionId,
+  CompanyAttributeValueId,
   ContactAttributeDefinitionId,
+  ContactAttributeValueId,
   WorkspaceId,
 } from "@feeblo/id";
 import * as S from "effect/Schema";
@@ -129,6 +131,7 @@ export type TCompanyAttributeDefinition = S.Schema.Type<
 
 const AttributeValueFields = {
   attributeId: S.String,
+  organizationId: S.String,
   valueText: S.NullOr(S.String),
   valueInteger: S.NullOr(S.Number),
   valueDecimal: S.NullOr(S.Number),
@@ -139,14 +142,14 @@ const AttributeValueFields = {
 };
 
 const AttributeValueUpsertFields = {
-  id: S.optional(S.String),
-  attributeId: S.String,
   organizationId: WorkspaceId.schema,
   value: S.NullOr(S.Union([S.String, S.Number, S.Boolean, S.DateFromString])),
 };
 
 export const ContactAttributeValueUpsert = S.Struct({
   ...AttributeValueUpsertFields,
+  id: S.optional(ContactAttributeValueId.schema),
+  attributeId: ContactAttributeDefinitionId.schema,
   contactId: S.String,
 });
 
@@ -156,6 +159,7 @@ export type TContactAttributeValueUpsert = S.Schema.Type<
 
 export const ContactAttributeValueList = S.Struct({
   contactId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TContactAttributeValueList = S.Schema.Type<
@@ -174,6 +178,8 @@ export type TContactAttributeValue = S.Schema.Type<
 
 export const CompanyAttributeValueUpsert = S.Struct({
   ...AttributeValueUpsertFields,
+  id: S.optional(CompanyAttributeValueId.schema),
+  attributeId: CompanyAttributeDefinitionId.schema,
   companyId: S.String,
 });
 
@@ -183,6 +189,7 @@ export type TCompanyAttributeValueUpsert = S.Schema.Type<
 
 export const CompanyAttributeValueList = S.Struct({
   companyId: S.String,
+  organizationId: WorkspaceId.schema,
 });
 
 export type TCompanyAttributeValueList = S.Schema.Type<

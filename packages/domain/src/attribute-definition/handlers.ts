@@ -101,8 +101,11 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         ),
     ContactAttributeValueList: (args: TContactAttributeValueList) =>
       repository
-        .findContactAttributeValues(args.contactId)
-        .pipe(withRemapDbErrors("ContactAttributeValue", "select")),
+        .findContactAttributeValues(args.contactId, args.organizationId)
+        .pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("ContactAttributeValue", "select")
+        ),
     ContactAttributeValueUpsert: (args: TContactAttributeValueUpsert) =>
       repository.upsertContactAttributeValue(args).pipe(
         Policy.withPolicy(
@@ -122,8 +125,11 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
       ),
     CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
       repository
-        .findCompanyAttributeValues(args.companyId)
-        .pipe(withRemapDbErrors("CompanyAttributeValue", "select")),
+        .findCompanyAttributeValues(args.companyId, args.organizationId)
+        .pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("CompanyAttributeValue", "select")
+        ),
     CompanyAttributeValueUpsert: (args: TCompanyAttributeValueUpsert) =>
       repository.upsertCompanyAttributeValue(args).pipe(
         Policy.withPolicy(

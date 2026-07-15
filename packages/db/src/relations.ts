@@ -203,6 +203,14 @@ export const relations = defineRelations(
         from: r.organizationTable.id,
         to: r.companyAttributeDefinitionTable.organizationId,
       }),
+      companyAttributeValues: r.many.companyAttributeValueTable({
+        from: r.organizationTable.id,
+        to: r.companyAttributeValueTable.organizationId,
+      }),
+      contactAttributeValues: r.many.contactAttributeValueTable({
+        from: r.organizationTable.id,
+        to: r.contactAttributeValueTable.organizationId,
+      }),
       site: r.one.siteTable({
         from: r.organizationTable.id,
         to: r.siteTable.organizationId,
@@ -451,6 +459,10 @@ export const relations = defineRelations(
       }),
     },
     contactAttributeValueTable: {
+      organization: r.one.organizationTable({
+        from: r.contactAttributeValueTable.organizationId,
+        to: r.organizationTable.id,
+      }),
       contact: r.one.contactTable({
         from: r.contactAttributeValueTable.contactId,
         to: r.contactTable.id,
@@ -471,6 +483,10 @@ export const relations = defineRelations(
       }),
     },
     companyAttributeValueTable: {
+      organization: r.one.organizationTable({
+        from: r.companyAttributeValueTable.organizationId,
+        to: r.organizationTable.id,
+      }),
       company: r.one.companyTable({
         from: r.companyAttributeValueTable.companyId,
         to: r.companyTable.id,
