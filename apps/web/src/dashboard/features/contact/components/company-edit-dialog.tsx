@@ -108,6 +108,7 @@ function CompanyEditForm({
   definitions: readonly TCompanyAttributeDefinition[];
   existingValues: readonly TCompanyAttributeValue[];
 }) {
+  const organizationId = useOrganizationId();
   const { companyAttributeValueCollection, companyCollection } =
     useDashboardCollections();
   const store = useCompanyEditDialogContext();
@@ -148,6 +149,7 @@ function CompanyEditForm({
           companyId,
           definitions,
           existingValues,
+          organizationId,
           values: data.value.attributes,
         });
         store.send({ type: "toggle" });

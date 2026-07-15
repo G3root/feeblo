@@ -119,6 +119,7 @@ function ContactEditFormFields({
   attributeValues: readonly TContactAttributeValue[];
   definitions: readonly TContactAttributeDefinition[];
 }) {
+  const organizationId = useOrganizationId();
   const { contactAttributeValueCollection, contactCollection } =
     useDashboardCollections();
   const store = useContactEditDialogContext();
@@ -152,6 +153,7 @@ function ContactEditFormFields({
           contactId: contact.id,
           definitions,
           existingValues,
+          organizationId,
           values: data.value.attributes,
         });
         store.send({ type: "setOpen", open: false });

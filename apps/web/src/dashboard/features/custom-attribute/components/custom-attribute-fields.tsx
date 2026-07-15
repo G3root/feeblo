@@ -257,7 +257,7 @@ export async function saveCustomAttributeValues<
   await Promise.all(
     transactions
       .filter(
-        (transaction): transaction is Awaited<TTransaction> =>
+        (transaction): transaction is NonNullable<TTransaction> =>
           transaction !== null
       )
       .map((transaction) => transaction.isPersisted.promise)
@@ -269,6 +269,7 @@ export async function saveContactCustomAttributeValues({
   contactId,
   definitions,
   existingValues,
+  organizationId,
   values,
 }: {
   contactAttributeValueCollection: DashboardCollections["contactAttributeValueCollection"];
@@ -280,6 +281,7 @@ export async function saveContactCustomAttributeValues({
     id: string;
     updatedAt: Date;
   })[];
+  organizationId: string;
   values: CustomAttributeInputValues;
 }) {
   await saveCustomAttributeValues({
@@ -287,6 +289,7 @@ export async function saveContactCustomAttributeValues({
       contactAttributeValueCollection.insert({
         id: await ContactAttributeValueId.unsafeGenerate(),
         contactId,
+        organizationId,
         attributeId: definition.id,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -307,6 +310,7 @@ export async function saveCompanyCustomAttributeValues({
   companyId,
   definitions,
   existingValues,
+  organizationId,
   values,
 }: {
   companyAttributeValueCollection: DashboardCollections["companyAttributeValueCollection"];
@@ -318,6 +322,7 @@ export async function saveCompanyCustomAttributeValues({
     id: string;
     updatedAt: Date;
   })[];
+  organizationId: string;
   values: CustomAttributeInputValues;
 }) {
   await saveCustomAttributeValues({
@@ -325,6 +330,7 @@ export async function saveCompanyCustomAttributeValues({
       companyAttributeValueCollection.insert({
         id: await CompanyAttributeValueId.unsafeGenerate(),
         companyId,
+        organizationId,
         attributeId: definition.id,
         createdAt: new Date(),
         updatedAt: new Date(),
