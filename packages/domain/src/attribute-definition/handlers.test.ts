@@ -10,6 +10,7 @@ import * as Layer from "effect/Layer";
 
 import { CurrentSession, type Session } from "../session-middleware";
 import { AttributeDefinitionRpcHandlersEffect } from "./handlers";
+import { AttributeDefinitionPolicy } from "./policies";
 import { AttributeDefinitionRepository } from "./repository";
 
 describe("AttributeDefinitionRpcHandlers", () => {
@@ -55,15 +56,19 @@ describe("AttributeDefinitionRpcHandlers", () => {
       return { organizationId, session };
     });
 
+  const RepositoryLayer = AttributeDefinitionRepository.layer.pipe(
+    Layer.provide(Database.PgliteDatabaseLive)
+  );
   const TestLayer = Layer.merge(
-    AttributeDefinitionRepository.layer.pipe(
-      Layer.provide(Database.PgliteDatabaseLive)
+    Layer.merge(
+      RepositoryLayer,
+      AttributeDefinitionPolicy.layer.pipe(Layer.provide(RepositoryLayer))
     ),
     Database.PgliteDatabaseLive
   );
 
   layer(TestLayer)("handlers", (it) => {
-    it.effect("creates and lists contact and company definitions", () =>
+    it.effect("creates, updates, lists, and deletes contact and company definitions", () =>
       Effect.gen(function* () {
         const handlers = yield* AttributeDefinitionRpcHandlersEffect;
         const { organizationId, session } = yield* makeFixture();
@@ -94,6 +99,29 @@ describe("AttributeDefinitionRpcHandlers", () => {
           })
           .pipe(provideSession);
 
+        yield* handlers
+          .ContactAttributeDefinitionUpdate({
+            id: contactId,
+            organizationId,
+            name: "Role",
+            key: "role",
+            description: "The contact's role",
+            type: "TEXT",
+            isRequired: true,
+          })
+          .pipe(provideSession);
+        yield* handlers
+          .CompanyAttributeDefinitionUpdate({
+            id: companyId,
+            organizationId,
+            name: "Sector",
+            key: "sector",
+            description: "The company's sector",
+            type: "TEXT",
+            isRequired: true,
+          })
+          .pipe(provideSession);
+
         const contactDefinitions = yield* handlers
           .ContactAttributeDefinitionList({ organizationId })
           .pipe(provideSession);
@@ -102,9 +130,33 @@ describe("AttributeDefinitionRpcHandlers", () => {
           .pipe(provideSession);
 
         expect(contactDefinitions).toHaveLength(1);
-        expect(contactDefinitions[0]).toMatchObject({ key: "jobTitle" });
+        expect(contactDefinitions[0]).toMatchObject({
+          key: "role",
+          isRequired: true,
+        });
         expect(companyDefinitions).toHaveLength(1);
-        expect(companyDefinitions[0]).toMatchObject({ key: "industry" });
+        expect(companyDefinitions[0]).toMatchObject({
+          key: "sector",
+          isRequired: true,
+        });
+
+        yield* handlers
+          .ContactAttributeDefinitionDelete({ id: contactId, organizationId })
+          .pipe(provideSession);
+        yield* handlers
+          .CompanyAttributeDefinitionDelete({ id: companyId, organizationId })
+          .pipe(provideSession);
+
+        expect(
+          yield* handlers
+            .ContactAttributeDefinitionList({ organizationId })
+            .pipe(provideSession)
+        ).toHaveLength(0);
+        expect(
+          yield* handlers
+            .CompanyAttributeDefinitionList({ organizationId })
+            .pipe(provideSession)
+        ).toHaveLength(0);
       })
     );
   });

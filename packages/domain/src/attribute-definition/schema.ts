@@ -58,6 +58,24 @@ export type TContactAttributeDefinitionCreate = S.Schema.Type<
   typeof ContactAttributeDefinitionCreate
 >;
 
+export const ContactAttributeDefinitionUpdate = S.Struct({
+  id: ContactAttributeDefinitionId.schema,
+  ...AttributeDefinitionFields,
+});
+
+export type TContactAttributeDefinitionUpdate = S.Schema.Type<
+  typeof ContactAttributeDefinitionUpdate
+>;
+
+export const ContactAttributeDefinitionDelete = S.Struct({
+  id: ContactAttributeDefinitionId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TContactAttributeDefinitionDelete = S.Schema.Type<
+  typeof ContactAttributeDefinitionDelete
+>;
+
 export const ContactAttributeDefinition = S.Struct(
   StoredAttributeDefinitionFields
 );
@@ -81,6 +99,24 @@ export const CompanyAttributeDefinitionCreate = S.Struct({
 
 export type TCompanyAttributeDefinitionCreate = S.Schema.Type<
   typeof CompanyAttributeDefinitionCreate
+>;
+
+export const CompanyAttributeDefinitionUpdate = S.Struct({
+  id: CompanyAttributeDefinitionId.schema,
+  ...AttributeDefinitionFields,
+});
+
+export type TCompanyAttributeDefinitionUpdate = S.Schema.Type<
+  typeof CompanyAttributeDefinitionUpdate
+>;
+
+export const CompanyAttributeDefinitionDelete = S.Struct({
+  id: CompanyAttributeDefinitionId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TCompanyAttributeDefinitionDelete = S.Schema.Type<
+  typeof CompanyAttributeDefinitionDelete
 >;
 
 export const CompanyAttributeDefinition = S.Struct(

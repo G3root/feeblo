@@ -1076,6 +1076,22 @@ export const contactAttributeDefinitionCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: definition } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactAttributeDefinitionUpdate({
+          id: definition.id,
+          name: definition.name,
+          key: definition.key,
+          description: definition.description,
+          type: definition.type,
+          isRequired: definition.isRequired,
+          organizationId: definition.organizationId,
+        })
+      );
+    },
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: definition } = mutation;
@@ -1088,6 +1104,17 @@ export const contactAttributeDefinitionCollection = createCollection(
           description: definition.description,
           type: definition.type,
           isRequired: definition.isRequired,
+          organizationId: definition.organizationId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: definition } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactAttributeDefinitionDelete({
+          id: definition.id,
           organizationId: definition.organizationId,
         })
       );
@@ -1116,6 +1143,22 @@ export const companyAttributeDefinitionCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: definition } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyAttributeDefinitionUpdate({
+          id: definition.id,
+          name: definition.name,
+          key: definition.key,
+          description: definition.description,
+          type: definition.type,
+          isRequired: definition.isRequired,
+          organizationId: definition.organizationId,
+        })
+      );
+    },
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: definition } = mutation;
@@ -1128,6 +1171,17 @@ export const companyAttributeDefinitionCollection = createCollection(
           description: definition.description,
           type: definition.type,
           isRequired: definition.isRequired,
+          organizationId: definition.organizationId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: definition } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyAttributeDefinitionDelete({
+          id: definition.id,
           organizationId: definition.organizationId,
         })
       );
