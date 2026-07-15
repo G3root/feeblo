@@ -5,13 +5,7 @@ import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CompanyRepository } from "./repository";
 import { CompanyRpcs } from "./rpcs";
-import type {
-  TCompanyAttributeDefinitionCreate,
-  TCompanyAttributeDefinitionList,
-  TCompanyAttributeValueList,
-  TCompanyList,
-  TCompanyUpsert,
-} from "./schema";
+import type { TCompanyList, TCompanyUpsert } from "./schema";
 
 export const CompanyRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CompanyRepository;
@@ -31,26 +25,6 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Company", "create")
         ),
-    CompanyAttributeDefinitionList: (args: TCompanyAttributeDefinitionList) =>
-      repository
-        .findCompanyAttributeDefinitions(args.organizationId)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("CompanyAttributeDefinition", "select")
-        ),
-    CompanyAttributeDefinitionCreate: (
-      args: TCompanyAttributeDefinitionCreate
-    ) =>
-      repository
-        .createCompanyAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("CompanyAttributeDefinition", "create")
-        ),
-    CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
-      repository
-        .findCompanyAttributeValues(args.companyId)
-        .pipe(withRemapDbErrors("CompanyAttributeValue", "select")),
   };
 });
 

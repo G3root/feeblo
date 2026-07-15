@@ -4,11 +4,14 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
+import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import type {
+  TCompanyAttributeDefinition,
+  TContactAttributeDefinition,
+} from "../attribute-definition/schema";
 import { CompanyRepository } from "../company/repository";
-import type { TCompanyAttributeDefinition } from "../company/schema";
 import type { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
-import type { TContactAttributeDefinition } from "../contact/schema";
 import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
 import { JwtSecretRepository } from "../jwt-secret/repository";
@@ -50,6 +53,7 @@ export function upsertContactFromParsed(
   userId?: string
 ) {
   return Effect.gen(function* () {
+    const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const contactRepository = yield* ContactRepository;
     const companyRepository = yield* CompanyRepository;
     let linkedCompanyId: string | undefined;
@@ -65,7 +69,7 @@ export function upsertContactFromParsed(
       linkedCompanyId = upsertedCompany.id;
 
       for (const attr of company.customAttributes) {
-        yield* companyRepository.upsertCompanyAttributeValue({
+        yield* attributeDefinitionRepository.upsertCompanyAttributeValue({
           companyId: upsertedCompany.id,
           attributeId: attr.definitionId,
           value: attr.value,
@@ -88,7 +92,7 @@ export function upsertContactFromParsed(
       contactId = contactOption.value.id;
 
       for (const attr of parsedContact.customAttributes) {
-        yield* contactRepository.upsertContactAttributeValue({
+        yield* attributeDefinitionRepository.upsertContactAttributeValue({
           contactId: contactOption.value.id,
           attributeId: attr.definitionId,
           value: attr.value,
@@ -117,8 +121,7 @@ export const createSsoSession = ({
 }) =>
   Effect.gen(function* () {
     const jwtSecretRepository = yield* JwtSecretRepository;
-    const contactRepository = yield* ContactRepository;
-    const companyRepository = yield* CompanyRepository;
+    const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const userRepository = yield* UserRepository;
 
     const secrets = yield* jwtSecretRepository.getSecretsForOrg({
@@ -137,11 +140,11 @@ export const createSsoSession = ({
     ).pipe(Effect.mapError(() => new SsoError({ code: "INVALID_JWT" })));
 
     const contactDefs =
-      (yield* contactRepository.findContactAttributeDefinitions(
+      (yield* attributeDefinitionRepository.findContactAttributeDefinitions(
         organizationId
       )) as unknown as readonly TContactAttributeDefinition[];
     const companyDefs =
-      (yield* companyRepository.findCompanyAttributeDefinitions(
+      (yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
         organizationId
       )) as unknown as readonly TCompanyAttributeDefinition[];
 
@@ -249,6 +252,7 @@ export const linkAnonymousAccount = ({
  * non-Effect runtime (e.g. the better-auth plugin).
  */
 export const SsoRepositoriesLive = Layer.mergeAll(
+  AttributeDefinitionRepository.layer,
   CompanyRepository.layer,
   ContactRepository.layer,
   JwtSecretRepository.layer,

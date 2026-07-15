@@ -6,13 +6,7 @@ import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { ContactRepository } from "./repository";
 import { ContactRpcs } from "./rpcs";
-import type {
-  TContactAttributeDefinitionCreate,
-  TContactAttributeDefinitionList,
-  TContactAttributeValueList,
-  TContactList,
-  TContactUpsert,
-} from "./schema";
+import type { TContactList, TContactUpsert } from "./schema";
 
 export const ContactRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ContactRepository;
@@ -34,30 +28,6 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Contact", "create")
         ),
-
-    ContactAttributeDefinitionList: (args: TContactAttributeDefinitionList) =>
-      repository
-        .findContactAttributeDefinitions(args.organizationId)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("ContactAttributeDefinition", "select")
-        ),
-
-    ContactAttributeDefinitionCreate: (
-      args: TContactAttributeDefinitionCreate
-    ) =>
-      repository
-        .createContactAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("ContactAttributeDefinition", "create")
-        ),
-
-    //TODOO add permission
-    ContactAttributeValueList: (args: TContactAttributeValueList) =>
-      repository
-        .findContactAttributeValues(args.contactId)
-        .pipe(withRemapDbErrors("ContactAttributeValue", "select")),
   };
 });
 

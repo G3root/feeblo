@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as RpcSerialization from "effect/unstable/rpc/RpcSerialization";
 import * as RpcServer from "effect/unstable/rpc/RpcServer";
 
+import { AttributeDefinitionRpcHandlers } from "./attribute-definition/handlers";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
@@ -41,7 +42,13 @@ export const RpcRoute = RpcServer.layerHttp({
   Layer.provide(OrganizationRpcHandlers),
   Layer.provide(CommentReactionRpcHandlers),
   Layer.provide(CommentRpcHandlers),
-  Layer.provide(Layer.merge(CompanyRpcHandlers, ContactRpcHandlers)),
+  Layer.provide(
+    Layer.mergeAll(
+      AttributeDefinitionRpcHandlers,
+      CompanyRpcHandlers,
+      ContactRpcHandlers
+    )
+  ),
   Layer.provide(SiteRpcHandlers),
   Layer.provide(TagRpcHandlers),
   Layer.provide(UpvoteRpcHandlers),

@@ -7,12 +7,15 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import type {
+  TCompanyAttributeDefinition,
+  TContactAttributeDefinition,
+} from "../attribute-definition/schema";
 import { BoardRepository } from "../board/repository";
 import { CompanyRepository } from "../company/repository";
-import type { TCompanyAttributeDefinition } from "../company/schema";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
-import type { TContactAttributeDefinition } from "../contact/schema";
 import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
@@ -62,8 +65,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
           const jwtSecretRepository = yield* JwtSecretRepository;
-          const contactRepository = yield* ContactRepository;
-          const companyRepository = yield* CompanyRepository;
+          const attributeDefinitionRepository =
+            yield* AttributeDefinitionRepository;
           const postRepository = yield* PostRepository;
 
           const board = yield* boardRepository.getById({
@@ -113,11 +116,11 @@ export const WidgetApiLive = HttpApiBuilder.group(
             }
 
             const contactDefs =
-              (yield* contactRepository.findContactAttributeDefinitions(
+              (yield* attributeDefinitionRepository.findContactAttributeDefinitions(
                 organizationId
               )) as unknown as readonly TContactAttributeDefinition[];
             const companyDefs =
-              (yield* companyRepository.findCompanyAttributeDefinitions(
+              (yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
                 organizationId
               )) as unknown as readonly TCompanyAttributeDefinition[];
 
@@ -180,6 +183,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           };
         }).pipe(
           Effect.provide([
+            AttributeDefinitionRepository.layer,
             BoardRepository.layer,
             CompanyRepository.layer,
             ContactRepository.layer,

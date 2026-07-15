@@ -165,6 +165,24 @@
     },
     "./company/repository": {
       "default": "./src/company/repository.ts"
+    },
+    "./attribute-definition/schema": {
+      "default": "./src/attribute-definition/schema.ts"
+    },
+    "./attribute-definition/rpcs": {
+      "default": "./src/attribute-definition/rpcs.ts"
+    },
+    "./attribute-definition/handlers": {
+      "default": "./src/attribute-definition/handlers.ts"
+    },
+    "./attribute-definition/errors": {
+      "default": "./src/attribute-definition/errors.ts"
+    },
+    "./attribute-definition/repository": {
+      "default": "./src/attribute-definition/repository.ts"
+    },
+    "./attribute-definition/validation": {
+      "default": "./src/attribute-definition/validation.ts"
     }
   },
   "dependencies": {

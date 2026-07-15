@@ -1,17 +1,11 @@
 import { currentDb, schema } from "@feeblo/db";
-import { ContactAttributeValueId, ContactId } from "@feeblo/id";
+import { ContactId } from "@feeblo/id";
 import { and, eq, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import type {
-  TContactAttributeDefinitionCreate,
-  TContactAttributeValueUpsert,
-  TContactUpsert,
-} from "./schema";
-
-import { buildAttributeValueColumns } from "./utils";
+import type { TContactUpsert } from "./schema";
 
 export type Contact = typeof schema.contactTable.$inferSelect;
 
@@ -107,84 +101,6 @@ const makeContactRepository = Effect.succeed({
         .select()
         .from(schema.contactTable)
         .where(eq(schema.contactTable.organizationId, organizationId));
-    }),
-
-  findContactAttributeDefinitions: (organizationId: string) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      return yield* db
-        .select()
-        .from(schema.contactAttributeDefinitionTable)
-        .where(
-          eq(
-            schema.contactAttributeDefinitionTable.organizationId,
-            organizationId
-          )
-        );
-    }),
-
-  createContactAttributeDefinition: (args: TContactAttributeDefinitionCreate) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      yield* db.insert(schema.contactAttributeDefinitionTable).values({
-        ...args,
-        description: args.description ?? null,
-        config: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }),
-
-  findContactAttributeValues: (contactId: string) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      return yield* db
-        .select()
-        .from(schema.contactAttributeValueTable)
-        .where(eq(schema.contactAttributeValueTable.contactId, contactId));
-    }),
-
-  upsertContactAttributeValue: (args: TContactAttributeValueUpsert) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      const valueMap = buildAttributeValueColumns(args.value);
-
-      if (args.id) {
-        const [updated = null] = yield* db
-          .update(schema.contactAttributeValueTable)
-          .set({
-            ...valueMap,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.contactAttributeValueTable.id, args.id))
-          .returning();
-        if (!updated) {
-          return yield* Effect.die(
-            new Error("Contact attribute value update did not return a row")
-          );
-        }
-        return updated;
-      }
-
-      const id = yield* ContactAttributeValueId.generate;
-      const now = new Date();
-      const [created = null] = yield* db
-        .insert(schema.contactAttributeValueTable)
-        .values({
-          id,
-          contactId: args.contactId,
-          attributeId: args.attributeId,
-          ...valueMap,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      if (!created) {
-        return yield* Effect.die(
-          new Error("Contact attribute value insert did not return a row")
-        );
-      }
-      return created;
     }),
 });
 

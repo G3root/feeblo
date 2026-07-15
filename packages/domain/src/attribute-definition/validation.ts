@@ -1,6 +1,8 @@
 import type { schema } from "@feeblo/db";
 import * as S from "effect/Schema";
 
+import { AttributeConfig } from "./schema";
+
 export type AttributeDefinition =
   | typeof schema.contactAttributeDefinitionTable.$inferSelect
   | typeof schema.companyAttributeDefinitionTable.$inferSelect;
@@ -12,12 +14,6 @@ export type AttributeValue =
   | Date
   | null
   | undefined;
-
-const AttributeConfig = S.Struct({
-  min: S.optional(S.Number),
-  max: S.optional(S.Number),
-  pattern: S.optional(S.String),
-});
 
 const validateType = (
   definition: AttributeDefinition,
@@ -60,10 +56,7 @@ const validateConfig = (
       if (typeof value !== "string") {
         return false;
       }
-      if (config.pattern && !new RegExp(config.pattern).test(value)) {
-        return false;
-      }
-      return true;
+      return !(config.pattern && !new RegExp(config.pattern).test(value));
     }
     case "INTEGER":
     case "DECIMAL": {
@@ -73,10 +66,7 @@ const validateConfig = (
       if (config.min !== undefined && value < config.min) {
         return false;
       }
-      if (config.max !== undefined && value > config.max) {
-        return false;
-      }
-      return true;
+      return !(config.max !== undefined && value > config.max);
     }
     default:
       return true;

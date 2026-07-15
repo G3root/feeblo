@@ -1,3 +1,4 @@
+import { AttributeDefinitionRpcs } from "./attribute-definition/rpcs";
 import { BillingRpcs } from "./billing/rpcs";
 import { BoardRpcs } from "./board/rpcs";
 import { ChangelogRpcs } from "./changelog/rpcs";
@@ -18,6 +19,7 @@ import { UpvoteRpcs } from "./upvote/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
 export const AllRpcs = PostRpcs.merge(
+  AttributeDefinitionRpcs,
   BillingRpcs,
   BoardRpcs,
   ChangelogRpcs,
