@@ -14,6 +14,7 @@ export function TextField({
   label,
   hideLabel,
   id: idProp,
+  onChange,
   ...props
 }: TextFieldProps) {
   const generateId = useId();
@@ -34,7 +35,10 @@ export function TextField({
         id={id}
         name={field.name}
         onBlur={field.handleBlur}
-        onChange={(e) => field.handleChange(e.target.value)}
+        onChange={(event) => {
+          field.handleChange(event.target.value);
+          onChange?.(event);
+        }}
         value={field.state.value}
       />
 

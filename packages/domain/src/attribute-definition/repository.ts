@@ -1,5 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { CompanyAttributeValueId, ContactAttributeValueId } from "@feeblo/id";
+import { toCamelCase } from "@feeblo/utils/scule";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -39,6 +40,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .insert(schema.contactAttributeDefinitionTable)
         .values({
           ...args,
+          key: toCamelCase(args.name),
           description: args.description ?? null,
           config: null,
           createdAt: new Date(),
@@ -53,7 +55,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .update(schema.contactAttributeDefinitionTable)
         .set({
           name: args.name,
-          key: args.key,
+          key: toCamelCase(args.name),
           description: args.description,
           type: args.type,
           isRequired: args.isRequired,
@@ -122,6 +124,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .insert(schema.companyAttributeDefinitionTable)
         .values({
           ...args,
+          key: toCamelCase(args.name),
           description: args.description ?? null,
           config: null,
           createdAt: new Date(),
@@ -136,7 +139,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .update(schema.companyAttributeDefinitionTable)
         .set({
           name: args.name,
-          key: args.key,
+          key: toCamelCase(args.name),
           description: args.description,
           type: args.type,
           isRequired: args.isRequired,
