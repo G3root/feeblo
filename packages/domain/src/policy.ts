@@ -108,6 +108,18 @@ export const any = <E, R>(
 export const hasMembership = (organizationId: string): Policy =>
   policy((user) => Effect.succeed(isMember(user, organizationId)));
 
+/**
+ * Allows guests and regular users, but confines organization-SSO users to the
+ * organization encoded in their authenticated session.
+ */
+export const hasRestrictedOrganizationScope = (organizationId: string): Policy =>
+  policy((session) =>
+    Effect.succeed(
+      session.user.restrictedToOrganizationId == null ||
+        session.user.restrictedToOrganizationId === organizationId
+    )
+  );
+
 export const isMember = (
   session: CurrentSession["Service"],
   organizationId: string
