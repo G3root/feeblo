@@ -13,7 +13,6 @@ import type {
   TCompanyDelete,
   TCompanyList,
   TCompanyUpdate,
-  TCompanyUpsert,
 } from "./schema";
 
 export const CompanyRpcHandlersEffect = Effect.gen(function* () {
@@ -27,13 +26,6 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Company", "select")
-        ),
-    CompanyUpsert: (args: TCompanyUpsert) =>
-      repository
-        .upsertCompany(args)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Company", "create")
         ),
     CompanyCreate: (args: TCompanyCreate) =>
       repository

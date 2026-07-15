@@ -10,18 +10,12 @@ import {
   CompanyDelete,
   CompanyList,
   CompanyUpdate,
-  CompanyUpsert,
 } from "./schema";
 
 export class CompanyRpcs extends RpcGroup.make(
   Rpc.make("CompanyList", {
     success: Schema.Array(Company),
     payload: CompanyList,
-    error: CompanyServiceErrors,
-  }).middleware(AuthMiddleware),
-  Rpc.make("CompanyUpsert", {
-    success: Company,
-    payload: CompanyUpsert,
     error: CompanyServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("CompanyCreate", {

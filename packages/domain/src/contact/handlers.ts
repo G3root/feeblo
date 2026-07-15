@@ -13,7 +13,6 @@ import type {
   TContactDelete,
   TContactList,
   TContactUpdate,
-  TContactUpsert,
 } from "./schema";
 
 export const ContactRpcHandlersEffect = Effect.gen(function* () {
@@ -27,15 +26,6 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Contact", "select")
-        ),
-
-    ContactUpsert: (args: TContactUpsert) =>
-      repository
-        .upsertContact(args)
-        .pipe(
-          Effect.map(Option.getOrNull),
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Contact", "create")
         ),
 
     ContactCreate: (args: TContactCreate) =>

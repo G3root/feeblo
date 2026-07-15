@@ -11,19 +11,12 @@ import {
   ContactDelete,
   ContactList,
   ContactUpdate,
-  ContactUpsert,
 } from "./schema";
 
 export class ContactRpcs extends RpcGroup.make(
   Rpc.make("ContactList", {
     success: Schema.Array(Contact),
     payload: ContactList,
-    error: ContactServiceErrors,
-  }).middleware(AuthMiddleware),
-
-  Rpc.make("ContactUpsert", {
-    success: Schema.NullOr(Contact),
-    payload: ContactUpsert,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),
 
