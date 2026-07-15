@@ -1,8 +1,12 @@
 /** biome-ignore-all lint/style/useDefaultSwitchClause: <explanation> */
-import { ContactAttributeValueId } from "@feeblo/id";
+import {
+  CompanyAttributeValueId,
+  ContactAttributeValueId,
+} from "@feeblo/id";
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
+import type { DashboardCollections } from "~/lib/collections";
 
 export type CustomAttributeDefinition = {
   id: string;
@@ -204,7 +208,6 @@ type PersistedTransaction = {
   isPersisted: { promise: Promise<unknown> };
 };
 
-//Todo fix this
 export async function saveCustomAttributeValues<
   TExistingValue extends CustomAttributeValue & { id: string },
   TTransaction extends PersistedTransaction,
@@ -254,7 +257,8 @@ export async function saveCustomAttributeValues<
   await Promise.all(
     transactions
       .filter(
-        (transaction): transaction is TTransaction => transaction !== null
+        (transaction): transaction is Awaited<TTransaction> =>
+          transaction !== null
       )
       .map((transaction) => transaction.isPersisted.promise)
   );
@@ -267,7 +271,7 @@ export async function saveContactCustomAttributeValues({
   existingValues,
   values,
 }: {
-  contactAttributeValueCollection: typeof contactAttributeValueCollection;
+  contactAttributeValueCollection: DashboardCollections["contactAttributeValueCollection"];
   contactId: string;
   definitions: readonly CustomAttributeDefinition[];
   existingValues: readonly (CustomAttributeValue & {
@@ -292,6 +296,44 @@ export async function saveContactCustomAttributeValues({
     existingValues,
     updateValue: ({ existingValue, valueColumns }) =>
       contactAttributeValueCollection.update(existingValue.id, (draft) => {
+        Object.assign(draft, valueColumns, { updatedAt: new Date() });
+      }),
+    values,
+  });
+}
+
+export async function saveCompanyCustomAttributeValues({
+  companyAttributeValueCollection,
+  companyId,
+  definitions,
+  existingValues,
+  values,
+}: {
+  companyAttributeValueCollection: DashboardCollections["companyAttributeValueCollection"];
+  companyId: string;
+  definitions: readonly CustomAttributeDefinition[];
+  existingValues: readonly (CustomAttributeValue & {
+    companyId: string;
+    createdAt: Date;
+    id: string;
+    updatedAt: Date;
+  })[];
+  values: CustomAttributeInputValues;
+}) {
+  await saveCustomAttributeValues({
+    createValue: async ({ definition, valueColumns }) =>
+      companyAttributeValueCollection.insert({
+        id: await CompanyAttributeValueId.unsafeGenerate(),
+        companyId,
+        attributeId: definition.id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...valueColumns,
+      }),
+    definitions,
+    existingValues,
+    updateValue: ({ existingValue, valueColumns }) =>
+      companyAttributeValueCollection.update(existingValue.id, (draft) => {
         Object.assign(draft, valueColumns, { updatedAt: new Date() });
       }),
     values,

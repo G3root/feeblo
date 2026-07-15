@@ -65,7 +65,7 @@ function ContactCreateForm() {
     },
     validators: {
       onSubmit: z.object({
-        email: z.string().email("Enter a valid email address"),
+        email: z.email(),
         name: z.string(),
         phone: z.string(),
         attributes: z.record(z.string(), z.any()),

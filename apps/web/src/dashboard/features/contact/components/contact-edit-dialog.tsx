@@ -15,6 +15,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
+  CustomAttributeFields,
   getCustomAttributeInputValues,
   saveContactCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";

@@ -1,5 +1,5 @@
 import { camelCase } from "scule";
 
-export function toCamelCase(word: string) {
-  return camelCase(word, { normalize: true });
+export function toCamelCaseAttributeKey(word: string) {
+  return camelCase(word.trim().split(/\s+/), { normalize: true });
 }

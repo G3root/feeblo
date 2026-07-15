@@ -15,9 +15,10 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import {
+  CustomAttributeFields,
   getCustomAttributeInputValues,
   hasMissingRequiredCustomAttributeValues,
-  saveCustomAttributeValues,
+  saveCompanyCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -142,26 +143,11 @@ function CompanyEditForm({
         });
 
         await tx.isPersisted.promise;
-        //TODO fix id generation
-        await saveCustomAttributeValues({
-          createValue: ({ definition, valueColumns }) =>
-            companyAttributeValueCollection.insert({
-              id: crypto.randomUUID(),
-              companyId,
-              attributeId: definition.id,
-              ...valueColumns,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }),
+        await saveCompanyCustomAttributeValues({
+          companyAttributeValueCollection,
+          companyId,
           definitions,
           existingValues,
-          updateValue: ({ existingValue, valueColumns }) =>
-            companyAttributeValueCollection.update(
-              existingValue.id,
-              (draft) => {
-                Object.assign(draft, valueColumns, { updatedAt: new Date() });
-              }
-            ),
           values: data.value.attributes,
         });
         store.send({ type: "toggle" });

@@ -81,7 +81,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             id: contactId,
             organizationId,
             name: "Job title",
-            key: "jobTitle",
+            key: "ignoredContactKey",
             description: null,
             type: "TEXT",
             isRequired: false,
@@ -91,8 +91,8 @@ describe("AttributeDefinitionRpcHandlers", () => {
           .CompanyAttributeDefinitionCreate({
             id: companyId,
             organizationId,
-            name: "Industry",
-            key: "industry",
+            name: "Industry vertical",
+            key: "ignoredCompanyKey",
             description: null,
             type: "TEXT",
             isRequired: false,
@@ -103,8 +103,8 @@ describe("AttributeDefinitionRpcHandlers", () => {
           .ContactAttributeDefinitionUpdate({
             id: contactId,
             organizationId,
-            name: "Role",
-            key: "role",
+            name: "Account role",
+            key: "anotherIgnoredContactKey",
             description: "The contact's role",
             type: "TEXT",
             isRequired: true,
@@ -114,8 +114,8 @@ describe("AttributeDefinitionRpcHandlers", () => {
           .CompanyAttributeDefinitionUpdate({
             id: companyId,
             organizationId,
-            name: "Sector",
-            key: "sector",
+            name: "Market sector",
+            key: "anotherIgnoredCompanyKey",
             description: "The company's sector",
             type: "TEXT",
             isRequired: true,
@@ -131,12 +131,12 @@ describe("AttributeDefinitionRpcHandlers", () => {
 
         expect(contactDefinitions).toHaveLength(1);
         expect(contactDefinitions[0]).toMatchObject({
-          key: "role",
+          key: "accountRole",
           isRequired: true,
         });
         expect(companyDefinitions).toHaveLength(1);
         expect(companyDefinitions[0]).toMatchObject({
-          key: "sector",
+          key: "marketSector",
           isRequired: true,
         });
 

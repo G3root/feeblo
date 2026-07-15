@@ -21,6 +21,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
+import { toCamelCaseAttributeKey } from "@feeblo/utils/scule";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -87,15 +88,7 @@ function CustomAttributeCreateForm({
       onSubmit: z.object({
         description: z.string(),
         isRequired: z.boolean(),
-        //TODO add keyValidation
-        key: z
-          .string()
-          .trim()
-          .min(1, "Enter an attribute key")
-          .regex(
-            /^[a-z][a-z0-9_]*$/,
-            "Use lowercase letters, numbers, and underscores"
-          ),
+        key: z.string().min(1, "Enter an attribute name first"),
         name: z.string().trim().min(1, "Enter an attribute name"),
         type: z.enum(["TEXT", "INTEGER", "DECIMAL", "BOOLEAN", "DATE"]),
       }),
@@ -107,7 +100,7 @@ function CustomAttributeCreateForm({
         createdAt: now,
         description: value.description.trim() || null,
         isRequired: value.isRequired,
-        key: value.key.trim(),
+        key: toCamelCaseAttributeKey(value.name),
         name: value.name.trim(),
         organizationId,
         type: value.type,
@@ -154,7 +147,16 @@ function CustomAttributeCreateForm({
       <div className="flex-1 space-y-5 overflow-y-auto px-6 py-2">
         <form.AppField
           children={(field) => (
-            <field.TextField label="Name" placeholder="e.g. Customer tier" />
+            <field.TextField
+              label="Name"
+              onChange={(event) =>
+                form.setFieldValue(
+                  "key",
+                  toCamelCaseAttributeKey(event.target.value)
+                )
+              }
+              placeholder="e.g. Customer tier"
+            />
           )}
           name="name"
         />
@@ -162,8 +164,9 @@ function CustomAttributeCreateForm({
           children={(field) => (
             <field.TextField
               autoCapitalize="none"
+              disabled
               label="Key"
-              placeholder="customer_tier"
+              placeholder="customerTier"
               spellCheck={false}
             />
           )}

@@ -14,7 +14,7 @@ import { z } from "zod";
 import {
   CustomAttributeFields,
   hasMissingRequiredCustomAttributeValues,
-  saveCustomAttributeValues,
+  saveCompanyCustomAttributeValues,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -94,17 +94,9 @@ function CompanyCreateForm() {
         });
 
         await tx.isPersisted.promise;
-        //TODO fix id generation
-        await saveCustomAttributeValues({
-          createValue: ({ definition, valueColumns }) =>
-            companyAttributeValueCollection.insert({
-              id: crypto.randomUUID(),
-              companyId,
-              attributeId: definition.id,
-              ...valueColumns,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }),
+        await saveCompanyCustomAttributeValues({
+          companyAttributeValueCollection,
+          companyId,
           definitions,
           existingValues: [],
           values: data.value.attributes,
