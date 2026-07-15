@@ -12,13 +12,16 @@ import type {
   TCompanyAttributeDefinitionList,
   TCompanyAttributeDefinitionUpdate,
   TCompanyAttributeValueList,
+  TCompanyAttributeValueUpsert,
   TContactAttributeDefinitionCreate,
   TContactAttributeDefinitionDelete,
   TContactAttributeDefinitionList,
   TContactAttributeDefinitionUpdate,
   TContactAttributeValueList,
+  TContactAttributeValueUpsert,
 } from "./schema";
 
+//TODO FIX later
 export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* AttributeDefinitionRepository;
   const attributeDefinitionPolicy = yield* AttributeDefinitionPolicy;
@@ -100,12 +103,64 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
       repository
         .findContactAttributeValues(args.contactId)
         .pipe(withRemapDbErrors("ContactAttributeValue", "select")),
+    ContactAttributeValueUpsert: (args: TContactAttributeValueUpsert) =>
+      repository.upsertContactAttributeValue(args).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasMembership(args.organizationId),
+            Policy.policy(() =>
+              repository.contactExists(args.contactId, args.organizationId)
+            ),
+            Policy.policy(() =>
+              repository.contactAttributeDefinitionExists(
+                contactAttributeDefinitionReference(args)
+              )
+            )
+          )
+        ),
+        withRemapDbErrors("ContactAttributeValue", "upsert")
+      ),
     CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
       repository
         .findCompanyAttributeValues(args.companyId)
         .pipe(withRemapDbErrors("CompanyAttributeValue", "select")),
+    CompanyAttributeValueUpsert: (args: TCompanyAttributeValueUpsert) =>
+      repository.upsertCompanyAttributeValue(args).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasMembership(args.organizationId),
+            Policy.policy(() =>
+              repository.companyExists(args.companyId, args.organizationId)
+            ),
+            Policy.policy(() =>
+              repository.companyAttributeDefinitionExists(
+                companyAttributeDefinitionReference(args)
+              )
+            )
+          )
+        ),
+        withRemapDbErrors("CompanyAttributeValue", "upsert")
+      ),
   };
 });
+
+function contactAttributeDefinitionReference(
+  args: TContactAttributeValueUpsert
+): TContactAttributeDefinitionDelete {
+  return {
+    id: args.attributeId,
+    organizationId: args.organizationId,
+  };
+}
+
+function companyAttributeDefinitionReference(
+  args: TCompanyAttributeValueUpsert
+): TCompanyAttributeDefinitionDelete {
+  return {
+    id: args.attributeId,
+    organizationId: args.organizationId,
+  };
+}
 
 export const AttributeDefinitionRpcHandlers = AttributeDefinitionRpcs.toLayer(
   AttributeDefinitionRpcHandlersEffect

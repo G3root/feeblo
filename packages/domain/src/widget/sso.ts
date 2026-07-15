@@ -72,6 +72,7 @@ export function upsertContactFromParsed(
         yield* attributeDefinitionRepository.upsertCompanyAttributeValue({
           companyId: upsertedCompany.id,
           attributeId: attr.definitionId,
+          organizationId,
           value: attr.value,
         });
       }
@@ -95,6 +96,7 @@ export function upsertContactFromParsed(
         yield* attributeDefinitionRepository.upsertContactAttributeValue({
           contactId: contactOption.value.id,
           attributeId: attr.definitionId,
+          organizationId,
           value: attr.value,
         });
       }

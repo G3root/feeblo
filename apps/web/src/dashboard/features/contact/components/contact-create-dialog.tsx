@@ -1,5 +1,5 @@
-import { useAppForm } from "@feeblo/ui/hooks/form";
 import { ContactId } from "@feeblo/id";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
   SheetContent,
@@ -8,8 +8,13 @@ import {
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+import {
+  CustomAttributeFields,
+  saveContactCustomAttributeValues,
+} from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useContactCreateDialogContext } from "../dialog-stores";
@@ -35,10 +40,25 @@ export function ContactCreateDialog() {
 
 function ContactCreateForm() {
   const organizationId = useOrganizationId();
-  const { contactCollection } = useDashboardCollections();
+  const {
+    contactAttributeDefinitionCollection,
+    contactAttributeValueCollection,
+    contactCollection,
+  } = useDashboardCollections();
   const store = useContactCreateDialogContext();
+  const { data: definitions = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ definition: contactAttributeDefinitionCollection })
+        .where(({ definition }) =>
+          eq(definition.organizationId, organizationId)
+        )
+        .orderBy(({ definition }) => definition.createdAt, "asc"),
+    [organizationId]
+  );
   const form = useAppForm({
     defaultValues: {
+      attributes: {},
       email: "",
       name: "",
       phone: "",
@@ -48,12 +68,14 @@ function ContactCreateForm() {
         email: z.string().email("Enter a valid email address"),
         name: z.string(),
         phone: z.string(),
+        attributes: z.record(z.string(), z.any()),
       }),
     },
     onSubmit: async (data) => {
       try {
+        const contactId = await ContactId.unsafeGenerate();
         const tx = contactCollection.insert({
-          id: await ContactId.unsafeGenerate(),
+          id: contactId,
           organizationId,
           externalId: null,
           email: data.value.email,
@@ -66,6 +88,13 @@ function ContactCreateForm() {
         });
 
         await tx.isPersisted.promise;
+        await saveContactCustomAttributeValues({
+          contactAttributeValueCollection,
+          contactId,
+          definitions,
+          existingValues: [],
+          values: data.value.attributes,
+        });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Contact created", type: "success" });
@@ -96,6 +125,18 @@ function ContactCreateForm() {
           children={(field) => <field.TextField label="Phone" type="tel" />}
           name="phone"
         />
+        <form.Subscribe selector={(state) => state.values.attributes}>
+          {(attributes) => (
+            <CustomAttributeFields
+              definitions={definitions}
+              entityName="contact"
+              onChange={(attributeId, value) =>
+                form.setFieldValue(`attributes.${attributeId}`, value)
+              }
+              values={attributes}
+            />
+          )}
+        </form.Subscribe>
         <form.AppForm>
           <form.SubscribeButton className="w-full" label="Create contact" />
         </form.AppForm>

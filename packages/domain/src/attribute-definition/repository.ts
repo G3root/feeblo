@@ -193,25 +193,41 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .from(schema.contactAttributeValueTable)
         .where(eq(schema.contactAttributeValueTable.contactId, contactId)),
 
+    contactExists: (contactId: string, organizationId: string) =>
+      db
+        .select({ id: schema.contactTable.id })
+        .from(schema.contactTable)
+        .where(
+          and(
+            eq(schema.contactTable.id, contactId),
+            eq(schema.contactTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0] !== undefined)),
+
     upsertContactAttributeValue: (args: TContactAttributeValueUpsert) =>
       Effect.gen(function* () {
         const valueMap = buildAttributeValueColumns(args.value);
 
         if (args.id) {
-          const [updated = null] = yield* db
+          const [updated] = yield* db
             .update(schema.contactAttributeValueTable)
             .set({ ...valueMap, updatedAt: new Date() })
-            .where(eq(schema.contactAttributeValueTable.id, args.id))
+            .where(
+              and(
+                eq(schema.contactAttributeValueTable.id, args.id),
+                eq(schema.contactAttributeValueTable.contactId, args.contactId)
+              )
+            )
             .returning();
-          if (!updated) {
-            return yield* Effect.die(
-              new Error("Contact attribute value update did not return a row")
-            );
+
+          if (updated) {
+            return updated;
           }
-          return updated;
         }
 
-        const id = yield* ContactAttributeValueId.generate;
+        const id = args.id ?? (yield* ContactAttributeValueId.generate);
         const now = new Date();
         const [created = null] = yield* db
           .insert(schema.contactAttributeValueTable)
@@ -238,25 +254,40 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .from(schema.companyAttributeValueTable)
         .where(eq(schema.companyAttributeValueTable.companyId, companyId)),
 
+    companyExists: (companyId: string, organizationId: string) =>
+      db
+        .select({ id: schema.companyTable.id })
+        .from(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.id, companyId),
+            eq(schema.companyTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0] !== undefined)),
+
     upsertCompanyAttributeValue: (args: TCompanyAttributeValueUpsert) =>
       Effect.gen(function* () {
         const valueMap = buildAttributeValueColumns(args.value);
 
         if (args.id) {
-          const [updated = null] = yield* db
+          const [updated] = yield* db
             .update(schema.companyAttributeValueTable)
             .set({ ...valueMap, updatedAt: new Date() })
-            .where(eq(schema.companyAttributeValueTable.id, args.id))
+            .where(
+              and(
+                eq(schema.companyAttributeValueTable.id, args.id),
+                eq(schema.companyAttributeValueTable.companyId, args.companyId)
+              )
+            )
             .returning();
-          if (!updated) {
-            return yield* Effect.die(
-              new Error("Company attribute value update did not return a row")
-            );
+          if (updated) {
+            return updated;
           }
-          return updated;
         }
 
-        const id = yield* CompanyAttributeValueId.generate;
+        const id = args.id ?? (yield* CompanyAttributeValueId.generate);
         const now = new Date();
         const [created = null] = yield* db
           .insert(schema.companyAttributeValueTable)

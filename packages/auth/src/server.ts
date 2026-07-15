@@ -85,7 +85,6 @@ export const initAuthHandler = () =>
 
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
-        dbLayer,
         PolarService.layer,
         BillingRepository.layer,
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
@@ -93,7 +92,7 @@ export const initAuthHandler = () =>
         Mailer.layer,
         WorkspaceRepository.layer,
         SsoRepositoriesLive
-      ).pipe(Layer.provide(dbLayer))
+      ).pipe(Layer.provideMerge(dbLayer))
     );
 
     const ssoOptions: JwtAutoLoginOptions = {

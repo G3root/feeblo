@@ -1,3 +1,9 @@
+import type {
+  TCompanyAttributeValue,
+  TCompanyAttributeValueUpsert,
+  TContactAttributeValue,
+  TContactAttributeValueUpsert,
+} from "@feeblo/domain/attribute-definition/schema";
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
@@ -1222,6 +1228,34 @@ export const contactAttributeValueCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: value } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactAttributeValueUpsert({
+          id: value.id,
+          attributeId: value.attributeId,
+          contactId: value.contactId,
+          organizationId: getCurrentOrganizationId() ?? "",
+          value: getAttributeValue(value),
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: value } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ContactAttributeValueUpsert({
+          id: value.id,
+          attributeId: value.attributeId,
+          contactId: value.contactId,
+          organizationId: getCurrentOrganizationId() ?? "",
+          value: getAttributeValue(value),
+        })
+      );
+    },
   })
 );
 
@@ -1258,8 +1292,55 @@ export const companyAttributeValueCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: value } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyAttributeValueUpsert({
+          id: value.id,
+          attributeId: value.attributeId,
+          companyId: value.companyId,
+          organizationId: getCurrentOrganizationId() ?? "",
+          value: getAttributeValue(value),
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: value } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.CompanyAttributeValueUpsert({
+          id: value.id,
+          attributeId: value.attributeId,
+          companyId: value.companyId,
+          organizationId: getCurrentOrganizationId() ?? "",
+          value: getAttributeValue(value),
+        })
+      );
+    },
   })
 );
+
+type AttributeValueRow = Pick<
+  TContactAttributeValue | TCompanyAttributeValue,
+  "valueBoolean" | "valueDate" | "valueDecimal" | "valueInteger" | "valueText"
+>;
+
+type AttributeValueUpsert =
+  | TContactAttributeValueUpsert["value"]
+  | TCompanyAttributeValueUpsert["value"];
+
+function getAttributeValue(value: AttributeValueRow): AttributeValueUpsert {
+  return (
+    value.valueText ??
+    value.valueInteger ??
+    value.valueDecimal ??
+    value.valueBoolean ??
+    value.valueDate
+  );
+}
 
 export const dashboardCollections = {
   boardCollection,

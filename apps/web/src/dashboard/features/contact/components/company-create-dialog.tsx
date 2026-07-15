@@ -1,5 +1,5 @@
-import { useAppForm } from "@feeblo/ui/hooks/form";
 import { CompanyId } from "@feeblo/id";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
   SheetContent,
@@ -8,8 +8,14 @@ import {
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+import {
+  CustomAttributeFields,
+  hasMissingRequiredCustomAttributeValues,
+  saveCustomAttributeValues,
+} from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useCompanyCreateDialogContext } from "../dialog-stores";
@@ -35,19 +41,49 @@ export function CompanyCreateDialog() {
 
 function CompanyCreateForm() {
   const organizationId = useOrganizationId();
-  const { companyCollection } = useDashboardCollections();
+  const {
+    companyAttributeDefinitionCollection,
+    companyAttributeValueCollection,
+    companyCollection,
+  } = useDashboardCollections();
   const store = useCompanyCreateDialogContext();
+  const definitionsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ definition: companyAttributeDefinitionCollection })
+        .where(({ definition }) =>
+          eq(definition.organizationId, organizationId)
+        )
+        .orderBy(({ definition }) => definition.createdAt, "asc"),
+    [organizationId]
+  );
+  const definitions = definitionsQuery.data ?? [];
   const form = useAppForm({
-    defaultValues: { name: "" },
+    defaultValues: { attributes: {}, name: "" },
     validators: {
       onSubmit: z.object({
         name: z.string().trim().min(1, "Enter a company name"),
+        attributes: z.record(z.string(), z.any()),
       }),
     },
     onSubmit: async (data) => {
+      const hasMissingRequiredValue = hasMissingRequiredCustomAttributeValues(
+        definitions,
+        data.value.attributes
+      );
+
+      if (hasMissingRequiredValue) {
+        toastManager.add({
+          title: "Complete all required custom fields",
+          type: "error",
+        });
+        return;
+      }
+
       try {
+        const companyId = await CompanyId.unsafeGenerate();
         const tx = companyCollection.insert({
-          id: await CompanyId.unsafeGenerate(),
+          id: companyId,
           organizationId,
           externalId: null,
           name: data.value.name,
@@ -58,6 +94,21 @@ function CompanyCreateForm() {
         });
 
         await tx.isPersisted.promise;
+        //TODO fix id generation
+        await saveCustomAttributeValues({
+          createValue: ({ definition, valueColumns }) =>
+            companyAttributeValueCollection.insert({
+              id: crypto.randomUUID(),
+              companyId,
+              attributeId: definition.id,
+              ...valueColumns,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }),
+          definitions,
+          existingValues: [],
+          values: data.value.attributes,
+        });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company created", type: "success" });
@@ -80,6 +131,18 @@ function CompanyCreateForm() {
           children={(field) => <field.TextField label="Name" />}
           name="name"
         />
+        <form.Subscribe selector={(state) => state.values.attributes}>
+          {(attributes) => (
+            <CustomAttributeFields
+              definitions={definitions}
+              entityName="company"
+              onChange={(attributeId, value) =>
+                form.setFieldValue(`attributes.${attributeId}`, value)
+              }
+              values={attributes}
+            />
+          )}
+        </form.Subscribe>
         <form.AppForm>
           <form.SubscribeButton className="w-full" label="Create company" />
         </form.AppForm>

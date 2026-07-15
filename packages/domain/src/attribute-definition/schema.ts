@@ -141,6 +141,7 @@ const AttributeValueFields = {
 const AttributeValueUpsertFields = {
   id: S.optional(S.String),
   attributeId: S.String,
+  organizationId: WorkspaceId.schema,
   value: S.NullOr(S.Union([S.String, S.Number, S.Boolean, S.DateFromString])),
 };
 

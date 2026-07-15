@@ -38,7 +38,7 @@ export class InternalServerError extends Schema.TaggedErrorClass<InternalServerE
 
 export function withRemapDbErrors<R, E extends { _tag: string }, A>(
   entityType: string,
-  action: "update" | "create" | "delete" | "select",
+  action: "update" | "create" | "delete" | "select" | "upsert",
   entityId?: unknown | { value: unknown; key: string }[]
 ) {
   return (

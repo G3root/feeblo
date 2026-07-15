@@ -1,3 +1,7 @@
+import type {
+  TContactAttributeDefinition,
+  TContactAttributeValue,
+} from "@feeblo/domain/attribute-definition/schema";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
@@ -10,6 +14,10 @@ import { toastManager } from "@feeblo/ui/toast";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+import {
+  getCustomAttributeInputValues,
+  saveContactCustomAttributeValues,
+} from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useContactEditDialogContext } from "../dialog-stores";
@@ -36,7 +44,11 @@ export function ContactEditDialog() {
 
 function ContactEditForm() {
   const organizationId = useOrganizationId();
-  const { contactCollection } = useDashboardCollections();
+  const {
+    contactAttributeDefinitionCollection,
+    contactAttributeValueCollection,
+    contactCollection,
+  } = useDashboardCollections();
   const store = useContactEditDialogContext();
   const contactId = useSelector(store, (state) => state.context.data.contactId);
   const { data } = useLiveQuery(
@@ -49,41 +61,79 @@ function ContactEditForm() {
             eq(contact.organizationId, organizationId)
           )
         )
+        .orderBy(({ contact }) => contact.updatedAt, "desc")
         .limit(1),
     [contactId, organizationId]
   );
   const contact = data[0];
+  const definitionsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ definition: contactAttributeDefinitionCollection })
+        .where(({ definition }) =>
+          eq(definition.organizationId, organizationId)
+        )
+        .orderBy(({ definition }) => definition.createdAt, "asc"),
+    [organizationId]
+  );
+  const attributeValuesQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ value: contactAttributeValueCollection })
+        .where(({ value }) => eq(value.contactId, contactId)),
+    [contactId]
+  );
 
-  if (!contact) {
+  if (
+    !contact ||
+    definitionsQuery.isLoading ||
+    attributeValuesQuery.isLoading
+  ) {
     return null;
   }
 
-  return <ContactEditFormFields contact={contact} />;
+  return (
+    <ContactEditFormFields
+      attributeValues={attributeValuesQuery.data ?? []}
+      contact={contact}
+      definitions={definitionsQuery.data ?? []}
+    />
+  );
 }
 
 type ContactEditFormFieldsProps = {
   contact: {
-    email: string;
+    email: string | null;
     id: string;
     name: string | null;
     phone: string | null;
   };
 };
 
-function ContactEditFormFields({ contact }: ContactEditFormFieldsProps) {
-  const { contactCollection } = useDashboardCollections();
+function ContactEditFormFields({
+  attributeValues: existingValues,
+  contact,
+  definitions,
+}: ContactEditFormFieldsProps & {
+  attributeValues: readonly TContactAttributeValue[];
+  definitions: readonly TContactAttributeDefinition[];
+}) {
+  const { contactAttributeValueCollection, contactCollection } =
+    useDashboardCollections();
   const store = useContactEditDialogContext();
   const form = useAppForm({
     defaultValues: {
-      email: contact.email,
+      attributes: getCustomAttributeInputValues(definitions, existingValues),
+      email: contact.email ?? "",
       name: contact.name ?? "",
       phone: contact.phone ?? "",
     },
     validators: {
       onSubmit: z.object({
-        email: z.string().email("Enter a valid email address"),
+        email: z.email("Enter a valid email address"),
         name: z.string(),
         phone: z.string(),
+        attributes: z.record(z.string(), z.any()),
       }),
     },
     onSubmit: async (data) => {
@@ -96,6 +146,13 @@ function ContactEditFormFields({ contact }: ContactEditFormFieldsProps) {
         });
 
         await tx.isPersisted.promise;
+        await saveContactCustomAttributeValues({
+          contactAttributeValueCollection,
+          contactId: contact.id,
+          definitions,
+          existingValues,
+          values: data.value.attributes,
+        });
         store.send({ type: "setOpen", open: false });
         toastManager.add({ title: "Contact updated", type: "success" });
       } catch (_error) {
@@ -125,6 +182,18 @@ function ContactEditFormFields({ contact }: ContactEditFormFieldsProps) {
           children={(field) => <field.TextField label="Phone" type="tel" />}
           name="phone"
         />
+        <form.Subscribe selector={(state) => state.values.attributes}>
+          {(attributes) => (
+            <CustomAttributeFields
+              definitions={definitions}
+              entityName="contact"
+              onChange={(attributeId, value) =>
+                form.setFieldValue(`attributes.${attributeId}`, value)
+              }
+              values={attributes}
+            />
+          )}
+        </form.Subscribe>
         <form.AppForm>
           <form.SubscribeButton className="w-full" label="Save changes" />
         </form.AppForm>

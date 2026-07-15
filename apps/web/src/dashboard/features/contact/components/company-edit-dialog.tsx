@@ -1,3 +1,7 @@
+import type {
+  TCompanyAttributeDefinition,
+  TCompanyAttributeValue,
+} from "@feeblo/domain/attribute-definition/schema";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
@@ -10,6 +14,11 @@ import { toastManager } from "@feeblo/ui/toast";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+import {
+  getCustomAttributeInputValues,
+  hasMissingRequiredCustomAttributeValues,
+  saveCustomAttributeValues,
+} from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useCompanyEditDialogContext } from "../dialog-stores";
@@ -33,7 +42,11 @@ export function CompanyEditDialog() {
 
 function CompanyEditFormLoader() {
   const organizationId = useOrganizationId();
-  const { companyCollection } = useDashboardCollections();
+  const {
+    companyAttributeDefinitionCollection,
+    companyAttributeValueCollection,
+    companyCollection,
+  } = useDashboardCollections();
   const store = useCompanyEditDialogContext();
   const companyId = useSelector(store, (state) => state.context.data.companyId);
   const { data } = useLiveQuery(
@@ -46,36 +59,82 @@ function CompanyEditFormLoader() {
             eq(company.organizationId, organizationId)
           )
         )
+        .orderBy(({ company }) => company.updatedAt, "desc")
         .limit(1),
     [companyId, organizationId]
   );
   const company = data?.[0];
+  const definitionsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ definition: companyAttributeDefinitionCollection })
+        .where(({ definition }) =>
+          eq(definition.organizationId, organizationId)
+        )
+        .orderBy(({ definition }) => definition.createdAt, "asc"),
+    [organizationId]
+  );
+  const valuesQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ value: companyAttributeValueCollection })
+        .where(({ value }) => eq(value.companyId, companyId)),
+    [companyId]
+  );
 
   if (!company) {
     return null;
   }
 
-  return <CompanyEditForm companyId={companyId} companyName={company.name} />;
+  return (
+    <CompanyEditForm
+      companyId={companyId}
+      companyName={company.name}
+      definitions={definitionsQuery.data ?? []}
+      existingValues={valuesQuery.data ?? []}
+    />
+  );
 }
 
 function CompanyEditForm({
   companyId,
   companyName,
+  definitions,
+  existingValues,
 }: {
   companyId: string;
   companyName: string;
+  definitions: readonly TCompanyAttributeDefinition[];
+  existingValues: readonly TCompanyAttributeValue[];
 }) {
-  const { companyCollection } = useDashboardCollections();
+  const { companyAttributeValueCollection, companyCollection } =
+    useDashboardCollections();
   const store = useCompanyEditDialogContext();
-
   const form = useAppForm({
-    defaultValues: { name: companyName },
+    defaultValues: {
+      attributes: getCustomAttributeInputValues(definitions, existingValues),
+      name: companyName,
+    },
     validators: {
       onSubmit: z.object({
         name: z.string().trim().min(1, "Enter a company name"),
+        attributes: z.record(z.string(), z.any()),
       }),
     },
     onSubmit: async (data) => {
+      const hasMissingRequiredValue = hasMissingRequiredCustomAttributeValues(
+        definitions,
+        data.value.attributes
+      );
+
+      if (hasMissingRequiredValue) {
+        toastManager.add({
+          title: "Complete all required custom fields",
+          type: "error",
+        });
+        return;
+      }
+
       try {
         const tx = companyCollection.update(companyId, (draft) => {
           draft.name = data.value.name;
@@ -83,6 +142,28 @@ function CompanyEditForm({
         });
 
         await tx.isPersisted.promise;
+        //TODO fix id generation
+        await saveCustomAttributeValues({
+          createValue: ({ definition, valueColumns }) =>
+            companyAttributeValueCollection.insert({
+              id: crypto.randomUUID(),
+              companyId,
+              attributeId: definition.id,
+              ...valueColumns,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }),
+          definitions,
+          existingValues,
+          updateValue: ({ existingValue, valueColumns }) =>
+            companyAttributeValueCollection.update(
+              existingValue.id,
+              (draft) => {
+                Object.assign(draft, valueColumns, { updatedAt: new Date() });
+              }
+            ),
+          values: data.value.attributes,
+        });
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company updated", type: "success" });
       } catch (_error) {
@@ -104,6 +185,18 @@ function CompanyEditForm({
           children={(field) => <field.TextField label="Name" />}
           name="name"
         />
+        <form.Subscribe selector={(state) => state.values.attributes}>
+          {(attributes) => (
+            <CustomAttributeFields
+              definitions={definitions}
+              entityName="company"
+              onChange={(attributeId, value) =>
+                form.setFieldValue(`attributes.${attributeId}`, value)
+              }
+              values={attributes}
+            />
+          )}
+        </form.Subscribe>
         <form.AppForm>
           <form.SubscribeButton className="w-full" label="Save changes" />
         </form.AppForm>

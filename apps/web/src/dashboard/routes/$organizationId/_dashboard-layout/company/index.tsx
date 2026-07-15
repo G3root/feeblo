@@ -22,6 +22,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { CompanyCreateDialog } from "~/features/contact/components/company-create-dialog";
+import {
+  type CustomAttributeDefinition,
+  type CustomAttributeValue,
+  formatCustomAttributeValue,
+} from "~/features/custom-attribute/components/custom-attribute-fields";
 import { CompanyDeleteDialog } from "~/features/contact/components/company-delete-dialog";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
 import {
@@ -32,7 +37,10 @@ import {
   useCompanyDeleteDialogContext,
   useCompanyEditDialogContext,
 } from "~/features/contact/dialog-stores";
-import { companyCollection } from "~/lib/collections";
+import {
+  companyCollection,
+  companyAttributeDefinitionCollection,
+} from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
@@ -40,7 +48,10 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await companyCollection.preload();
+    await Promise.all([
+      companyCollection.preload(),
+      companyAttributeDefinitionCollection.preload(),
+    ]);
     return null;
   },
 });
@@ -62,7 +73,8 @@ function RouteComponent() {
 
 function CompanyPage() {
   const { organizationId } = Route.useParams();
-  const { companyCollection } = useDashboardCollections();
+  const { companyAttributeDefinitionCollection, companyCollection } =
+    useDashboardCollections();
   const createDialogStore = useCompanyCreateDialogContext();
   const editDialogStore = useCompanyEditDialogContext();
   const deleteDialogStore = useCompanyDeleteDialogContext();
@@ -75,6 +87,17 @@ function CompanyPage() {
     [organizationId]
   );
   const companies = companiesQuery.data ?? [];
+  const definitionsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ definition: companyAttributeDefinitionCollection })
+        .where(({ definition }) =>
+          eq(definition.organizationId, organizationId)
+        )
+        .orderBy(({ definition }) => definition.createdAt, "asc"),
+    [organizationId]
+  );
+  const definitions = definitionsQuery.data ?? [];
 
   const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
 
@@ -117,6 +140,9 @@ function CompanyPage() {
             <TableHead>External ID</TableHead>
             <TableHead>Created</TableHead>
             <TableHead>Updated</TableHead>
+            {definitions.map((definition) => (
+              <TableHead key={definition.id}>{definition.name}</TableHead>
+            ))}
             <TableHead className="w-12">
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -129,6 +155,10 @@ function CompanyPage() {
               <TableCell>{company.externalId ?? "—"}</TableCell>
               <TableCell>{formatDate(company.createdAt)}</TableCell>
               <TableCell>{formatDate(company.updatedAt)}</TableCell>
+              <CompanyAttributeCells
+                companyId={company.id}
+                definitions={definitions}
+              />
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger
@@ -182,6 +212,36 @@ function CompanyPage() {
       </Table>
     </div>
   );
+}
+
+function CompanyAttributeCells({
+  companyId,
+  definitions,
+}: {
+  companyId: string;
+  definitions: CustomAttributeDefinition[];
+}) {
+  const { companyAttributeValueCollection } = useDashboardCollections();
+  const valuesQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ value: companyAttributeValueCollection })
+        .where(({ value }) => eq(value.companyId, companyId)),
+    [companyId]
+  );
+  const valuesByAttributeId = new Map(
+    (valuesQuery.data ?? []).map((value) => [value.attributeId, value])
+  );
+
+  return definitions.map((definition) => (
+    <TableCell key={definition.id}>
+      {formatCustomAttributeValue(
+        valuesByAttributeId.get(definition.id) as
+          | CustomAttributeValue
+          | undefined
+      )}
+    </TableCell>
+  ));
 }
 
 function formatDate(date: Date) {
