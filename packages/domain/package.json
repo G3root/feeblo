@@ -150,6 +150,21 @@
     },
     "./contact/repository": {
       "default": "./src/contact/repository.ts"
+    },
+    "./company/schema": {
+      "default": "./src/company/schema.ts"
+    },
+    "./company/rpcs": {
+      "default": "./src/company/rpcs.ts"
+    },
+    "./company/handlers": {
+      "default": "./src/company/handlers.ts"
+    },
+    "./company/errors": {
+      "default": "./src/company/errors.ts"
+    },
+    "./company/repository": {
+      "default": "./src/company/repository.ts"
     }
   },
   "dependencies": {

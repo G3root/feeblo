@@ -1,18 +1,16 @@
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
-
-import { DataValidationError } from "./errors";
 import type {
   TCommonCompanyFields,
-  TCommonContactFields,
   TCompanyAttributeDefinition,
+} from "../company/schema";
+import { CommonCompanyFields } from "../company/schema";
+import { DataValidationError } from "./errors";
+import type {
+  TCommonContactFields,
   TContactAttributeDefinition,
 } from "./schema";
-import {
-  AttributeConfig,
-  CommonCompanyFields,
-  CommonContactFields,
-} from "./schema";
+import { AttributeConfig, CommonContactFields } from "./schema";
 
 export type AttributeValue = string | number | boolean | Date | null;
 

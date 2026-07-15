@@ -4,12 +4,11 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as S from "effect/Schema";
+import { CompanyRepository } from "../company/repository";
+import type { TCompanyAttributeDefinition } from "../company/schema";
 import type { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
-import type {
-  TCompanyAttributeDefinition,
-  TContactAttributeDefinition,
-} from "../contact/schema";
+import type { TContactAttributeDefinition } from "../contact/schema";
 import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
 import { JwtSecretRepository } from "../jwt-secret/repository";
@@ -52,10 +51,11 @@ export function upsertContactFromParsed(
 ) {
   return Effect.gen(function* () {
     const contactRepository = yield* ContactRepository;
+    const companyRepository = yield* CompanyRepository;
     let linkedCompanyId: string | undefined;
 
     for (const company of parsedContact.companies) {
-      const upsertedCompany = yield* contactRepository.upsertCompany({
+      const upsertedCompany = yield* companyRepository.upsertCompany({
         organizationId,
         externalId: company.commonFields.id,
         name: company.commonFields.name,
@@ -65,7 +65,7 @@ export function upsertContactFromParsed(
       linkedCompanyId = upsertedCompany.id;
 
       for (const attr of company.customAttributes) {
-        yield* contactRepository.upsertCompanyAttributeValue({
+        yield* companyRepository.upsertCompanyAttributeValue({
           companyId: upsertedCompany.id,
           attributeId: attr.definitionId,
           value: attr.value,
@@ -118,6 +118,7 @@ export const createSsoSession = ({
   Effect.gen(function* () {
     const jwtSecretRepository = yield* JwtSecretRepository;
     const contactRepository = yield* ContactRepository;
+    const companyRepository = yield* CompanyRepository;
     const userRepository = yield* UserRepository;
 
     const secrets = yield* jwtSecretRepository.getSecretsForOrg({
@@ -140,7 +141,7 @@ export const createSsoSession = ({
         organizationId
       )) as unknown as readonly TContactAttributeDefinition[];
     const companyDefs =
-      (yield* contactRepository.findCompanyAttributeDefinitions(
+      (yield* companyRepository.findCompanyAttributeDefinitions(
         organizationId
       )) as unknown as readonly TCompanyAttributeDefinition[];
 
@@ -248,6 +249,7 @@ export const linkAnonymousAccount = ({
  * non-Effect runtime (e.g. the better-auth plugin).
  */
 export const SsoRepositoriesLive = Layer.mergeAll(
+  CompanyRepository.layer,
   ContactRepository.layer,
   JwtSecretRepository.layer,
   UserRepository.layer

@@ -8,12 +8,11 @@ import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { BoardRepository } from "../board/repository";
+import { CompanyRepository } from "../company/repository";
+import type { TCompanyAttributeDefinition } from "../company/schema";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
-import type {
-  TCompanyAttributeDefinition,
-  TContactAttributeDefinition,
-} from "../contact/schema";
+import type { TContactAttributeDefinition } from "../contact/schema";
 import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
@@ -64,6 +63,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const postStatusRepository = yield* PostStatusRepository;
           const jwtSecretRepository = yield* JwtSecretRepository;
           const contactRepository = yield* ContactRepository;
+          const companyRepository = yield* CompanyRepository;
           const postRepository = yield* PostRepository;
 
           const board = yield* boardRepository.getById({
@@ -117,7 +117,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 organizationId
               )) as unknown as readonly TContactAttributeDefinition[];
             const companyDefs =
-              (yield* contactRepository.findCompanyAttributeDefinitions(
+              (yield* companyRepository.findCompanyAttributeDefinitions(
                 organizationId
               )) as unknown as readonly TCompanyAttributeDefinition[];
 
@@ -181,6 +181,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
         }).pipe(
           Effect.provide([
             BoardRepository.layer,
+            CompanyRepository.layer,
             ContactRepository.layer,
             JwtSecretRepository.layer,
             PostRepository.layer,

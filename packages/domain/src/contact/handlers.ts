@@ -7,11 +7,6 @@ import { withRemapDbErrors } from "../rpc-errors";
 import { ContactRepository } from "./repository";
 import { ContactRpcs } from "./rpcs";
 import type {
-  TCompanyAttributeDefinitionCreate,
-  TCompanyAttributeDefinitionList,
-  TCompanyAttributeValueList,
-  TCompanyList,
-  TCompanyUpsert,
   TContactAttributeDefinitionCreate,
   TContactAttributeDefinitionList,
   TContactAttributeValueList,
@@ -31,14 +26,6 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Contact", "select")
         ),
 
-    CompanyList: (args: TCompanyList) =>
-      repository
-        .findManyCompanies(args.organizationId)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Company", "select")
-        ),
-
     ContactUpsert: (args: TContactUpsert) =>
       repository
         .upsertContact(args)
@@ -46,14 +33,6 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           Effect.map(Option.getOrNull),
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Contact", "create")
-        ),
-
-    CompanyUpsert: (args: TCompanyUpsert) =>
-      repository
-        .upsertCompany(args)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("Company", "create")
         ),
 
     ContactAttributeDefinitionList: (args: TContactAttributeDefinitionList) =>
@@ -74,35 +53,11 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ContactAttributeDefinition", "create")
         ),
 
-    CompanyAttributeDefinitionList: (args: TCompanyAttributeDefinitionList) =>
-      repository
-        .findCompanyAttributeDefinitions(args.organizationId)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("CompanyAttributeDefinition", "select")
-        ),
-
-    CompanyAttributeDefinitionCreate: (
-      args: TCompanyAttributeDefinitionCreate
-    ) =>
-      repository
-        .createCompanyAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("CompanyAttributeDefinition", "create")
-        ),
-
     //TODOO add permission
     ContactAttributeValueList: (args: TContactAttributeValueList) =>
       repository
         .findContactAttributeValues(args.contactId)
         .pipe(withRemapDbErrors("ContactAttributeValue", "select")),
-
-    CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
-      repository.findCompanyAttributeValues(args.companyId).pipe(
-        //TODOO add permission
-        withRemapDbErrors("CompanyAttributeValue", "select")
-      ),
   };
 });
 

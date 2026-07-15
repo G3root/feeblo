@@ -3,11 +3,12 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { CurrentSession, type Session } from "../session-middleware";
-import { ContactRpcHandlersEffect } from "./handlers";
-import { ContactRepository } from "./repository";
 
-describe("ContactRpcHandlers", () => {
+import { CurrentSession, type Session } from "../session-middleware";
+import { CompanyRpcHandlersEffect } from "./handlers";
+import { CompanyRepository } from "./repository";
+
+describe("CompanyRpcHandlers", () => {
   type Fixture = {
     membershipId: string;
     organizationId: string;
@@ -63,33 +64,44 @@ describe("ContactRpcHandlers", () => {
     });
 
   const TestLayer = Layer.merge(
-    ContactRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+    CompanyRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
   layer(TestLayer)("handlers", (it) => {
-    it.effect("lists contacts for organization members", () =>
+    it.effect("lists companies for organization members", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const handlers = yield* ContactRpcHandlersEffect;
+        const handlers = yield* CompanyRpcHandlersEffect;
         const fixture = yield* makeFixture();
-        yield* db.insert(schema.contactTable).values({
-          id: `contact_${fixture.organizationId}`,
+        yield* db.insert(schema.companyTable).values({
+          id: `company_${fixture.organizationId}`,
           organizationId: fixture.organizationId,
-          name: "Ada",
-          email: "ada@example.com",
+          name: "Acme",
           createdAt: new Date(),
           updatedAt: new Date(),
         });
 
-        const contacts = yield* handlers
-          .ContactList({ organizationId: fixture.organizationId })
+        const companies = yield* handlers
+          .CompanyList({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-        expect(contacts).toHaveLength(1);
-        expect(contacts[0]).toMatchObject({
-          name: "Ada",
-          email: "ada@example.com",
-        });
+        expect(companies).toHaveLength(1);
+        expect(companies[0]).toMatchObject({ name: "Acme" });
+      })
+    );
+
+    it.effect("rejects non-members from listing companies", () =>
+      Effect.gen(function* () {
+        const handlers = yield* CompanyRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const error = yield* Effect.flip(
+          handlers
+            .CompanyList({ organizationId: fixture.organizationId })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, false))
+            )
+        );
+        expect(error._tag).toBe("PolicyDenied");
       })
     );
   });

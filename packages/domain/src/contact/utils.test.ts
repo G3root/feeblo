@@ -1,10 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
+import type { TCompanyAttributeDefinition } from "../company/schema";
 import { DataValidationError } from "./errors";
-import type {
-  TCompanyAttributeDefinition,
-  TContactAttributeDefinition,
-} from "./schema";
+import type { TContactAttributeDefinition } from "./schema";
 import {
   buildAttributeValueColumns,
   parseCompanyCustomAttributes,

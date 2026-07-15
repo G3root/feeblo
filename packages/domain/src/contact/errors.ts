@@ -1,10 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { PolicyDeniedError } from "../policy";
-import {
-  InternalServerError,
-  UnauthorizedError,
-} from "../rpc-errors";
+import { InternalServerError, UnauthorizedError } from "../rpc-errors";
 
 export class DataValidationError extends Schema.TaggedErrorClass<DataValidationError>()(
   "DataValidationError",
@@ -20,14 +17,6 @@ export class ContactNotFoundError extends Schema.TaggedErrorClass<ContactNotFoun
     message: Schema.optional(Schema.String),
   },
   { httpApiStatus: 404, identifier: "ContactNotFoundError" }
-) {}
-
-export class CompanyNotFoundError extends Schema.TaggedErrorClass<CompanyNotFoundError>()(
-  "CompanyNotFoundError",
-  {
-    message: Schema.optional(Schema.String),
-  },
-  { httpApiStatus: 404, identifier: "CompanyNotFoundError" }
 ) {}
 
 export class AttributeDefinitionNotFoundError extends Schema.TaggedErrorClass<AttributeDefinitionNotFoundError>()(
@@ -50,18 +39,6 @@ export class FailedToUpdateContactError extends Schema.TaggedErrorClass<FailedTo
   { httpApiStatus: 500, identifier: "FailedToUpdateContactError" }
 ) {}
 
-export class FailedToCreateCompanyError extends Schema.TaggedErrorClass<FailedToCreateCompanyError>()(
-  "FailedToCreateCompanyError",
-  {},
-  { httpApiStatus: 500, identifier: "FailedToCreateCompanyError" }
-) {}
-
-export class FailedToUpdateCompanyError extends Schema.TaggedErrorClass<FailedToUpdateCompanyError>()(
-  "FailedToUpdateCompanyError",
-  {},
-  { httpApiStatus: 500, identifier: "FailedToUpdateCompanyError" }
-) {}
-
 export class FailedToUpsertAttributeValueError extends Schema.TaggedErrorClass<FailedToUpsertAttributeValueError>()(
   "FailedToUpsertAttributeValueError",
   {},
@@ -74,11 +51,8 @@ export const ContactServiceErrors = Schema.Union([
   PolicyDeniedError,
   DataValidationError,
   ContactNotFoundError,
-  CompanyNotFoundError,
   AttributeDefinitionNotFoundError,
   FailedToCreateContactError,
   FailedToUpdateContactError,
-  FailedToCreateCompanyError,
-  FailedToUpdateCompanyError,
   FailedToUpsertAttributeValueError,
 ]);
