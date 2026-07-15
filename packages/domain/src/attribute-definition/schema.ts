@@ -30,6 +30,14 @@ const AttributeDefinitionFields = {
   organizationId: WorkspaceId.schema,
 };
 
+const AttributeDefinitionUpdateFields = {
+  name: S.NonEmptyString,
+  key: S.NonEmptyString,
+  description: S.NullOr(S.String),
+  isRequired: S.Boolean,
+  organizationId: WorkspaceId.schema,
+};
+
 const StoredAttributeDefinitionFields = {
   id: S.String,
   name: S.String,
@@ -62,7 +70,7 @@ export type TContactAttributeDefinitionCreate = S.Schema.Type<
 
 export const ContactAttributeDefinitionUpdate = S.Struct({
   id: ContactAttributeDefinitionId.schema,
-  ...AttributeDefinitionFields,
+  ...AttributeDefinitionUpdateFields,
 });
 
 export type TContactAttributeDefinitionUpdate = S.Schema.Type<
@@ -105,7 +113,7 @@ export type TCompanyAttributeDefinitionCreate = S.Schema.Type<
 
 export const CompanyAttributeDefinitionUpdate = S.Struct({
   id: CompanyAttributeDefinitionId.schema,
-  ...AttributeDefinitionFields,
+  ...AttributeDefinitionUpdateFields,
 });
 
 export type TCompanyAttributeDefinitionUpdate = S.Schema.Type<

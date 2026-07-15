@@ -92,7 +92,6 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
           name: args.name,
           key: toCamelCaseAttributeKey(args.name),
           description: args.description,
-          type: args.type,
           isRequired: args.isRequired,
           updatedAt: new Date(),
         })
@@ -176,7 +175,6 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
           name: args.name,
           key: toCamelCaseAttributeKey(args.name),
           description: args.description,
-          type: args.type,
           isRequired: args.isRequired,
           updatedAt: new Date(),
         })

@@ -1092,7 +1092,6 @@ export const contactAttributeDefinitionCollection = createCollection(
           name: definition.name,
           key: definition.key,
           description: definition.description,
-          type: definition.type,
           isRequired: definition.isRequired,
           organizationId: definition.organizationId,
         })
@@ -1159,7 +1158,6 @@ export const companyAttributeDefinitionCollection = createCollection(
           name: definition.name,
           key: definition.key,
           description: definition.description,
-          type: definition.type,
           isRequired: definition.isRequired,
           organizationId: definition.organizationId,
         })

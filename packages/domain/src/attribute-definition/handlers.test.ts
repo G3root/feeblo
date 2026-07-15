@@ -106,7 +106,6 @@ describe("AttributeDefinitionRpcHandlers", () => {
             name: "Account role",
             key: "anotherIgnoredContactKey",
             description: "The contact's role",
-            type: "TEXT",
             isRequired: true,
           })
           .pipe(provideSession);
@@ -117,7 +116,6 @@ describe("AttributeDefinitionRpcHandlers", () => {
             name: "Market sector",
             key: "anotherIgnoredCompanyKey",
             description: "The company's sector",
-            type: "TEXT",
             isRequired: true,
           })
           .pipe(provideSession);
