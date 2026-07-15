@@ -312,7 +312,6 @@ const makePostRepository = Effect.gen(function* () {
       excerpt: inputExcerpt,
     }: TPostCreate) =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const excerpt = inputExcerpt ?? htmlToExcerpt(content);
 
         return yield* db
@@ -515,9 +514,6 @@ const makePostRepository = Effect.gen(function* () {
   };
 });
 
-/**
- * @effect-expect-leaking Database
- */
 export class PostRepository extends Context.Service<PostRepository>()(
   "PostRepository",
   {

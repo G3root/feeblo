@@ -28,113 +28,112 @@ interface UpsertSsoUserInput {
   restrictedToOrganizationId?: string | null;
 }
 
-const makeUserRepository = Effect.succeed({
-  findByEmailHash: (email: string) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      const rows = yield* db
-        .select({ id: schema.userTable.id })
-        .from(schema.userTable)
-        .where(eq(schema.userTable.emailHash, hashEmail(email)))
-        .limit(1);
-      return rows[0] ? Option.some(rows[0]) : Option.none();
-    }),
+const makeUserRepository = Effect.gen(function* () {
+  const db = yield* currentDb;
 
-  upsertSsoUser: (args: UpsertSsoUserInput) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      const emailHash = hashEmail(args.email);
-      const normalizedEmail = args.email.toLowerCase().trim();
+  return {
+    findByEmailHash: (email: string) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({ id: schema.userTable.id })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.emailHash, hashEmail(email)))
+          .limit(1);
+        return rows[0] ? Option.some(rows[0]) : Option.none();
+      }),
 
-      // Prefer linking to an existing Better-Auth user by real email. A real
-      // account is never re-scoped to an organization by an SSO token, so
-      // `restrictedToOrganizationId` is intentionally not applied here.
-      const existingByEmail = yield* db
-        .select({ id: schema.userTable.id })
-        .from(schema.userTable)
-        .where(eq(schema.userTable.email, normalizedEmail))
-        .limit(1)
-        .pipe(Effect.map((rows) => rows[0]));
+    upsertSsoUser: (args: UpsertSsoUserInput) =>
+      Effect.gen(function* () {
+        const emailHash = hashEmail(args.email);
+        const normalizedEmail = args.email.toLowerCase().trim();
 
-      if (existingByEmail) {
-        const updatedAt = yield* DateTime.nowAsDate;
-        const [updated = null] = yield* db
-          .update(schema.userTable)
-          .set({
+        // Prefer linking to an existing Better-Auth user by real email. A real
+        // account is never re-scoped to an organization by an SSO token, so
+        // `restrictedToOrganizationId` is intentionally not applied here.
+        const existingByEmail = yield* db
+          .select({ id: schema.userTable.id })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.email, normalizedEmail))
+          .limit(1)
+          .pipe(Effect.map((rows) => rows[0]));
+
+        if (existingByEmail) {
+          const updatedAt = yield* DateTime.nowAsDate;
+          const [updated = null] = yield* db
+            .update(schema.userTable)
+            .set({
+              name: args.name,
+              emailHash,
+              jwtAutoLoginAt: updatedAt,
+              updatedAt,
+            })
+            .where(eq(schema.userTable.id, existingByEmail.id))
+            .returning();
+          if (!updated) {
+            return yield* Effect.die(
+              new Error("SSO user update did not return a row")
+            );
+          }
+          return updated;
+        }
+
+        // Otherwise look up an existing SSO user by email hash.
+        const existingByHash = yield* db
+          .select({ id: schema.userTable.id })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.emailHash, emailHash))
+          .limit(1)
+          .pipe(Effect.map((rows) => rows[0]));
+
+        if (existingByHash) {
+          const updatedAt = yield* DateTime.nowAsDate;
+          const [updated = null] = yield* db
+            .update(schema.userTable)
+            .set({
+              name: args.name,
+              ...(args.restrictedToOrganizationId !== undefined && {
+                restrictedToOrganizationId: args.restrictedToOrganizationId,
+              }),
+              jwtAutoLoginAt: updatedAt,
+              updatedAt,
+            })
+            .where(eq(schema.userTable.id, existingByHash.id))
+            .returning();
+          if (!updated) {
+            return yield* Effect.die(
+              new Error("SSO user update did not return a row")
+            );
+          }
+          return updated;
+        }
+
+        // Create a new SSO-only user with a random email address.
+        const id = yield* UserId.generate;
+        const now = yield* DateTime.nowAsDate;
+        const [created = null] = yield* db
+          .insert(schema.userTable)
+          .values({
+            id,
             name: args.name,
+            email: generateRandomEmail(),
+            emailVerified: true,
             emailHash,
-            jwtAutoLoginAt: updatedAt,
-            updatedAt,
+            jwtAutoLoginAt: now,
+            restrictedToOrganizationId: args.restrictedToOrganizationId ?? null,
+            createdAt: now,
+            updatedAt: now,
           })
-          .where(eq(schema.userTable.id, existingByEmail.id))
           .returning();
-        if (!updated) {
+        if (!created) {
           return yield* Effect.die(
-            new Error("SSO user update did not return a row")
+            new Error("SSO user insert did not return a row")
           );
         }
-        return updated;
-      }
-
-      // Otherwise look up an existing SSO user by email hash.
-      const existingByHash = yield* db
-        .select({ id: schema.userTable.id })
-        .from(schema.userTable)
-        .where(eq(schema.userTable.emailHash, emailHash))
-        .limit(1)
-        .pipe(Effect.map((rows) => rows[0]));
-
-      if (existingByHash) {
-        const updatedAt = yield* DateTime.nowAsDate;
-        const [updated = null] = yield* db
-          .update(schema.userTable)
-          .set({
-            name: args.name,
-            ...(args.restrictedToOrganizationId !== undefined && {
-              restrictedToOrganizationId: args.restrictedToOrganizationId,
-            }),
-            jwtAutoLoginAt: updatedAt,
-            updatedAt,
-          })
-          .where(eq(schema.userTable.id, existingByHash.id))
-          .returning();
-        if (!updated) {
-          return yield* Effect.die(
-            new Error("SSO user update did not return a row")
-          );
-        }
-        return updated;
-      }
-
-      // Create a new SSO-only user with a random email address.
-      const id = yield* UserId.generate;
-      const now = yield* DateTime.nowAsDate;
-      const [created = null] = yield* db
-        .insert(schema.userTable)
-        .values({
-          id,
-          name: args.name,
-          email: generateRandomEmail(),
-          emailVerified: true,
-          emailHash,
-          jwtAutoLoginAt: now,
-          restrictedToOrganizationId: args.restrictedToOrganizationId ?? null,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      if (!created) {
-        return yield* Effect.die(
-          new Error("SSO user insert did not return a row")
-        );
-      }
-      return created;
-    }),
+        return created;
+      }),
+  };
 });
 
-/**
- * @effect-expect-leaking Database
- */
 export class UserRepository extends Context.Service<UserRepository>()(
   "UserRepository",
   {
