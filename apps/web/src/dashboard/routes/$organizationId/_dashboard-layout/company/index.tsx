@@ -22,11 +22,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { CompanyCreateDialog } from "~/features/contact/components/company-create-dialog";
-import {
-  type CustomAttributeDefinition,
-  type CustomAttributeValue,
-  formatCustomAttributeValue,
-} from "~/features/custom-attribute/components/custom-attribute-fields";
 import { CompanyDeleteDialog } from "~/features/contact/components/company-delete-dialog";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
 import {
@@ -38,8 +33,14 @@ import {
   useCompanyEditDialogContext,
 } from "~/features/contact/dialog-stores";
 import {
-  companyCollection,
+  type CustomAttributeDefinition,
+  type CustomAttributeValue,
+  formatCustomAttributeValue,
+} from "~/features/custom-attribute/components/custom-attribute-fields";
+import {
   companyAttributeDefinitionCollection,
+  companyAttributeValueCollection,
+  companyCollection,
 } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -51,6 +52,7 @@ export const Route = createFileRoute(
     await Promise.all([
       companyCollection.preload(),
       companyAttributeDefinitionCollection.preload(),
+      companyAttributeValueCollection.preload(),
     ]);
     return null;
   },

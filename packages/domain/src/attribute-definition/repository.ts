@@ -225,15 +225,12 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0] !== undefined)),
 
-    findContactAttributeValues: (contactId: string, organizationId: string) =>
+    findContactAttributeValues: (organizationId: string) =>
       db
         .select()
         .from(schema.contactAttributeValueTable)
         .where(
-          and(
-            eq(schema.contactAttributeValueTable.contactId, contactId),
-            eq(schema.contactAttributeValueTable.organizationId, organizationId)
-          )
+          eq(schema.contactAttributeValueTable.organizationId, organizationId)
         ),
 
     contactExists: (contactId: string, organizationId: string) =>
@@ -287,15 +284,12 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         errorMessage: "Contact attribute value insert did not return a row",
       }),
 
-    findCompanyAttributeValues: (companyId: string, organizationId: string) =>
+    findCompanyAttributeValues: (organizationId: string) =>
       db
         .select()
         .from(schema.companyAttributeValueTable)
         .where(
-          and(
-            eq(schema.companyAttributeValueTable.companyId, companyId),
-            eq(schema.companyAttributeValueTable.organizationId, organizationId)
-          )
+          eq(schema.companyAttributeValueTable.organizationId, organizationId)
         ),
 
     companyExists: (companyId: string, organizationId: string) =>

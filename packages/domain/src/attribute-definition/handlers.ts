@@ -101,7 +101,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         ),
     ContactAttributeValueList: (args: TContactAttributeValueList) =>
       repository
-        .findContactAttributeValues(args.contactId, args.organizationId)
+        .findContactAttributeValues(args.organizationId)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("ContactAttributeValue", "select")
@@ -125,7 +125,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
       ),
     CompanyAttributeValueList: (args: TCompanyAttributeValueList) =>
       repository
-        .findCompanyAttributeValues(args.companyId, args.organizationId)
+        .findCompanyAttributeValues(args.organizationId)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("CompanyAttributeValue", "select")

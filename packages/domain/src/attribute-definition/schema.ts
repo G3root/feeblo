@@ -158,7 +158,6 @@ export type TContactAttributeValueUpsert = S.Schema.Type<
 >;
 
 export const ContactAttributeValueList = S.Struct({
-  contactId: S.String,
   organizationId: WorkspaceId.schema,
 });
 
@@ -188,7 +187,6 @@ export type TCompanyAttributeValueUpsert = S.Schema.Type<
 >;
 
 export const CompanyAttributeValueList = S.Struct({
-  companyId: S.String,
   organizationId: WorkspaceId.schema,
 });
 

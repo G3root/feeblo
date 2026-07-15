@@ -1197,30 +1197,16 @@ export const companyAttributeDefinitionCollection = createCollection(
 
 export const contactAttributeValueCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const contactId = getEqFilterValue(parsed.filters, "contactId");
-
-      return contactId
-        ? getOrganizationScopedQueryKey(
-            "contact-attribute-value",
-            "contactId",
-            contactId
-          )
-        : getOrganizationScopedQueryKey("contact-attribute-value");
-    },
-    syncMode: "on-demand",
+    queryKey: () => getOrganizationScopedQueryKey("contact-attribute-value"),
     queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const contactId = getEqFilterValue(parsed.filters, "contactId");
       const organizationId = getCurrentOrganizationId();
 
-      if (!contactId || !organizationId) {
+      if (!organizationId) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.ContactAttributeValueList({ contactId, organizationId }),
+        (rpc) => rpc.ContactAttributeValueList({ organizationId }),
         { signal: ctx.signal }
       );
 
@@ -1261,30 +1247,16 @@ export const contactAttributeValueCollection = createCollection(
 
 export const companyAttributeValueCollection = createCollection(
   queryCollectionOptions({
-    queryKey: (opts) => {
-      const parsed = parseLoadSubsetOptions(opts);
-      const companyId = getEqFilterValue(parsed.filters, "companyId");
-
-      return companyId
-        ? getOrganizationScopedQueryKey(
-            "company-attribute-value",
-            "companyId",
-            companyId
-          )
-        : getOrganizationScopedQueryKey("company-attribute-value");
-    },
-    syncMode: "on-demand",
+    queryKey: () => getOrganizationScopedQueryKey("company-attribute-value"),
     queryFn: async (ctx) => {
-      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const companyId = getEqFilterValue(parsed.filters, "companyId");
       const organizationId = getCurrentOrganizationId();
 
-      if (!companyId || !organizationId) {
+      if (!organizationId) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.CompanyAttributeValueList({ companyId, organizationId }),
+        (rpc) => rpc.CompanyAttributeValueList({ organizationId }),
         { signal: ctx.signal }
       );
 

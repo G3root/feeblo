@@ -47,6 +47,7 @@ import {
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import {
   contactAttributeDefinitionCollection,
+  contactAttributeValueCollection,
   contactCollection,
 } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -59,6 +60,7 @@ export const Route = createFileRoute(
     await Promise.all([
       contactCollection.preload(),
       contactAttributeDefinitionCollection.preload(),
+      contactAttributeValueCollection.preload(),
     ]);
     return null;
   },
