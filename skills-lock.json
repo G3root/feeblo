@@ -43,11 +43,23 @@
       "skillPath": "skills/make-interfaces-feel-better/SKILL.md",
       "computedHash": "8e3423e467eae12f3748ca1a365a668105ac59dbb0fdd50e66b45a40bb581950"
     },
+    "no-ui-flash": {
+      "source": "RhysSullivan/skills",
+      "sourceType": "github",
+      "skillPath": "skills/no-ui-flash/SKILL.md",
+      "computedHash": "bf5a948ef42b036ce714463e40d0b8a0d7be867104ed86370487561ceda265c6"
+    },
     "playwright-best-practices": {
       "source": "octalign/playwright-best-practices-skill",
       "sourceType": "github",
       "skillPath": "playwright-best-practices/SKILL.md",
       "computedHash": "d4beb67ed0ecd6e9f61d9715e038a33beb15322662ed9a6acb9a3787da2dc915"
+    },
+    "quality-code": {
+      "source": "RhysSullivan/skills",
+      "sourceType": "github",
+      "skillPath": "skills/quality-code/SKILL.md",
+      "computedHash": "327fc074c121d259ff0c8d7a031dd4f63877d490169cf8d91a3bb30f4a017311"
     },
     "review-animations": {
       "source": "emilkowalski/skill",
