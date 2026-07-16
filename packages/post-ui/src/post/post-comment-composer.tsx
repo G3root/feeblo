@@ -20,8 +20,8 @@ export function PostCommentComposer({
   showVisibilityPicker = false,
 }: PostCommentComposerProps) {
   const { data: session } = useAuthState();
-  const { isLocked, canManagePost } = usePostCollectionData();
-  const disabled = isLocked || !canManagePost || !session;
+  const { isLocked } = usePostCollectionData();
+  const disabled = isLocked || !session;
   const [editorKey, setEditorKey] = useState(0);
 
   const form = useCommentForm({
@@ -46,7 +46,7 @@ export function PostCommentComposer({
         form={form}
         resetKey={editorKey}
       />
-      {disabled && (
+      {isLocked && (
         <Alert variant="info">
           <HugeiconsIcon icon={MessageLock01Icon} />
           <AlertTitle>Comments locked</AlertTitle>
