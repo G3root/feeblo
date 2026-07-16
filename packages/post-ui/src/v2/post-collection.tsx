@@ -1,5 +1,3 @@
-import type { TBoard } from "@feeblo/domain/board/schema";
-import type { TPost } from "@feeblo/domain/post/schema";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   anyPolicy,
@@ -7,46 +5,11 @@ import {
   isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
-import { createContext, type ReactNode, use } from "react";
-
-type TPageType = "Dashboard" | "PublicPage";
-export interface PostCollectionState {
-  board: TBoard;
-  canManagePost: boolean;
-  isArchived: boolean;
-  isLocked: boolean;
-  isMember: boolean;
-  isMerged: boolean;
-  isPrivateBoard: boolean;
-  isPublicBoard: boolean;
-  organizationId: string;
-  pageType: TPageType;
-  post: TPost;
-}
-
-const PostCollectionDataContext = createContext<PostCollectionState | null>(
-  null
-);
-
-export function usePostCollectionData() {
-  const value = use(PostCollectionDataContext);
-
-  if (!value) {
-    throw new Error(
-      "usePostCollectionData must be used within PostCollectionDataProvider"
-    );
-  }
-
-  return value;
-}
-
-export interface PostCollectionDataProviderProps {
-  board: TBoard;
-  children?: ReactNode;
-  organizationId: string;
-  pageType: TPageType;
-  post: TPost;
-}
+import {
+  createPostCollectionState as buildPostCollectionState,
+  type PostCollectionDataProviderProps,
+  PostCollectionStateProvider as StateProvider,
+} from "./post-page-context";
 
 export function PostCollectionDataProvider({
   board,
@@ -67,24 +30,15 @@ export function PostCollectionDataProvider({
     session?.memberships?.some((m) => m.organizationId === organizationId) ??
     false;
 
-  const state: PostCollectionState = {
+  const state = buildPostCollectionState({
     board,
-    isArchived: post.archivedAt !== null && post.archivedAt !== undefined,
-    isLocked: post.lockedAt !== null && post.lockedAt !== undefined,
-    isMerged:
-      post.mergedIntoPostId !== null && post.mergedIntoPostId !== undefined,
-    isPrivateBoard: board.visibility === "PRIVATE",
-    isPublicBoard: board.visibility === "PUBLIC",
     post,
     canManagePost,
     organizationId,
     isMember,
+    isAuthenticated: Boolean(session?.session),
     pageType,
-  };
+  });
 
-  return (
-    <PostCollectionDataContext value={{ ...state }}>
-      {children}
-    </PostCollectionDataContext>
-  );
+  return <StateProvider value={state}>{children}</StateProvider>;
 }

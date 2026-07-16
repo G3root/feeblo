@@ -1,5 +1,5 @@
 import { usePostDeleteDialogContext } from "@feeblo/post-ui/dialog-stores";
-import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
+import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import {
   DropdownMenu,

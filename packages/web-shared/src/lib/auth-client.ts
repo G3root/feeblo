@@ -86,6 +86,12 @@ export const updateAuthState = (data: AuthClientSession): AuthState => {
   return state;
 };
 
+export const clearAuthStateCache = () => {
+  if (authStateCollection.has(AUTH_STATE_KEY)) {
+    authStateCollection.delete(AUTH_STATE_KEY);
+  }
+};
+
 export const initAuthStateCache = async () => {
   const cached = getAuthState();
   if (cached) {
@@ -94,7 +100,7 @@ export const initAuthStateCache = async () => {
 
   const result = await authClient.getSession();
   if (result.data) {
-    updateAuthState(result.data);
+    return updateAuthState(result.data);
   }
 
   return null;

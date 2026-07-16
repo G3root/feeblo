@@ -1,4 +1,4 @@
-import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
+import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { StatusField } from "@feeblo/post-ui/post-properties";
 import { toastManager } from "@feeblo/ui/toast";
 import { eq, useLiveQuery } from "@tanstack/react-db";

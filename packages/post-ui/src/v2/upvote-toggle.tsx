@@ -8,7 +8,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import NumberFlow from "@number-flow/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
-import { usePostCollectionData } from "./post-collection";
+import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 type UpvoteToggleState = {

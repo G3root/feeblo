@@ -2,6 +2,7 @@ import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
+import { getAuthState } from "@feeblo/web-shared/auth-client";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
@@ -23,7 +24,7 @@ type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 
 const queryClient = getContext().queryClient;
 
-function getCurrentOrganizationId() {
+export function getCurrentOrganizationId() {
   if (typeof window === "undefined") {
     return undefined;
   }
@@ -33,6 +34,31 @@ function getCurrentOrganizationId() {
   };
 
   return runtimeWindow.global?.__ENV?.organizationId;
+}
+
+/**
+ * Mutations are always scoped to the organization hosting this public board.
+ * A restricted SSO session must never use a client-supplied entity organization
+ * id to act on a different board.
+ */
+function getMutationOrganizationId() {
+  const organizationId = getCurrentOrganizationId();
+
+  if (!organizationId) {
+    throw new Error("Missing public board organization id");
+  }
+
+  const restrictedToOrganizationId =
+    getAuthState()?.user.restrictedToOrganizationId;
+
+  if (
+    restrictedToOrganizationId &&
+    restrictedToOrganizationId !== organizationId
+  ) {
+    throw new Error("Session is not authorized for this organization");
+  }
+
+  return organizationId;
 }
 
 function getOrganizationScopedQueryKey(
@@ -100,7 +126,7 @@ export const publicPostCollection = createCollection(
         rpc.PostCreatePublic({
           id: newPost.id,
           boardId: newPost.boardId,
-          organizationId: newPost.organizationId,
+          organizationId: getMutationOrganizationId(),
           title: newPost.title,
           content: newPost.content,
           statusId: newPost.statusId,
@@ -118,7 +144,7 @@ export const publicPostCollection = createCollection(
           content: updatedPost.content,
           title: updatedPost.title,
           boardId: updatedPost.boardId,
-          organizationId: updatedPost.organizationId,
+          organizationId: getMutationOrganizationId(),
         })
       );
     },
@@ -128,7 +154,7 @@ export const publicPostCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.PostDeletePublic({
-          organizationId: deletedPost.organizationId,
+          organizationId: getMutationOrganizationId(),
           boardId: deletedPost.boardId,
           id: deletedPost.id,
         })
@@ -326,7 +352,7 @@ export const publicCommentCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.CommentCreatePublic({
-          organizationId: newComment.organizationId,
+          organizationId: getMutationOrganizationId(),
           visibility: newComment.visibility,
           content: newComment.content,
           postId: newComment.postId,
@@ -342,7 +368,7 @@ export const publicCommentCollection = createCollection(
       await fetchRpc((rpc) =>
         rpc.CommentUpdatePublic({
           id: updatedComment.id,
-          organizationId: updatedComment.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: updatedComment.postId,
           content: updatedComment.content,
           visibility: updatedComment.visibility,
@@ -356,7 +382,7 @@ export const publicCommentCollection = createCollection(
       await fetchRpc((rpc) =>
         rpc.CommentDeletePublic({
           id: deletedComment.id,
-          organizationId: deletedComment.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: deletedComment.postId,
         })
       );
@@ -409,7 +435,7 @@ export const publicCommentReactionCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.CommentReactionTogglePublic({
-          organizationId: newCommentReaction.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: newCommentReaction.postId,
           commentId: newCommentReaction.commentId,
           emoji: newCommentReaction.emoji,
@@ -422,7 +448,7 @@ export const publicCommentReactionCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.CommentReactionTogglePublic({
-          organizationId: deletedCommentReaction.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: deletedCommentReaction.postId,
           commentId: deletedCommentReaction.commentId,
           emoji: deletedCommentReaction.emoji,
@@ -459,7 +485,7 @@ export const publicUpvoteCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.UpvoteTogglePublic({
-          organizationId: newUpvote.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: newUpvote.postId,
         })
       );
@@ -470,7 +496,7 @@ export const publicUpvoteCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.UpvoteTogglePublic({
-          organizationId: deletedUpvote.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: deletedUpvote.postId,
         })
       );
@@ -519,7 +545,7 @@ export const publicPostReactionCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.PostReactionTogglePublic({
-          organizationId: newPostReaction.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: newPostReaction.postId,
           emoji: newPostReaction.emoji,
         })
@@ -531,7 +557,7 @@ export const publicPostReactionCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.PostReactionTogglePublic({
-          organizationId: deletedPostReaction.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: deletedPostReaction.postId,
           emoji: deletedPostReaction.emoji,
         })
@@ -582,7 +608,7 @@ export const publicPostSubscriptionCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.PostSubscriptionCreatePublic({
-          organizationId: newSubscription.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: newSubscription.postId,
         })
       );
@@ -593,7 +619,7 @@ export const publicPostSubscriptionCollection = createCollection(
 
       await fetchRpc((rpc) =>
         rpc.PostSubscriptionDeletePublic({
-          organizationId: deletedSubscription.organizationId,
+          organizationId: getMutationOrganizationId(),
           postId: deletedSubscription.postId,
         })
       );

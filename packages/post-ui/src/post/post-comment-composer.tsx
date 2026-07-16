@@ -4,7 +4,7 @@ import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useState } from "react";
 import { CommentComposerField, useCommentForm } from "../v2/forms/comment-form";
-import { usePostCollectionData } from "../v2/post-collection";
+import { usePostCollectionData } from "../v2/post-page-context";
 
 type TCommentVisibility = "PUBLIC" | "INTERNAL";
 

@@ -1,4 +1,4 @@
-import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
+import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";

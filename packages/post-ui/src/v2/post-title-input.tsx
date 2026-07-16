@@ -2,7 +2,7 @@ import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { useId } from "react";
-import { usePostCollectionData } from "./post-collection";
+import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 interface PostTitleInputProps

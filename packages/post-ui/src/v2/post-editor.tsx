@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePostCollectionData } from "./post-collection";
+import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 type PostEditorState = {

@@ -1,4 +1,4 @@
-import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
+import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import {
   AlertDialog,
   AlertDialogAction,

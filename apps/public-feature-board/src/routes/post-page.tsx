@@ -1,27 +1,6 @@
-import { CommentsList } from "@feeblo/post-ui/comment-display";
-import {
-  CommentDeleteDialogProvider,
-  CommentVisibilityDialogProvider,
-  PostDeleteDialogProvider,
-} from "@feeblo/post-ui/dialog-stores";
-import {
-  CommentDeleteDialog,
-  CommentVisibilityDialog,
-  PostDeleteDialog,
-} from "@feeblo/post-ui/dialogs";
-import {
-  PostCollectionDataProvider,
-  usePostCollectionData,
-} from "@feeblo/post-ui/post-collection";
-import {
-  PostCommentComposer,
-  PostCommentGuestPrompt,
-} from "@feeblo/post-ui/post-comment-composer";
-
-import { PostContentUpdateInput } from "@feeblo/post-ui/post-editor";
-import { PostTitleUpdateInput } from "@feeblo/post-ui/post-title-input";
-import { PostReactionPicker } from "@feeblo/post-ui/reaction-picker";
-import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
+import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
+import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
+import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -32,7 +11,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { cn } from "@feeblo/ui/utils";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -95,7 +73,6 @@ export const Route = createLazyRoute("/p/$slug")({
 export function PostPage() {
   const site = useSite();
   const organizationId = site.organizationId;
-  const { data: session } = useAuthState();
   const { slug } = useParams({ from: "/p/$slug" });
   const {
     publicBoardCollection,
@@ -199,67 +176,58 @@ export function PostPage() {
   const selectedTags = postTagsQuery.data ?? [];
 
   return (
-    <PostDeleteDialogProvider>
-      <CommentDeleteDialogProvider>
-        <CommentVisibilityDialogProvider>
-          <PostCollectionDataProvider
-            board={board}
-            organizationId={organizationId}
-            pageType="PublicPage"
-            post={post}
-          >
-            <RootLayout>
-              <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
-                <article className="min-w-0 lg:col-span-9">
-                  <PostPageActions />
+    <ComposedPostPage.Root
+      board={board}
+      organizationId={organizationId}
+      pageType="PublicPage"
+      post={post}
+    >
+      <RootLayout>
+        <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
+          <article className="min-w-0 lg:col-span-9">
+            <PostPageActions />
 
-                  <div className="flex items-start gap-4 sm:gap-6">
-                    <div className="shrink-0 pt-1">
-                      <UpvoteButton variant="compact" />
-                    </div>
-
-                    <div className="min-w-0 flex-1 space-y-6">
-                      <div className="space-y-3">
-                        <PostTitleUpdateInput />
-                      </div>
-
-                      <PostContentUpdateInput />
-
-                      <PostReactionPicker />
-
-                      <div className="space-y-4">
-                        <PostCommentComposer defaultVisibility="PUBLIC" />
-                        <PostCommentGuestPrompt
-                          action={<AuthDialog variant="sign-in" />}
-                          isAuthenticated={!!session?.session}
-                        />
-
-                        <CommentsList />
-                      </div>
-                    </div>
-                  </div>
-                </article>
-
-                <PostMetaSidebar.Root>
-                  <PostMetaSidebar.Voters />
-                  <PostMetaSidebar.Board />
-                  <PostMetaSidebar.Status
-                    status={postStatus?.type ?? "PLANNED"}
-                  />
-                  <PostMetaSidebar.Tags tags={selectedTags} />
-                  <PostMetaSidebar.Author />
-                  <PostMetaSidebar.PublishedOn />
-                  {/* <PostMetaSidebar.Share /> */}
-                </PostMetaSidebar.Root>
+            <div className="flex items-start gap-4 sm:gap-6">
+              <div className="shrink-0 pt-1">
+                <ComposedPostPage.CompactVote />
               </div>
-            </RootLayout>
-            <PostDeleteDialog />
-            <CommentDeleteDialog />
-            <CommentVisibilityDialog />
-          </PostCollectionDataProvider>
-        </CommentVisibilityDialogProvider>
-      </CommentDeleteDialogProvider>
-    </PostDeleteDialogProvider>
+
+              <div className="min-w-0 flex-1 space-y-6">
+                <div className="space-y-3">
+                  <ComposedPostPage.Title />
+                </div>
+
+                <ComposedPostPage.Content />
+
+                <ComposedPostPage.Reactions />
+
+                <div className="space-y-4">
+                  <ComposedPostPage.PublicCommentComposer />
+                  <ComposedPostPage.Guest>
+                    <PostCommentGuestPrompt
+                      action={<AuthDialog variant="sign-in" />}
+                      isAuthenticated={false}
+                    />
+                  </ComposedPostPage.Guest>
+
+                  <ComposedPostPage.Comments />
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <PostMetaSidebar.Root>
+            <PostMetaSidebar.Voters />
+            <PostMetaSidebar.Board />
+            <PostMetaSidebar.Status status={postStatus?.type ?? "PLANNED"} />
+            <PostMetaSidebar.Tags tags={selectedTags} />
+            <PostMetaSidebar.Author />
+            <PostMetaSidebar.PublishedOn />
+            {/* <PostMetaSidebar.Share /> */}
+          </PostMetaSidebar.Root>
+        </div>
+      </RootLayout>
+    </ComposedPostPage.Root>
   );
 }
 

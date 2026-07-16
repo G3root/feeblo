@@ -1,8 +1,12 @@
-import { initAuthStateCache } from "@feeblo/web-shared/auth-client";
+import {
+  clearAuthStateCache,
+  initAuthStateCache,
+} from "@feeblo/web-shared/auth-client";
 import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
 import * as S from "effect/Schema";
 import { PublicBoardShell } from "../components/layout/public-board-shell";
 import {
+  getCurrentOrganizationId,
   publicBoardCollection,
   publicChangelogCollection,
   publicPostCollection,
@@ -14,7 +18,20 @@ import {
 import { NotFoundPage } from "../routes/not-found-page";
 
 const rootRoute = createRootRoute({
-  beforeLoad: () => initAuthStateCache(),
+  beforeLoad: async () => {
+    const session = await initAuthStateCache();
+    const restrictedToOrganizationId =
+      session?.user?.restrictedToOrganizationId;
+    const organizationId = getCurrentOrganizationId();
+
+    if (
+      restrictedToOrganizationId &&
+      organizationId &&
+      restrictedToOrganizationId !== organizationId
+    ) {
+      clearAuthStateCache();
+    }
+  },
   component: () => (
     <PublicBoardShell>
       <Outlet />

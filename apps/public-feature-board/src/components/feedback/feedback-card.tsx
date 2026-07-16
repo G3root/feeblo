@@ -1,4 +1,4 @@
-import { usePostCollectionData } from "@feeblo/post-ui/post-collection";
+import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Skeleton } from "@feeblo/ui/skeleton";

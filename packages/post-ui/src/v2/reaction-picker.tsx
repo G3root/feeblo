@@ -16,7 +16,7 @@ import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, count, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
-import { usePostCollectionData } from "./post-collection";
+import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 type ReactionPickerState = {

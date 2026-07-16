@@ -8,7 +8,7 @@ import {
   CommentComposer,
   type CommentComposerProviderProps,
 } from "../comment-composer";
-import { usePostCollectionData } from "../post-collection";
+import { usePostCollectionData } from "../post-page-context";
 import { usePostCollections } from "../providers/post-collections-provider";
 
 const CommentVisibilitySchema = z.enum(["PUBLIC", "INTERNAL"]);
