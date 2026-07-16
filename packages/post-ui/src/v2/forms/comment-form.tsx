@@ -48,6 +48,7 @@ export const useCommentForm = ({
   const postId = post.id;
   const {
     collections: { commentCollection },
+    onAuthRequired,
   } = usePostCollections();
 
   const { data: session } = useAuthState();
@@ -61,6 +62,7 @@ export const useCommentForm = ({
     },
     onSubmit: async ({ value }) => {
       if (!session) {
+        onAuthRequired?.();
         return;
       }
 

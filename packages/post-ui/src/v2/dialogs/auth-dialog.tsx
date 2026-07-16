@@ -1,8 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: Keeps the auth action ordering compact. */
 /** biome-ignore-all lint/style/useDefaultSwitchClause: DialogStep is an exhaustive union. */
 
-import { getSafeCallbackURL } from "@feeblo/post-ui/auth-flows";
-import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -38,13 +36,18 @@ import {
 } from "@feeblo/web-shared/user-validation";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useStore } from "@nanostores/react";
+import { useSelector } from "@xstate/store-react";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
-import { authDialogStore, closeAuthDialog, openAuthDialog } from "../../stores";
+import { getSafeCallbackURL } from "../../auth/auth-flows";
+import { SocialAuthButtons } from "../../auth/social-auth-buttons";
+import {
+  type AuthDialogVariant,
+  useAuthDialogContext,
+} from "../dialog-stores/auth";
 
 interface AuthDialogProps {
-  variant: "sign-in" | "sign-up";
+  variant: AuthDialogVariant;
 }
 
 type EmailStep = "email-sign-in" | "email-sign-up";
@@ -73,17 +76,28 @@ const OtpSchema = z.object({
 const CHOOSER_STEP: DialogStep = { kind: "chooser" };
 
 export function AuthDialog({ variant }: AuthDialogProps) {
+  const store = useAuthDialogContext();
   const triggerLabel = variant === "sign-in" ? "Sign in" : "Sign up";
 
   return (
-    <Button onClick={() => openAuthDialog(variant)} variant="secondary">
+    <Button
+      onClick={() =>
+        store.send({ type: "setOpen", open: true, data: { variant } })
+      }
+      variant="secondary"
+    >
       {triggerLabel}
     </Button>
   );
 }
 
 export function AuthDialogRoot() {
-  const { isOpen, variant } = useStore(authDialogStore);
+  const store = useAuthDialogContext();
+  const isOpen = useSelector(store, (state) => state.context.open);
+  const variant = useSelector(
+    store,
+    (state) => state.context.data.variant ?? "sign-in"
+  );
   const [step, setStep] = useState<DialogStep>(CHOOSER_STEP);
 
   const preferredEmailStep: EmailStep =
@@ -91,12 +105,15 @@ export function AuthDialogRoot() {
 
   const { title, description } = getStepCopy(step);
 
-  const handleOpenChange = useCallback((nextOpen: boolean) => {
-    if (!nextOpen) {
-      closeAuthDialog();
-      setStep(CHOOSER_STEP);
-    }
-  }, []);
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        store.send({ type: "setOpen", open: false });
+        setStep(CHOOSER_STEP);
+      }
+    },
+    [store]
+  );
 
   const handleVerify = useCallback((email: string, previous: EmailStep) => {
     setStep({
@@ -107,9 +124,9 @@ export function AuthDialogRoot() {
   }, []);
 
   const handleSuccess = useCallback(() => {
-    closeAuthDialog();
+    store.send({ type: "setOpen", open: false });
     setStep(CHOOSER_STEP);
-  }, []);
+  }, [store]);
 
   const handleSelectEmailStep = useCallback((nextStep: EmailStep) => {
     setStep({ kind: nextStep });

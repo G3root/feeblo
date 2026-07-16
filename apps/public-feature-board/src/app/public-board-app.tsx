@@ -1,4 +1,5 @@
 import type { TSite } from "@feeblo/domain/site/schema";
+import { AuthDialogProvider } from "@feeblo/post-ui/dialog-stores";
 import { RouterProvider } from "@tanstack/react-router";
 import {
   getContext,
@@ -13,10 +14,12 @@ export interface PublicBoardAppProps {
 
 export function PublicBoardApp({ site }: PublicBoardAppProps) {
   return (
-    <Provider queryClient={getContext().queryClient}>
-      <SiteProvider site={site}>
-        <RouterProvider router={router} />
-      </SiteProvider>
-    </Provider>
+    <AuthDialogProvider>
+      <Provider queryClient={getContext().queryClient}>
+        <SiteProvider site={site}>
+          <RouterProvider router={router} />
+        </SiteProvider>
+      </Provider>
+    </AuthDialogProvider>
   );
 }

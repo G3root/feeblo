@@ -23,7 +23,7 @@ import { usePostCollections } from "../providers/post-collections-provider";
 
 export function PostCreateForm() {
   const store = usePostCreateDialogContext();
-  const { collections, organizationId } = usePostCollections();
+  const { collections, onAuthRequired, organizationId } = usePostCollections();
   const {
     boardCollection,
     membersCollection,
@@ -102,6 +102,7 @@ export function PostCreateForm() {
 
     onSubmit: async ({ value }) => {
       if (!session) {
+        onAuthRequired?.();
         return;
       }
 

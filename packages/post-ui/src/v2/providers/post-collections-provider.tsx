@@ -1,7 +1,7 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
+import type { TCommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TComment } from "@feeblo/domain/comments/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
-import type { TCommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TPostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
@@ -26,6 +26,7 @@ export interface PostCollections {
 
 export interface PostCollectionsValue {
   collections: PostCollections;
+  onAuthRequired?: () => void;
   organizationId: string;
 }
 
@@ -44,14 +45,18 @@ export function usePostCollections() {
 export function PostCollectionsProvider({
   children,
   collections,
+  onAuthRequired,
   organizationId,
 }: {
   children: React.ReactNode;
   collections: PostCollections;
+  onAuthRequired?: () => void;
   organizationId: string;
 }) {
   return (
-    <PostCollectionsContext.Provider value={{ collections, organizationId }}>
+    <PostCollectionsContext.Provider
+      value={{ collections, onAuthRequired, organizationId }}
+    >
       {children}
     </PostCollectionsContext.Provider>
   );

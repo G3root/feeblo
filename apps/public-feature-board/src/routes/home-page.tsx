@@ -1,4 +1,7 @@
-import { usePostCreateDialogContext } from "@feeblo/post-ui/dialog-stores";
+import {
+  useAuthDialogContext,
+  usePostCreateDialogContext,
+} from "@feeblo/post-ui/dialog-stores";
 import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
@@ -39,7 +42,6 @@ import {
 import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
-import { openAuthDialog } from "../stores";
 
 function MainContent({ children }: { children: ReactNode }) {
   return (
@@ -105,6 +107,7 @@ export const Route = createLazyRoute("/")({
 function HomePage() {
   const { data: session } = useAuthState();
   const postCreateStore = usePostCreateDialogContext();
+  const authDialogStore = useAuthDialogContext();
   const site = useSite();
 
   const organizationId = site.organizationId;
@@ -312,7 +315,9 @@ function HomePage() {
 
     for (const bc of boardCounts) {
       const board = boards.find((b) => b.id === bc.boardId);
-      if (!board) continue;
+      if (!board) {
+        continue;
+      }
       countMap.set(board.slug, (countMap.get(board.slug) ?? 0) + bc.count);
     }
 
@@ -434,7 +439,11 @@ function HomePage() {
                         data: { boardId: activeBoardId },
                       });
                     } else {
-                      openAuthDialog("sign-in");
+                      authDialogStore.send({
+                        type: "setOpen",
+                        open: true,
+                        data: { variant: "sign-in" },
+                      });
                     }
                   }}
                 >

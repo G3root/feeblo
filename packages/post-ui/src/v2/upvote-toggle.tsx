@@ -159,6 +159,7 @@ export function UpvoteButton({ variant }: UpvoteButtonProps) {
   const { data: session } = useAuthState();
   const {
     collections: { upvoteCollection },
+    onAuthRequired,
   } = usePostCollections();
 
   const { data: upvotes, isLoading: isUpvotesLoading } = useLiveQuery(
@@ -205,7 +206,12 @@ export function UpvoteButton({ variant }: UpvoteButtonProps) {
   }
 
   const onToggle = async () => {
-    if (disabled || !session) {
+    if (disabled) {
+      return;
+    }
+
+    if (!session) {
+      onAuthRequired?.();
       return;
     }
     const userId = session.user.id;

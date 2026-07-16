@@ -1,3 +1,4 @@
+import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
@@ -14,7 +15,6 @@ import { cn } from "@feeblo/ui/utils";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { AuthDialog } from "../components/common/auth-dialog";
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";

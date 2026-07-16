@@ -59,15 +59,18 @@ test(
       });
       await expect(upvoteButton).toContainText("0");
       await upvoteButton.click();
+
+      const authDialogHeading = visitorPage.getByRole("heading", {
+        name: "Continue to Feeblo",
+      });
+      await expect(authDialogHeading).toBeVisible();
+      await visitorPage.keyboard.press("Escape");
+      await expect(authDialogHeading).toBeHidden();
       await expect(upvoteButton).toContainText("0");
 
-      await visitorPage
-        .getByRole("button", { name: "Sign in" })
-        .first()
-        .click();
-      await expect(
-        visitorPage.getByRole("heading", { name: "Continue to Feeblo" })
-      ).toBeVisible();
+      await visitorPage.getByRole("button", { name: "Add reaction" }).click();
+      await visitorPage.getByRole("button", { name: "👍️" }).click();
+      await expect(authDialogHeading).toBeVisible();
     } finally {
       await visitorContext.close();
     }

@@ -192,6 +192,7 @@ export function PostReactionPicker() {
   const postId = post.id;
   const {
     collections: { postReactionCollection },
+    onAuthRequired,
   } = usePostCollections();
   const { data: session } = useAuthState();
 
@@ -250,7 +251,11 @@ export function PostReactionPicker() {
     const currentUserId = session?.user?.id;
 
     if (!currentUserId) {
-      toastManager.add({ title: "Sign in to react", type: "error" });
+      if (onAuthRequired) {
+        onAuthRequired();
+      } else {
+        toastManager.add({ title: "Sign in to react", type: "error" });
+      }
       return;
     }
 
@@ -344,6 +349,7 @@ export function CommentReactionPicker({
 }: CommentReactionPickerProps) {
   const {
     collections: { commentReactionCollection },
+    onAuthRequired,
     organizationId,
   } = usePostCollections();
   const { data: session } = useAuthState();
@@ -403,7 +409,11 @@ export function CommentReactionPicker({
     const currentUserId = session?.user?.id;
 
     if (!currentUserId) {
-      toastManager.add({ title: "Sign in to react", type: "error" });
+      if (onAuthRequired) {
+        onAuthRequired();
+      } else {
+        toastManager.add({ title: "Sign in to react", type: "error" });
+      }
       return;
     }
 

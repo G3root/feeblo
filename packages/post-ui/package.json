@@ -88,6 +88,10 @@
       "types": "./src/auth/auth-flows.ts",
       "default": "./src/auth/auth-flows.ts"
     },
+    "./auth-dialog": {
+      "types": "./src/v2/dialogs/auth-dialog.tsx",
+      "default": "./src/v2/dialogs/auth-dialog.tsx"
+    },
     "./roadmap/roadmap-grid": {
       "types": "./src/roadmap/roadmap-grid.tsx",
       "default": "./src/roadmap/roadmap-grid.tsx"

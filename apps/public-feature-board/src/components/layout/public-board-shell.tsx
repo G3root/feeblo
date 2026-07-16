@@ -1,8 +1,13 @@
-import { PostCreateDialogProvider } from "@feeblo/post-ui/dialog-stores";
+import { AuthDialogRoot } from "@feeblo/post-ui/auth-dialog";
+import {
+  PostCreateDialogProvider,
+  useAuthDialogContext,
+} from "@feeblo/post-ui/dialog-stores";
 import type { PostCollections } from "@feeblo/post-ui/post-collections-provider";
 import { PostCollectionsProvider } from "@feeblo/post-ui/post-collections-provider";
 import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
 import type { ReactNode } from "react";
+import { useCallback } from "react";
 import {
   publicBoardCollection,
   publicCommentCollection,
@@ -13,12 +18,20 @@ import {
   publicUpvoteCollection,
 } from "../../lib/collections";
 import { useSite } from "../../providers/site-provider";
-import { AuthDialogRoot } from "../common/auth-dialog";
 import { Navbar } from "../common/navbar";
 import { PoweredByTag } from "./powered-by-tag";
 
 export function PublicBoardShell({ children }: { children: ReactNode }) {
   const site = useSite();
+  const authDialogStore = useAuthDialogContext();
+
+  const handleAuthRequired = useCallback(() => {
+    authDialogStore.send({
+      type: "setOpen",
+      open: true,
+      data: { variant: "sign-in" },
+    });
+  }, [authDialogStore]);
 
   const collections: PostCollections = {
     boardCollection: publicBoardCollection,
@@ -34,6 +47,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
   return (
     <PostCollectionsProvider
       collections={collections}
+      onAuthRequired={handleAuthRequired}
       organizationId={site.organizationId}
     >
       <PostCreateDialogProvider>

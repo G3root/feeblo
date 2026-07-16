@@ -1,3 +1,4 @@
+import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
   Item,
@@ -10,7 +11,6 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
-import { AuthDialog } from "../common/auth-dialog";
 
 export function CommentsSection({ postId }: { postId: string }) {
   const site = useSite();
