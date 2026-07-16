@@ -183,6 +183,7 @@ const makeContactRepository = Effect.gen(function* () {
             externalId: args.externalId,
             companyId: args.companyId,
             userId: args.userId,
+            source: "WIDGET",
             createdAt: now,
             updatedAt: now,
           })

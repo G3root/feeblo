@@ -70,6 +70,7 @@ export const Company = S.Struct({
   name: S.String,
   avatar: S.NullOr(S.String),
   externalCreatedAt: S.NullOr(S.DateFromString),
+  source: S.Literals(["DASHBOARD", "WIDGET", "API", "IMPORT"]),
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

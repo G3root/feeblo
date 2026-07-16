@@ -162,6 +162,7 @@ const makeCompanyRepository = Effect.gen(function* () {
             externalId: args.externalId,
             avatar: args.avatar ?? null,
             externalCreatedAt: args.externalCreatedAt ?? null,
+            source: "WIDGET",
             createdAt: now,
             updatedAt: now,
           })

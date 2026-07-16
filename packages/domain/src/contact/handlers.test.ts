@@ -130,6 +130,7 @@ describe("ContactRpcHandlers", () => {
           id: created.id,
           name: "Ada Lovelace",
           phone: "+44 20 0000 0000",
+          source: "DASHBOARD",
         });
 
         yield* handlers

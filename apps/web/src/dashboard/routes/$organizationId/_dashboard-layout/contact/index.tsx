@@ -170,6 +170,7 @@ function ContactPage() {
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
             <TableHead>External ID</TableHead>
+            <TableHead>Source</TableHead>
             <TableHead>Company</TableHead>
             {definitions.map((definition) => (
               <TableHead key={definition.id}>{definition.name}</TableHead>
@@ -233,6 +234,7 @@ function ContactTableRow({
     id: string;
     name: string | null;
     phone: string | null;
+    source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT";
     updatedAt: Date;
   };
   definitions: readonly CustomAttributeDefinition[];
@@ -260,6 +262,7 @@ function ContactTableRow({
       <TableCell>{contact.email ?? "—"}</TableCell>
       <TableCell>{contact.phone ?? "—"}</TableCell>
       <TableCell>{contact.externalId ?? "—"}</TableCell>
+      <TableCell>{formatSource(contact.source)}</TableCell>
       <TableCell>
         {company ? (
           <Button
@@ -316,4 +319,13 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
   }).format(date);
+}
+
+function formatSource(source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT") {
+  return {
+    DASHBOARD: "Dashboard",
+    WIDGET: "Widget",
+    API: "API",
+    IMPORT: "Import",
+  }[source];
 }

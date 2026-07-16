@@ -81,6 +81,7 @@ export const Contact = S.Struct({
   phone: S.NullOr(S.String),
   avatar: S.NullOr(S.String),
   companyId: S.NullOr(S.String),
+  source: S.Literals(["DASHBOARD", "WIDGET", "API", "IMPORT"]),
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

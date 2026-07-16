@@ -139,6 +139,7 @@ describe("CompanyRpcHandlers", () => {
         expect(updated).toMatchObject({
           id: created.id,
           name: "Acme Inc.",
+          source: "DASHBOARD",
         });
 
         yield* handlers

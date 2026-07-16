@@ -140,6 +140,7 @@ function CompanyPage() {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>External ID</TableHead>
+            <TableHead>Source</TableHead>
             <TableHead>Created</TableHead>
             <TableHead>Updated</TableHead>
             {definitions.map((definition) => (
@@ -155,6 +156,7 @@ function CompanyPage() {
             <TableRow key={company.id}>
               <TableCell className="font-medium">{company.name}</TableCell>
               <TableCell>{company.externalId ?? "—"}</TableCell>
+              <TableCell>{formatSource(company.source)}</TableCell>
               <TableCell>{formatDate(company.createdAt)}</TableCell>
               <TableCell>{formatDate(company.updatedAt)}</TableCell>
               <CompanyAttributeCells
@@ -250,6 +252,15 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
   }).format(date);
+}
+
+function formatSource(source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT") {
+  return {
+    DASHBOARD: "Dashboard",
+    WIDGET: "Widget",
+    API: "API",
+    IMPORT: "Import",
+  }[source];
 }
 
 import { Button } from "@feeblo/ui/button";

@@ -79,6 +79,13 @@ export const postSourceEnum = pgEnum("post_source", [
   "PUBLIC_BOARD",
 ]);
 
+export const contactCompanySourceEnum = pgEnum("contact_company_source", [
+  "DASHBOARD",
+  "WIDGET",
+  "API",
+  "IMPORT",
+]);
+
 export const attributeDataTypeEnum = pgEnum("attribute_data_type", [
   "TEXT",
   "INTEGER",
@@ -260,6 +267,7 @@ export const companyTable = pgTable(
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
     externalCreatedAt: timestamp("external_created_at", { withTimezone: true }),
+    source: contactCompanySourceEnum("source").default("DASHBOARD").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -299,6 +307,7 @@ export const contactTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
+    source: contactCompanySourceEnum("source").default("DASHBOARD").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
