@@ -54,17 +54,21 @@ export function FeedbackCard({ status }: { status: string }) {
   const description = truncate(post.excerpt, 100) || "No details yet.";
 
   return (
-    /// TODO: fix the link wrapping
-    <Link
-      className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
-      params={{
-        slug: post.slug,
-      }}
-      to="/p/$slug"
-    >
-      <UpvoteButton variant="compact" />
+    <div className="group relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
+      <Link
+        aria-label={`View ${post.title}`}
+        className="absolute inset-0 z-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-[-2px]"
+        params={{
+          slug: post.slug,
+        }}
+        to="/p/$slug"
+      />
 
-      <div className="min-w-0 flex-1">
+      <div className="relative z-10">
+        <UpvoteButton variant="compact" />
+      </div>
+
+      <div className="pointer-events-none relative z-10 min-w-0 flex-1">
         <h3 className="truncate font-medium text-sm leading-snug">
           {post.title}
         </h3>
@@ -79,7 +83,7 @@ export function FeedbackCard({ status }: { status: string }) {
         </div>
       </div>
 
-      <div className="hidden shrink-0 items-center gap-3 sm:flex">
+      <div className="pointer-events-none relative z-10 hidden shrink-0 items-center gap-3 sm:flex">
         <StatusIndicator status={status} />
         <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-muted-foreground text-xs">
           {board.name}
@@ -91,7 +95,7 @@ export function FeedbackCard({ status }: { status: string }) {
           </span>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
