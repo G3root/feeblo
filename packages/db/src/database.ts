@@ -42,8 +42,9 @@ const pgliteDataDir = (url: string): string => {
 // data-directory URL the reference implementation passes straight through.
 export const PgliteClientLive = PgliteClient.layerFrom(
   Effect.acquireRelease(
-    Effect.map(Config.string("DATABASE_URL"), (url) =>
-      new PGlite(pgliteDataDir(url))
+    Effect.map(
+      Config.string("DATABASE_URL"),
+      (url) => new PGlite(pgliteDataDir(url))
     ),
     (pglite) => Effect.promise(() => pglite.close())
   ).pipe(

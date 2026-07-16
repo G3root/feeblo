@@ -7,6 +7,7 @@ import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
@@ -60,16 +61,10 @@ const ProductMetadataFromPolar = Schema.Unknown.pipe(
   Schema.decodeTo(
     Schema.NullOr(ProductMetadataSchema),
     SchemaTransformation.transform({
-      decode: (value) => {
-        try {
-          const decoded = Schema.decodeUnknownSync(ProductMetadataSchema)(
-            value
-          );
-          return decoded;
-        } catch (_error) {
-          return null;
-        }
-      },
+      decode: (value) =>
+        Option.getOrNull(
+          Schema.decodeUnknownOption(ProductMetadataSchema)(value)
+        ),
       encode: (value) => value,
     })
   )

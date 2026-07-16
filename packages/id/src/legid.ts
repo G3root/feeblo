@@ -1,5 +1,6 @@
 import type * as Brand from "effect/Brand";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 
 import { createId, verifyId } from "legid";
@@ -278,12 +279,7 @@ export const makeId = <
         return false;
       }
 
-      try {
-        Effect.runSync(validateLegidFormat(idPart));
-        return true;
-      } catch {
-        return false;
-      }
+      return Exit.isSuccess(Effect.runSyncExit(validateLegidFormat(idPart)));
     },
     unsafeParse: (input) => Effect.runPromise(parse(input)),
     unsafeGenerate: () => Effect.runPromise(generate()),

@@ -14,6 +14,8 @@ import { Auth } from "@feeblo/domain/session-middleware";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
@@ -64,42 +66,48 @@ const program = Effect.gen(function* () {
   const isLocalDevHost = (host: string): boolean =>
     host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
 
+  const parseUrl = (value: string): URL | null =>
+    Option.getOrNull(Schema.decodeUnknownOption(Schema.URLFromString)(value));
+
   const isAllowedOrigin = (origin: string | undefined): boolean => {
     if (!origin) {
       return true;
     }
 
-    try {
-      const originHost = new URL(origin).hostname;
-      const appHost = new URL(config.appUrl).hostname;
-      const apiHost = new URL(config.apiUrl).hostname;
-      const appRootDomainHost = config.appRootDomain.includes(":")
-        ? config.appRootDomain?.split(":")[0]
-        : config.appRootDomain;
-
-      if (originHost === apiHost) {
-        return true;
-      }
-      if (originHost === appHost) {
-        return true;
-      }
-
-      if (
-        config.nodeEnv === "development" &&
-        isLocalDevHost(originHost) &&
-        isLocalDevHost(appRootDomainHost ?? "")
-      ) {
-        return true;
-      }
-
-      if (originHost.endsWith(`.${appRootDomainHost}`)) {
-        return true;
-      }
-
-      return false;
-    } catch {
+    const originUrl = parseUrl(origin);
+    const appUrl = parseUrl(config.appUrl);
+    const apiUrl = parseUrl(config.apiUrl);
+    if (!(originUrl && appUrl && apiUrl)) {
       return false;
     }
+
+    const originHost = originUrl.hostname;
+    const appHost = appUrl.hostname;
+    const apiHost = apiUrl.hostname;
+    const appRootDomainHost = config.appRootDomain.includes(":")
+      ? config.appRootDomain.split(":")[0]
+      : config.appRootDomain;
+
+    if (originHost === apiHost) {
+      return true;
+    }
+    if (originHost === appHost) {
+      return true;
+    }
+
+    if (
+      config.nodeEnv === "development" &&
+      isLocalDevHost(originHost) &&
+      isLocalDevHost(appRootDomainHost ?? "")
+    ) {
+      return true;
+    }
+
+    if (originHost.endsWith(`.${appRootDomainHost}`)) {
+      return true;
+    }
+
+    return false;
   };
 
   const AllRoutes = Layer.mergeAll(
