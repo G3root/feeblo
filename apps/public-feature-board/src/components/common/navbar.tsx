@@ -1,7 +1,7 @@
 import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { Button } from "@feeblo/ui/button";
 import { cn } from "@feeblo/ui/utils";
-import { authClient } from "@feeblo/web-shared/auth-client";
+import { clearAuthStateCache } from "@feeblo/web-shared/auth-client";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Link, useLocation } from "@tanstack/react-router";
 import { useSite } from "../../providers/site-provider";
@@ -76,8 +76,8 @@ function UserActions() {
     <div className="flex items-center gap-2">
       {session ? (
         <Button
-          onClick={async () => {
-            await authClient.signOut();
+          onClick={() => {
+            clearAuthStateCache();
           }}
           size="sm"
           variant="outline"

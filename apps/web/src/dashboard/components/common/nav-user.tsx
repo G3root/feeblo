@@ -18,6 +18,8 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { useTheme } from "@feeblo/ui/theme-provider";
+import { clearAuthStateCache } from "@feeblo/web-shared/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   CreditCardIcon,
   LogoutSquare01Icon,
@@ -27,9 +29,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { authClient } from "@feeblo/web-shared/auth-client";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -83,14 +83,9 @@ export function NavUser() {
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
-              onClick={async () => {
-                await authClient.signOut({
-                  fetchOptions: {
-                    onSuccess: () => {
-                      navigate({ to: "/sign-in" });
-                    },
-                  },
-                });
+              onClick={() => {
+                clearAuthStateCache();
+                navigate({ to: "/sign-in" });
               }}
             >
               <HugeiconsIcon icon={LogoutSquare01Icon} />
