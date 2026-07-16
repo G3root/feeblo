@@ -5,6 +5,13 @@ import type {
 import type { TContact } from "@feeblo/domain/contact/schema";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@feeblo/ui/select";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -48,6 +55,7 @@ export function ContactEditDialog() {
 function ContactEditForm() {
   const organizationId = useOrganizationId();
   const {
+    companyCollection,
     contactAttributeDefinitionCollection,
     contactAttributeValueCollection,
     contactCollection,
@@ -86,11 +94,20 @@ function ContactEditForm() {
         .where(({ value }) => eq(value.contactId, contactId)),
     [contactId]
   );
+  const companiesQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ company: companyCollection })
+        .where(({ company }) => eq(company.organizationId, organizationId))
+        .orderBy(({ company }) => company.name, "asc"),
+    [organizationId]
+  );
 
   if (
     !contact ||
     definitionsQuery.isLoading ||
-    attributeValuesQuery.isLoading
+    attributeValuesQuery.isLoading ||
+    companiesQuery.isLoading
   ) {
     return null;
   }
@@ -98,6 +115,7 @@ function ContactEditForm() {
   return (
     <ContactEditFormFields
       attributeValues={attributeValuesQuery.data ?? []}
+      companies={companiesQuery.data ?? []}
       contact={contact}
       definitions={definitionsQuery.data ?? []}
     />
@@ -110,10 +128,12 @@ type ContactEditFormFieldsProps = {
 
 function ContactEditFormFields({
   attributeValues: existingValues,
+  companies,
   contact,
   definitions,
 }: ContactEditFormFieldsProps & {
   attributeValues: readonly TContactAttributeValue[];
+  companies: readonly { id: string; name: string }[];
   definitions: readonly TContactAttributeDefinition[];
 }) {
   const organizationId = useOrganizationId();
@@ -121,6 +141,7 @@ function ContactEditFormFields({
   const form = useAppForm({
     defaultValues: {
       attributes: getCustomAttributeInputValues(definitions, existingValues),
+      companyId: contact.companyId ?? "none",
       email: contact.email ?? "",
       externalId: contact.externalId ?? "",
       name: contact.name ?? "",
@@ -128,6 +149,7 @@ function ContactEditFormFields({
     },
     validators: {
       onSubmit: z.object({
+        companyId: z.string(),
         email: z.email("Enter a valid email address"),
         externalId: z.string(),
         name: z.string(),
@@ -149,6 +171,7 @@ function ContactEditFormFields({
         await createContactAction({
           contact: {
             ...contact,
+            companyId: data.value.companyId === "none" ? null : data.value.companyId,
             email: data.value.email,
             externalId: data.value.externalId || null,
             name: data.value.name || null,
@@ -191,6 +214,44 @@ function ContactEditFormFields({
         <form.AppField
           children={(field) => <field.TextField label="Phone" type="tel" />}
           name="phone"
+        />
+        <form.AppField
+          children={(field) => (
+            <div className="space-y-2">
+              <label
+                className="font-medium text-sm"
+                htmlFor="contact-edit-company-id"
+              >
+                Company
+              </label>
+              <Select
+                onValueChange={(value) =>
+                  field.handleChange(value ?? "none")
+                }
+                value={field.state.value}
+              >
+                <SelectTrigger className="w-full" id="contact-edit-company-id">
+                  <SelectValue placeholder="Select a company">
+                    {(value) =>
+                      value === "none"
+                        ? "None"
+                        : companies.find((company) => company.id === value)
+                            ?.name ?? "Select a company"
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          name="companyId"
         />
         <form.Subscribe selector={(state) => state.values.attributes}>
           {(attributes) => (

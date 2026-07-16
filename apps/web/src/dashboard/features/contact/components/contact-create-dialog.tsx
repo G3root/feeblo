@@ -1,6 +1,13 @@
 import { ContactId } from "@feeblo/id";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@feeblo/ui/select";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -41,7 +48,8 @@ export function ContactCreateDialog() {
 
 function ContactCreateForm() {
   const organizationId = useOrganizationId();
-  const { contactAttributeDefinitionCollection } = useDashboardCollections();
+  const { companyCollection, contactAttributeDefinitionCollection } =
+    useDashboardCollections();
   const store = useContactCreateDialogContext();
   const { data: definitions = [] } = useLiveQuery(
     (q) =>
@@ -53,9 +61,18 @@ function ContactCreateForm() {
         .orderBy(({ definition }) => definition.createdAt, "asc"),
     [organizationId]
   );
+  const { data: companies = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ company: companyCollection })
+        .where(({ company }) => eq(company.organizationId, organizationId))
+        .orderBy(({ company }) => company.name, "asc"),
+    [organizationId]
+  );
   const form = useAppForm({
     defaultValues: {
       attributes: {},
+      companyId: "none",
       email: "",
       externalId: "",
       name: "",
@@ -64,6 +81,7 @@ function ContactCreateForm() {
     validators: {
       onSubmit: z.object({
         email: z.email(),
+        companyId: z.string(),
         externalId: z.string(),
         name: z.string(),
         phone: z.string(),
@@ -82,18 +100,20 @@ function ContactCreateForm() {
           name: data.value.name || null,
           phone: data.value.phone || null,
           avatar: null,
-          companyId: null,
+          companyId:
+            data.value.companyId === "none" ? null : data.value.companyId,
           createdAt: now,
           updatedAt: now,
         };
-        const { createAttribute } =
-          await getContactCustomAttributeValueChanges({
+        const { createAttribute } = await getContactCustomAttributeValueChanges(
+          {
             contactId,
             definitions,
             existingValues: [],
             organizationId,
             values: data.value.attributes,
-          });
+          }
+        );
         //TODO add error validation
         await createContactAction({
           contact,
@@ -138,6 +158,45 @@ function ContactCreateForm() {
         <form.AppField
           children={(field) => <field.TextField label="Phone" type="tel" />}
           name="phone"
+        />
+        <form.AppField
+          children={(field) => (
+            <div className="space-y-2">
+              <label
+                className="font-medium text-sm"
+                htmlFor="contact-create-company-id"
+              >
+                Company
+              </label>
+              <Select
+                onValueChange={(value) => field.handleChange(value ?? "none")}
+                value={field.state.value}
+              >
+                <SelectTrigger
+                  className="w-full"
+                  id="contact-create-company-id"
+                >
+                  <SelectValue placeholder="Select a company">
+                    {(value) =>
+                      value === "none"
+                        ? "None"
+                        : (companies.find((company) => company.id === value)
+                            ?.name ?? "Select a company")
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          name="companyId"
         />
         <form.Subscribe selector={(state) => state.values.attributes}>
           {(attributes) => (

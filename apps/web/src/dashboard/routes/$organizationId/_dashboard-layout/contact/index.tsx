@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@feeblo/ui/table";
 import {
+  ArrowUpRight01Icon,
   Delete02Icon,
   Edit,
   Ellipsis,
@@ -30,13 +31,16 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
 import { ContactCreateDialog } from "~/features/contact/components/contact-create-dialog";
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
 import { ContactEditDialog } from "~/features/contact/components/contact-edit-dialog";
 import {
+  CompanyEditDialogProvider,
   ContactCreateDialogProvider,
   ContactDeleteDialogProvider,
   ContactEditDialogProvider,
+  useCompanyEditDialogContext,
   useContactCreateDialogContext,
   useContactDeleteDialogContext,
   useContactEditDialogContext,
@@ -46,6 +50,7 @@ import {
   formatCustomAttributeValue,
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import {
+  companyCollection,
   contactAttributeDefinitionCollection,
   contactAttributeValueCollection,
   contactCollection,
@@ -61,6 +66,7 @@ export const Route = createFileRoute(
       contactCollection.preload(),
       contactAttributeDefinitionCollection.preload(),
       contactAttributeValueCollection.preload(),
+      companyCollection.preload(),
     ]);
     return null;
   },
@@ -68,26 +74,33 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   return (
-    <ContactCreateDialogProvider>
-      <ContactEditDialogProvider>
-        <ContactDeleteDialogProvider>
-          <ContactPage />
-          <ContactCreateDialog />
-          <ContactEditDialog />
-          <ContactDeleteDialog />
-        </ContactDeleteDialogProvider>
-      </ContactEditDialogProvider>
-    </ContactCreateDialogProvider>
+    <CompanyEditDialogProvider>
+      <ContactCreateDialogProvider>
+        <ContactEditDialogProvider>
+          <ContactDeleteDialogProvider>
+            <ContactPage />
+            <CompanyEditDialog />
+            <ContactCreateDialog />
+            <ContactEditDialog />
+            <ContactDeleteDialog />
+          </ContactDeleteDialogProvider>
+        </ContactEditDialogProvider>
+      </ContactCreateDialogProvider>
+    </CompanyEditDialogProvider>
   );
 }
 
 function ContactPage() {
   const { organizationId } = Route.useParams();
-  const { contactAttributeDefinitionCollection, contactCollection } =
-    useDashboardCollections();
+  const {
+    companyCollection,
+    contactAttributeDefinitionCollection,
+    contactCollection,
+  } = useDashboardCollections();
   const createDialogStore = useContactCreateDialogContext();
   const editDialogStore = useContactEditDialogContext();
   const deleteDialogStore = useContactDeleteDialogContext();
+  const companyEditDialogStore = useCompanyEditDialogContext();
   const contactsQuery = useLiveQuery(
     (q) =>
       q
@@ -107,6 +120,14 @@ function ContactPage() {
         .orderBy(({ definition }) => definition.createdAt, "asc"),
     [organizationId]
   );
+  const { data: companies = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ company: companyCollection })
+        .where(({ company }) => eq(company.organizationId, organizationId)),
+    [organizationId]
+  );
+  const companiesById = new Map(companies.map((c) => [c.id, c]));
 
   const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
 
@@ -145,10 +166,11 @@ function ContactPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>External ID</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Phone</TableHead>
+            <TableHead>External ID</TableHead>
+            <TableHead>Company</TableHead>
             {definitions.map((definition) => (
               <TableHead key={definition.id}>{definition.name}</TableHead>
             ))}
@@ -161,9 +183,20 @@ function ContactPage() {
         <TableBody>
           {contacts.map((contact) => (
             <ContactTableRow
+              company={
+                contact.companyId
+                  ? companiesById.get(contact.companyId)
+                  : undefined
+              }
               contact={contact}
               definitions={definitions}
               key={contact.id}
+              onCompanyClick={(companyId) =>
+                companyEditDialogStore.send({
+                  type: "toggle",
+                  data: { companyId, mode: "display" },
+                })
+              }
               onDelete={() =>
                 deleteDialogStore.send({
                   type: "toggle",
@@ -185,12 +218,16 @@ function ContactPage() {
 }
 
 function ContactTableRow({
+  company,
   contact,
   definitions,
+  onCompanyClick,
   onDelete,
   onEdit,
 }: {
+  company?: { id: string; name: string };
   contact: {
+    companyId: string | null;
     email: string | null;
     externalId: string | null;
     id: string;
@@ -199,6 +236,7 @@ function ContactTableRow({
     updatedAt: Date;
   };
   definitions: readonly CustomAttributeDefinition[];
+  onCompanyClick: (companyId: string) => void;
   onDelete: () => void;
   onEdit: () => void;
 }) {
@@ -222,6 +260,19 @@ function ContactTableRow({
       <TableCell>{contact.email ?? "—"}</TableCell>
       <TableCell>{contact.phone ?? "—"}</TableCell>
       <TableCell>{contact.externalId ?? "—"}</TableCell>
+      <TableCell>
+        {company ? (
+          <Button
+            onClick={() => onCompanyClick(company.id)}
+            type="button"
+            variant="link"
+          >
+            {company.name} <HugeiconsIcon icon={ArrowUpRight01Icon} />
+          </Button>
+        ) : (
+          "—"
+        )}
+      </TableCell>
       {definitions.map((definition) => (
         <TableCell key={definition.id}>
           {formatCustomAttributeValue(valuesByAttributeId.get(definition.id))}

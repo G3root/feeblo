@@ -48,11 +48,13 @@ type AttributeValueUpsert =
 
 export function CustomAttributeFields({
   definitions,
+  disabled = false,
   entityName,
   onChange,
   values,
 }: {
   definitions: readonly CustomAttributeDefinition[];
+  disabled?: boolean;
   entityName: "company" | "contact";
   onChange: (attributeId: string, value: CustomAttributeInputValue) => void;
   values: CustomAttributeInputValues;
@@ -73,6 +75,7 @@ export function CustomAttributeFields({
             <div className="flex items-center gap-2" key={definition.id}>
               <Checkbox
                 checked={value === true}
+                disabled={disabled}
                 id={id}
                 onCheckedChange={(checked) =>
                   onChange(definition.id, checked === true)
@@ -93,6 +96,7 @@ export function CustomAttributeFields({
               {definition.isRequired ? " *" : null}
             </Label>
             <Input
+              disabled={disabled}
               id={id}
               onChange={(event) => onChange(definition.id, event.target.value)}
               required={definition.isRequired}

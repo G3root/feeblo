@@ -29,7 +29,10 @@ export const [CompanyCreateDialogProvider, useCompanyCreateDialogContext] =
   });
 
 export const [CompanyEditDialogProvider, useCompanyEditDialogContext] =
-  createModalStoreContext<{ companyId: string }>({
+  createModalStoreContext<{
+    companyId: string;
+    mode?: "display" | "edit";
+  }>({
     name: "CompanyEditDialogContext",
     hookName: "useCompanyEditDialogContext",
     providerName: "CompanyEditDialogProvider",
