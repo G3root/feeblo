@@ -3,21 +3,19 @@ import { Copy, EmailShell, Lead } from "./email-shell";
 type UserOnboardingEmailProps = {
   readonly dashboardUrl: string;
   readonly name: string;
-  readonly unsubscribeUrl: string;
 };
 
 export const UserOnboardingEmail = ({
   dashboardUrl,
   name,
-  unsubscribeUrl,
 }: UserOnboardingEmailProps) => (
   <EmailShell
     cta={{ label: "Open your dashboard", href: dashboardUrl }}
     eyebrow="Welcome to Feeblo"
     footer={
       <>
-        You received this lifecycle email because you created a Feeblo account.{" "}
-        <a href={unsubscribeUrl}>Unsubscribe from onboarding emails</a>.
+        You received this one-time lifecycle email because you created a Feeblo
+        account.
       </>
     }
     preview="A quick guide to getting started with Feeblo"
