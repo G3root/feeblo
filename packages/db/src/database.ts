@@ -123,6 +123,13 @@ export const DatabaseContextLive = Layer.unwrap(
   )
 );
 
+/** Effect SQL client used by cluster workflow persistence. */
+export const SqlClientContextLive = Layer.unwrap(
+  Effect.map(Config.string("DATABASE_URL"), (url) =>
+    isPgliteUrl(url) ? PgliteClientLive : PgClientLive
+  )
+);
+
 // Backwards-compatible alias for the Postgres-only database layer.
 export const DatabaseLive = PgDatabaseLive;
 

@@ -7,13 +7,17 @@ import {
 } from "better-auth/client/plugins";
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import { z } from "zod";
+import { clientTimeZoneHeader } from "./client-time-zone";
 import type {
   Auth,
   AuthClientMembership,
   AuthClientOrganization,
 } from "./server";
 
-export const createAuthClient = (baseURL: string) => {
+export const createAuthClient = (
+  baseURL: string,
+  options?: { readonly getTimeZone?: () => string | undefined }
+) => {
   return createAuthClientBase({
     plugins: [
       customSessionClient<Auth>(),
@@ -23,6 +27,15 @@ export const createAuthClient = (baseURL: string) => {
       adminClient(),
     ],
     baseURL,
+    fetchOptions: {
+      onRequest(context) {
+        const timeZone = options?.getTimeZone?.();
+        if (timeZone) {
+          context.headers.set(clientTimeZoneHeader, timeZone);
+        }
+        return context;
+      },
+    },
   });
 };
 

@@ -8,6 +8,7 @@ import {
   localOnlyCollectionOptions,
 } from "@tanstack/react-db";
 import { z } from "zod";
+import { getClientTimeZone } from "./client-hints";
 import { getRuntimePublicEnv } from "./runtime-public-env";
 
 const API_URL = getRuntimePublicEnv().apiUrl;
@@ -26,7 +27,9 @@ export const uploadedEditorMediaSchema = z.object({
   url: z.url(),
 });
 
-export const authClient = createAuthClient(baseUrl);
+export const authClient = createAuthClient(baseUrl, {
+  getTimeZone: getClientTimeZone,
+});
 
 export const authStateCollection = createCollection(
   localOnlyCollectionOptions({

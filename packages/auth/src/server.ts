@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+/** biome-ignore-all lint/style/noNestedTernary: provider option construction is clearer inline */
 
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
@@ -8,6 +8,7 @@ import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
 import { isPrivilegedMemberRole } from "@feeblo/domain/plan-entitlements";
 import { PolicyDeniedError } from "@feeblo/domain/policy";
+import { WelcomeUserWorkflow } from "@feeblo/domain/user/workflows";
 import {
   createSsoSession,
   linkAnonymousAccount,
@@ -38,7 +39,9 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 import { drizzleAdapter } from "./adapter/drizzzle-adapter";
+import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
@@ -80,6 +83,7 @@ export const initAuthHandler = () =>
 
     const trustedOrigins = yield* getTrustedOrigins;
     const db = yield* Database.Database;
+    const workflowEngine = yield* WorkflowEngine;
 
     const dbLayer = Layer.succeed(Database.Database, db);
 
@@ -94,6 +98,52 @@ export const initAuthHandler = () =>
         SsoRepositoriesLive
       ).pipe(Layer.provideMerge(dbLayer))
     );
+
+    const scheduleWelcome = (user: {
+      readonly email: string;
+      readonly id: string;
+      readonly name: string;
+    }) =>
+      callbackRuntime.runPromise(
+        WelcomeUserWorkflow.execute(
+          {
+            userId: user.id,
+            email: user.email,
+            name: user.name,
+            dashboardUrl: appUrl,
+          },
+          { discard: true }
+        ).pipe(
+          Effect.provideService(WorkflowEngine, workflowEngine),
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Failed to queue welcome email", cause).pipe(
+              Effect.annotateLogs({ userId: user.id })
+            )
+          )
+        )
+      );
+
+    const updateTimeZone = (
+      userId: string,
+      timeZone: string | null | undefined
+    ) => {
+      if (!(timeZone && isValidTimeZone(timeZone))) {
+        return Promise.resolve();
+      }
+      return callbackRuntime.runPromise(
+        db
+          .update(schema.userTable)
+          .set({ timezone: timeZone, updatedAt: new Date() })
+          .where(eq(schema.userTable.id, userId))
+          .pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning("Failed to update user timezone", cause).pipe(
+                Effect.annotateLogs({ userId, timeZone })
+              )
+            )
+          )
+      );
+    };
 
     const ssoOptions: JwtAutoLoginOptions = {
       createSsoUser: async ({ organizationId, token }) => {
@@ -425,7 +475,7 @@ export const initAuthHandler = () =>
       ],
 
       hooks: {
-        // biome-ignore lint/suspicious/useAwait: <explanation>
+        // biome-ignore lint/suspicious/useAwait: middleware callback must remain async
         before: createAuthMiddleware(async (ctx) => {
           if (
             (ctx.path.startsWith("/sign-in") ||
@@ -455,6 +505,38 @@ export const initAuthHandler = () =>
             }
           }
         }),
+      },
+      databaseHooks: {
+        user: {
+          create: {
+            async after(user) {
+              if (user.emailVerified) {
+                await scheduleWelcome(user);
+              }
+            },
+          },
+          update: {
+            async after(user, context) {
+              const isVerificationFlow =
+                context?.path.includes("verify") === true ||
+                context?.path.includes("email-otp") === true;
+              if (user.emailVerified && isVerificationFlow) {
+                await scheduleWelcome(user);
+              }
+            },
+          },
+        },
+        session: {
+          create: {
+            async after(session, context) {
+              //TODO update only once
+              await updateTimeZone(
+                session.userId,
+                context?.getHeader(clientTimeZoneHeader)
+              );
+            },
+          },
+        },
       },
       user: {
         additionalFields: {

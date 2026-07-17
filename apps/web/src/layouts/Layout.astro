@@ -7,14 +7,17 @@ interface Props {
 
 const { title = "feeblo" } = Astro.props;
 
+import { getClientHintCheckScript } from "@feeblo/web-shared/client-hints";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
+
+const clientHintCheckScript = getClientHintCheckScript();
 ---
 
 <!doctype html>
 <html lang="en">
-  <CommonHead title={title} />
+  <CommonHead clientHintCheckScript={clientHintCheckScript} title={title} />
 
   <style is:global>
     .pending-shell {
