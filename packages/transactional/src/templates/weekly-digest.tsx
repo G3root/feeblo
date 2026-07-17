@@ -2,42 +2,19 @@ import { Copy, EmailShell, Lead } from "./email-shell";
 
 type DigestItem = { readonly label: string; readonly url: string };
 
-type DigestSectionProps = {
-  readonly title: string;
-  readonly total: number;
-  readonly items: readonly DigestItem[];
-  readonly moreUrl: string;
-};
-
-const DigestSection = ({
-  title,
-  total,
-  items,
-  moreUrl,
-}: DigestSectionProps) => {
-  if (total === 0) {
-    return null;
-  }
-  const more = Math.max(0, total - items.length);
+const DigestPosts = ({ posts }: { readonly posts: readonly DigestItem[] }) => {
   return (
     <div style={{ marginTop: "24px" }}>
       <Copy>
-        <strong>
-          {title} ({total})
-        </strong>
+        <strong>Latest feedback</strong>
       </Copy>
       <ul>
-        {items.map((item) => (
+        {posts.map((item) => (
           <li key={item.url}>
             <a href={item.url}>{item.label}</a>
           </li>
         ))}
       </ul>
-      {more > 0 ? (
-        <Copy>
-          <a href={moreUrl}>{more} more</a>
-        </Copy>
-      ) : null}
     </div>
   );
 };
@@ -46,9 +23,7 @@ type WeeklyDigestEmailProps = {
   readonly organizationName: string;
   readonly dashboardUrl: string;
   readonly unsubscribeUrl: string;
-  readonly followed: DigestSectionProps;
-  readonly submissions: DigestSectionProps;
-  readonly changelogs: DigestSectionProps;
+  readonly posts: readonly DigestItem[];
 };
 
 export const WeeklyDigestEmail = (props: WeeklyDigestEmailProps) => (
@@ -65,9 +40,7 @@ export const WeeklyDigestEmail = (props: WeeklyDigestEmailProps) => (
     title="Your weekly digest"
   >
     <Lead>Here is what happened in the workspace last week.</Lead>
-    <DigestSection {...props.followed} />
-    <DigestSection {...props.submissions} />
-    <DigestSection {...props.changelogs} />
+    <DigestPosts posts={props.posts} />
   </EmailShell>
 );
 

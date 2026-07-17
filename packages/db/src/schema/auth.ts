@@ -19,6 +19,7 @@ export const userTable = pgTable(
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").default(false).notNull(),
+    timezone: text("timezone"),
     image: text("image"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

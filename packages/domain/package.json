@@ -19,6 +19,12 @@
     "./http/router": {
       "default": "./src/http/router.ts"
     },
+    "./notifications/runtime": {
+      "default": "./src/notifications/runtime.ts"
+    },
+    "./notifications/batches": {
+      "default": "./src/notifications/batches.ts"
+    },
     "./widget/schema": {
       "default": "./src/widget/schema.ts"
     },
@@ -66,6 +72,12 @@
     },
     "./user/handlers": {
       "default": "./src/user/handlers.ts"
+    },
+    "./user/workflows": {
+      "default": "./src/user/workflows.ts"
+    },
+    "./workflows": {
+      "default": "./src/workflows.ts"
     },
     "./site/schema": {
       "default": "./src/site/schema.ts"
@@ -196,6 +208,7 @@
     "@effect-aws/s3": "catalog:",
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
+    "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@polar-sh/sdk": "catalog:",
     "better-auth": "catalog:",

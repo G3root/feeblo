@@ -11,24 +11,26 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
+import { WorkflowsLive } from "@feeblo/domain/workflows";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
-
 import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
-
 import { ServerConfig } from "./config";
 import { corsVaryFix } from "./middlewares/cors-vary";
 
-const ServiceLayers = Database.DatabaseContextLive;
+const WorkFlowLayer = WorkflowsLive.pipe(
+  Layer.provide(Database.DatabaseContextLive),
+  Layer.provide(Database.SqlClientContextLive)
+);
+const ServiceLayers = Layer.merge(Database.DatabaseContextLive, WorkFlowLayer);
 const AuthLayer = Layer.effect(Auth, initAuthHandler());
 
 const BetterAuthApp = Effect.gen(function* () {

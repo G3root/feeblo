@@ -32,6 +32,10 @@
       "types": "./src/lib/auth-client.ts",
       "default": "./src/lib/auth-client.ts"
     },
+    "./client-hints": {
+      "types": "./src/lib/client-hints.ts",
+      "default": "./src/lib/client-hints.ts"
+    },
     "./reaction-keys": {
       "types": "./src/lib/reaction-keys.ts",
       "default": "./src/lib/reaction-keys.ts"
@@ -69,6 +73,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@epic-web/client-hints": "^1.3.9",
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",

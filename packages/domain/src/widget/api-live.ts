@@ -5,7 +5,6 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import type {
@@ -47,15 +46,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           return boards.map(({ visibility: _visibility, ...board }) => board);
         }).pipe(
           Effect.provide(BoardRepository.layer),
-          Effect.catchIf(
-            (e) =>
-              Predicate.isTagged(e, "EffectDrizzleQueryError") ||
-              Predicate.isTagged(e, "SqlError"),
-            () =>
-              Effect.fail(
-                new InternalServerError({ message: "Failed to list boards" })
-              )
-          )
+          withRemapDbErrors("Boards", "select")
         )
       )
       .handle("createFeedback", ({ payload }) =>

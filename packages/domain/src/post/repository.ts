@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+/** biome-ignore-all lint/style/noNestedTernary: query value selection is clearer inline */
 import { currentDb, schema } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
@@ -98,6 +98,19 @@ const makePostRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
+    findStatusId: ({ id, organizationId }: TPostById) =>
+      db
+        .select({ statusId: schema.postTable.statusId })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]?.statusId)),
+
     findByCreatorId: ({
       id,
       organizationId,

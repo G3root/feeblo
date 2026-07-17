@@ -4,7 +4,6 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { AuthApiLive } from "../auth/api-live";
 import { MediaApiLive } from "../media/api-live";
-import { NotificationApiLive } from "../notifications/api-live";
 import { OrganizationApiLive } from "../organization/api-live";
 import { ProfileApiLive } from "../profile/api-live";
 import { WidgetApiLive } from "../widget/api-live";
@@ -15,7 +14,6 @@ export const HttpRoute = HttpApiBuilder.layer(Api, {
 }).pipe(
   Layer.provide(AuthApiLive),
   Layer.provide(MediaApiLive),
-  Layer.provide(NotificationApiLive),
   Layer.provide(OrganizationApiLive),
   Layer.provide(ProfileApiLive),
   Layer.provide(WidgetApiLive)

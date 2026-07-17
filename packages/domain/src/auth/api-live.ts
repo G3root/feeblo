@@ -11,6 +11,7 @@ import {
   BadRequestError,
   InternalServerError,
   NotFoundError,
+  withRemapDbErrors,
 } from "../rpc-errors";
 import { VerificationOtpConfig } from "./config";
 import type { VerificationOTPState } from "./schema";
@@ -27,10 +28,14 @@ export const AuthApiLive = HttpApiBuilder.group(
   (handlers) =>
     handlers
       .handle("postVerificationOtp", ({ payload }) =>
-        postVerificationOtp(payload)
+        postVerificationOtp(payload).pipe(withRemapDbErrors("Otp", "create"))
       )
-      .handle("getVerificationOtp", () => getVerificationOtp())
-      .handle("deleteVerificationOtp", () => deleteVerificationOtp())
+      .handle("getVerificationOtp", () =>
+        getVerificationOtp().pipe(withRemapDbErrors("Otp", "select"))
+      )
+      .handle("deleteVerificationOtp", () =>
+        deleteVerificationOtp().pipe(withRemapDbErrors("Otp", "delete"))
+      )
 );
 
 function postVerificationOtp(

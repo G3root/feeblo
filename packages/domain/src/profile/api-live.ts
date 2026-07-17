@@ -1,14 +1,17 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-import * as Predicate from "effect/Predicate";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { Api } from "../http/api";
-import { BadRequestError, InternalServerError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  withRemapDbErrors,
+} from "../rpc-errors";
 import { S3UploadService, S3UploadServiceLive } from "../services/s3";
 import {
   currentHttpApiSession,
@@ -82,24 +85,8 @@ export const ProfileApiLive = HttpApiBuilder.group(
         return uploaded;
       }).pipe(
         Effect.provide(S3UploadServiceLive),
-        Effect.catchTag("ConfigError", () =>
-          Effect.fail(
-            new InternalServerError({
-              message: "Upload storage is not configured",
-            })
-          )
-        ),
-        Effect.catchIf(
-          (e) =>
-            Predicate.isTagged(e, "EffectDrizzleQueryError") ||
-            Predicate.isTagged(e, "SqlError"),
-          () =>
-            Effect.fail(
-              new InternalServerError({
-                message: "Failed to update profile logo",
-              })
-            )
-        )
+
+        withRemapDbErrors("UserProfile", "create")
       );
     })
 ).pipe(Layer.provide(HttpApiAuthMiddlewareLive));

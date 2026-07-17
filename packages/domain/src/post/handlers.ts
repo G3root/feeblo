@@ -82,9 +82,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             excerpt: htmlToExcerpt(sanitizedHtml),
             creatorId: session.session.userId,
             ...(opts.source ? { source: opts.source } : {}),
-            ...(membership
-              ? { creatorMemberId: membership.membershipId }
-              : {}),
+            ...(membership ? { creatorMemberId: membership.membershipId } : {}),
           });
 
           // The creator of a post is automatically subscribed to it.
@@ -204,7 +202,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostCreatePublic: (args: TPostCreate) =>
       createPostEffect(args, { source: "PUBLIC_BOARD" }).pipe(
-        Policy.withPolicy(Policy.hasRestrictedOrganizationScope(args.organizationId)),
+        Policy.withPolicy(
+          Policy.hasRestrictedOrganizationScope(args.organizationId)
+        ),
         withRemapDbErrors("Post", "create")
       ),
 

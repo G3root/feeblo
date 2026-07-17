@@ -5,7 +5,11 @@ import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
 import { Api } from "../http/api";
-import { BadRequestError, InternalServerError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  withRemapDbErrors,
+} from "../rpc-errors";
 import { S3UploadService, S3UploadServiceLive } from "../services/s3";
 import {
   currentHttpApiSession,
@@ -81,13 +85,7 @@ export const MediaApiLive = HttpApiBuilder.group(
         return { ...uploaded, kind };
       }).pipe(
         Effect.provide(S3UploadServiceLive),
-        Effect.catchTag("ConfigError", () =>
-          Effect.fail(
-            new InternalServerError({
-              message: "Upload storage is not configured",
-            })
-          )
-        )
+        withRemapDbErrors("Media", "create")
       )
     )
 ).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
