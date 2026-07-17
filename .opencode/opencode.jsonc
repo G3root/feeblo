@@ -4,17 +4,14 @@
   "permission": {},
   "references": {
     "effect": {
-      "repository": "github.com/Effect-TS/effect-smol",
+      "repository": "Effect-TS/effect-smol",
       "description": "Use for Effect v4 and effect-smol implementation details"
     },
     "tanstack-db": {
-      "repository": "github.com/TanStack/db",
+      "repository": "TanStack/db",
       "description": "Use for TanStack DB client, query building, and database patterns"
     }
   },
   "mcp": {},
-  "tools": {
-    "github-triage": false,
-    "github-pr-search": false
-  }
+  "tools": {}
 }
