@@ -1,3 +1,4 @@
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Effect from "effect/Effect";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
@@ -36,7 +37,7 @@ export class InternalServerError extends Schema.TaggedErrorClass<InternalServerE
   { httpApiStatus: 500, identifier: "InternalServerError" }
 ) {}
 
-export function withRemapDbErrors<R, E extends { _tag: string }, A>(
+export function withRemapDbErrors<R, E, A>(
   entityType: string,
   action: "update" | "create" | "delete" | "select" | "upsert",
   entityId?: unknown | { value: unknown; key: string }[]
@@ -47,13 +48,8 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
     R,
     | Exclude<
         E,
-        {
-          _tag:
-            | "EffectDrizzleQueryError"
-            | "SqlError"
-            | "SchemaError"
-            | "LegidError";
-        }
+        | EffectDrizzleQueryError
+        | { _tag: "SqlError" | "SchemaError" | "LegidError" }
       >
     | InternalServerError,
     A
@@ -69,41 +65,36 @@ export function withRemapDbErrors<R, E extends { _tag: string }, A>(
 
     return effect.pipe(
       Effect.catchIf(
-        (e): e is Extract<E, { _tag: "EffectDrizzleQueryError" }> =>
-          Predicate.isTagged(e, "EffectDrizzleQueryError"),
-        (err) => toInternalError(err, "There was a database error when")
-      ),
-      Effect.catchIf(
-        (e): e is Extract<E, { _tag: "SqlError" }> =>
-          Predicate.isTagged(e, "SqlError"),
-        (err) => toInternalError(err, "There was a database error when")
-      ),
-      Effect.catchIf(
-        (e): e is Extract<E, { _tag: "SchemaError" }> =>
-          Predicate.isTagged(e, "SchemaError"),
-        (err) => toInternalError(err, "There was an error in parsing when")
-      ),
-      Effect.catchIf(
-        (e): e is Extract<E, { _tag: "LegidError" }> =>
-          Predicate.isTagged(e, "LegidError"),
-        (err) =>
-          toInternalError(err, "There was an error generating an id when")
-      )
-    ) as Effect.Effect<
-      R,
-      | Exclude<
+        (
+          e
+        ): e is Extract<
           E,
-          {
-            _tag:
-              | "EffectDrizzleQueryError"
-              | "SqlError"
-              | "SchemaError"
-              | "LegidError";
+          | EffectDrizzleQueryError
+          | { _tag: "SqlError" }
+          | { _tag: "SchemaError" }
+          | { _tag: "LegidError" }
+        > =>
+          e instanceof EffectDrizzleQueryError ||
+          Predicate.isTagged(e, "SqlError") ||
+          Predicate.isTagged(e, "SchemaError") ||
+          Predicate.isTagged(e, "LegidError"),
+        (err) => {
+          if (Predicate.isTagged(err, "SchemaError")) {
+            return toInternalError(
+              err,
+              "There was an error in parsing when"
+            );
           }
-        >
-      | InternalServerError,
-      A
-    >;
+          if (Predicate.isTagged(err, "LegidError")) {
+            return toInternalError(
+              err,
+              "There was an error generating an id when"
+            );
+          }
+          return toInternalError(err, "There was a database error when");
+        }
+      )
+    );
   };
 }
 

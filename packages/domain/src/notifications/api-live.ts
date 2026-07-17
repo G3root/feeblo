@@ -3,7 +3,6 @@ import { Api } from "../http/api";
 import { withRemapDbErrors } from "../rpc-errors";
 import { applyUnsubscribe, inspectUnsubscribe } from "./unsubscribe";
 
-//TODO fix type error
 export const NotificationApiLive = HttpApiBuilder.group(
   Api,
   "NotificationApiGroup",
@@ -11,10 +10,12 @@ export const NotificationApiLive = HttpApiBuilder.group(
     handlers
       .handle("inspectUnsubscribe", ({ params }) =>
         inspectUnsubscribe(params.token).pipe(
-          withRemapDbErrors("Post", "select")
+          withRemapDbErrors("Notification", "select")
         )
       )
       .handle("applyUnsubscribe", ({ params }) =>
-        applyUnsubscribe(params.token).pipe(withRemapDbErrors("Post", "select"))
+        applyUnsubscribe(params.token).pipe(
+          withRemapDbErrors("Notification", "select")
+        )
       )
 );

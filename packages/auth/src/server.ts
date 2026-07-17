@@ -281,6 +281,9 @@ export const initAuthHandler = () =>
       },
       emailVerification: {
         autoSignInAfterVerification: true,
+        afterEmailVerification: async (user) => {
+          await scheduleWelcome(user);
+        },
       },
       emailAndPassword: {
         enabled: signUpEnabled,
@@ -507,25 +510,6 @@ export const initAuthHandler = () =>
         }),
       },
       databaseHooks: {
-        user: {
-          create: {
-            async after(user) {
-              if (user.emailVerified) {
-                await scheduleWelcome(user);
-              }
-            },
-          },
-          update: {
-            async after(user, context) {
-              const isVerificationFlow =
-                context?.path.includes("verify") === true ||
-                context?.path.includes("email-otp") === true;
-              if (user.emailVerified && isVerificationFlow) {
-                await scheduleWelcome(user);
-              }
-            },
-          },
-        },
         session: {
           create: {
             async after(session, context) {
@@ -541,6 +525,10 @@ export const initAuthHandler = () =>
       user: {
         additionalFields: {
           restrictedToOrganizationId: {
+            type: "string",
+            required: false,
+          },
+          timezone: {
             type: "string",
             required: false,
           },
