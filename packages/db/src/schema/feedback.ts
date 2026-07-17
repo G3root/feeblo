@@ -79,25 +79,6 @@ export const postSourceEnum = pgEnum("post_source", [
   "PUBLIC_BOARD",
 ]);
 
-export const notificationBatchKindEnum = pgEnum("notification_batch_kind", [
-  "STATUS_CHANGE",
-  "WEEKLY_DIGEST",
-]);
-
-export const notificationBatchStatusEnum = pgEnum("notification_batch_status", [
-  "QUEUED",
-  "DISPATCHED",
-  "PROCESSING",
-  "COMPLETED",
-  "SUPPRESSED",
-  "FAILED",
-]);
-
-export const notificationDeliveryStatusEnum = pgEnum(
-  "notification_delivery_status",
-  ["PENDING", "SENT", "SUPPRESSED", "FAILED"]
-);
-
 export const contactCompanySourceEnum = pgEnum("contact_company_source", [
   "DASHBOARD",
   "WIDGET",
