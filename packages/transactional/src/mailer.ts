@@ -15,9 +15,11 @@ type MailMessage = {
   readonly react: ReactElement;
   readonly from?: string;
   readonly replyTo?: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly messageId?: string;
 };
 
-class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplateRenderError>()(
+export class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplateRenderError>()(
   "MailTemplateRenderError",
   {
     subject: Schema.String,
@@ -25,7 +27,7 @@ class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplateRender
   }
 ) {}
 
-class MailDeliveryError extends Schema.TaggedErrorClass<MailDeliveryError>()(
+export class MailDeliveryError extends Schema.TaggedErrorClass<MailDeliveryError>()(
   "MailDeliveryError",
   {
     subject: Schema.String,
@@ -65,6 +67,8 @@ const makeMailer = Effect.gen(function* () {
   return {
     send: Effect.fn("Mailer.send")(function* ({
       from,
+      headers,
+      messageId,
       react,
       replyTo,
       subject,
@@ -86,6 +90,8 @@ const makeMailer = Effect.gen(function* () {
             text,
             from: from ?? defaultFrom,
             ...(replyTo ? { replyTo } : {}),
+            ...(headers ? { headers } : {}),
+            ...(messageId ? { messageId } : {}),
           }),
         catch: (cause) => new MailDeliveryError({ subject, cause }),
       });

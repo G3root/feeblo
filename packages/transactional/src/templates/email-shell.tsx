@@ -26,7 +26,7 @@ type EmailShellProps = {
     readonly label: string;
     readonly href: string;
   };
-  readonly footer?: string;
+  readonly footer?: ReactNode;
 };
 
 export const EmailShell = ({
