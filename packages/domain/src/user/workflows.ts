@@ -3,6 +3,7 @@ import {
   Mailer,
   MailTemplateRenderError,
 } from "@feeblo/transactional/mailer";
+import { createUserFeedbackEmail } from "@feeblo/transactional/templates/user-feedback";
 import { createUserOnboardingEmail } from "@feeblo/transactional/templates/user-onboarding";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -54,6 +55,38 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
     }).pipe(
       Effect.tapError((error) =>
         Effect.logError("SendWelcomeEmail failed").pipe(
+          Effect.annotateLogs({
+            error: String(error),
+            ...payload,
+          })
+        )
+      )
+    );
+
+    yield* W.DurableClock.sleep({
+      name: `delay-welcome-email-experience-${payload.userId}`,
+      duration: "6 days",
+    });
+
+    yield* W.Activity.make({
+      name: "SendUserFeedbackEmail",
+      error: S.Union([MailTemplateRenderError, MailDeliveryError]),
+
+      execute: Effect.gen(function* () {
+        const mailer = yield* Mailer;
+
+        yield* mailer.send({
+          ...createUserFeedbackEmail({
+            feedbackUrl: "https://feedback.feeblo.com",
+            name: payload.name,
+          }),
+          messageId: `<feedback-request.${payload.userId}@notifications.feeblo>`,
+          to: payload.email,
+        });
+      }),
+    }).pipe(
+      Effect.tapError((error) =>
+        Effect.logError("SendUserFeedbackEmail failed").pipe(
           Effect.annotateLogs({
             error: String(error),
             ...payload,
