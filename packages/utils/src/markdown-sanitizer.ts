@@ -1,7 +1,7 @@
 import { HtmlSanitizer } from "./html-sanitizer.js";
 import { htmlToMarkdown, markdownToHtml } from "./markdown/index.js";
 
-function commonmarkEscape(str: string): string {
+export function commonmarkEscape(str: string): string {
   const markdownSyntaxCharacters = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
   // From the CommonMark spec 0.31.2 section 2.4:
   // Any ASCII punctuation character may be backslash-escaped.
@@ -13,6 +13,9 @@ function commonmarkEscape(str: string): string {
 
   while (i < str.length) {
     const char = str[i];
+    if (char === undefined) {
+      break;
+    }
 
     if (char === "\\") {
       // Check if this is an escaped backslash (\\)
@@ -24,9 +27,10 @@ function commonmarkEscape(str: string): string {
       }
 
       // Check if the next character is escapable (a punctuation character)
-      if (i + 1 < str.length && markdownSyntaxCharacters.includes(str[i + 1])) {
+      const nextChar = str[i + 1];
+      if (nextChar !== undefined && markdownSyntaxCharacters.includes(nextChar)) {
         // Valid escape sequence - keep the backslash and the character as is
-        result += str[i] + str[i + 1];
+        result += char + nextChar;
         i += 2;
         continue;
       }

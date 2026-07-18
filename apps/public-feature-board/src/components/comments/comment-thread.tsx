@@ -1,4 +1,4 @@
-import type { Comment } from "@feeblo/domain/comments/schema";
+import type { TComment } from "@feeblo/domain/comments/schema";
 import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -21,10 +21,10 @@ export function CommentThread({
   repliesByParentId,
 }: {
   canReply: boolean;
-  comment: Comment;
+  comment: TComment;
   currentUserName: string | null;
   onSubmitReply: (content: string, parentCommentId: string) => Promise<void>;
-  repliesByParentId: ReadonlyMap<string, Comment[]>;
+  repliesByParentId: ReadonlyMap<string, TComment[]>;
 }) {
   const [isReplying, setIsReplying] = useState(false);
   const replies = repliesByParentId.get(comment.id) ?? [];

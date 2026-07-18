@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
   "extends": "../config/tsconfig.base.json",
   "compilerOptions": {
+    "lib": ["ESNext", "DOM"],
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "plugins": [

@@ -93,7 +93,8 @@ export function ChangelogPage() {
                   <header>
                     <Link
                       className="block w-fit transition-opacity hover:opacity-80"
-                      to={`/changelog/${item.slug}`}
+                      params={{ changelogSlug: item.slug }}
+                      to="/changelog/$changelogSlug"
                     >
                       <h3 className="font-semibold text-2xl tracking-tight sm:text-3xl">
                         {item.title}
