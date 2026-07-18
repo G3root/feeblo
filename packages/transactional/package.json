@@ -11,6 +11,9 @@
     "./mailer": {
       "default": "./src/mailer.ts"
     },
+    "./mailer/test": {
+      "default": "./src/test-mailer.ts"
+    },
     "./templates/*": {
       "default": "./src/templates/*.tsx"
     }

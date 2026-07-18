@@ -9,7 +9,7 @@ import { createTransport } from "nodemailer";
 import type { ReactElement } from "react";
 import { MailerConfig } from "./config";
 
-type MailMessage = {
+export type MailMessage = {
   readonly to: string;
   readonly subject: string;
   readonly react: ReactElement;
