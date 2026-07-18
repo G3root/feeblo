@@ -4,6 +4,7 @@ export type LogCategory =
   | "lifecycle"
   | "message"
   | "positioning"
+  | "link"
   | "trigger"
   | "identity"
   | "config"

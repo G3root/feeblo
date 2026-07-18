@@ -1,4 +1,5 @@
 import {
+  authClient,
   clearAuthStateCache,
   initAuthStateCache,
 } from "@feeblo/web-shared/auth-client";
@@ -19,10 +20,30 @@ import { NotFoundPage } from "../routes/not-found-page";
 
 const rootRoute = createRootRoute({
   beforeLoad: async () => {
-    const session = await initAuthStateCache();
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get("ssoToken");
+    const organizationId = getCurrentOrganizationId();
+    let session = await initAuthStateCache();
+
+    if (token && organizationId) {
+      url.searchParams.delete("ssoToken");
+      window.history.replaceState(window.history.state, "", url);
+
+      if (session?.user.restrictedToOrganizationId !== organizationId) {
+        const result = await authClient.signIn.jwtAutoLogin({
+          organizationId,
+          token,
+        });
+        if (result.error) {
+          throw new Error(result.error.message ?? "Feeblo auto-login failed");
+        }
+        clearAuthStateCache();
+        session = await initAuthStateCache();
+      }
+    }
+
     const restrictedToOrganizationId =
       session?.user?.restrictedToOrganizationId;
-    const organizationId = getCurrentOrganizationId();
 
     if (
       restrictedToOrganizationId &&

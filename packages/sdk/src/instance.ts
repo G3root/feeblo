@@ -2,6 +2,7 @@ import { banner } from "./debug";
 import { Embed } from "./embed";
 import { EmbedError } from "./errors";
 import { resolveBaseUrl } from "./iframe";
+import { startLinkAuthentication } from "./links";
 import { startTriggerScanning, stopTriggerScanning } from "./triggers";
 import type {
   EmbedOptions,
@@ -15,6 +16,7 @@ import { isBrowser } from "./utils";
 let currentEmbed: Embed | null = null;
 let currentOrgId: string | null = null;
 let globalCleanup: (() => void) | null = null;
+let linkCleanup: (() => void) | null = null;
 
 function setupGlobalListeners(): void {
   if (globalCleanup) {
@@ -58,6 +60,8 @@ export function destroyInstance(embed: Embed | null): void {
   embed.destroy();
   if (currentEmbed === embed) {
     stopTriggerScanning();
+    linkCleanup?.();
+    linkCleanup = null;
     globalCleanup?.();
     currentEmbed = null;
     currentOrgId = null;
@@ -157,6 +161,7 @@ export function init(
 
   setupGlobalListeners();
   startTriggerScanning(embed, embed.logger);
+  linkCleanup = startLinkAuthentication(embed, embed.logger);
 
   if (embed.logger.enabled) {
     banner(organizationId, resolveBaseUrl(resolvedOptions));

@@ -132,6 +132,19 @@ https://feedback.yourdomain.com/?ssoToken=JWT
 Feeblo will verify the token, create a session, and redirect the user back with
 the token removed from the URL.
 
+Links marked with `data-feeblo-link` receive the JWT from the most recent
+`identify` call automatically when the user interacts with them:
+
+```html
+<a href="https://feedback.yourdomain.com/" data-feeblo-link>
+  Give feedback
+</a>
+```
+
+The SDK adds `?ssoToken=JWT` on mouse, keyboard, and context-menu interaction.
+The public board exchanges it for a restricted session cookie and immediately
+removes the token from the visible URL.
+
 ## Triggers
 
 Any element with the `data-feeblo-feedback` attribute automatically opens the

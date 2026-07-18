@@ -8,6 +8,7 @@ import {
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import { z } from "zod";
 import { clientTimeZoneHeader } from "./client-time-zone";
+import { jwtAutoLoginClient } from "./plugins/jwt-auto-login/client";
 import type {
   Auth,
   AuthClientMembership,
@@ -25,6 +26,7 @@ export const createAuthClient = (
       organizationClient(),
       twoFactorClient(),
       adminClient(),
+      jwtAutoLoginClient(),
     ],
     baseURL,
     fetchOptions: {

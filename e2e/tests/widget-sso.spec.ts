@@ -7,6 +7,7 @@ import { createTestUser } from "../helpers/test-users";
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const organizationIdPattern = /^org_/;
+const ssoTokenPattern = /ssoToken/;
 const sdkBundlePath = fileURLToPath(
   new URL("../../packages/sdk/dist/feeblo-sdk.umd.cjs", import.meta.url)
 );
@@ -81,6 +82,7 @@ test(
     const feedbackTitle = `Widget feedback ${randomUUID().slice(0, 8)}`;
     const feedbackContent =
       "Submitted from the embedded feedback widget by an identified user.";
+    const boardUrl = publicBoardUrl(owner.workspaceName);
     const visitorContext = await browser.newContext();
     const visitorPage = await visitorContext.newPage();
 
@@ -93,6 +95,7 @@ test(
             <body>
               <h1>Host application</h1>
               <button type="button">Give feedback</button>
+              <a href="${boardUrl}" data-feeblo-link>Open public board</a>
             </body>
           </html>
         `);
@@ -100,6 +103,10 @@ test(
 
         await visitorPage.evaluate(
           ({ host, identity, orgId }) => {
+            type WidgetHandle = {
+              close: () => WidgetHandle;
+              open: () => WidgetHandle;
+            };
             const browserGlobal = globalThis as unknown as {
               Feeblo: {
                 init: (
@@ -113,8 +120,9 @@ test(
                       token: string;
                     };
                   }
-                ) => { open: () => void };
+                ) => WidgetHandle;
               };
+              e2eWidget?: WidgetHandle;
               addEventListener: (
                 event: string,
                 listener: (event: unknown) => void,
@@ -135,7 +143,7 @@ test(
               { once: true }
             );
 
-            browserGlobal.Feeblo.init(orgId, {
+            browserGlobal.e2eWidget = browserGlobal.Feeblo.init(orgId, {
               baseUrl: host,
               user: {
                 id: identity.userId,
@@ -185,17 +193,47 @@ test(
         );
       });
 
-      await test.step("use the same identity token for public-board SSO", async () => {
-        const ssoResponse = await visitorContext.request.post(
-          `${apiURL}/api/auth/sign-in/jwt-auto-login`,
-          {
-            data: { organizationId, token },
-            headers: { Origin: baseURL },
-          }
-        );
-        expect(ssoResponse.ok()).toBeTruthy();
+      await test.step("auto-login through a data-feeblo-link", async () => {
+        await visitorPage.evaluate(() => {
+          const browserGlobal = globalThis as unknown as {
+            e2eWidget?: { close: () => void };
+          };
+          browserGlobal.e2eWidget?.close();
+        });
+        await expect(
+          visitorPage.locator("#feeblo-embed-container")
+        ).toBeHidden();
 
-        await visitorPage.goto(publicBoardUrl(owner.workspaceName));
+        const publicBoardLink = visitorPage.getByRole("link", {
+          name: "Open public board",
+        });
+        await expect(publicBoardLink).not.toHaveAttribute(
+          "href",
+          ssoTokenPattern
+        );
+
+        const autoLoginResponse = visitorPage.waitForResponse(
+          (response) =>
+            response.url() === `${apiURL}/api/auth/sign-in/jwt-auto-login` &&
+            response.request().method() === "POST"
+        );
+        await publicBoardLink.click();
+
+        const response = await autoLoginResponse;
+        expect(
+          response.ok(),
+          `JWT auto-login response: ${await response.text()}`
+        ).toBeTruthy();
+
+        await expect(visitorPage).toHaveURL((url) => {
+          return url.origin === boardUrl && !url.searchParams.has("ssoToken");
+        });
+
+        const cookies = await visitorContext.cookies(apiURL);
+        expect(
+          cookies.some((cookie) => cookie.name === "better-auth.session_token")
+        ).toBeTruthy();
+
         await expect(
           visitorPage.getByRole("button", { name: "Sign out" })
         ).toBeVisible();

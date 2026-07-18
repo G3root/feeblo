@@ -248,6 +248,10 @@ export class Embed {
     }
   }
 
+  getAutoLoginToken(): string | undefined {
+    return this.identity?.token;
+  }
+
   private sendIdentify(): void {
     if (!this.identity) {
       return;
