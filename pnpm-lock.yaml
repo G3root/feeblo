@@ -270,6 +270,9 @@ importers:
       '@feeblo/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@feeblo/transactional':
+        specifier: workspace:*
+        version: link:../../packages/transactional
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../../packages/utils

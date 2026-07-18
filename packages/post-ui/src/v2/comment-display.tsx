@@ -443,6 +443,8 @@ function CommentDisplayitem({ data, currentUserId }: CommentDisplayItemProps) {
       createdAt={data.createdAt}
       isAuthor={currentUserId ? data.userId === currentUserId : false}
       isInternal={data.visibility === "INTERNAL"}
+      onDelete={() => {}}
+      onReply={() => {}}
       postId={data.postId}
     />
   );

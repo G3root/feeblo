@@ -11,11 +11,18 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
-import { WorkflowsLive } from "@feeblo/domain/workflows";
+import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
+import { Mailer } from "@feeblo/transactional/mailer";
+import {
+  makeMailerTestLayer,
+  TestMailer,
+  type TestMailerState,
+} from "@feeblo/transactional/mailer/test";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
@@ -26,13 +33,7 @@ import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
 import { ServerConfig } from "./config";
 import { corsVaryFix } from "./middlewares/cors-vary";
 
-const WorkFlowLayer = WorkflowsLive.pipe(
-  Layer.provide(Database.DatabaseContextLive),
-  Layer.provide(Database.SqlClientContextLive)
-);
-const ServiceLayers = Layer.merge(Database.DatabaseContextLive, WorkFlowLayer);
-const AuthLayer = Layer.effect(Auth, initAuthHandler());
-
+const useTestMailer = process.env.E2E_TEST_MAILER === "true";
 const BetterAuthApp = Effect.gen(function* () {
   const auth = yield* Auth;
   return yield* HttpEffect.fromWebHandler((request) =>
@@ -62,8 +63,45 @@ const RootRouter = HttpRouter.use((router) =>
   router.add("GET", "/", HttpServerResponse.text("Hello world"))
 );
 
+const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
+  HttpRouter.use((router) =>
+    router.add(
+      "GET",
+      "/__e2e/emails",
+      Effect.gen(function* () {
+        const state = yield* Ref.get(mailbox);
+        return yield* HttpServerResponse.json({
+          emails: state.renderedMessages,
+        });
+      }).pipe(Effect.orDie)
+    )
+  );
+
 const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
+  const mailbox = useTestMailer ? yield* TestMailer.make : undefined;
+  const makeMailerLayer = (): Layer.Layer<
+    Mailer,
+    Layer.Error<typeof Mailer.layer>
+  > => (mailbox ? makeMailerTestLayer(mailbox) : Mailer.layer);
+  const WorkFlowLayer = mailbox
+    ? makeWorkflowsTest(makeMailerLayer).pipe(
+        Layer.provide(Database.DatabaseContextLive)
+      )
+    : WorkflowsLive.pipe(
+        Layer.provide(Database.DatabaseContextLive),
+        Layer.provide(Database.SqlClientContextLive)
+      );
+  const AuthLayer = Layer.effect(
+    Auth,
+    mailbox ? initAuthHandler(makeMailerLayer) : initAuthHandler()
+  );
+  const ServiceLayers = Layer.merge(
+    Database.DatabaseContextLive,
+    WorkFlowLayer
+  );
+  const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
+    mailbox ? Layer.merge(RootRouter, testMailboxRouter(mailbox)) : RootRouter;
 
   const isLocalDevHost = (host: string): boolean =>
     host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
@@ -113,7 +151,7 @@ const program = Effect.gen(function* () {
   };
 
   const AllRoutes = Layer.mergeAll(
-    RootRouter,
+    RootRouterLive,
     HealthRouter,
     RpcRoute,
     HttpRoute,

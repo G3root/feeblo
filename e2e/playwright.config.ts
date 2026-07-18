@@ -18,6 +18,7 @@ const e2eEnv = {
   AUTH_EMAIL_VERIFICATION_REQUIRED: "false",
   AUTH_ENCRYPTION_KEY: "playwright-e2e-local-secret-32-chars",
   DATABASE_URL: databaseURL,
+  E2E_TEST_MAILER: "true",
   NODE_ENV: "development",
   SERVER_PORT: serverPort,
 };
@@ -31,7 +32,7 @@ export default defineConfig({
   ...(process.env.CI ? { workers: 1 } : {}),
   reporter: process.env.CI
     ? [["list"], ["github"], ["html", { open: "never" }]]
-    : [["list"], ["html", { open: "on-failure" }]],
+    : [["list"], ["html", { open: "never" }]],
   timeout: 60_000,
   expect: {
     timeout: 10_000,

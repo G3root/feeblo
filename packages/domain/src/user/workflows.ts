@@ -6,7 +6,6 @@ import {
 import { createUserFeedbackEmail } from "@feeblo/transactional/templates/user-feedback";
 import { createUserOnboardingEmail } from "@feeblo/transactional/templates/user-onboarding";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as S from "effect/Schema";
 import * as W from "effect/unstable/workflow";
 
@@ -95,4 +94,4 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
       )
     );
   })
-).pipe(Layer.provide(Mailer.layer));
+);

@@ -59,7 +59,12 @@ const loadVerificationOtpEmail = () =>
 const createTestUtilsPlugin = (): BetterAuthPlugin =>
   testUtils({ captureOTP: true }) as unknown as BetterAuthPlugin;
 
-export const initAuthHandler = () =>
+export const initAuthHandler = (
+  makeMailerLayer: () => Layer.Layer<
+    Mailer,
+    Layer.Error<typeof Mailer.layer>
+  > = () => Mailer.layer
+) =>
   Effect.gen(function* () {
     const {
       appUrl,
@@ -93,7 +98,7 @@ export const initAuthHandler = () =>
         BillingRepository.layer,
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
         MembershipRepository.layer,
-        Mailer.layer,
+        makeMailerLayer(),
         WorkspaceRepository.layer,
         SsoRepositoriesLive
       ).pipe(Layer.provideMerge(dbLayer))
@@ -543,7 +548,7 @@ export const initAuthHandler = () =>
         PolarService.layer,
         BillingRepository.layer,
         MembershipRepository.layer,
-        Mailer.layer,
+        makeMailerLayer(),
         WorkspaceRepository.layer
       )
     )
