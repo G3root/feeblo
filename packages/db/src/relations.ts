@@ -24,6 +24,8 @@ import {
   productTable,
   sessionTable,
   siteTable,
+  submissionNotificationBatchTable,
+  submissionNotificationQueueTable,
   subscriptionTable,
   tagTable,
   twoFactorTable,
@@ -62,6 +64,8 @@ export const relations = defineRelations(
     companyAttributeValueTable,
     contactAttributeDefinitionTable,
     contactAttributeValueTable,
+    submissionNotificationBatchTable,
+    submissionNotificationQueueTable,
   },
   (r) => ({
     userTable: {
@@ -219,6 +223,14 @@ export const relations = defineRelations(
         from: r.organizationTable.id,
         to: r.subscriptionTable.organizationId,
       }),
+      submissionNotificationBatch: r.one.submissionNotificationBatchTable({
+        from: r.organizationTable.id,
+        to: r.submissionNotificationBatchTable.organizationId,
+      }),
+      submissionNotificationQueue: r.many.submissionNotificationQueueTable({
+        from: r.organizationTable.id,
+        to: r.submissionNotificationQueueTable.organizationId,
+      }),
     },
     memberTable: {
       organization: r.one.organizationTable({
@@ -340,6 +352,10 @@ export const relations = defineRelations(
       subscriptions: r.many.postSubscriptionTable({
         from: r.postTable.id,
         to: r.postSubscriptionTable.postId,
+      }),
+      submissionNotification: r.one.submissionNotificationQueueTable({
+        from: r.postTable.id,
+        to: r.submissionNotificationQueueTable.postId,
       }),
     },
     postSubscriptionTable: {
@@ -518,6 +534,22 @@ export const relations = defineRelations(
       changelogTags: r.many.changelogTagTable({
         from: r.changelogTable.id,
         to: r.changelogTagTable.changelogId,
+      }),
+    },
+    submissionNotificationBatchTable: {
+      organization: r.one.organizationTable({
+        from: r.submissionNotificationBatchTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+    },
+    submissionNotificationQueueTable: {
+      organization: r.one.organizationTable({
+        from: r.submissionNotificationQueueTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      post: r.one.postTable({
+        from: r.submissionNotificationQueueTable.postId,
+        to: r.postTable.id,
       }),
     },
     changelogTagTable: {

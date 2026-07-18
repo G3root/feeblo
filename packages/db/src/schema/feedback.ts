@@ -782,6 +782,40 @@ export const companyAttributeValueTable = pgTable(
   ]
 );
 
+export const submissionNotificationQueueTable = pgTable(
+  "submission_notification_queue",
+  {
+    postId: text("post_id")
+      .primaryKey()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("submission_notification_queue_organization_idx").on(
+      table.organizationId
+    ),
+  ]
+);
+
+export const submissionNotificationBatchTable = pgTable(
+  "submission_notification_batch",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" })
+      .unique(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }
+);
+
 export type InsertComment = typeof commentTable.$inferInsert;
 export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
 export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;

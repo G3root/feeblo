@@ -8,9 +8,11 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { FailedToMergePostError } from "./errors";
 import type { TPostAdminUpdate, TPostUpdate } from "./schema";
+import { scheduleSubmissionNotificationBatch } from "./workflow";
 
 interface TPostFindMany {
   boardId?: string | null | undefined;
@@ -524,6 +526,31 @@ const makePostRepository = Effect.gen(function* () {
             );
         })
       ),
+
+    enqueueSubmissionNotification: ({
+      postId,
+      organizationId,
+    }: {
+      postId: string;
+      organizationId: string;
+    }) =>
+      db
+        .insert(schema.submissionNotificationQueueTable)
+        .values({ postId, organizationId })
+        .pipe(Effect.asVoid),
+
+    scheduleSubmissionNotification: (organizationId: string) =>
+      Effect.gen(function* () {
+        const engineOption = yield* Effect.serviceOption(WorkflowEngine);
+
+        if (Option.isNone(engineOption)) {
+          return;
+        }
+
+        yield* scheduleSubmissionNotificationBatch(organizationId).pipe(
+          Effect.provideService(WorkflowEngine, engineOption.value)
+        );
+      }),
   };
 });
 

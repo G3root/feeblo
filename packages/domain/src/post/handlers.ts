@@ -92,8 +92,29 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             userId: session.session.userId,
             ...(membership ? { memberId: membership.membershipId } : {}),
           });
+
+          yield* repository.enqueueSubmissionNotification({
+            postId: args.id,
+            organizationId: args.organizationId,
+          });
         })
       );
+
+      yield* repository
+        .scheduleSubmissionNotification(args.organizationId)
+        .pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to schedule submission notification workflow",
+              cause
+            ).pipe(
+              Effect.annotateLogs({
+                postId: args.id,
+                organizationId: args.organizationId,
+              })
+            )
+          )
+        );
     });
 
   // -- RPC handlers --

@@ -95,13 +95,15 @@ const pgDbEffect = PgDrizzle.make({ relations }).pipe(
 const pgliteDbEffect = PgDrizzlePglite.make({ relations }).pipe(
   Effect.provide(PgDrizzlePglite.DefaultServices),
   Effect.tap(testConnection),
-  Effect.map((db) => db as unknown as PgDrizzle.EffectPgDatabase)
+  Effect.map(
+    (db) => db as unknown as PgDrizzle.EffectPgDatabase<typeof relations>
+  )
 );
 
 // Define a DB service tag for dependency injection
 export class Database extends Context.Service<
   Database,
-  PgDrizzle.EffectPgDatabase
+  PgDrizzle.EffectPgDatabase<typeof relations>
 >()("@feeblo/Database") {}
 
 // Postgres-backed layers
