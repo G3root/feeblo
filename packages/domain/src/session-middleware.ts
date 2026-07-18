@@ -43,14 +43,6 @@ export type AuthHandler = {
     readonly getSession: (args: {
       readonly headers: Headers;
     }) => Promise<Session | null>;
-    readonly createInvitation: (args: {
-      readonly headers: Headers;
-      readonly body: {
-        readonly organizationId: string;
-        readonly email: string;
-        readonly role: "owner" | "admin" | "member";
-      };
-    }) => Promise<unknown>;
   };
 };
 

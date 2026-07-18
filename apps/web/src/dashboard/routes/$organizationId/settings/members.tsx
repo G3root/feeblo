@@ -7,6 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   InputGroup,
   InputGroupAddon,
@@ -21,6 +22,12 @@ import {
 } from "@feeblo/ui/select";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toastManager } from "@feeblo/ui/toast";
+import { authClient } from "@feeblo/web-shared/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import {
+  hasOwnerOrAdminRole,
+  PolicyGuard,
+} from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Plus, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -29,12 +36,8 @@ import * as React from "react";
 import { z } from "zod";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
-import { useAppForm } from "@feeblo/ui/hooks/form";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { hasOwnerOrAdminRole, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
-import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute("/$organizationId/settings/members")({
@@ -638,15 +641,13 @@ function InviteMemberForm() {
       onSubmit: InviteMemberFormSchema,
     },
     onSubmit: async ({ value, formApi }) => {
-      try {
-        await fetchRpc((rpc) =>
-          rpc.OrganizationInviteMember({
-            email: value.email.trim().toLowerCase(),
-            organizationId,
-            role: value.role,
-          })
-        );
-      } catch (_error) {
+      const result = await authClient.organization.inviteMember({
+        email: value.email.trim().toLowerCase(),
+        organizationId,
+        role: value.role,
+      });
+
+      if (result.error) {
         toastManager.add({
           title: "Failed to invite member",
           type: "error",

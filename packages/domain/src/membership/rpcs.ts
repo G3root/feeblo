@@ -7,7 +7,6 @@ import { AuthMiddleware } from "../session-middleware";
 import { MembershipServiceErrors } from "./errors";
 import {
   CancelInvitation,
-  InviteMember,
   Membership,
   OrganizationId,
   OrganizationInvitation,
@@ -29,11 +28,6 @@ export class MembershipRpcs extends RpcGroup.make(
   Rpc.make("OrganizationInvitationsList", {
     payload: OrganizationId,
     success: Schema.Array(OrganizationInvitation),
-    error: MembershipServiceErrors,
-  }),
-  Rpc.make("OrganizationInviteMember", {
-    payload: InviteMember,
-    success: Schema.Void,
     error: MembershipServiceErrors,
   }),
   Rpc.make("OrganizationUpdateMemberRole", {

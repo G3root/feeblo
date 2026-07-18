@@ -28,17 +28,15 @@ export async function waitForTestEmail(
 ): Promise<TestEmail> {
   let matchingEmail: TestEmail | undefined;
 
-  await expect
-    .poll(async () => {
-      const emails = await getTestEmails(request);
-      matchingEmail = emails.find(
-        (email) =>
-          email.to.toLowerCase() === recipient.toLowerCase() &&
-          invitationPathPattern.test(email.html)
-      );
-      return matchingEmail;
-    })
-    .toBeDefined();
+  await expect(async () => {
+    const emails = await getTestEmails(request);
+    matchingEmail = emails.find(
+      (email) =>
+        email.to.toLowerCase() === recipient.toLowerCase() &&
+        invitationPathPattern.test(email.html)
+    );
+    expect(matchingEmail).toBeDefined();
+  }).toPass();
 
   return matchingEmail as TestEmail;
 }

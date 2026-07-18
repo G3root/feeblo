@@ -46,6 +46,9 @@
     "./membership/repository": {
       "default": "./src/membership/repository.ts"
     },
+    "./membership/policies": {
+      "default": "./src/membership/policies.ts"
+    },
     "./workspace/repository": {
       "default": "./src/workspace/repository.ts"
     },

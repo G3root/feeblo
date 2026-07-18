@@ -1,4 +1,5 @@
 import { Column, Row, Section, Text } from "@react-email/components";
+import * as React from "react";
 import { Copy, EmailShell, Lead } from "./email-shell";
 
 type OrganizationInvitationEmailProps = {
@@ -56,7 +57,7 @@ export const createOrganizationInvitationEmail = (
   props: OrganizationInvitationEmailProps
 ) => ({
   subject: `Join ${props.organizationName} on Feeblo`,
-  react: <OrganizationInvitationEmail {...props} />,
+  react: React.createElement(OrganizationInvitationEmail, props),
 });
 
 OrganizationInvitationEmail.PreviewProps = {

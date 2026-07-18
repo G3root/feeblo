@@ -15,18 +15,19 @@ import {
   Tailwind,
   Text,
 } from "@react-email/components";
-import type { ReactNode } from "react";
+// biome-ignore lint/style/useImportType: the server TSX runtime requires React in scope
+import * as React from "react";
 
 type EmailShellProps = {
   readonly preview: string;
   readonly title: string;
   readonly eyebrow: string;
-  readonly children: ReactNode;
+  readonly children: React.ReactNode;
   readonly cta?: {
     readonly label: string;
     readonly href: string;
   };
-  readonly footer?: ReactNode;
+  readonly footer?: React.ReactNode;
 };
 
 export const EmailShell = ({
@@ -98,13 +99,13 @@ export const EmailShell = ({
   </Html>
 );
 
-export const Lead = ({ children }: { readonly children: ReactNode }) => (
+export const Lead = ({ children }: { readonly children: React.ReactNode }) => (
   <Text className="mx-0 mt-0 mb-[15px] text-[#3c4149] text-[15px] leading-[1.4]">
     {children}
   </Text>
 );
 
-export const Copy = ({ children }: { readonly children: ReactNode }) => (
+export const Copy = ({ children }: { readonly children: React.ReactNode }) => (
   <Text className="mx-0 mt-0 mb-[15px] text-[#3c4149] text-[15px] leading-[1.4]">
     {children}
   </Text>

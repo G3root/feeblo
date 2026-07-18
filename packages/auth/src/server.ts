@@ -5,8 +5,8 @@ import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
+import { MembershipPolicy } from "@feeblo/domain/membership/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
-import { isPrivilegedMemberRole } from "@feeblo/domain/plan-entitlements";
 import { PolicyDeniedError } from "@feeblo/domain/policy";
 import { WelcomeUserWorkflow } from "@feeblo/domain/user/workflows";
 import {
@@ -91,12 +91,20 @@ export const initAuthHandler = (
     const workflowEngine = yield* WorkflowEngine;
 
     const dbLayer = Layer.succeed(Database.Database, db);
+    const entitlementPolicyLayer = EntitlementPolicy.layer.pipe(
+      Layer.provide(WorkspaceRepository.layer)
+    );
+    const membershipPolicyLayer = MembershipPolicy.layer.pipe(
+      Layer.provide(entitlementPolicyLayer),
+      Layer.provide(MembershipRepository.layer)
+    );
 
     const callbackRuntime = ManagedRuntime.make(
       Layer.mergeAll(
         PolarService.layer,
         BillingRepository.layer,
-        EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+        entitlementPolicyLayer,
+        membershipPolicyLayer,
         MembershipRepository.layer,
         makeMailerLayer(),
         WorkspaceRepository.layer,
@@ -192,28 +200,6 @@ export const initAuthHandler = (
         throw mapPolicyDeniedToApiError(error);
       }
     };
-
-    const canAssignPrivilegedRole = (organizationId: string) =>
-      Effect.gen(function* () {
-        const entitlementPolicy = yield* EntitlementPolicy;
-        const membershipRepository = yield* MembershipRepository;
-
-        yield* entitlementPolicy.canAssignPrivilegedRole({
-          organizationId,
-          privilegedRoleCount: Effect.gen(function* () {
-            const privilegedMembersCount =
-              yield* membershipRepository.countPrivilegedMembers({
-                organizationId,
-              });
-            const pendingPrivilegedInvitationsCount =
-              yield* membershipRepository.countPendingPrivilegedInvitations({
-                organizationId,
-              });
-
-            return privilegedMembersCount + pendingPrivilegedInvitationsCount;
-          }),
-        });
-      });
 
     const baseConfig = {
       plugins: [jwtAutoLogin(ssoOptions)],
@@ -410,24 +396,24 @@ export const initAuthHandler = (
           allowUserToCreateOrganization: false,
           organizationHooks: {
             async beforeCreateInvitation(data) {
-              if (!isPrivilegedMemberRole(data.invitation.role)) {
-                return;
-              }
-
               await runCallbackPolicy(
-                canAssignPrivilegedRole(data.organization.id)
+                MembershipPolicy.use((policy) =>
+                  policy.canInviteRoleWithinPlan({
+                    organizationId: data.organization.id,
+                    role: data.invitation.role,
+                  })
+                )
               );
             },
             async beforeUpdateMemberRole(data) {
-              if (
-                !isPrivilegedMemberRole(data.newRole) ||
-                isPrivilegedMemberRole(data.member.role)
-              ) {
-                return;
-              }
-
               await runCallbackPolicy(
-                canAssignPrivilegedRole(data.organization.id)
+                MembershipPolicy.use((policy) =>
+                  policy.canChangeRoleWithinPlan({
+                    organizationId: data.organization.id,
+                    currentRole: data.member.role,
+                    newRole: data.newRole,
+                  })
+                )
               );
             },
           },

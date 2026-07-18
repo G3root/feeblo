@@ -30,6 +30,17 @@ type TCanAssignRoleWithinPlan = {
   role: "owner" | "admin" | "member";
 };
 
+type TCanInviteRoleWithinPlan = {
+  organizationId: string;
+  role: string;
+};
+
+type TCanChangeRoleWithinPlan = {
+  organizationId: string;
+  currentRole: string;
+  newRole: string;
+};
+
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
@@ -59,6 +70,33 @@ const makeMembershipPolicy = Effect.gen(function* () {
         Effect.map((members) => members.length > 0)
       );
 
+  const canAddPrivilegedRole = (organizationId: string) =>
+    entitlementPolicy.canAssignPrivilegedRole({
+      organizationId,
+      privilegedRoleCount: Effect.gen(function* () {
+        const privilegedMembersCount = yield* repository.countPrivilegedMembers(
+          { organizationId }
+        );
+        const pendingPrivilegedInvitationsCount =
+          yield* repository.countPendingPrivilegedInvitations({
+            organizationId,
+          });
+
+        return privilegedMembersCount + pendingPrivilegedInvitationsCount;
+      }),
+    });
+
+  const canInviteRoleWithinPlan = (args: TCanInviteRoleWithinPlan) =>
+    isPrivilegedMemberRole(args.role)
+      ? canAddPrivilegedRole(args.organizationId)
+      : Effect.void;
+
+  const canChangeRoleWithinPlan = (args: TCanChangeRoleWithinPlan) =>
+    isPrivilegedMemberRole(args.newRole) &&
+    !isPrivilegedMemberRole(args.currentRole)
+      ? canAddPrivilegedRole(args.organizationId)
+      : Effect.void;
+
   const canAssignRoleWithinPlan = (args: TCanAssignRoleWithinPlan) =>
     Effect.gen(function* () {
       const member = yield* repository.findMemberById({
@@ -71,27 +109,10 @@ const makeMembershipPolicy = Effect.gen(function* () {
         });
       }
 
-      if (
-        !isPrivilegedMemberRole(args.role) ||
-        isPrivilegedMemberRole(member.value.role)
-      ) {
-        return;
-      }
-
-      yield* entitlementPolicy.canAssignPrivilegedRole({
+      yield* canChangeRoleWithinPlan({
         organizationId: args.organizationId,
-        privilegedRoleCount: Effect.gen(function* () {
-          const privilegedMembersCount =
-            yield* repository.countPrivilegedMembers({
-              organizationId: args.organizationId,
-            });
-          const pendingPrivilegedInvitationsCount =
-            yield* repository.countPendingPrivilegedInvitations({
-              organizationId: args.organizationId,
-            });
-
-          return privilegedMembersCount + pendingPrivilegedInvitationsCount;
-        }),
+        currentRole: member.value.role,
+        newRole: args.role,
       });
     });
 
@@ -100,6 +121,8 @@ const makeMembershipPolicy = Effect.gen(function* () {
     isMember,
     hasOtherOwners: (args: THasOtherOwners) =>
       Policy.all(hasOtherOwners(args), isMember(args)),
+    canInviteRoleWithinPlan,
+    canChangeRoleWithinPlan,
     canAssignRoleWithinPlan,
   };
 });

@@ -44,14 +44,6 @@ export const OrganizationId = S.Struct({
 
 export type TOrganizationId = S.Schema.Type<typeof OrganizationId>;
 
-export const InviteMember = S.Struct({
-  organizationId: WorkspaceId.schema,
-  email: S.String,
-  role: ROLE_LITERAL,
-});
-
-export type TInviteMember = S.Schema.Type<typeof InviteMember>;
-
 export const UpdateMemberRole = S.Struct({
   organizationId: WorkspaceId.schema,
   memberId: MemberId.schema,
