@@ -99,7 +99,7 @@ const makeBoardPolicy = Effect.gen(function* () {
       })
     );
 
-  return { isCreator, isOwner, canCreate, canDelete, canUpdate };
+  return { canCreate, canDelete, canUpdate };
 });
 
 export class BoardPolicy extends Context.Service<BoardPolicy>()("BoardPolicy", {

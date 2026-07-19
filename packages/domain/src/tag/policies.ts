@@ -38,15 +38,9 @@ const makeTagPolicy = Effect.gen(function* () {
         )
     );
 
-  const isOrganizationOwnerOrAdmin = (organizationId: string) =>
-    Policy.any(
-      Policy.hasOrganizationRole(organizationId, "admin"),
-      Policy.hasOrganizationRole(organizationId, "owner")
-    );
-
   const isOwner = (args: TIsOwner) =>
     Policy.any(
-      isOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
       isCreator(args)
     );
 
@@ -66,9 +60,6 @@ const makeTagPolicy = Effect.gen(function* () {
     );
 
   return {
-    isCreator,
-    isOrganizationOwnerOrAdmin,
-    isOwner,
     canCreate,
     canDelete,
     canUpdate,

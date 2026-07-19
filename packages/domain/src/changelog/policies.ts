@@ -73,7 +73,7 @@ const makeChangelogPolicy = Effect.gen(function* () {
       })
     );
 
-  return { isCreator, isOwner, canCreate, canDelete, canUpdate };
+  return { canCreate, canDelete, canUpdate };
 });
 
 export class ChangelogPolicy extends Context.Service<ChangelogPolicy>()(

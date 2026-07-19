@@ -9,11 +9,6 @@ import { isPrivilegedMemberRole } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { MembershipRepository } from "./repository";
 
-type TIsNotMember = {
-  organizationId: string;
-  email: string;
-};
-
 type THasOtherOwners = {
   organizationId: string;
   memberId: string;
@@ -58,14 +53,6 @@ type TCanUpdateMemberRole = {
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
-
-  const isNotMember = (args: TIsNotMember) =>
-    repository
-      .findMemberByEmailInOrg({
-        organizationId: args.organizationId,
-        email: args.email,
-      })
-      .pipe(Effect.map(Option.isNone));
 
   const isMemberAlready = (args: TIsMember) =>
     repository
@@ -155,10 +142,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
     );
 
   return {
-    isNotMember,
-    isMember: isMemberAlready,
     canInviteRoleWithinPlan,
-    canChangeRoleWithinPlan,
     canAssignRoleWithinPlan,
     canCancelInvitation,
     canRemoveMember,

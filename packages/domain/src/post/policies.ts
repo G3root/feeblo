@@ -158,9 +158,6 @@ const makePostPolicy = Effect.gen(function* () {
   const canMerge = canAdminUpdate;
 
   return {
-    isCreator,
-    isOrganizationOwnerOrAdmin,
-    isOwner,
     isUnlocked,
     isUnlockedPublic,
     canCreate,

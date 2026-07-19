@@ -28,19 +28,6 @@ const makeSitePolicy = Effect.gen(function* () {
       entitlementPolicy.canHidePoweredByBranding(args)
     );
 
-  const canViewRoadmap = (organizationId: string) =>
-    Effect.gen(function* () {
-      const site = yield* siteRepository.findByOrganizationId({
-        organizationId,
-      });
-
-      if (Option.isNone(site) || site.value.roadmapVisibility !== "PUBLIC") {
-        return yield* new Policy.PolicyDeniedError({
-          reason: "Roadmap is not publicly visible.",
-        });
-      }
-    });
-
   const canViewChangelog = (organizationId: string) =>
     Effect.gen(function* () {
       const site = yield* siteRepository.findByOrganizationId({
@@ -57,7 +44,6 @@ const makeSitePolicy = Effect.gen(function* () {
   return {
     canManageSite,
     canHidePoweredByBranding,
-    canViewRoadmap,
     canViewChangelog,
   };
 });

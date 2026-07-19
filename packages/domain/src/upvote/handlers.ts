@@ -3,18 +3,18 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
-import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { UpvotePolicy } from "./policies";
 import { UpvoteRepository } from "./repository";
 import { UpvoteRpcs } from "./rpcs";
 import type { TUpvoteList, TUpvoteToggle } from "./schema";
 
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
-  const postPolicy = yield* PostPolicy;
+  const upvotePolicy = yield* UpvotePolicy;
   const subscriptionRepository = yield* PostSubscriptionRepository;
   // const sitePolicy = yield* SitePolicy;
 
@@ -25,7 +25,12 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
         .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          Policy.withPolicy(
+            upvotePolicy.canList({
+              organizationId: args.organizationId,
+              source: "dashboard",
+            })
+          ),
           withRemapDbErrors("Upvote", "select")
         ),
     UpvoteToggle: (args: TUpvoteToggle) =>
@@ -58,13 +63,11 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         return result;
       }).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
+          upvotePolicy.canToggle({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            source: "dashboard",
+          })
         ),
         withRemapDbErrors("Upvote", "update")
       ),
@@ -107,13 +110,11 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         return result;
       }).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            })
-          )
+          upvotePolicy.canToggle({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            source: "public",
+          })
         ),
         withRemapDbErrors("Upvote", "update")
       ),
@@ -123,7 +124,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
 export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
   UpvoteRpcHandlersEffect
 ).pipe(
-  Layer.provide(PostPolicy.layer),
+  Layer.provide(UpvotePolicy.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(UpvoteRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer)

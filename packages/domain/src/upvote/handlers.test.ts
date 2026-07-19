@@ -9,14 +9,11 @@ import {
 } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
-import {
-  CurrentSession,
-  type Session,
-} from "../session-middleware";
+import { CurrentSession, type Session } from "../session-middleware";
 import { UpvoteRpcHandlersEffect } from "./handlers";
+import { UpvotePolicy } from "./policies";
 import { UpvoteRepository } from "./repository";
 
 describe("UpvoteRpcHandlers", () => {
@@ -30,7 +27,7 @@ describe("UpvoteRpcHandlers", () => {
 
   const makeSession = (
     fixture: Fixture,
-    role: Session["memberships"][number]["role"] | null = "owner",
+    role: Session["memberships"][number]["role"] | null = "owner"
   ): Session => ({
     user: {
       id: fixture.userId,
@@ -110,7 +107,7 @@ describe("UpvoteRpcHandlers", () => {
     fixture: Fixture,
     id: LegidOf<"PostId">,
     title: string,
-    content = title,
+    content = title
   ) =>
     Effect.gen(function* () {
       const repository = yield* PostRepository;
@@ -150,11 +147,11 @@ describe("UpvoteRpcHandlers", () => {
   const RepositoriesTest = Layer.mergeAll(
     PostRepository.layer,
     UpvoteRepository.layer,
-    PostSubscriptionRepository.layer,
+    PostSubscriptionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
-  const HandlerTest = PostPolicy.layer.pipe(
-    Layer.provideMerge(RepositoriesTest),
+  const HandlerTest = UpvotePolicy.layer.pipe(
+    Layer.provideMerge(RepositoriesTest)
   );
 
   const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
@@ -173,13 +170,13 @@ describe("UpvoteRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("lists upvotes for members", () =>
@@ -212,7 +209,7 @@ describe("UpvoteRpcHandlers", () => {
             memberId: fixture.membershipId,
           });
           expect(upvotes[0]?.user.name).toBe("Test User");
-        }),
+        })
       );
     });
 
@@ -234,13 +231,13 @@ describe("UpvoteRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("rejects upvoting on locked posts", () =>
@@ -265,11 +262,11 @@ describe("UpvoteRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 postId,
               })
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture))),
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("toggles upvote on for a post", () =>
@@ -298,7 +295,7 @@ describe("UpvoteRpcHandlers", () => {
 
           expect(upvotes).toHaveLength(1);
           expect(upvotes[0]).toMatchObject({ postId, userId: fixture.userId });
-        }),
+        })
       );
 
       it.effect("toggles upvote off when already upvoted", () =>
@@ -334,7 +331,7 @@ describe("UpvoteRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           expect(upvotes).toHaveLength(0);
-        }),
+        })
       );
     });
 
@@ -366,7 +363,7 @@ describe("UpvoteRpcHandlers", () => {
             userId: fixture.userId,
           });
           expect(upvotes[0]?.user.name).toBe("Test User");
-        }),
+        })
       );
     });
 
@@ -385,10 +382,7 @@ describe("UpvoteRpcHandlers", () => {
               postId,
             })
             .pipe(
-              Effect.provideService(
-                CurrentSession,
-                makeSession(fixture, null),
-              ),
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
             );
 
           expect(result.upvoted).toBe(true);
@@ -400,7 +394,7 @@ describe("UpvoteRpcHandlers", () => {
 
           expect(upvotes).toHaveLength(1);
           expect(upvotes[0]).toMatchObject({ postId, userId: fixture.userId });
-        }),
+        })
       );
 
       it.effect("rejects upvoting on locked posts via public endpoint", () =>
@@ -425,46 +419,48 @@ describe("UpvoteRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 postId,
               })
-              .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
-              ),
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
-      it.effect("rejects upvoting on private board posts via public endpoint", () =>
-        Effect.gen(function* () {
-          const handlers = yield* UpvoteRpcHandlersEffect;
-          const fixture = yield* makeFixture("PUBLIC");
-          const privateBoardId = yield* addBoard(fixture, "PRIVATE");
-          const postId = yield* PostId.generate;
+      it.effect(
+        "rejects upvoting on private board posts via public endpoint",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* UpvoteRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const privateBoardId = yield* addBoard(fixture, "PRIVATE");
+            const postId = yield* PostId.generate;
 
-          // Create a post on the private board via repository directly
-          const repository = yield* PostRepository;
-          yield* repository.create({
-            id: postId,
-            boardId: privateBoardId,
-            organizationId: fixture.organizationId,
-            statusId: fixture.statusId,
-            title: "Private post",
-            content: "Content",
-            creatorId: fixture.userId,
-            creatorMemberId: fixture.membershipId,
-          });
+            // Create a post on the private board via repository directly
+            const repository = yield* PostRepository;
+            yield* repository.create({
+              id: postId,
+              boardId: privateBoardId,
+              organizationId: fixture.organizationId,
+              statusId: fixture.statusId,
+              title: "Private post",
+              content: "Content",
+              creatorId: fixture.userId,
+              creatorMemberId: fixture.membershipId,
+            });
 
-          const error = yield* Effect.flip(
-            handlers
-              .UpvoteTogglePublic({
-                organizationId: fixture.organizationId,
-                postId,
-              })
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture))),
-          );
+            const error = yield* Effect.flip(
+              handlers
+                .UpvoteTogglePublic({
+                  organizationId: fixture.organizationId,
+                  postId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                )
+            );
 
-          expect(error._tag).toBe("PolicyDenied");
-        }),
+            expect(error._tag).toBe("PolicyDenied");
+          })
       );
 
       it.effect("toggles upvote off via public endpoint", () =>
@@ -500,7 +496,7 @@ describe("UpvoteRpcHandlers", () => {
             organizationId: fixture.organizationId,
           });
           expect(upvotes).toHaveLength(0);
-        }),
+        })
       );
     });
   });
