@@ -154,14 +154,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostDelete: (args: TPostDelete) =>
       deletePostEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isOwner({
-              organizationId: args.organizationId,
-              postId: args.id,
-              boardId: args.boardId,
-            })
-          )
+          postPolicy.canDelete({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "dashboard",
+          })
         ),
         withRemapDbErrors("Post", "delete")
       ),
@@ -169,14 +167,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostDeletePublic: (args: TPostDelete) =>
       deletePostEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isOwner({
-              organizationId: args.organizationId,
-              postId: args.id,
-              boardId: args.boardId,
-            })
-          )
+          postPolicy.canDelete({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "public",
+          })
         ),
         withRemapDbErrors("Post", "delete")
       ),
@@ -184,14 +180,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUpdate: (args: TPostUpdate) =>
       updatePostEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isOwner({
-              organizationId: args.organizationId,
-              postId: args.id,
-              boardId: args.boardId,
-            })
-          )
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "dashboard",
+          })
         ),
         withRemapDbErrors("Post", "update")
       ),
@@ -199,32 +193,34 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUpdatePublic: (args: TPostUpdate) =>
       updatePostEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.id,
-            }),
-            postPolicy.isOwner({
-              organizationId: args.organizationId,
-              postId: args.id,
-              boardId: args.boardId,
-            })
-          )
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "public",
+          })
         ),
         withRemapDbErrors("Post", "update")
       ),
 
     PostCreate: (args: TPostCreate) =>
       createPostEffect(args).pipe(
-        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        Policy.withPolicy(
+          postPolicy.canCreate({
+            organizationId: args.organizationId,
+            source: "dashboard",
+          })
+        ),
         withRemapDbErrors("Post", "create")
       ),
 
     PostCreatePublic: (args: TPostCreate) =>
       createPostEffect(args, { source: "PUBLIC_BOARD" }).pipe(
         Policy.withPolicy(
-          Policy.hasRestrictedOrganizationScope(args.organizationId)
+          postPolicy.canCreate({
+            organizationId: args.organizationId,
+            source: "public",
+          })
         ),
         withRemapDbErrors("Post", "create")
       ),
@@ -233,9 +229,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       repository
         .adminUpdate(args)
         .pipe(
-          Policy.withPolicy(
-            postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
-          ),
+          Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
           withRemapDbErrors("Post", "update")
         ),
 
@@ -248,9 +242,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         }
         return yield* repository.merge(args);
       }).pipe(
-        Policy.withPolicy(
-          postPolicy.isOrganizationOwnerOrAdmin(args.organizationId)
-        ),
+        Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")
       ),
   };

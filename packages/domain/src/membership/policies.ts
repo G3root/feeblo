@@ -41,6 +41,20 @@ type TCanChangeRoleWithinPlan = {
   newRole: string;
 };
 
+type TCanCancelInvitation = {
+  organizationId: string;
+};
+
+type TCanRemoveMember = {
+  organizationId: string;
+  memberId: string;
+};
+
+type TCanUpdateMemberRole = {
+  organizationId: string;
+  memberId: string;
+};
+
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
@@ -53,10 +67,11 @@ const makeMembershipPolicy = Effect.gen(function* () {
       })
       .pipe(Effect.map(Option.isNone));
 
-  const isMember = (args: TIsMember) =>
+  const isMemberAlready = (args: TIsMember) =>
     repository
       .findMemberById({
         memberId: args.memberId,
+        organizationId: args.organizationId,
       })
       .pipe(Effect.map(Option.isSome));
 
@@ -101,6 +116,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
     Effect.gen(function* () {
       const member = yield* repository.findMemberById({
         memberId: args.memberId,
+        organizationId: args.organizationId,
       });
 
       if (Option.isNone(member)) {
@@ -116,14 +132,37 @@ const makeMembershipPolicy = Effect.gen(function* () {
       });
     });
 
+  const canCancelInvitation = (args: TCanCancelInvitation) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.hasOrganizationOwnerOrAdmin(args.organizationId)
+    );
+
+  const canRemoveMember = (args: TCanRemoveMember) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      isMemberAlready(args),
+      hasOtherOwners(args)
+    );
+
+  const canUpdateMemberRole = (args: TCanUpdateMemberRole) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      isMemberAlready(args),
+      hasOtherOwners(args)
+    );
+
   return {
     isNotMember,
-    isMember,
-    hasOtherOwners: (args: THasOtherOwners) =>
-      Policy.all(hasOtherOwners(args), isMember(args)),
+    isMember: isMemberAlready,
     canInviteRoleWithinPlan,
     canChangeRoleWithinPlan,
     canAssignRoleWithinPlan,
+    canCancelInvitation,
+    canRemoveMember,
+    canUpdateMemberRole,
   };
 });
 

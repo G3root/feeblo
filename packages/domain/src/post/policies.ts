@@ -8,10 +8,31 @@ import * as Policy from "../policy";
 import { PostRepository } from "./repository";
 import { PostIds } from "./schema";
 
+type TSource = "dashboard" | "public";
+
 type TIsCreator = {
   organizationId: string;
   postId: string | readonly string[];
   boardId: string;
+};
+
+type TCanCreate = {
+  organizationId: string;
+  source: TSource;
+};
+
+type TCanDelete = {
+  organizationId: string;
+  postId: string | readonly string[];
+  boardId: string;
+  source: TSource;
+};
+
+type TCanUpdate = {
+  organizationId: string;
+  postId: string;
+  boardId: string;
+  source: TSource;
 };
 
 type TIsUnlocked = {
@@ -78,12 +99,75 @@ const makePostPolicy = Effect.gen(function* () {
       })
     );
 
+  const canCreate = (args: TCanCreate) => {
+    if (args.source === "public") {
+      return Policy.hasRestrictedOrganizationScope(args.organizationId);
+    }
+    return Policy.hasMembership(args.organizationId);
+  };
+
+  const canDelete = (args: TCanDelete) => {
+    if (args.source === "public") {
+      return Policy.all(
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+        isOwner({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          boardId: args.boardId,
+        })
+      );
+    }
+    return Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({
+        organizationId: args.organizationId,
+        postId: args.postId,
+        boardId: args.boardId,
+      })
+    );
+  };
+
+  const canUpdate = (args: TCanUpdate) => {
+    if (args.source === "public") {
+      return Policy.all(
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+        isUnlockedPublic({
+          organizationId: args.organizationId,
+          postId: args.postId,
+        }),
+        isOwner({
+          organizationId: args.organizationId,
+          postId: args.postId,
+          boardId: args.boardId,
+        })
+      );
+    }
+    return Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({
+        organizationId: args.organizationId,
+        postId: args.postId,
+        boardId: args.boardId,
+      })
+    );
+  };
+
+  const canAdminUpdate = (organizationId: string) =>
+    isOrganizationOwnerOrAdmin(organizationId);
+
+  const canMerge = canAdminUpdate;
+
   return {
     isCreator,
     isOrganizationOwnerOrAdmin,
     isOwner,
     isUnlocked,
     isUnlockedPublic,
+    canCreate,
+    canDelete,
+    canUpdate,
+    canAdminUpdate,
+    canMerge,
   };
 });
 

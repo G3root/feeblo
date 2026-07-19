@@ -68,14 +68,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         })
       ).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(organizationId),
-            Policy.any(
-              Policy.hasOrganizationRole(organizationId, "owner"),
-              Policy.hasOrganizationRole(organizationId, "admin")
-            ),
-            membershipPolicy.hasOtherOwners({ organizationId, memberId })
-          )
+          membershipPolicy.canUpdateMemberRole({ organizationId, memberId })
         ),
         withRemapDbErrors("Membership", "update")
       ),
@@ -87,14 +80,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         })
         .pipe(
           Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(organizationId),
-              Policy.any(
-                Policy.hasOrganizationRole(organizationId, "owner"),
-                Policy.hasOrganizationRole(organizationId, "admin")
-              ),
-              membershipPolicy.hasOtherOwners({ organizationId, memberId })
-            )
+            membershipPolicy.canRemoveMember({ organizationId, memberId })
           ),
           withRemapDbErrors("Membership", "delete")
         ),
@@ -106,13 +92,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         .cancelInvitation({ organizationId, invitationId })
         .pipe(
           Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(organizationId),
-              Policy.any(
-                Policy.hasOrganizationRole(organizationId, "owner"),
-                Policy.hasOrganizationRole(organizationId, "admin")
-              )
-            )
+            membershipPolicy.canCancelInvitation({ organizationId })
           ),
           withRemapDbErrors("Invitation", "update")
         ),

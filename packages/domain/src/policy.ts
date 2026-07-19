@@ -112,7 +112,9 @@ export const hasMembership = (organizationId: string): Policy =>
  * Allows guests and regular users, but confines organization-SSO users to the
  * organization encoded in their authenticated session.
  */
-export const hasRestrictedOrganizationScope = (organizationId: string): Policy =>
+export const hasRestrictedOrganizationScope = (
+  organizationId: string
+): Policy =>
   policy((session) =>
     Effect.succeed(
       session.user.restrictedToOrganizationId == null ||
@@ -146,6 +148,17 @@ export const hasOrganizationRole = (
         (membership) =>
           membership.organizationId === organizationId &&
           membership.role === role
+      )
+    )
+  );
+
+export const hasOrganizationOwnerOrAdmin = (organizationId: string) =>
+  policy((user) =>
+    Effect.succeed(
+      user.memberships.some(
+        (membership) =>
+          membership.organizationId === organizationId &&
+          (membership.role === "owner" || membership.role === "admin")
       )
     )
   );

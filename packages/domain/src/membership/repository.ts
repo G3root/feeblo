@@ -30,6 +30,7 @@ interface TFindOwnersInOrg {
 
 interface TFindMemberById {
   memberId: string;
+  organizationId: string;
 }
 
 interface TDeleteMember {
@@ -169,7 +170,7 @@ const makeMembershipRepository = Effect.gen(function* () {
         })
         .pipe(Effect.asVoid),
 
-    findMemberById: ({ memberId }: TFindMemberById) =>
+    findMemberById: ({ memberId, organizationId }: TFindMemberById) =>
       db
         .select({
           id: schema.memberTable.id,
@@ -179,7 +180,12 @@ const makeMembershipRepository = Effect.gen(function* () {
           createdAt: schema.memberTable.createdAt,
         })
         .from(schema.memberTable)
-        .where(eq(schema.memberTable.id, memberId))
+        .where(
+          and(
+            eq(schema.memberTable.id, memberId),
+            eq(schema.memberTable.organizationId, organizationId)
+          )
+        )
         .pipe(Effect.map(EffectArray.get(0))),
 
     deleteMember: ({ memberId, organizationId }: TDeleteMember) =>
