@@ -51,6 +51,17 @@ jobs:
 
       - name: Build app
         run: pnpm run build
+        env:
+          APP_ROOT_DOMAIN: localhost
+          APP_URL: http://localhost:3101
+          API_URL: http://localhost:3100
+          CLOUDFLARE_ADAPTER: "false"
+
+      - name: Install Playwright browser
+        run: pnpm --filter @feeblo/e2e exec playwright install --with-deps chromium
+
+      - name: Run end-to-end tests using built apps
+        run: pnpm --filter @feeblo/e2e test:ci
   
   docker_smoke_test:
     name: Docker Smoke Test
@@ -115,4 +126,3 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: docker compose logs
-

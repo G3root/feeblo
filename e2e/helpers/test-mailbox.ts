@@ -12,6 +12,7 @@ export interface TestEmail {
 
 const mailboxUrl = `${apiURL}/__e2e/emails`;
 const invitationPathPattern = /\/invitation\/([^"<\s]+)/;
+const verificationCodePattern = /\b(\d{6})\b/;
 
 export async function getTestEmails(
   request: APIRequestContext
@@ -39,6 +40,32 @@ export async function waitForTestEmail(
   }).toPass();
 
   return matchingEmail as TestEmail;
+}
+
+export async function waitForVerificationEmail(
+  request: APIRequestContext,
+  recipient: string
+): Promise<TestEmail> {
+  let matchingEmail: TestEmail | undefined;
+
+  await expect(async () => {
+    const emails = await getTestEmails(request);
+    matchingEmail = emails.find(
+      (email) =>
+        email.to.toLowerCase() === recipient.toLowerCase() &&
+        email.subject.toLowerCase().includes("email verification") &&
+        verificationCodePattern.test(email.text)
+    );
+    expect(matchingEmail).toBeDefined();
+  }).toPass();
+
+  return matchingEmail as TestEmail;
+}
+
+export function verificationCodeFromEmail(email: TestEmail): string {
+  const match = email.text.match(verificationCodePattern);
+  expect(match?.[1]).toBeTruthy();
+  return match?.[1] ?? "";
 }
 
 export function invitationIdFromEmail(email: TestEmail): string {

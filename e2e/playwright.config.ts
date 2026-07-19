@@ -6,6 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 const serverPort = new URL(apiURL).port || "3100";
+const webPort = new URL(baseURL).port || "3101";
+const reuseBuiltApps = process.env.E2E_REUSE_BUILD === "true";
 const databaseURL =
   process.env.E2E_DATABASE_URL ??
   `pglite:${mkdtempSync(path.join(tmpdir(), "feeblo-e2e-"))}`;
@@ -17,9 +19,12 @@ const e2eEnv = {
   AUTH_AUTO_SIGN_IN_AFTER_SIGN_UP: "true",
   AUTH_EMAIL_VERIFICATION_REQUIRED: "false",
   AUTH_ENCRYPTION_KEY: "playwright-e2e-local-secret-32-chars",
+  CLOUDFLARE_ADAPTER: "false",
   DATABASE_URL: databaseURL,
   E2E_TEST_MAILER: "true",
+  HOST: "127.0.0.1",
   NODE_ENV: "development",
+  PORT: webPort,
   SERVER_PORT: serverPort,
 };
 
@@ -55,14 +60,18 @@ export default defineConfig({
 
   webServer: [
     {
-      command: "pnpm run dev:server:e2e",
+      command: reuseBuiltApps
+        ? "../node_modules/.bin/tsx scripts/migrate-pglite.ts && ../node_modules/.bin/tsx ../apps/server/src/index.ts"
+        : "pnpm run dev:server:e2e",
       env: e2eEnv,
       reuseExistingServer: false,
       timeout: 120_000,
       url: `${apiURL}/health`,
     },
     {
-      command: "pnpm run dev:web:e2e",
+      command: reuseBuiltApps
+        ? "node ../apps/web/dist/server/entry.mjs"
+        : "pnpm run dev:web:e2e",
       env: e2eEnv,
       reuseExistingServer: false,
       timeout: 120_000,

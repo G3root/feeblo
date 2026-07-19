@@ -18,7 +18,10 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { useTheme } from "@feeblo/ui/theme-provider";
-import { clearAuthStateCache } from "@feeblo/web-shared/auth-client";
+import {
+  authClient,
+  clearAuthStateCache,
+} from "@feeblo/web-shared/auth-client";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   CreditCardIcon,
@@ -83,9 +86,10 @@ export function NavUser() {
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
-              onClick={() => {
+              onClick={async () => {
+                await authClient.signOut();
                 clearAuthStateCache();
-                navigate({ to: "/sign-in" });
+                await navigate({ to: "/sign-in" });
               }}
             >
               <HugeiconsIcon icon={LogoutSquare01Icon} />

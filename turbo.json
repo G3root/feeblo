@@ -4,6 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["APP_ROOT_DOMAIN", "APP_URL", "API_URL", "CLOUDFLARE_ADAPTER"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
