@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
+import { PostRepository } from "../post/repository";
 import { CommentRepository } from "./repository";
 
 type TIsOwner = {
@@ -15,20 +16,42 @@ type TIsOwner = {
 type TCanCreate = {
   organizationId: string;
   visibility: "PUBLIC" | "INTERNAL";
+  postId: string;
+  source: "dashboard" | "public";
 };
 
 const makeCommentPolicy = Effect.gen(function* () {
   const repository = yield* CommentRepository;
+  const postRepository = yield* PostRepository;
 
-  const canCreate = (args: TCanCreate) =>
-    Policy.policy((user) =>
-      Effect.succeed(
-        args.visibility === "PUBLIC" ||
-          user.memberships.some(
-            (membership) => membership.organizationId === args.organizationId
-          )
+  const canCreate = (args: TCanCreate) => {
+    if (args.source === "public") {
+      return Policy.all(
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+        Policy.policy(() =>
+          postRepository.isUnlockedPublic({
+            id: args.postId,
+            organizationId: args.organizationId,
+          })
+        ),
+        Policy.any(
+          // member can create internal and public comments
+          Policy.hasMembership(args.organizationId),
+          Policy.policy(() => Effect.succeed(args.visibility === "PUBLIC"))
+        )
+      );
+    }
+
+    return Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.policy(() =>
+        postRepository.isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
       )
     );
+  };
 
   const isOwner = (args: TIsOwner) =>
     Policy.policy((user) =>

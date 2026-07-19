@@ -28,36 +28,17 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const commentPolicy = yield* CommentPolicy;
   const postPolicy = yield* PostPolicy;
-  const postRepository = yield* PostRepository;
   // const sitePolicy = yield* SitePolicy;
 
   const subscriptionRepository = yield* PostSubscriptionRepository;
 
   // -- Shared effect helpers (no policy applied) --
 
-  const createCommentEffect = (
-    args: TCommentCreate,
-    opts: { allowNonMemberPublic?: boolean } = {}
-  ) => {
+  const createCommentEffect = (args: TCommentCreate) => {
     const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
     return Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
-
-      const isPublicPost = yield* postRepository.isPublicPost({
-        id: args.postId,
-        organizationId: args.organizationId,
-      });
-
-      if (
-        opts.allowNonMemberPublic
-          ? args.visibility !== "PUBLIC" || !isPublicPost
-          : !membership && (args.visibility !== "PUBLIC" || !isPublicPost)
-      ) {
-        return yield* new Policy.PolicyDeniedError({
-          reason: "You are not allowed to comment on this post.",
-        });
-      }
 
       yield* transaction(
         Effect.gen(function* () {
@@ -200,35 +181,25 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     CommentCreate: (args: TCommentCreate) =>
       createCommentEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            }),
-            commentPolicy.canCreate({
-              organizationId: args.organizationId,
-              visibility: args.visibility,
-            })
-          )
+          commentPolicy.canCreate({
+            organizationId: args.organizationId,
+            visibility: args.visibility,
+            postId: args.postId,
+            source: "dashboard",
+          })
         ),
         withRemapDbErrors("Comment", "create")
       ),
 
     CommentCreatePublic: (args: TCommentCreate) =>
-      createCommentEffect(args, { allowNonMemberPublic: true }).pipe(
+      createCommentEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            }),
-            commentPolicy.canCreate({
-              organizationId: args.organizationId,
-              visibility: args.visibility,
-            })
-          )
+          commentPolicy.canCreate({
+            organizationId: args.organizationId,
+            visibility: args.visibility,
+            postId: args.postId,
+            source: "public",
+          })
         ),
         withRemapDbErrors("Comment", "create")
       ),

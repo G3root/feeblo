@@ -1,7 +1,3 @@
-import type {
-  TCompanyAttributeValue,
-  TContactAttributeValue,
-} from "@feeblo/domain/attribute-definition/schema";
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
