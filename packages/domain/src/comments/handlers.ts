@@ -4,7 +4,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
-import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { withRemapDbErrors } from "../rpc-errors";
@@ -221,7 +220,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   CommentRpcHandlersEffect
 ).pipe(
   // Layer.provide(SitePolicy.layer),
-  Layer.provide(PostPolicy.layer),
   Layer.provide(CommentPolicy.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),
