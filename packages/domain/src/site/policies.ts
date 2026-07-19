@@ -16,8 +16,17 @@ const makeSitePolicy = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
   const siteRepository = yield* SiteRepository;
 
+  const canManageSite = (organizationId: string) =>
+    Policy.all(
+      Policy.hasMembership(organizationId),
+      Policy.hasOrganizationOwnerOrAdmin(organizationId)
+    );
+
   const canHidePoweredByBranding = (args: TCanHidePoweredByBranding) =>
-    entitlementPolicy.canHidePoweredByBranding(args);
+    Policy.all(
+      canManageSite(args.organizationId),
+      entitlementPolicy.canHidePoweredByBranding(args)
+    );
 
   const canViewRoadmap = (organizationId: string) =>
     Effect.gen(function* () {
@@ -45,7 +54,12 @@ const makeSitePolicy = Effect.gen(function* () {
       }
     });
 
-  return { canHidePoweredByBranding, canViewRoadmap, canViewChangelog };
+  return {
+    canManageSite,
+    canHidePoweredByBranding,
+    canViewRoadmap,
+    canViewChangelog,
+  };
 });
 
 export class SitePolicy extends Context.Service<SitePolicy>()("SitePolicy", {

@@ -41,31 +41,16 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
       repository
         .update(args)
         .pipe(
-          Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(args.organizationId),
-              Policy.any(
-                Policy.hasOrganizationRole(args.organizationId, "owner"),
-                Policy.hasOrganizationRole(args.organizationId, "admin")
-              )
-            )
-          ),
+          Policy.withPolicy(sitePolicy.canManageSite(args.organizationId)),
           withRemapDbErrors("Site", "update")
         ),
     SiteHidePoweredByBranding: (args: TSiteHidePoweredByBranding) =>
       repository.updateHidePoweredByBranding(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            Policy.any(
-              Policy.hasOrganizationRole(args.organizationId, "owner"),
-              Policy.hasOrganizationRole(args.organizationId, "admin")
-            ),
-            sitePolicy.canHidePoweredByBranding({
-              organizationId: args.organizationId,
-              hidePoweredBy: args.hidePoweredBy,
-            })
-          )
+          sitePolicy.canHidePoweredByBranding({
+            organizationId: args.organizationId,
+            hidePoweredBy: args.hidePoweredBy,
+          })
         ),
         withRemapDbErrors("Site", "update")
       ),
