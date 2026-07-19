@@ -2,7 +2,6 @@ import { transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
@@ -86,54 +85,14 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       };
     });
 
-  const updateCommentEffect = (
-    args: TCommentUpdate,
-    opts: { allowNonMemberPublic?: boolean } = {}
-  ) => {
+  const updateCommentEffect = (args: TCommentUpdate) => {
     const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
     return Effect.gen(function* () {
       const session = yield* CurrentSession;
 
-      if (opts.allowNonMemberPublic) {
-        const updatedComment = yield* repository.update({
-          id: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          content: sanitizedMarkdown,
-          userId: session.session.userId,
-        });
-
-        if (!updatedComment) {
-          return yield* new FailedToUpdateCommentError({
-            message: "Failed to update comment",
-          });
-        }
-
-        return {
-          message: "Comment updated successfully",
-        };
-      }
-
       const membership = Policy.getMembership(session, args.organizationId);
 
-      //Todo turn into a policy
-      if (!membership) {
-        const existing = yield* repository.findById({
-          id: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          userId: session.session.userId,
-        });
-        if (
-          Option.isSome(existing) &&
-          existing.value.visibility !== args.visibility
-        ) {
-          return yield* new Policy.PolicyDeniedError({
-            reason: "You are not allowed to change comment visibility.",
-          });
-        }
-      }
-
+      //only members can update visibility
       const updatedComment = yield* repository.update({
         id: args.id,
         organizationId: args.organizationId,
@@ -236,6 +195,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             commentId: args.id,
             postId: args.postId,
+
             source: "dashboard",
           })
         ),
@@ -243,7 +203,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CommentUpdatePublic: (args: TCommentUpdate) =>
-      updateCommentEffect(args, { allowNonMemberPublic: true }).pipe(
+      updateCommentEffect(args).pipe(
         Policy.withPolicy(
           commentPolicy.canUpdate({
             organizationId: args.organizationId,
