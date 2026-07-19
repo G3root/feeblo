@@ -27,7 +27,6 @@ import type {
 export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const commentPolicy = yield* CommentPolicy;
-  const postPolicy = yield* PostPolicy;
   // const sitePolicy = yield* SitePolicy;
 
   const subscriptionRepository = yield* PostSubscriptionRepository;
@@ -207,18 +206,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     CommentDelete: (args: TCommentDelete) =>
       deleteCommentEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            }),
-            commentPolicy.isOwner({
-              organizationId: args.organizationId,
-              commentId: args.id,
-              postId: args.postId,
-            })
-          )
+          commentPolicy.canDelete({
+            organizationId: args.organizationId,
+            commentId: args.id,
+            postId: args.postId,
+            source: "dashboard",
+          })
         ),
         withRemapDbErrors("Comment", "delete")
       ),
@@ -226,18 +219,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     CommentDeletePublic: (args: TCommentDelete) =>
       deleteCommentEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            }),
-            commentPolicy.isOwner({
-              organizationId: args.organizationId,
-              commentId: args.id,
-              postId: args.postId,
-            })
-          )
+          commentPolicy.canDelete({
+            organizationId: args.organizationId,
+            commentId: args.id,
+            postId: args.postId,
+            source: "public",
+          })
         ),
         withRemapDbErrors("Comment", "delete")
       ),
@@ -245,18 +232,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     CommentUpdate: (args: TCommentUpdate) =>
       updateCommentEffect(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            postPolicy.isUnlocked({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            }),
-            commentPolicy.isOwner({
-              organizationId: args.organizationId,
-              commentId: args.id,
-              postId: args.postId,
-            })
-          )
+          commentPolicy.canUpdate({
+            organizationId: args.organizationId,
+            commentId: args.id,
+            postId: args.postId,
+            source: "dashboard",
+          })
         ),
         withRemapDbErrors("Comment", "update")
       ),
@@ -264,18 +245,12 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     CommentUpdatePublic: (args: TCommentUpdate) =>
       updateCommentEffect(args, { allowNonMemberPublic: true }).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasRestrictedOrganizationScope(args.organizationId),
-            postPolicy.isUnlockedPublic({
-              organizationId: args.organizationId,
-              postId: args.postId,
-            }),
-            commentPolicy.isOwner({
-              organizationId: args.organizationId,
-              commentId: args.id,
-              postId: args.postId,
-            })
-          )
+          commentPolicy.canUpdate({
+            organizationId: args.organizationId,
+            commentId: args.id,
+            postId: args.postId,
+            source: "public",
+          })
         ),
         withRemapDbErrors("Comment", "update")
       ),

@@ -7,6 +7,8 @@ import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import { CommentRepository } from "./repository";
 
+type TSource = "dashboard" | "public";
+
 type TIsOwner = {
   organizationId: string;
   commentId: string;
@@ -17,7 +19,21 @@ type TCanCreate = {
   organizationId: string;
   visibility: "PUBLIC" | "INTERNAL";
   postId: string;
-  source: "dashboard" | "public";
+  source: TSource;
+};
+
+type TCanDelete = {
+  organizationId: string;
+  commentId: string;
+  postId: string;
+  source: TSource;
+};
+
+type TCanUpdate = {
+  organizationId: string;
+  commentId: string;
+  postId: string;
+  source: TSource;
 };
 
 const makeCommentPolicy = Effect.gen(function* () {
@@ -65,9 +81,78 @@ const makeCommentPolicy = Effect.gen(function* () {
         .pipe(Effect.map(Option.isSome))
     );
 
+  const canDelete = (args: TCanDelete) => {
+    if (args.source === "public") {
+      return Policy.all(
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+        Policy.policy(() =>
+          postRepository.isUnlockedPublic({
+            id: args.postId,
+            organizationId: args.organizationId,
+          })
+        ),
+        isOwner({
+          organizationId: args.organizationId,
+          commentId: args.commentId,
+          postId: args.postId,
+        })
+      );
+    }
+
+    return Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.policy(() =>
+        postRepository.isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      ),
+      isOwner({
+        organizationId: args.organizationId,
+        commentId: args.commentId,
+        postId: args.postId,
+      })
+    );
+  };
+
+  const canUpdate = (args: TCanUpdate) => {
+    if (args.source === "public") {
+      return Policy.all(
+        Policy.hasRestrictedOrganizationScope(args.organizationId),
+        Policy.policy(() =>
+          postRepository.isUnlockedPublic({
+            id: args.postId,
+            organizationId: args.organizationId,
+          })
+        ),
+        isOwner({
+          organizationId: args.organizationId,
+          commentId: args.commentId,
+          postId: args.postId,
+        })
+      );
+    }
+
+    return Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.policy(() =>
+        postRepository.isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      ),
+      isOwner({
+        organizationId: args.organizationId,
+        commentId: args.commentId,
+        postId: args.postId,
+      })
+    );
+  };
+
   return {
     canCreate,
-    isOwner,
+    canDelete,
+    canUpdate,
   };
 });
 
