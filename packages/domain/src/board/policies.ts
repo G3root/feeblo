@@ -17,6 +17,11 @@ type TCanCreate = {
   visibility: "PUBLIC" | "PRIVATE";
 };
 
+type TCanDelete = {
+  organizationId: string;
+  boardId: string;
+};
+
 type TCanUpdate = {
   organizationId: string;
   boardId: string;
@@ -54,34 +59,47 @@ const makeBoardPolicy = Effect.gen(function* () {
     );
 
   const canCreate = (args: TCanCreate) =>
-    entitlementPolicy.canCreateBoard({
-      ...args,
-      boardCount: repository.countByOrganizationId({
-        organizationId: args.organizationId,
-      }),
-    });
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      entitlementPolicy.canCreateBoard({
+        ...args,
+        boardCount: repository.countByOrganizationId({
+          organizationId: args.organizationId,
+        }),
+      })
+    );
+
+  const canDelete = (args: TCanDelete) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({ organizationId: args.organizationId, boardId: args.boardId })
+    );
 
   const canUpdate = (args: TCanUpdate) =>
-    Effect.gen(function* () {
-      if (args.visibility !== "PRIVATE") {
-        return;
-      }
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({ organizationId: args.organizationId, boardId: args.boardId }),
+      Effect.gen(function* () {
+        if (args.visibility !== "PRIVATE") {
+          return;
+        }
 
-      const board = yield* repository.getById({
-        id: args.boardId,
-        organizationId: args.organizationId,
-      });
+        const board = yield* repository.getById({
+          id: args.boardId,
+          organizationId: args.organizationId,
+        });
 
-      if (Option.isSome(board) && board.value.visibility === "PRIVATE") {
-        return;
-      }
+        if (Option.isSome(board) && board.value.visibility === "PRIVATE") {
+          return;
+        }
 
-      yield* entitlementPolicy.canUpdateBoardVisibility({
-        organizationId: args.organizationId,
-      });
-    });
+        yield* entitlementPolicy.canUpdateBoardVisibility({
+          organizationId: args.organizationId,
+        });
+      })
+    );
 
-  return { isOwner, canCreate, canUpdate };
+  return { isCreator, isOwner, canCreate, canDelete, canUpdate };
 });
 
 export class BoardPolicy extends Context.Service<BoardPolicy>()("BoardPolicy", {

@@ -55,7 +55,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
         });
       }).pipe(
-        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        Policy.withPolicy(changelogPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Changelog", "create")
       );
     },
@@ -63,13 +63,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     ChangelogDelete: (args: TChangelogDelete) =>
       repository.delete(args).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            changelogPolicy.isOwner({
-              organizationId: args.organizationId,
-              changelogId: args.id,
-            })
-          )
+          changelogPolicy.canDelete({
+            organizationId: args.organizationId,
+            changelogId: args.id,
+          })
         ),
         withRemapDbErrors("Changelog", "delete")
       ),
@@ -83,13 +80,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         })
         .pipe(
           Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(args.organizationId),
-              changelogPolicy.isOwner({
-                organizationId: args.organizationId,
-                changelogId: args.id,
-              })
-            )
+            changelogPolicy.canUpdate({
+              organizationId: args.organizationId,
+              changelogId: args.id,
+            })
           ),
           withRemapDbErrors("Changelog", "update")
         );

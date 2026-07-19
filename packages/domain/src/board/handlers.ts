@@ -46,13 +46,10 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
         })
         .pipe(
           Policy.withPolicy(
-            Policy.all(
-              Policy.hasMembership(args.organizationId),
-              boardPolicy.isOwner({
-                organizationId: args.organizationId,
-                boardId: args.id,
-              })
-            )
+            boardPolicy.canDelete({
+              organizationId: args.organizationId,
+              boardId: args.id,
+            })
           ),
           withRemapDbErrors("Board", "delete")
         );
@@ -77,13 +74,10 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
         });
       }).pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            boardPolicy.canCreate({
-              organizationId: args.organizationId,
-              visibility: args.visibility,
-            })
-          )
+          boardPolicy.canCreate({
+            organizationId: args.organizationId,
+            visibility: args.visibility,
+          })
         ),
         withRemapDbErrors("Board", "create")
       );
@@ -102,20 +96,13 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
         }
 
         yield* repository.update(args);
-      }).pipe(
+      })      .pipe(
         Policy.withPolicy(
-          Policy.all(
-            Policy.hasMembership(args.organizationId),
-            boardPolicy.isOwner({
-              organizationId: args.organizationId,
-              boardId: args.id,
-            }),
-            boardPolicy.canUpdate({
-              organizationId: args.organizationId,
-              boardId: args.id,
-              visibility: args.visibility,
-            })
-          )
+          boardPolicy.canUpdate({
+            organizationId: args.organizationId,
+            boardId: args.id,
+            visibility: args.visibility,
+          })
         ),
         withRemapDbErrors("Board", "update")
       ),

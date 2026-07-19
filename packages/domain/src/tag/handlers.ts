@@ -139,14 +139,14 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           ...(membership ? { creatorMemberId: membership.membershipId } : {}),
         });
       }).pipe(
-        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        Policy.withPolicy(tagPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Tag", "create")
       ),
 
     TagUpdate: (args: TTagUpdate) =>
       repository.update(args).pipe(
         Policy.withPolicy(
-          tagPolicy.isOwner({
+          tagPolicy.canUpdate({
             organizationId: args.organizationId,
             tagId: args.id,
           })
@@ -157,7 +157,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
     TagDelete: (args: TTagDelete) =>
       repository.delete(args).pipe(
         Policy.withPolicy(
-          tagPolicy.isOwner({
+          tagPolicy.canDelete({
             organizationId: args.organizationId,
             tagId: args.id,
           })

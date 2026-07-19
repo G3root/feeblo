@@ -11,6 +11,16 @@ type TIsOwner = {
   tagId: string;
 };
 
+type TCanDelete = {
+  organizationId: string;
+  tagId: string;
+};
+
+type TCanUpdate = {
+  organizationId: string;
+  tagId: string;
+};
+
 const makeTagPolicy = Effect.gen(function* () {
   const repository = yield* TagRepository;
 
@@ -40,10 +50,28 @@ const makeTagPolicy = Effect.gen(function* () {
       isCreator(args)
     );
 
+  const canCreate = (organizationId: string) =>
+    Policy.hasMembership(organizationId);
+
+  const canDelete = (args: TCanDelete) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({ organizationId: args.organizationId, tagId: args.tagId })
+    );
+
+  const canUpdate = (args: TCanUpdate) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({ organizationId: args.organizationId, tagId: args.tagId })
+    );
+
   return {
     isCreator,
     isOrganizationOwnerOrAdmin,
     isOwner,
+    canCreate,
+    canDelete,
+    canUpdate,
   };
 });
 

@@ -11,6 +11,16 @@ type TIsCreator = {
   changelogId: string;
 };
 
+type TCanDelete = {
+  organizationId: string;
+  changelogId: string;
+};
+
+type TCanUpdate = {
+  organizationId: string;
+  changelogId: string;
+};
+
 const makeChangelogPolicy = Effect.gen(function* () {
   const repository = yield* ChangelogRepository;
 
@@ -42,7 +52,28 @@ const makeChangelogPolicy = Effect.gen(function* () {
       isCreator(args)
     );
 
-  return { isCreator, isOwner };
+  const canCreate = (organizationId: string) =>
+    Policy.hasMembership(organizationId);
+
+  const canDelete = (args: TCanDelete) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({
+        organizationId: args.organizationId,
+        changelogId: args.changelogId,
+      })
+    );
+
+  const canUpdate = (args: TCanUpdate) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isOwner({
+        organizationId: args.organizationId,
+        changelogId: args.changelogId,
+      })
+    );
+
+  return { isCreator, isOwner, canCreate, canDelete, canUpdate };
 });
 
 export class ChangelogPolicy extends Context.Service<ChangelogPolicy>()(
