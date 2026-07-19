@@ -480,6 +480,59 @@ describe("CommentRpcHandlers", () => {
         })
       );
 
+      it.effect(
+        "allows members to create internal comments without exposing them publicly",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* CommentRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const commentId = yield* CommentId.generate;
+
+            const result = yield* handlers
+              .CommentCreatePublic(
+                commentCreateInput(
+                  fixture,
+                  commentId,
+                  "Member-only context",
+                  "INTERNAL"
+                )
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(result.message).toBe("Comment created successfully");
+
+            const publicComments = yield* handlers
+              .CommentListPublic({
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+
+            expect(publicComments).toEqual([]);
+
+            const memberComments = yield* handlers
+              .CommentList({
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(memberComments).toHaveLength(1);
+            expect(memberComments[0]).toMatchObject({
+              id: commentId,
+              visibility: "INTERNAL",
+              memberId: fixture.membershipId,
+            });
+            expect(memberComments[0]?.content).toContain("Member-only context");
+          })
+      );
+
       it.effect("rejects non-members on private boards", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
