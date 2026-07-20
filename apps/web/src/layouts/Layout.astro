@@ -12,12 +12,15 @@ import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
 
+import { getSecret } from "astro:env/server";
+
 const clientHintCheckScript = getClientHintCheckScript();
+const noIndex = Boolean(getSecret("NO_INDEX"));
 ---
 
 <!doctype html>
 <html lang="en">
-  <CommonHead clientHintCheckScript={clientHintCheckScript} title={title} />
+  <CommonHead clientHintCheckScript={clientHintCheckScript} title={title} noIndex={noIndex} />
 
   <style is:global>
     .pending-shell {

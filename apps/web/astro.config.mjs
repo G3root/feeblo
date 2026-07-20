@@ -152,11 +152,17 @@ export default defineConfig({
                 return "floating-ui-vendor";
               }
 
-              if (id.includes("/better-auth/") || id.includes("/@better-auth/")) {
+              if (
+                id.includes("/better-auth/") ||
+                id.includes("/@better-auth/")
+              ) {
                 return "better-auth-vendor";
               }
 
-              if (id.includes("/node_modules/solid-js/") || id.includes("/@solidjs/")) {
+              if (
+                id.includes("/node_modules/solid-js/") ||
+                id.includes("/@solidjs/")
+              ) {
                 return "solid-vendor";
               }
 
@@ -207,6 +213,11 @@ export default defineConfig({
         optional: true,
       }),
       TURNSTILE_SITE_KEY: envField.string({
+        context: "server",
+        access: "secret",
+        optional: true,
+      }),
+      NO_INDEX: envField.string({
         context: "server",
         access: "secret",
         optional: true,

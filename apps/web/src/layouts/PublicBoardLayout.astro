@@ -4,17 +4,20 @@ import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
 
+import { getSecret } from "astro:env/server";
+
 interface Props {
   organizationId: string;
   title?: string;
 }
 
 const { title = "feeblo", organizationId } = Astro.props;
+const noIndex = Boolean(getSecret("NO_INDEX"));
 ---
 
 <!doctype html>
 <html lang="en">
-  <CommonHead title={title} />
+  <CommonHead title={title} noIndex={noIndex} />
   <EnvScript organizationId={organizationId} />
   <ThemeScript />
   <body>

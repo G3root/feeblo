@@ -1,10 +1,11 @@
 ---
 interface Props {
   clientHintCheckScript?: string;
+  noIndex?: boolean;
   title?: string;
 }
 
-const { clientHintCheckScript, title = "feeblo" } = Astro.props;
+const { clientHintCheckScript, noIndex, title = "feeblo" } = Astro.props;
 
 import { Font } from "astro:assets";
 ---
@@ -21,4 +22,7 @@ import { Font } from "astro:assets";
   <meta name="generator" content={Astro.generator} />
   <title>{title}</title>
   <Font cssVariable="--font-inter" preload />
+  {
+    noIndex && <meta name="robots" content="noindex" />
+  }
 </head>
