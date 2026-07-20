@@ -19,7 +19,7 @@ env:
 
 jobs:
   build-and-push:
-    name: Publish ${{ matrix.service.image }}
+    name: Build ${{ matrix.service.image }} (${{ matrix.platform.arch }})
     if: >-
       github.repository == 'G3root/feeblo' && (
         (github.event_name == 'workflow_run' &&
@@ -28,14 +28,11 @@ jobs:
         (github.event_name == 'release' &&
           startsWith(github.event.release.tag_name, 'v'))
       )
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
-      attestations: write
-      artifact-metadata: write
-      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -44,6 +41,13 @@ jobs:
             dockerfile: apps/server/Dockerfile
           - image: feeblo-web
             dockerfile: apps/web/Dockerfile
+        platform:
+          - arch: amd64
+            os: linux/amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            os: linux/arm64
+            runner: ubuntu-24.04-arm
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
@@ -64,8 +68,69 @@ jobs:
           ref: ${{ github.event.release.tag_name || github.event.workflow_run.head_sha }}
           persist-credentials: false
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push native image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ${{ matrix.service.dockerfile }}
+          platforms: ${{ matrix.platform.os }}
+          push: true
+          provenance: false
+          build-args: APP_RELEASE=${{ github.event.release.tag_name || github.event.workflow_run.head_sha }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}:sha-${{ github.event.workflow_run.head_sha || github.sha }}-${{ matrix.platform.arch }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha || github.sha }}
+            org.opencontainers.image.version=${{ github.event.release.tag_name || github.event.workflow_run.head_sha }}
+          cache-from: type=gha,scope=${{ matrix.service.image }}-${{ matrix.platform.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.image }}-${{ matrix.platform.arch }}
+
+  merge-manifests:
+    name: Publish ${{ matrix.service.image }} manifest
+    needs: build-and-push
+    if: >-
+      github.repository == 'G3root/feeblo' && (
+        (github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.conclusion == 'success') ||
+        (github.event_name == 'release' &&
+          startsWith(github.event.release.tag_name, 'v'))
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      artifact-metadata: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - image: feeblo-server
+          - image: feeblo-web
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            ghcr.io:443
+            pkg-containers.githubusercontent.com:443
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -86,10 +151,6 @@ jobs:
           tags: |
             type=sha,format=long
             type=raw,value=latest
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
-            org.opencontainers.image.version=${{ github.event.workflow_run.head_sha }}
 
       - name: Extract release metadata
         if: github.event_name == 'release'
@@ -102,32 +163,36 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ github.event.release.tag_name }}
 
-      - name: Build and push multi-platform image
-        id: push
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: ${{ matrix.service.dockerfile }}
-          platforms: linux/amd64,linux/arm64
-          push: true
-          build-args: APP_RELEASE=${{ github.event.release.tag_name || github.event.workflow_run.head_sha }}
-          tags: |
+      - name: Create multi-platform manifest
+        id: manifest
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
+          SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          TAGS: |
             ${{ steps.staging-meta.outputs.tags }}
             ${{ steps.release-meta.outputs.tags }}
-          labels: |
-            ${{ steps.staging-meta.outputs.labels }}
-            ${{ steps.release-meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.service.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service.image }}
+        run: |
+          tag_args=()
+          first_tag=""
+          while IFS= read -r tag; do
+            [[ -n "${tag}" ]] || continue
+            tag_args+=(--tag "${tag}")
+            [[ -n "${first_tag}" ]] || first_tag="${tag}"
+          done <<< "${TAGS}"
+
+          docker buildx imagetools create \
+            "${tag_args[@]}" \
+            "${IMAGE}:sha-${SOURCE_SHA}-amd64" \
+            "${IMAGE}:sha-${SOURCE_SHA}-arm64"
+
+          digest="$(docker buildx imagetools inspect "${first_tag}" --format '{{ .Manifest.Digest }}')"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
 
       - name: Attest image provenance
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.service.image }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
           push-to-registry: true
