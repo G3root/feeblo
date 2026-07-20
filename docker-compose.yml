@@ -18,7 +18,12 @@ services:
 
   server:
     container_name: feeblo-server
-    image: ghcr.io/g3root/feeblo-server:${IMAGE_TAG:-nightly}
+    image: ghcr.io/g3root/feeblo-server:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      args:
+        APP_RELEASE: ${APP_RELEASE:-dev}
     restart: always
     depends_on:
       pg:
@@ -30,7 +35,6 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3001}
       API_URL: ${API_URL:-http://localhost:3000}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
-      APP_RELEASE: ${IMAGE_TAG:-nightly}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
       AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-dev-key}
     ports:
@@ -38,7 +42,15 @@ services:
 
   web:
     container_name: feeblo-web
-    image: ghcr.io/g3root/feeblo-web:${IMAGE_TAG:-nightly}
+    image: ghcr.io/g3root/feeblo-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        APP_RELEASE: ${APP_RELEASE:-dev}
+        API_URL: ${API_URL:-http://localhost:3000}
+        APP_URL: ${APP_URL:-http://localhost:3001}
+        APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
     restart: always
     depends_on:
       - server
@@ -49,7 +61,6 @@ services:
       API_URL: ${API_URL:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3001}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
-      APP_RELEASE: ${IMAGE_TAG:-nightly}
     ports:
       - "${WEB_PORT:-4321}:4321"
 

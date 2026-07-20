@@ -55,9 +55,17 @@ const DocsRoute = HttpApiScalar.layer(Api, {
   path: "/docs",
 });
 
-const HealthRouter = HttpRouter.use((router) =>
-  router.add("GET", "/health", HttpServerResponse.text("OK"))
-);
+const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
+  HttpRouter.use((router) =>
+    router.add(
+      "GET",
+      "/health",
+      HttpServerResponse.jsonUnsafe({
+        status: "ok",
+        release: process.env.APP_RELEASE ?? "dev",
+      })
+    )
+  );
 
 const RootRouter = HttpRouter.use((router) =>
   router.add("GET", "/", HttpServerResponse.text("Hello world"))

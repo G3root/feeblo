@@ -92,31 +92,20 @@ jobs:
       - name: Copy env
         run: cp .env.example .env
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
-
-      - name: Build server image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: apps/server/Dockerfile
-          push: false
-          load: true
-          tags: ghcr.io/g3root/feeblo-server:test
-
-      - name: Build web image
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          push: false
-          load: true
-          tags: ghcr.io/g3root/feeblo-web:test
+      - name: Build self-hosted stack
+        run: docker compose build server web
+        env:
+          IMAGE_TAG: test
+          APP_RELEASE: ${{ github.sha }}
+          APP_URL: http://localhost:3001
+          API_URL: http://localhost:3000
+          APP_ROOT_DOMAIN: localhost
 
       - name: Start services
         run: docker compose up -d --wait --wait-timeout 60
         env:
           IMAGE_TAG: test
+          APP_RELEASE: ${{ github.sha }}
           DATABASE_URL: postgres://feeblo:password@pg:5432/feeblo
           APP_URL: http://localhost:3001
           API_URL: http://localhost:3000
@@ -126,3 +115,7 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: docker compose logs
+
+      - name: Stop services
+        if: always()
+        run: docker compose down --volumes
