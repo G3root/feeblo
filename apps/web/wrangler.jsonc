@@ -24,5 +24,13 @@
   },
   "secrets": {
     "required": ["API_URL", "APP_URL", "APP_ROOT_DOMAIN"]
+  },
+  "env": {
+    "staging": {
+      "name": "feeblo-staging",
+      "secrets": {
+        "required": ["API_URL", "APP_URL", "APP_ROOT_DOMAIN"]
+      }
+    }
   }
 }
