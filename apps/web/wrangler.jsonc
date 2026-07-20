@@ -1,6 +1,10 @@
 {
+  "$schema": "node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-06-10",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
   "name": "feeblo",
   "main": "@astrojs/cloudflare/entrypoints/server",
   "assets": {
@@ -23,14 +27,25 @@
     }
   },
   "secrets": {
-    "required": ["API_URL", "APP_URL", "APP_ROOT_DOMAIN"]
+    "required": [
+      "API_URL",
+      "APP_URL",
+      "APP_ROOT_DOMAIN"
+    ]
   },
   "env": {
     "staging": {
       "name": "feeblo-staging",
       "secrets": {
-        "required": ["API_URL", "APP_URL", "APP_ROOT_DOMAIN"]
+        "required": [
+          "API_URL",
+          "APP_URL",
+          "APP_ROOT_DOMAIN"
+        ]
       }
+    },
+    "production": {
+      "name": "feeblo"
     }
   }
 }
