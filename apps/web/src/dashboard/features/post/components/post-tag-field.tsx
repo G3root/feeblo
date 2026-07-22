@@ -1,10 +1,8 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
-import { Card, CardPanel, CardHeader, CardTitle } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
-  TagList,
   TagSelect,
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
@@ -98,23 +96,13 @@ export function PostTagField() {
 
   return (
     <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Tags</CardTitle>
-        </CardHeader>
-        <CardPanel className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <TagList selectedTags={postTags ?? []} tags={tags} />
-            <TagSelect
-              disabled={disabled}
-              onTagSelect={handleTagSelect}
-              selectedTags={postTags ?? []}
-              tags={tags}
-              type="FEEDBACK"
-            />
-          </div>
-        </CardPanel>
-      </Card>
+      <TagSelect
+        disabled={disabled}
+        onTagSelect={handleTagSelect}
+        selectedTags={postTags ?? []}
+        tags={tags}
+        type="FEEDBACK"
+      />
       <TagCreateDialog />
     </TagCreateDialogProvider>
   );

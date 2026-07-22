@@ -4,10 +4,10 @@ import { toastManager } from "@feeblo/ui/toast";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-export function PostStatusSelect() {
+export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
   const { post, organizationId, isLocked, canManagePost } =
     usePostCollectionData();
-  const disabled = isLocked || !canManagePost;
+  const isDisabled = disabled || isLocked || !canManagePost;
   const { postCollection, postStatusCollection } = useDashboardCollections();
 
   const { data: postStatuses } = useLiveQuery(
@@ -27,9 +27,9 @@ export function PostStatusSelect() {
   return (
     <StatusField
       currentStatusId={post.statusId}
-      disabled={disabled}
+      disabled={isDisabled}
       onValueChange={async (nextPostStatus) => {
-        if (!nextPostStatus || disabled) {
+        if (!nextPostStatus || isDisabled) {
           return;
         }
         try {

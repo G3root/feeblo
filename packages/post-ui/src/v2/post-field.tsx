@@ -1,15 +1,15 @@
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
-import { Button } from "@feeblo/ui/button";
 import {
   Combobox,
-  ComboboxPopup,
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
+  ComboboxPopup,
   ComboboxTrigger,
   ComboboxValue,
 } from "@feeblo/ui/combobox";
+import { SelectButton } from "@feeblo/ui/select";
 import { cn } from "@feeblo/ui/utils";
 import {
   BOARD_LANE_COLOR_MAP,
@@ -17,7 +17,7 @@ import {
   type BoardPostStatus,
   getBoardStatusLabel,
 } from "@feeblo/web-shared/board/constants";
-import { DashedLine02Icon } from "@hugeicons/core-free-icons";
+import { DashedLine02Icon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 export function FieldRow({
@@ -65,6 +65,7 @@ export function StatusField({
   return (
     <Combobox
       defaultValue={defaultValue}
+      disabled={disabled}
       items={items}
       key={currentStatusId}
       onValueChange={(value) =>
@@ -78,46 +79,51 @@ export function StatusField({
         )
       }
     >
-      <ComboboxTrigger
-        render={
-          <Button disabled={disabled} size="sm" variant="ghost">
-            <ComboboxValue>
-              {(value) => (
-                <span className="flex items-center gap-2">
-                  {value ? (
-                    <>
-                      <HugeiconsIcon
-                        className={cn(
-                          "size-4",
-                          BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
-                        )}
-                        icon={BoardIconMap[value.type as BoardPostStatus]}
-                        strokeWidth={2}
-                      />
-                      {value.label}
-                    </>
-                  ) : null}
-                </span>
-              )}
-            </ComboboxValue>
-          </Button>
-        }
-      />
-      <ComboboxPopup className="w-full">
-        <ComboboxInput placeholder="Search" showTrigger={false} />
-        <ComboboxEmpty>No items; found.</ComboboxEmpty>
+      <ComboboxTrigger render={<SelectButton size="sm" />}>
+        <ComboboxValue>
+          {(value) => (
+            <span className="flex items-center gap-2">
+              {value ? (
+                <>
+                  <HugeiconsIcon
+                    className={cn(
+                      "size-4",
+                      BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
+                    )}
+                    icon={BoardIconMap[value.type as BoardPostStatus]}
+                    strokeWidth={2}
+                  />
+                  {value.label}
+                </>
+              ) : null}
+            </span>
+          )}
+        </ComboboxValue>
+      </ComboboxTrigger>
+      <ComboboxPopup aria-label="Select status" className="w-full">
+        <div className="border-b p-2">
+          <ComboboxInput
+            className="rounded-md before:rounded-[calc(var(--radius-md)-1px)]"
+            placeholder="Search statuses..."
+            showTrigger={false}
+            startAddon={<HugeiconsIcon icon={Search01Icon} strokeWidth={2} />}
+          />
+        </div>
+        <ComboboxEmpty>No statuses found.</ComboboxEmpty>
         <ComboboxList>
           {(item) => (
             <ComboboxItem key={item.value} value={item}>
-              <HugeiconsIcon
-                className={cn(
-                  "size-4",
-                  BOARD_LANE_COLOR_MAP[item.type as BoardPostStatus]
-                )}
-                icon={BoardIconMap[item.type as BoardPostStatus]}
-                strokeWidth={2}
-              />{" "}
-              {item.label}
+              <span className="flex items-center gap-2 whitespace-nowrap">
+                <HugeiconsIcon
+                  className={cn(
+                    "size-4",
+                    BOARD_LANE_COLOR_MAP[item.type as BoardPostStatus]
+                  )}
+                  icon={BoardIconMap[item.type as BoardPostStatus]}
+                  strokeWidth={2}
+                />
+                {item.label}
+              </span>
             </ComboboxItem>
           )}
         </ComboboxList>
@@ -147,6 +153,7 @@ export function PostBoardSelect({
 
   return (
     <Combobox
+      disabled={disabled}
       items={items}
       onValueChange={(board) => onValueChange(board?.value ?? null)}
       value={
@@ -156,44 +163,46 @@ export function PostBoardSelect({
       }
     >
       <ComboboxTrigger
-        render={
-          <Button
-            className="w-full justify-between"
-            disabled={disabled}
-            size="sm"
-            variant="ghost"
-          >
-            <ComboboxValue placeholder="Select board">
-              {(value) => (
-                <span className="flex items-center gap-2">
-                  {value ? (
-                    <>
-                      <HugeiconsIcon
-                        className="size-4 text-primary-blue"
-                        icon={DashedLine02Icon}
-                        strokeWidth={2}
-                      />
-                      {value.label}
-                    </>
-                  ) : null}
-                </span>
-              )}
-            </ComboboxValue>
-          </Button>
-        }
-      />
-      <ComboboxPopup className="w-full">
-        <ComboboxInput placeholder="Search boards" showTrigger={false} />
+        render={<SelectButton className="w-full" size="sm" />}
+      >
+        <ComboboxValue placeholder="Select board">
+          {(value) => (
+            <span className="flex items-center gap-2">
+              {value ? (
+                <>
+                  <HugeiconsIcon
+                    className="size-4 text-primary-blue"
+                    icon={DashedLine02Icon}
+                    strokeWidth={2}
+                  />
+                  {value.label}
+                </>
+              ) : null}
+            </span>
+          )}
+        </ComboboxValue>
+      </ComboboxTrigger>
+      <ComboboxPopup aria-label="Select board" className="w-full">
+        <div className="border-b p-2">
+          <ComboboxInput
+            className="rounded-md before:rounded-[calc(var(--radius-md)-1px)]"
+            placeholder="Search boards..."
+            showTrigger={false}
+            startAddon={<HugeiconsIcon icon={Search01Icon} strokeWidth={2} />}
+          />
+        </div>
         <ComboboxEmpty>No boards found.</ComboboxEmpty>
         <ComboboxList>
           {(item) => (
             <ComboboxItem key={item.value} value={item}>
-              <HugeiconsIcon
-                className="size-4 text-primary-blue"
-                icon={DashedLine02Icon}
-                strokeWidth={2}
-              />{" "}
-              {item.label}
+              <span className="flex items-center gap-2 whitespace-nowrap">
+                <HugeiconsIcon
+                  className="size-4 text-primary-blue"
+                  icon={DashedLine02Icon}
+                  strokeWidth={2}
+                />
+                {item.label}
+              </span>
             </ComboboxItem>
           )}
         </ComboboxList>

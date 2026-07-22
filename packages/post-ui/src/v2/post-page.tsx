@@ -46,8 +46,12 @@ function Authenticated({ children }: { children: ReactNode }) {
   return usePostCollectionData().isAuthenticated ? children : null;
 }
 
-function CanManage({ children }: { children: ReactNode }) {
-  return usePostCollectionData().canManagePost ? children : null;
+function CanManage({
+  children,
+}: {
+  children: (canManagePost: boolean) => ReactNode;
+}) {
+  return children(usePostCollectionData().canManagePost);
 }
 
 function Locked({ children }: { children: ReactNode }) {

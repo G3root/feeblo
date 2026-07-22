@@ -69,7 +69,9 @@ function renderState(options?: Parameters<typeof state>[0]) {
     <PostCollectionStateProvider value={state(options)}>
       <PostPage.Guest>guest</PostPage.Guest>
       <PostPage.Authenticated>authenticated</PostPage.Authenticated>
-      <PostPage.CanManage>manager</PostPage.CanManage>
+      <PostPage.CanManage>
+        {(canManagePost) => `manager: ${canManagePost}`}
+      </PostPage.CanManage>
       <PostPage.Locked>locked</PostPage.Locked>
       <PostPage.Unlocked>unlocked</PostPage.Unlocked>
     </PostCollectionStateProvider>
@@ -82,6 +84,7 @@ describe("PostPage composition", () => {
 
     await expect.element(screen.getByText("guest")).toBeVisible();
     await expect.element(screen.getByText("unlocked")).toBeVisible();
+    await expect.element(screen.getByText("manager: false")).toBeVisible();
     await expect
       .element(screen.getByText("authenticated"))
       .not.toBeInTheDocument();
@@ -91,7 +94,7 @@ describe("PostPage composition", () => {
     const screen = await renderState({ authenticated: true, canManage: true });
 
     await expect.element(screen.getByText("authenticated")).toBeVisible();
-    await expect.element(screen.getByText("manager")).toBeVisible();
+    await expect.element(screen.getByText("manager: true")).toBeVisible();
     await expect.element(screen.getByText("guest")).not.toBeInTheDocument();
   });
 

@@ -1,17 +1,18 @@
-import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
-import { Checkbox } from "@feeblo/ui/checkbox";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@feeblo/ui/command";
-import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
-import { PlusSignIcon, Tag01Icon } from "@hugeicons/core-free-icons";
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+} from "@feeblo/ui/combobox";
+import {
+  Cancel01Icon,
+  PlusSignIcon,
+  Search01Icon,
+  Tag01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { useTagCreateDialogContext } from "../dialog-stores";
@@ -39,92 +40,107 @@ interface TagSelectProps {
   type: TagSelectOption["type"];
 }
 
-export const TagSelect = ({
-  tags,
-  selectedTags,
-  onTagSelect,
-  type,
+export function TagSelect({
   disabled = false,
-}: TagSelectProps) => {
+  onTagSelect,
+  selectedTags,
+  tags,
+  type,
+}: TagSelectProps) {
   const [open, setOpen] = useState(false);
   const createDialogStore = useTagCreateDialogContext();
   const selectedTagIds = new Set(selectedTags.map((tag) => tag.tagId));
-  const hasSelectedTags = selectedTags.length > 0;
+  const selected = tags.filter((tag) => selectedTagIds.has(tag.id));
+
+  const updateSelection = async (nextSelected: TagSelectOption[]) => {
+    const nextTagIds = new Set(nextSelected.map((tag) => tag.id));
+    const changedTag = tags.find(
+      (tag) => selectedTagIds.has(tag.id) !== nextTagIds.has(tag.id)
+    );
+
+    if (!changedTag) {
+      return;
+    }
+
+    await onTagSelect(changedTag, selectedTagIds.has(changedTag.id));
+    setOpen(false);
+  };
+
   return (
-    <Popover onOpenChange={setOpen} open={open}>
-      <PopoverTrigger
-        render={
-          <Button
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <Combobox
+            autoHighlight
             disabled={disabled}
-            size={hasSelectedTags ? "icon-xs" : "xs"}
-            variant="ghost"
+            items={tags}
+            multiple
+            onOpenChange={setOpen}
+            onValueChange={updateSelection}
+            open={open}
+            value={selected}
           >
-            {hasSelectedTags ? (
-              <HugeiconsIcon icon={PlusSignIcon} />
-            ) : (
-              <>
-                <HugeiconsIcon icon={Tag01Icon} /> Add Tag
-              </>
-            )}
-          </Button>
-        }
-      />
-      <PopoverPopup align="start" className="w-50 p-0">
-        <Command>
-          <CommandInput />
-          <CommandList className="max-h-full">
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup className="max-h-75 scroll-py-1 overflow-y-auto overflow-x-hidden">
-              {tags.map((tag) => {
-                const isSelected = selectedTagIds.has(tag.id);
+            <ComboboxInput
+              aria-label="Add tags"
+              placeholder="Add tags..."
+              size="sm"
+              startAddon={
+                <HugeiconsIcon icon={Search01Icon} strokeWidth={2} />
+              }
+            />
+            <ComboboxPopup aria-label="Select tags">
+              <ComboboxEmpty>No tags found.</ComboboxEmpty>
+              <ComboboxList>
+                {(tag) => (
+                  <ComboboxItem key={tag.id} value={tag}>
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      <HugeiconsIcon icon={Tag01Icon} strokeWidth={2} />
+                      {tag.name}
+                    </span>
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxPopup>
+          </Combobox>
+        </div>
+        <Button
+          aria-label="Create tag"
+          disabled={disabled}
+          onClick={() =>
+            createDialogStore.send({ type: "toggle", data: { type } })
+          }
+          size="icon-sm"
+          variant="outline"
+        >
+          <HugeiconsIcon icon={PlusSignIcon} />
+        </Button>
+      </div>
 
-                return (
-                  <CommandItem
-                    key={tag.id}
-                    onSelect={async () => {
-                      await onTagSelect(tag, isSelected);
-                      setOpen(false);
-                    }}
-                    value={tag.name}
-                  >
-                    <Checkbox checked={isSelected} />
-                    {tag.name}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem
-                onSelect={() => {
-                  setOpen(false);
-                  createDialogStore.send({ type: "toggle", data: { type } });
-                }}
-                value="create tag"
+      {selected.length > 0 ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {selected.map((tag) => (
+            <li
+              className="flex min-w-0 items-center gap-1 rounded-md border border-input bg-background py-0.5 ps-2 pe-0.5 text-sm"
+              key={tag.id}
+            >
+              <HugeiconsIcon
+                className="size-3.5 shrink-0 text-muted-foreground"
+                icon={Tag01Icon}
+              />
+              <span className="truncate font-medium">{tag.name}</span>
+              <Button
+                aria-label={`Remove ${tag.name}`}
+                disabled={disabled}
+                onClick={() => onTagSelect(tag, true)}
+                size="icon-xs"
+                variant="ghost"
               >
-                <HugeiconsIcon icon={PlusSignIcon} />
-                Create tag
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverPopup>
-    </Popover>
+                <HugeiconsIcon icon={Cancel01Icon} />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
-};
-
-export const TagList = ({
-  tags,
-  selectedTags,
-}: {
-  tags: TagSelectOption[];
-  selectedTags: SelectedTag[];
-}) => {
-  const tagIdToNameMap = new Map(tags.map((tag) => [tag.id, tag.name]));
-  return selectedTags.map((tag) => (
-    <Badge key={tag.id} variant="secondary">
-      <HugeiconsIcon data-icon="inline-start" icon={Tag01Icon} />
-      {tagIdToNameMap.get(tag.tagId) || "Unknown Tag"}
-    </Badge>
-  ));
-};
+}

@@ -5,10 +5,10 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-export function PostBoardField() {
+export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
   const { post, board, organizationId, canManagePost, isLocked } =
     usePostCollectionData();
-  const disabled = isLocked || !canManagePost;
+  const isDisabled = disabled || isLocked || !canManagePost;
   const navigate = useNavigate();
   const { boardCollection, postCollection } = useDashboardCollections();
 
@@ -29,9 +29,9 @@ export function PostBoardField() {
     <PostBoardSelect
       boards={allBoards}
       currentBoardId={board.id}
-      disabled={disabled}
+      disabled={isDisabled}
       onValueChange={async (boardId) => {
-        if (!boardId || disabled) {
+        if (!boardId || isDisabled) {
           return;
         }
         try {

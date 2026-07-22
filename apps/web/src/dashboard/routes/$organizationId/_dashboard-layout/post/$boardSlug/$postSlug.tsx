@@ -1,7 +1,6 @@
 import { PostPage } from "@feeblo/post-ui/post-page";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
-import { Card, CardPanel, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
   Empty,
   EmptyContent,
@@ -9,6 +8,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { Separator } from "@feeblo/ui/separator";
 import { CircleLockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -135,26 +135,34 @@ function RouteComponent() {
             <PostSidebarActions />
 
             <PostPage.CanManage>
-              <SidebarCard title="Properties">
-                <div>
-                  <PostStatusSelect />
-                </div>
+              {(canManagePost) => (
+                <>
+                  <div>
+                    <PostStatusSelect disabled={!canManagePost} />
+                  </div>
 
-                <PostBoardField />
-              </SidebarCard>
+                  <PostBoardField disabled={!canManagePost} />
+                </>
+              )}
             </PostPage.CanManage>
+
+            <div>
+              <Separator />
+            </div>
 
             <PostTagField />
 
-            <SidebarCard title="Details">
-              <p className="text-muted-foreground text-sm">
-                {formatPostDate(post.createdAt)}
-              </p>
+            <div>
+              <Separator />
+            </div>
 
-              <p className="text-muted-foreground text-sm">
-                {post.user?.name ?? "Unknown author"}
-              </p>
-            </SidebarCard>
+            <p className="text-muted-foreground text-sm">
+              {formatPostDate(post.createdAt)}
+            </p>
+
+            <p className="text-muted-foreground text-sm">
+              {post.user?.name ?? "Unknown author"}
+            </p>
           </div>
         </aside>
       </div>
@@ -174,22 +182,5 @@ function PostStatusAlerts() {
         </AlertDescription>
       </Alert>
     </PostPage.Locked>
-  );
-}
-
-function SidebarCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardPanel className="flex flex-col gap-4">{children}</CardPanel>
-    </Card>
   );
 }
