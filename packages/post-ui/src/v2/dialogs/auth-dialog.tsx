@@ -4,10 +4,10 @@
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogPanel,
+  DialogPopup,
   DialogTitle,
 } from "@feeblo/ui/dialog";
 import {
@@ -18,11 +18,10 @@ import {
 } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
-} from "@feeblo/ui/input-otp";
+  OTPField,
+  OTPFieldInput,
+  OTPFieldSeparator,
+} from "@feeblo/ui/otp-field";
 import { toastManager } from "@feeblo/ui/toast";
 import {
   authClient,
@@ -85,6 +84,7 @@ export function AuthDialog({ variant }: AuthDialogProps) {
       onClick={() =>
         store.send({ type: "setOpen", open: true, data: { variant } })
       }
+      type="button"
       variant="secondary"
     >
       {triggerLabel}
@@ -150,7 +150,7 @@ export function AuthDialogRoot() {
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={isOpen}>
-      <DialogContent>
+      <DialogPopup>
         <DialogHeader>
           {step.kind !== "chooser" ? (
             <Button
@@ -190,7 +190,7 @@ export function AuthDialogRoot() {
             <OtpVerificationForm email={step.email} onSuccess={handleSuccess} />
           ) : null}
         </DialogPanel>
-      </DialogContent>
+      </DialogPopup>
     </Dialog>
   );
 }
@@ -238,7 +238,7 @@ function AuthMethodChooser({
       {actions.map((action) => (
         <Button
           autoFocus={action.step === preferredEmailStep}
-          className="h-auto flex-col items-start gap-1.5 rounded-2xl px-4 py-3 text-left"
+          className="!h-auto w-full flex-col items-start gap-1.5 whitespace-normal rounded-2xl px-4 py-3 text-left"
           key={action.label}
           onClick={() => onSelectEmailStep(action.step)}
           type="button"
@@ -513,27 +513,25 @@ function OtpVerificationForm({
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
               <Field data-invalid={isInvalid}>
-                <InputOTP
-                  containerClassName="justify-center gap-4"
+                <OTPField
+                  aria-label="Verification code"
+                  className="justify-center gap-4"
                   id={field.name}
-                  maxLength={6}
+                  length={6}
                   name={field.name}
                   onBlur={field.handleBlur}
-                  onChange={(value) => field.handleChange(value)}
+                  onValueChange={(value) => field.handleChange(value)}
+                  size="lg"
                   value={field.state.value}
                 >
-                  <InputOTPGroup className="gap-2.5 *:data-[slot=input-otp-slot]:h-14 *:data-[slot=input-otp-slot]:w-10 *:data-[slot=input-otp-slot]:rounded-md *:data-[slot=input-otp-slot]:border *:data-[slot=input-otp-slot]:text-lg">
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                  </InputOTPGroup>
-                  <InputOTPSeparator />
-                  <InputOTPGroup className="gap-2.5 *:data-[slot=input-otp-slot]:h-14 *:data-[slot=input-otp-slot]:w-10 *:data-[slot=input-otp-slot]:rounded-md *:data-[slot=input-otp-slot]:border *:data-[slot=input-otp-slot]:text-lg">
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
+                  <OTPFieldInput />
+                  <OTPFieldInput aria-label="Character 2 of 6" />
+                  <OTPFieldInput aria-label="Character 3 of 6" />
+                  <OTPFieldSeparator />
+                  <OTPFieldInput aria-label="Character 4 of 6" />
+                  <OTPFieldInput aria-label="Character 5 of 6" />
+                  <OTPFieldInput aria-label="Character 6 of 6" />
+                </OTPField>
                 {isInvalid ? (
                   <FieldError errors={field.state.meta.errors} />
                 ) : null}
