@@ -9,6 +9,7 @@ import {
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChangelogCompletedPosts } from "~/features/changelog/components/changelog-completed-posts";
 import {
   ChangelogEditorBackLink,
   ChangelogEditorContentField,
@@ -28,11 +29,25 @@ import {
   ChangelogDeleteDialogProvider,
   ChangelogMoveToDraftDialogProvider,
 } from "~/features/changelog/dialog-stores";
+import {
+  changelogCollection,
+  changelogPostCollection,
+  postCollection,
+  postStatusCollection,
+} from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
   "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 )({
+  beforeLoad: async () => {
+    await Promise.all([
+      changelogCollection.preload(),
+      changelogPostCollection.preload(),
+      postCollection.preload(),
+      postStatusCollection.preload(),
+    ]);
+  },
   component: RouteComponent,
 });
 
@@ -119,6 +134,7 @@ function RouteComponent() {
 
                 <ChangelogEditorTitleField />
                 <ChangelogEditorContentField />
+                <ChangelogCompletedPosts organizationId={organizationId} />
                 <div className="flex justify-end pt-2">
                   <ChangelogEditorSubmitAction />
                 </div>

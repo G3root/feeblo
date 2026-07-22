@@ -2,6 +2,7 @@ import { defineRelations } from "drizzle-orm";
 import {
   accountTable,
   boardTable,
+  changelogPostTable,
   changelogTable,
   changelogTagTable,
   commentReactionTable,
@@ -57,6 +58,7 @@ export const relations = defineRelations(
     commentReactionTable,
     siteTable,
     changelogTable,
+    changelogPostTable,
     changelogTagTable,
     companyTable,
     contactTable,
@@ -349,6 +351,10 @@ export const relations = defineRelations(
         from: r.postTable.id,
         to: r.postTagTable.postId,
       }),
+      changelogPosts: r.many.changelogPostTable({
+        from: r.postTable.id,
+        to: r.changelogPostTable.postId,
+      }),
       subscriptions: r.many.postSubscriptionTable({
         from: r.postTable.id,
         to: r.postSubscriptionTable.postId,
@@ -534,6 +540,24 @@ export const relations = defineRelations(
       changelogTags: r.many.changelogTagTable({
         from: r.changelogTable.id,
         to: r.changelogTagTable.changelogId,
+      }),
+      changelogPosts: r.many.changelogPostTable({
+        from: r.changelogTable.id,
+        to: r.changelogPostTable.changelogId,
+      }),
+    },
+    changelogPostTable: {
+      changelog: r.one.changelogTable({
+        from: r.changelogPostTable.changelogId,
+        to: r.changelogTable.id,
+      }),
+      post: r.one.postTable({
+        from: r.changelogPostTable.postId,
+        to: r.postTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.changelogPostTable.organizationId,
+        to: r.organizationTable.id,
       }),
     },
     submissionNotificationBatchTable: {

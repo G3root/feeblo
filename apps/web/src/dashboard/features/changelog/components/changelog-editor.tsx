@@ -1,13 +1,8 @@
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
-import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import {
   allPolicy,
@@ -60,7 +55,10 @@ type ChangelogEditorFormValues = {
 type ChangelogSubmitMeta = {
   successTitle: string;
   overrides?: Partial<
-    Pick<TChangelogEditorRecord, "publishedAt" | "scheduledAt" | "status">
+    Pick<
+      TChangelogEditorRecord,
+      "publishedAt" | "scheduledAt" | "slug" | "status"
+    >
   >;
 };
 
@@ -78,6 +76,7 @@ function useChangelogEditorForm({
   organizationId: string;
 }) {
   const { changelogCollection } = useDashboardCollections();
+  const navigate = useNavigate();
 
   return useAppForm({
     formId: `${changelog.id}:${changelog.updatedAt.getTime()}`,
@@ -98,7 +97,7 @@ function useChangelogEditorForm({
         const payload = updatedChangelogSchema.parse({
           id: changelog.id,
           title: value.title.trim(),
-          slug: changelog.slug,
+          slug: submitMeta?.overrides?.slug ?? changelog.slug,
           content: value.content,
           status: submitMeta?.overrides?.status ?? changelog.status,
           scheduledAt:
@@ -114,6 +113,7 @@ function useChangelogEditorForm({
 
         const tx = changelogCollection.update(changelog.id, (draft) => {
           draft.title = payload.title;
+          draft.slug = payload.slug;
           draft.content = payload.content;
           draft.status = payload.status;
           draft.scheduledAt = payload.scheduledAt;
@@ -121,6 +121,14 @@ function useChangelogEditorForm({
         });
 
         await tx.isPersisted.promise;
+
+        if (payload.slug !== changelog.slug) {
+          await navigate({
+            to: "/$organizationId/changelog/edit/$changelogSlug",
+            params: { organizationId, changelogSlug: payload.slug },
+            replace: true,
+          });
+        }
 
         toastManager.add({
           title: submitMeta?.successTitle ?? "Changelog saved",
@@ -327,26 +335,17 @@ export function ChangelogEditorSubmitAction() {
             </Button>
           ) : (
             <ChangelogPublishDialog
-              currentStatus={changelog.status}
-              defaultScheduledAt={changelog.scheduledAt}
+              defaultPublishedAt={changelog.publishedAt}
+              defaultSlug={changelog.slug}
               key={changelog.status}
-              onPublishNow={() =>
+              onPublish={({ publishedAt, slug }) =>
                 form.handleSubmit({
                   successTitle: "Changelog published",
                   overrides: {
+                    slug,
                     status: "published",
-                    publishedAt: new Date(),
+                    publishedAt,
                     scheduledAt: null,
-                  },
-                })
-              }
-              onScheduleLater={(scheduledAt) =>
-                form.handleSubmit({
-                  successTitle: "Changelog scheduled",
-                  overrides: {
-                    status: "scheduled",
-                    scheduledAt,
-                    publishedAt: null,
                   },
                 })
               }

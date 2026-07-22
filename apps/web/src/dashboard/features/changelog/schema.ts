@@ -14,42 +14,14 @@ export const updatedChangelogSchema = z.object({
   organizationId: z.string(),
 });
 
-export const publishChangelogSchema = z
-  .object({
-    mode: z.enum(["publish-now", "schedule-later"]),
-    scheduledAt: z.string().trim().optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.mode !== "schedule-later") {
-      return;
-    }
-
-    if (!value.scheduledAt) {
-      ctx.addIssue({
-        code: "custom",
-        message: "A publish date is required",
-        path: ["scheduledAt"],
-      });
-      return;
-    }
-
-    const parsed = new Date(value.scheduledAt);
-    if (Number.isNaN(parsed.getTime())) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Enter a valid publish date",
-        path: ["scheduledAt"],
-      });
-      return;
-    }
-
-    if (parsed.getTime() <= Date.now()) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Choose a future date and time",
-        path: ["scheduledAt"],
-      });
-    }
-  });
-
-export type TPublishChangelogValues = z.infer<typeof publishChangelogSchema>;
+export const publishChangelogSchema = z.object({
+  slug: z.string().trim().min(1, "A slug is required"),
+  publishedAt: z
+    .string()
+    .trim()
+    .min(1, "A published date is required")
+    .refine(
+      (value) => !Number.isNaN(new Date(value).getTime()),
+      "Enter a valid published date"
+    ),
+});

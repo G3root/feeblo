@@ -9,6 +9,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   real,
   text,
   timestamp,
@@ -626,6 +627,29 @@ export const changelogTable = pgTable(
       table.organizationId,
       table.slug
     ),
+  ]
+);
+
+export const changelogPostTable = pgTable(
+  "changelog_post",
+  {
+    changelogId: text("changelog_id")
+      .notNull()
+      .references(() => changelogTable.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.changelogId, table.postId] }),
+    uniqueIndex("changelog_post_postId_uidx").on(table.postId),
+    index("changelog_post_organizationId_idx").on(table.organizationId),
   ]
 );
 

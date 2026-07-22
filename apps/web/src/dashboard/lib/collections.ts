@@ -241,6 +241,54 @@ export const changelogCollection = createCollection(
   })
 );
 
+export const getChangelogPostKey = ({
+  changelogId,
+  postId,
+}: {
+  changelogId: string;
+  postId: string;
+}) => `${changelogId}:${postId}`;
+
+export const changelogPostCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("changelog-post"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogPostList({ organizationId }),
+        { signal: ctx.signal }
+      );
+      return [...data];
+    },
+    queryClient,
+    getKey: getChangelogPostKey,
+    onInsert: async ({ transaction }) => {
+      const { modified } = transaction.mutations[0];
+      await fetchRpc((rpc) =>
+        rpc.ChangelogPostCreate({
+          changelogId: modified.changelogId,
+          postId: modified.postId,
+          organizationId: modified.organizationId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const { original } = transaction.mutations[0];
+      await fetchRpc((rpc) =>
+        rpc.ChangelogPostDelete({
+          changelogId: original.changelogId,
+          postId: original.postId,
+          organizationId: original.organizationId,
+        })
+      );
+    },
+  })
+);
+
 export const boardCollection = createCollection(
   queryCollectionOptions({
     queryKey: () => getOrganizationScopedQueryKey("board"),
@@ -1235,6 +1283,7 @@ export const companyAttributeValueCollection = createCollection(
 export const dashboardCollections = {
   boardCollection,
   changelogCollection,
+  changelogPostCollection,
   changelogTagCollection,
   commentCollection,
   commentReactionCollection,

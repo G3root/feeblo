@@ -99,7 +99,6 @@ describe("ChangelogRpcHandlers", () => {
             status: "draft",
             scheduledAt: null,
             publishedAt: null,
-            postIds: [],
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         const entries = yield* handlers

@@ -1,49 +1,39 @@
-import { Button } from "@feeblo/ui/button";
 import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPopup,
-  DialogTitle,
-} from "@feeblo/ui/dialog";
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
-import { RadioGroup, Radio } from "@feeblo/ui/radio-group";
 import { toastManager } from "@feeblo/ui/toast";
 import { useState } from "react";
-import type { ChangelogStatus } from "../constants";
-import {
-  publishChangelogSchema,
-  type TPublishChangelogValues,
-} from "../schema";
+import { publishChangelogSchema } from "../schema";
 
 export function ChangelogPublishDialog({
-  defaultScheduledAt,
-  currentStatus,
-  onPublishNow,
-  onScheduleLater,
+  defaultPublishedAt,
+  defaultSlug,
+  onPublish,
   triggerLabel = "Save",
 }: {
-  defaultScheduledAt: Date | null;
-  currentStatus: ChangelogStatus;
-  onPublishNow: () => Promise<void>;
-  onScheduleLater: (scheduledAt: Date) => Promise<void>;
+  defaultPublishedAt: Date | null;
+  defaultSlug: string;
+  onPublish: (values: { publishedAt: Date; slug: string }) => Promise<void>;
   triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] =
-    useState<TPublishChangelogValues["mode"]>("publish-now");
-  const [scheduledAt, setScheduledAt] = useState(
-    defaultScheduledAt ? toDatetimeLocalValue(defaultScheduledAt) : ""
+  const [slug, setSlug] = useState(defaultSlug);
+  const [publishedAt, setPublishedAt] = useState(
+    toDatetimeLocalValue(defaultPublishedAt ?? new Date())
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit() {
-    const parsed = publishChangelogSchema.safeParse({
-      mode,
-      scheduledAt,
-    });
+    const parsed = publishChangelogSchema.safeParse({ publishedAt, slug });
 
     if (!parsed.success) {
       toastManager.add({
@@ -55,13 +45,10 @@ export function ChangelogPublishDialog({
 
     try {
       setIsSubmitting(true);
-
-      if (parsed.data.mode === "publish-now") {
-        await onPublishNow();
-      } else {
-        await onScheduleLater(new Date(parsed.data.scheduledAt!));
-      }
-
+      await onPublish({
+        publishedAt: new Date(parsed.data.publishedAt),
+        slug: parsed.data.slug,
+      });
       setOpen(false);
     } finally {
       setIsSubmitting(false);
@@ -70,100 +57,53 @@ export function ChangelogPublishDialog({
 
   return (
     <>
-      <Button
-        onClick={() => {
-          if (currentStatus === "published") {
-            setMode("publish-now");
-          }
-          setOpen(true);
-        }}
-        type="button"
-      >
+      <Button onClick={() => setOpen(true)} type="button">
         {triggerLabel}
       </Button>
-      <Dialog onOpenChange={setOpen} open={open}>
-        <DialogPopup className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Save changelog</DialogTitle>
-            <DialogDescription>
-              {currentStatus === "published"
-                ? "This changelog is already published. You can publish updates immediately."
-                : "Publish immediately or schedule this changelog for a later time."}
-            </DialogDescription>
-          </DialogHeader>
+      <AlertDialog onOpenChange={setOpen} open={open}>
+        <AlertDialogPopup className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save changelog</AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose the public URL and publication date for this changelog.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-          <div className="space-y-4 px-6 pb-2">
-            <RadioGroup
-              className="space-y-3"
-              onValueChange={(value) =>
-                setMode(value as TPublishChangelogValues["mode"])
-              }
-              value={mode}
-            >
-              <label
-                className="flex items-start gap-3 rounded-xl border p-4"
-                htmlFor="publish-now"
-              >
-                <Radio id="publish-now" value="publish-now" />
-                <div className="space-y-1">
-                  <p className="font-medium text-sm">Publish now</p>
-                  <p className="text-muted-foreground text-sm">
-                    Make this update visible immediately.
-                  </p>
-                </div>
-              </label>
+          <div className="space-y-4 px-6 pb-6">
+            <div className="space-y-2">
+              <Label htmlFor="changelog-slug">Slug</Label>
+              <Input
+                autoComplete="off"
+                id="changelog-slug"
+                onChange={(event) => setSlug(event.target.value)}
+                type="text"
+                value={slug}
+              />
+            </div>
 
-              {currentStatus !== "published" ? (
-                <label
-                  className="flex items-start gap-3 rounded-xl border p-4 opacity-50"
-                  htmlFor="schedule-later"
-                >
-                  <Radio
-                    disabled
-                    id="schedule-later"
-                    value="schedule-later"
-                  />
-                  <div className="space-y-1">
-                    <p className="font-medium text-sm">Publish later</p>
-                    <p className="text-muted-foreground text-sm">
-                      Not available yet.
-                    </p>
-                  </div>
-                </label>
-              ) : null}
-            </RadioGroup>
-
-            {false ? (
-              <div className="space-y-2">
-                <Label htmlFor="scheduled-at">Publish date</Label>
-                <Input
-                  id="scheduled-at"
-                  onChange={(event) => setScheduledAt(event.target.value)}
-                  type="datetime-local"
-                  value={scheduledAt}
-                />
-              </div>
-            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="published-at">Published date</Label>
+              <Input
+                id="published-at"
+                onChange={(event) => setPublishedAt(event.target.value)}
+                type="datetime-local"
+                value={publishedAt}
+              />
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button
-              onClick={() => setOpen(false)}
-              type="button"
-              variant="outline"
-            >
-              Cancel
-            </Button>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
             <Button
               disabled={isSubmitting}
               onClick={handleSubmit}
               type="button"
             >
-              {mode === "publish-now" ? "Publish now" : "Schedule"}
+              Save
             </Button>
-          </DialogFooter>
-        </DialogPopup>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
     </>
   );
 }
