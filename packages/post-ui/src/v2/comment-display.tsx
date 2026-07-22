@@ -1,5 +1,5 @@
 import type { TComment } from "@feeblo/domain/src/comments/schema.js";
-import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import { Button } from "@feeblo/ui/button";
 import {
   Menu,
@@ -28,18 +28,6 @@ import { usePostCollections } from "./providers/post-collections-provider";
 import { CommentReactionPicker } from "./reaction-picker";
 
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-const WHITESPACE_REGEX = /\s+/;
-
-function getInitials(name: string | null | undefined) {
-  const normalized = name?.trim();
-
-  if (!normalized) {
-    return "??";
-  }
-
-  const segments = normalized.split(WHITESPACE_REGEX).slice(0, 2);
-  return segments.map((segment) => segment.charAt(0).toUpperCase()).join("");
-}
 
 function formatRelativeTime(value: Date | string) {
   const date = value instanceof Date ? value : new Date(value);
@@ -196,9 +184,7 @@ function CommentDisplayAvatar() {
   const { state } = useCommentDisplay();
 
   return (
-    <Avatar size="sm">
-      <AvatarFallback>{getInitials(state.authorName)}</AvatarFallback>
-    </Avatar>
+    <UserAvatar name={state.authorName} size="sm" />
   );
 }
 

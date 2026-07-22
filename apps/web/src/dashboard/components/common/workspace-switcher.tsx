@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import {
   Menu,
   MenuItem,
@@ -51,18 +51,10 @@ export function WorkspaceSwitcher() {
                     size="lg"
                     {...props}
                   >
-                    <Avatar>
-                      {selectedOrganization?.logo ? (
-                        <AvatarImage
-                          alt={selectedOrganization.name}
-                          className="rounded-lg"
-                          src={selectedOrganization.logo}
-                        />
-                      ) : null}
-                      <AvatarFallback>
-                        {selectedOrganization?.name.slice(0, 1) ?? "W"}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      image={selectedOrganization?.logo}
+                      name={selectedOrganization?.name ?? "W"}
+                    />
                     <div className="flex flex-col gap-0.5 leading-none">
                       <span className="font-medium">
                         {selectedOrganization?.name ?? "Select workspace"}

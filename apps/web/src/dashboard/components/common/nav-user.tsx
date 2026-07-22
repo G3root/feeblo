@@ -1,4 +1,3 @@
-import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import {
   Menu,
   MenuItem,
@@ -21,6 +20,7 @@ import { useTheme } from "@feeblo/ui/theme-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import {
   CreditCardIcon,
   LogoutSquare01Icon,
@@ -50,10 +50,11 @@ export function NavUser() {
               />
             }
           >
-            <Avatar className="h-8 w-8 rounded-lg">
-              {/* <AvatarImage src={user.avatar} alt={user.name} /> */}
-              <AvatarFallback className="rounded-lg">CN</AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              className="h-8 w-8 rounded-lg"
+              image={user?.image}
+              name={user?.name ?? "CN"}
+            />
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user?.name}</span>
               <span className="truncate text-xs">{user?.email}</span>

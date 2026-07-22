@@ -1,6 +1,6 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
@@ -112,12 +112,7 @@ function Button(props: React.ComponentProps<"button">) {
         type="button"
         {...props}
       >
-        <Avatar>
-          {imageUrl ? <AvatarImage alt={imageAlt} src={imageUrl} /> : null}
-          <AvatarFallback>
-            {name.trim().slice(0, 1).toUpperCase() || "U"}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar image={imageUrl} imageAlt={imageAlt} name={name} />
       </button>
     </div>
   );

@@ -2,7 +2,6 @@ import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
-import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -12,6 +11,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { cn } from "@feeblo/ui/utils";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -19,7 +19,7 @@ import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
 // import { useUpvote } from "../hooks/use-upvote";
-import { formatPostStatus, getInitials } from "../lib/utils";
+import { formatPostStatus } from "../lib/utils";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
@@ -328,15 +328,11 @@ function PostMetaSidebarTags({
 function PostMetaSidebarAuthor() {
   const { post } = usePostCollectionData();
   const authorName = post?.user?.name ?? "Anonymous";
-  const authorInitials = getInitials(authorName);
   const authorImage = post?.user?.image ?? undefined;
   return (
     <PostMetaSidebarSection title="Posted by">
       <div className="flex items-center gap-2.5">
-        <Avatar className="size-8">
-          <AvatarImage src={authorImage} />
-          <AvatarFallback>{authorInitials}</AvatarFallback>
-        </Avatar>
+        <UserAvatar className="size-8" image={authorImage} name={authorName} />
         <p className="font-medium text-foreground text-sm">{authorName}</p>
       </div>
     </PostMetaSidebarSection>

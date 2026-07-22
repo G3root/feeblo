@@ -1,5 +1,4 @@
 import type { TComment } from "@feeblo/domain/comments/schema";
-import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
   Item,
@@ -9,8 +8,9 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@feeblo/ui/item";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import { useState } from "react";
-import { formatDate, getInitials } from "../../lib/utils";
+import { formatDate } from "../../lib/utils";
 import { CommentComposer } from "./comment-composer";
 
 export function CommentThread({
@@ -36,9 +36,7 @@ export function CommentThread({
         variant="outline"
       >
         <ItemMedia>
-          <Avatar>
-            <AvatarFallback>{getInitials(comment.user.name)}</AvatarFallback>
-          </Avatar>
+          <UserAvatar name={comment.user.name} />
         </ItemMedia>
         <ItemContent className="gap-3">
           <ItemHeader className="items-start">

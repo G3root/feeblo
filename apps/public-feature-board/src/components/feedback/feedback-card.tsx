@@ -1,10 +1,10 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
-import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "@feeblo/ui/utils";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import { Link } from "@tanstack/react-router";
-import { formatPostStatus, getInitials, truncate } from "../../lib/utils";
+import { formatPostStatus, truncate } from "../../lib/utils";
 
 const statusColors: Record<string, string> = {
   PENDING: "bg-muted-foreground/50",
@@ -28,23 +28,6 @@ function StatusIndicator({ status }: { status: string }) {
         {formatPostStatus(status)}
       </span>
     </div>
-  );
-}
-
-function UserAvatar({
-  image,
-  name,
-}: {
-  image: string | null;
-  name: string | null;
-}) {
-  const initials = getInitials(name);
-
-  return (
-    <Avatar size="sm">
-      {image ? <AvatarImage alt={name ?? "User avatar"} src={image} /> : null}
-      <AvatarFallback>{initials}</AvatarFallback>
-    </Avatar>
   );
 }
 

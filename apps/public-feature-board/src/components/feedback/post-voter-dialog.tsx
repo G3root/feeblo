@@ -1,10 +1,4 @@
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-  AvatarImage,
-} from "@feeblo/ui/avatar";
+import { AvatarGroup, AvatarGroupCount } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -15,9 +9,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@feeblo/ui/dialog";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
-import { getInitials } from "../../lib/utils";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
@@ -113,10 +107,11 @@ function PostVoterList() {
   return (
     <AvatarGroup>
       {visibleVoters.map((voter) => (
-        <Avatar key={voter.id}>
-          <AvatarImage src={voter.user.image ?? undefined} />
-          <AvatarFallback>{getInitials(voter.user.name)}</AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          image={voter.user.image}
+          key={voter.id}
+          name={voter.user.name}
+        />
       ))}
       {hiddenVoterCount > 0 ? (
         <AvatarGroupCount>+{hiddenVoterCount}</AvatarGroupCount>
@@ -142,12 +137,7 @@ function PostVoterDialogPopup() {
           {voters.map((voter) => (
             <li key={voter.id}>
               <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-                <Avatar>
-                  <AvatarImage src={voter.user.image ?? undefined} />
-                  <AvatarFallback>
-                    {getInitials(voter.user.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar image={voter.user.image} name={voter.user.name} />
                 <span className="font-medium text-foreground text-sm">
                   {voter.user.name}
                 </span>

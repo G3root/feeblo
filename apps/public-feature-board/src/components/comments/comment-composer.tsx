@@ -1,8 +1,7 @@
-import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
 import { useState } from "react";
 import { z } from "zod";
-import { getInitials } from "../../lib/utils";
 
 export function CommentComposer({
   autoFocus = false,
@@ -47,9 +46,7 @@ export function CommentComposer({
         form.handleSubmit();
       }}
     >
-      <Avatar className="mt-1 hidden sm:flex">
-        <AvatarFallback>{getInitials(userName)}</AvatarFallback>
-      </Avatar>
+      <UserAvatar className="mt-1 hidden sm:flex" name={userName} />
       <div className="flex-1 rounded-xl border bg-card p-3">
         <form.AppField name="content">
           {(field) => (
