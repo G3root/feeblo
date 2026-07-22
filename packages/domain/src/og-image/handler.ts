@@ -1,4 +1,5 @@
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
@@ -14,11 +15,19 @@ import { generateOgImage } from "./og-image";
 import { OgImageRequest } from "./schema";
 import { OgImageService } from "./service";
 
+const browserCacheDuration = Duration.hours(1);
+const staleCacheDuration = Duration.days(1);
+const cacheControl = [
+  "public",
+  `max-age=${Duration.toSeconds(browserCacheDuration)}`,
+  `stale-while-revalidate=${Duration.toSeconds(staleCacheDuration)}`,
+].join(", ");
+
 const imageResponse = (image: Uint8Array) =>
   HttpServerResponse.uint8Array(image, {
     contentType: "image/png",
     headers: {
-      "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+      "Cache-Control": cacheControl,
     },
   });
 

@@ -15,36 +15,76 @@ const statusPresentation: Record<
   CLOSED: { color: "#a1a1aa", label: "Closed" },
   COMPLETED: { color: "#34d399", label: "Completed" },
   IN_PROGRESS: { color: "#fbbf24", label: "In Progress" },
-  PENDING: { color: "#a78bfa", label: "Pending" },
-  PLANNED: { color: "#818cf8", label: "Planned" },
+  PENDING: { color: "#60a5fa", label: "Pending" },
+  PLANNED: { color: "#3b82f6", label: "Planned" },
   REVIEW: { color: "#38bdf8", label: "In Review" },
 };
 
 interface OgFrameProps {
   children: ReactNode;
   siteName: string;
+  stage: ProductStage;
 }
+
+type ProductStage = "listen" | "plan" | "ship";
+
+const productStages = [
+  { label: "Listen", stage: "listen" },
+  { label: "Plan", stage: "plan" },
+  { label: "Ship", stage: "ship" },
+] as const;
 
 function BrandMark() {
   return (
-    <div tw="flex h-11 w-11 items-center justify-center rounded-full bg-slate-700 text-2xl text-white">
-      +
+    <div tw="relative flex h-11 w-11 items-center justify-center rounded-full bg-[#343c4c] text-white">
+      <div tw="flex h-[18px] w-[18px] rotate-45 rounded-[5px] border-2 border-[#9dceff]" />
+      <div tw="absolute flex h-[6px] w-[6px] rounded-full bg-white" />
     </div>
   );
 }
 
-function OgFrame({ children, siteName }: OgFrameProps) {
+function ProductLoop({ activeStage }: { activeStage: ProductStage }) {
+  return (
+    <div tw="flex items-center gap-3 text-[13px] font-semibold uppercase tracking-[2px] text-[#697086]">
+      {productStages.map(({ label, stage }, index) => {
+        const isActive = stage === activeStage;
+        return (
+          <React.Fragment key={stage}>
+            {index > 0 ? <div tw="flex h-px w-8 bg-[#34394a]" /> : null}
+            <div
+              style={{ color: isActive ? "#9dceff" : "#697086" }}
+              tw="flex items-center gap-2"
+            >
+              <div
+                style={{
+                  backgroundColor: isActive ? "#4ea7ff" : "#34394a",
+                  boxShadow: isActive ? "0 0 18px #4ea7ff" : "none",
+                }}
+                tw="flex h-2 w-2 rounded-full"
+              />
+              {label}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function OgFrame({ children, siteName, stage }: OgFrameProps) {
   return (
     <div tw="flex h-full w-full bg-linear-to-br from-zinc-900 font-sans text-zinc-100 overflow-hidden">
-      <div tw="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl " />
+      <div tw="absolute -top-24 -right-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl " />
       <div tw="relative flex h-full w-full flex-col px-[76px] py-[76px]">
-        <div tw="flex items-center gap-3">
-          <BrandMark />
-          <div tw="text-[34px] font-bold leading-none">{siteName}</div>
+        <div tw="flex w-full items-center justify-between">
+          <div tw="flex items-center gap-3">
+            <BrandMark />
+            <div tw="text-[34px] font-bold leading-none">{siteName}</div>
+          </div>
+          <ProductLoop activeStage={stage} />
         </div>
 
         <div tw="mt-auto flex flex-col pb-[38px]">{children}</div>
-        <div tw="absolute bottom-0 left-0 h-4 w-full bg-[#6558b5]" />
       </div>
     </div>
   );
@@ -54,6 +94,7 @@ interface MainImageProps {
   accentLabel?: string;
   description: string;
   siteName: string;
+  stage: ProductStage;
   title: string;
 }
 
@@ -61,12 +102,13 @@ function MainImage({
   accentLabel,
   description,
   siteName,
+  stage,
   title,
 }: MainImageProps) {
   return (
-    <OgFrame siteName={siteName}>
+    <OgFrame siteName={siteName} stage={stage}>
       {accentLabel ? (
-        <div tw="mb-7 text-[28px] font-medium text-[#8b7cff]">
+        <div tw="mb-7 text-[28px] font-medium text-[#4ea7ff]">
           {accentLabel}
         </div>
       ) : null}
@@ -118,31 +160,46 @@ function UpvoteIcon() {
   );
 }
 
+const postStage = (status: TPostStatus["type"]): ProductStage => {
+  if (status === "PLANNED" || status === "IN_PROGRESS") {
+    return "plan";
+  }
+  if (status === "COMPLETED" || status === "CLOSED") {
+    return "ship";
+  }
+  return "listen";
+};
+
 export function OgImage(props: OgImageData) {
   switch (props.type) {
     case "feedback-main":
       return (
         <MainImage
-          accentLabel="Feedback"
-          description={`Tell ${props.siteName} how they could make the product more useful to you.`}
+          accentLabel="Open feedback"
+          description={`Share what would make ${props.siteName} work better for you.`}
           siteName={props.siteName}
-          title="Have something to say?"
+          stage="listen"
+          title="Shape what comes next."
         />
       );
     case "changelog-main":
       return (
         <MainImage
-          description="Keep up with the latest improvements, fixes, and product updates."
+          accentLabel="Recently shipped"
+          description="Fresh improvements, thoughtful fixes, and everything newly released."
           siteName={props.siteName}
-          title="Changelog"
+          stage="ship"
+          title="What’s new."
         />
       );
     case "roadmap-main":
       return (
         <MainImage
-          description="See what's coming next and vote for your favorite ideas."
+          accentLabel="Public roadmap"
+          description="Explore what’s planned, follow what’s moving, and support the ideas that matter."
           siteName={props.siteName}
-          title="Roadmap"
+          stage="plan"
+          title="Built in the open."
         />
       );
     case "post-detail": {
@@ -150,7 +207,7 @@ export function OgImage(props: OgImageData) {
       const upvoteLabel = `${props.upvoteCount} ${props.upvoteCount === 1 ? "Upvote" : "Upvotes"}`;
 
       return (
-        <OgFrame siteName={props.siteName}>
+        <OgFrame siteName={props.siteName} stage={postStage(props.status)}>
           <div
             style={{ color: status.color }}
             tw="mb-8 text-[28px] font-medium"
