@@ -113,4 +113,4 @@ export function PopoverDescription({
   );
 }
 
-export { PopoverPrimitive, PopoverPopup as PopoverContent };
+export { PopoverPrimitive };

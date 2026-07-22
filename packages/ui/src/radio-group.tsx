@@ -37,4 +37,4 @@ export function Radio({
   );
 }
 
-export { RadioGroupPrimitive, RadioPrimitive, Radio as RadioGroupItem };
+export { RadioGroupPrimitive, RadioPrimitive };

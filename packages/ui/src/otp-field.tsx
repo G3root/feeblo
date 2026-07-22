@@ -1,4 +1,4 @@
-import { OTPField as OTPFieldPrimitive } from "@base-ui/react/otp-field";
+import { OTPFieldPreview as OTPFieldPrimitive } from "@base-ui/react/otp-field";
 import type * as React from "react";
 import { Separator } from "./separator";
 import { cn } from "./utils";

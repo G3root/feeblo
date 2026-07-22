@@ -4,18 +4,30 @@ import { cn } from "./utils";
 
 export function Avatar({
   className,
+  size = "default",
   ...props
-}: AvatarPrimitive.Root.Props): React.ReactElement {
+}: AvatarPrimitive.Root.Props & { size?: "sm" | "default" | "lg" }): React.ReactElement {
   return (
     <AvatarPrimitive.Root
       className={cn(
-        "inline-flex size-8 shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-background align-middle font-medium text-xs",
+        "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-background align-middle font-medium text-xs",
+        size === "sm" && "size-6",
+        size === "default" && "size-8",
+        size === "lg" && "size-10",
         className
       )}
       data-slot="avatar"
       {...props}
     />
   );
+}
+
+export function AvatarGroup(props: React.ComponentProps<"div">): React.ReactElement {
+  return <div className={cn("flex -space-x-2", props.className)} data-slot="avatar-group" {...props} />;
+}
+
+export function AvatarGroupCount(props: React.ComponentProps<"div">): React.ReactElement {
+  return <div className={cn("relative flex size-8 items-center justify-center rounded-full bg-muted text-xs ring-2 ring-background", props.className)} data-slot="avatar-group-count" {...props} />;
 }
 
 export function AvatarImage({

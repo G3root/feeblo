@@ -1,5 +1,6 @@
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
 import type React from "react";
+import { Button, type ButtonProps } from "./button";
 import { cn } from "./utils";
 
 export const AlertDialogCreateHandle: typeof AlertDialogPrimitive.createHandle =
@@ -158,8 +159,18 @@ export function AlertDialogClose(
   );
 }
 
+export function AlertDialogCancel(props: ButtonProps): React.ReactElement {
+  return (
+    <AlertDialogClose render={<Button variant="ghost" />} {...props} />
+  );
+}
+
+export function AlertDialogAction(props: ButtonProps): React.ReactElement {
+  return (
+    <AlertDialogClose render={<Button variant="destructive" />} {...props} />
+  );
+}
+
 export {
   AlertDialogPrimitive,
-  AlertDialogBackdrop as AlertDialogOverlay,
-  AlertDialogPopup as AlertDialogContent,
 };

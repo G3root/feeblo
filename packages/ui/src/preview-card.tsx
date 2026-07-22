@@ -53,7 +53,4 @@ export function PreviewCardPopup({
 
 export {
   PreviewCardPrimitive,
-  PreviewCard as HoverCard,
-  PreviewCardTrigger as HoverCardTrigger,
-  PreviewCardPopup as HoverCardContent,
 };
