@@ -17,7 +17,17 @@ import { useTagCreateDialogContext } from "../dialog-stores";
 
 type TagType = "FEEDBACK" | "CHANGELOG";
 
-export function TagCreateDialog() {
+export type CreatedTag = {
+  id: string;
+  name: string;
+  type: TagType;
+};
+
+export function TagCreateDialog({
+  onCreated,
+}: {
+  onCreated?: (tag: CreatedTag) => void | Promise<void>;
+}) {
   const store = useTagCreateDialogContext();
   const open = useSelector(store, (state) => state.context.open);
 
@@ -31,14 +41,18 @@ export function TagCreateDialog() {
           </SheetDescription>
         </SheetHeader>
         <div className="p-4">
-          <TagCreateForm />
+          <TagCreateForm onCreated={onCreated} />
         </div>
       </SheetPopup>
     </Sheet>
   );
 }
 
-function TagCreateForm() {
+function TagCreateForm({
+  onCreated,
+}: {
+  onCreated?: (tag: CreatedTag) => void | Promise<void>;
+}) {
   const organizationId = useOrganizationId();
   const { tagCollection } = useDashboardCollections();
   const store = useTagCreateDialogContext();
@@ -69,6 +83,11 @@ function TagCreateForm() {
         });
 
         await tx.isPersisted.promise;
+        await onCreated?.({
+          id,
+          name: data.value.name,
+          type: data.value.type,
+        });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({

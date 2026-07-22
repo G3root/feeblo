@@ -9,7 +9,11 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Separator } from "@feeblo/ui/separator";
-import { CircleLockIcon } from "@hugeicons/core-free-icons";
+import {
+  Calendar03Icon,
+  CircleLockIcon,
+  UserIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -156,17 +160,70 @@ function RouteComponent() {
               <Separator />
             </div>
 
-            <p className="text-muted-foreground text-sm">
-              {formatPostDate(post.createdAt)}
-            </p>
-
-            <p className="text-muted-foreground text-sm">
-              {post.user?.name ?? "Unknown author"}
-            </p>
+            <PostDetails
+              author={post.user?.name}
+              createdAt={post.createdAt}
+              updatedAt={post.updatedAt}
+            />
           </div>
         </aside>
       </div>
     </PostPage.Root>
+  );
+}
+
+function PostDetails({
+  author,
+  createdAt,
+  updatedAt,
+}: {
+  author: string | null | undefined;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}) {
+  const details = [
+    {
+      icon: UserIcon,
+      label: "Author",
+      value: author ?? "Unknown author",
+    },
+    {
+      icon: Calendar03Icon,
+      label: "Created",
+      value: formatPostDate(createdAt),
+    },
+    // {
+    //   icon: Time02Icon,
+    //   label: "Updated",
+    //   value: formatPostDate(updatedAt),
+    // },
+  ];
+
+  return (
+    <section aria-labelledby="post-details-heading" className="space-y-2.5">
+      <h2 className="sr-only" id="post-details-heading">
+        Details
+      </h2>
+      <dl className="space-y-2">
+        {details.map((detail) => (
+          <div
+            className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs"
+            key={detail.label}
+          >
+            <HugeiconsIcon
+              aria-hidden="true"
+              className="size-4 text-muted-foreground/72"
+              icon={detail.icon}
+              strokeWidth={1.75}
+            />
+            <dt className="text-muted-foreground">{detail.label}</dt>
+            <dd className="max-w-32 truncate font-medium text-foreground">
+              {detail.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 

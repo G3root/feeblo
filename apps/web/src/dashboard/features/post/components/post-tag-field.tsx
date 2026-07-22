@@ -58,7 +58,8 @@ export function PostTagField() {
 
   const handleTagSelect = async (
     option: TagSelectOption,
-    isSelected: boolean
+    isSelected: boolean,
+    showSuccessToast = true
   ) => {
     if (disabled) {
       return;
@@ -82,10 +83,12 @@ export function PostTagField() {
 
       await postTagCollection.utils.refetch();
 
-      toastManager.add({
-        title: "Tags updated",
-        type: "success",
-      });
+      if (showSuccessToast) {
+        toastManager.add({
+          title: "Tags updated",
+          type: "success",
+        });
+      }
     } catch {
       toastManager.add({
         title: "Failed to update tags",
@@ -103,7 +106,9 @@ export function PostTagField() {
         tags={tags}
         type="FEEDBACK"
       />
-      <TagCreateDialog />
+      <TagCreateDialog
+        onCreated={(tag) => handleTagSelect(tag, false, false)}
+      />
     </TagCreateDialogProvider>
   );
 }
