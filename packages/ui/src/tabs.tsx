@@ -84,4 +84,4 @@ export function TabsPanel({
   );
 }
 
-export { TabsPrimitive, TabsTab as TabsTrigger, TabsPanel as TabsContent };
+export { TabsPrimitive };
