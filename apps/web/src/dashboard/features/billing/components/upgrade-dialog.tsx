@@ -4,11 +4,11 @@ import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogPanel,
+  DialogPopup,
   DialogTitle,
 } from "@feeblo/ui/dialog";
 import {
@@ -25,7 +25,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@feeblo/ui/item";
-import { RadioGroup, RadioGroupItem } from "@feeblo/ui/radio-group";
+import { Radio, RadioGroup } from "@feeblo/ui/radio-group";
 import { SparklesIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -71,13 +71,13 @@ export function UpgradePlanDialog() {
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={isOpen}>
-      {isOpen ? <UpgradePlanDialogContent /> : null}
+      {isOpen ? <UpgradePlanDialogPopup /> : null}
     </Dialog>
   );
 }
 
 // TODO: add loading states for products and plans
-function UpgradePlanDialogContent() {
+function UpgradePlanDialogPopup() {
   const organizationId = useOrganizationId();
   const { workspacePlanCollection, workspaceProductCollection } =
     useDashboardCollections();
@@ -117,7 +117,7 @@ function UpgradePlanDialogContent() {
   const isCurrentPlan = selectedPlanType === currentPlanType;
 
   return (
-    <DialogContent className="max-w-5xl">
+    <DialogPopup className="max-w-5xl">
       <DialogPanel scrollFade={false}>
         <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
           <div className="flex flex-col border-border lg:border-r">
@@ -157,12 +157,12 @@ function UpgradePlanDialogContent() {
                     selectedInterval === "year" ? plan.year : plan.month;
 
                   return (
-                    <FieldLabel htmlFor={plan.planType} key={plan.planType}>
-                      <Field orientation="horizontal">
-                        <RadioGroupItem
-                          id={plan.planType}
-                          value={plan.planType}
-                        />
+                    <Field key={plan.planType} orientation="horizontal">
+                      <FieldLabel
+                        className="flex flex-1 cursor-pointer items-center gap-3"
+                        htmlFor={plan.planType}
+                      >
+                        <Radio id={plan.planType} value={plan.planType} />
                         <FieldContent>
                           <FieldTitle>
                             {plan.name}{" "}
@@ -179,8 +179,8 @@ function UpgradePlanDialogContent() {
                             {formatPlanPrice(selectedProduct, selectedInterval)}
                           </div>
                         </div>
-                      </Field>
-                    </FieldLabel>
+                      </FieldLabel>
+                    </Field>
                   );
                 })}
               </RadioGroup>
@@ -226,7 +226,7 @@ function UpgradePlanDialogContent() {
           </aside>
         </div>
       </DialogPanel>
-    </DialogContent>
+    </DialogPopup>
   );
 }
 

@@ -14,11 +14,11 @@ import {
 } from "@feeblo/ui/item";
 import { Separator } from "@feeblo/ui/separator";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
+import { cn } from "@feeblo/ui/utils";
 import { LockedIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
 import type { VariantProps } from "class-variance-authority";
 import type * as React from "react";
-import { cn } from "@feeblo/ui/utils";
 
 function Root({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col gap-4">{children}</div>;
@@ -63,7 +63,7 @@ function Field({
   return (
     <BaseField
       className={cn(
-        "@md/field-group:flex-row flex-col @md/field-group:items-center *:w-full @md/field-group:*:w-auto @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "@md/field-group:flex-row flex-col @md/field-group:items-center [&>.sr-only]:w-auto [&>[data-slot=field-content]]:w-full @md/field-group:[&>[data-slot=field-content]]:min-w-0 @md/field-group:[&>[data-slot=field-content]]:flex-1 @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
         className
       )}
       orientation="vertical"

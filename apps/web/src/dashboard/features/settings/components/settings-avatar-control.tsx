@@ -1,10 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
-import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -104,25 +99,27 @@ function Button(props: React.ComponentProps<"button">) {
     useSettingsAvatarControl();
 
   return (
-    <button
-      aria-label={ariaLabel}
-      onClick={(event) => {
-        props.onClick?.(event);
+    <div>
+      <button
+        aria-label={ariaLabel}
+        onClick={(event) => {
+          props.onClick?.(event);
 
-        if (!event.defaultPrevented) {
-          openFileDialog();
-        }
-      }}
-      type="button"
-      {...props}
-    >
-      <Avatar>
-        {imageUrl ? <AvatarImage alt={imageAlt} src={imageUrl} /> : null}
-        <AvatarFallback>
-          {name.trim().slice(0, 1).toUpperCase() || "U"}
-        </AvatarFallback>
-      </Avatar>
-    </button>
+          if (!event.defaultPrevented) {
+            openFileDialog();
+          }
+        }}
+        type="button"
+        {...props}
+      >
+        <Avatar>
+          {imageUrl ? <AvatarImage alt={imageAlt} src={imageUrl} /> : null}
+          <AvatarFallback>
+            {name.trim().slice(0, 1).toUpperCase() || "U"}
+          </AvatarFallback>
+        </Avatar>
+      </button>
+    </div>
   );
 }
 

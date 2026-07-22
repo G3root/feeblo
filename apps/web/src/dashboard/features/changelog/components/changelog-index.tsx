@@ -115,14 +115,14 @@ function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
           <EmptyHeader>
             <EmptyTitle>{emptyTitle}</EmptyTitle>
             <EmptyDescription>{emptyDescription}</EmptyDescription>
-            {canCreate && !hasSearchFilter ? (
-              <EmptyContent>
-                <Button onClick={createChangeLog} type="button">
-                  Create your first entry
-                </Button>
-              </EmptyContent>
-            ) : null}
           </EmptyHeader>
+          {canCreate && !hasSearchFilter ? (
+            <EmptyContent>
+              <Button onClick={createChangeLog} type="button">
+                Create your first entry
+              </Button>
+            </EmptyContent>
+          ) : null}
         </Empty>
       </div>
     );
