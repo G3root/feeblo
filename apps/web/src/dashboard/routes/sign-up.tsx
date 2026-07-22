@@ -97,13 +97,14 @@ function RouteComponent() {
                 return;
               }
 
-              navigate({
+              await navigate({
                 to: "/email-verify",
                 search: {
+                  email,
                   redirectTo: search.redirectTo,
                 },
               });
-              break;
+              return;
             }
             case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL": {
               form.setErrorMap({
@@ -153,6 +154,23 @@ function RouteComponent() {
               });
               return;
           }
+        }
+
+        if (!response.data?.user.emailVerified) {
+          const isVerificationReady =
+            await initializeEmailVerification(email);
+          if (!isVerificationReady) {
+            return;
+          }
+
+          await navigate({
+            to: "/email-verify",
+            search: {
+              email,
+              redirectTo: search.redirectTo,
+            },
+          });
+          return;
         }
 
         navigate({

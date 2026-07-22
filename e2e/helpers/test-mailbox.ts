@@ -31,13 +31,16 @@ export async function waitForTestEmail(
 
   await expect(async () => {
     const emails = await getTestEmails(request);
-    matchingEmail = emails.find(
+    matchingEmail = emails.findLast(
       (email) =>
         email.to.toLowerCase() === recipient.toLowerCase() &&
         invitationPathPattern.test(email.html)
     );
     expect(matchingEmail).toBeDefined();
-  }).toPass();
+  }).toPass({
+    intervals: [100, 250, 500, 1000],
+    timeout: 15_000,
+  });
 
   return matchingEmail as TestEmail;
 }
@@ -50,14 +53,17 @@ export async function waitForVerificationEmail(
 
   await expect(async () => {
     const emails = await getTestEmails(request);
-    matchingEmail = emails.find(
+    matchingEmail = emails.findLast(
       (email) =>
         email.to.toLowerCase() === recipient.toLowerCase() &&
         email.subject.toLowerCase().includes("email verification") &&
         verificationCodePattern.test(email.text)
     );
     expect(matchingEmail).toBeDefined();
-  }).toPass();
+  }).toPass({
+    intervals: [100, 250, 500, 1000],
+    timeout: 15_000,
+  });
 
   return matchingEmail as TestEmail;
 }

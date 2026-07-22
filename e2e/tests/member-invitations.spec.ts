@@ -25,7 +25,8 @@ function membersUrl(organizationUrl: string): string {
 async function inviteMember(
   page: Page,
   email: string,
-  role: "admin" | "member" = "member"
+  role: "admin" | "member" = "member",
+  expectSuccess = true
 ) {
   const form = page.locator("form").filter({
     has: page.getByRole("textbox", { name: "Invite email" }),
@@ -37,6 +38,11 @@ async function inviteMember(
     await page.getByRole("option", { name: "Admin" }).click();
   }
   await form.getByRole("button", { name: "Invite" }).click();
+  if (expectSuccess) {
+    await expect(
+      page.getByText("Invitation sent", { exact: true })
+    ).toBeVisible();
+  }
 }
 
 async function createSignedInUser(
@@ -110,7 +116,7 @@ test.describe("member invitations", () => {
     const invalidEmail = "not-an-email";
 
     await page.goto(membersUrl(owner.organizationUrl));
-    await inviteMember(page, invalidEmail);
+    await inviteMember(page, invalidEmail, "member", false);
 
     expect(
       await page
@@ -138,7 +144,7 @@ test.describe("member invitations", () => {
     await expect(
       page.getByRole("textbox", { name: "Invite email" })
     ).toBeEmpty();
-    await inviteMember(page, invitee.email);
+    await inviteMember(page, invitee.email, "member", false);
 
     await expect(
       page.getByText("Failed to invite member", { exact: true })
@@ -274,19 +280,16 @@ test.describe("member invitations", () => {
     }
   });
 
-  test("a member cannot invite teammates, while an admin can", async ({
+  test("a member cannot invite teammates", async ({
     browser,
     page,
   }) => {
     const owner = await createAuthenticatedWorkspace(page);
     const member = createTestUser();
-    const admin = createTestUser();
     const memberContext = await browser.newContext();
-    const adminContext = await browser.newContext();
 
     try {
       const memberPage = await createSignedInUser(memberContext, member);
-      const adminPage = await createSignedInUser(adminContext, admin);
       await page.goto(membersUrl(owner.organizationUrl));
 
       await inviteMember(page, member.email);
@@ -304,6 +307,24 @@ test.describe("member invitations", () => {
         ).ok()
       ).toBeTruthy();
 
+      await memberPage.goto(membersUrl(owner.organizationUrl));
+      await expect(
+        memberPage.getByRole("textbox", { name: "Invite email" })
+      ).toHaveCount(0);
+    } finally {
+      await memberContext.close();
+    }
+  });
+
+  test("an admin can invite teammates", async ({ browser, page }) => {
+    const owner = await createAuthenticatedWorkspace(page);
+    const admin = createTestUser();
+    const adminContext = await browser.newContext();
+
+    try {
+      const adminPage = await createSignedInUser(adminContext, admin);
+      await page.goto(membersUrl(owner.organizationUrl));
+
       await inviteMember(page, admin.email, "admin");
       const adminEmail = await waitForTestEmail(
         page.context().request,
@@ -319,17 +340,11 @@ test.describe("member invitations", () => {
         ).ok()
       ).toBeTruthy();
 
-      await memberPage.goto(membersUrl(owner.organizationUrl));
-      await expect(
-        memberPage.getByRole("textbox", { name: "Invite email" })
-      ).toHaveCount(0);
-
       await adminPage.goto(membersUrl(owner.organizationUrl));
       await expect(
         adminPage.getByRole("textbox", { name: "Invite email" })
       ).toBeVisible();
     } finally {
-      await memberContext.close();
       await adminContext.close();
     }
   });
@@ -361,7 +376,7 @@ test.describe("member invitations", () => {
       ).toBeTruthy();
 
       await page.reload();
-      await inviteMember(page, invitee.email);
+      await inviteMember(page, invitee.email, "member", false);
       await expect(
         page.getByText("Failed to invite member", { exact: true })
       ).toBeVisible();

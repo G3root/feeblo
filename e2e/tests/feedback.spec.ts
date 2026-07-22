@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 import { createTestUser } from "../helpers/test-users";
 
@@ -51,7 +51,10 @@ async function openPost(page: Page, title: string) {
 
 async function chooseFirstReaction(page: Page) {
   await page.getByRole("button", { name: "Add reaction" }).first().click();
-  await page.getByRole("button", { name: "👍️", exact: true }).click();
+  await page
+    .locator('[role="dialog"]:visible')
+    .getByRole("button", { name: "👍️", exact: true })
+    .click();
 }
 
 test.describe("feedback workflow", () => {
@@ -108,7 +111,10 @@ test.describe("feedback workflow", () => {
         "xpath=ancestor::div[contains(@class, 'rounded-2xl')][1]"
       );
       await commentCard.getByRole("button", { name: "Add reaction" }).click();
-      await page.getByRole("button", { name: "👍️", exact: true }).click();
+      await page
+        .locator('[role="dialog"]:visible')
+        .getByRole("button", { name: "👍️", exact: true })
+        .click();
       await expect(
         commentCard
           .getByRole("button")
@@ -117,4 +123,47 @@ test.describe("feedback workflow", () => {
       ).toBeVisible();
     }
   );
+
+  test("changelog offers completed posts that have not been announced", async ({
+    page,
+  }) => {
+    const workspace = await createWorkspace(page);
+    const completedTitle = `Completed post ${randomUUID().slice(0, 8)}`;
+    const pendingTitle = `Pending post ${randomUUID().slice(0, 8)}`;
+
+    await createPost(page, completedTitle, "This work has shipped.");
+    await openPost(page, completedTitle);
+    await page.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: "Completed", exact: true }).click();
+    await expect(page.getByText("Status updated")).toBeVisible();
+
+    await page.goto(workspace.organizationUrl);
+    await createPost(page, pendingTitle, "This work is still pending.");
+
+    await page.getByRole("link", { name: "Changelog" }).click();
+    await page.getByRole("button", { name: "Create your first entry" }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Recently completed" })
+    ).toBeVisible();
+    const completedPost = page.getByRole("checkbox", { name: completedTitle });
+    await expect(completedPost).toBeVisible();
+    await expect(
+      page.getByRole("checkbox", { name: pendingTitle })
+    ).toHaveCount(0);
+
+    await completedPost.check();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Changes saved")).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByRole("checkbox", { name: completedTitle })
+    ).toBeChecked();
+
+    await page.getByLabel("Back to changelog").click();
+    await page.getByRole("button", { name: "New Entry" }).click();
+    await expect(
+      page.getByRole("checkbox", { name: completedTitle })
+    ).toHaveCount(0);
+  });
 });

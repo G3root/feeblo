@@ -21,7 +21,7 @@ export class LoginPage {
   async login(email: string, password: string) {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
-    await Promise.all([
+    const [response] = await Promise.all([
       this.page.waitForResponse(
         (response) =>
           response.url().includes("/api/auth/sign-in/email") &&
@@ -29,5 +29,6 @@ export class LoginPage {
       ),
       this.submitButton.click(),
     ]);
+    expect(response.ok()).toBeTruthy();
   }
 }

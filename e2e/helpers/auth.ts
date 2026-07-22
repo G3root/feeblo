@@ -2,6 +2,10 @@ import { expect, type Page } from "@playwright/test";
 import { LoginPage } from "../page-objects/LoginPage";
 import { RegisterPage } from "../page-objects/RegisterPage";
 import { SignUpPage } from "../page-objects/SignUpPage";
+import {
+  verificationCodeFromEmail,
+  waitForVerificationEmail,
+} from "./test-mailbox";
 import { createTestUser, type TestUser } from "./test-users";
 
 export type AuthenticatedUser = TestUser & {
@@ -23,6 +27,30 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
   );
 
   expect(response.ok()).toBeTruthy();
+
+  const email = await waitForVerificationEmail(page.request, user.email);
+  const verificationResponse = await page.context().request.post(
+    `${apiURL}/api/auth/email-otp/verify-email`,
+    {
+      data: {
+        email: user.email,
+        otp: verificationCodeFromEmail(email),
+      },
+    }
+  );
+  expect(verificationResponse.ok()).toBeTruthy();
+}
+
+async function verifyEmailThroughSignUpFlow(page: Page, user: TestUser) {
+  await expect(page).toHaveURL(/\/email-verify/);
+  await expect(
+    page.getByRole("heading", { name: "Enter verification code" })
+  ).toBeVisible();
+
+  const email = await waitForVerificationEmail(page.request, user.email);
+  await page.locator("#otp").fill(verificationCodeFromEmail(email));
+  await page.getByRole("button", { name: "Verify", exact: true }).click();
+  await expect(page).not.toHaveURL(/\/email-verify/);
 }
 
 export async function signUpAndCreateWorkspace(
@@ -32,6 +60,7 @@ export async function signUpAndCreateWorkspace(
   const signUpPage = new SignUpPage(page);
   await signUpPage.goto();
   await signUpPage.signUp(user.name, user.email, user.password);
+  await verifyEmailThroughSignUpFlow(page, user);
 
   // The sign-up flow lands on a placeholder route; navigate to the workspace
   // registration page so we can create the first organization.
@@ -70,11 +99,14 @@ export async function logOut(page: Page, userEmail: string) {
   await page.getByRole("button", { name: userEmail }).click();
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await page.waitForURL("/sign-in");
+  await expect(
+    page.getByRole("button", { name: "Login", exact: true })
+  ).toBeVisible();
 }
 
 export async function logIn(page: Page, user: TestUser) {
   const loginPage = new LoginPage(page);
-  await loginPage.goto();
+  await expect(loginPage.submitButton).toBeVisible();
   await Promise.all([
     page.waitForURL(/\/org_/),
     loginPage.login(user.email, user.password),

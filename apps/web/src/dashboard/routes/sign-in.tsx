@@ -1,14 +1,17 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { z } from "zod";
-import { AuthShell } from "~/features/auth/components/auth-shell";
-import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import {
   getSafeCallbackURL,
   initializeEmailVerification,
 } from "@feeblo/post-ui/auth-flows";
+import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { authClient } from "@feeblo/web-shared/auth-client";
-import { EmailSchema, PasswordSchema } from "@feeblo/web-shared/user-validation";
+import {
+  EmailSchema,
+  PasswordSchema,
+} from "@feeblo/web-shared/user-validation";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
+import { AuthShell } from "~/features/auth/components/auth-shell";
 
 export const Route = createFileRoute("/sign-in")({
   validateSearch: (search) =>
@@ -61,6 +64,7 @@ function RouteComponent() {
               navigate({
                 to: "/email-verify",
                 search: {
+                  email: value.email,
                   redirectTo: search.redirectTo,
                 },
               });

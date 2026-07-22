@@ -102,7 +102,7 @@ test(
 );
 
 test(
-  "visitor can sign up from a public board and gain public write access",
+  "user can verify their email with the emailed code",
   { tag: "@critical" },
   async ({ browser, page }) => {
     const owner = createTestUser();
@@ -149,17 +149,14 @@ test(
         name: "Verify your email",
       });
       await expect(verificationDialog).toBeVisible();
-      await verificationDialog
-        .getByRole("button", { name: "Resend", exact: true })
-        .click();
 
       const email = await waitForVerificationEmail(
         visitorPage.request,
         visitor.email
       );
-      await verificationDialog
-        .getByRole("textbox")
-        .fill(verificationCodeFromEmail(email));
+      await verificationDialog.locator("#otp").fill(
+        verificationCodeFromEmail(email)
+      );
       await verificationDialog
         .getByRole("button", { name: "Verify", exact: true })
         .click();

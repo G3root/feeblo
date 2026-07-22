@@ -497,6 +497,11 @@ function OtpVerificationForm({
       await fetch(verificationOtpEndpoint, {
         method: "DELETE",
         credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email,
+          type: "email-verification",
+        }),
       });
 
       onSuccess();

@@ -17,7 +17,7 @@ const e2eEnv = {
   APP_URL: baseURL,
   API_URL: apiURL,
   AUTH_AUTO_SIGN_IN_AFTER_SIGN_UP: "true",
-  AUTH_EMAIL_VERIFICATION_REQUIRED: "false",
+  AUTH_EMAIL_VERIFICATION_REQUIRED: "true",
   AUTH_ENCRYPTION_KEY: "playwright-e2e-local-secret-32-chars",
   AUTH_TRUSTED_ORIGINS: `${baseURL},${apiURL},*.localhost:${webPort}`,
   CLOUDFLARE_ADAPTER: "false",
@@ -35,7 +35,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  ...(process.env.CI ? { workers: 1 } : {}),
+  ...(process.env.CI ? { workers: 2 } : {}),
   reporter: process.env.CI
     ? [["list"], ["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
