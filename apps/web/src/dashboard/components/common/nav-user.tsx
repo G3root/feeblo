@@ -19,8 +19,8 @@ import {
 } from "@feeblo/ui/sidebar";
 import { useTheme } from "@feeblo/ui/theme-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
+import { useAuth } from "@feeblo/web-shared/auth-context";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   CreditCardIcon,
   LogoutSquare01Icon,
@@ -34,7 +34,8 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-  const { data: session } = useAuthState();
+  const auth = useAuth();
+  const user = auth.status === "authenticated" ? auth.user : null;
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
   return (
@@ -55,9 +56,9 @@ export function NavUser() {
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">
-                {session?.user?.name}
+                {user?.name}
               </span>
-              <span className="truncate text-xs">{session?.user?.email}</span>
+              <span className="truncate text-xs">{user?.email}</span>
             </div>
             <HugeiconsIcon className="ml-auto size-4" icon={UnfoldMoreIcon} />
           </DropdownMenuTrigger>

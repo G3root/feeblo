@@ -11,7 +11,7 @@ import { SiteProvider } from "../providers/site-provider";
 import { router } from "./public-board-router";
 
 export interface PublicBoardAppProps {
-  readonly initialHint?: AuthHint | null;
+  readonly initialHint: AuthHint | null;
   readonly site: TSite;
 }
 

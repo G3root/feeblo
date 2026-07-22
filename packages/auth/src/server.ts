@@ -45,6 +45,7 @@ import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
+import { AUTH_SESSION_DURATION_SECONDS } from "./session";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
 
 const loadPasswordResetEmail = () =>
@@ -223,6 +224,9 @@ export const initAuthHandler = (
 
       baseURL: apiUrl,
       secret: Redacted.value(secret),
+      session: {
+        expiresIn: AUTH_SESSION_DURATION_SECONDS,
+      },
       ...((githubClientId._tag === "Some" &&
         githubClientSecret._tag === "Some") ||
       (googleClientId._tag === "Some" && googleClientSecret._tag === "Some")

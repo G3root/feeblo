@@ -5,7 +5,11 @@ import { createRouter } from "./router";
 
 const router = createRouter();
 
-export const Dashboard = ({ initialHint }: { initialHint?: AuthHint | null }) => (
+export const Dashboard = ({
+  initialHint,
+}: {
+  initialHint: AuthHint | null;
+}) => (
   <AuthProvider initialHint={initialHint}>
     <RouterProvider router={router} />
   </AuthProvider>

@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+/** biome-ignore-all lint/style/noNestedTernary: Redirect suffixes mirror the route decision tree. */
 import { sequence } from "astro:middleware";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";
@@ -38,6 +38,32 @@ function isFeedbackWidgetPath(pathname: string) {
     pathname === FEEDBACK_WIDGET_PATH ||
     pathname.startsWith(`${FEEDBACK_WIDGET_PATH}/`)
   );
+}
+
+function isDocumentRequest(request: Request) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return false;
+  }
+
+  const destination = request.headers.get("sec-fetch-dest");
+  return (
+    destination === "document" ||
+    (!destination && request.headers.get("accept")?.includes("text/html"))
+  );
+}
+
+async function documentCacheMiddleware(
+  context: APIContext,
+  next: MiddlewareNext
+) {
+  const response = await next();
+  if (isDocumentRequest(context.request)) {
+    // The document varies by the HttpOnly session cookie because it embeds a
+    // server-verified display hint. Neither anonymous nor signed-in HTML may
+    // enter a shared cache under this URL.
+    response.headers.set("Cache-Control", "private, no-store");
+  }
+  return response;
 }
 
 function resolveSubdomain(context: APIContext) {
@@ -155,20 +181,17 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
     }
   }
 
-  const { user, organizations } = context.locals;
-  context.locals.authHint =
-    user && organizations
-      ? ({
-          v: 1,
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            image: user.image ?? null,
-          },
-          organizations,
-        } satisfies AuthHint)
-      : null;
+  const { user } = context.locals;
+  context.locals.authHint = user
+    ? ({
+        v: 1,
+        user: {
+          email: user.email,
+          name: user.name,
+          image: user.image ?? null,
+        },
+      } satisfies AuthHint)
+    : null;
 
   return next();
 }
@@ -273,6 +296,7 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
 }
 
 export const onRequest = sequence(
+  documentCacheMiddleware,
   subdomainMiddleware,
   siteMiddleware,
   authMiddleware,
