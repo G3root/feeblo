@@ -86,7 +86,8 @@
     }
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@effect/atom-react": "4.0.0-beta.66",
@@ -110,6 +111,9 @@
     "@feeblo/config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "typescript": "catalog:"
+    "@vitest/browser-playwright": "^4.1.10",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vitest-browser-react": "^2.2.0"
   }
 }

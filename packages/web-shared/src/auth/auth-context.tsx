@@ -1,5 +1,6 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import type { AuthClientSession } from "@feeblo/auth/client";
+import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo } from "react";
@@ -63,6 +64,9 @@ const sessionState = (session: AuthClientSession): AuthState => ({
   },
 });
 
+const confirmedState = (session: AuthClientSession | null): AuthState =>
+  session === null ? { status: "unauthenticated" } : sessionState(session);
+
 function AuthProviderClient({
   children,
   initialHint,
@@ -78,9 +82,15 @@ function AuthProviderClient({
     () =>
       AsyncResult.match(session, {
         onInitial: () => ({ status: "loading" }),
-        onFailure: () => ({ status: "unauthenticated" }),
-        onSuccess: ({ value }) =>
-          value === null ? { status: "unauthenticated" } : sessionState(value),
+        // A failed revalidation is not evidence that the user signed out. Keep
+        // the last authoritative result when available; otherwise remain in the
+        // reconciliation state so an initial server hint can continue to paint.
+        onFailure: ({ previousSuccess }) =>
+          Option.match(previousSuccess, {
+            onNone: () => ({ status: "loading" }),
+            onSome: ({ value }) => confirmedState(value),
+          }),
+        onSuccess: ({ value }) => confirmedState(value),
       }),
     [session]
   );

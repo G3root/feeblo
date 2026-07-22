@@ -1,5 +1,6 @@
 import type { AuthClientSession } from "@feeblo/auth/client";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
@@ -13,17 +14,32 @@ import { authClient } from "../lib/auth-client";
 // of truth for that complete shape. It replaces the former local React DB
 // collection, which duplicated Better Auth state and needed manual syncing.
 //
-// Better Auth reports a signed-out user as a successful `null` result. Network
-// failures are represented by the client response as well, so the Effect itself
-// does not need an untyped error channel.
+// Better Auth reports a signed-out user as a successful `null` result. Transport
+// and server failures are kept in the Effect error channel so consumers can
+// distinguish them from an authoritative signed-out response.
 // ---------------------------------------------------------------------------
 
+export class AuthSessionRequestError extends Schema.TaggedErrorClass<AuthSessionRequestError>()(
+  "AuthSessionRequestError",
+  { cause: Schema.Defect }
+) {}
+
 export const meAtom = Atom.make(
-  Effect.promise(async (): Promise<AuthClientSession | null> => {
-    const result = await authClient.getSession();
+  Effect.gen(function* () {
+    const result = yield* Effect.promise(() => authClient.getSession());
+    if (result.error) {
+      return yield* new AuthSessionRequestError({ cause: result.error });
+    }
     return result.data;
   })
-).pipe(Atom.setIdleTTL("5 minutes"));
+).pipe(
+  Atom.swr({
+    staleTime: "5 minutes",
+    revalidateOnFocus: "always",
+    focusSignal: Atom.windowFocusSignal,
+  }),
+  Atom.setIdleTTL("5 minutes")
+);
 
 /**
  * Shared by React and router callbacks so both surfaces see the same atom.
