@@ -5,12 +5,13 @@ import { TextField } from "../text-field";
 import { TextareaField } from "../textarea-field";
 
 interface SubscribeButtonProps extends React.ComponentProps<typeof Button> {
-  label: string;
+  label?: string;
 }
 
 function SubscribeButton({
   label,
   type = "submit",
+  children,
   ...props
 }: SubscribeButtonProps) {
   const form = useFormContext();
@@ -18,7 +19,7 @@ function SubscribeButton({
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
         <Button {...props} disabled={isSubmitting} type={type}>
-          {label}
+          {children ?? label}
         </Button>
       )}
     </form.Subscribe>

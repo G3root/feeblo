@@ -15,8 +15,8 @@ import {
 } from "@feeblo/ui/input-group";
 import {
   Select,
-  SelectPopup,
   SelectItem,
+  SelectPopup,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
@@ -713,7 +713,7 @@ function InviteMemberForm() {
       />
       <form.AppForm>
         <SkeletonWrapper>
-          <form.SubscribeButton label="Invite" type="submit">
+          <form.SubscribeButton type="submit">
             <HugeiconsIcon icon={Plus} />
             Invite
           </form.SubscribeButton>
