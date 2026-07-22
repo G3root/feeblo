@@ -50,6 +50,11 @@ export default defineConfig({
       name: "Inter",
       cssVariable: "--font-inter",
     },
+    {
+      provider: fontProviders.google(),
+      name: "Geist Mono",
+      cssVariable: "--font-geist-mono",
+    },
   ],
 
   vite: {

@@ -1,86 +1,98 @@
-import { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
+import type { Toggle as TogglePrimitive } from "@base-ui/react/toggle";
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group";
 import type { VariantProps } from "class-variance-authority";
 import * as React from "react";
-import { toggleVariants } from "./toggle";
+import { Separator } from "./separator";
+import { Toggle as ToggleComponent, type toggleVariants } from "./toggle";
 import { cn } from "./utils";
 
-const ToggleGroupContext = React.createContext<
-  VariantProps<typeof toggleVariants> & {
-    spacing?: number;
-    orientation?: "horizontal" | "vertical";
-  }
->({
+export const ToggleGroupContext: React.Context<
+  VariantProps<typeof toggleVariants>
+> = React.createContext<VariantProps<typeof toggleVariants>>({
   size: "default",
   variant: "default",
-  spacing: 0,
-  orientation: "horizontal",
 });
 
-function ToggleGroup({
+export function ToggleGroup({
   className,
-  variant,
-  size,
-  spacing = 0,
+  variant = "default",
+  size = "default",
   orientation = "horizontal",
   children,
   ...props
 }: ToggleGroupPrimitive.Props &
-  VariantProps<typeof toggleVariants> & {
-    spacing?: number;
-    orientation?: "horizontal" | "vertical";
-  }) {
+  VariantProps<typeof toggleVariants>): React.ReactElement {
   return (
     <ToggleGroupPrimitive
       className={cn(
-        "group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-[spacing=0]:data-[variant=outline]:rounded-3xl data-vertical:flex-col data-vertical:items-stretch",
+        "flex w-fit *:focus-visible:z-10 dark:*:[[data-slot=separator]:has(+[data-slot=toggle]:hover)]:before:bg-input/64 dark:*:[[data-slot=separator]:has(+[data-slot=toggle][data-pressed])]:before:bg-input dark:*:[[data-slot=toggle]:hover+[data-slot=separator]]:before:bg-input/64 dark:*:[[data-slot=toggle][data-pressed]+[data-slot=separator]]:before:bg-input",
+        orientation === "horizontal"
+          ? "*:pointer-coarse:after:min-w-auto"
+          : "*:pointer-coarse:after:min-h-auto",
+        variant === "default"
+          ? "gap-0.5"
+          : orientation === "horizontal"
+            ? "*:not-first:rounded-s-none *:not-last:rounded-e-none *:not-first:border-s-0 *:not-last:border-e-0 *:not-first:not-data-[slot=separator]:before:-start-[0.5px] *:not-last:not-data-[slot=separator]:before:-end-[0.5px] *:not-first:before:rounded-s-none *:not-last:before:rounded-e-none"
+            : "flex-col *:not-first:rounded-t-none *:not-last:rounded-b-none *:not-first:border-t-0 *:not-last:border-b-0 *:not-first:not-data-[slot=separator]:before:-top-[0.5px] *:not-last:not-data-[slot=separator]:before:-bottom-[0.5px] *:not-first:before:rounded-t-none *:not-last:before:rounded-b-none *:data-[slot=toggle]:not-last:before:hidden dark:*:last:before:hidden dark:*:first:before:block",
         className
       )}
-      data-orientation={orientation}
       data-size={size}
       data-slot="toggle-group"
-      data-spacing={spacing}
       data-variant={variant}
-      style={{ "--gap": spacing } as React.CSSProperties}
+      orientation={orientation}
       {...props}
     >
-      <ToggleGroupContext.Provider
-        value={{ variant, size, spacing, orientation }}
-      >
+      <ToggleGroupContext.Provider value={{ size, variant }}>
         {children}
       </ToggleGroupContext.Provider>
     </ToggleGroupPrimitive>
   );
 }
 
-function ToggleGroupItem({
+export function ToggleGroupItem({
   className,
   children,
-  variant = "default",
-  size = "default",
+  variant,
+  size,
   ...props
-}: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
+}: TogglePrimitive.Props &
+  VariantProps<typeof toggleVariants>): React.ReactElement {
   const context = React.useContext(ToggleGroupContext);
 
+  const resolvedVariant = context.variant || variant;
+  const resolvedSize = context.size || size;
+
   return (
-    <TogglePrimitive
-      className={cn(
-        "shrink-0 focus:z-10 focus-visible:z-10 data-[state=on]:bg-muted group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-s-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-[spacing=0]/toggle-group:px-3 group-data-[spacing=0]/toggle-group:shadow-none group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:ps-2.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pe-2.5 group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-e-3xl group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-3xl group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-s group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-s-3xl group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-3xl",
-        toggleVariants({
-          variant: context.variant || variant,
-          size: context.size || size,
-        }),
-        className
-      )}
-      data-size={context.size || size}
-      data-slot="toggle-group-item"
-      data-spacing={context.spacing}
-      data-variant={context.variant || variant}
+    <ToggleComponent
+      className={className}
+      data-size={resolvedSize}
+      data-variant={resolvedVariant}
+      size={resolvedSize}
+      variant={resolvedVariant}
       {...props}
     >
       {children}
-    </TogglePrimitive>
+    </ToggleComponent>
   );
 }
 
-export { ToggleGroup, ToggleGroupItem };
+export function ToggleGroupSeparator({
+  className,
+  orientation = "vertical",
+  ...props
+}: {
+  className?: string;
+} & React.ComponentProps<typeof Separator>): React.ReactElement {
+  return (
+    <Separator
+      className={cn(
+        "pointer-events-none relative bg-input before:absolute before:inset-0 dark:before:bg-input/32",
+        className
+      )}
+      orientation={orientation}
+      {...props}
+    />
+  );
+}
+
+export { ToggleGroupPrimitive };
