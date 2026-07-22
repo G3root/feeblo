@@ -5,6 +5,8 @@ import { ChangelogRepository } from "../changelog/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogPostRepository } from "./repository";
 import { ChangelogPostRpcs } from "./rpcs";
@@ -17,6 +19,7 @@ import type {
 export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* ChangelogPostRepository;
   const changelogPolicy = yield* ChangelogPolicy;
+  const sitePolicy = yield* SitePolicy;
 
   return {
     ChangelogPostList: (args: TChangelogPostList) =>
@@ -24,6 +27,16 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
         .findMany(args)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("ChangelogPost", "select")
+        ),
+
+    ChangelogPostListPublic: (args: TChangelogPostList) =>
+      repository
+        .findManyPublished(args)
+        .pipe(
+          Policy.withPublicPolicy(
+            sitePolicy.canViewChangelog(args.organizationId)
+          ),
           withRemapDbErrors("ChangelogPost", "select")
         ),
 
@@ -66,6 +79,8 @@ export const ChangelogPostRpcHandlers = ChangelogPostRpcs.toLayer(
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(ChangelogPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(SiteRepository.layer),
+  Layer.provide(SitePolicy.layer),
   Layer.provide(ChangelogPostRepository.layer),
   Layer.provide(ChangelogRepository.layer)
 );

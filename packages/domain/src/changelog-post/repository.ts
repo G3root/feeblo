@@ -24,6 +24,35 @@ const makeChangelogPostRepository = Effect.gen(function* () {
         .from(schema.changelogPostTable)
         .where(eq(schema.changelogPostTable.organizationId, organizationId)),
 
+    findManyPublished: ({ organizationId }: TChangelogPostList) =>
+      db
+        .select({
+          changelogId: schema.changelogPostTable.changelogId,
+          postId: schema.changelogPostTable.postId,
+          organizationId: schema.changelogPostTable.organizationId,
+          createdAt: schema.changelogPostTable.createdAt,
+        })
+        .from(schema.changelogPostTable)
+        .innerJoin(
+          schema.changelogTable,
+          eq(schema.changelogPostTable.changelogId, schema.changelogTable.id)
+        )
+        .innerJoin(
+          schema.postTable,
+          eq(schema.changelogPostTable.postId, schema.postTable.id)
+        )
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.postTable.boardId, schema.boardTable.id)
+        )
+        .where(
+          and(
+            eq(schema.changelogPostTable.organizationId, organizationId),
+            eq(schema.changelogTable.status, "published"),
+            eq(schema.boardTable.visibility, "PUBLIC")
+          )
+        ),
+
     findEligible: ({ postId, organizationId }: TChangelogPostCreate) =>
       db
         .select({ postId: schema.postTable.id })

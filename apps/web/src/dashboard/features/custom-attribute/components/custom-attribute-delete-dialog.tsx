@@ -2,10 +2,10 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
@@ -53,7 +53,6 @@ export function CustomAttributeDeleteDialog() {
             onClick={async () => {
               try {
                 const { attributeId } = store.get().context.data;
-                store.send({ type: "toggle" });
                 const collection = getCollection(entityType, collections);
                 const tx = collection.delete(attributeId);
                 await tx.isPersisted.promise;
