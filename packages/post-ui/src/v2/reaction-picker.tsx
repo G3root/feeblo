@@ -1,6 +1,6 @@
 import { CommentReactionId, PostReactionId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
+import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { toastManager } from "@feeblo/ui/toast";
 import {
   getReactionEmoji,
@@ -122,7 +122,7 @@ function ReactionPickerGrid() {
   const { actions, state } = useReactionPicker();
 
   return (
-    <PopoverContent className="w-auto p-1" sideOffset={4}>
+    <PopoverPopup className="w-auto" sideOffset={4}>
       <div className="grid grid-cols-4 gap-1">
         {REACTION_EMOJIS.map((emoji) => {
           const isSelected = state.selectedReactions.has(emoji);
@@ -143,7 +143,7 @@ function ReactionPickerGrid() {
           );
         })}
       </div>
-    </PopoverContent>
+    </PopoverPopup>
   );
 }
 

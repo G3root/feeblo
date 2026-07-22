@@ -4,7 +4,7 @@ import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
   Card,
-  CardContent,
+  CardPanel,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -92,7 +92,7 @@ function BillingSettingsPage() {
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="grid gap-4">
+            <CardPanel className="grid gap-4">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <div className="text-muted-foreground text-sm">
@@ -125,14 +125,14 @@ function BillingSettingsPage() {
                   </Button>
                 </div>
               ) : null}
-            </CardContent>
+            </CardPanel>
           </Card>
 
           <Card className="border border-border shadow-none ring-0">
             <CardHeader>
               <CardTitle>Available Plans</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardPanel className="space-y-6">
               <div className="flex justify-start sm:justify-end">
                 <BillingIntervalTabs
                   onValueChange={setSelectedInterval}
@@ -144,9 +144,9 @@ function BillingSettingsPage() {
                 <PlanGridSkeleton />
               ) : productsError ? (
                 <Card size="sm">
-                  <CardContent className="py-2 text-muted-foreground">
+                  <CardPanel className="py-2 text-muted-foreground">
                     Plans are unavailable right now.
-                  </CardContent>
+                  </CardPanel>
                 </Card>
               ) : (
                 <div className="grid gap-4 xl:grid-cols-3">
@@ -191,7 +191,7 @@ function BillingSettingsPage() {
                             </div>
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardPanel className="space-y-4">
                           <Separator />
                           <div className="space-y-3">
                             {PLAN_FEATURES[plan.planType].map((feature) => (
@@ -200,7 +200,7 @@ function BillingSettingsPage() {
                               </div>
                             ))}
                           </div>
-                        </CardContent>
+                        </CardPanel>
                         <CardFooter>
                           <Button
                             className="w-full"
@@ -260,7 +260,7 @@ function BillingSettingsPage() {
                   upgrade action to review plan changes and checkout options.
                 </div>
               ) : null}
-            </CardContent>
+            </CardPanel>
           </Card>
         </div>
       </SettingsLayout.Content>
@@ -289,12 +289,12 @@ function PlanGridSkeleton() {
             <Skeleton className="h-4 w-40" />
             <Skeleton className="h-8 w-28" />
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardPanel className="space-y-4">
             <Skeleton className="h-px w-full" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-11/12" />
             <Skeleton className="h-4 w-10/12" />
-          </CardContent>
+          </CardPanel>
           <CardFooter>
             <Skeleton className="h-9 w-full" />
           </CardFooter>

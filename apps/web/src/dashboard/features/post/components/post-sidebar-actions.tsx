@@ -3,7 +3,7 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
+  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
@@ -11,7 +11,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@feeblo/ui/tooltip";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import {
   CircleLockIcon,
   CircleUnlockIcon,
@@ -128,7 +128,7 @@ function PostAdminActionButtons() {
                 </Button>
               )}
             />
-            <TooltipContent>{lockLabel}</TooltipContent>
+            <TooltipPopup>{lockLabel}</TooltipPopup>
           </Tooltip>
 
           <Tooltip>
@@ -160,7 +160,7 @@ function PostAdminActionButtons() {
                 </Button>
               )}
             />
-            <TooltipContent>Delete post</TooltipContent>
+            <TooltipPopup>Delete post</TooltipPopup>
           </Tooltip>
         </>
       ) : null}
@@ -198,7 +198,7 @@ function ConfirmActionDialog({
 }) {
   return (
     <AlertDialog onOpenChange={onOpenChange} open={isOpen}>
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
@@ -209,7 +209,7 @@ function ConfirmActionDialog({
             {isPending ? "Updating..." : "Continue"}
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   );
 }
@@ -229,7 +229,6 @@ function RedirectToPostUrlButton() {
           <Button
             {...props}
             className="rounded-full"
-            nativeButton={false}
             render={(buttonProps) => (
               <a
                 {...buttonProps}
@@ -245,7 +244,7 @@ function RedirectToPostUrlButton() {
           />
         )}
       />
-      <TooltipContent>Go to Public Post</TooltipContent>
+      <TooltipPopup>Go to Public Post</TooltipPopup>
     </Tooltip>
   );
 }
@@ -288,7 +287,7 @@ function CopyPostButton() {
           </Button>
         )}
       />
-      <TooltipContent>Copy post link</TooltipContent>
+      <TooltipPopup>Copy post link</TooltipPopup>
     </Tooltip>
   );
 }

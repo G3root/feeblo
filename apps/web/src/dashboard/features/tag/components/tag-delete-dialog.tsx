@@ -2,7 +2,7 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
+  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
@@ -23,7 +23,7 @@ export function TagDeleteDialog() {
       onOpenChange={() => store.send({ type: "toggle" })}
       open={open}
     >
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Tag</AlertDialogTitle>
           <AlertDialogDescription>
@@ -54,7 +54,7 @@ export function TagDeleteDialog() {
             Continue
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   );
 }

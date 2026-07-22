@@ -1,6 +1,6 @@
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -23,13 +23,13 @@ export function RenameBoardDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Rename Board</SheetTitle>
           <SheetDescription>Rename the board to a new name.</SheetDescription>
         </SheetHeader>
         <div className="p-4">{open ? <RenameBoardForm /> : null}</div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }

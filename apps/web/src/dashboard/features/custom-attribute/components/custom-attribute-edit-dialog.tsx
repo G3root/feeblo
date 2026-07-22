@@ -2,14 +2,14 @@ import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
-  SelectContent,
+  SelectPopup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -53,7 +53,7 @@ export function CustomAttributeEditDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Edit {entityType} attribute</SheetTitle>
           <SheetDescription>
@@ -61,7 +61,7 @@ export function CustomAttributeEditDialog() {
           </SheetDescription>
         </SheetHeader>
         <div className="p-4">{open ? <CustomAttributeEditForm /> : null}</div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }
@@ -164,13 +164,13 @@ function CustomAttributeEditForm() {
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectPopup>
               {attributeTypes.map((type) => (
                 <SelectItem key={type.value} value={type.value}>
                   {type.label}
                 </SelectItem>
               ))}
-            </SelectContent>
+            </SelectPopup>
           </Select>
           <FieldDescription>
             The data type cannot be changed after creation.

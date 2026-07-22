@@ -7,7 +7,7 @@ import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -34,7 +34,7 @@ export function CompanyEditDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>
             {mode === "display" ? "View company" : "Edit company"}
@@ -46,7 +46,7 @@ export function CompanyEditDialog() {
         <div className="p-4">
           {open ? <CompanyEditFormLoader mode={mode} /> : null}
         </div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }

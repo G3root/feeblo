@@ -2,7 +2,7 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
+  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
@@ -25,7 +25,7 @@ export function ChangelogDeleteDialog() {
       onOpenChange={() => store.send({ type: "toggle" })}
       open={open}
     >
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Changelog</AlertDialogTitle>
           <AlertDialogDescription>
@@ -45,7 +45,7 @@ export function ChangelogDeleteDialog() {
             Continue
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   );
 }
@@ -60,7 +60,7 @@ export function ChangelogMoveToDraftDialog() {
       onOpenChange={() => store.send({ type: "toggle" })}
       open={open}
     >
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>Move To Draft</AlertDialogTitle>
           <AlertDialogDescription>
@@ -80,7 +80,7 @@ export function ChangelogMoveToDraftDialog() {
             Continue
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   );
 }

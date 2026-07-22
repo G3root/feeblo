@@ -5,7 +5,7 @@ import {
   InputGroupAddon,
   InputGroupText,
 } from "@feeblo/ui/input-group";
-import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
+import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { toggleVariants } from "@feeblo/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
 import {
@@ -161,11 +161,11 @@ function DisplayPopOver() {
           </Button>
         }
       />
-      <PopoverContent className="w-100">
+      <PopoverPopup className="w-100">
         <div className="p-4">
           <ViewSelect />
         </div>
-      </PopoverContent>
+      </PopoverPopup>
     </Popover>
   );
 }
@@ -182,7 +182,6 @@ function ViewSelect() {
         });
       }}
       size="sm"
-      spacing={2}
       value={[mode]}
       variant="outline"
     >

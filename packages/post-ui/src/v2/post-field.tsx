@@ -2,7 +2,7 @@ import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import { Button } from "@feeblo/ui/button";
 import {
   Combobox,
-  ComboboxContent,
+  ComboboxPopup,
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
@@ -103,7 +103,7 @@ export function StatusField({
           </Button>
         }
       />
-      <ComboboxContent className="w-full">
+      <ComboboxPopup className="w-full">
         <ComboboxInput placeholder="Search" showTrigger={false} />
         <ComboboxEmpty>No items; found.</ComboboxEmpty>
         <ComboboxList>
@@ -121,7 +121,7 @@ export function StatusField({
             </ComboboxItem>
           )}
         </ComboboxList>
-      </ComboboxContent>
+      </ComboboxPopup>
     </Combobox>
   );
 }
@@ -182,7 +182,7 @@ export function PostBoardSelect({
           </Button>
         }
       />
-      <ComboboxContent className="w-full">
+      <ComboboxPopup className="w-full">
         <ComboboxInput placeholder="Search boards" showTrigger={false} />
         <ComboboxEmpty>No boards found.</ComboboxEmpty>
         <ComboboxList>
@@ -197,7 +197,7 @@ export function PostBoardSelect({
             </ComboboxItem>
           )}
         </ComboboxList>
-      </ComboboxContent>
+      </ComboboxPopup>
     </Combobox>
   );
 }

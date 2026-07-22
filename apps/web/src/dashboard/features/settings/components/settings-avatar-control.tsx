@@ -1,10 +1,10 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -127,25 +127,25 @@ function Button(props: React.ComponentProps<"button">) {
 }
 
 function Dropdown({ children }: { children: React.ReactNode }) {
-  return <DropdownMenu>{children}</DropdownMenu>;
+  return <Menu>{children}</Menu>;
 }
 
 function DropdownTrigger() {
-  return <DropdownMenuTrigger render={<Button />} />;
+  return <MenuTrigger render={<Button />} />;
 }
 
-function Menu({ children }: { children: React.ReactNode }) {
-  return <DropdownMenuContent className="w-40">{children}</DropdownMenuContent>;
+function DropdownMenu({ children }: { children: React.ReactNode }) {
+  return <MenuPopup className="w-40">{children}</MenuPopup>;
 }
 
 function ChangeItem({ children }: { children: React.ReactNode }) {
   const { openFileDialog } = useSettingsAvatarControl();
 
   return (
-    <DropdownMenuItem onClick={openFileDialog}>
+    <MenuItem onClick={openFileDialog}>
       <HugeiconsIcon icon={Edit01Icon} />
       <span>{children}</span>
-    </DropdownMenuItem>
+    </MenuItem>
   );
 }
 
@@ -165,7 +165,7 @@ function RemoveItem({
   }
 
   return (
-    <DropdownMenuItem
+    <MenuItem
       onClick={async () => {
         try {
           await onRemove();
@@ -183,7 +183,7 @@ function RemoveItem({
     >
       <HugeiconsIcon icon={Cancel01Icon} />
       <span>{children}</span>
-    </DropdownMenuItem>
+    </MenuItem>
   );
 }
 
@@ -192,7 +192,7 @@ export const SettingsAvatarControl = {
   Button,
   Dropdown,
   DropdownTrigger,
-  Menu,
+  Menu: DropdownMenu,
   ChangeItem,
   RemoveItem,
 };

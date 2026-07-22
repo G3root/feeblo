@@ -2,11 +2,11 @@ import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import {
@@ -257,7 +257,6 @@ export function ChangelogEditorBackLink() {
     <Button
       aria-label="Back to changelog"
       className="rounded-full transition-transform active:scale-[0.96]"
-      nativeButton={false}
       render={(props) => (
         <Link
           {...props}
@@ -420,8 +419,8 @@ export function ChangelogEditorMoreActions() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Menu>
+      <MenuTrigger
         render={(props) => (
           <Button
             {...props}
@@ -434,8 +433,8 @@ export function ChangelogEditorMoreActions() {
           </Button>
         )}
       />
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem
+      <MenuPopup align="end" className="w-48">
+        <MenuItem
           onClick={() =>
             deleteDialogStore.send({
               type: "toggle",
@@ -446,9 +445,9 @@ export function ChangelogEditorMoreActions() {
         >
           <HugeiconsIcon icon={Delete02Icon} />
           <span>Delete</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
   );
 }
 

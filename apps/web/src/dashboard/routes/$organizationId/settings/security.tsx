@@ -2,11 +2,11 @@
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -140,8 +140,8 @@ function RouteComponent() {
                     <Button onClick={handleCopy} size="sm" variant="outline">
                       Copy Secret
                     </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
+                    <Menu>
+                      <MenuTrigger
                         render={
                           <Button size="icon-sm" variant="outline">
                             <HugeiconsIcon icon={MoreVerticalIcon} />
@@ -149,18 +149,18 @@ function RouteComponent() {
                         }
                       />
 
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem
+                      <MenuPopup align="end" className="w-40">
+                        <MenuItem
                           onClick={handleRevoke}
                           variant="destructive"
                         >
                           Revoke Immediately
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleRotate}>
+                        </MenuItem>
+                        <MenuItem onClick={handleRotate}>
                           Rotate (24h grace period)
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                        </MenuItem>
+                      </MenuPopup>
+                    </Menu>
                   </div>
                 </div>
               </SettingsItem.ItemContent>
@@ -197,16 +197,16 @@ function RouteComponent() {
                       >
                         Copy Secret
                       </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
+                      <Menu>
+                        <MenuTrigger
                           render={
                             <Button size="icon-sm" variant="outline">
                               <HugeiconsIcon icon={MoreVerticalIcon} />
                             </Button>
                           }
                         />
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
+                        <MenuPopup align="end" className="w-40">
+                          <MenuItem
                             onClick={async () => {
                               try {
                                 await fetchRpc((rpc) =>
@@ -231,9 +231,9 @@ function RouteComponent() {
                             variant="destructive"
                           >
                             Revoke Immediately
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </MenuItem>
+                        </MenuPopup>
+                      </Menu>
                     </div>
                   </div>
                 </SettingsItem.ItemContent>

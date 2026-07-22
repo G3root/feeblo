@@ -1,7 +1,7 @@
 import { Badge } from "@feeblo/ui/badge";
 import {
   Select,
-  SelectContent,
+  SelectPopup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -48,13 +48,13 @@ export function ChangelogStatusSelect({
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Select a status" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectPopup>
         {CHANGELOG_STATUSES.map((status) => (
           <SelectItem key={status} value={status}>
             {getChangelogStatusLabel(status)}
           </SelectItem>
         ))}
-      </SelectContent>
+      </SelectPopup>
     </Select>
   );
 }

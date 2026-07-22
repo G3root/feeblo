@@ -1,6 +1,6 @@
 import {
   Select,
-  SelectContent,
+  SelectPopup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -48,11 +48,11 @@ function PreferencesSettingsPage() {
                         <SelectTrigger className="w-36">
                           <SelectValue className="capitalize" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectPopup>
                           <SelectItem value="light">Light</SelectItem>
                           <SelectItem value="dark">Dark</SelectItem>
                           <SelectItem value="auto">System</SelectItem>
-                        </SelectContent>
+                        </SelectPopup>
                       </Select>
                     </SettingsItem.ItemActions>
                   </SettingsItem.Field>

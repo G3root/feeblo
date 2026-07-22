@@ -1,6 +1,6 @@
 import {
   Card,
-  CardContent,
+  CardPanel,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -22,7 +22,7 @@ function Root({
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6">{children}</CardContent>
+        <CardPanel className="grid gap-6">{children}</CardPanel>
       </Card>
     </div>
   );

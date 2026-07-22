@@ -1,7 +1,7 @@
 import { Button } from "@feeblo/ui/button";
 import {
   Card,
-  CardContent,
+  CardPanel,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -71,7 +71,7 @@ function RegisterRoute() {
           </CardDescription>
         </CardHeader>
 
-        <CardContent>
+        <CardPanel>
           <form
             className="flex flex-col gap-5"
             id="register-form"
@@ -85,7 +85,7 @@ function RegisterRoute() {
               <RegisterWorkspaceStep form={form} />
             </RegisterShell.Body>
           </form>
-        </CardContent>
+        </CardPanel>
       </Card>
 
       <form.Subscribe

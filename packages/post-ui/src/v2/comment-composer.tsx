@@ -1,15 +1,10 @@
 import { Button } from "@feeblo/ui/button";
-import { ButtonGroup } from "@feeblo/ui/button-group";
 import { Editor } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
+import { Group } from "@feeblo/ui/group";
 import { GlobeIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  createContext,
-  type ReactNode,
-  use,
-  useState,
-} from "react";
+import { createContext, type ReactNode, use, useState } from "react";
 
 type CommentComposerState = {
   content: string;
@@ -160,10 +155,10 @@ function VisibilitySwitcher() {
 function CommentComposerSubmit() {
   return (
     <div className="flex items-center justify-end pt-2">
-      <ButtonGroup>
+      <Group>
         <VisibilitySwitcher />
         <SubmitButton />
-      </ButtonGroup>
+      </Group>
     </div>
   );
 }

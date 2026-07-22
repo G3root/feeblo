@@ -1,7 +1,7 @@
 import { BoardId } from "@feeblo/id";
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -22,7 +22,7 @@ export function CreateBoardDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Create Board.</SheetTitle>
           <SheetDescription>
@@ -32,7 +32,7 @@ export function CreateBoardDialog() {
         <div className="p-4">
           <CreateBoardForm />
         </div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }

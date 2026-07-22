@@ -1,5 +1,5 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
-import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
+import { Card, CardPanel, CardHeader, CardTitle } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
@@ -102,7 +102,7 @@ export function PostTagField() {
         <CardHeader>
           <CardTitle>Tags</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+        <CardPanel className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-1.5">
             <TagList selectedTags={postTags ?? []} tags={tags} />
             <TagSelect
@@ -113,7 +113,7 @@ export function PostTagField() {
               type="FEEDBACK"
             />
           </div>
-        </CardContent>
+        </CardPanel>
       </Card>
       <TagCreateDialog />
     </TagCreateDialogProvider>

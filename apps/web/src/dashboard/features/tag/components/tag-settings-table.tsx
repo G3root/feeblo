@@ -1,10 +1,10 @@
 import { Button } from "@feeblo/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   Empty,
   EmptyContent,
@@ -194,8 +194,8 @@ function TagTableRow({
       <TableCell>{formatDate(createdAt)}</TableCell>
       <TableCell>{formatDate(updatedAt)}</TableCell>
       <TableCell className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger
+        <Menu>
+          <MenuTrigger
             render={(triggerProps) => (
               <Button
                 {...triggerProps}
@@ -208,17 +208,17 @@ function TagTableRow({
               </Button>
             )}
           />
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={onEdit}>
+          <MenuPopup align="end" className="w-40">
+            <MenuItem onClick={onEdit}>
               <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
               <span>Rename</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} variant="destructive">
+            </MenuItem>
+            <MenuItem onClick={onDelete} variant="destructive">
               <HugeiconsIcon icon={Delete02Icon} />
               <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
       </TableCell>
     </TableRow>
   );

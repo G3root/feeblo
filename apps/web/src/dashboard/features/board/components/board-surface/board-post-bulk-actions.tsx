@@ -2,7 +2,7 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
+  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
@@ -75,7 +75,7 @@ function BulkDeleteAlert() {
       }
       open={open}
     >
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete selected posts</AlertDialogTitle>
           <AlertDialogDescription>
@@ -137,7 +137,7 @@ function BulkDeleteAlert() {
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   );
 }

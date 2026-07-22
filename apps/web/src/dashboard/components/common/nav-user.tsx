@@ -1,16 +1,16 @@
 import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuItem,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuSub,
+  MenuSubPopup,
+  MenuSubTrigger,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -41,8 +41,8 @@ export function NavUser() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
+        <Menu>
+          <MenuTrigger
             render={
               <SidebarMenuButton
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
@@ -55,20 +55,18 @@ export function NavUser() {
               <AvatarFallback className="rounded-lg">CN</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">
-                {user?.name}
-              </span>
+              <span className="truncate font-medium">{user?.name}</span>
               <span className="truncate text-xs">{user?.email}</span>
             </div>
             <HugeiconsIcon className="ml-auto size-4" icon={UnfoldMoreIcon} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
+          </MenuTrigger>
+          <MenuPopup
             align="end"
             className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             sideOffset={4}
           >
-            <DropdownMenuItem
+            <MenuItem
               nativeButton={false}
               render={(props) => (
                 <Link
@@ -82,9 +80,9 @@ export function NavUser() {
               )}
             />
             <ThemeMenu />
-            <DropdownMenuSeparator />
+            <MenuSeparator />
 
-            <DropdownMenuItem
+            <MenuItem
               onClick={async () => {
                 await authClient.signOut();
                 await refreshAuthSession();
@@ -93,9 +91,9 @@ export function NavUser() {
             >
               <HugeiconsIcon icon={LogoutSquare01Icon} />
               Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
       </SidebarMenuItem>
     </SidebarMenu>
   );
@@ -104,23 +102,23 @@ export function NavUser() {
 function ThemeMenu() {
   const { themeMode, setTheme } = useTheme();
   return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
+    <MenuSub>
+      <MenuSubTrigger>
         <HugeiconsIcon icon={themeMode === "dark" ? Moon02Icon : Sun01Icon} />
         Theme
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent>
-        <DropdownMenuRadioGroup
+      </MenuSubTrigger>
+      <MenuSubPopup>
+        <MenuRadioGroup
           onValueChange={(value) =>
             setTheme(value as "light" | "dark" | "auto")
           }
           value={themeMode}
         >
-          <DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="auto">System</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
+          <MenuRadioItem value="light">Light</MenuRadioItem>
+          <MenuRadioItem value="dark">Dark</MenuRadioItem>
+          <MenuRadioItem value="auto">System</MenuRadioItem>
+        </MenuRadioGroup>
+      </MenuSubPopup>
+    </MenuSub>
   );
 }

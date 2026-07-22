@@ -2,7 +2,7 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
+  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
@@ -23,7 +23,7 @@ export function CompanyDeleteDialog() {
       onOpenChange={() => store.send({ type: "toggle" })}
       open={open}
     >
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete company</AlertDialogTitle>
           <AlertDialogDescription>
@@ -49,7 +49,7 @@ export function CompanyDeleteDialog() {
             Delete company
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   );
 }

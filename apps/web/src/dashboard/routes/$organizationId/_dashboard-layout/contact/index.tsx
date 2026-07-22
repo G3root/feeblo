@@ -1,10 +1,10 @@
 import { Button } from "@feeblo/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   Empty,
   EmptyContent,
@@ -283,8 +283,8 @@ function ContactTableRow({
       ))}
       <TableCell>{formatDate(contact.updatedAt)}</TableCell>
       <TableCell className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger
+        <Menu>
+          <MenuTrigger
             render={(triggerProps) => (
               <Button
                 {...triggerProps}
@@ -299,17 +299,17 @@ function ContactTableRow({
               </Button>
             )}
           />
-          <DropdownMenuContent align="end" className="w-40">
-            <DropdownMenuItem onClick={onEdit}>
+          <MenuPopup align="end" className="w-40">
+            <MenuItem onClick={onEdit}>
               <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
               <span>Edit</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} variant="destructive">
+            </MenuItem>
+            <MenuItem onClick={onDelete} variant="destructive">
               <HugeiconsIcon icon={Delete02Icon} />
               <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
       </TableCell>
     </TableRow>
   );

@@ -1,9 +1,9 @@
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   Table,
   TableBody,
@@ -164,8 +164,8 @@ function CompanyPage() {
                 definitions={definitions}
               />
               <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger
+                <Menu>
+                  <MenuTrigger
                     render={(triggerProps) => (
                       <Button
                         {...triggerProps}
@@ -180,8 +180,8 @@ function CompanyPage() {
                       </Button>
                     )}
                   />
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem
+                  <MenuPopup align="end" className="w-40">
+                    <MenuItem
                       onClick={() =>
                         editDialogStore.send({
                           type: "toggle",
@@ -194,8 +194,8 @@ function CompanyPage() {
                         icon={Edit}
                       />
                       <span>Edit</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
+                    </MenuItem>
+                    <MenuItem
                       onClick={() =>
                         deleteDialogStore.send({
                           type: "toggle",
@@ -206,9 +206,9 @@ function CompanyPage() {
                     >
                       <HugeiconsIcon icon={Delete02Icon} />
                       <span>Delete</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    </MenuItem>
+                  </MenuPopup>
+                </Menu>
               </TableCell>
             </TableRow>
           ))}

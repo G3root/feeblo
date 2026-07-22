@@ -7,11 +7,10 @@ import {
   FieldLabel,
 } from "@feeblo/ui/field";
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSeparator,
-  InputOTPSlot,
-} from "@feeblo/ui/input-otp";
+  OTPField,
+  OTPFieldInput,
+  OTPFieldSeparator,
+} from "@feeblo/ui/otp-field";
 import { toastManager } from "@feeblo/ui/toast";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { z } from "zod";
@@ -139,27 +138,25 @@ function RouteComponent() {
                       <FieldLabel className="sr-only" htmlFor={field.name}>
                         Verification code
                       </FieldLabel>
-                      <InputOTP
-                        containerClassName="gap-4"
+                      <OTPField
+                        aria-label="Verification code"
+                        className="justify-center gap-4"
                         id={field.name}
-                        maxLength={6}
+                        length={6}
                         name={field.name}
                         onBlur={field.handleBlur}
-                        onChange={(value) => field.handleChange(value)}
+                        onValueChange={(value) => field.handleChange(value)}
+                        size="lg"
                         value={field.state.value}
                       >
-                        <InputOTPGroup className="gap-2.5 *:data-[slot=input-otp-slot]:h-16 *:data-[slot=input-otp-slot]:w-12 *:data-[slot=input-otp-slot]:rounded-md *:data-[slot=input-otp-slot]:border *:data-[slot=input-otp-slot]:text-xl">
-                          <InputOTPSlot index={0} />
-                          <InputOTPSlot index={1} />
-                          <InputOTPSlot index={2} />
-                        </InputOTPGroup>
-                        <InputOTPSeparator />
-                        <InputOTPGroup className="gap-2.5 *:data-[slot=input-otp-slot]:h-16 *:data-[slot=input-otp-slot]:w-12 *:data-[slot=input-otp-slot]:rounded-md *:data-[slot=input-otp-slot]:border *:data-[slot=input-otp-slot]:text-xl">
-                          <InputOTPSlot index={3} />
-                          <InputOTPSlot index={4} />
-                          <InputOTPSlot index={5} />
-                        </InputOTPGroup>
-                      </InputOTP>
+                        <OTPFieldInput />
+                        <OTPFieldInput aria-label="Character 2 of 6" />
+                        <OTPFieldInput aria-label="Character 3 of 6" />
+                        <OTPFieldSeparator />
+                        <OTPFieldInput aria-label="Character 4 of 6" />
+                        <OTPFieldInput aria-label="Character 5 of 6" />
+                        <OTPFieldInput aria-label="Character 6 of 6" />
+                      </OTPField>
                       {isInvalid && (
                         <FieldError errors={field.state.meta.errors} />
                       )}

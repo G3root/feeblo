@@ -2,14 +2,14 @@ import { ContactId } from "@feeblo/id";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
-  SelectContent,
+  SelectPopup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -33,7 +33,7 @@ export function ContactCreateDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Create contact</SheetTitle>
           <SheetDescription>Add a person to this workspace.</SheetDescription>
@@ -41,7 +41,7 @@ export function ContactCreateDialog() {
         <div className="p-4">
           <ContactCreateForm />
         </div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }
@@ -185,14 +185,14 @@ function ContactCreateForm() {
                     }
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectPopup>
                   <SelectItem value="none">None</SelectItem>
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
                     </SelectItem>
                   ))}
-                </SelectContent>
+                </SelectPopup>
               </Select>
             </div>
           )}

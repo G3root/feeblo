@@ -2,7 +2,7 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
+  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
@@ -29,7 +29,7 @@ export function CommentVisibilityDialog() {
       onOpenChange={() => store.send({ type: "toggle" })}
       open={open}
     >
-      <AlertDialogContent>
+      <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>
             {isInternal ? "Make comment public" : "Make comment internal"}
@@ -68,7 +68,7 @@ export function CommentVisibilityDialog() {
             Continue
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </AlertDialogPopup>
     </AlertDialog>
   );
 }

@@ -82,7 +82,6 @@ function RouteComponent() {
           </EmptyDescription>
           <EmptyContent>
             <Button
-              nativeButton={false}
               render={(props) => (
                 <Link
                   {...props}

@@ -1,7 +1,7 @@
 import {
   Select,
-  SelectContent,
   SelectItem,
+  SelectPopup,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
@@ -32,13 +32,13 @@ export function BoardSelect({
         <SelectTrigger className="min-w-52">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectPopup>
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
           ))}
-        </SelectContent>
+        </SelectPopup>
       </Select>
     </div>
   );

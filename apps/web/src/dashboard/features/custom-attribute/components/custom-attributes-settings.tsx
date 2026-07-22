@@ -1,11 +1,11 @@
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   Empty,
   EmptyContent,
@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@feeblo/ui/tabs";
+import { Tabs, TabsPanel, TabsList, TabsTab } from "@feeblo/ui/tabs";
 import {
   Building03Icon,
   Contact01Icon,
@@ -101,16 +101,16 @@ export function CustomAttributesSettings() {
   return (
     <Tabs defaultValue="contact">
       <TabsList>
-        <TabsTrigger value="contact">
+        <TabsTab value="contact">
           <HugeiconsIcon icon={Contact01Icon} />
           Contacts
-        </TabsTrigger>
-        <TabsTrigger value="company">
+        </TabsTab>
+        <TabsTab value="company">
           <HugeiconsIcon icon={Building03Icon} />
           Companies
-        </TabsTrigger>
+        </TabsTab>
       </TabsList>
-      <TabsContent className="pt-4" value="contact">
+      <TabsPanel className="pt-4" value="contact">
         <AttributeList
           attributes={contactAttributesQuery.data}
           entityType="contact"
@@ -120,8 +120,8 @@ export function CustomAttributesSettings() {
           onDelete={(id) => openDeleteDialog(id, "contact")}
           onEdit={(id) => openEditDialog(id, "contact")}
         />
-      </TabsContent>
-      <TabsContent className="pt-4" value="company">
+      </TabsPanel>
+      <TabsPanel className="pt-4" value="company">
         <AttributeList
           attributes={companyAttributesQuery.data}
           entityType="company"
@@ -131,7 +131,7 @@ export function CustomAttributesSettings() {
           onDelete={(id) => openDeleteDialog(id, "company")}
           onEdit={(id) => openEditDialog(id, "company")}
         />
-      </TabsContent>
+      </TabsPanel>
     </Tabs>
   );
 }
@@ -234,8 +234,8 @@ function AttributeList({
               {attribute.isRequired ? "Required" : "Optional"}
             </TableCell>
             <TableCell className="text-right">
-              <DropdownMenu>
-                <DropdownMenuTrigger
+              <Menu>
+                <MenuTrigger
                   render={(triggerProps) => (
                     <Button
                       {...triggerProps}
@@ -250,23 +250,23 @@ function AttributeList({
                     </Button>
                   )}
                 />
-                <DropdownMenuContent align="end" className="w-40">
-                  <DropdownMenuItem onClick={() => onEdit(attribute.id)}>
+                <MenuPopup align="end" className="w-40">
+                  <MenuItem onClick={() => onEdit(attribute.id)}>
                     <HugeiconsIcon
                       className="text-muted-foreground"
                       icon={Edit}
                     />
                     <span>Edit</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
+                  </MenuItem>
+                  <MenuItem
                     onClick={() => onDelete(attribute.id)}
                     variant="destructive"
                   >
                     <HugeiconsIcon icon={Delete02Icon} />
                     <span>Delete</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </MenuItem>
+                </MenuPopup>
+              </Menu>
             </TableCell>
           </TableRow>
         ))}

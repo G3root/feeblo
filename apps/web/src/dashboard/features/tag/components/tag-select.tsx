@@ -10,7 +10,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@feeblo/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@feeblo/ui/popover";
+import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { PlusSignIcon, Tag01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
@@ -69,7 +69,7 @@ export const TagSelect = ({
           </Button>
         }
       />
-      <PopoverContent align="start" className="w-50 p-0">
+      <PopoverPopup align="start" className="w-50 p-0">
         <Command>
           <CommandInput />
           <CommandList className="max-h-full">
@@ -108,7 +108,7 @@ export const TagSelect = ({
             </CommandGroup>
           </CommandList>
         </Command>
-      </PopoverContent>
+      </PopoverPopup>
     </Popover>
   );
 };

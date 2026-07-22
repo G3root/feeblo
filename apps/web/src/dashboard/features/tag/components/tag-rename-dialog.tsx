@@ -1,6 +1,6 @@
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -21,13 +21,13 @@ export function TagRenameDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Rename Tag</SheetTitle>
           <SheetDescription>Rename the tag to a new name.</SheetDescription>
         </SheetHeader>
         <div className="p-4">{open ? <TagRenameForm /> : null}</div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }

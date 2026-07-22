@@ -1,7 +1,7 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
 import {
   Accordion,
-  AccordionContent,
+  AccordionPanel,
   AccordionTrigger,
 } from "@feeblo/ui/accordion";
 import { Button } from "@feeblo/ui/button";
@@ -67,7 +67,7 @@ export function BoardListView({
                 />
               </PolicyGuard>
             </div>
-            <AccordionContent className="h-auto pb-0" panelClassName="px-0">
+            <AccordionPanel className="h-auto px-0 pb-0">
               {lane.posts.map((post) => (
                 <BoardPostRowItem
                   key={post.id}
@@ -75,7 +75,7 @@ export function BoardListView({
                   post={post}
                 />
               ))}
-            </AccordionContent>
+            </AccordionPanel>
           </AccordionPrimitive.Item>
         ))}
       </Accordion>

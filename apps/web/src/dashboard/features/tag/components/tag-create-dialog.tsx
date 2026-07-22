@@ -1,7 +1,7 @@
 import { TagId } from "@feeblo/id";
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -23,7 +23,7 @@ export function TagCreateDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Create Tag</SheetTitle>
           <SheetDescription>
@@ -33,7 +33,7 @@ export function TagCreateDialog() {
         <div className="p-4">
           <TagCreateForm />
         </div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }

@@ -15,7 +15,7 @@ import {
 } from "@feeblo/ui/input-group";
 import {
   Select,
-  SelectContent,
+  SelectPopup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -480,11 +480,11 @@ function MemberListItem({
             <SelectTrigger className="w-28" disabled={isOwner}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectPopup>
               {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
               <SelectItem value="member">Member</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
+            </SelectPopup>
           </Select>
 
           <Button
@@ -703,10 +703,10 @@ function InviteMemberForm() {
                 <SelectValue />
               </SelectTrigger>
             </SkeletonWrapper>
-            <SelectContent>
+            <SelectPopup>
               <SelectItem value="member">Member</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
+            </SelectPopup>
           </Select>
         )}
         name="role"

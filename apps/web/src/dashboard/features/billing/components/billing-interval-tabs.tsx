@@ -1,5 +1,5 @@
 import { Badge } from "@feeblo/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@feeblo/ui/tabs";
+import { Tabs, TabsList, TabsTab } from "@feeblo/ui/tabs";
 import type { BillingInterval } from "../lib/plans";
 
 export function BillingIntervalTabs({
@@ -15,10 +15,10 @@ export function BillingIntervalTabs({
       value={value}
     >
       <TabsList>
-        <TabsTrigger value="month">Monthly</TabsTrigger>
-        <TabsTrigger value="year">
+        <TabsTab value="month">Monthly</TabsTab>
+        <TabsTab value="year">
           Yearly <Badge>2 Months Free</Badge>
-        </TabsTrigger>
+        </TabsTab>
       </TabsList>
     </Tabs>
   );

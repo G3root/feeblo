@@ -1,8 +1,8 @@
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
+  CardPanel,
   CardTitle,
 } from "@feeblo/ui/card";
 import { Link } from "@tanstack/react-router";
@@ -23,7 +23,7 @@ export function BoardNotFound({
             We could not find a board for <code>{boardSlug}</code>.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardPanel>
           <Link
             className="text-primary text-sm underline underline-offset-4"
             params={{ organizationId }}
@@ -31,7 +31,7 @@ export function BoardNotFound({
           >
             Go back to dashboard
           </Link>
-        </CardContent>
+        </CardPanel>
       </Card>
     </div>
   );

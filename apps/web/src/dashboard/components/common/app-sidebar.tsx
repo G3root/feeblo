@@ -1,10 +1,10 @@
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   Sidebar,
   SidebarContent,
@@ -328,8 +328,8 @@ function BoardMenu({ boardPublicId }: BoardMenuProps) {
   const { isMobile } = useSidebar();
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Menu>
+      <MenuTrigger
         render={(props) => (
           <SidebarMenuAction {...props} className="mr-2" showOnHover>
             <HugeiconsIcon icon={Ellipsis} />
@@ -338,18 +338,18 @@ function BoardMenu({ boardPublicId }: BoardMenuProps) {
         )}
       />
 
-      <DropdownMenuContent
+      <MenuPopup
         align={isMobile ? "end" : "start"}
         className="w-48 rounded-lg"
         side={isMobile ? "bottom" : "right"}
       >
         <RenameBoardButton boardPublicId={boardPublicId} />
 
-        <DropdownMenuSeparator />
+        <MenuSeparator />
 
         <DeleteBoardButton boardPublicId={boardPublicId} />
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </MenuPopup>
+    </Menu>
   );
 }
 
@@ -357,28 +357,28 @@ const DeleteBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
   const store = useDeleteBoardDialogContext();
 
   return (
-    <DropdownMenuItem
+    <MenuItem
       onClick={() =>
         store.send({ type: "toggle", data: { boardId: boardPublicId } })
       }
     >
       <HugeiconsIcon className="text-muted-foreground" icon={Delete02Icon} />
       <span>Delete</span>
-    </DropdownMenuItem>
+    </MenuItem>
   );
 };
 
 const RenameBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
   const store = useRenameBoardDialogContext();
   return (
-    <DropdownMenuItem
+    <MenuItem
       onClick={() =>
         store.send({ type: "toggle", data: { boardId: boardPublicId } })
       }
     >
       <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
       <span>Rename</span>
-    </DropdownMenuItem>
+    </MenuItem>
   );
 };
 

@@ -2,7 +2,7 @@ import { CompanyId } from "@feeblo/id";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -27,7 +27,7 @@ export function CompanyCreateDialog() {
 
   return (
     <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Create company</SheetTitle>
           <SheetDescription>Add a company to this workspace.</SheetDescription>
@@ -35,7 +35,7 @@ export function CompanyCreateDialog() {
         <div className="p-4">
           <CompanyCreateForm />
         </div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }

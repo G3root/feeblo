@@ -4,7 +4,7 @@ import {
 } from "@feeblo/post-ui/dialog-stores";
 import { PostCollectionDataProvider } from "@feeblo/post-ui/post-collection";
 import { Button } from "@feeblo/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
+import { Card, CardHeader, CardPanel, CardTitle } from "@feeblo/ui/card";
 import {
   Empty,
   EmptyDescription,
@@ -13,8 +13,8 @@ import {
 } from "@feeblo/ui/empty";
 import {
   Select,
-  SelectContent,
   SelectItem,
+  SelectPopup,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
@@ -346,7 +346,7 @@ function HomePage() {
       <MainContent>
         <div className="space-y-6">
           <Card className={surfaceClassName("bg-muted/20")}>
-            <CardContent className="px-6 py-8 sm:px-8 sm:py-10">
+            <CardPanel className="px-6 py-8 sm:px-8 sm:py-10">
               <div className="grid gap-6 lg:grid-cols-5 lg:items-center">
                 <div className="space-y-3 lg:col-span-3">
                   <div className="h-3 w-28 animate-pulse rounded-full bg-muted" />
@@ -362,21 +362,21 @@ function HomePage() {
                   ))}
                 </div>
               </div>
-            </CardContent>
+            </CardPanel>
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-4">
             <Card className={surfaceClassName()}>
-              <CardContent className="px-4 py-4">
+              <CardPanel className="px-4 py-4">
                 <div className="h-40 animate-pulse rounded-2xl bg-muted" />
-              </CardContent>
+              </CardPanel>
             </Card>
             <Card className={surfaceClassName("lg:col-span-3")}>
-              <CardContent className="px-0 py-0">
+              <CardPanel className="px-0 py-0">
                 {["a", "b", "c", "d", "e"].map((key) => (
                   <FeedbackCardSkeleton key={key} />
                 ))}
-              </CardContent>
+              </CardPanel>
             </Card>
           </div>
         </div>
@@ -424,11 +424,11 @@ function HomePage() {
                   <SelectTrigger className="w-full sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectPopup>
                     <SelectItem value="upvotes">Most upvoted</SelectItem>
                     <SelectItem value="newest">Newest</SelectItem>
                     <SelectItem value="oldest">Oldest</SelectItem>
-                  </SelectContent>
+                  </SelectPopup>
                 </Select>
 
                 <Button
@@ -454,7 +454,7 @@ function HomePage() {
             </CardHeader>
 
             <Card className={surfaceClassName()} id="feedback-list">
-              <CardContent className="px-0 py-0">
+              <CardPanel className="px-0 py-0">
                 {filteredPosts.length === 0 ? (
                   <div className="p-5">
                     <Empty className="border">
@@ -481,13 +481,13 @@ function HomePage() {
                     ))}
                   </div>
                 )}
-              </CardContent>
+              </CardPanel>
             </Card>
           </div>
 
           <div className="flex flex-col gap-2">
             <Card className={surfaceClassName("h-fit")}>
-              <CardContent className="space-y-6 pt-4 pb-4">
+              <CardPanel className="space-y-6 pt-4 pb-4">
                 <FilterSection
                   items={statusItems}
                   onSelect={(value) => updateFilters({ status: value })}
@@ -500,7 +500,7 @@ function HomePage() {
                   selectedValue={selectedBoard}
                   title="Boards"
                 />
-              </CardContent>
+              </CardPanel>
             </Card>
           </div>
         </div>

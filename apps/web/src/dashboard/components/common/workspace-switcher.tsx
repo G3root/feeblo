@@ -1,11 +1,11 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuItem,
+  MenuPopup,
+  MenuSeparator,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -42,8 +42,8 @@ export function WorkspaceSwitcher() {
     <SkeletonLoader isLoading={organizationsQuery.isLoading}>
       <SidebarMenu>
         <SidebarMenuItem>
-          <DropdownMenu>
-            <DropdownMenuTrigger
+          <Menu>
+            <MenuTrigger
               render={(props) => (
                 <SkeletonWrapper>
                   <SidebarMenuButton
@@ -74,14 +74,14 @@ export function WorkspaceSwitcher() {
                 </SkeletonWrapper>
               )}
             />
-            <DropdownMenuContent align="start">
+            <MenuPopup align="start">
               <WorkspaceList
                 organizations={data}
                 selectedOrganizationId={selectedOrganization?.id ?? null}
               />
-              <DropdownMenuSeparator />
+              <MenuSeparator />
 
-              <DropdownMenuItem
+              <MenuItem
                 className="justify-center"
                 onClick={() =>
                   navigate({
@@ -91,9 +91,9 @@ export function WorkspaceSwitcher() {
               >
                 <HugeiconsIcon className="text-muted-foreground" icon={Plus} />
                 <span>Create workspace</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </MenuItem>
+            </MenuPopup>
+          </Menu>
         </SidebarMenuItem>
       </SidebarMenu>
     </SkeletonLoader>
@@ -141,7 +141,7 @@ const WorkspaceList = ({
     const isSelected = organization.id === selectedOrganizationId;
 
     return (
-      <DropdownMenuItem
+      <MenuItem
         key={organization.id}
         nativeButton={false}
         render={(props) => (

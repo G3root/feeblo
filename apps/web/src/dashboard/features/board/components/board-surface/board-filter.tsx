@@ -1,17 +1,17 @@
 import { Button } from "@feeblo/ui/button";
-import { ButtonGroup, ButtonGroupText } from "@feeblo/ui/button-group";
+import { Group, GroupText } from "@feeblo/ui/group";
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuCheckboxItem,
+  MenuPopup,
+  MenuGroup,
+  MenuItem,
+  MenuPortal,
+  MenuSub,
+  MenuSubPopup,
+  MenuSubTrigger,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import {
   Cancel01Icon,
   DashedLineCircleIcon,
@@ -180,25 +180,25 @@ function BoardFilterTrigger() {
   const selectedTagIds = new Set(filters.tagIds);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Menu>
+      <MenuTrigger
         render={
           <Button className="rounded-full" size="icon-sm" variant="outline">
             <HugeiconsIcon icon={FilterMailIcon} />
           </Button>
         }
       />
-      <DropdownMenuContent className="w-44">
-        <DropdownMenuGroup>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
+      <MenuPopup className="w-44">
+        <MenuGroup>
+          <MenuSub>
+            <MenuSubTrigger>
               <HugeiconsIcon icon={DashedLineCircleIcon} />
               Status
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent>
+            </MenuSubTrigger>
+            <MenuPortal>
+              <MenuSubPopup>
                 {postStatuses.map((postStatus) => (
-                  <DropdownMenuCheckboxItem
+                  <MenuCheckboxItem
                     checked={selectedStatuses.has(postStatus.type)}
                     key={postStatus.id}
                     onCheckedChange={() => {
@@ -206,20 +206,20 @@ function BoardFilterTrigger() {
                     }}
                   >
                     {getBoardStatusLabel(postStatus.type)}
-                  </DropdownMenuCheckboxItem>
+                  </MenuCheckboxItem>
                 ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
+              </MenuSubPopup>
+            </MenuPortal>
+          </MenuSub>
+          <MenuSub>
+            <MenuSubTrigger>
               <HugeiconsIcon icon={Tag01Icon} />
               Labels
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent>
+            </MenuSubTrigger>
+            <MenuPortal>
+              <MenuSubPopup>
                 {tags.map((tag) => (
-                  <DropdownMenuCheckboxItem
+                  <MenuCheckboxItem
                     checked={selectedTagIds.has(tag.id)}
                     key={tag.id}
                     onCheckedChange={() => {
@@ -227,14 +227,14 @@ function BoardFilterTrigger() {
                     }}
                   >
                     {tag.name}
-                  </DropdownMenuCheckboxItem>
+                  </MenuCheckboxItem>
                 ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+              </MenuSubPopup>
+            </MenuPortal>
+          </MenuSub>
+        </MenuGroup>
+      </MenuPopup>
+    </Menu>
   );
 }
 
@@ -339,9 +339,9 @@ function BoardFilterLabelsGroup({
 
 function BoardFilterActiveGroup({ children }: { children: ReactNode }) {
   return (
-    <ButtonGroup className="rounded-full bg-background/90">
+    <Group className="rounded-full bg-background/90">
       {children}
-    </ButtonGroup>
+    </Group>
   );
 }
 
@@ -353,10 +353,10 @@ function BoardFilterReadonlySegment({
   icon: typeof DashedLineCircleIcon;
 }) {
   return (
-    <ButtonGroupText className="rounded-full border-border bg-background px-3 text-foreground">
+    <GroupText className="rounded-full border-border bg-background px-3 text-foreground">
       <HugeiconsIcon className="text-muted-foreground" icon={icon} />
       {children}
-    </ButtonGroupText>
+    </GroupText>
   );
 }
 
@@ -375,9 +375,9 @@ function BoardFilterOperatorMenu<T extends string>({
 
   return (
     <BoardFilterMenuSegment label={activeLabel ?? ""}>
-      <DropdownMenuGroup>
+      <MenuGroup>
         {options.map((option) => (
-          <DropdownMenuCheckboxItem
+          <MenuCheckboxItem
             checked={option.value === value}
             key={option.value}
             onCheckedChange={(checked) => {
@@ -387,9 +387,9 @@ function BoardFilterOperatorMenu<T extends string>({
             }}
           >
             {option.label}
-          </DropdownMenuCheckboxItem>
+          </MenuCheckboxItem>
         ))}
-      </DropdownMenuGroup>
+      </MenuGroup>
     </BoardFilterMenuSegment>
   );
 }
@@ -405,12 +405,12 @@ function BoardFilterValueMenu({
 }) {
   return (
     <BoardFilterMenuSegment className="max-w-48" label={label}>
-      <DropdownMenuGroup>
+      <MenuGroup>
         {items.length === 0 ? (
-          <DropdownMenuItem disabled>No options found</DropdownMenuItem>
+          <MenuItem disabled>No options found</MenuItem>
         ) : (
           items.map((item) => (
-            <DropdownMenuCheckboxItem
+            <MenuCheckboxItem
               checked={item.checked}
               key={item.key}
               onCheckedChange={() => {
@@ -418,10 +418,10 @@ function BoardFilterValueMenu({
               }}
             >
               {item.label}
-            </DropdownMenuCheckboxItem>
+            </MenuCheckboxItem>
           ))
         )}
-      </DropdownMenuGroup>
+      </MenuGroup>
     </BoardFilterMenuSegment>
   );
 }
@@ -436,8 +436,8 @@ function BoardFilterMenuSegment({
   label: string;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Menu>
+      <MenuTrigger
         render={
           <Button
             className={cn("max-w-48 rounded-full px-3 font-normal", className)}
@@ -448,10 +448,10 @@ function BoardFilterMenuSegment({
           </Button>
         }
       />
-      <DropdownMenuContent align="start" className="w-56">
+      <MenuPopup align="start" className="w-56">
         {children}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </MenuPopup>
+    </Menu>
   );
 }
 

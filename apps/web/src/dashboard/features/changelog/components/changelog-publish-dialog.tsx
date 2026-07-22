@@ -9,7 +9,7 @@ import {
 } from "@feeblo/ui/dialog";
 import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
-import { RadioGroup, RadioGroupItem } from "@feeblo/ui/radio-group";
+import { RadioGroup, Radio } from "@feeblo/ui/radio-group";
 import { toastManager } from "@feeblo/ui/toast";
 import { useState } from "react";
 import type { ChangelogStatus } from "../constants";
@@ -104,7 +104,7 @@ export function ChangelogPublishDialog({
                 className="flex items-start gap-3 rounded-xl border p-4"
                 htmlFor="publish-now"
               >
-                <RadioGroupItem id="publish-now" value="publish-now" />
+                <Radio id="publish-now" value="publish-now" />
                 <div className="space-y-1">
                   <p className="font-medium text-sm">Publish now</p>
                   <p className="text-muted-foreground text-sm">
@@ -118,7 +118,7 @@ export function ChangelogPublishDialog({
                   className="flex items-start gap-3 rounded-xl border p-4 opacity-50"
                   htmlFor="schedule-later"
                 >
-                  <RadioGroupItem
+                  <Radio
                     disabled
                     id="schedule-later"
                     value="schedule-later"

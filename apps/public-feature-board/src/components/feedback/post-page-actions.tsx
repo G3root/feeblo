@@ -2,11 +2,11 @@ import { usePostDeleteDialogContext } from "@feeblo/post-ui/dialog-stores";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import { cn } from "@feeblo/ui/utils";
 import {
   ArrowLeft01Icon,
@@ -38,8 +38,8 @@ export function PostPageActions() {
       </Link>
 
       {canManagePost ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger
+        <Menu>
+          <MenuTrigger
             render={(props) => (
               <Button
                 {...props}
@@ -51,8 +51,8 @@ export function PostPageActions() {
               </Button>
             )}
           />
-          <DropdownMenuContent align="start" className="w-40">
-            <DropdownMenuItem
+          <MenuPopup align="start" className="w-40">
+            <MenuItem
               onClick={() =>
                 store.send({
                   type: "toggle",
@@ -63,9 +63,9 @@ export function PostPageActions() {
             >
               <HugeiconsIcon icon={Delete02Icon} />
               <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
       ) : null}
     </div>
   );

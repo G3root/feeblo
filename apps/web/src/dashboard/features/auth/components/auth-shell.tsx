@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
+import { Card, CardHeader, CardPanel, CardTitle } from "@feeblo/ui/card";
 import type { ReactNode } from "react";
 
 type AuthShellProps = {
@@ -22,12 +22,12 @@ export function AuthShell({
             <CardTitle className="text-xl">{title}</CardTitle>
             <p className="text-muted-foreground text-sm">{description}</p>
           </CardHeader>
-          <CardContent>
+          <CardPanel>
             <div className="flex flex-col gap-4">
               {children}
               {footer}
             </div>
-          </CardContent>
+          </CardPanel>
         </Card>
       </div>
     </div>

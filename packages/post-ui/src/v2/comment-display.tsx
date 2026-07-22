@@ -2,11 +2,11 @@ import type { TComment } from "@feeblo/domain/src/comments/schema.js";
 import { Avatar, AvatarFallback } from "@feeblo/ui/avatar";
 import { Button } from "@feeblo/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@feeblo/ui/dropdown-menu";
+  Menu,
+  MenuPopup,
+  MenuItem,
+  MenuTrigger,
+} from "@feeblo/ui/menu";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   Delete02Icon,
@@ -275,7 +275,7 @@ function DeleteButton() {
   const { meta, state } = useCommentDisplay();
 
   return (
-    <DropdownMenuItem
+    <MenuItem
       onClick={() =>
         store.send({
           type: "toggle",
@@ -287,7 +287,7 @@ function DeleteButton() {
     >
       <HugeiconsIcon icon={Delete02Icon} />
       {meta.deleteLabel}
-    </DropdownMenuItem>
+    </MenuItem>
   );
 }
 
@@ -295,10 +295,10 @@ function EditButton() {
   const { meta, actions } = useCommentDisplay();
 
   return (
-    <DropdownMenuItem onClick={actions.onEdit}>
+    <MenuItem onClick={actions.onEdit}>
       <HugeiconsIcon icon={Edit01Icon} />
       {meta.editLabel}
-    </DropdownMenuItem>
+    </MenuItem>
   );
 }
 
@@ -312,7 +312,7 @@ function ToggleVisibilityButton() {
   }
 
   return (
-    <DropdownMenuItem
+    <MenuItem
       onClick={() =>
         store.send({
           type: "toggle",
@@ -325,7 +325,7 @@ function ToggleVisibilityButton() {
     >
       <HugeiconsIcon icon={state.isInternal ? EyeIcon : ViewOffIcon} />
       {state.isInternal ? meta.toggleToPublicLabel : meta.toggleToInternalLabel}
-    </DropdownMenuItem>
+    </MenuItem>
   );
 }
 
@@ -338,20 +338,20 @@ function CommentDisplayDropdown() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Menu>
+      <MenuTrigger
         render={
           <Button size="icon-sm" variant="ghost">
             <HugeiconsIcon icon={Ellipsis} />
           </Button>
         }
       />
-      <DropdownMenuContent>
+      <MenuPopup>
         <EditButton />
         <ToggleVisibilityButton />
         <DeleteButton />
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </MenuPopup>
+    </Menu>
   );
 }
 

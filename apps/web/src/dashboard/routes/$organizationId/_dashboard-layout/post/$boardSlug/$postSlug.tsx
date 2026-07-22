@@ -1,7 +1,7 @@
 import { PostPage } from "@feeblo/post-ui/post-page";
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@feeblo/ui/card";
+import { Card, CardPanel, CardHeader, CardTitle } from "@feeblo/ui/card";
 import {
   Empty,
   EmptyContent,
@@ -79,7 +79,6 @@ function RouteComponent() {
           </EmptyDescription>
           <EmptyContent>
             <Button
-              nativeButton={false}
               render={(props) => (
                 <Link
                   {...props}
@@ -190,7 +189,7 @@ function SidebarCard({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">{children}</CardContent>
+      <CardPanel className="flex flex-col gap-4">{children}</CardPanel>
     </Card>
   );
 }

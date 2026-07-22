@@ -8,10 +8,10 @@ import {
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
-  DialogContent,
   DialogDescription,
   DialogHeader,
   DialogPanel,
+  DialogPopup,
   DialogTitle,
   DialogTrigger,
 } from "@feeblo/ui/dialog";
@@ -125,11 +125,11 @@ function PostVoterList() {
   );
 }
 
-function PostVoterDialogContent() {
+function PostVoterDialogPopup() {
   const { voterCount, voters } = usePostVoterDialog();
 
   return (
-    <DialogContent>
+    <DialogPopup>
       <DialogHeader>
         <DialogTitle>Voters</DialogTitle>
         <DialogDescription>
@@ -156,13 +156,13 @@ function PostVoterDialogContent() {
           ))}
         </ul>
       </DialogPanel>
-    </DialogContent>
+    </DialogPopup>
   );
 }
 
 export const PostVoterDialog = {
   Root: PostVoterDialogRoot,
   Trigger: PostVoterDialogTrigger,
-  Content: PostVoterDialogContent,
+  Content: PostVoterDialogPopup,
   Items: PostVoterList,
 };

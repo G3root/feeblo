@@ -6,14 +6,14 @@ import type { TContact } from "@feeblo/domain/contact/schema";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
-  SelectContent,
+  SelectPopup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
 import {
   Sheet,
-  SheetContent,
+  SheetPopup,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -41,13 +41,13 @@ export function ContactEditDialog() {
       onOpenChange={(open) => store.send({ type: "setOpen", open })}
       open={open}
     >
-      <SheetContent>
+      <SheetPopup>
         <SheetHeader>
           <SheetTitle>Edit contact</SheetTitle>
           <SheetDescription>Update this person's details.</SheetDescription>
         </SheetHeader>
         <div className="p-4">{open ? <ContactEditForm /> : null}</div>
-      </SheetContent>
+      </SheetPopup>
     </Sheet>
   );
 }
@@ -240,14 +240,14 @@ function ContactEditFormFields({
                     }
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectPopup>
                   <SelectItem value="none">None</SelectItem>
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
                     </SelectItem>
                   ))}
-                </SelectContent>
+                </SelectPopup>
               </Select>
             </div>
           )}
