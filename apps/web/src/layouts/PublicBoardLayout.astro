@@ -1,23 +1,44 @@
 ---
 import "../styles/global.css";
+
+import { getSecret } from "astro:env/server";
+import { getServerRuntimePublicEnv } from "../dashboard/lib/server-runtime-public-env";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
 
-import { getSecret } from "astro:env/server";
-
 interface Props {
+  description?: string;
+  noIndex?: boolean;
   organizationId: string;
+  siteName: string;
+  subdomain: string;
   title?: string;
 }
 
-const { title = "feeblo", organizationId } = Astro.props;
-const noIndex = Boolean(getSecret("NO_INDEX"));
+const {
+  description,
+  title = "feeblo",
+  organizationId,
+  siteName,
+  subdomain,
+} = Astro.props;
+const noIndex = Boolean(getSecret("NO_INDEX")) || Boolean(Astro.props.noIndex);
+const canonicalUrl = new URL(Astro.url.pathname, Astro.url.origin).toString();
+const ogImageUrl = new URL("/og-image", getServerRuntimePublicEnv().apiUrl);
+ogImageUrl.searchParams.set("name", siteName);
+ogImageUrl.searchParams.set("site", subdomain);
 ---
 
 <!doctype html>
 <html lang="en">
-  <CommonHead title={title} noIndex={noIndex} />
+  <CommonHead
+    canonicalUrl={canonicalUrl}
+    description={description}
+    title={title}
+    noIndex={noIndex}
+    ogImageUrl={ogImageUrl.toString()}
+  />
   <EnvScript organizationId={organizationId} />
   <ThemeScript />
   <body>

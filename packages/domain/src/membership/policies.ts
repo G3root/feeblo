@@ -147,6 +147,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
     canCancelInvitation,
     canRemoveMember,
     canUpdateMemberRole,
+    canChangeRoleWithinPlan,
   };
 });
 

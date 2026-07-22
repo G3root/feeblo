@@ -46,6 +46,12 @@ function RouteComponent() {
           <SettingsItem.Separator />
           <SettingsItem.ItemContent>
             <SettingsItem.FieldGroup>
+              <SearchEngineIndexing canEdit={isAdmin} />
+            </SettingsItem.FieldGroup>
+          </SettingsItem.ItemContent>
+          <SettingsItem.Separator />
+          <SettingsItem.ItemContent>
+            <SettingsItem.FieldGroup>
               <HidePoweredByBranding
                 canEdit={isAdmin && isPaidPlan_}
                 hasPaidPlan={isPaidPlan_}
@@ -55,6 +61,52 @@ function RouteComponent() {
         </SettingsItem.Item>
       </SettingsLayout.Content>
     </SettingsLayout.Root>
+  );
+}
+
+function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
+  const id = useId();
+  const site = useSite();
+
+  async function handleChange(value: boolean) {
+    if (!(canEdit && site)) {
+      return;
+    }
+
+    try {
+      const tx = siteCollection.update(site.id, (draft) => {
+        draft.noIndex = value;
+      });
+      await tx.isPersisted.promise;
+      toastManager.add({
+        title: "Search engine visibility updated",
+        type: "success",
+      });
+    } catch {
+      toastManager.add({
+        title: "Failed to update search engine visibility",
+        type: "error",
+      });
+    }
+  }
+
+  return (
+    <SettingsItem.Field>
+      <SettingsItem.FieldContent>
+        <SettingsItem.FieldLabel htmlFor={id}>
+          Hide from search engines
+        </SettingsItem.FieldLabel>
+        <SettingsItem.FieldDescription>
+          Ask search engines not to index any page on this public site.
+        </SettingsItem.FieldDescription>
+      </SettingsItem.FieldContent>
+      <Switch
+        checked={site?.noIndex ?? false}
+        disabled={!(canEdit && site)}
+        id={id}
+        onCheckedChange={handleChange}
+      />
+    </SettingsItem.Field>
   );
 }
 

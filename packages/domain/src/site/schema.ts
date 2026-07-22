@@ -11,6 +11,7 @@ export const Site = S.Struct({
   customDomain: S.Union([S.String, S.Null]),
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
+  noIndex: S.Boolean,
   hidePoweredBy: S.Boolean,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
@@ -30,6 +31,7 @@ export const SiteUpdate = S.Struct({
   organizationId: WorkspaceId.schema,
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
+  noIndex: S.Boolean,
   name: S.String,
 });
 

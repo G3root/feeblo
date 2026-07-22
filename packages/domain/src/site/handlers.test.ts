@@ -220,6 +220,7 @@ describe("SiteRpcHandlers", () => {
                 name: "Updated name",
                 changelogVisibility: "HIDDEN",
                 roadmapVisibility: "HIDDEN",
+                noIndex: false,
               })
               .pipe(
                 Effect.provideService(
@@ -247,6 +248,7 @@ describe("SiteRpcHandlers", () => {
                 name: "Updated name",
                 changelogVisibility: "HIDDEN",
                 roadmapVisibility: "HIDDEN",
+                noIndex: false,
               })
               .pipe(
                 Effect.provideService(
@@ -273,6 +275,7 @@ describe("SiteRpcHandlers", () => {
               name: "Admin updated",
               changelogVisibility: "HIDDEN",
               roadmapVisibility: "HIDDEN",
+              noIndex: true,
             })
             .pipe(
               Effect.provideService(
@@ -291,6 +294,7 @@ describe("SiteRpcHandlers", () => {
             name: "Admin updated",
             changelogVisibility: "HIDDEN",
             roadmapVisibility: "HIDDEN",
+            noIndex: true,
           });
         })
       );
@@ -307,6 +311,7 @@ describe("SiteRpcHandlers", () => {
               name: "Owner updated",
               changelogVisibility: "PUBLIC",
               roadmapVisibility: "PUBLIC",
+              noIndex: false,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 

@@ -18,6 +18,7 @@ interface updateArgs {
   changelogVisibility: "PUBLIC" | "HIDDEN";
   id: string;
   name: string;
+  noIndex: boolean;
   organizationId: string;
   roadmapVisibility: "PUBLIC" | "HIDDEN";
 }
@@ -41,6 +42,7 @@ const makeSiteRepository = Effect.gen(function* () {
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
           roadmapVisibility: schema.siteTable.roadmapVisibility,
+          noIndex: schema.siteTable.noIndex,
           createdAt: schema.siteTable.createdAt,
           updatedAt: schema.siteTable.updatedAt,
           organizationId: schema.siteTable.organizationId,
@@ -72,6 +74,7 @@ const makeSiteRepository = Effect.gen(function* () {
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
           roadmapVisibility: schema.siteTable.roadmapVisibility,
+          noIndex: schema.siteTable.noIndex,
           createdAt: schema.siteTable.createdAt,
           updatedAt: schema.siteTable.updatedAt,
           organizationId: schema.siteTable.organizationId,
@@ -85,6 +88,7 @@ const makeSiteRepository = Effect.gen(function* () {
       changelogVisibility,
       id,
       name,
+      noIndex,
       organizationId,
       roadmapVisibility,
     }: updateArgs) =>
@@ -94,6 +98,7 @@ const makeSiteRepository = Effect.gen(function* () {
           changelogVisibility,
           updatedAt: new Date(),
           roadmapVisibility,
+          noIndex,
           name,
         })
         .where(

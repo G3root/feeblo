@@ -51,6 +51,7 @@
     "@xstate/store": "^3.17.1",
     "@xstate/store-react": "^1.0.1",
     "astro": "7.0.0",
+    "astro-seo": "^1.1.0",
     "better-auth": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",

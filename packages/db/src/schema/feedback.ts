@@ -575,6 +575,7 @@ export const siteTable = pgTable(
     roadmapVisibility: roadmapVisibilityEnum("roadmap_visibility")
       .default("PUBLIC")
       .notNull(),
+    noIndex: boolean("no_index").default(false).notNull(),
     hidePoweredBy: boolean("hide_powered_by").default(false).notNull(),
     organizationId: text("organization_id")
       .notNull()

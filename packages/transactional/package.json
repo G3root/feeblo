@@ -34,7 +34,7 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@react-email/preview-server": "^5.2.9",
+    "@react-email/preview-server": "^5.2.11",
     "@types/nodemailer": "^7.0.11",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

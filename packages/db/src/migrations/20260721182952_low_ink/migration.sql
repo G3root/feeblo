@@ -1,0 +1,1 @@
+ALTER TABLE "site" ADD COLUMN "no_index" boolean DEFAULT false NOT NULL;

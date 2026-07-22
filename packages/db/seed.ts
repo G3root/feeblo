@@ -17,6 +17,8 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { and, eq, inArray } from "drizzle-orm";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 
 import { Database } from "./src";
 import { nukeDatabase } from "./src/nuke";
@@ -746,7 +748,10 @@ const seed = Effect.gen(function* () {
   console.log(`Primary user password: ${TEST_USER.password}`);
 });
 
-const SeedLayer = Database.DatabaseContextLive;
+const SeedLayer = Layer.merge(
+  Database.DatabaseContextLive,
+  WorkflowEngine.layerMemory
+);
 
 Effect.runPromise(seed.pipe(Effect.provide(SeedLayer))).catch((error) => {
   console.error("Seed failed:", error);

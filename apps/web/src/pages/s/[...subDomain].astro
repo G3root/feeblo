@@ -16,8 +16,12 @@ if (!site) {
 ---
 
 <PublicBoardLayout
+  description={`Share feedback, follow the roadmap, and read product updates from ${site.name}.`}
+  noIndex={site.noIndex}
   organizationId={site.organizationId}
-  title={`Public Board${subdomain ? ` - ${subdomain}` : ""}`}
+  siteName={site.name}
+  subdomain={site.subdomain}
+  title={`${site.name} — Feedback and roadmap`}
 >
   <main>
     <PublicBoardApp client:only="react" site={site} />

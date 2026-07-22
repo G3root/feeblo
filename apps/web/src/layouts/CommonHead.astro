@@ -1,13 +1,24 @@
 ---
 interface Props {
+  canonicalUrl?: string;
   clientHintCheckScript?: string;
+  description?: string;
   noIndex?: boolean;
+  ogImageUrl?: string;
   title?: string;
 }
 
-const { clientHintCheckScript, noIndex, title = "feeblo" } = Astro.props;
+const {
+  canonicalUrl,
+  clientHintCheckScript,
+  description,
+  noIndex,
+  ogImageUrl,
+  title = "feeblo",
+} = Astro.props;
 
 import { Font } from "astro:assets";
+import { SEO } from "astro-seo";
 ---
 
 <head>
@@ -20,9 +31,38 @@ import { Font } from "astro:assets";
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="generator" content={Astro.generator} />
-  <title>{title}</title>
+  <SEO
+    title={title}
+    description={description}
+    canonical={canonicalUrl}
+    noindex={noIndex}
+    nofollow={false}
+    openGraph={ogImageUrl
+      ? {
+          basic: {
+            title,
+            type: "website",
+            image: ogImageUrl,
+            url: canonicalUrl,
+          },
+          optional: {
+            description,
+          },
+          image: {
+            type: "image/png",
+            width: 1200,
+            height: 630,
+            alt: `${title} social preview`,
+          },
+        }
+      : undefined}
+    twitter={{
+      card: "summary_large_image",
+      title,
+      description,
+      image: ogImageUrl,
+      imageAlt: ogImageUrl ? `${title} social preview` : undefined,
+    }}
+  />
   <Font cssVariable="--font-inter" preload />
-  {
-    noIndex && <meta name="robots" content="noindex" />
-  }
 </head>
