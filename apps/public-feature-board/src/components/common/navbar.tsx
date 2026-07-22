@@ -1,10 +1,8 @@
 import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { Button } from "@feeblo/ui/button";
 import { cn } from "@feeblo/ui/utils";
-import {
-  authClient,
-  clearAuthStateCache,
-} from "@feeblo/web-shared/auth-client";
+import { authClient } from "@feeblo/web-shared/auth-client";
+import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Link, useLocation } from "@tanstack/react-router";
 import { useSite } from "../../providers/site-provider";
@@ -81,7 +79,7 @@ function UserActions() {
         <Button
           onClick={async () => {
             await authClient.signOut();
-            clearAuthStateCache();
+            await refreshAuthSession();
           }}
           size="sm"
           variant="outline"

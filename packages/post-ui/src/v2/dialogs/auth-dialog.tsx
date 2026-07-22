@@ -28,6 +28,7 @@ import {
   authClient,
   verificationOtpEndpoint,
 } from "@feeblo/web-shared/auth-client";
+import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
 import {
   EmailSchema,
   NameSchema,
@@ -124,6 +125,7 @@ export function AuthDialogRoot() {
   }, []);
 
   const handleSuccess = useCallback(() => {
+    void refreshAuthSession();
     store.send({ type: "setOpen", open: false });
     setStep(CHOOSER_STEP);
   }, [store]);

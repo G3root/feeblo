@@ -1,36 +1,24 @@
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useCallback } from "react";
-import {
-  AUTH_STATE_KEY,
-  type AuthState,
-  authClient,
-  authStateCollection,
-  isAuthStateValid,
-  updateAuthState,
-} from "../lib/auth-client";
+import { refreshAuthSession } from "../auth/atoms";
+import { useAuth } from "../auth/auth-context";
 
+/**
+ * Compatibility adapter for existing full-session consumers. New display-only
+ * consumers should use `useAuth`; this adapter deliberately withholds an
+ * optimistic hint because roles and session metadata must be authoritative.
+ */
 export const useAuthState = () => {
-  const { data, isLoading } = useLiveQuery(
-    (q) =>
-      q
-        .from({ auth: authStateCollection })
-        .where(({ auth }) => eq(auth.id, AUTH_STATE_KEY))
-        .findOne(),
-    []
-  );
+  const auth = useAuth();
 
   const refetch = useCallback(async () => {
-    const result = await authClient.getSession();
-    if (result.data) {
-      updateAuthState(result.data);
-    }
+    await refreshAuthSession();
   }, []);
 
-  const state = data as AuthState | undefined;
-
   return {
-    data: isAuthStateValid(state) ? state : undefined,
-    isPending: isLoading,
+    data: auth.status === "authenticated" && auth.data ? auth.data : undefined,
+    isPending:
+      auth.status === "loading" ||
+      (auth.status === "authenticated" && auth.data === null),
     refetch,
   };
 };

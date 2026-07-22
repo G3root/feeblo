@@ -2,6 +2,7 @@
 import { sequence } from "astro:middleware";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";
+import type { AuthHint } from "@feeblo/web-shared/auth-hint";
 import type { APIContext, MiddlewareNext } from "astro";
 import { fetchRpcServer } from "~/lib/runtime-server";
 import { authClient } from "~/lib/server-auth-client";
@@ -119,6 +120,7 @@ async function siteMiddleware(context: APIContext, next: MiddlewareNext) {
 
 async function authMiddleware(context: APIContext, next: MiddlewareNext) {
   if (isFeedbackWidgetPath(normalizePathname(context.url.pathname))) {
+    context.locals.authHint = null;
     return next();
   }
 
@@ -128,6 +130,9 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
 
   const sessionData = data as AuthClientSession | null;
 
+  // The HttpOnly Better Auth cookie remains the authority. Middleware resolves
+  // it before serving the document; the display-only hint passed to the React
+  // island below merely avoids a loading flash while `meAtom` reconciles.
   context.locals.user = sessionData?.user ?? null;
   context.locals.session = sessionData?.session ?? null;
   context.locals.organizations = sessionData?.organizations ?? null;
@@ -149,6 +154,21 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
       context.locals.organizations = null;
     }
   }
+
+  const { user, organizations } = context.locals;
+  context.locals.authHint =
+    user && organizations
+      ? ({
+          v: 1,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image ?? null,
+          },
+          organizations,
+        } satisfies AuthHint)
+      : null;
 
   return next();
 }

@@ -32,6 +32,22 @@
       "types": "./src/lib/auth-client.ts",
       "default": "./src/lib/auth-client.ts"
     },
+    "./auth-context": {
+      "types": "./src/auth/auth-context.tsx",
+      "default": "./src/auth/auth-context.tsx"
+    },
+    "./auth-hint": {
+      "types": "./src/utils/auth-hint.ts",
+      "default": "./src/utils/auth-hint.ts"
+    },
+    "./auth-session": {
+      "types": "./src/auth/atoms.ts",
+      "default": "./src/auth/atoms.ts"
+    },
+    "./organization-id-gate": {
+      "types": "./src/auth/org-slug-gate.tsx",
+      "default": "./src/auth/org-slug-gate.tsx"
+    },
     "./client-hints": {
       "types": "./src/lib/client-hints.ts",
       "default": "./src/lib/client-hints.ts"
@@ -73,6 +89,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@effect/atom-react": "4.0.0-beta.66",
     "@epic-web/client-hints": "^1.3.9",
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
@@ -81,8 +98,9 @@
     "@feeblo/utils": "workspace:*",
     "@tanstack/query-db-collection": "catalog:",
     "@tanstack/react-db": "catalog:",
-    "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-form": "^1.28.6",
+    "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-router": "catalog:",
     "effect": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

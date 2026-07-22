@@ -1,8 +1,8 @@
+import type { AuthClientSession } from "@feeblo/auth/client";
 import { type ReactNode, useMemo } from "react";
-import type { ValidAuthState } from "../lib/auth-client";
 import { useAuthState } from "./use-auth-state";
 
-type SessionData = ValidAuthState;
+type SessionData = AuthClientSession;
 
 export type ClientPolicy = (session: SessionData) => boolean;
 

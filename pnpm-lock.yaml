@@ -1076,6 +1076,9 @@ importers:
 
   packages/web-shared:
     dependencies:
+      '@effect/atom-react':
+        specifier: 4.0.0-beta.66
+        version: 4.0.0-beta.66(effect@4.0.0-beta.66)(react@19.2.5)(scheduler@0.27.0)
       '@epic-web/client-hints':
         specifier: ^1.3.9
         version: 1.3.9
@@ -1106,6 +1109,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.101.0
         version: 5.101.0(react@19.2.5)
+      '@tanstack/react-router':
+        specifier: 'catalog:'
+        version: 1.170.15(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0-beta.66
@@ -2010,6 +2016,13 @@ packages:
     peerDependencies:
       '@effect-aws/client-s3': ^2.0.0-beta.4
       effect: '>=4.0.0 <5.0.0'
+
+  '@effect/atom-react@4.0.0-beta.66':
+    resolution: {integrity: sha512-YEUbGXBZsb9dmgQ/FMTsqU6IYp/2rRVqloySSXFzhXlIbRT6b28SvNyTpK3x+HLGavURYfTUjjZ/Y2wEj/7A9g==}
+    peerDependencies:
+      effect: ^4.0.0-beta.66
+      react: ^19.2.4
+      scheduler: '*'
 
   '@effect/language-service@0.85.1':
     resolution: {integrity: sha512-EXnJjIy6zQ3nUO/MZ+ynWUb8B895KZPotd1++oTs9JjDkplwM7cb6zo8Zq2zU6piwq+KflO7amXbEfj1UMpHkw==}
@@ -11489,6 +11502,12 @@ snapshots:
     dependencies:
       '@effect-aws/client-s3': 2.0.0-beta.4(effect@4.0.0-beta.66)
       effect: 4.0.0-beta.66
+
+  '@effect/atom-react@4.0.0-beta.66(effect@4.0.0-beta.66)(react@19.2.5)(scheduler@0.27.0)':
+    dependencies:
+      effect: 4.0.0-beta.66
+      react: 19.2.5
+      scheduler: 0.27.0
 
   '@effect/language-service@0.85.1': {}
 

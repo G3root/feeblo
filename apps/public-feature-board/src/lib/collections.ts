@@ -2,7 +2,7 @@ import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
-import { getAuthState } from "@feeblo/web-shared/auth-client";
+import { getCachedAuthSession } from "@feeblo/web-shared/auth-session";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
@@ -49,7 +49,7 @@ function getMutationOrganizationId() {
   }
 
   const restrictedToOrganizationId =
-    getAuthState()?.user.restrictedToOrganizationId;
+    getCachedAuthSession()?.user.restrictedToOrganizationId;
 
   if (
     restrictedToOrganizationId &&

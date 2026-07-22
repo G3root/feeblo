@@ -1,8 +1,8 @@
+import { authClient } from "@feeblo/web-shared/auth-client";
 import {
-  authClient,
-  clearAuthStateCache,
-  initAuthStateCache,
-} from "@feeblo/web-shared/auth-client";
+  getAuthSession,
+  refreshAuthSession,
+} from "@feeblo/web-shared/auth-session";
 import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
 import * as S from "effect/Schema";
 import { PublicBoardShell } from "../components/layout/public-board-shell";
@@ -23,7 +23,7 @@ const rootRoute = createRootRoute({
     const url = new URL(window.location.href);
     const token = url.searchParams.get("ssoToken");
     const organizationId = getCurrentOrganizationId();
-    let session = await initAuthStateCache();
+    let session = await getAuthSession();
 
     if (token && organizationId) {
       url.searchParams.delete("ssoToken");
@@ -37,8 +37,7 @@ const rootRoute = createRootRoute({
         if (result.error) {
           throw new Error(result.error.message ?? "Feeblo auto-login failed");
         }
-        clearAuthStateCache();
-        session = await initAuthStateCache();
+        session = await refreshAuthSession();
       }
     }
 
@@ -50,7 +49,8 @@ const rootRoute = createRootRoute({
       organizationId &&
       restrictedToOrganizationId !== organizationId
     ) {
-      clearAuthStateCache();
+      await authClient.signOut();
+      await refreshAuthSession();
     }
   },
   component: () => (
