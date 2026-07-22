@@ -1,7 +1,7 @@
 import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
-import { useId } from "react";
+import { useId, useRef } from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -41,22 +41,31 @@ export function PostTitleUpdateInput() {
 
   const defaultValue = post.title;
   const postId = post.id;
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     collections: { postCollection },
   } = usePostCollections();
 
-  const handleChange = async (value: string) => {
-    // Multiple rapid changes merge into a single transaction
+  const handleBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
 
-    if (value.trim() === "") {
+    //TODO add debounce. later
+    if (newValue === defaultValue) {
+      return;
+    }
+
+    if (newValue.trim() === "") {
       toastManager.add({ title: "Title is required", type: "error" });
+      if (inputRef.current) {
+        inputRef.current.value = defaultValue;
+      }
       return;
     }
 
     try {
       const tx = postCollection.update(postId, (draft) => {
-        draft.title = value;
+        draft.title = newValue;
       });
 
       await tx.isPersisted.promise;
@@ -65,16 +74,20 @@ export function PostTitleUpdateInput() {
         title: "Title updated successfully",
         type: "success",
       });
-    } catch (_error) {
+    } catch {
       toastManager.add({ title: "Failed to update title", type: "error" });
+      if (inputRef.current) {
+        inputRef.current.value = defaultValue;
+      }
     }
   };
 
   return (
     <PostTitleInput
       defaultValue={defaultValue}
-      onBlur={canManagePost ? (e) => handleChange(e.target.value) : undefined}
+      onBlur={canManagePost ? handleBlur : undefined}
       readOnly={!canManagePost}
+      ref={inputRef}
     />
   );
 }
