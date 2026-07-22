@@ -64,7 +64,6 @@ function RouteComponent() {
               navigate({
                 to: "/email-verify",
                 search: {
-                  email: value.email,
                   redirectTo: search.redirectTo,
                 },
               });

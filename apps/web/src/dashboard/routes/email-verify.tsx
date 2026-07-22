@@ -6,16 +6,19 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@feeblo/ui/field";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   OTPField,
   OTPFieldInput,
   OTPFieldSeparator,
 } from "@feeblo/ui/otp-field";
 import { toastManager } from "@feeblo/ui/toast";
+import {
+  authClient,
+  verificationOtpEndpoint,
+} from "@feeblo/web-shared/auth-client";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { z } from "zod";
-import { useAppForm } from "@feeblo/ui/hooks/form";
-import { authClient, verificationOtpEndpoint } from "@feeblo/web-shared/auth-client";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
@@ -33,9 +36,7 @@ export const Route = createFileRoute("/email-verify")({
     });
 
     if (!response.ok) {
-      throw redirect({
-        to: "/sign-up",
-      });
+      throw redirect({ to: "/sign-up" });
     }
 
     const parsed = z
@@ -46,9 +47,7 @@ export const Route = createFileRoute("/email-verify")({
       .safeParse(await response.json());
 
     if (!parsed.success || parsed.data.type !== "email-verification") {
-      throw redirect({
-        to: "/sign-up",
-      });
+      throw redirect({ to: "/sign-up" });
     }
 
     return parsed.data;
@@ -92,6 +91,11 @@ function RouteComponent() {
       await fetch(verificationOtpEndpoint, {
         method: "DELETE",
         credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: verificationState.email,
+          type: "email-verification",
+        }),
       });
 
       const redirectTo = search.redirectTo?.startsWith("/")
@@ -114,7 +118,7 @@ function RouteComponent() {
             }}
           >
             <FieldGroup>
-              <div className="flex flex-col items-center gap-2 text-center">
+              <Field className="items-center text-center">
                 <Link
                   className="flex flex-col items-center gap-2 font-medium"
                   to="/sign-up"
@@ -128,7 +132,7 @@ function RouteComponent() {
                 <FieldDescription>
                   We sent a 6-digit code to your email address
                 </FieldDescription>
-              </div>
+              </Field>
               <form.Field
                 children={(field) => {
                   const isInvalid =
@@ -200,11 +204,13 @@ function RouteComponent() {
               </Field>
             </FieldGroup>
           </form>
-          <FieldDescription className="px-6 text-center">
-            By clicking continue, you agree to our{" "}
-            <Link to="/sign-up">Terms of Service</Link> and{" "}
-            <Link to="/sign-up">Privacy Policy</Link>.
-          </FieldDescription>
+          <Field>
+            <FieldDescription className="px-6 text-center">
+              By clicking continue, you agree to our{" "}
+              <Link to="/sign-up">Terms of Service</Link> and{" "}
+              <Link to="/sign-up">Privacy Policy</Link>.
+            </FieldDescription>
+          </Field>
         </div>
       </div>
     </div>

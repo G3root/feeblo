@@ -1,13 +1,8 @@
-import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import { z } from "zod";
-import { AuthShell } from "~/features/auth/components/auth-shell";
-import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import {
   getSafeCallbackURL,
   initializeEmailVerification,
 } from "@feeblo/post-ui/auth-flows";
+import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
@@ -16,6 +11,11 @@ import {
   NameSchema,
   PasswordAndConfirmPasswordSchema,
 } from "@feeblo/web-shared/user-validation";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import { z } from "zod";
+import { AuthShell } from "~/features/auth/components/auth-shell";
 
 export const Route = createFileRoute("/sign-up")({
   validateSearch: (search) =>
@@ -100,7 +100,6 @@ function RouteComponent() {
               await navigate({
                 to: "/email-verify",
                 search: {
-                  email,
                   redirectTo: search.redirectTo,
                 },
               });
@@ -157,8 +156,7 @@ function RouteComponent() {
         }
 
         if (!response.data?.user.emailVerified) {
-          const isVerificationReady =
-            await initializeEmailVerification(email);
+          const isVerificationReady = await initializeEmailVerification(email);
           if (!isVerificationReady) {
             return;
           }
@@ -166,7 +164,6 @@ function RouteComponent() {
           await navigate({
             to: "/email-verify",
             search: {
-              email,
               redirectTo: search.redirectTo,
             },
           });
