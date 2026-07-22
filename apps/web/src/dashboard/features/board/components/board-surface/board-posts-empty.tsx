@@ -7,8 +7,8 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
+import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 
 export function BoardPostsEmpty({
   boardId,
@@ -34,7 +34,7 @@ export function BoardPostsEmpty({
               : "This workspace does not have any feedback yet."}
         </EmptyDescription>
       </EmptyHeader>
-      {boardId && !hasFilters ? (
+      {hasFilters ? null : (
         <EmptyContent>
           <PolicyGuard policy={hasMembership(organizationId)}>
             <Button
@@ -49,7 +49,7 @@ export function BoardPostsEmpty({
             </Button>
           </PolicyGuard>
         </EmptyContent>
-      ) : null}
+      )}
     </Empty>
   );
 }
