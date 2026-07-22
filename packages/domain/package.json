@@ -133,6 +133,21 @@
     "./organization/repository": {
       "default": "./src/organization/repository.ts"
     },
+    "./og-image/errors": {
+      "default": "./src/og-image/errors.ts"
+    },
+    "./og-image/handler": {
+      "default": "./src/og-image/handler.ts"
+    },
+    "./og-image/og-image": {
+      "default": "./src/og-image/og-image.tsx"
+    },
+    "./og-image/schema": {
+      "default": "./src/og-image/schema.ts"
+    },
+    "./og-image/service": {
+      "default": "./src/og-image/service.ts"
+    },
     "./services/s3": {
       "default": "./src/services/s3.ts"
     },
@@ -218,7 +233,9 @@
     "cookie-es": "^3.1.1",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
-    "jose": "catalog:"
+    "jose": "catalog:",
+    "react": "catalog:",
+    "takumi-js": "^2.4.0"
   },
   "scripts": {
     "check-types": "tsc --noEmit",
@@ -228,6 +245,7 @@
   "devDependencies": {
     "@effect/vitest": "4.0.0-beta.94",
     "@feeblo/config": "workspace:*",
+    "@types/react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

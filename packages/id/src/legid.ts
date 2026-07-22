@@ -33,7 +33,7 @@ export interface LegidFactory<Name extends string> {
   readonly generate: Effect.Effect<LegidOf<Name>, LegidError>;
   readonly is: (input: string) => input is LegidOf<Name>;
   readonly parse: (input: string) => Effect.Effect<LegidOf<Name>, LegidError>;
-  readonly schema: Schema.Schema<LegidOf<Name>>;
+  readonly schema: Schema.Codec<LegidOf<Name>, string>;
   readonly unsafeGenerate: () => Promise<LegidOf<Name>>;
   readonly unsafeParse: (input: string) => Promise<LegidOf<Name>>;
   readonly verify: (input: string) => Effect.Effect<boolean>;
@@ -257,7 +257,7 @@ export const makeId = <
   const idSchema = Schema.String.pipe(
     Schema.brand("LegidId"),
     Schema.brand(brand)
-  ) as Schema.Schema<LegidOf<BrandName>>;
+  ) as Schema.Codec<LegidOf<BrandName>, string>;
 
   return {
     brand,

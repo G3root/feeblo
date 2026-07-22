@@ -9,6 +9,8 @@ import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
+import { handleOgImage } from "@feeblo/domain/og-image/handler";
+import { OgImageService } from "@feeblo/domain/og-image/service";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
@@ -34,22 +36,38 @@ import { ServerConfig } from "./config";
 import { corsVaryFix } from "./middlewares/cors-vary";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
-const BetterAuthApp = Effect.gen(function* () {
-  const auth = yield* Auth;
-  return yield* HttpEffect.fromWebHandler((request) =>
-    Promise.resolve(auth.handler(request))
-  );
-});
-
 const BetterAuthRouterLive = HttpRouter.use((router) =>
-  router.add("*", "/api/auth/*", (request) =>
-    Effect.provideService(
-      BetterAuthApp,
-      HttpServerRequest.HttpServerRequest,
-      request
-    )
-  )
+  Effect.gen(function* () {
+    const auth = yield* Auth;
+    const authApp = HttpEffect.fromWebHandler((request) =>
+      Promise.resolve(auth.handler(request))
+    );
+
+    return yield* router.add("*", "/api/auth/*", (request) =>
+      Effect.provideService(
+        authApp,
+        HttpServerRequest.HttpServerRequest,
+        request
+      ).pipe(Effect.orDie)
+    );
+  })
 );
+
+const OgImageRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
+  HttpRouter.use((router) =>
+    Effect.gen(function* () {
+      const ogImageService = yield* OgImageService;
+      return yield* router.add("GET", "/og-image", (request) =>
+        handleOgImage(request).pipe(
+          Effect.provideService(OgImageService, ogImageService)
+        )
+      );
+    })
+  ).pipe(
+    Layer.provide(OgImageService.layer),
+    Layer.provide(Database.DatabaseContextLive),
+    Layer.orDie
+  );
 
 const DocsRoute = HttpApiScalar.layer(Api, {
   path: "/docs",
@@ -110,7 +128,8 @@ const program = Effect.gen(function* () {
   );
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
     mailbox ? Layer.merge(RootRouter, testMailboxRouter(mailbox)) : RootRouter;
-
+  const PublicRouters: Layer.Layer<never, never, HttpRouter.HttpRouter> =
+    Layer.merge(RootRouterLive, OgImageRouterLive);
   const isLocalDevHost = (host: string): boolean =>
     host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
 
@@ -158,14 +177,15 @@ const program = Effect.gen(function* () {
     return false;
   };
 
-  const AllRoutes = Layer.mergeAll(
-    RootRouterLive,
+  const MergedRoutes = Layer.mergeAll(
+    PublicRouters,
     HealthRouter,
     RpcRoute,
     HttpRoute,
     BetterAuthRouterLive,
     DocsRoute
-  ).pipe(
+  );
+  const AllRoutes = MergedRoutes.pipe(
     Layer.provide(
       HttpRouter.middleware(
         HttpMiddleware.cors({

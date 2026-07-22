@@ -17,8 +17,7 @@
     "@feeblo/domain": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
-    "effect": "catalog:",
-    "takumi-js": "^2.4.0"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
