@@ -4,18 +4,13 @@ import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { RoadmapColumnRepository } from "./repository";
 import { RoadmapColumnRpcs } from "./rpcs";
-import type {
-  TRoadmapColumnCreate,
-  TRoadmapColumnDelete,
-  TRoadmapColumnList,
-  TRoadmapColumnUpdate,
-} from "./schema";
+import type { TRoadmapColumnList } from "./schema";
 
 export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
   const columns = yield* RoadmapColumnRepository;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
-  const manage = (organizationId: string) =>
-    Policy.hasOrganizationOwnerOrAdmin(organizationId);
+  // const manage = (organizationId: string) =>
+  //   Policy.hasOrganizationOwnerOrAdmin(organizationId);
   return {
     RoadmapColumnList: (args: TRoadmapColumnList) =>
       columns
@@ -24,27 +19,27 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(read(args.organizationId)),
           withRemapDbErrors("RoadmapColumn", "select")
         ),
-    RoadmapColumnCreate: (args: TRoadmapColumnCreate) =>
-      columns
-        .create(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("RoadmapColumn", "create")
-        ),
-    RoadmapColumnUpdate: (args: TRoadmapColumnUpdate) =>
-      columns
-        .update(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("RoadmapColumn", "update")
-        ),
-    RoadmapColumnDelete: (args: TRoadmapColumnDelete) =>
-      columns
-        .delete(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("RoadmapColumn", "delete")
-        ),
+    // RoadmapColumnCreate: (args: TRoadmapColumnCreate) =>
+    //   columns
+    //     .create(args)
+    //     .pipe(
+    //       Policy.withPolicy(manage(args.organizationId)),
+    //       withRemapDbErrors("RoadmapColumn", "create")
+    //     ),
+    // RoadmapColumnUpdate: (args: TRoadmapColumnUpdate) =>
+    //   columns
+    //     .update(args)
+    //     .pipe(
+    //       Policy.withPolicy(manage(args.organizationId)),
+    //       withRemapDbErrors("RoadmapColumn", "update")
+    //     ),
+    // RoadmapColumnDelete: (args: TRoadmapColumnDelete) =>
+    //   columns
+    //     .delete(args)
+    //     .pipe(
+    //       Policy.withPolicy(manage(args.organizationId)),
+    //       withRemapDbErrors("RoadmapColumn", "delete")
+    //     ),
   };
 });
 export const RoadmapColumnRpcHandlers = RoadmapColumnRpcs.toLayer(

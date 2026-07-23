@@ -4,17 +4,12 @@ import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { RoadmapRepository } from "./repository";
 import { RoadmapRpcs } from "./rpcs";
-import type {
-  TRoadmapCreate,
-  TRoadmapDelete,
-  TRoadmapList,
-  TRoadmapUpdate,
-} from "./schema";
+import type { TRoadmapList } from "./schema";
 
 export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* RoadmapRepository;
-  const manage = (organizationId: string) =>
-    Policy.hasOrganizationOwnerOrAdmin(organizationId);
+  // const manage = (organizationId: string) =>
+  //   Policy.hasOrganizationOwnerOrAdmin(organizationId);
   return {
     RoadmapList: (args: TRoadmapList) =>
       repository
@@ -23,27 +18,27 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Roadmap", "select")
         ),
-    RoadmapCreate: (args: TRoadmapCreate) =>
-      repository
-        .create(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("Roadmap", "create")
-        ),
-    RoadmapUpdate: (args: TRoadmapUpdate) =>
-      repository
-        .update(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("Roadmap", "update")
-        ),
-    RoadmapDelete: (args: TRoadmapDelete) =>
-      repository
-        .delete(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("Roadmap", "delete")
-        ),
+    // RoadmapCreate: (args: TRoadmapCreate) =>
+    //   repository
+    //     .create(args)
+    //     .pipe(
+    //       Policy.withPolicy(manage(args.organizationId)),
+    //       withRemapDbErrors("Roadmap", "create")
+    //     ),
+    // RoadmapUpdate: (args: TRoadmapUpdate) =>
+    //   repository
+    //     .update(args)
+    //     .pipe(
+    //       Policy.withPolicy(manage(args.organizationId)),
+    //       withRemapDbErrors("Roadmap", "update")
+    //     ),
+    // RoadmapDelete: (args: TRoadmapDelete) =>
+    //   repository
+    //     .delete(args)
+    //     .pipe(
+    //       Policy.withPolicy(manage(args.organizationId)),
+    //       withRemapDbErrors("Roadmap", "delete")
+    //     ),
   };
 });
 
