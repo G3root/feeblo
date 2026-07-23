@@ -8,16 +8,37 @@ import type {
   TRoadmapDelete,
   TRoadmapList,
   TRoadmapUpdate,
+  TRoadmapVisibility,
+  TSimpleRoadmapFilter,
 } from "./schema";
+
+export const toMutableRoadmapFilter = (filter: TSimpleRoadmapFilter) => ({
+  version: filter.version,
+  operator: filter.operator,
+  conditions: filter.conditions.map((condition) => ({
+    ...condition,
+    value: [...condition.value],
+  })),
+});
 
 const makeRoadmapRepository = Effect.gen(function* () {
   const db = yield* currentDb;
-  const findMany = ({ organizationId }: TRoadmapList) =>
+  const findMany = ({
+    organizationId,
+    visibility,
+  }: TRoadmapList & { visibility?: TRoadmapVisibility }) =>
     Effect.gen(function* () {
       const roadmaps = yield* db
         .select()
         .from(schema.roadmapTable)
-        .where(eq(schema.roadmapTable.organizationId, organizationId));
+        .where(
+          and(
+            eq(schema.roadmapTable.organizationId, organizationId),
+            visibility
+              ? eq(schema.roadmapTable.visibility, visibility)
+              : undefined
+          )
+        );
       return roadmaps;
     });
 
@@ -35,7 +56,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
           isPrimary: input.isPrimary ?? false,
           mode: input.mode,
           visibility: input.visibility,
-          filter: input.filter,
+          filter: toMutableRoadmapFilter(input.filter),
         })
         .pipe(Effect.asVoid),
     update: (input: TRoadmapUpdate) =>
@@ -48,7 +69,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
           isPrimary: input.isPrimary,
           mode: input.mode,
           visibility: input.visibility,
-          filter: input.filter,
+          filter: toMutableRoadmapFilter(input.filter),
           updatedAt: new Date(),
         })
         .where(

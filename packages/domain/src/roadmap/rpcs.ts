@@ -10,7 +10,12 @@ export class RoadmapRpcs extends RpcGroup.make(
     success: S.Array(Roadmap),
     payload: RoadmapList,
     error: RoadmapServiceErrors,
-  }).middleware(AuthMiddleware)
+  }).middleware(AuthMiddleware),
+  Rpc.make("RoadmapListPublic", {
+    success: S.Array(Roadmap),
+    payload: RoadmapList,
+    error: RoadmapServiceErrors,
+  })
   // Rpc.make("RoadmapCreate", {
   //   success: S.Void,
   //   payload: RoadmapCreate,

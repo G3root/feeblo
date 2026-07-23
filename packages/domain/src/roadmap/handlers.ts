@@ -18,6 +18,10 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
           withRemapDbErrors("Roadmap", "select")
         ),
+    RoadmapListPublic: (args: TRoadmapList) =>
+      repository
+        .findMany({ organizationId: args.organizationId, visibility: "public" })
+        .pipe(withRemapDbErrors("Roadmap", "select")),
     // RoadmapCreate: (args: TRoadmapCreate) =>
     //   repository
     //     .create(args)
