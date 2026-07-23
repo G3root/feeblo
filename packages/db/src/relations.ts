@@ -18,6 +18,8 @@ import {
   memberTable,
   organizationTable,
   postReactionTable,
+  roadmapColumnTable,
+  roadmapTable,
   postStatusTable,
   postSubscriptionTable,
   postTable,
@@ -53,6 +55,8 @@ export const relations = defineRelations(
     postStatusTable,
     upvoteTable,
     postReactionTable,
+    roadmapTable,
+    roadmapColumnTable,
     postSubscriptionTable,
     commentTable,
     commentReactionTable,
@@ -172,6 +176,10 @@ export const relations = defineRelations(
       postStatuses: r.many.postStatusTable({
         from: r.organizationTable.id,
         to: r.postStatusTable.organizationId,
+      }),
+      roadmaps: r.many.roadmapTable({
+        from: r.organizationTable.id,
+        to: r.roadmapTable.organizationId,
       }),
       posts: r.many.postTable({
         from: r.organizationTable.id,
@@ -522,6 +530,22 @@ export const relations = defineRelations(
       organization: r.one.organizationTable({
         from: r.siteTable.organizationId,
         to: r.organizationTable.id,
+      }),
+    },
+    roadmapTable: {
+      organization: r.one.organizationTable({
+        from: r.roadmapTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      columns: r.many.roadmapColumnTable({
+        from: r.roadmapTable.id,
+        to: r.roadmapColumnTable.roadmapId,
+      }),
+    },
+    roadmapColumnTable: {
+      roadmap: r.one.roadmapTable({
+        from: r.roadmapColumnTable.roadmapId,
+        to: r.roadmapTable.id,
       }),
     },
     changelogTable: {

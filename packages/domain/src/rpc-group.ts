@@ -14,6 +14,8 @@ import { PostRpcs } from "./post/rpcs";
 import { PostReactionRpcs } from "./post-reaction/rpcs";
 import { PostStatusRpcs } from "./post-status/rpcs";
 import { PostSubscriptionRpcs } from "./post-subscription/rpcs";
+import { RoadmapRpcs } from "./roadmap/rpcs";
+import { RoadmapColumnRpcs } from "./roadmap-column/rpcs";
 import { SiteRpcs } from "./site/rpcs";
 import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
@@ -36,6 +38,8 @@ export const AllRpcs = PostRpcs.merge(
   PostReactionRpcs,
   PostStatusRpcs,
   PostSubscriptionRpcs,
+  RoadmapRpcs,
+  RoadmapColumnRpcs,
   WorkspaceRpcs,
   ContactRpcs
 );

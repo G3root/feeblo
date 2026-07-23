@@ -3,6 +3,8 @@ import {
   BoardId,
   MemberId,
   PostStatusId,
+  RoadmapColumnId,
+  RoadmapId,
   SiteId,
   WorkspaceId,
 } from "@feeblo/id";
@@ -98,6 +100,30 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               createdAt: new Date(),
               updatedAt: new Date(),
             });
+          }
+
+          const roadmapId = yield* RoadmapId.generate;
+          yield* tx.insert(schema.roadmapTable).values({
+            id: roadmapId,
+            organizationId,
+            name: "Roadmap",
+            slug: "roadmap",
+            description: null,
+            isPrimary: true,
+            mode: "status",
+            visibility: "public",
+            filter: { version: 1, operator: "and", conditions: [] },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          const defaultRoadmapStatuses = ["PLANNED", "IN_PROGRESS", "COMPLETED"] as const;
+          for (const [position, type] of defaultRoadmapStatuses.entries()) {
+            const status = yield* tx.select({ id: schema.postStatusTable.id }).from(schema.postStatusTable).where(and(eq(schema.postStatusTable.organizationId, organizationId), eq(schema.postStatusTable.type, type))).limit(1).pipe(Effect.map(EffectArray.get(0)));
+            if (Option.isSome(status)) {
+              const columnId = yield* RoadmapColumnId.generate;
+              yield* tx.insert(schema.roadmapColumnTable).values({ id: columnId, roadmapId, name: type === "IN_PROGRESS" ? "In progress" : type[0] + type.slice(1).toLowerCase(), position, config: { type: "status", statusId: status.value.id }, createdAt: new Date(), updatedAt: new Date() });
+            }
           }
 
           const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;

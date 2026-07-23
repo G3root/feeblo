@@ -9,6 +9,8 @@ import {
   PostId,
   PostReactionId,
   PostStatusId,
+  RoadmapColumnId,
+  RoadmapId,
   SiteId,
   UpvoteId,
   WorkspaceId,
@@ -32,6 +34,8 @@ import {
   postReactionTable,
   postStatusTable,
   postTable,
+  roadmapColumnTable,
+  roadmapTable,
   siteTable,
   upvoteTable,
   userTable,
@@ -223,6 +227,65 @@ const ensureOrganization = (userId: string) =>
           orderIndex: postStatusDefinition.orderIndex,
           createdAt: new Date(),
           updatedAt: new Date(),
+        });
+      }
+    }
+
+    const [primaryRoadmap] = yield* db
+      .select({ id: roadmapTable.id })
+      .from(roadmapTable)
+      .where(
+        and(
+          eq(roadmapTable.organizationId, org.id),
+          eq(roadmapTable.isPrimary, true)
+        )
+      )
+      .limit(1);
+
+    if (!primaryRoadmap) {
+      const roadmapId = yield* RoadmapId.generate;
+      const now = new Date();
+      yield* db.insert(roadmapTable).values({
+        id: roadmapId,
+        organizationId: org.id,
+        name: "Roadmap",
+        slug: "roadmap",
+        description: null,
+        isPrimary: true,
+        mode: "status",
+        visibility: "public",
+        filter: { version: 1, operator: "and", conditions: [] },
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const roadmapStatuses = yield* db
+        .select({ id: postStatusTable.id, type: postStatusTable.type })
+        .from(postStatusTable)
+        .where(eq(postStatusTable.organizationId, org.id));
+      const statusByType = new Map(
+        roadmapStatuses.map((status) => [status.type, status.id])
+      );
+
+      for (const [position, type] of ([
+        "PLANNED",
+        "IN_PROGRESS",
+        "COMPLETED",
+      ] as const).entries()) {
+        const statusId = statusByType.get(type);
+        if (!statusId) continue;
+        const columnId = yield* RoadmapColumnId.generate;
+        yield* db.insert(roadmapColumnTable).values({
+          id: columnId,
+          roadmapId,
+          name:
+            type === "IN_PROGRESS"
+              ? "In progress"
+              : `${type[0]}${type.slice(1).toLowerCase()}`,
+          position,
+          config: { type: "status", statusId },
+          createdAt: now,
+          updatedAt: now,
         });
       }
     }

@@ -63,6 +63,13 @@ export const roadmapVisibilityEnum = pgEnum("roadmap_visibility", [
   "HIDDEN",
 ]);
 
+export const roadmapModeEnum = pgEnum("roadmap_mode", ["status", "filtered"]);
+
+export const savedRoadmapVisibilityEnum = pgEnum("saved_roadmap_visibility", [
+  "public",
+  "private",
+]);
+
 export const postIconTypeEnum = pgEnum("post_icon_type", ["EMOJI"]);
 
 export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
@@ -194,6 +201,102 @@ export const postStatusTable = pgTable(
     uniqueIndex("post_status_organizationId_orderIndex_uidx").on(
       table.organizationId,
       table.orderIndex
+    ),
+  ]
+);
+
+export const roadmapTable = pgTable(
+  "roadmap",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    description: text("description"),
+    isPrimary: boolean("is_primary").default(false).notNull(),
+    mode: roadmapModeEnum("mode").notNull(),
+    visibility: savedRoadmapVisibilityEnum("visibility").notNull(),
+    // An empty condition list deliberately means every post in the workspace.
+    filter: jsonb("filter")
+      .$type<{
+        version: 1;
+        operator: "and";
+        conditions: Array<
+          | { field: "boardId"; operator: "in"; value: string[] }
+          | { field: "status"; operator: "in"; value: string[] }
+          | {
+              field: "tagId";
+              operator: "containsAny" | "containsAll";
+              value: string[];
+            }
+        >;
+      }>()
+      .notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("roadmap_organizationId_slug_uidx").on(
+      table.organizationId,
+      table.slug
+    ),
+    index("roadmap_organizationId_idx").on(table.organizationId),
+    uniqueIndex("roadmap_primary_organizationId_uidx")
+      .on(table.organizationId)
+      .where(sql`${table.isPrimary}`),
+  ]
+);
+
+export const roadmapColumnTable = pgTable(
+  "roadmap_column",
+  {
+    id: text("id").primaryKey(),
+    roadmapId: text("roadmap_id")
+      .notNull()
+      .references(() => roadmapTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    position: integer("position").notNull(),
+    config: jsonb("config")
+      .$type<
+        | { type: "status"; statusId: string }
+        | {
+            type: "filter";
+            filter: {
+              version: 1;
+              operator: "and";
+              conditions: Array<
+                | { field: "boardId"; operator: "in"; value: string[] }
+                | { field: "status"; operator: "in"; value: string[] }
+                | {
+                    field: "tagId";
+                    operator: "containsAny" | "containsAll";
+                    value: string[];
+                  }
+              >;
+            };
+          }
+      >()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("roadmap_column_roadmapId_idx").on(table.roadmapId),
+    index("roadmap_column_roadmapId_position_idx").on(
+      table.roadmapId,
+      table.position
     ),
   ]
 );
