@@ -1088,9 +1088,6 @@ importers:
       '@feeblo/rpc-client':
         specifier: workspace:*
         version: link:../rpc-client
-      '@feeblo/ui':
-        specifier: workspace:*
-        version: link:../ui
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../utils
