@@ -83,10 +83,6 @@
     "./board/constants": {
       "types": "./src/board/constants.ts",
       "default": "./src/board/constants.ts"
-    },
-    "./components/user-avatar": {
-      "types": "./src/components/user-avatar.tsx",
-      "default": "./src/components/user-avatar.tsx"
     }
   },
   "scripts": {
@@ -99,7 +95,6 @@
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
-    "@feeblo/ui": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@tanstack/query-db-collection": "catalog:",

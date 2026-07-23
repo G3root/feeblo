@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@feeblo/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import type React from "react";
 
 const WHITESPACE_REGEX = /\s+/;

@@ -1,5 +1,5 @@
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useState } from "react";
 import { z } from "zod";
 

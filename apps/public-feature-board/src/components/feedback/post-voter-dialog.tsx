@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@feeblo/ui/dialog";
-import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
 import { usePublicCollections } from "../../providers/public-collections-provider";

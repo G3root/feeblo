@@ -1,4 +1,4 @@
-import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import {
   Menu,
   MenuItem,

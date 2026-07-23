@@ -1,5 +1,5 @@
 import type { TComment } from "@feeblo/domain/src/comments/schema.js";
-import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { Button } from "@feeblo/ui/button";
 import {
   Menu,

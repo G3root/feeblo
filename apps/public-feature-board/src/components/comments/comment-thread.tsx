@@ -8,7 +8,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@feeblo/ui/item";
-import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useState } from "react";
 import { formatDate } from "../../lib/utils";
 import { CommentComposer } from "./comment-composer";

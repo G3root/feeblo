@@ -2,7 +2,7 @@ import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "@feeblo/ui/utils";
-import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { Link } from "@tanstack/react-router";
 import { formatPostStatus, truncate } from "../../lib/utils";
 

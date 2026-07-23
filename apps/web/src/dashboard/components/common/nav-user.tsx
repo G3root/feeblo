@@ -20,7 +20,7 @@ import { useTheme } from "@feeblo/ui/theme-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
-import { UserAvatar } from "@feeblo/web-shared/components/user-avatar";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import {
   CreditCardIcon,
   LogoutSquare01Icon,
