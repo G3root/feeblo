@@ -1,6 +1,7 @@
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
+import { groupPostHogOrganization } from "../components/posthog-provider";
 
 export const Route = createFileRoute("/$organizationId")({
   component: OrganizationLayoutRoute,
@@ -59,7 +60,24 @@ function AuthGate({ children }: { readonly children: ReactNode }) {
 function OrganizationLayoutRoute() {
   return (
     <AuthGate>
+      <PostHogOrganizationGroup />
       <Outlet />
     </AuthGate>
   );
+}
+
+function PostHogOrganizationGroup() {
+  const auth = useAuth();
+  const { organizationId } = Route.useParams();
+  const canGroup = auth.status === "authenticated" && auth.data !== null;
+
+  useEffect(() => {
+    if (!canGroup) {
+      return;
+    }
+
+    groupPostHogOrganization(organizationId);
+  }, [canGroup, organizationId]);
+
+  return null;
 }

@@ -52,6 +52,12 @@ export function identifyPostHog(state: {
   }
 }
 
+export function groupPostHogOrganization(organizationId: string) {
+  if (posthogKey) {
+    posthog.group("organization", organizationId);
+  }
+}
+
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   if (!posthogKey) {
     return <>{children}</>;
