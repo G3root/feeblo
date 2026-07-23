@@ -20,12 +20,15 @@ import {
   TestMailer,
   type TestMailerState,
 } from "@feeblo/transactional/mailer/test";
+import * as Sentry from "@sentry/effect/server";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
+import * as Tracer from "effect/Tracer";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -105,6 +108,19 @@ const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
 
 const program = Effect.gen(function* () {
   const config = yield* ServerConfig;
+  const SentryLive: Layer.Layer<never> = config.sentryDsn
+    ? Layer.mergeAll(
+        Sentry.effectLayer({
+          dsn: config.sentryDsn,
+          enableLogs: true,
+          environment: config.sentryEnvironment,
+          tracesSampleRate: config.sentryTracesSampleRate,
+        }),
+        Layer.succeed(Tracer.Tracer, Sentry.SentryEffectTracer),
+        Logger.layer([Sentry.SentryEffectLogger]),
+        Sentry.SentryEffectMetricsLayer
+      )
+    : Layer.empty;
   const mailbox = useTestMailer ? yield* TestMailer.make : undefined;
   const makeMailerLayer = (): Layer.Layer<
     Mailer,
@@ -209,6 +225,7 @@ const program = Effect.gen(function* () {
     Layer.provide(ServiceLayers),
     Layer.provide(NodeFileSystem.layer),
     Layer.provide(NodePath.layer),
+    Layer.provide(SentryLive),
     Layer.provide(
       NodeHttpServer.layerConfig(
         createServer,

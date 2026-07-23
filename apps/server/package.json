@@ -17,6 +17,7 @@
     "@feeblo/domain": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@sentry/effect": "^10.67.0",
     "effect": "catalog:"
   },
   "devDependencies": {
