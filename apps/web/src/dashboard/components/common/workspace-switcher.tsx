@@ -1,4 +1,3 @@
-import { UserAvatar } from "@feeblo/ui/user-avatar";
 import {
   Menu,
   MenuItem,
@@ -12,10 +11,12 @@ import {
   SidebarMenuItem,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { Plus, Tick02Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -135,20 +136,19 @@ const WorkspaceList = ({
     return (
       <MenuItem
         key={organization.id}
-        nativeButton={false}
-        render={(props) => (
-          <Link
-            {...props}
-            params={{ organizationId: organization.id }}
-            to="/$organizationId"
-          >
-            {organization.name}
-            {isSelected ? (
-              <HugeiconsIcon className="ml-auto" icon={Tick02Icon} />
-            ) : null}
-          </Link>
-        )}
-      />
+        onClick={() => {
+          if (!isSelected) {
+            trackEvent("org_switched", { success: true });
+          }
+
+          window.location.pathname = `/${encodeURIComponent(organization.id)}`;
+        }}
+      >
+        {organization.name}
+        {isSelected ? (
+          <HugeiconsIcon className="ml-auto" icon={Tick02Icon} />
+        ) : null}
+      </MenuItem>
     );
   });
 };
