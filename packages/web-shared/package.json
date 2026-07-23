@@ -83,6 +83,10 @@
     "./board/constants": {
       "types": "./src/board/constants.ts",
       "default": "./src/board/constants.ts"
+    },
+    "./analytics-provider": {
+      "types": "./src/lib/analytics-provider.tsx",
+      "default": "./src/lib/analytics-provider.tsx"
     }
   },
   "scripts": {

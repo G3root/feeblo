@@ -7,6 +7,8 @@ export function getPublicEnvServer() {
     APP_ROOT_DOMAIN: getSecret("APP_ROOT_DOMAIN") as string,
     APP_RELEASE: getSecret("APP_RELEASE") as string,
     TURNSTILE_SITE_KEY: getSecret("TURNSTILE_SITE_KEY") as string | undefined,
+    POSTHOG_KEY: getSecret("POSTHOG_KEY") as string | undefined,
+    POSTHOG_HOST: getSecret("POSTHOG_HOST") as string | undefined,
   };
 }
 
@@ -19,5 +21,7 @@ export function getServerRuntimePublicEnv() {
     appRootDomain: env.APP_ROOT_DOMAIN,
     appRelease: env.APP_RELEASE,
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
+    posthogKey: env.POSTHOG_KEY,
+    posthogHost: env.POSTHOG_HOST,
   };
 }

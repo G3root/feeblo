@@ -171,6 +171,10 @@ export default defineConfig({
                 return "solid-vendor";
               }
 
+              if (id.includes("/posthog-js/")) {
+                return "posthog-vendor";
+              }
+
               if (id.includes("/dompurify/")) {
                 return "dompurify-vendor";
               }
@@ -223,6 +227,16 @@ export default defineConfig({
         optional: true,
       }),
       NO_INDEX: envField.string({
+        context: "server",
+        access: "secret",
+        optional: true,
+      }),
+      POSTHOG_KEY: envField.string({
+        context: "server",
+        access: "secret",
+        optional: true,
+      }),
+      POSTHOG_HOST: envField.string({
         context: "server",
         access: "secret",
         optional: true,

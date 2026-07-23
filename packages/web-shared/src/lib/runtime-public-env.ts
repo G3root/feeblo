@@ -7,6 +7,8 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
     appRootDomain: env.APP_ROOT_DOMAIN,
     appRelease: env.APP_RELEASE ?? "unknown",
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
+    posthogKey: env.POSTHOG_KEY,
+    posthogHost: env.POSTHOG_HOST,
   };
 }
 
