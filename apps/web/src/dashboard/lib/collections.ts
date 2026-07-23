@@ -1280,6 +1280,28 @@ export const companyAttributeValueCollection = createCollection(
   })
 );
 
+export const roadmapCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("roadmap"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.RoadmapList({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const dashboardCollections = {
   boardCollection,
   changelogCollection,
