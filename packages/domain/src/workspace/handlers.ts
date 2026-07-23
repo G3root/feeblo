@@ -1,5 +1,5 @@
 import { transaction } from "@feeblo/db";
-import { RESERVED_SUBDOMAINS, slugify } from "@feeblo/utils/url";
+import { getReservedSubdomains, slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -16,7 +16,7 @@ import type {
 } from "./schema";
 
 const isReservedSubdomain = (subdomain: string) =>
-  RESERVED_SUBDOMAINS.includes(subdomain);
+  getReservedSubdomains().includes(subdomain);
 
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;

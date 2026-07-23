@@ -36,7 +36,7 @@ export const extractSubdomain = ({
   return null;
 };
 
-export const RESERVED_SUBDOMAINS = [
+const DEFAULT_RESERVED_SUBDOMAINS = [
   "app",
   "dashboard",
   "www",
@@ -52,3 +52,14 @@ export const RESERVED_SUBDOMAINS = [
   "s",
   "feedback-widget",
 ];
+
+export function getReservedSubdomains(): string[] {
+  const envValue = process.env.RESERVED_SUBDOMAINS;
+  if (envValue) {
+    return envValue
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return DEFAULT_RESERVED_SUBDOMAINS;
+}
