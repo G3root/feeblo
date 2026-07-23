@@ -28,9 +28,38 @@ import type * as React from "react";
 // ---------------------------------------------------------------------------
 
 export interface AnalyticsEvents {
+  // ── Changelog ────────────────────────────────────────────────────────────
+  changelog_created: { success: boolean };
+  changelog_deleted: { success: boolean };
+  changelog_saved: {
+    status: "draft" | "published" | "scheduled";
+    success: boolean;
+  };
+
+  // ── CRM ──────────────────────────────────────────────────────────────────
+  company_created: { success: boolean };
+  company_deleted: { success: boolean };
+  company_updated: { success: boolean };
+  contact_created: { success: boolean };
+  contact_deleted: { success: boolean };
+  contact_updated: { success: boolean };
+  custom_attribute_created: {
+    entity_type: "company" | "contact";
+    success: boolean;
+  };
+  custom_attribute_deleted: {
+    entity_type: "company" | "contact";
+    success: boolean;
+  };
+  custom_attribute_updated: {
+    entity_type: "company" | "contact";
+    success: boolean;
+  };
   org_created: { success: boolean };
   org_deleted: { success: boolean };
   org_invitation_accepted: { success: boolean };
+  org_invitation_revoked: { success: boolean };
+  org_logo_updated: { action: "uploaded" | "removed"; success: boolean };
   org_member_invited: { role: string; success: boolean };
   org_member_removed: { success: boolean };
   org_member_role_changed: { role: string; success: boolean };
@@ -39,8 +68,28 @@ export interface AnalyticsEvents {
   org_renamed: { success: boolean };
   org_switched: { success: boolean };
 
+  // ── Posts ────────────────────────────────────────────────────────────────
+  post_created: { source: PostCreationSource; success: boolean };
+  post_deleted: { mode: "single" | "bulk"; success: boolean };
+  post_lock_changed: { locked: boolean; success: boolean };
+  post_updated: {
+    field: "board" | "content" | "status" | "title";
+    success: boolean;
+  };
+
   signed_out: {};
+
+  // ── SSO ──────────────────────────────────────────────────────────────────
+  sso_secret_copied: { success: boolean };
+  sso_secret_revoked: { success: boolean };
+  sso_secret_rotated: { success: boolean };
 }
+
+export type PostCreationSource =
+  | "board_column"
+  | "board_empty_state"
+  | "board_list"
+  | "dashboard";
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
 

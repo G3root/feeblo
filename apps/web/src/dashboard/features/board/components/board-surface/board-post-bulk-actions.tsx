@@ -2,14 +2,16 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { cn } from "@feeblo/ui/utils";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
 import {
   useBoardStore,
@@ -18,7 +20,6 @@ import {
 } from "~/features/board/state/board-store-context";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { fetchRpc } from "~/lib/runtime";
-import { cn } from "@feeblo/ui/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function BoardPostBulkActions() {
@@ -116,6 +117,7 @@ function BulkDeleteAlert() {
                 );
 
                 await postCollection.utils.refetch();
+                trackEvent("post_deleted", { mode: "bulk", success: true });
 
                 store.send({ type: "clearSelection" });
                 store.send({ type: "setBulkDeleteOpen", open: false });
@@ -126,6 +128,7 @@ function BulkDeleteAlert() {
                   type: "success",
                 });
               } catch (_error) {
+                trackEvent("post_deleted", { mode: "bulk", success: false });
                 console.error(_error);
                 toastManager.add({
                   title: "Failed to delete selected posts",

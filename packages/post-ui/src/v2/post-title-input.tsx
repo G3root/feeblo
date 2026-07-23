@@ -1,6 +1,7 @@
 import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useId, useRef } from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
@@ -69,12 +70,14 @@ export function PostTitleUpdateInput() {
       });
 
       await tx.isPersisted.promise;
+      trackEvent("post_updated", { field: "title", success: true });
 
       toastManager.add({
         title: "Title updated successfully",
         type: "success",
       });
     } catch {
+      trackEvent("post_updated", { field: "title", success: false });
       toastManager.add({ title: "Failed to update title", type: "error" });
       if (inputRef.current) {
         inputRef.current.value = defaultValue;

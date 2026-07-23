@@ -2,13 +2,14 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useCompanyDeleteDialogContext } from "../dialog-stores";
@@ -39,10 +40,15 @@ export function CompanyDeleteDialog() {
                 const companyId = store.get().context.data.companyId;
                 const tx = companyCollection.delete(companyId);
                 await tx.isPersisted.promise;
+                trackEvent("company_deleted", { success: true });
                 store.send({ type: "toggle" });
                 toastManager.add({ title: "Company deleted", type: "success" });
               } catch (_error) {
-                toastManager.add({ title: "Failed to delete company", type: "error" });
+                trackEvent("company_deleted", { success: false });
+                toastManager.add({
+                  title: "Failed to delete company",
+                  type: "error",
+                });
               }
             }}
           >

@@ -3,15 +3,16 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import {
   CircleLockIcon,
   CircleUnlockIcon,
@@ -90,6 +91,7 @@ function PostAdminActionButtons() {
       await updatePostAdminState({
         locked: nextLocked,
       });
+      trackEvent("post_lock_changed", { locked: nextLocked, success: true });
 
       toastManager.add({
         title: isLocked ? "Post unlocked" : "Post locked",
@@ -98,6 +100,10 @@ function PostAdminActionButtons() {
 
       setDialogAction(null);
     } catch (_error) {
+      trackEvent("post_lock_changed", {
+        locked: action === "lock" ? !isLocked : isLocked,
+        success: false,
+      });
       toastManager.add({
         title: "Failed to update lock status",
         type: "error",

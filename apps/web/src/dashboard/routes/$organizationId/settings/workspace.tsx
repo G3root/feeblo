@@ -1,5 +1,8 @@
 import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { organizationLogoUploadEndpoint } from "@feeblo/web-shared/auth-client";
+import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
@@ -7,8 +10,6 @@ import { SettingsAvatarControl } from "~/features/settings/components/settings-a
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
-import { organizationLogoUploadEndpoint } from "@feeblo/web-shared/auth-client";
 import {
   membershipCollection,
   organizationCollection,
@@ -140,11 +141,13 @@ function WorkspaceNameField({
         draft.name = name;
       });
       await tx.isPersisted.promise;
+      trackEvent("org_renamed", { success: true });
       toastManager.add({
         title: "Workspace name updated",
         type: "success",
       });
     } catch {
+      trackEvent("org_renamed", { success: false });
       toastManager.add({
         title: "Failed to update workspace name",
         type: "error",
@@ -187,26 +190,32 @@ function WorkspaceLogoButton({
       return;
     }
 
-    const formData = new FormData();
-    formData.set("file", file);
-    formData.set("organizationId", organizationId);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("organizationId", organizationId);
 
-    const response = await fetch(organizationLogoUploadEndpoint, {
-      method: "POST",
-      credentials: "include",
-      body: formData,
-    });
+      const response = await fetch(organizationLogoUploadEndpoint, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        throw new Error("Failed to upload workspace logo");
+      }
+
+      await organizationCollection.utils.refetch();
+      trackEvent("org_logo_updated", { action: "uploaded", success: true });
+      toastManager.add({ title: "Workspace logo updated", type: "success" });
+    } catch (error) {
+      trackEvent("org_logo_updated", { action: "uploaded", success: false });
       toastManager.add({
         title: "Failed to upload workspace logo",
         type: "error",
       });
-      throw new Error("Failed to upload workspace logo");
+      throw error;
     }
-
-    await organizationCollection.utils.refetch();
-    toastManager.add({ title: "Workspace logo updated", type: "success" });
   }
 
   return (
@@ -216,10 +225,16 @@ function WorkspaceLogoButton({
       imageUrl={imageUrl}
       name={name}
       onRemove={async () => {
-        const tx = organizationCollection.update(organizationId, (draft) => {
-          draft.logo = null;
-        });
-        await tx.isPersisted.promise;
+        try {
+          const tx = organizationCollection.update(organizationId, (draft) => {
+            draft.logo = null;
+          });
+          await tx.isPersisted.promise;
+          trackEvent("org_logo_updated", { action: "removed", success: true });
+        } catch (error) {
+          trackEvent("org_logo_updated", { action: "removed", success: false });
+          throw error;
+        }
       }}
       onUpload={uploadWorkspaceLogo}
     >

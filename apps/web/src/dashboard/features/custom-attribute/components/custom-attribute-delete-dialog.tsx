@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import {
@@ -56,11 +57,19 @@ export function CustomAttributeDeleteDialog() {
                 const collection = getCollection(entityType, collections);
                 const tx = collection.delete(attributeId);
                 await tx.isPersisted.promise;
+                trackEvent("custom_attribute_deleted", {
+                  entity_type: entityType,
+                  success: true,
+                });
                 toastManager.add({
                   title: "Attribute deleted successfully",
                   type: "success",
                 });
               } catch (_error) {
+                trackEvent("custom_attribute_deleted", {
+                  entity_type: entityType,
+                  success: false,
+                });
                 toastManager.add({
                   title: "Failed to delete attribute",
                   type: "error",

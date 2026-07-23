@@ -6,19 +6,20 @@ import type { TContact } from "@feeblo/domain/contact/schema";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
-  SelectPopup,
   SelectItem,
+  SelectPopup,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
 import {
   Sheet,
-  SheetPopup,
   SheetDescription,
   SheetHeader,
+  SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -171,7 +172,8 @@ function ContactEditFormFields({
         await createContactAction({
           contact: {
             ...contact,
-            companyId: data.value.companyId === "none" ? null : data.value.companyId,
+            companyId:
+              data.value.companyId === "none" ? null : data.value.companyId,
             email: data.value.email,
             externalId: data.value.externalId || null,
             name: data.value.name || null,
@@ -182,9 +184,11 @@ function ContactEditFormFields({
           operation: "update",
           upsertAttribute,
         });
+        trackEvent("contact_updated", { success: true });
         store.send({ type: "setOpen", open: false });
         toastManager.add({ title: "Contact updated", type: "success" });
       } catch (_error) {
+        trackEvent("contact_updated", { success: false });
         toastManager.add({ title: "Failed to update contact", type: "error" });
       }
     },
@@ -225,9 +229,7 @@ function ContactEditFormFields({
                 Company
               </label>
               <Select
-                onValueChange={(value) =>
-                  field.handleChange(value ?? "none")
-                }
+                onValueChange={(value) => field.handleChange(value ?? "none")}
                 value={field.state.value}
               >
                 <SelectTrigger className="w-full" id="contact-edit-company-id">
@@ -235,8 +237,8 @@ function ContactEditFormFields({
                     {(value) =>
                       value === "none"
                         ? "None"
-                        : companies.find((company) => company.id === value)
-                            ?.name ?? "Select a company"
+                        : (companies.find((company) => company.id === value)
+                            ?.name ?? "Select a company")
                     }
                   </SelectValue>
                 </SelectTrigger>

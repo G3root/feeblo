@@ -1,13 +1,9 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
-import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -68,12 +64,14 @@ function RouteComponent() {
   const handleCopy = () => {
     navigator.clipboard.writeText(activeSecret.secret).then(
       () => {
+        trackEvent("sso_secret_copied", { success: true });
         toastManager.add({
           title: "Secret copied to clipboard",
           type: "success",
         });
       },
       () => {
+        trackEvent("sso_secret_copied", { success: false });
         toastManager.add({ title: "Failed to copy secret", type: "error" });
       }
     );
@@ -82,11 +80,13 @@ function RouteComponent() {
   const handleRotate = async () => {
     try {
       await fetchRpc((rpc) => rpc.JwtSecretRotate({ organizationId }));
+      trackEvent("sso_secret_rotated", { success: true });
       toastManager.add({
         title: "Secret rotated successfully",
         type: "success",
       });
     } catch {
+      trackEvent("sso_secret_rotated", { success: false });
       toastManager.add({ title: "Failed to rotate secret", type: "error" });
       return;
     }
@@ -98,11 +98,13 @@ function RouteComponent() {
       await fetchRpc((rpc) =>
         rpc.JwtSecretRevoke({ organizationId, secretId: activeSecret.id })
       );
+      trackEvent("sso_secret_revoked", { success: true });
       toastManager.add({
         title: "Secret revoked immediately",
         type: "success",
       });
     } catch {
+      trackEvent("sso_secret_revoked", { success: false });
       toastManager.add({ title: "Failed to revoke secret", type: "error" });
       return;
     }
@@ -150,10 +152,7 @@ function RouteComponent() {
                       />
 
                       <MenuPopup align="end" className="w-40">
-                        <MenuItem
-                          onClick={handleRevoke}
-                          variant="destructive"
-                        >
+                        <MenuItem onClick={handleRevoke} variant="destructive">
                           Revoke Immediately
                         </MenuItem>
                         <MenuItem onClick={handleRotate}>
@@ -180,16 +179,24 @@ function RouteComponent() {
                       <Button
                         onClick={() => {
                           navigator.clipboard.writeText(s.secret).then(
-                            () =>
+                            () => {
+                              trackEvent("sso_secret_copied", {
+                                success: true,
+                              });
                               toastManager.add({
                                 title: "Secret copied to clipboard",
                                 type: "success",
-                              }),
-                            () =>
+                              });
+                            },
+                            () => {
+                              trackEvent("sso_secret_copied", {
+                                success: false,
+                              });
                               toastManager.add({
                                 title: "Failed to copy secret",
                                 type: "error",
-                              })
+                              });
+                            }
                           );
                         }}
                         size="sm"
@@ -215,11 +222,17 @@ function RouteComponent() {
                                     secretId: s.id,
                                   })
                                 );
+                                trackEvent("sso_secret_revoked", {
+                                  success: true,
+                                });
                                 toastManager.add({
                                   title: "Secret revoked immediately",
                                   type: "success",
                                 });
                               } catch {
+                                trackEvent("sso_secret_revoked", {
+                                  success: false,
+                                });
                                 toastManager.add({
                                   title: "Failed to revoke secret",
                                   type: "error",

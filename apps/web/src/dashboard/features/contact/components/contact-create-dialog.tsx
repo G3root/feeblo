@@ -2,19 +2,20 @@ import { ContactId } from "@feeblo/id";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
-  SelectPopup,
   SelectItem,
+  SelectPopup,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
 import {
   Sheet,
-  SheetPopup,
   SheetDescription,
   SheetHeader,
+  SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -120,10 +121,12 @@ function ContactCreateForm() {
           createAttribute,
           operation: "create",
         });
+        trackEvent("contact_created", { success: true });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Contact created", type: "success" });
       } catch (error) {
+        trackEvent("contact_created", { success: false });
         toastManager.add({
           title: hasExistingRecordError(error)
             ? "A contact with this email already exists"

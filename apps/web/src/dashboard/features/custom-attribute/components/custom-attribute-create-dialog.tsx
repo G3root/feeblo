@@ -6,22 +6,23 @@ import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
-  SelectPopup,
   SelectItem,
+  SelectPopup,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
 import {
   Sheet,
-  SheetPopup,
   SheetDescription,
   SheetFooter,
   SheetHeader,
+  SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
 import { toCamelCaseAttributeKey } from "@feeblo/utils/scule";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -120,6 +121,10 @@ function CustomAttributeCreateForm({
               });
 
         await transaction.isPersisted.promise;
+        trackEvent("custom_attribute_created", {
+          entity_type: entityType,
+          success: true,
+        });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({
@@ -127,6 +132,10 @@ function CustomAttributeCreateForm({
           type: "success",
         });
       } catch (_error) {
+        trackEvent("custom_attribute_created", {
+          entity_type: entityType,
+          success: false,
+        });
         toastManager.add({
           title: `Failed to create ${entityType} attribute`,
           type: "error",

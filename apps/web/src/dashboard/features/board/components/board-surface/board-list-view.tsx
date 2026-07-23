@@ -101,7 +101,10 @@ function AddPostButton({
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        store.send({ type: "toggle", data: { boardId, status, statusId } });
+        store.send({
+          type: "toggle",
+          data: { boardId, source: "board_list", status, statusId },
+        });
       }}
       size="icon-sm"
       type="button"

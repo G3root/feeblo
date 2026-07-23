@@ -1,6 +1,7 @@
 import { ChangelogId } from "@feeblo/id";
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, queryOnce } from "@tanstack/react-db";
@@ -64,12 +65,14 @@ export const useChangelogAction = () => {
       });
 
       await tx.isPersisted.promise;
+      trackEvent("changelog_created", { success: true });
 
       navigate({
         to: "/$organizationId/changelog/edit/$changelogSlug",
         params: { organizationId, changelogSlug: slug },
       });
     } catch (_error) {
+      trackEvent("changelog_created", { success: false });
       toastManager.add({
         title: "Failed to create changelog",
         type: "error",

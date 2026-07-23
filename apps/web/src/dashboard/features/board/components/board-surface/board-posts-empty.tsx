@@ -41,7 +41,11 @@ export function BoardPostsEmpty({
               onClick={() =>
                 store.send({
                   type: "toggle",
-                  data: { boardId, status: "PLANNED" },
+                  data: {
+                    boardId,
+                    source: "board_empty_state",
+                    status: "PLANNED",
+                  },
                 })
               }
             >

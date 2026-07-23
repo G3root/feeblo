@@ -22,6 +22,7 @@ import {
 } from "@feeblo/ui/select";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
@@ -459,16 +460,27 @@ function MemberListItem({
         <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
           <Select
             onValueChange={async (value) => {
+              if (!value) {
+                throw new Error("value not found");
+              }
               const tx = membersCollection.update(id, (draft) => {
                 draft.role = value as "owner" | "admin" | "member";
               });
               try {
                 await tx.isPersisted.promise;
+                trackEvent("org_member_role_changed", {
+                  role: value,
+                  success: true,
+                });
                 toastManager.add({
                   title: "Member role updated",
                   type: "success",
                 });
               } catch (_error) {
+                trackEvent("org_member_role_changed", {
+                  role: value,
+                  success: false,
+                });
                 toastManager.add({
                   title: "Failed to update role",
                   type: "error",
@@ -493,11 +505,13 @@ function MemberListItem({
               const tx = membersCollection.delete(id);
               try {
                 await tx.isPersisted.promise;
+                trackEvent("org_member_removed", { success: true });
                 toastManager.add({
                   title: "Member removed",
                   type: "success",
                 });
               } catch (_error) {
+                trackEvent("org_member_removed", { success: false });
                 toastManager.add({
                   title: "Failed to remove member",
                   type: "error",
@@ -575,11 +589,13 @@ function InvitationListItem({
             const tx = invitationsCollection.delete(id);
             try {
               await tx.isPersisted.promise;
+              trackEvent("org_invitation_revoked", { success: true });
               toastManager.add({
                 title: "Invitation revoked",
                 type: "success",
               });
             } catch (_error) {
+              trackEvent("org_invitation_revoked", { success: false });
               toastManager.add({
                 title: "Failed to revoke invitation",
                 type: "error",
@@ -648,6 +664,10 @@ function InviteMemberForm() {
       });
 
       if (result.error) {
+        trackEvent("org_member_invited", {
+          role: value.role,
+          success: false,
+        });
         toastManager.add({
           title: "Failed to invite member",
           type: "error",
@@ -659,6 +679,7 @@ function InviteMemberForm() {
         membersCollection.utils.refetch(),
         invitationsCollection.utils.refetch(),
       ]);
+      trackEvent("org_member_invited", { role: value.role, success: true });
       toastManager.add({
         title: "Invitation sent",
         type: "success",

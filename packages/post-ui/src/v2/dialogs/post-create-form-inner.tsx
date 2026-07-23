@@ -6,6 +6,7 @@ import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -106,6 +107,8 @@ export function PostCreateForm() {
         return;
       }
 
+      const source = store.get().context.data.source;
+
       try {
         const postId = await PostId.unsafeGenerate();
         const title = value.title.trim();
@@ -140,6 +143,7 @@ export function PostCreateForm() {
         });
 
         await tx.isPersisted.promise;
+        trackEvent("post_created", { source, success: true });
         toastManager.add({
           title: "Post created successfully",
           type: "success",
@@ -156,6 +160,7 @@ export function PostCreateForm() {
         setContentEditorKey((current) => current + 1);
         store.send({ type: "toggle" });
       } catch (_error) {
+        trackEvent("post_created", { source, success: false });
         console.error(_error);
         toastManager.add({
           title: "Failed to create post",

@@ -2,13 +2,14 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useContactDeleteDialogContext } from "../dialog-stores";
@@ -23,9 +24,11 @@ export function ContactDeleteDialog() {
       const contactId = store.get().context.data.contactId;
       const tx = contactCollection.delete(contactId);
       await tx.isPersisted.promise;
+      trackEvent("contact_deleted", { success: true });
       store.send({ type: "setOpen", open: false });
       toastManager.add({ title: "Contact deleted", type: "success" });
     } catch (_error) {
+      trackEvent("contact_deleted", { success: false });
       toastManager.add({ title: "Failed to delete contact", type: "error" });
     }
   };

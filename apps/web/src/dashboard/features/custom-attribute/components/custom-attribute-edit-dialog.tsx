@@ -16,6 +16,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -121,12 +122,20 @@ function CustomAttributeEditForm() {
         });
 
         await tx.isPersisted.promise;
+        trackEvent("custom_attribute_updated", {
+          entity_type: entityType,
+          success: true,
+        });
         toastManager.add({
           title: "Attribute updated successfully",
           type: "success",
         });
         store.send({ type: "toggle" });
       } catch (_error) {
+        trackEvent("custom_attribute_updated", {
+          entity_type: entityType,
+          success: false,
+        });
         toastManager.add({
           title: "Failed to update attribute",
           type: "error",

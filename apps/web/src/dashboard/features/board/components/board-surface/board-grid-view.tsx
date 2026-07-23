@@ -1,6 +1,8 @@
+/** biome-ignore-all lint/complexity/noVoid: <explanation> */
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useCallback, useRef, useState } from "react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
@@ -158,13 +160,17 @@ export function BoardGridView({
         }
       );
 
-      void tx.isPersisted.promise.catch(() => {
-        setItems(snapshot.current);
-        toastManager.add({
-          title: "Failed to update status",
-          type: "error",
-        });
-      });
+      void tx.isPersisted.promise.then(
+        () => trackEvent("post_updated", { field: "status", success: true }),
+        () => {
+          trackEvent("post_updated", { field: "status", success: false });
+          setItems(snapshot.current);
+          toastManager.add({
+            title: "Failed to update status",
+            type: "error",
+          });
+        }
+      );
     },
     [postCollection.update]
   );

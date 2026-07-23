@@ -2,12 +2,13 @@ import { CompanyId } from "@feeblo/id";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
-  SheetPopup,
   SheetDescription,
   SheetHeader,
+  SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -90,25 +91,29 @@ function CompanyCreateForm() {
           externalCreatedAt: null,
           createdAt: now,
           updatedAt: now,
+          source: "DASHBOARD" as const,
         };
-        const { createAttribute } =
-          await getCompanyCustomAttributeValueChanges({
+        const { createAttribute } = await getCompanyCustomAttributeValueChanges(
+          {
             companyId,
             definitions,
             existingValues: [],
             organizationId,
             values: data.value.attributes,
-          });
+          }
+        );
         //TODO add error validation
         await createCompanyAction({
           company,
           createAttribute,
           operation: "create",
         });
+        trackEvent("company_created", { success: true });
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company created", type: "success" });
       } catch (error) {
+        trackEvent("company_created", { success: false });
         toastManager.add({
           title: hasExistingRecordError(error)
             ? "A company with this name already exists"

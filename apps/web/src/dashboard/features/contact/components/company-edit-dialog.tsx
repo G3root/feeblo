@@ -7,12 +7,13 @@ import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
-  SheetPopup,
   SheetDescription,
   SheetHeader,
+  SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -169,9 +170,11 @@ function CompanyEditForm({
           operation: "update",
           upsertAttribute,
         });
+        trackEvent("company_updated", { success: true });
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company updated", type: "success" });
       } catch (_error) {
+        trackEvent("company_updated", { success: false });
         toastManager.add({ title: "Failed to update company", type: "error" });
       }
     },

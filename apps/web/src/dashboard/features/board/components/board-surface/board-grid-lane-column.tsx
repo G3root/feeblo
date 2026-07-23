@@ -48,7 +48,12 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
           onClick={() => {
             store.send({
               type: "toggle",
-              data: { boardId, status, statusId },
+              data: {
+                boardId,
+                source: "board_column",
+                status,
+                statusId,
+              },
             });
           }}
           size="icon-xs"

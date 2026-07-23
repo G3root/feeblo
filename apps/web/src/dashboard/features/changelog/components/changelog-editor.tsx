@@ -4,6 +4,7 @@ import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import {
   allPolicy,
   hasMembership,
@@ -121,6 +122,10 @@ function useChangelogEditorForm({
         });
 
         await tx.isPersisted.promise;
+        trackEvent("changelog_saved", {
+          status: payload.status,
+          success: true,
+        });
 
         if (payload.slug !== changelog.slug) {
           await navigate({
@@ -135,6 +140,10 @@ function useChangelogEditorForm({
           type: "success",
         });
       } catch (_error) {
+        trackEvent("changelog_saved", {
+          status: changelog.status,
+          success: false,
+        });
         toastManager.add({
           title: "Failed to update changelog",
           type: "error",
@@ -188,6 +197,7 @@ export function ChangelogEditorProvider({
         optimistic: false,
       });
       await tx.isPersisted.promise;
+      trackEvent("changelog_deleted", { success: true });
 
       toastManager.add({
         title: "Changelog deleted",
@@ -199,6 +209,7 @@ export function ChangelogEditorProvider({
         params: { organizationId },
       });
     } catch (_error) {
+      trackEvent("changelog_deleted", { success: false });
       toastManager.add({
         title: "Failed to delete changelog",
         type: "error",

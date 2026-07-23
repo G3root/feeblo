@@ -2,13 +2,14 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { toastManager } from "@feeblo/ui/toast";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { usePostDeleteDialogContext } from "../dialog-stores/post";
@@ -44,6 +45,7 @@ export function PostDeleteDialog() {
                   optimistic: false,
                 });
                 await tx.isPersisted.promise;
+                trackEvent("post_deleted", { mode: "single", success: true });
                 store.send({ type: "toggle" });
                 toastManager.add({
                   title: "Post deleted successfully",
@@ -53,6 +55,7 @@ export function PostDeleteDialog() {
                   navigate(redirectOptions);
                 }
               } catch (_error) {
+                trackEvent("post_deleted", { mode: "single", success: false });
                 toastManager.add({
                   title: "Failed to delete post",
                   type: "error",

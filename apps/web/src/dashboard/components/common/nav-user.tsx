@@ -20,6 +20,7 @@ import { useTheme } from "@feeblo/ui/theme-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import {
   CreditCardIcon,
@@ -86,6 +87,7 @@ export function NavUser() {
             <MenuItem
               onClick={async () => {
                 await authClient.signOut();
+                trackEvent("signed_out");
                 await refreshAuthSession();
                 await navigate({ to: "/sign-in" });
               }}

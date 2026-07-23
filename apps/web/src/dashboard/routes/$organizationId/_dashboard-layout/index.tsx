@@ -9,6 +9,7 @@ import {
   ItemTitle,
 } from "@feeblo/ui/item";
 import { Separator } from "@feeblo/ui/separator";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -16,7 +17,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   boardCollection,
@@ -87,7 +87,7 @@ function RouteComponent() {
             onClick={() =>
               createPostStore.send({
                 type: "toggle",
-                data: { status: "PENDING" },
+                data: { source: "dashboard", status: "PENDING" },
               })
             }
             size="sm"
