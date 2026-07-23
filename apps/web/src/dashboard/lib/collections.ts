@@ -1302,6 +1302,28 @@ export const roadmapCollection = createCollection(
   })
 );
 
+export const roadmapColumnCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("roadmap-column"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.RoadmapColumnList({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const dashboardCollections = {
   boardCollection,
   changelogCollection,
@@ -1324,6 +1346,8 @@ export const dashboardCollections = {
   postReactionCollection,
   postStatusCollection,
   postSubscriptionCollection,
+  roadmapCollection,
+  roadmapColumnCollection,
   postTagCollection,
   siteCollection,
   tagCollection,
