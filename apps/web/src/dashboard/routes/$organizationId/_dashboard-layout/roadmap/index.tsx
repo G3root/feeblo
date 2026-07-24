@@ -1,7 +1,13 @@
 import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
+import { Button } from "@feeblo/ui/button";
+import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import { Plus } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
+import { useCreateRoadmapDialogContext } from "~/features/roadmap/dialog-stores";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   boardCollection,
   postCollection,
@@ -141,6 +147,7 @@ function RouteComponent() {
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
+      <RoadmapListHeader />
       {roadmaps.map((roadmap) => {
         const lanes = groupRoadmapPostsByStatus(
           posts,
@@ -168,6 +175,24 @@ function RouteComponent() {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function RoadmapListHeader() {
+  const organizationId = useOrganizationId();
+  const createStore = useCreateRoadmapDialogContext();
+  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
+
+  return (
+    <div className="flex items-center justify-between px-3">
+      <h1 className="font-semibold text-xl">Roadmaps</h1>
+      {canManage && (
+        <Button onClick={() => createStore.send({ type: "toggle" })} size="sm">
+          <HugeiconsIcon icon={Plus} />
+          New Roadmap
+        </Button>
+      )}
     </div>
   );
 }

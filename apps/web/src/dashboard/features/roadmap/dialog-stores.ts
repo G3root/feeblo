@@ -6,3 +6,10 @@ export const [CreateRoadmapDialogProvider, useCreateRoadmapDialogContext] =
     hookName: "useCreateRoadmapDialogContext",
     providerName: "CreateRoadmapDialogProvider",
   });
+
+export const [DeleteRoadmapDialogProvider, useDeleteRoadmapDialogContext] =
+  createModalStoreContext<{ roadmapId: string }>({
+    name: "DeleteRoadmapDialogContext",
+    hookName: "useDeleteRoadmapDialogContext",
+    providerName: "DeleteRoadmapDialogProvider",
+  });

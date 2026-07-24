@@ -1335,6 +1335,17 @@ export const roadmapCollection = createCollection(
         })
       );
     },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedRoadmap } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.RoadmapDelete({
+          id: deletedRoadmap.id,
+          organizationId: deletedRoadmap.organizationId,
+        })
+      );
+    },
   })
 );
 

@@ -1,7 +1,16 @@
 import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
+import { Button } from "@feeblo/ui/button";
+import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import { Delete02Icon, Plus } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
+import {
+  useCreateRoadmapDialogContext,
+  useDeleteRoadmapDialogContext,
+} from "~/features/roadmap/dialog-stores";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   boardCollection,
   postCollection,
@@ -138,13 +147,16 @@ function RouteComponent() {
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
       <section className="flex h-full min-h-0 shrink-0 flex-col gap-4">
-        <header className="px-3">
-          <h1 className="font-semibold text-xl">{roadmap.name}</h1>
-          {roadmap.description ? (
-            <p className="mt-1 text-muted-foreground text-sm">
-              {roadmap.description}
-            </p>
-          ) : null}
+        <header className="flex items-start justify-between gap-2 px-3">
+          <div>
+            <h1 className="font-semibold text-xl">{roadmap.name}</h1>
+            {roadmap.description ? (
+              <p className="mt-1 text-muted-foreground text-sm">
+                {roadmap.description}
+              </p>
+            ) : null}
+          </div>
+          <RoadmapDetailActions roadmapId={roadmap.id} />
         </header>
         {lanes.length > 0 ? (
           <RoadmapBoard lanes={lanes} organizationId={organizationId} />
@@ -152,6 +164,42 @@ function RouteComponent() {
           <RoadmapEmptyState message="This roadmap has no columns configured." />
         )}
       </section>
+    </div>
+  );
+}
+
+function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
+  const organizationId = useOrganizationId();
+  const createStore = useCreateRoadmapDialogContext();
+  const deleteStore = useDeleteRoadmapDialogContext();
+  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
+
+  const handleDeleteClick = () => {
+    deleteStore.send({ type: "toggle", data: { roadmapId } });
+  };
+
+  if (!canManage) {
+    return null;
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <Button
+        onClick={() => createStore.send({ type: "toggle" })}
+        size="sm"
+        variant="default"
+      >
+        <HugeiconsIcon icon={Plus} />
+        New Roadmap
+      </Button>
+      <Button
+        aria-label="delete roadmap"
+        onClick={handleDeleteClick}
+        size="icon-sm"
+        variant="destructive-outline"
+      >
+        <HugeiconsIcon icon={Delete02Icon} />
+      </Button>
     </div>
   );
 }
