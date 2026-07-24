@@ -30,11 +30,12 @@ import { Route as OrganizationIdSettingsCustomAttributesRouteImport } from "./ro
 import { Route as OrganizationIdSettingsChangelogTagsRouteImport } from "./routes/$organizationId/settings/changelog-tags"
 import { Route as OrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/$organizationId/settings/changelog-privacy"
 import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
-import { Route as OrganizationIdDashboardLayoutRoadmapRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap"
+import { Route as OrganizationIdDashboardLayoutRoadmapIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/index"
 import { Route as OrganizationIdDashboardLayoutFeedbackIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/index"
 import { Route as OrganizationIdDashboardLayoutContactIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/contact/index"
 import { Route as OrganizationIdDashboardLayoutCompanyIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/company/index"
 import { Route as OrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/index"
+import { Route as OrganizationIdDashboardLayoutRoadmapSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/$slug"
 import { Route as OrganizationIdDashboardLayoutFeedbackBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/backlog"
 import { Route as OrganizationIdDashboardLayoutFeedbackActiveRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/active"
 import { Route as OrganizationIdDashboardLayoutChangelogPublishedRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/published"
@@ -164,10 +165,10 @@ const OrganizationIdSettingsBillingRoute =
     path: "/billing",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdDashboardLayoutRoadmapRoute =
-  OrganizationIdDashboardLayoutRoadmapRouteImport.update({
-    id: "/roadmap",
-    path: "/roadmap",
+const OrganizationIdDashboardLayoutRoadmapIndexRoute =
+  OrganizationIdDashboardLayoutRoadmapIndexRouteImport.update({
+    id: "/roadmap/",
+    path: "/roadmap/",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
 const OrganizationIdDashboardLayoutFeedbackIndexRoute =
@@ -192,6 +193,12 @@ const OrganizationIdDashboardLayoutChangelogIndexRoute =
   OrganizationIdDashboardLayoutChangelogIndexRouteImport.update({
     id: "/changelog/",
     path: "/changelog/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutRoadmapSlugRoute =
+  OrganizationIdDashboardLayoutRoadmapSlugRouteImport.update({
+    id: "/roadmap/$slug",
+    path: "/roadmap/$slug",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
 const OrganizationIdDashboardLayoutFeedbackBacklogRoute =
@@ -256,7 +263,6 @@ export interface FileRoutesByFullPath {
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
-  "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
@@ -275,10 +281,12 @@ export interface FileRoutesByFullPath {
   "/$organizationId/changelog/published": typeof OrganizationIdDashboardLayoutChangelogPublishedRoute
   "/$organizationId/feedback/active": typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/feedback/backlog": typeof OrganizationIdDashboardLayoutFeedbackBacklogRoute
+  "/$organizationId/roadmap/$slug": typeof OrganizationIdDashboardLayoutRoadmapSlugRoute
   "/$organizationId/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/company/": typeof OrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/contact/": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback/": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
+  "/$organizationId/roadmap/": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
@@ -291,7 +299,6 @@ export interface FileRoutesByTo {
   "/register": typeof RegisterRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
-  "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
@@ -309,10 +316,12 @@ export interface FileRoutesByTo {
   "/$organizationId/changelog/published": typeof OrganizationIdDashboardLayoutChangelogPublishedRoute
   "/$organizationId/feedback/active": typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/feedback/backlog": typeof OrganizationIdDashboardLayoutFeedbackBacklogRoute
+  "/$organizationId/roadmap/$slug": typeof OrganizationIdDashboardLayoutRoadmapSlugRoute
   "/$organizationId/changelog": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/company": typeof OrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/contact": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
+  "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
@@ -328,7 +337,6 @@ export interface FileRoutesById {
   "/sign-up": typeof SignUpRoute
   "/$organizationId/_dashboard-layout": typeof OrganizationIdDashboardLayoutRouteWithChildren
   "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
-  "/$organizationId/_dashboard-layout/roadmap": typeof OrganizationIdDashboardLayoutRoadmapRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-privacy": typeof OrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
@@ -347,10 +355,12 @@ export interface FileRoutesById {
   "/$organizationId/_dashboard-layout/changelog/published": typeof OrganizationIdDashboardLayoutChangelogPublishedRoute
   "/$organizationId/_dashboard-layout/feedback/active": typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/_dashboard-layout/feedback/backlog": typeof OrganizationIdDashboardLayoutFeedbackBacklogRoute
+  "/$organizationId/_dashboard-layout/roadmap/$slug": typeof OrganizationIdDashboardLayoutRoadmapSlugRoute
   "/$organizationId/_dashboard-layout/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/_dashboard-layout/company/": typeof OrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/_dashboard-layout/contact/": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/_dashboard-layout/feedback/": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
+  "/$organizationId/_dashboard-layout/roadmap/": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
@@ -366,7 +376,6 @@ export interface FileRouteTypes {
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/settings"
-    | "/$organizationId/roadmap"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
@@ -385,10 +394,12 @@ export interface FileRouteTypes {
     | "/$organizationId/changelog/published"
     | "/$organizationId/feedback/active"
     | "/$organizationId/feedback/backlog"
+    | "/$organizationId/roadmap/$slug"
     | "/$organizationId/changelog/"
     | "/$organizationId/company/"
     | "/$organizationId/contact/"
     | "/$organizationId/feedback/"
+    | "/$organizationId/roadmap/"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
@@ -401,7 +412,6 @@ export interface FileRouteTypes {
     | "/register"
     | "/sign-in"
     | "/sign-up"
-    | "/$organizationId/roadmap"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
@@ -419,10 +429,12 @@ export interface FileRouteTypes {
     | "/$organizationId/changelog/published"
     | "/$organizationId/feedback/active"
     | "/$organizationId/feedback/backlog"
+    | "/$organizationId/roadmap/$slug"
     | "/$organizationId/changelog"
     | "/$organizationId/company"
     | "/$organizationId/contact"
     | "/$organizationId/feedback"
+    | "/$organizationId/roadmap"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
@@ -437,7 +449,6 @@ export interface FileRouteTypes {
     | "/sign-up"
     | "/$organizationId/_dashboard-layout"
     | "/$organizationId/settings"
-    | "/$organizationId/_dashboard-layout/roadmap"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/changelog-tags"
@@ -456,10 +467,12 @@ export interface FileRouteTypes {
     | "/$organizationId/_dashboard-layout/changelog/published"
     | "/$organizationId/_dashboard-layout/feedback/active"
     | "/$organizationId/_dashboard-layout/feedback/backlog"
+    | "/$organizationId/_dashboard-layout/roadmap/$slug"
     | "/$organizationId/_dashboard-layout/changelog/"
     | "/$organizationId/_dashboard-layout/company/"
     | "/$organizationId/_dashboard-layout/contact/"
     | "/$organizationId/_dashboard-layout/feedback/"
+    | "/$organizationId/_dashboard-layout/roadmap/"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/active"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
     | "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
@@ -624,11 +637,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsBillingRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
-    "/$organizationId/_dashboard-layout/roadmap": {
-      id: "/$organizationId/_dashboard-layout/roadmap"
+    "/$organizationId/_dashboard-layout/roadmap/": {
+      id: "/$organizationId/_dashboard-layout/roadmap/"
       path: "/roadmap"
-      fullPath: "/$organizationId/roadmap"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapRouteImport
+      fullPath: "/$organizationId/roadmap/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapIndexRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
     "/$organizationId/_dashboard-layout/feedback/": {
@@ -657,6 +670,13 @@ declare module "@tanstack/react-router" {
       path: "/changelog"
       fullPath: "/$organizationId/changelog/"
       preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/roadmap/$slug": {
+      id: "/$organizationId/_dashboard-layout/roadmap/$slug"
+      path: "/roadmap/$slug"
+      fullPath: "/$organizationId/roadmap/$slug"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapSlugRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
     "/$organizationId/_dashboard-layout/feedback/backlog": {
@@ -726,16 +746,17 @@ declare module "@tanstack/react-router" {
 }
 
 interface OrganizationIdDashboardLayoutRouteChildren {
-  OrganizationIdDashboardLayoutRoadmapRoute: typeof OrganizationIdDashboardLayoutRoadmapRoute
   OrganizationIdDashboardLayoutIndexRoute: typeof OrganizationIdDashboardLayoutIndexRoute
   OrganizationIdDashboardLayoutChangelogDraftRoute: typeof OrganizationIdDashboardLayoutChangelogDraftRoute
   OrganizationIdDashboardLayoutChangelogPublishedRoute: typeof OrganizationIdDashboardLayoutChangelogPublishedRoute
   OrganizationIdDashboardLayoutFeedbackActiveRoute: typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
   OrganizationIdDashboardLayoutFeedbackBacklogRoute: typeof OrganizationIdDashboardLayoutFeedbackBacklogRoute
+  OrganizationIdDashboardLayoutRoadmapSlugRoute: typeof OrganizationIdDashboardLayoutRoadmapSlugRoute
   OrganizationIdDashboardLayoutChangelogIndexRoute: typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   OrganizationIdDashboardLayoutCompanyIndexRoute: typeof OrganizationIdDashboardLayoutCompanyIndexRoute
   OrganizationIdDashboardLayoutContactIndexRoute: typeof OrganizationIdDashboardLayoutContactIndexRoute
   OrganizationIdDashboardLayoutFeedbackIndexRoute: typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
+  OrganizationIdDashboardLayoutRoadmapIndexRoute: typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
   OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute: typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
@@ -745,8 +766,6 @@ interface OrganizationIdDashboardLayoutRouteChildren {
 
 const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutRouteChildren =
   {
-    OrganizationIdDashboardLayoutRoadmapRoute:
-      OrganizationIdDashboardLayoutRoadmapRoute,
     OrganizationIdDashboardLayoutIndexRoute:
       OrganizationIdDashboardLayoutIndexRoute,
     OrganizationIdDashboardLayoutChangelogDraftRoute:
@@ -757,6 +776,8 @@ const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutR
       OrganizationIdDashboardLayoutFeedbackActiveRoute,
     OrganizationIdDashboardLayoutFeedbackBacklogRoute:
       OrganizationIdDashboardLayoutFeedbackBacklogRoute,
+    OrganizationIdDashboardLayoutRoadmapSlugRoute:
+      OrganizationIdDashboardLayoutRoadmapSlugRoute,
     OrganizationIdDashboardLayoutChangelogIndexRoute:
       OrganizationIdDashboardLayoutChangelogIndexRoute,
     OrganizationIdDashboardLayoutCompanyIndexRoute:
@@ -765,6 +786,8 @@ const OrganizationIdDashboardLayoutRouteChildren: OrganizationIdDashboardLayoutR
       OrganizationIdDashboardLayoutContactIndexRoute,
     OrganizationIdDashboardLayoutFeedbackIndexRoute:
       OrganizationIdDashboardLayoutFeedbackIndexRoute,
+    OrganizationIdDashboardLayoutRoadmapIndexRoute:
+      OrganizationIdDashboardLayoutRoadmapIndexRoute,
     OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute:
       OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute,
     OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute:

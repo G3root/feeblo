@@ -11,7 +11,7 @@ import {
 } from "~/lib/collections";
 
 export const Route = createFileRoute(
-  "/$organizationId/_dashboard-layout/roadmap"
+  "/$organizationId/_dashboard-layout/roadmap/"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
