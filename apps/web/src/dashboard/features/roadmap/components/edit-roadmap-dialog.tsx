@@ -11,7 +11,6 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { roadmapCollection } from "~/lib/collections";
@@ -40,7 +39,6 @@ function EditRoadmapForm() {
   const organizationId = useOrganizationId();
   const store = useEditRoadmapDialogContext();
   const data = useSelector(store, (state) => state.context.data);
-  const navigate = useNavigate({ from: "/$organizationId/roadmap/$slug" });
 
   const roadmapQuery = useLiveQuery(
     (q) =>
@@ -74,9 +72,9 @@ function EditRoadmapForm() {
     ...roadmapFormOpts,
     defaultValues,
     onSubmit: async ({ value }) => {
+      const oldSlug = roadmapQuery.data?.slug;
+      const newSlugifiedValue = slugify(value.name);
       try {
-        const oldSlug = roadmapQuery.data?.slug;
-        const newSlugifiedValue = slugify(value.name);
         const tx = roadmapCollection.update(data.roadmapId, (draft) => {
           draft.name = value.name;
           draft.slug = newSlugifiedValue;
@@ -85,16 +83,16 @@ function EditRoadmapForm() {
           draft.updatedAt = new Date();
         });
 
+        if (newSlugifiedValue !== oldSlug) {
+          window.history.replaceState(
+            null,
+            "",
+            `/${organizationId}/roadmap/${newSlugifiedValue}`
+          );
+        }
+
         await tx.isPersisted.promise;
 
-        //TODO fix this race condition
-        if (newSlugifiedValue !== oldSlug) {
-          await navigate({
-            to: "/$organizationId/roadmap/$slug",
-            params: { organizationId, slug: newSlugifiedValue },
-            replace: true,
-          });
-        }
         store.send({ type: "toggle" });
         toastManager.add({
           title: "Roadmap updated successfully",
@@ -105,6 +103,14 @@ function EditRoadmapForm() {
           title: "Failed to update roadmap",
           type: "error",
         });
+
+        if (newSlugifiedValue !== oldSlug) {
+          window.history.replaceState(
+            null,
+            "",
+            `/${organizationId}/roadmap/${oldSlug}`
+          );
+        }
       }
     },
   });
