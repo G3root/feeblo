@@ -1,7 +1,7 @@
 import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
 import { Button } from "@feeblo/ui/button";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
-import { Delete02Icon, Plus } from "@hugeicons/core-free-icons";
+import { Delete02Icon, Edit01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
@@ -9,6 +9,7 @@ import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
 import {
   useCreateRoadmapDialogContext,
   useDeleteRoadmapDialogContext,
+  useEditRoadmapDialogContext,
 } from "~/features/roadmap/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
@@ -46,7 +47,6 @@ function RouteComponent() {
           and(
             eq(roadmap.organizationId, organizationId),
             eq(roadmap.slug, slug)
-            // eq(roadmap.mode, "status")
           )
         )
         .select(({ roadmap }) => ({
@@ -172,10 +172,15 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
   const organizationId = useOrganizationId();
   const createStore = useCreateRoadmapDialogContext();
   const deleteStore = useDeleteRoadmapDialogContext();
+  const editStore = useEditRoadmapDialogContext();
   const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
 
   const handleDeleteClick = () => {
     deleteStore.send({ type: "toggle", data: { roadmapId } });
+  };
+
+  const handleEditClick = () => {
+    editStore.send({ type: "toggle", data: { roadmapId } });
   };
 
   if (!canManage) {
@@ -193,7 +198,15 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
         New Roadmap
       </Button>
       <Button
-        aria-label="delete roadmap"
+        aria-label="Edit roadmap"
+        onClick={handleEditClick}
+        size="icon-sm"
+        variant="outline"
+      >
+        <HugeiconsIcon icon={Edit01Icon} />
+      </Button>
+      <Button
+        aria-label="Delete roadmap"
         onClick={handleDeleteClick}
         size="icon-sm"
         variant="destructive-outline"

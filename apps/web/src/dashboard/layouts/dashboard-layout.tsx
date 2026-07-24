@@ -25,9 +25,11 @@ import {
 } from "~/features/board/dialog-stores";
 import { CreateRoadmapDialog } from "~/features/roadmap/components/create-roadmap-dialog";
 import { DeleteRoadmapDialog } from "~/features/roadmap/components/delete-roadmap-dialog";
+import { EditRoadmapDialog } from "~/features/roadmap/components/edit-roadmap-dialog";
 import {
   CreateRoadmapDialogProvider,
   DeleteRoadmapDialogProvider,
+  EditRoadmapDialogProvider,
 } from "~/features/roadmap/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
@@ -65,38 +67,41 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <CreateBoardDialogProvider>
                   <CreateRoadmapDialogProvider>
                     <DeleteRoadmapDialogProvider>
-                      <PostDeleteDialogProvider>
-                      <SidebarProvider
-                      className="h-dvh overflow-hidden"
-                      style={
-                        {
-                          "--sidebar-width": "calc(var(--spacing) * 72)",
-                          "--header-height": "calc(var(--spacing) * 12)",
-                        } as React.CSSProperties
-                      }
-                    >
-                      <AppSidebar variant="inset" />
-                      <SidebarInset className="h-full min-h-0 overflow-hidden">
-                        <header className="flex h-(--header-height) shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-                          <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-                            <SidebarTrigger className="-ml-1" />
-                          </div>
-                        </header>
+                      <EditRoadmapDialogProvider>
+                        <PostDeleteDialogProvider>
+                          <SidebarProvider
+                            className="h-dvh overflow-hidden"
+                            style={
+                              {
+                                "--sidebar-width": "calc(var(--spacing) * 72)",
+                                "--header-height": "calc(var(--spacing) * 12)",
+                              } as React.CSSProperties
+                            }
+                          >
+                            <AppSidebar variant="inset" />
+                            <SidebarInset className="h-full min-h-0 overflow-hidden">
+                              <header className="flex h-(--header-height) shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+                                <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
+                                  <SidebarTrigger className="-ml-1" />
+                                </div>
+                              </header>
 
-                        <ScrollArea className="min-h-0 flex-1 overflow-hidden">
-                          {children}
-                        </ScrollArea>
-                      </SidebarInset>
-                      <CreateBoardDialog />
-                      <CreateRoadmapDialog />
-                      <DeleteRoadmapDialog />
-                      <DeleteBoardDialog />
-                      <RenameBoardDialog />
-                      <PostDeleteDialog />
-                      <PostCreateDialog />
-                      <CommentDeleteDialog />
-                    </SidebarProvider>
-                    </PostDeleteDialogProvider>
+                              <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+                                {children}
+                              </ScrollArea>
+                            </SidebarInset>
+                            <CreateBoardDialog />
+                            <CreateRoadmapDialog />
+                            <DeleteRoadmapDialog />
+                            <EditRoadmapDialog />
+                            <DeleteBoardDialog />
+                            <RenameBoardDialog />
+                            <PostDeleteDialog />
+                            <PostCreateDialog />
+                            <CommentDeleteDialog />
+                          </SidebarProvider>
+                        </PostDeleteDialogProvider>
+                      </EditRoadmapDialogProvider>
                     </DeleteRoadmapDialogProvider>
                   </CreateRoadmapDialogProvider>
                 </CreateBoardDialogProvider>
