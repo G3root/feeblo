@@ -4,6 +4,7 @@ export type RoadmapStatus = BoardPostStatus;
 
 export type RoadmapStatusDefinition = {
   id: string;
+  name?: string;
   type: RoadmapStatus;
 };
 
@@ -20,6 +21,7 @@ export type RoadmapPost = {
 };
 
 export type RoadmapLane<TPost extends RoadmapPost = RoadmapPost> = {
+  name?: string;
   posts: TPost[];
   status: RoadmapStatus;
   statusId: string;

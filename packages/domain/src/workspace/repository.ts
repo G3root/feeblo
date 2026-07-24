@@ -90,6 +90,11 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             userId: args.userId,
           });
 
+          const statusIdByType = new Map<
+            (typeof schema.DEFAULT_POST_STATUSES)[number]["type"],
+            string
+          >();
+
           for (const postStatus of schema.DEFAULT_POST_STATUSES) {
             const postStatusId = yield* PostStatusId.generate;
             yield* tx.insert(schema.postStatusTable).values({
@@ -100,6 +105,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               createdAt: new Date(),
               updatedAt: new Date(),
             });
+            statusIdByType.set(postStatus.type, postStatusId);
           }
 
           const roadmapId = yield* RoadmapId.generate;
@@ -117,13 +123,30 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             updatedAt: new Date(),
           });
 
-          const defaultRoadmapStatuses = ["PLANNED", "IN_PROGRESS", "COMPLETED"] as const;
+          const defaultRoadmapStatuses = [
+            "PLANNED",
+            "IN_PROGRESS",
+            "COMPLETED",
+          ] as const;
           for (const [position, type] of defaultRoadmapStatuses.entries()) {
-            const status = yield* tx.select({ id: schema.postStatusTable.id }).from(schema.postStatusTable).where(and(eq(schema.postStatusTable.organizationId, organizationId), eq(schema.postStatusTable.type, type))).limit(1).pipe(Effect.map(EffectArray.get(0)));
-            if (Option.isSome(status)) {
-              const columnId = yield* RoadmapColumnId.generate;
-              yield* tx.insert(schema.roadmapColumnTable).values({ id: columnId, roadmapId, name: type === "IN_PROGRESS" ? "In progress" : type[0] + type.slice(1).toLowerCase(), position, config: { type: "status", statusId: status.value.id }, createdAt: new Date(), updatedAt: new Date() });
+            const statusId = statusIdByType.get(type);
+            if (!statusId) {
+              continue;
             }
+
+            const columnId = yield* RoadmapColumnId.generate;
+            yield* tx.insert(schema.roadmapColumnTable).values({
+              id: columnId,
+              roadmapId,
+              name:
+                type === "IN_PROGRESS"
+                  ? "In progress"
+                  : type[0] + type.slice(1).toLowerCase(),
+              position,
+              config: { type: "status", statusId },
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
           }
 
           const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;

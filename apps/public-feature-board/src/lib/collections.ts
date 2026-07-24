@@ -187,6 +187,52 @@ export const publicPostStatusCollection = createCollection(
   })
 );
 
+export const publicRoadmapCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: () => getOrganizationScopedQueryKey("public-roadmap"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.RoadmapListPublic({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const publicRoadmapColumnCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: () => getOrganizationScopedQueryKey("public-roadmap-column"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.RoadmapColumnListPublic({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const publicChangelogCollection = createCollection(
   queryCollectionOptions({
     staleTime: Duration.toMillis(Duration.minutes(5)),
@@ -670,6 +716,8 @@ export const publicCollections = {
   publicPostStatusCollection,
   publicPostSubscriptionCollection,
   publicPostTagCollection,
+  publicRoadmapCollection,
+  publicRoadmapColumnCollection,
   publicTagCollection,
   publicUpvoteCollection,
 };

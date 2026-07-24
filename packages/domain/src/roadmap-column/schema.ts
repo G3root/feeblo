@@ -27,6 +27,23 @@ export const RoadmapColumn = S.Struct({
 });
 export type TRoadmapColumn = S.Schema.Type<typeof RoadmapColumn>;
 
+/**
+ * Read model used by the status-only roadmap UI. Flattening statusId keeps the
+ * client collection normalized and makes it directly joinable to post statuses.
+ */
+export const StatusRoadmapColumn = S.Struct({
+  id: S.String,
+  roadmapId: S.String,
+  name: S.String.check(S.isLengthBetween(1, 120)),
+  position: S.Int,
+  statusId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
+export type TStatusRoadmapColumn = S.Schema.Type<
+  typeof StatusRoadmapColumn
+>;
+
 const ColumnInput = {
   roadmapId: RoadmapId.schema,
   organizationId: WorkspaceId.schema,
@@ -51,7 +68,6 @@ export const RoadmapColumnDelete = S.Struct({
 });
 export type TRoadmapColumnDelete = S.Schema.Type<typeof RoadmapColumnDelete>;
 export const RoadmapColumnList = S.Struct({
-  roadmapId: RoadmapId.schema,
   organizationId: WorkspaceId.schema,
 });
 export type TRoadmapColumnList = S.Schema.Type<typeof RoadmapColumnList>;

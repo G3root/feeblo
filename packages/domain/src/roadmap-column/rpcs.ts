@@ -3,13 +3,18 @@ import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import { AuthMiddleware } from "../session-middleware";
 import { RoadmapColumnServiceErrors } from "./errors";
-import { RoadmapColumn, RoadmapColumnList } from "./schema";
+import { RoadmapColumnList, StatusRoadmapColumn } from "./schema";
 export class RoadmapColumnRpcs extends RpcGroup.make(
   Rpc.make("RoadmapColumnList", {
-    success: S.Array(RoadmapColumn),
+    success: S.Array(StatusRoadmapColumn),
     payload: RoadmapColumnList,
     error: RoadmapColumnServiceErrors,
-  }).middleware(AuthMiddleware)
+  }).middleware(AuthMiddleware),
+  Rpc.make("RoadmapColumnListPublic", {
+    success: S.Array(StatusRoadmapColumn),
+    payload: RoadmapColumnList,
+    error: RoadmapColumnServiceErrors,
+  })
   // Rpc.make("RoadmapColumnCreate", {
   //   success: S.Void,
   //   payload: RoadmapColumnCreate,

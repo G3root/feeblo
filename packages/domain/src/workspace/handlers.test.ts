@@ -1,13 +1,11 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import {
-  CurrentSession,
-  type Session,
-} from "../session-middleware";
+import { CurrentSession, type Session } from "../session-middleware";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspaceRepository } from "./repository";
 
@@ -20,7 +18,7 @@ describe("WorkspaceRpcHandlers", () => {
 
   const makeSession = (
     fixture: Fixture,
-    role: Session["memberships"][number]["role"] | null = "owner",
+    role: Session["memberships"][number]["role"] | null = "owner"
   ): Session => ({
     user: {
       id: fixture.userId,
@@ -90,7 +88,7 @@ describe("WorkspaceRpcHandlers", () => {
     });
 
   const RepositoryTest = WorkspaceRepository.layer.pipe(
-    Layer.provide(Database.PgliteDatabaseLive),
+    Layer.provide(Database.PgliteDatabaseLive)
   );
 
   const TestLayer = Layer.merge(RepositoryTest, Database.PgliteDatabaseLive);
@@ -140,7 +138,9 @@ describe("WorkspaceRpcHandlers", () => {
           const members = yield* db
             .select()
             .from(schema.memberTable)
-            .where(eq(schema.memberTable.organizationId, result.organizationId));
+            .where(
+              eq(schema.memberTable.organizationId, result.organizationId)
+            );
           expect(members).toHaveLength(1);
           expect(members[0]?.userId).toBe(userId);
           expect(members[0]?.role).toBe("owner");
@@ -159,8 +159,47 @@ describe("WorkspaceRpcHandlers", () => {
           const statuses = yield* db
             .select()
             .from(schema.postStatusTable)
-            .where(eq(schema.postStatusTable.organizationId, result.organizationId));
+            .where(
+              eq(schema.postStatusTable.organizationId, result.organizationId)
+            );
           expect(statuses).toHaveLength(6);
+
+          // Verify the primary status roadmap and its ordered columns were created
+          const roadmaps = yield* db
+            .select()
+            .from(schema.roadmapTable)
+            .where(
+              eq(schema.roadmapTable.organizationId, result.organizationId)
+            );
+          expect(roadmaps).toHaveLength(1);
+          expect(roadmaps[0]).toMatchObject({
+            isPrimary: true,
+            mode: "status",
+            name: "Roadmap",
+            slug: "roadmap",
+          });
+
+          const columns = yield* db
+            .select()
+            .from(schema.roadmapColumnTable)
+            .where(eq(schema.roadmapColumnTable.roadmapId, roadmaps[0]!.id))
+            .orderBy(schema.roadmapColumnTable.position);
+          expect(columns.map((column) => column.name)).toEqual([
+            "Planned",
+            "In progress",
+            "Completed",
+          ]);
+
+          const statusTypeById = new Map(
+            statuses.map((status) => [status.id, status.type])
+          );
+          expect(
+            columns.map((column) =>
+              column.config.type === "status"
+                ? statusTypeById.get(column.config.statusId)
+                : undefined
+            )
+          ).toEqual(["PLANNED", "IN_PROGRESS", "COMPLETED"]);
 
           // Verify a site was created
           const sites = yield* db
@@ -170,7 +209,7 @@ describe("WorkspaceRpcHandlers", () => {
           expect(sites).toHaveLength(1);
           expect(sites[0]?.subdomain).toBe("my-awesome-workspace");
           expect(sites[0]?.name).toBe("My Awesome Workspace");
-        }),
+        })
       );
 
       it.effect(
@@ -183,16 +222,13 @@ describe("WorkspaceRpcHandlers", () => {
               handlers
                 .WorkspaceCreate({ workspaceName: "a" })
                 .pipe(
-                  Effect.provideService(
-                    CurrentSession,
-                    makeSession(fixture),
-                  ),
-                ),
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                )
             );
 
             expect(error._tag).toBe("BadRequestError");
             expect(error.message).toContain("at least 4 characters");
-          }),
+          })
       );
 
       it.effect("rejects reserved subdomains", () =>
@@ -204,14 +240,12 @@ describe("WorkspaceRpcHandlers", () => {
           const error = yield* Effect.flip(
             handlers
               .WorkspaceCreate({ workspaceName: "feeblo" })
-              .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
-              ),
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
           expect(error._tag).toBe("BadRequestError");
           expect(error.message).toContain("reserved");
-        }),
+        })
       );
 
       it.effect("rejects when the subdomain is already taken", () =>
@@ -222,20 +256,18 @@ describe("WorkspaceRpcHandlers", () => {
           // Create a site that claims the subdomain first
           yield* createSiteForSubdomain(
             "existing-workspace",
-            fixture.organizationId,
+            fixture.organizationId
           );
 
           const error = yield* Effect.flip(
             handlers
               .WorkspaceCreate({ workspaceName: "Existing Workspace" })
-              .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
-              ),
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
           expect(error._tag).toBe("BadRequestError");
           expect(error.message).toBe("This workspace name is already taken");
-        }),
+        })
       );
     });
 
@@ -246,12 +278,10 @@ describe("WorkspaceRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const products = yield* handlers
             .WorkspaceProductList()
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(products).toEqual([]);
-        }),
+        })
       );
 
       it.effect("lists non-archived products", () =>
@@ -285,13 +315,11 @@ describe("WorkspaceRpcHandlers", () => {
 
           const products = yield* handlers
             .WorkspaceProductList()
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(products).toHaveLength(1);
           expect(products[0]?.name).toBe("Starter Plan");
-        }),
+        })
       );
     });
 
@@ -302,15 +330,13 @@ describe("WorkspaceRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const plan = yield* handlers
             .WorkspacePlanGet({ organizationId: fixture.organizationId })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(plan).toEqual({
             organizationId: fixture.organizationId,
             plan: "free",
           });
-        }),
+        })
       );
 
       it.effect("rejects users without a membership", () =>
@@ -323,13 +349,13 @@ describe("WorkspaceRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("returns the plan from an active subscription", () =>
@@ -361,9 +387,7 @@ describe("WorkspaceRpcHandlers", () => {
             recurringIntervalCount: 1,
             status: "active",
             currentPeriodStart: new Date(),
-            currentPeriodEnd: new Date(
-              Date.now() + 30 * 24 * 60 * 60 * 1000,
-            ),
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             customerId: "cus_1",
             productId: "prod_starter",
             createdAt: new Date(),
@@ -372,15 +396,13 @@ describe("WorkspaceRpcHandlers", () => {
 
           const plan = yield* handlers
             .WorkspacePlanGet({ organizationId: fixture.organizationId })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(plan).toEqual({
             organizationId: fixture.organizationId,
             plan: "starter",
           });
-        }),
+        })
       );
     });
 
@@ -391,12 +413,10 @@ describe("WorkspaceRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const result = yield* handlers
             .WorkspaceSlugCheck({ slug: "my-unique-slug" })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(result).toEqual({ available: true, suggestion: null });
-        }),
+        })
       );
 
       it.effect("returns available: false for reserved subdomains", () =>
@@ -405,29 +425,29 @@ describe("WorkspaceRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const result = yield* handlers
             .WorkspaceSlugCheck({ slug: "app" })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(result).toEqual({ available: false, suggestion: null });
-        }),
+        })
       );
 
-      it.effect("returns available: false with suggestion for taken slugs", () =>
-        Effect.gen(function* () {
-          const handlers = yield* WorkspaceRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-          yield* createSiteForSubdomain("taken-slug", fixture.organizationId);
+      it.effect(
+        "returns available: false with suggestion for taken slugs",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* WorkspaceRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* createSiteForSubdomain("taken-slug", fixture.organizationId);
 
-          const result = yield* handlers
-            .WorkspaceSlugCheck({ slug: "taken-slug" })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            const result = yield* handlers
+              .WorkspaceSlugCheck({ slug: "taken-slug" })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
 
-          expect(result.available).toBe(false);
-          expect(result.suggestion).toBe("taken-slug-2");
-        }),
+            expect(result.available).toBe(false);
+            expect(result.suggestion).toBe("taken-slug-2");
+          })
       );
     });
   });

@@ -18,13 +18,14 @@ export function formatRoadmapPostDate(value: Date | string) {
 }
 
 export function groupRoadmapPostsByStatus<TPost extends RoadmapPost>(
-  posts: TPost[],
+  posts: readonly TPost[],
   orderedStatuses: readonly RoadmapStatusDefinition[]
 ) {
   const map = new Map<string, RoadmapLane<TPost>>(
     orderedStatuses.map((status) => [
       status.id,
       {
+        name: status.name,
         posts: [],
         status: status.type,
         statusId: status.id,

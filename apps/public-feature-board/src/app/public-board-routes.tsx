@@ -13,6 +13,8 @@ import {
   publicPostCollection,
   publicPostStatusCollection,
   publicPostTagCollection,
+  publicRoadmapCollection,
+  publicRoadmapColumnCollection,
   publicTagCollection,
   publicUpvoteCollection,
 } from "../lib/collections";
@@ -84,15 +86,24 @@ const homeRoute = createRoute({
   },
 }).lazy(() => import("../routes/home-page").then((d) => d.Route));
 
+const RoadmapSearchSchema = S.toStandardSchemaV1(
+  S.Struct({
+    roadmap: S.String.pipe(S.optional),
+  })
+);
+
 const roadmapRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/roadmap",
+  validateSearch: RoadmapSearchSchema,
   beforeLoad: async () => {
     await Promise.all([
       publicBoardCollection.preload(),
       publicUpvoteCollection.preload(),
       publicPostCollection.preload(),
       publicPostStatusCollection.preload(),
+      publicRoadmapCollection.preload(),
+      publicRoadmapColumnCollection.preload(),
     ]);
 
     return null;

@@ -36,6 +36,7 @@ import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
 import { ServerConfig } from "./config";
+import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
 import { corsVaryFix } from "./middlewares/cors-vary";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
@@ -143,7 +144,13 @@ const program = Effect.gen(function* () {
     WorkFlowLayer
   );
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
-    mailbox ? Layer.merge(RootRouter, testMailboxRouter(mailbox)) : RootRouter;
+    mailbox
+      ? Layer.mergeAll(
+          RootRouter,
+          testMailboxRouter(mailbox),
+          e2eRoadmapSeedRouter
+        )
+      : RootRouter;
   const PublicRouters: Layer.Layer<never, never, HttpRouter.HttpRouter> =
     Layer.merge(RootRouterLive, OgImageRouterLive);
   const isLocalDevHost = (host: string): boolean =>

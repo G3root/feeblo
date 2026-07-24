@@ -103,6 +103,21 @@
     "./board/schema": {
       "default": "./src/board/schema.ts"
     },
+    "./roadmap/schema": {
+      "default": "./src/roadmap/schema.ts"
+    },
+    "./roadmap/repository": {
+      "default": "./src/roadmap/repository.ts"
+    },
+    "./roadmap-column/schema": {
+      "default": "./src/roadmap-column/schema.ts"
+    },
+    "./roadmap-column/repository": {
+      "default": "./src/roadmap-column/repository.ts"
+    },
+    "./post-status/repository": {
+      "default": "./src/post-status/repository.ts"
+    },
     "./post/schema": {
       "default": "./src/post/schema.ts"
     },

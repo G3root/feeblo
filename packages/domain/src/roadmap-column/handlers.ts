@@ -19,6 +19,10 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
           Policy.withPolicy(read(args.organizationId)),
           withRemapDbErrors("RoadmapColumn", "select")
         ),
+    RoadmapColumnListPublic: (args: TRoadmapColumnList) =>
+      columns
+        .findMany({ organizationId: args.organizationId, visibility: "public" })
+        .pipe(withRemapDbErrors("RoadmapColumn", "select")),
     // RoadmapColumnCreate: (args: TRoadmapColumnCreate) =>
     //   columns
     //     .create(args)

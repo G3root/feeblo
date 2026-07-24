@@ -15,6 +15,7 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/db-migrator": "workspace:*",
     "@feeblo/domain": "workspace:*",
+    "@feeblo/id": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@sentry/effect": "^10.67.0",

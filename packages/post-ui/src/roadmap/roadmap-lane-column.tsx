@@ -9,6 +9,7 @@ interface RoadmapLaneColumnProps {
   children?: ReactNode;
   contentRef?: Ref<HTMLDivElement>;
   isHighlighted?: boolean;
+  name?: string;
   status: RoadmapStatus;
   totalPosts: number;
 }
@@ -18,6 +19,7 @@ export function RoadmapLaneColumn({
   children,
   contentRef,
   isHighlighted = false,
+  name,
   status,
   totalPosts,
 }: RoadmapLaneColumnProps) {
@@ -29,7 +31,7 @@ export function RoadmapLaneColumn({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <RoadmapStatusIcon status={status} />
-            <h3 className="font-medium text-sm">{readableStatus}</h3>
+            <h3 className="font-medium text-sm">{name ?? readableStatus}</h3>
             <span className="text-muted-foreground text-xs">{totalPosts}</span>
           </div>
           {action}
