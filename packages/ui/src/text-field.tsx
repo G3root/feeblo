@@ -1,11 +1,12 @@
-import { useStore } from "@tanstack/react-store";
+import { useSelector } from "@tanstack/react-store";
 import { useId } from "react";
+import { Field, FieldError } from "./field";
 import { useFieldContext } from "./form-context";
 import { Input } from "./input";
 import { Label } from "./label";
 import { cn } from "./utils";
 
-interface TextFieldProps extends React.ComponentProps<"input"> {
+interface TextFieldProps extends React.ComponentProps<typeof Input> {
   hideLabel?: boolean;
   label: string;
 }
@@ -21,11 +22,18 @@ export function TextField({
   const id = idProp ?? generateId;
   const field = useFieldContext<string>();
 
-  const errors = useStore(field.store, (state) => state.meta.errors);
-  const isTouched = useStore(field.store, (state) => state.meta.isTouched);
+  const errors = useSelector(field.store, (state) => state.meta.errors);
+  const isTouched = useSelector(field.store, (state) => state.meta.isTouched);
+  const isDirty = useSelector(field.store, (state) => state.meta.isDirty);
+  const isValid = useSelector(field.store, (state) => state.meta.isValid);
 
   return (
-    <div className="flex flex-col gap-2">
+    <Field
+      dirty={isDirty}
+      invalid={!isValid}
+      name={field.name}
+      touched={isTouched}
+    >
       <Label className={hideLabel ? "sr-only" : ""} htmlFor={id}>
         {label}
       </Label>
@@ -41,16 +49,7 @@ export function TextField({
         }}
         value={field.state.value}
       />
-
-      {isTouched && errors.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          {errors.map((error: { message: string }) => (
-            <p className="text-destructive text-sm" key={error.message}>
-              {error.message}
-            </p>
-          ))}
-        </div>
-      ) : null}
-    </div>
+      <FieldError errors={errors} match={!isValid} />
+    </Field>
   );
 }

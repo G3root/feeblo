@@ -82,6 +82,7 @@ export function FieldError({
     )
     .filter(Boolean)
     .join(", ");
+
   return (
     <FieldPrimitive.Error
       className={cn("text-destructive-foreground text-xs", className)}
@@ -93,23 +94,59 @@ export function FieldError({
   );
 }
 
-export function FieldGroup(props: React.ComponentProps<"div">): React.ReactElement {
-  return <div className={cn("flex flex-col gap-4", props.className)} data-slot="field-group" {...props} />;
-}
-
-export function FieldContent(props: React.ComponentProps<"div">): React.ReactElement {
-  return <div className={cn("flex flex-1 flex-col gap-1", props.className)} data-slot="field-content" {...props} />;
-}
-
-export function FieldTitle(props: React.ComponentProps<"div">): React.ReactElement {
-  return <div className={cn("font-medium text-sm", props.className)} data-slot="field-title" {...props} />;
-}
-
-export function FieldSeparator({ children, className, ...props }: React.ComponentProps<"div">): React.ReactElement {
+export function FieldGroup(
+  props: React.ComponentProps<"div">
+): React.ReactElement {
   return (
-    <div className={cn("relative flex items-center py-2", className)} data-slot="field-separator" {...props}>
+    <div
+      className={cn("flex flex-col gap-4", props.className)}
+      data-slot="field-group"
+      {...props}
+    />
+  );
+}
+
+export function FieldContent(
+  props: React.ComponentProps<"div">
+): React.ReactElement {
+  return (
+    <div
+      className={cn("flex flex-1 flex-col gap-1", props.className)}
+      data-slot="field-content"
+      {...props}
+    />
+  );
+}
+
+export function FieldTitle(
+  props: React.ComponentProps<"div">
+): React.ReactElement {
+  return (
+    <div
+      className={cn("font-medium text-sm", props.className)}
+      data-slot="field-title"
+      {...props}
+    />
+  );
+}
+
+export function FieldSeparator({
+  children,
+  className,
+  ...props
+}: React.ComponentProps<"div">): React.ReactElement {
+  return (
+    <div
+      className={cn("relative flex items-center py-2", className)}
+      data-slot="field-separator"
+      {...props}
+    >
       <Separator className="absolute inset-x-0" />
-      {children ? <span className="relative mx-auto bg-background px-2 text-muted-foreground text-xs">{children}</span> : null}
+      {children ? (
+        <span className="relative mx-auto bg-background px-2 text-muted-foreground text-xs">
+          {children}
+        </span>
+      ) : null}
     </div>
   );
 }

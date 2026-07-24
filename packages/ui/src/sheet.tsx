@@ -222,6 +222,4 @@ export function SheetPanel({
   );
 }
 
-export {
-  SheetPrimitive,
-};
+export { SheetPrimitive };
