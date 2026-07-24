@@ -36,16 +36,11 @@ export function groupRoadmapPostsByStatus<TPost extends RoadmapPost>(
   for (const post of posts) {
     const existing = map.get(post.statusId);
 
+    // Posts whose status has no configured column stay off the roadmap
+    // instead of surfacing as an implicit extra lane.
     if (existing) {
       existing.posts.push(post);
-      continue;
     }
-
-    map.set(post.statusId, {
-      posts: [post],
-      status: post.status,
-      statusId: post.statusId,
-    });
   }
 
   return [...map.values()];

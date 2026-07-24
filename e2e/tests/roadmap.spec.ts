@@ -46,11 +46,17 @@ test.describe("roadmap", () => {
     "posts move through dashboard roadmap lanes as their status changes",
     { tag: "@critical" },
     async ({ page }) => {
-      await createAuthenticatedWorkspace(page, createTestUser());
+      const workspace = await createAuthenticatedWorkspace(
+        page,
+        createTestUser()
+      );
       const title = `Roadmap post ${randomUUID().slice(0, 8)}`;
       await createPost(page, title, "This post should start in Planned.");
 
-      await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+      // Posts created from the dashboard default to the Pending status. The
+      // roadmap only configures Planned/In progress/Completed columns, so the
+      // post stays off the roadmap instead of surfacing as an extra lane.
+      await page.goto(`${workspace.organizationUrl}/roadmap`);
       await expect(page).toHaveURL(roadmapUrlPattern);
       await expect(
         page.getByRole("heading", { name: "Roadmap", exact: true })
@@ -60,22 +66,23 @@ test.describe("roadmap", () => {
           page.getByRole("heading", { name: laneName, exact: true })
         ).toBeVisible();
       }
-
-      // Posts created from the dashboard default to the Pending status, which
-      // surfaces on the roadmap as an extra lane beyond the configured ones.
-      await expect(roadmapLane(page, "Pending").getByText(title)).toBeVisible();
       await expect(
         roadmapLane(page, "Planned").getByText("No issues in this stage.")
       ).toBeVisible();
+      await expect(page.getByText(title)).toHaveCount(0);
+      await expect(
+        page.getByRole("heading", { name: "Pending", exact: true })
+      ).toHaveCount(0);
 
-      // Open the post from its roadmap card and move it to Planned.
-      await roadmapLane(page, "Pending").getByText(title).click();
+      // Move the post to Planned so it lands in the matching lane.
+      await page.goto(workspace.organizationUrl);
+      await page.getByText(title).click();
       await expect(page.getByLabel("Post Title")).toHaveValue(title);
       await page.getByRole("combobox").first().click();
       await page.getByRole("option", { name: "Planned", exact: true }).click();
       await expect(page.getByText("Status updated")).toBeVisible();
 
-      await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+      await page.goto(`${workspace.organizationUrl}/roadmap`);
       await expect(roadmapLane(page, "Planned").getByText(title)).toBeVisible();
       await expect(
         page.getByRole("heading", { name: "Pending", exact: true })
@@ -92,6 +99,13 @@ test.describe("roadmap", () => {
       const title = `Public roadmap post ${randomUUID().slice(0, 8)}`;
       await createPost(page, title, "Visitors can follow this on the roadmap.");
 
+      // Move the post to Planned so it shows up in a configured lane.
+      await page.getByText(title).click();
+      await expect(page.getByLabel("Post Title")).toHaveValue(title);
+      await page.getByRole("combobox").first().click();
+      await page.getByRole("option", { name: "Planned", exact: true }).click();
+      await expect(page.getByText("Status updated")).toBeVisible();
+
       const visitorContext = await browser.newContext();
       const visitorPage = await visitorContext.newPage();
 
@@ -105,16 +119,20 @@ test.describe("roadmap", () => {
           visitorPage.getByRole("heading", { name: "Roadmap", exact: true })
         ).toBeVisible();
 
-        const pendingLane = roadmapLane(visitorPage, "Pending");
-        await expect(pendingLane.getByText(title)).toBeVisible();
-        await expect(pendingLane.getByText("Features 💡")).toBeVisible();
+        const plannedLane = roadmapLane(visitorPage, "Planned");
+        await expect(plannedLane.getByText(title)).toBeVisible();
+        await expect(plannedLane.getByText("Features 💡")).toBeVisible();
+        // Unconfigured statuses do not surface as extra lanes.
         await expect(
-          roadmapLane(visitorPage, "Planned").getByText(
+          visitorPage.getByRole("heading", { name: "Pending", exact: true })
+        ).toHaveCount(0);
+        await expect(
+          roadmapLane(visitorPage, "In progress").getByText(
             "No updates in this stage."
           )
         ).toBeVisible();
 
-        await pendingLane.getByText(title).click();
+        await plannedLane.getByText(title).click();
         await expect(visitorPage).toHaveURL(publicPostUrlPattern);
         await expect(visitorPage.getByText(title)).toBeVisible();
       } finally {
@@ -136,8 +154,8 @@ test.describe("roadmap", () => {
 
       // Move the post to Planned so it lands in a lane that exists on both
       // roadmaps (the seeded one's "Backlog" lane points at Planned too).
-      await page.getByRole("link", { name: "Roadmap", exact: true }).click();
-      await roadmapLane(page, "Pending").getByText(title).click();
+      await page.getByText(title).click();
+      await expect(page.getByLabel("Post Title")).toHaveValue(title);
       await page.getByRole("combobox").first().click();
       await page.getByRole("option", { name: "Planned", exact: true }).click();
       await expect(page.getByText("Status updated")).toBeVisible();

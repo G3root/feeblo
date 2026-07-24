@@ -1368,6 +1368,63 @@ export const roadmapColumnCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newColumn } = mutation;
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        throw new Error("Missing organization id");
+      }
+
+      await fetchRpc((rpc) =>
+        rpc.RoadmapColumnCreate({
+          id: newColumn.id,
+          roadmapId: newColumn.roadmapId,
+          organizationId,
+          name: newColumn.name,
+          position: newColumn.position,
+          config: { type: "status", statusId: newColumn.statusId },
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedColumn } = mutation;
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        throw new Error("Missing organization id");
+      }
+
+      await fetchRpc((rpc) =>
+        rpc.RoadmapColumnUpdate({
+          id: updatedColumn.id,
+          roadmapId: updatedColumn.roadmapId,
+          organizationId,
+          name: updatedColumn.name,
+          position: updatedColumn.position,
+          config: { type: "status", statusId: updatedColumn.statusId },
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedColumn } = mutation;
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        throw new Error("Missing organization id");
+      }
+
+      await fetchRpc((rpc) =>
+        rpc.RoadmapColumnDelete({
+          id: deletedColumn.id,
+          roadmapId: deletedColumn.roadmapId,
+          organizationId,
+        })
+      );
+    },
   })
 );
 

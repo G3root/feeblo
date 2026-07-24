@@ -24,6 +24,7 @@ export const WorkspaceSlugCheckInput = S.Struct({
 export const WorkspaceSlugCheckOutput = S.Struct({
   available: S.Boolean,
   suggestion: S.NullOr(S.String),
+  reason: S.NullOr(S.String),
 });
 
 export type TCreateWorkspaceInput = S.Schema.Type<typeof CreateWorkspaceInput>;

@@ -13,7 +13,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
 import { useSelector } from "@xstate/store-react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { roadmapCollection } from "~/lib/collections";
+import { roadmapCollection, roadmapColumnCollection } from "~/lib/collections";
 import { useCreateRoadmapDialogContext } from "../dialog-stores";
 import { roadmapFormOpts } from "../shared-form";
 import { RoadmapFields } from "./roadmap-fields";
@@ -50,10 +50,12 @@ function CreateRoadmapForm() {
     ...roadmapFormOpts,
     onSubmit: async ({ value }) => {
       try {
+        const now = new Date();
+        const roadmapId = await RoadmapId.unsafeGenerate();
         const tx = roadmapCollection.insert({
-          id: await RoadmapId.unsafeGenerate(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          id: roadmapId,
+          createdAt: now,
+          updatedAt: now,
           name: value.name,
           slug: slugify(value.name),
           description: value.description ?? null,
@@ -65,6 +67,23 @@ function CreateRoadmapForm() {
         });
 
         await tx.isPersisted.promise;
+
+        await Promise.all(
+          value.columns.map(async (column, index) => {
+            const columnTx = roadmapColumnCollection.insert({
+              id: column.id,
+              roadmapId,
+              name: column.name,
+              position: index,
+              statusId: column.statusId,
+              createdAt: now,
+              updatedAt: now,
+            });
+
+            await columnTx.isPersisted.promise;
+          })
+        );
+
         store.send({ type: "toggle" });
         toastManager.add({
           title: "Roadmap created successfully",

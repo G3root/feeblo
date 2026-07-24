@@ -13,7 +13,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { roadmapCollection } from "~/lib/collections";
+import { roadmapCollection, roadmapColumnCollection } from "~/lib/collections";
 import { useEditRoadmapDialogContext } from "../dialog-stores";
 import { type RoadmapFormValues, roadmapFormOpts } from "../shared-form";
 import { RoadmapFields } from "./roadmap-fields";
@@ -60,12 +60,28 @@ function EditRoadmapForm() {
     [organizationId, data.roadmapId]
   );
 
-  if (!roadmapQuery.data) {
+  const columnsQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ column: roadmapColumnCollection })
+        .where(({ column }) => eq(column.roadmapId, data.roadmapId))
+        .orderBy(({ column }) => column.position, "asc"),
+    [data.roadmapId]
+  );
+
+  if (!(roadmapQuery.data && columnsQuery.data)) {
     throw new Error("not found");
   }
 
+  const persistedColumns = columnsQuery.data;
+
   const defaultValues: RoadmapFormValues = {
     ...roadmapQuery.data,
+    columns: persistedColumns.map((column) => ({
+      id: column.id,
+      name: column.name,
+      statusId: column.statusId,
+    })),
   };
 
   const form = useAppForm({
@@ -92,6 +108,59 @@ function EditRoadmapForm() {
         }
 
         await tx.isPersisted.promise;
+
+        const persistedById = new Map(
+          persistedColumns.map((column) => [column.id, column])
+        );
+        const nextIds = new Set(value.columns.map((column) => column.id));
+
+        const mutations: Promise<unknown>[] = [];
+
+        for (const column of persistedColumns) {
+          if (!nextIds.has(column.id)) {
+            mutations.push(
+              roadmapColumnCollection.delete(column.id).isPersisted.promise
+            );
+          }
+        }
+
+        const now = new Date();
+
+        for (const [index, column] of value.columns.entries()) {
+          const persisted = persistedById.get(column.id);
+
+          if (!persisted) {
+            mutations.push(
+              roadmapColumnCollection.insert({
+                id: column.id,
+                roadmapId: data.roadmapId,
+                name: column.name,
+                position: index,
+                statusId: column.statusId,
+                createdAt: now,
+                updatedAt: now,
+              }).isPersisted.promise
+            );
+            continue;
+          }
+
+          if (
+            persisted.name !== column.name ||
+            persisted.statusId !== column.statusId ||
+            persisted.position !== index
+          ) {
+            mutations.push(
+              roadmapColumnCollection.update(column.id, (draft) => {
+                draft.name = column.name;
+                draft.statusId = column.statusId;
+                draft.position = index;
+                draft.updatedAt = now;
+              }).isPersisted.promise
+            );
+          }
+        }
+
+        await Promise.all(mutations);
 
         store.send({ type: "toggle" });
         toastManager.add({

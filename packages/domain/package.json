@@ -234,6 +234,9 @@
     },
     "./attribute-definition/validation": {
       "default": "./src/attribute-definition/validation.ts"
+    },
+    "./site/subdomain-validation-service": {
+      "default": "./src/site/services/profanity-check-service.ts"
     }
   },
   "dependencies": {

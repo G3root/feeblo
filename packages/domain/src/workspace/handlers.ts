@@ -1,5 +1,5 @@
 import { transaction } from "@feeblo/db";
-import { getReservedSubdomains, slugify } from "@feeblo/utils/url";
+import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -7,6 +7,7 @@ import * as Option from "effect/Option";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { SubdomainValidationService } from "../site/services/profanity-check-service";
 import { WorkspaceRepository } from "./repository";
 import { WorkspaceRpcs } from "./rpcs";
 import type {
@@ -15,11 +16,9 @@ import type {
   TWorkspaceSlugCheckInput,
 } from "./schema";
 
-const isReservedSubdomain = (subdomain: string) =>
-  getReservedSubdomains().includes(subdomain);
-
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;
+  const { validate: validateSubdomain } = yield* SubdomainValidationService;
 
   return {
     WorkspaceCreate: (args: TCreateWorkspaceInput) => {
@@ -34,11 +33,8 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
               "Workspace name must produce a subdomain of at least 4 characters",
           });
         }
-        if (isReservedSubdomain(subdomain)) {
-          return yield* new BadRequestError({
-            message: "This workspace name is reserved. Please choose another.",
-          });
-        }
+
+        yield* validateSubdomain(subdomain);
 
         const organizationId = yield* transaction(
           Effect.gen(function* () {
@@ -74,23 +70,42 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Workspace", "select")
         ),
     WorkspaceSlugCheck: (args: TWorkspaceSlugCheckInput) =>
-      Effect.gen(function* () {
-        if (isReservedSubdomain(args.slug)) {
-          return { available: false, suggestion: null };
-        }
-        const taken = yield* repository.isSubdomainTaken(args.slug);
-        if (!taken) {
-          return { available: true, suggestion: null };
-        }
-        const suggestion = yield* repository.getSubdomainSuggestion(args.slug);
-        return {
-          available: false,
-          suggestion: Option.getOrNull(suggestion),
-        };
-      }).pipe(withRemapDbErrors("Workspace", "select")),
+      validateSubdomain(args.slug).pipe(
+        Effect.matchEffect({
+          onFailure: (error) =>
+            Effect.succeed({
+              available: false,
+              suggestion: null,
+              reason: error.message,
+            }),
+          onSuccess: () =>
+            Effect.gen(function* () {
+              const taken = yield* repository.isSubdomainTaken(args.slug);
+              if (!taken) {
+                return {
+                  available: true,
+                  suggestion: null,
+                  reason: null,
+                };
+              }
+              const suggestion = yield* repository.getSubdomainSuggestion(
+                args.slug
+              );
+              return {
+                available: false,
+                suggestion: Option.getOrNull(suggestion),
+                reason: "This workspace name is already taken",
+              };
+            }),
+        }),
+        withRemapDbErrors("Workspace", "select")
+      ),
   };
 });
 
 export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
   WorkspaceRpcHandlersEffect
-).pipe(Layer.provide(WorkspaceRepository.layer));
+).pipe(
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(SubdomainValidationService.liveLayer)
+);
