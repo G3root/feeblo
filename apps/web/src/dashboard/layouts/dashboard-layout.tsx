@@ -23,6 +23,8 @@ import {
   DeleteBoardDialogProvider,
   RenameBoardDialogProvider,
 } from "~/features/board/dialog-stores";
+import { CreateRoadmapDialog } from "~/features/roadmap/components/create-roadmap-dialog";
+import { CreateRoadmapDialogProvider } from "~/features/roadmap/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   boardCollection,
@@ -57,8 +59,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <RenameBoardDialogProvider>
               <DeleteBoardDialogProvider>
                 <CreateBoardDialogProvider>
-                  <PostDeleteDialogProvider>
-                    <SidebarProvider
+                  <CreateRoadmapDialogProvider>
+                    <PostDeleteDialogProvider>
+                      <SidebarProvider
                       className="h-dvh overflow-hidden"
                       style={
                         {
@@ -80,13 +83,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         </ScrollArea>
                       </SidebarInset>
                       <CreateBoardDialog />
+                      <CreateRoadmapDialog />
                       <DeleteBoardDialog />
                       <RenameBoardDialog />
                       <PostDeleteDialog />
                       <PostCreateDialog />
                       <CommentDeleteDialog />
                     </SidebarProvider>
-                  </PostDeleteDialogProvider>
+                    </PostDeleteDialogProvider>
+                  </CreateRoadmapDialogProvider>
                 </CreateBoardDialogProvider>
               </DeleteBoardDialogProvider>
             </RenameBoardDialogProvider>

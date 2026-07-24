@@ -1299,6 +1299,42 @@ export const roadmapCollection = createCollection(
     },
     queryClient,
     getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newRoadmap } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.RoadmapCreate({
+          id: newRoadmap.id,
+          organizationId: newRoadmap.organizationId,
+          name: newRoadmap.name,
+          slug: newRoadmap.slug,
+          description: newRoadmap.description,
+          isPrimary: newRoadmap.isPrimary,
+          mode: newRoadmap.mode,
+          visibility: newRoadmap.visibility,
+          filter: newRoadmap.filter,
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedRoadmap } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.RoadmapUpdate({
+          id: updatedRoadmap.id,
+          organizationId: updatedRoadmap.organizationId,
+          name: updatedRoadmap.name,
+          slug: updatedRoadmap.slug,
+          description: updatedRoadmap.description,
+          isPrimary: updatedRoadmap.isPrimary,
+          mode: updatedRoadmap.mode,
+          visibility: updatedRoadmap.visibility,
+          filter: updatedRoadmap.filter,
+        })
+      );
+    },
   })
 );
 
