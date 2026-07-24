@@ -6,6 +6,10 @@ import {
   InternalServerError,
   UnauthorizedError,
 } from "../rpc-errors";
+import {
+  ProfanityError,
+  ReservedSubdomainError,
+} from "../site/services/profanity-check-schema";
 
 export class FailedToCreateWorkspaceError extends Schema.TaggedErrorClass<FailedToCreateWorkspaceError>()(
   "FailedToCreateWorkspaceError",
@@ -21,4 +25,6 @@ export const WorkspaceServiceErrors = Schema.Union([
   InternalServerError,
   PolicyDeniedError,
   FailedToCreateWorkspaceError,
+  ProfanityError,
+  ReservedSubdomainError,
 ]);

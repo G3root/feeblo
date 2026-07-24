@@ -6,6 +6,12 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
+import {
+  ReservedSubdomainError,
+} from "../site/services/profanity-check-schema";
+import {
+  SubdomainValidationService,
+} from "../site/services/profanity-check-service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspaceRepository } from "./repository";
 
@@ -91,7 +97,30 @@ describe("WorkspaceRpcHandlers", () => {
     Layer.provide(Database.PgliteDatabaseLive)
   );
 
-  const TestLayer = Layer.merge(RepositoryTest, Database.PgliteDatabaseLive);
+  const MockSubdomainValidationLayer = Layer.effect(
+    SubdomainValidationService,
+    Effect.succeed({
+      validate: (subdomain: string) => {
+        if (subdomain === "feeblo" || subdomain === "app") {
+          return Effect.fail(
+            new ReservedSubdomainError({
+              message: `"${subdomain}" is a reserved subdomain`,
+            })
+          );
+        }
+        return Effect.succeed({
+          valid: true as const,
+          message: "Subdomain is valid",
+        });
+      },
+    })
+  );
+
+  const TestLayer = Layer.mergeAll(
+    RepositoryTest,
+    Database.PgliteDatabaseLive,
+    MockSubdomainValidationLayer
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("WorkspaceCreate", () => {
@@ -243,7 +272,7 @@ describe("WorkspaceRpcHandlers", () => {
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
-          expect(error._tag).toBe("BadRequestError");
+          expect(error._tag).toBe("ReservedSubdomainError");
           expect(error.message).toContain("reserved");
         })
       );
@@ -415,7 +444,11 @@ describe("WorkspaceRpcHandlers", () => {
             .WorkspaceSlugCheck({ slug: "my-unique-slug" })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          expect(result).toEqual({ available: true, suggestion: null });
+          expect(result).toEqual({
+            available: true,
+            suggestion: null,
+            reason: null,
+          });
         })
       );
 
@@ -427,7 +460,11 @@ describe("WorkspaceRpcHandlers", () => {
             .WorkspaceSlugCheck({ slug: "app" })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          expect(result).toEqual({ available: false, suggestion: null });
+          expect(result).toEqual({
+            available: false,
+            suggestion: null,
+            reason: '"app" is a reserved subdomain',
+          });
         })
       );
 
@@ -447,6 +484,7 @@ describe("WorkspaceRpcHandlers", () => {
 
             expect(result.available).toBe(false);
             expect(result.suggestion).toBe("taken-slug-2");
+            expect(result.reason).toBe("This workspace name is already taken");
           })
       );
     });
