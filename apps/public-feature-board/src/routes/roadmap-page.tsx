@@ -187,7 +187,7 @@ function RoadmapPage() {
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
       <section className="flex h-full min-h-0 shrink-0 flex-col gap-4">
         <header className="flex items-start justify-between gap-2 px-3">
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="font-semibold text-xl">{primaryRoadmap.name}</h1>
             {primaryRoadmap.description ? (
               <p className="mt-1 text-muted-foreground text-sm">
@@ -207,7 +207,7 @@ function RoadmapPage() {
             }}
             value={primaryRoadmap.slug}
           >
-            <SelectTrigger className="min-w-40">
+            <SelectTrigger className="w-44 shrink-0">
               <SelectValue />
             </SelectTrigger>
             <SelectPopup>
