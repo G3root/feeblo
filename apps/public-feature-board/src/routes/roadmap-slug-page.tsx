@@ -187,37 +187,35 @@ function RoadmapSlugPage() {
               </p>
             ) : null}
           </div>
-          {roadmaps.length > 1 ? (
-            <Select
-              onValueChange={(newSlug) => {
-                if (newSlug === null) return;
-                if (primaryRoadmap && newSlug === primaryRoadmap.slug) {
-                  navigate({
-                    to: "/roadmap",
-                    replace: true,
-                  });
-                } else {
-                  navigate({
-                    to: "/roadmap/$slug",
-                    params: { slug: newSlug },
-                    replace: true,
-                  });
-                }
-              }}
-              value={selectedRoadmap.slug}
-            >
-              <SelectTrigger className="min-w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectPopup>
-                {roadmaps.map((roadmap) => (
-                  <SelectItem key={roadmap.id} value={roadmap.slug}>
-                    {roadmap.name}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-          ) : null}
+          <Select
+            onValueChange={(newSlug) => {
+              if (newSlug === null) return;
+              if (primaryRoadmap && newSlug === primaryRoadmap.slug) {
+                navigate({
+                  to: "/roadmap",
+                  replace: true,
+                });
+              } else {
+                navigate({
+                  to: "/roadmap/$slug",
+                  params: { slug: newSlug },
+                  replace: true,
+                });
+              }
+            }}
+            value={selectedRoadmap.slug}
+          >
+            <SelectTrigger className="min-w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup>
+              {roadmaps.map((roadmap) => (
+                <SelectItem key={roadmap.id} value={roadmap.slug}>
+                  {roadmap.name}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
         </header>
         {lanes.length > 0 ? (
           <RoadmapGrid

@@ -195,31 +195,29 @@ function RoadmapPage() {
               </p>
             ) : null}
           </div>
-          {roadmaps.length > 1 ? (
-            <Select
-              onValueChange={(slug) => {
-                if (slug !== null && slug !== primaryRoadmap.slug) {
-                  navigate({
-                    to: "/roadmap/$slug",
-                    params: { slug },
-                    replace: true,
-                  });
-                }
-              }}
-              value={primaryRoadmap.slug}
-            >
-              <SelectTrigger className="min-w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectPopup>
-                {roadmaps.map((roadmap) => (
-                  <SelectItem key={roadmap.id} value={roadmap.slug}>
-                    {roadmap.name}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-          ) : null}
+          <Select
+            onValueChange={(slug) => {
+              if (slug !== null && slug !== primaryRoadmap.slug) {
+                navigate({
+                  to: "/roadmap/$slug",
+                  params: { slug },
+                  replace: true,
+                });
+              }
+            }}
+            value={primaryRoadmap.slug}
+          >
+            <SelectTrigger className="min-w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup>
+              {roadmaps.map((roadmap) => (
+                <SelectItem key={roadmap.id} value={roadmap.slug}>
+                  {roadmap.name}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
         </header>
         {lanes.length > 0 ? (
           <RoadmapGrid
