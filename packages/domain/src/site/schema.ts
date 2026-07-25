@@ -7,6 +7,7 @@ export const roadmapVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
 export const Site = S.Struct({
   id: S.String,
   name: S.String,
+  logo: S.NullOr(S.String),
   subdomain: S.String,
   customDomain: S.Union([S.String, S.Null]),
   changelogVisibility: changelogVisibilitySchema,

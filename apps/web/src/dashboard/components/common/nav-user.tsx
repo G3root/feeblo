@@ -17,11 +17,11 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { useTheme } from "@feeblo/ui/theme-provider";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
-import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import { UserAvatar } from "@feeblo/ui/user-avatar";
 import {
   CreditCardIcon,
   LogoutSquare01Icon,
@@ -51,11 +51,7 @@ export function NavUser() {
               />
             }
           >
-            <UserAvatar
-              className="h-8 w-8 rounded-lg"
-              image={user?.image}
-              name={user?.name ?? "CN"}
-            />
+            <UserAvatar image={user?.image} name={user?.name ?? "CN"} />
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user?.name}</span>
               <span className="truncate text-xs">{user?.email}</span>

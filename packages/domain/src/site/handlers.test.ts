@@ -55,6 +55,7 @@ describe("SiteRpcHandlers", () => {
         id: organizationId,
         name: "Test organization",
         slug: organizationId,
+        logo: "https://example.com/test-organization-logo.webp",
         createdAt: now,
       });
       yield* db.insert(schema.userTable).values({
@@ -191,6 +192,7 @@ describe("SiteRpcHandlers", () => {
             name: "Test site",
             subdomain,
             organizationId: fixture.organizationId,
+            logo: "https://example.com/test-organization-logo.webp",
           });
         })
       );

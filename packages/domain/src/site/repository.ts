@@ -38,6 +38,7 @@ const makeSiteRepository = Effect.gen(function* () {
         .select({
           id: schema.siteTable.id,
           name: schema.siteTable.name,
+          logo: schema.organizationTable.logo,
           subdomain: schema.siteTable.subdomain,
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
@@ -49,6 +50,10 @@ const makeSiteRepository = Effect.gen(function* () {
           hidePoweredBy: schema.siteTable.hidePoweredBy,
         })
         .from(schema.siteTable)
+        .innerJoin(
+          schema.organizationTable,
+          eq(schema.siteTable.organizationId, schema.organizationTable.id)
+        )
         .where(eq(schema.siteTable.organizationId, organizationId))
         .limit(1)
         .pipe(Effect.map(EffectArray.get(0))),
@@ -70,6 +75,7 @@ const makeSiteRepository = Effect.gen(function* () {
         .select({
           id: schema.siteTable.id,
           name: schema.siteTable.name,
+          logo: schema.organizationTable.logo,
           subdomain: schema.siteTable.subdomain,
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
@@ -81,6 +87,10 @@ const makeSiteRepository = Effect.gen(function* () {
           hidePoweredBy: schema.siteTable.hidePoweredBy,
         })
         .from(schema.siteTable)
+        .innerJoin(
+          schema.organizationTable,
+          eq(schema.siteTable.organizationId, schema.organizationTable.id)
+        )
         .where(whereClause)
         .limit(findManyArgs.limit);
     },

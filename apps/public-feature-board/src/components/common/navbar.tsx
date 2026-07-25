@@ -1,5 +1,6 @@
 import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { Button } from "@feeblo/ui/button";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
@@ -15,7 +16,13 @@ export function Navbar() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="flex flex-col">
+            <div className="flex min-w-0 items-center gap-2">
+              <UserAvatar
+                className="rounded-md"
+                image={site.logo}
+                name={site.name}
+                size="sm"
+              />
               <h1 className="truncate font-semibold text-sm tracking-tight sm:text-base">
                 {site.name}
               </h1>
@@ -53,7 +60,8 @@ export function Navbar() {
 
 function NavTab({ href, label }: { href: string; label: string }) {
   const { pathname } = useLocation();
-  const isActive = pathname === href;
+  const isActive =
+    pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
 
   return (
     <Link
