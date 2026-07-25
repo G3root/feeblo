@@ -86,16 +86,9 @@ const homeRoute = createRoute({
   },
 }).lazy(() => import("../routes/home-page").then((d) => d.Route));
 
-const RoadmapSearchSchema = S.toStandardSchemaV1(
-  S.Struct({
-    roadmap: S.String.pipe(S.optional),
-  })
-);
-
 const roadmapRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/roadmap",
-  validateSearch: RoadmapSearchSchema,
   beforeLoad: async () => {
     await Promise.all([
       publicBoardCollection.preload(),
@@ -125,6 +118,23 @@ const boardRoute = createRoute({
     return null;
   },
 }).lazy(() => import("../routes/board-page").then((d) => d.Route));
+
+const roadmapSlugRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/roadmap/$slug",
+  beforeLoad: async () => {
+    await Promise.all([
+      publicBoardCollection.preload(),
+      publicUpvoteCollection.preload(),
+      publicPostCollection.preload(),
+      publicPostStatusCollection.preload(),
+      publicRoadmapCollection.preload(),
+      publicRoadmapColumnCollection.preload(),
+    ]);
+
+    return null;
+  },
+}).lazy(() => import("../routes/roadmap-slug-page").then((d) => d.Route));
 
 const postRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -170,6 +180,7 @@ const notFoundRoute = createRoute({
 export const routeTree = rootRoute.addChildren([
   homeRoute,
   roadmapRoute,
+  roadmapSlugRoute,
   boardRoute,
   postRoute,
   changelogRoute,

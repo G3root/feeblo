@@ -2,12 +2,6 @@ import { RoadmapGrid } from "@feeblo/post-ui/roadmap/roadmap-grid";
 import { PublicRoadmapIssueCard } from "@feeblo/post-ui/roadmap/roadmap-issue-card";
 import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@feeblo/ui/empty";
-import {
   Select,
   SelectItem,
   SelectPopup,
@@ -15,17 +9,24 @@ import {
   SelectValue,
 } from "@feeblo/ui/select";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createLazyRoute, useNavigate } from "@tanstack/react-router";
+import {
+  createLazyRoute,
+  getRouteApi,
+  useNavigate,
+} from "@tanstack/react-router";
 import { usePublicCollections } from "../providers/public-collections-provider";
 import { useSite } from "../providers/site-provider";
 
-export const Route = createLazyRoute("/roadmap")({
-  component: RoadmapPage,
+const roadmapSlugRouteApi = getRouteApi("/roadmap/$slug");
+
+export const Route = createLazyRoute("/roadmap/$slug")({
+  component: RoadmapSlugPage,
 });
 
-function RoadmapPage() {
+function RoadmapSlugPage() {
   const site = useSite();
   const navigate = useNavigate();
+  const { slug } = roadmapSlugRouteApi.useParams();
   const {
     publicBoardCollection,
     publicPostCollection,
@@ -130,14 +131,9 @@ function RoadmapPage() {
   if (roadmapsQuery.isError || columnsQuery.isError || postsQuery.isError) {
     return (
       <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyTitle>Roadmap unavailable</EmptyTitle>
-            <EmptyDescription>
-              There was a problem loading the roadmap.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <div className="flex min-h-64 flex-1 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
+          There was a problem loading the roadmap.
+        </div>
       </div>
     );
   }
@@ -160,18 +156,14 @@ function RoadmapPage() {
 
   const roadmaps = roadmapsQuery.data ?? [];
   const primaryRoadmap = roadmaps[0];
+  const selectedRoadmap = roadmaps.find((r) => r.slug === slug);
 
-  if (!primaryRoadmap) {
+  if (!selectedRoadmap) {
     return (
       <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyTitle>No roadmap yet</EmptyTitle>
-            <EmptyDescription>
-              This workspace does not have a public roadmap yet.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <div className="flex min-h-64 flex-1 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
+          This roadmap does not exist or has been removed.
+        </div>
       </div>
     );
   }
@@ -180,7 +172,7 @@ function RoadmapPage() {
   const posts = postsQuery.data ?? [];
   const lanes = groupRoadmapPostsByStatus(
     posts,
-    columns.filter((column) => column.roadmapId === primaryRoadmap.id)
+    columns.filter((column) => column.roadmapId === selectedRoadmap.id)
   );
 
   return (
@@ -188,25 +180,31 @@ function RoadmapPage() {
       <section className="flex h-full min-h-0 shrink-0 flex-col gap-4">
         <header className="flex items-start justify-between gap-2 px-3">
           <div>
-            <h1 className="font-semibold text-xl">{primaryRoadmap.name}</h1>
-            {primaryRoadmap.description ? (
+            <h1 className="font-semibold text-xl">{selectedRoadmap.name}</h1>
+            {selectedRoadmap.description ? (
               <p className="mt-1 text-muted-foreground text-sm">
-                {primaryRoadmap.description}
+                {selectedRoadmap.description}
               </p>
             ) : null}
           </div>
           {roadmaps.length > 1 ? (
             <Select
-              onValueChange={(slug) => {
-                if (slug !== null && slug !== primaryRoadmap.slug) {
+              onValueChange={(newSlug) => {
+                if (newSlug === null) return;
+                if (primaryRoadmap && newSlug === primaryRoadmap.slug) {
+                  navigate({
+                    to: "/roadmap",
+                    replace: true,
+                  });
+                } else {
                   navigate({
                     to: "/roadmap/$slug",
-                    params: { slug },
+                    params: { slug: newSlug },
                     replace: true,
                   });
                 }
               }}
-              value={primaryRoadmap.slug}
+              value={selectedRoadmap.slug}
             >
               <SelectTrigger className="min-w-40">
                 <SelectValue />
