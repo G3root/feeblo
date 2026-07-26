@@ -3,8 +3,10 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import { BoardRepository } from "../board/repository";
+import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
@@ -25,6 +27,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
   const repository = yield* PostRepository;
   const postPolicy = yield* PostPolicy;
+  const notifications = yield* Effect.serviceOption(NotificationService);
   // const sitePolicy = yield* SitePolicy;
 
   // -- Shared effect helpers (no policy applied) --
@@ -38,10 +41,26 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
   const updatePostEffect = (args: TPostUpdate) => {
     const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
-    return repository.update({
-      ...args,
-      content: sanitizedMarkdown,
-      excerpt: htmlToExcerpt(sanitizedHtml),
+    return Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+      const previousStatusId = yield* repository.findStatusId({ id: args.id, organizationId: args.organizationId });
+      yield* transaction(
+        repository.update({
+          ...args,
+          content: sanitizedMarkdown,
+          excerpt: htmlToExcerpt(sanitizedHtml),
+        }).pipe(
+          Effect.andThen(
+            previousStatusId && previousStatusId !== args.statusId
+              ? Option.match(notifications, {
+                  onNone: () => Effect.void,
+                  onSome: (service) => service.notifyPostStatusChanged({ organizationId: args.organizationId, postId: args.id, ...(membership ? { actorMemberId: membership.membershipId } : {}) }),
+                })
+              : Effect.void
+          )
+        )
+      );
     });
   };
 
@@ -96,6 +115,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* repository.enqueueSubmissionNotification({
             postId: args.id,
             organizationId: args.organizationId,
+          });
+
+          yield* Option.match(notifications, {
+            onNone: () => Effect.void,
+            onSome: (service) => service.notifySubmission({
+              organizationId: args.organizationId,
+              postId: args.id,
+              ...(membership ? { actorMemberId: membership.membershipId } : {}),
+            }),
           });
         })
       );
@@ -253,5 +281,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostPolicy.layer),
   Layer.provide(BoardRepository.layer),
   Layer.provide(PostRepository.layer),
-  Layer.provide(PostSubscriptionRepository.layer)
+  Layer.provide(PostSubscriptionRepository.layer),
+  Layer.provide(NotificationService.layer)
 );

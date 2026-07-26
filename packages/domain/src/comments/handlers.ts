@@ -2,7 +2,8 @@ import { transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
+import * as Option from "effect/Option";
+import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -28,6 +29,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   // const sitePolicy = yield* SitePolicy;
 
   const subscriptionRepository = yield* PostSubscriptionRepository;
+  const notifications = yield* Effect.serviceOption(NotificationService);
 
   // -- Shared effect helpers (no policy applied) --
 
@@ -52,6 +54,19 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             postId: args.postId,
             userId: session.session.userId,
             ...(membership ? { memberId: membership.membershipId } : {}),
+          });
+
+          yield* Option.match(notifications, {
+            onNone: () => Effect.void,
+            onSome: (service) =>
+              service.notifyComment({
+                organizationId: args.organizationId,
+                postId: args.postId,
+                commentId: args.id,
+                ...(membership
+                  ? { actorMemberId: membership.membershipId }
+                  : {}),
+              }),
           });
         })
       );
@@ -223,5 +238,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(CommentPolicy.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),
-  Layer.provide(PostSubscriptionRepository.layer)
+  Layer.provide(PostSubscriptionRepository.layer),
+  Layer.provide(NotificationService.layer)
 );

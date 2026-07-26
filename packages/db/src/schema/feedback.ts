@@ -944,6 +944,45 @@ export const submissionNotificationBatchTable = pgTable(
   }
 );
 
+export const notificationTable = pgTable(
+  "notification",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    recipientMemberId: text("recipient_member_id")
+      .notNull()
+      .references(() => memberTable.id, { onDelete: "cascade" }),
+    actorMemberId: text("actor_member_id").references(() => memberTable.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind").notNull(),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id").notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    href: text("href").notNull(),
+    deduplicationKey: text("deduplication_key").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("notification_recipient_read_created_idx").on(
+      table.recipientMemberId,
+      table.readAt,
+      table.createdAt
+    ),
+    index("notification_organization_idx").on(table.organizationId),
+    uniqueIndex("notification_recipient_deduplication_uidx").on(
+      table.recipientMemberId,
+      table.deduplicationKey
+    ),
+  ]
+);
+
 export type InsertComment = typeof commentTable.$inferInsert;
 export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
 export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;
