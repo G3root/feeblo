@@ -87,6 +87,12 @@ export const postSourceEnum = pgEnum("post_source", [
   "PUBLIC_BOARD",
 ]);
 
+export const notificationKindEnum = pgEnum("notification_kind", [
+  "feedback.submitted",
+  "feedback.commented",
+  "feedback.status_changed",
+]);
+
 export const contactCompanySourceEnum = pgEnum("contact_company_source", [
   "DASHBOARD",
   "WIDGET",
@@ -957,7 +963,7 @@ export const notificationTable = pgTable(
     actorMemberId: text("actor_member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
-    kind: text("kind").notNull(),
+    kind: notificationKindEnum("kind").notNull(),
     resourceType: text("resource_type").notNull(),
     resourceId: text("resource_id").notNull(),
     title: text("title").notNull(),

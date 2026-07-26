@@ -5,12 +5,14 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import type { TNotificationEventType } from "./schema";
+
 type NotificationInput = {
   actorMemberId?: string | null;
   body?: string | null;
   deduplicationKey: string;
   href: string;
-  kind: string;
+  kind: TNotificationEventType;
   organizationId: string;
   recipientMemberIds: ReadonlyArray<string | null | undefined>;
   resourceId: string;

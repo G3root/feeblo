@@ -1,12 +1,22 @@
 import { NotificationId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+export const NotificationEventType = S.Literals([
+  "feedback.submitted",
+  "feedback.commented",
+  "feedback.status_changed",
+]);
+
+export type TNotificationEventType = S.Schema.Type<
+  typeof NotificationEventType
+>;
+
 export const Notification = S.Struct({
   id: S.String,
   organizationId: S.String,
   recipientMemberId: S.String,
   actorMemberId: S.NullOr(S.String),
-  kind: S.String,
+  kind: NotificationEventType,
   resourceType: S.String,
   resourceId: S.String,
   title: S.String,

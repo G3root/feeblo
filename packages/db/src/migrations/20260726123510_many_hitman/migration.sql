@@ -1,0 +1,2 @@
+CREATE TYPE "notification_kind" AS ENUM('feedback.submitted', 'feedback.commented', 'feedback.status_changed');--> statement-breakpoint
+ALTER TABLE "notification" ALTER COLUMN "kind" SET DATA TYPE "notification_kind" USING "kind"::"notification_kind";
