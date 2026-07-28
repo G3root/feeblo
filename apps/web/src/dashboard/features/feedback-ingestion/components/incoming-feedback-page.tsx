@@ -77,6 +77,7 @@ export function IncomingFeedbackPage({
         rpc.FeedbackTriageList({
           organizationId,
           status: "OPEN",
+          pageSize: 100,
         })
       ),
     refetchInterval: refreshMs,
@@ -99,7 +100,7 @@ export function IncomingFeedbackPage({
             Incoming feedback
           </h1>
           {triageItems.data && (
-            <Badge variant="secondary">{triageItems.data.length}</Badge>
+            <Badge variant="secondary">{triageItems.data.items.length}</Badge>
           )}
         </div>
         <p className="mt-1 max-w-2xl text-muted-foreground text-sm">
@@ -134,7 +135,7 @@ export function IncomingFeedbackPage({
         </Card>
       )}
 
-      {triageItems.data?.length === 0 && (
+      {triageItems.data?.items.length === 0 && (
         <Card>
           <Empty>
             <EmptyHeader>
@@ -151,7 +152,7 @@ export function IncomingFeedbackPage({
         </Card>
       )}
 
-      {triageItems.data?.map((triageItem) => (
+      {triageItems.data?.items.map((triageItem) => (
         <FeedbackTriageCard
           boards={boards}
           key={triageItem.id}

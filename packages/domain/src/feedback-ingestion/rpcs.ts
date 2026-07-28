@@ -1,4 +1,3 @@
-import * as S from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import { AuthMiddleware } from "../session-middleware";
@@ -8,9 +7,9 @@ import {
   CaptureFeedbackResult,
   FeedbackTriageCreatePost,
   FeedbackTriageIgnore,
-  FeedbackTriageItem,
   FeedbackTriageLinkPost,
   FeedbackTriageList,
+  FeedbackTriagePage,
   FeedbackTriageResolution,
 } from "./schema";
 
@@ -23,7 +22,7 @@ export class FeedbackIngestionRpcs extends RpcGroup.make(
 
   Rpc.make("FeedbackTriageList", {
     payload: FeedbackTriageList,
-    success: S.Array(FeedbackTriageItem),
+    success: FeedbackTriagePage,
     error: FeedbackIngestionServiceErrors,
   }).middleware(AuthMiddleware),
 

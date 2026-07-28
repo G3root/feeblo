@@ -20,6 +20,14 @@ export const FeedbackChannelKind = S.Literals([
 
 export type TFeedbackChannelKind = S.Schema.Type<typeof FeedbackChannelKind>;
 
+const NonBlankString = S.String.check(S.isPattern(/\S/));
+const FeedbackKey = NonBlankString.check(S.isMaxLength(255));
+const FeedbackText = S.String.check(S.isMaxLength(10_000));
+const FeedbackMetadata = S.Record(
+  S.String.check(S.isMaxLength(128)),
+  S.MutableJson
+);
+
 export const FeedbackSender = S.Struct({
   upstreamId: S.optional(S.String),
   email: S.optional(S.String),
@@ -27,22 +35,22 @@ export const FeedbackSender = S.Struct({
 });
 
 export const FeedbackMessage = S.Struct({
-  text: S.String,
-  title: S.optional(S.String),
+  text: FeedbackText,
+  title: S.optional(FeedbackText),
 });
 
 export const CaptureFeedback = S.Struct({
   organizationId: WorkspaceId.schema,
   channel: S.Struct({
-    key: S.String,
+    key: FeedbackKey,
     kind: FeedbackChannelKind,
     label: S.String,
   }),
   upstreamItemId: S.optional(S.String),
-  deliveryKey: S.String,
+  deliveryKey: FeedbackKey,
   sender: FeedbackSender,
   message: FeedbackMessage,
-  metadata: S.optional(S.Record(S.String, S.Unknown)),
+  metadata: S.optional(FeedbackMetadata),
 });
 
 export type TCaptureFeedback = S.Schema.Type<typeof CaptureFeedback>;
@@ -99,9 +107,30 @@ export type TFeedbackTriageItem = S.Schema.Type<typeof FeedbackTriageItem>;
 export const FeedbackTriageList = S.Struct({
   organizationId: WorkspaceId.schema,
   status: S.optional(FeedbackTriageStatus),
+  pageSize: S.Number.check(
+    S.isInt(),
+    S.isGreaterThanOrEqualTo(1),
+    S.isLessThanOrEqualTo(100)
+  ),
+  cursor: S.optional(
+    S.Struct({
+      createdAt: S.DateFromString,
+      id: FeedbackTriageItemId.schema,
+    })
+  ),
 });
 
 export type TFeedbackTriageList = S.Schema.Type<typeof FeedbackTriageList>;
+
+export const FeedbackTriagePage = S.Struct({
+  items: S.Array(FeedbackTriageItem),
+  nextCursor: S.NullOr(
+    S.Struct({
+      createdAt: S.DateFromString,
+      id: FeedbackTriageItemId.schema,
+    })
+  ),
+});
 
 export const FeedbackTriageCreatePost = S.Struct({
   organizationId: WorkspaceId.schema,

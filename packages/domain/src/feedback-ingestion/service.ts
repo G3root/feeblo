@@ -67,6 +67,10 @@ const makeFeedbackIngestionService = Effect.gen(function* () {
           receiptId: result.receiptId,
         },
         { discard: true }
+      ).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Failed to schedule feedback ingestion", cause)
+        )
       );
 
       return result;

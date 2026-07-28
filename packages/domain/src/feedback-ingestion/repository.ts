@@ -8,7 +8,7 @@ import {
   FeedbackTriageItemId,
   WorkspaceId,
 } from "@feeblo/id";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -27,6 +27,9 @@ import type {
 const toFeedbackReceiptId = asLegid(FeedbackReceiptId);
 const toFeedbackTriageItemId = asLegid(FeedbackTriageItemId);
 const toWorkspaceId = asLegid(WorkspaceId);
+
+const normalizeEmail = (email: string | undefined) =>
+  email?.trim().toLowerCase() || undefined;
 
 const contactSourceFor = (
   source: TFeedbackChannelKind
@@ -266,6 +269,7 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
         }
 
         const upstreamContactId = raw.sender.upstreamId;
+        const email = normalizeEmail(raw.sender.email);
         const mapped = upstreamContactId
           ? yield* db
               .select({
@@ -294,12 +298,12 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
         if (!contactId) {
           const existing = yield* findContact({
             organizationId,
-            email: raw.sender.email,
+            email,
           });
           contactId = existing?.id;
         }
 
-        if (!(contactId || upstreamContactId || raw.sender.email)) {
+        if (!(contactId || upstreamContactId || email)) {
           yield* db
             .update(schema.feedbackReceiptTable)
             .set({
@@ -319,7 +323,7 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
             .values({
               id: generatedContactId,
               organizationId,
-              email: raw.sender.email,
+              email,
               name: raw.sender.name,
               source: contactSourceFor(raw.channelKind),
               createdAt: now,
@@ -332,7 +336,7 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
             created?.id ??
             (yield* findContact({
               organizationId,
-              email: raw.sender.email,
+              email,
             }))?.id;
           createdContactId = created?.id;
         }
@@ -532,21 +536,50 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
             ),
             ...(input.status
               ? [eq(schema.feedbackTriageItemTable.status, input.status)]
+              : []),
+            ...(input.cursor
+              ? [
+                  or(
+                    gt(
+                      schema.feedbackTriageItemTable.createdAt,
+                      input.cursor.createdAt
+                    ),
+                    and(
+                      eq(
+                        schema.feedbackTriageItemTable.createdAt,
+                        input.cursor.createdAt
+                      ),
+                      gt(schema.feedbackTriageItemTable.id, input.cursor.id)
+                    )
+                  ),
+                ]
               : [])
           )
         )
-        .orderBy(asc(schema.feedbackTriageItemTable.createdAt))
+        .orderBy(
+          asc(schema.feedbackTriageItemTable.createdAt),
+          asc(schema.feedbackTriageItemTable.id)
+        )
+        .limit(input.pageSize + 1)
         .pipe(
-          Effect.map((rows) =>
-            rows.map((row) => ({
+          Effect.map((rows) => {
+            const items = rows.slice(0, input.pageSize).map((row) => ({
               ...row,
               id: toFeedbackTriageItemId(row.id),
               organizationId: toWorkspaceId(row.organizationId),
               receiptId: toFeedbackReceiptId(row.receiptId),
               senderName: row.sender.name ?? null,
               senderEmail: row.sender.email ?? null,
-            }))
-          )
+            }));
+            const lastItem = items.at(-1);
+            return {
+              items,
+              nextCursor:
+                rows.length > input.pageSize && lastItem
+                  ? { createdAt: lastItem.createdAt, id: lastItem.id }
+                  : null,
+            };
+          })
         ),
 
     getOpenTriageItemForUpdate: ({
@@ -589,7 +622,7 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
             )
           )
           .limit(1)
-          .for("update")
+          .for("update", { of: schema.feedbackTriageItemTable })
           .pipe(Effect.map((rows) => rows[0]));
 
         if (!triageItem) {

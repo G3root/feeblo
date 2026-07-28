@@ -2,6 +2,7 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema, transaction } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, UserId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import { PostRepository } from "../post/repository";
@@ -126,6 +127,51 @@ const makeFixture = Effect.fn("FeedbackIngestionTest.makeFixture")(
 
 describe("feedback ingestion", () => {
   layer(TestLayer)("repository and triage", (it) => {
+    it.effect(
+      "rejects triage items whose receipt belongs to another workspace",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const repository = yield* FeedbackIngestionRepository;
+          const fixture = yield* makeFixture();
+          const foreignOrganizationId = yield* WorkspaceId.generate;
+          const now = new Date();
+
+          yield* db.insert(schema.organizationTable).values({
+            id: foreignOrganizationId,
+            name: "Foreign workspace",
+            slug: foreignOrganizationId,
+            createdAt: now,
+          });
+          const foreignReceipt = yield* transaction(
+            repository.captureIdempotently({
+              organizationId: foreignOrganizationId,
+              channel: {
+                key: "api:default",
+                kind: "API",
+                label: "Public API",
+              },
+              deliveryKey: "foreign-request-123",
+              sender: {},
+              message: { text: "Foreign feedback" },
+              metadata: {},
+            })
+          );
+
+          const result = yield* Effect.exit(
+            transaction(
+              repository.persistAssessment({
+                organizationId: fixture.organizationId,
+                receiptId: foreignReceipt.receiptId,
+                assessment,
+              })
+            )
+          );
+
+          expect(Exit.isFailure(result)).toBe(true);
+        })
+    );
+
     it.effect("captures idempotently and attaches a contact vote once", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
@@ -203,9 +249,10 @@ describe("feedback ingestion", () => {
           })
         );
 
-        const [triageItem] = yield* repository.listTriageItems({
+        const { items: [triageItem] } = yield* repository.listTriageItems({
           organizationId: fixture.organizationId,
           status: "OPEN",
+          pageSize: 100,
         });
         expect(triageItem).toMatchObject({
           senderEmail: "customer@example.com",
@@ -236,9 +283,10 @@ describe("feedback ingestion", () => {
           .from(schema.upvoteTable);
         expect(votes).toEqual([{ contactId, userId: null }]);
 
-        const [resolved] = yield* repository.listTriageItems({
+        const { items: [resolved] } = yield* repository.listTriageItems({
           organizationId: fixture.organizationId,
           status: "POST_LINKED",
+          pageSize: 100,
         });
         expect(resolved?.id).toBe(triageItem.id);
 
@@ -287,9 +335,10 @@ describe("feedback ingestion", () => {
           receiptId: captured.receiptId,
         });
 
-        const [triageItem] = yield* repository.listTriageItems({
+        const { items: [triageItem] } = yield* repository.listTriageItems({
           organizationId: fixture.organizationId,
           status: "OPEN",
+          pageSize: 100,
         });
         expect(triageItem).toMatchObject({
           senderEmail: "workflow@example.com",

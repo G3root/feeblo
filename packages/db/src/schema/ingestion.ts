@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   jsonb,
   pgEnum,
@@ -133,6 +134,10 @@ export const feedbackReceiptTable = pgTable(
     uniqueIndex(
       "feedback_receipt_organizationId_channelId_deliveryKey_uidx"
     ).on(table.organizationId, table.channelId, table.deliveryKey),
+    uniqueIndex("feedback_receipt_id_organizationId_uidx").on(
+      table.id,
+      table.organizationId
+    ),
     index("feedback_receipt_organizationId_pipelineStage_idx").on(
       table.organizationId,
       table.pipelineStage
@@ -234,5 +239,13 @@ export const feedbackTriageItemTable = pgTable(
       "feedback_triage_item_post_result_chk",
       sql`(${table.status} in ('POST_CREATED', 'POST_LINKED') and ${table.resolvedPostId} is not null) or (${table.status} in ('OPEN', 'IGNORED') and ${table.resolvedPostId} is null)`
     ),
+    foreignKey({
+      name: "feedback_triage_item_receipt_same_organization_fk",
+      columns: [table.receiptId, table.organizationId],
+      foreignColumns: [
+        feedbackReceiptTable.id,
+        feedbackReceiptTable.organizationId,
+      ],
+    }).onDelete("cascade"),
   ]
 );

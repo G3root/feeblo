@@ -33,7 +33,7 @@ const describeProcessingError = (
 ) => {
   switch (error._tag) {
     case "FeedbackProcessingDataError":
-      return `${error.operation}: ${String(error.cause)}`;
+      return `${error.operation}: ${error._tag}`;
     case "FeedbackNotFoundError":
       return error.message ?? "Feedback was not found";
     default:
@@ -131,20 +131,25 @@ export const FeedbackIngestionWorkflowLayer = FeedbackIngestionWorkflow.toLayer(
 
     yield* processFeedback.pipe(
       Effect.tapError((error) =>
-        transaction(
-          FeedbackIngestionRepository.pipe(
-            Effect.flatMap((repository) =>
-              repository.markProcessingFailed({
-                ...payload,
-                message: describeProcessingError(error),
-              })
+        Effect.gen(function* () {
+          if (error._tag === "FeedbackProcessingDataError") {
+            yield* Effect.logWarning("Feedback processing failed", error.cause);
+          }
+          yield* transaction(
+            FeedbackIngestionRepository.pipe(
+              Effect.flatMap((repository) =>
+                repository.markProcessingFailed({
+                  ...payload,
+                  message: describeProcessingError(error),
+                })
+              )
+            )
+          ).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning("Failed to record ingestion failure", cause)
             )
           )
-        ).pipe(
-          Effect.catchCause((cause) =>
-            Effect.logWarning("Failed to record ingestion failure", cause)
-          )
-        )
+        })
       )
     );
 
