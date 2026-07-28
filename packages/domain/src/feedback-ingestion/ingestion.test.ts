@@ -4,12 +4,14 @@ import { BoardId, PostId, PostStatusId, UserId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as S from "effect/Schema";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import { PostRepository } from "../post/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { UpvoteRepository } from "../upvote/repository";
 import { type FeedbackAssessment, FeedbackAssessor } from "./interpreter";
 import { FeedbackIngestionRepository } from "./repository";
+import { CaptureFeedback } from "./schema";
 import { FeedbackTriageService } from "./service";
 import {
   FeedbackIngestionWorkflow,
@@ -127,6 +129,109 @@ const makeFixture = Effect.fn("FeedbackIngestionTest.makeFixture")(
 
 describe("feedback ingestion", () => {
   layer(TestLayer)("repository and triage", (it) => {
+    it.effect("validates bounded, non-blank captured feedback", () =>
+      Effect.gen(function* () {
+        const organizationId = yield* WorkspaceId.generate;
+        const valid = {
+          organizationId,
+          channel: { key: "api:default", kind: "API", label: "Public API" },
+          deliveryKey: "request-123",
+          sender: {},
+          message: { text: "A valid request" },
+          metadata: { source: ["api", true, null] },
+        };
+
+        yield* S.decodeUnknownEffect(CaptureFeedback)(valid);
+
+        const invalid = S.decodeUnknownExit(CaptureFeedback)({
+          ...valid,
+          deliveryKey: "   ",
+          message: { text: "x".repeat(10_001) },
+        });
+        expect(Exit.isFailure(invalid)).toBe(true);
+      })
+    );
+
+    it.effect("normalizes contact email before lookup and creation", () =>
+      Effect.gen(function* () {
+        const repository = yield* FeedbackIngestionRepository;
+        const fixture = yield* makeFixture();
+        const input = {
+          organizationId: fixture.organizationId,
+          channel: { key: "api:default", kind: "API", label: "Public API" },
+          sender: { email: "  CUSTOMER@EXAMPLE.COM  " },
+          message: { text: "Please add export auditing." },
+        } as const;
+        const first = yield* transaction(
+          repository.captureIdempotently({ ...input, deliveryKey: "request-1" })
+        );
+        const firstContactId = yield* transaction(
+          repository.resolveIdentity({
+            organizationId: fixture.organizationId,
+            receiptId: first.receiptId,
+          })
+        );
+        const second = yield* transaction(
+          repository.captureIdempotently({
+            ...input,
+            deliveryKey: "request-2",
+            sender: { email: "customer@example.com" },
+          })
+        );
+        const secondContactId = yield* transaction(
+          repository.resolveIdentity({
+            organizationId: fixture.organizationId,
+            receiptId: second.receiptId,
+          })
+        );
+
+        expect(firstContactId).toBe(secondContactId);
+      })
+    );
+
+    it.effect("returns triage items with an ascending keyset cursor", () =>
+      Effect.gen(function* () {
+        const repository = yield* FeedbackIngestionRepository;
+        const fixture = yield* makeFixture();
+        const receipts = yield* Effect.forEach(["1", "2", "3"], (suffix) =>
+          transaction(
+            repository.captureIdempotently({
+              organizationId: fixture.organizationId,
+              channel: { key: "api:default", kind: "API", label: "Public API" },
+              deliveryKey: `page-${suffix}`,
+              sender: {},
+              message: { text: `Feedback ${suffix}` },
+            })
+          )
+        );
+        yield* Effect.forEach(receipts, (receipt) =>
+          transaction(
+            repository.persistAssessment({
+              organizationId: fixture.organizationId,
+              receiptId: receipt.receiptId,
+              assessment,
+            })
+          )
+        );
+
+        const firstPage = yield* repository.listTriageItems({
+          organizationId: fixture.organizationId,
+          pageSize: 2,
+        });
+        const secondPage = yield* repository.listTriageItems({
+          organizationId: fixture.organizationId,
+          pageSize: 2,
+          cursor: firstPage.nextCursor ?? undefined,
+        });
+
+        expect(firstPage.items).toHaveLength(2);
+        expect(firstPage.nextCursor).not.toBeNull();
+        expect(secondPage.items).toHaveLength(1);
+        expect(secondPage.items[0]?.id).not.toBe(firstPage.items[1]?.id);
+        expect(secondPage.nextCursor).toBeNull();
+      })
+    );
+
     it.effect(
       "rejects triage items whose receipt belongs to another workspace",
       () =>
