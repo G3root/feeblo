@@ -9,9 +9,12 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Separator } from "@feeblo/ui/separator";
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import {
+  Activity01Icon,
   Calendar03Icon,
   CircleLockIcon,
+  Comment01Icon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -19,6 +22,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { PostBoardField } from "~/features/post/components/post-board-field";
+import { PostActivityList } from "~/features/post/components/post-activity-list";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
@@ -128,9 +132,28 @@ function RouteComponent() {
 
               <PostPage.Vote />
             </div>
-            <PostPage.DashboardCommentComposer />
-
-            <PostPage.Comments />
+            <Tabs defaultValue="comments">
+              <TabsList variant="underline">
+                <TabsTab value="comments">
+                  <HugeiconsIcon icon={Comment01Icon} />
+                  Comments
+                </TabsTab>
+                <TabsTab value="activity">
+                  <HugeiconsIcon icon={Activity01Icon} />
+                  Activity
+                </TabsTab>
+              </TabsList>
+              <TabsPanel className="space-y-6 pt-4" value="comments">
+                <PostPage.DashboardCommentComposer />
+                <PostPage.Comments />
+              </TabsPanel>
+              <TabsPanel className="pt-4" value="activity">
+                <PostActivityList
+                  organizationId={organizationId}
+                  postId={post.id}
+                />
+              </TabsPanel>
+            </Tabs>
           </section>
         </div>
 

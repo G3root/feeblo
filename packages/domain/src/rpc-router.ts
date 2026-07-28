@@ -17,6 +17,7 @@ import { MembershipRpcHandlers } from "./membership/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
 import { OrganizationRpcHandlers } from "./organization/handlers";
 import { PostRpcHandlers } from "./post/handlers";
+import { PostActivityRpcHandlers } from "./post-activity/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { PostStatusRpcHandlers } from "./post-status/handlers";
 import { PostSubscriptionRpcHandlers } from "./post-subscription/handlers";
@@ -37,7 +38,7 @@ export const RpcRoute = RpcServer.layerHttp({
   protocol: "http",
   group: AllRpcs,
 }).pipe(
-  Layer.provide(PostRpcHandlers),
+  Layer.provide(Layer.merge(PostRpcHandlers, PostActivityRpcHandlers)),
   Layer.provide(BillingRpcHandlers),
   Layer.provide(BoardRpcHandlers),
   Layer.provide(Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)),

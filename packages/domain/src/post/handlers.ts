@@ -8,9 +8,14 @@ import * as Option from "effect/Option";
 import { BoardRepository } from "../board/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
+import {
+  type CreatePostActivity,
+  PostActivityRepository,
+} from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { FailedToUpdatePostError } from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -26,6 +31,7 @@ import type {
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
   const repository = yield* PostRepository;
+  const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
   const notifications = yield* Effect.serviceOption(NotificationService);
   // const sitePolicy = yield* SitePolicy;
@@ -44,22 +50,69 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     return Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
-      const previousStatusId = yield* repository.findStatusId({ id: args.id, organizationId: args.organizationId });
       yield* transaction(
-        repository.update({
-          ...args,
-          content: sanitizedMarkdown,
-          excerpt: htmlToExcerpt(sanitizedHtml),
-        }).pipe(
-          Effect.andThen(
-            previousStatusId && previousStatusId !== args.statusId
-              ? Option.match(notifications, {
-                  onNone: () => Effect.void,
-                  onSome: (service) => service.notifyPostStatusChanged({ organizationId: args.organizationId, postId: args.id, ...(membership ? { actorMemberId: membership.membershipId } : {}) }),
-                })
-              : Effect.void
-          )
-        )
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          const actor = {
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+          };
+          const activities: CreatePostActivity[] = [];
+          if (previous.title !== args.title) {
+            activities.push({
+              ...actor,
+              kind: "TITLE_CHANGED",
+              previousValue: previous.title,
+              nextValue: args.title,
+            });
+          }
+          if (previous.content !== sanitizedMarkdown) {
+            activities.push({ ...actor, kind: "CONTENT_CHANGED" });
+          }
+          if (previous.statusId !== args.statusId) {
+            activities.push({
+              ...actor,
+              kind: "STATUS_CHANGED",
+              previousValue: previous.statusId,
+              nextValue: args.statusId,
+            });
+          }
+          if (previous.boardId !== args.boardId) {
+            activities.push({
+              ...actor,
+              kind: "BOARD_CHANGED",
+              previousValue: previous.boardId,
+              nextValue: args.boardId,
+            });
+          }
+          yield* repository.update({
+            ...args,
+            content: sanitizedMarkdown,
+            excerpt: htmlToExcerpt(sanitizedHtml),
+          });
+          yield* activityRepository.createMany(activities);
+          if (previous.statusId !== args.statusId) {
+            yield* Option.match(notifications, {
+              onNone: () => Effect.void,
+              onSome: (service) =>
+                service.notifyPostStatusChanged({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  ...(membership
+                    ? { actorMemberId: membership.membershipId }
+                    : {}),
+                }),
+            });
+          }
+        })
       );
     });
   };
@@ -104,6 +157,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             ...(membership ? { creatorMemberId: membership.membershipId } : {}),
           });
 
+          yield* activityRepository.create({
+            organizationId: args.organizationId,
+            postId: args.id,
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            kind: "POST_CREATED",
+          });
+
           // The creator of a post is automatically subscribed to it.
           yield* subscriptionRepository.subscribe({
             organizationId: args.organizationId,
@@ -119,11 +180,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
           yield* Option.match(notifications, {
             onNone: () => Effect.void,
-            onSome: (service) => service.notifySubmission({
-              organizationId: args.organizationId,
-              postId: args.id,
-              ...(membership ? { actorMemberId: membership.membershipId } : {}),
-            }),
+            onSome: (service) =>
+              service.notifySubmission({
+                organizationId: args.organizationId,
+                postId: args.id,
+                ...(membership
+                  ? { actorMemberId: membership.membershipId }
+                  : {}),
+              }),
           });
         })
       );
@@ -254,12 +318,51 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostAdminUpdate: (args: TPostAdminUpdate) =>
-      repository
-        .adminUpdate(args)
-        .pipe(
-          Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
-          withRemapDbErrors("Post", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+        yield* transaction(
+          Effect.gen(function* () {
+            const previous = yield* repository.findActivityState({
+              id: args.id,
+              organizationId: args.organizationId,
+            });
+            if (!previous) {
+              return yield* new FailedToUpdatePostError();
+            }
+            const actor = {
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              organizationId: args.organizationId,
+              postId: args.id,
+            };
+            const activities: CreatePostActivity[] = [];
+            if (
+              args.locked !== undefined &&
+              Boolean(previous.lockedAt) !== args.locked
+            ) {
+              activities.push({
+                ...actor,
+                kind: args.locked ? "POST_LOCKED" : "POST_UNLOCKED",
+              });
+            }
+            if (
+              args.archived !== undefined &&
+              Boolean(previous.archivedAt) !== args.archived
+            ) {
+              activities.push({
+                ...actor,
+                kind: args.archived ? "POST_ARCHIVED" : "POST_UNARCHIVED",
+              });
+            }
+            yield* repository.adminUpdate(args);
+            yield* activityRepository.createMany(activities);
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
+        withRemapDbErrors("Post", "update")
+      ),
 
     PostMerge: (args: TPostMerge) =>
       Effect.gen(function* () {
@@ -281,6 +384,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostPolicy.layer),
   Layer.provide(BoardRepository.layer),
   Layer.provide(PostRepository.layer),
+  Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(NotificationService.layer)
 );

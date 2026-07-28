@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
+import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { withRemapDbErrors } from "../rpc-errors";
@@ -25,6 +26,7 @@ import type {
 
 export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentRepository;
+  const activityRepository = yield* PostActivityRepository;
   const commentPolicy = yield* CommentPolicy;
   // const sitePolicy = yield* SitePolicy;
 
@@ -46,6 +48,16 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             content: sanitizedMarkdown,
             userId: session.session.userId,
             ...(membership ? { memberId: membership.membershipId } : {}),
+          });
+
+          yield* activityRepository.create({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            kind: "COMMENT_CREATED",
+            commentId: args.id,
+            nextValue: args.visibility,
           });
 
           // Commenting on a post automatically subscribes the user to it.
@@ -80,13 +92,29 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const deleteCommentEffect = (args: TCommentDelete) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
 
-      const deletedComment = yield* repository.delete({
-        id: args.id,
-        organizationId: args.organizationId,
-        postId: args.postId,
-        userId: session.session.userId,
-      });
+      const deletedComment = yield* transaction(
+        Effect.gen(function* () {
+          const deleted = yield* repository.delete({
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+            userId: session.session.userId,
+          });
+          if (deleted) {
+            yield* activityRepository.create({
+              organizationId: args.organizationId,
+              postId: args.postId,
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "COMMENT_DELETED",
+              commentId: args.id,
+            });
+          }
+          return deleted;
+        })
+      );
 
       if (!deletedComment) {
         return yield* new FailedToDeleteCommentError({
@@ -107,14 +135,30 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       const membership = Policy.getMembership(session, args.organizationId);
 
       //only members can update visibility
-      const updatedComment = yield* repository.update({
-        id: args.id,
-        organizationId: args.organizationId,
-        postId: args.postId,
-        content: sanitizedMarkdown,
-        userId: session.session.userId,
-        ...(membership ? { visibility: args.visibility } : {}),
-      });
+      const updatedComment = yield* transaction(
+        Effect.gen(function* () {
+          const updated = yield* repository.update({
+            id: args.id,
+            organizationId: args.organizationId,
+            postId: args.postId,
+            content: sanitizedMarkdown,
+            userId: session.session.userId,
+            ...(membership ? { visibility: args.visibility } : {}),
+          });
+          if (updated) {
+            yield* activityRepository.create({
+              organizationId: args.organizationId,
+              postId: args.postId,
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              kind: "COMMENT_UPDATED",
+              commentId: args.id,
+              nextValue: membership ? args.visibility : null,
+            });
+          }
+          return updated;
+        })
+      );
 
       if (!updatedComment) {
         return yield* new FailedToUpdateCommentError({
@@ -238,6 +282,7 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(CommentPolicy.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),
+  Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(NotificationService.layer)
 );

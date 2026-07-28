@@ -12,6 +12,7 @@ import { MembershipRpcs } from "./membership/rpcs";
 import { NotificationRpcs } from "./notification/rpcs";
 import { OrganizationRpcs } from "./organization/rpcs";
 import { PostRpcs } from "./post/rpcs";
+import { PostActivityRpcs } from "./post-activity/rpcs";
 import { PostReactionRpcs } from "./post-reaction/rpcs";
 import { PostStatusRpcs } from "./post-status/rpcs";
 import { PostSubscriptionRpcs } from "./post-subscription/rpcs";
@@ -22,7 +23,7 @@ import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
-export const AllRpcs = PostRpcs.merge(
+export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
   AttributeDefinitionRpcs,
   BillingRpcs,
   BoardRpcs,

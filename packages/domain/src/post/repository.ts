@@ -100,6 +100,27 @@ const makePostRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
+    findActivityState: ({ id, organizationId }: TPostById) =>
+      db
+        .select({
+          archivedAt: schema.postTable.archivedAt,
+          boardId: schema.postTable.boardId,
+          content: schema.postTable.content,
+          lockedAt: schema.postTable.lockedAt,
+          statusId: schema.postTable.statusId,
+          title: schema.postTable.title,
+        })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .for("update")
+        .pipe(Effect.map((rows) => rows[0])),
+
     findStatusId: ({ id, organizationId }: TPostById) =>
       db
         .select({ statusId: schema.postTable.statusId })

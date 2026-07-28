@@ -1,4 +1,5 @@
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
+import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
@@ -658,6 +659,58 @@ export const commentCollection = createCollection(
         {}
       );
     },
+  })
+);
+
+export const postActivityCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: (opts) => {
+      const parsed = parseLoadSubsetOptions(opts);
+      const postId = getEqFilterValue(parsed.filters, "postId");
+
+      return postId
+        ? getOrganizationScopedQueryKey("post-activity", "postId", postId)
+        : getOrganizationScopedQueryKey("post-activity");
+    },
+    syncMode: "on-demand",
+    refetchInterval: Duration.toMillis(Duration.seconds(30)),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+      const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
+      const postId = getEqFilterValue(parsed.filters, "postId");
+
+      if (!(organizationId && postId)) {
+        return [];
+      }
+
+      const existingData =
+        queryClient.getQueryData<readonly TPostActivity[]>(ctx.queryKey) ?? [];
+      const since = existingData.reduce<Date | undefined>(
+        (latest, activity) =>
+          latest === undefined || activity.createdAt > latest
+            ? activity.createdAt
+            : latest,
+        undefined
+      );
+      const changes = await fetchRpc(
+        (rpc) =>
+          rpc.PostActivityList({
+            organizationId,
+            postId,
+            ...(since === undefined ? {} : { since }),
+          }),
+        { signal: ctx.signal }
+      );
+      const merged = new Map(
+        existingData.map((activity) => [activity.id, activity])
+      );
+      for (const activity of changes) {
+        merged.set(activity.id, activity);
+      }
+      return [...merged.values()];
+    },
+    queryClient,
+    getKey: (item) => item.id,
   })
 );
 
@@ -1447,6 +1500,7 @@ export const dashboardCollections = {
   membershipCollection,
   organizationCollection,
   postCollection,
+  postActivityCollection,
   postReactionCollection,
   postStatusCollection,
   postSubscriptionCollection,
