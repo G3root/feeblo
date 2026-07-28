@@ -110,6 +110,8 @@ export const postCollection = createCollection(
           organizationId: updatedPost.organizationId,
         })
       );
+
+      await postActivityCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -628,6 +630,8 @@ export const commentCollection = createCollection(
           }),
         {}
       );
+
+      await postActivityCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -642,6 +646,8 @@ export const commentCollection = createCollection(
           }),
         {}
       );
+
+      await postActivityCollection.utils.refetch();
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -658,6 +664,8 @@ export const commentCollection = createCollection(
           }),
         {}
       );
+
+      await postActivityCollection.utils.refetch();
     },
   })
 );

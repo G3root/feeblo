@@ -52,7 +52,7 @@ const PostPublicActionButtons = memo(function PostPublicActionButtons() {
 function PostAdminActionButtons() {
   const { post, board, canManagePost, isLocked, organizationId } =
     usePostCollectionData();
-  const { postCollection } = useDashboardCollections();
+  const { postActivityCollection, postCollection } = useDashboardCollections();
   const postDialogStore = usePostDeleteDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
   const [pendingAction, setPendingAction] = useState<PostAdminAction | null>(
@@ -79,6 +79,7 @@ function PostAdminActionButtons() {
       );
 
       await postCollection.utils.refetch();
+      await postActivityCollection.utils.refetch();
     },
   });
 
@@ -88,9 +89,11 @@ function PostAdminActionButtons() {
     try {
       const nextLocked = action === "lock" ? !isLocked : isLocked;
 
-      await updatePostAdminState({
+      const transaction = updatePostAdminState({
         locked: nextLocked,
       });
+      await transaction.isPersisted.promise;
+
       trackEvent("post_lock_changed", { locked: nextLocked, success: true });
 
       toastManager.add({
