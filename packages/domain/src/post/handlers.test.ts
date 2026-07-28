@@ -12,6 +12,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { BoardRepository } from "../board/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { PostActivityRepository } from "../post-activity/repository";
 import { BadRequestError } from "../rpc-errors";
 import {
   CurrentSession,
@@ -147,6 +148,7 @@ describe("PostRpcHandlers", () => {
   const RepositoriesTest = Layer.mergeAll(
     BoardRepository.layer,
     PostRepository.layer,
+    PostActivityRepository.layer,
     PostSubscriptionRepository.layer,
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 

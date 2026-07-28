@@ -17,6 +17,7 @@ import {
   jwtSecretTable,
   memberTable,
   organizationTable,
+  postActivityTable,
   postReactionTable,
   roadmapColumnTable,
   roadmapTable,
@@ -51,6 +52,7 @@ export const relations = defineRelations(
     boardTable,
     tagTable,
     postTable,
+    postActivityTable,
     postTagTable,
     postStatusTable,
     upvoteTable,
@@ -355,6 +357,10 @@ export const relations = defineRelations(
         from: r.postTable.id,
         to: r.commentTable.postId,
       }),
+      activities: r.many.postActivityTable({
+        from: r.postTable.id,
+        to: r.postActivityTable.postId,
+      }),
       postTags: r.many.postTagTable({
         from: r.postTable.id,
         to: r.postTagTable.postId,
@@ -370,6 +376,24 @@ export const relations = defineRelations(
       submissionNotification: r.one.submissionNotificationQueueTable({
         from: r.postTable.id,
         to: r.submissionNotificationQueueTable.postId,
+      }),
+    },
+    postActivityTable: {
+      post: r.one.postTable({
+        from: r.postActivityTable.postId,
+        to: r.postTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.postActivityTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      actor: r.one.userTable({
+        from: r.postActivityTable.actorId,
+        to: r.userTable.id,
+      }),
+      actorMember: r.one.memberTable({
+        from: r.postActivityTable.actorMemberId,
+        to: r.memberTable.id,
       }),
     },
     postSubscriptionTable: {

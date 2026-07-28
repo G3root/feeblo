@@ -87,6 +87,21 @@ export const postSourceEnum = pgEnum("post_source", [
   "PUBLIC_BOARD",
 ]);
 
+export const postActivityKindEnum = pgEnum("post_activity_kind", [
+  "POST_CREATED",
+  "TITLE_CHANGED",
+  "CONTENT_CHANGED",
+  "STATUS_CHANGED",
+  "BOARD_CHANGED",
+  "POST_LOCKED",
+  "POST_UNLOCKED",
+  "POST_ARCHIVED",
+  "POST_UNARCHIVED",
+  "COMMENT_CREATED",
+  "COMMENT_UPDATED",
+  "COMMENT_DELETED",
+]);
+
 export const notificationKindEnum = pgEnum("notification_kind", [
   "feedback.submitted",
   "feedback.commented",
@@ -669,6 +684,39 @@ export const commentReactionTable = pgTable(
       table.commentId,
       table.emoji
     ),
+  ]
+);
+
+export const postActivityTable = pgTable(
+  "post_activity",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    actorId: text("actor_id").references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    actorMemberId: text("actor_member_id").references(() => memberTable.id, {
+      onDelete: "set null",
+    }),
+    kind: postActivityKindEnum("kind").notNull(),
+    previousValue: text("previous_value"),
+    nextValue: text("next_value"),
+    commentId: text("comment_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("post_activity_postId_createdAt_idx").on(
+      table.postId,
+      table.createdAt
+    ),
+    index("post_activity_organizationId_idx").on(table.organizationId),
   ]
 );
 

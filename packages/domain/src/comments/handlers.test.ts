@@ -14,6 +14,7 @@ import * as Option from "effect/Option";
 import { BoardRepository } from "../board/repository";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
+import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import {
   CurrentSession,
@@ -174,6 +175,7 @@ describe("CommentRpcHandlers", () => {
   const RepositoriesTest = Layer.mergeAll(
     BoardRepository.layer,
     CommentRepository.layer,
+    PostActivityRepository.layer,
     PostRepository.layer,
     PostSubscriptionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));

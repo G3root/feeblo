@@ -121,6 +121,9 @@
     "./post/schema": {
       "default": "./src/post/schema.ts"
     },
+    "./post-activity/schema": {
+      "default": "./src/post-activity/schema.ts"
+    },
     "./post-subscription/schema": {
       "default": "./src/post-subscription/schema.ts"
     },
