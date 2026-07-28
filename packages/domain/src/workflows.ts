@@ -5,6 +5,9 @@ import {
   SingleRunner,
   TestRunner,
 } from "effect/unstable/cluster";
+import { FeedbackAssessor } from "./feedback-ingestion/interpreter";
+import { FeedbackIngestionRepository } from "./feedback-ingestion/repository";
+import { FeedbackIngestionWorkflowLayer } from "./feedback-ingestion/workflow";
 import { SubmissionEmailNotificationWorkflowLayer } from "./post/workflow";
 import { WelcomeUserWorkflowLayer } from "./user/workflows";
 
@@ -26,6 +29,10 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
     WelcomeUserWorkflowLayer.pipe(Layer.provide(makeMailerLayer())),
     SubmissionEmailNotificationWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer())
+    ),
+    FeedbackIngestionWorkflowLayer.pipe(
+      Layer.provide(FeedbackAssessor.manualLayer),
+      Layer.provide(FeedbackIngestionRepository.layer)
     )
   );
 

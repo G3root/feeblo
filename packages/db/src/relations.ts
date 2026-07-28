@@ -19,13 +19,13 @@ import {
   organizationTable,
   postActivityTable,
   postReactionTable,
-  roadmapColumnTable,
-  roadmapTable,
   postStatusTable,
   postSubscriptionTable,
   postTable,
   postTagTable,
   productTable,
+  roadmapColumnTable,
+  roadmapTable,
   sessionTable,
   siteTable,
   submissionNotificationBatchTable,
@@ -414,6 +414,10 @@ export const relations = defineRelations(
       user: r.one.userTable({
         from: r.upvoteTable.userId,
         to: r.userTable.id,
+      }),
+      contact: r.one.contactTable({
+        from: r.upvoteTable.contactId,
+        to: r.contactTable.id,
       }),
       post: r.one.postTable({
         from: r.upvoteTable.postId,

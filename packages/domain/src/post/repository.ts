@@ -429,6 +429,7 @@ const makePostRepository = Effect.gen(function* () {
 
           const upvotes = yield* tx
             .select({
+              contactId: schema.upvoteTable.contactId,
               id: schema.upvoteTable.id,
               userId: schema.upvoteTable.userId,
             })
@@ -436,14 +437,16 @@ const makePostRepository = Effect.gen(function* () {
             .where(eq(schema.upvoteTable.postId, sourcePostId));
 
           for (const upvote of upvotes) {
+            const actorCondition = upvote.userId
+              ? eq(schema.upvoteTable.userId, upvote.userId)
+              : upvote.contactId
+                ? eq(schema.upvoteTable.contactId, upvote.contactId)
+                : sql`false`;
             const existing = yield* tx
               .select({ id: schema.upvoteTable.id })
               .from(schema.upvoteTable)
               .where(
-                and(
-                  eq(schema.upvoteTable.postId, targetPostId),
-                  eq(schema.upvoteTable.userId, upvote.userId)
-                )
+                and(eq(schema.upvoteTable.postId, targetPostId), actorCondition)
               )
               .limit(1)
               .pipe(Effect.map(EffectArray.get(0)));

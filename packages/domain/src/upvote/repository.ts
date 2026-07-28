@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UpvoteId } from "@feeblo/id";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -19,6 +19,13 @@ interface TUpvoteToggle {
   visibility?: "PUBLIC" | "PRIVATE";
 }
 
+interface TAddUpvoteOnBehalf {
+  addedByMemberId: string;
+  contactId: string;
+  organizationId: string;
+  postId: string;
+}
+
 const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
@@ -30,18 +37,27 @@ const makeUpvoteRepository = Effect.gen(function* () {
           postId: schema.upvoteTable.postId,
           organizationId: schema.upvoteTable.organizationId,
           userId: schema.upvoteTable.userId,
+          contactId: schema.upvoteTable.contactId,
           user: {
-            name: schema.userTable.name,
-            image: schema.userTable.image,
+            name: sql<
+              string | null
+            >`coalesce(${schema.userTable.name}, ${schema.contactTable.name})`,
+            image: sql<
+              string | null
+            >`coalesce(${schema.userTable.image}, ${schema.contactTable.avatar})`,
           },
           memberId: schema.upvoteTable.memberId,
           createdAt: schema.upvoteTable.createdAt,
           updatedAt: schema.upvoteTable.updatedAt,
         })
         .from(schema.upvoteTable)
-        .innerJoin(
+        .leftJoin(
           schema.userTable,
           eq(schema.userTable.id, schema.upvoteTable.userId)
+        )
+        .leftJoin(
+          schema.contactTable,
+          eq(schema.contactTable.id, schema.upvoteTable.contactId)
         )
         .where(and(eq(schema.upvoteTable.organizationId, organizationId))),
 
@@ -112,6 +128,31 @@ const makeUpvoteRepository = Effect.gen(function* () {
           .onConflictDoNothing();
 
         return { upvoted: true };
+      }),
+
+    addOnBehalf: ({
+      organizationId,
+      postId,
+      contactId,
+      addedByMemberId,
+    }: TAddUpvoteOnBehalf) =>
+      Effect.gen(function* () {
+        const upvoteId = yield* UpvoteId.generate;
+        const [created] = yield* db
+          .insert(schema.upvoteTable)
+          .values({
+            id: upvoteId,
+            organizationId,
+            postId,
+            contactId,
+            addedByMemberId,
+            userId: null,
+            memberId: null,
+          })
+          .onConflictDoNothing()
+          .returning({ id: schema.upvoteTable.id });
+
+        return { upvoted: created !== undefined };
       }),
   };
 });

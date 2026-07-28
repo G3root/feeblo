@@ -7,6 +7,7 @@ import { CommentReactionRpcs } from "./comment-reaction/rpcs";
 import { CommentRpcs } from "./comments/rpcs";
 import { CompanyRpcs } from "./company/rpcs";
 import { ContactRpcs } from "./contact/rpcs";
+import { FeedbackIngestionRpcs } from "./feedback-ingestion/rpcs";
 import { JwtSecretRpcs } from "./jwt-secret/rpcs";
 import { MembershipRpcs } from "./membership/rpcs";
 import { NotificationRpcs } from "./notification/rpcs";
@@ -44,5 +45,6 @@ export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
   RoadmapRpcs,
   RoadmapColumnRpcs,
   WorkspaceRpcs,
-  ContactRpcs
+  ContactRpcs,
+  FeedbackIngestionRpcs
 );

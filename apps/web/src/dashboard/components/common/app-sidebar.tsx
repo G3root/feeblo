@@ -118,7 +118,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                isActive={pathname.startsWith(`/${organizationId}/feedback`)}
+                isActive={pathname === `/${organizationId}/feedback`}
                 render={(props) => (
                   <Link
                     {...props}
@@ -127,6 +127,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   >
                     <HugeiconsIcon icon={MessageMultiple01Icon} />
                     <span>Feedback</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname === `/${organizationId}/feedback/incoming`}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/feedback/incoming"
+                  >
+                    <HugeiconsIcon icon={SparklesIcon} />
+                    <span>Incoming</span>
                   </Link>
                 )}
               />
@@ -399,10 +414,7 @@ function RoadmapNav({ pathname }: { pathname: string }) {
   const roadmaps = roadmapsQuery.data ?? [];
 
   return (
-    <Collapsible
-      className="group/collapsible"
-      defaultOpen={isActive}
-    >
+    <Collapsible className="group/collapsible" defaultOpen={isActive}>
       <SidebarMenuItem>
         <CollapsibleTrigger
           render={(props) => (
@@ -427,8 +439,7 @@ function RoadmapNav({ pathname }: { pathname: string }) {
               <SidebarMenuSubItem key={roadmap.id}>
                 <SidebarMenuSubButton
                   isActive={
-                    pathname ===
-                    `/${organizationId}/roadmap/${roadmap.slug}`
+                    pathname === `/${organizationId}/roadmap/${roadmap.slug}`
                   }
                   render={(props) => (
                     <Link
