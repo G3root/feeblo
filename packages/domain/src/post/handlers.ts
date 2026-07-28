@@ -15,6 +15,7 @@ import {
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { FailedToUpdatePostError } from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -49,53 +50,56 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     return Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
-      const previous = yield* repository.findActivityState({
-        id: args.id,
-        organizationId: args.organizationId,
-      });
-      const actor = {
-        actorId: session.session.userId,
-        actorMemberId: membership?.membershipId ?? null,
-        organizationId: args.organizationId,
-        postId: args.id,
-      };
-      const activities: CreatePostActivity[] = [];
-      if (previous?.title !== args.title) {
-        activities.push({
-          ...actor,
-          kind: "TITLE_CHANGED",
-          previousValue: previous?.title ?? null,
-          nextValue: args.title,
-        });
-      }
-      if (previous?.content !== sanitizedMarkdown) {
-        activities.push({ ...actor, kind: "CONTENT_CHANGED" });
-      }
-      if (previous?.statusId !== args.statusId) {
-        activities.push({
-          ...actor,
-          kind: "STATUS_CHANGED",
-          previousValue: previous?.statusId ?? null,
-          nextValue: args.statusId,
-        });
-      }
-      if (previous?.boardId !== args.boardId) {
-        activities.push({
-          ...actor,
-          kind: "BOARD_CHANGED",
-          previousValue: previous?.boardId ?? null,
-          nextValue: args.boardId,
-        });
-      }
       yield* transaction(
         Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          const actor = {
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+          };
+          const activities: CreatePostActivity[] = [];
+          if (previous.title !== args.title) {
+            activities.push({
+              ...actor,
+              kind: "TITLE_CHANGED",
+              previousValue: previous.title,
+              nextValue: args.title,
+            });
+          }
+          if (previous.content !== sanitizedMarkdown) {
+            activities.push({ ...actor, kind: "CONTENT_CHANGED" });
+          }
+          if (previous.statusId !== args.statusId) {
+            activities.push({
+              ...actor,
+              kind: "STATUS_CHANGED",
+              previousValue: previous.statusId,
+              nextValue: args.statusId,
+            });
+          }
+          if (previous.boardId !== args.boardId) {
+            activities.push({
+              ...actor,
+              kind: "BOARD_CHANGED",
+              previousValue: previous.boardId,
+              nextValue: args.boardId,
+            });
+          }
           yield* repository.update({
             ...args,
             content: sanitizedMarkdown,
             excerpt: htmlToExcerpt(sanitizedHtml),
           });
           yield* activityRepository.createMany(activities);
-          if (previous?.statusId && previous.statusId !== args.statusId) {
+          if (previous.statusId !== args.statusId) {
             yield* Option.match(notifications, {
               onNone: () => Effect.void,
               onSome: (service) =>
@@ -176,11 +180,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
           yield* Option.match(notifications, {
             onNone: () => Effect.void,
-            onSome: (service) => service.notifySubmission({
-              organizationId: args.organizationId,
-              postId: args.id,
-              ...(membership ? { actorMemberId: membership.membershipId } : {}),
-            }),
+            onSome: (service) =>
+              service.notifySubmission({
+                organizationId: args.organizationId,
+                postId: args.id,
+                ...(membership
+                  ? { actorMemberId: membership.membershipId }
+                  : {}),
+              }),
           });
         })
       );
@@ -314,37 +321,40 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
-        const previous = yield* repository.findActivityState({
-          id: args.id,
-          organizationId: args.organizationId,
-        });
-        const actor = {
-          actorId: session.session.userId,
-          actorMemberId: membership?.membershipId ?? null,
-          organizationId: args.organizationId,
-          postId: args.id,
-        };
-        const activities: CreatePostActivity[] = [];
-        if (
-          args.locked !== undefined &&
-          Boolean(previous?.lockedAt) !== args.locked
-        ) {
-          activities.push({
-            ...actor,
-            kind: args.locked ? "POST_LOCKED" : "POST_UNLOCKED",
-          });
-        }
-        if (
-          args.archived !== undefined &&
-          Boolean(previous?.archivedAt) !== args.archived
-        ) {
-          activities.push({
-            ...actor,
-            kind: args.archived ? "POST_ARCHIVED" : "POST_UNARCHIVED",
-          });
-        }
         yield* transaction(
           Effect.gen(function* () {
+            const previous = yield* repository.findActivityState({
+              id: args.id,
+              organizationId: args.organizationId,
+            });
+            if (!previous) {
+              return yield* new FailedToUpdatePostError();
+            }
+            const actor = {
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              organizationId: args.organizationId,
+              postId: args.id,
+            };
+            const activities: CreatePostActivity[] = [];
+            if (
+              args.locked !== undefined &&
+              Boolean(previous.lockedAt) !== args.locked
+            ) {
+              activities.push({
+                ...actor,
+                kind: args.locked ? "POST_LOCKED" : "POST_UNLOCKED",
+              });
+            }
+            if (
+              args.archived !== undefined &&
+              Boolean(previous.archivedAt) !== args.archived
+            ) {
+              activities.push({
+                ...actor,
+                kind: args.archived ? "POST_ARCHIVED" : "POST_UNARCHIVED",
+              });
+            }
             yield* repository.adminUpdate(args);
             yield* activityRepository.createMany(activities);
           })

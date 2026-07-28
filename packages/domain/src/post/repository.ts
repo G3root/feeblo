@@ -118,6 +118,7 @@ const makePostRepository = Effect.gen(function* () {
           )
         )
         .limit(1)
+        .for("update")
         .pipe(Effect.map((rows) => rows[0])),
 
     findStatusId: ({ id, organizationId }: TPostById) =>

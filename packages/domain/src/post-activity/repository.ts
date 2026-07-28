@@ -41,13 +41,10 @@ const makePostActivityRepository = Effect.gen(function* () {
     create: (input: CreatePostActivity) =>
       makeRow(input).pipe(
         Effect.flatMap((row) =>
-          db
-            .insert(schema.postActivityTable)
-            .values(row)
-            .pipe(Effect.asVoid)
+          db.insert(schema.postActivityTable).values(row).pipe(Effect.asVoid)
         )
       ),
-    createMany: (inputs: ReadonlyArray<CreatePostActivity>) =>
+    createMany: (inputs: readonly CreatePostActivity[]) =>
       Effect.forEach(inputs, makeRow).pipe(
         Effect.flatMap((rows) =>
           rows.length === 0
@@ -74,10 +71,8 @@ const makePostActivityRepository = Effect.gen(function* () {
           postId: schema.postActivityTable.postId,
           actorId: schema.postActivityTable.actorId,
           actorMemberId: schema.postActivityTable.actorMemberId,
-          actor: {
-            name: schema.userTable.name,
-            image: schema.userTable.image,
-          },
+          actorName: schema.userTable.name,
+          actorImage: schema.userTable.image,
           kind: schema.postActivityTable.kind,
           previousValue: schema.postActivityTable.previousValue,
           nextValue: schema.postActivityTable.nextValue,
@@ -93,14 +88,23 @@ const makePostActivityRepository = Effect.gen(function* () {
           and(
             eq(schema.postActivityTable.organizationId, organizationId),
             eq(schema.postActivityTable.postId, postId),
-            ...(since
-              ? [gte(schema.postActivityTable.createdAt, since)]
-              : [])
+            ...(since ? [gte(schema.postActivityTable.createdAt, since)] : [])
           )
         )
         .orderBy(
           asc(schema.postActivityTable.createdAt),
           asc(schema.postActivityTable.id)
+        )
+        .pipe(
+          Effect.map((rows) =>
+            rows.map(({ actorName, actorImage, ...activity }) => ({
+              ...activity,
+              actor: {
+                name: actorName,
+                image: actorImage,
+              },
+            }))
+          )
         ),
   };
 });
