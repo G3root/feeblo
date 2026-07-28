@@ -6,7 +6,7 @@ import { createTestUser } from "../helpers/test-users";
 
 const roadmapUrlPattern = /\/roadmap$/;
 const publicPostUrlPattern = /\/p\//;
-const roadmapSwitcherUrlPattern = /\/roadmap\?roadmap=q3-focus/;
+const roadmapSwitcherUrlPattern = /\/roadmap\/q3-focus$/;
 
 async function createPost(page: Page, title: string, content: string) {
   await page.getByRole("button", { name: "New post" }).click();
@@ -178,11 +178,9 @@ test.describe("roadmap", () => {
         await visitorPage.goto(`${publicBoardUrl(user.workspaceName)}/roadmap`);
 
         // The primary roadmap is selected by default.
+        const roadmapSwitcher = visitorPage.getByRole("combobox");
         await expect(
-          visitorPage.getByRole("tab", { name: "Roadmap" })
-        ).toHaveAttribute("aria-selected", "true");
-        await expect(
-          visitorPage.getByRole("tab", { name: "Q3 Focus" })
+          visitorPage.getByRole("heading", { name: "Roadmap", exact: true })
         ).toBeVisible();
         await expect(
           visitorPage.getByRole("heading", { name: "In progress", exact: true })
@@ -191,12 +189,15 @@ test.describe("roadmap", () => {
           roadmapLane(visitorPage, "Planned").getByText(title)
         ).toBeVisible();
 
-        // Switching tabs swaps the board to the seeded roadmap's columns.
-        await visitorPage.getByRole("tab", { name: "Q3 Focus" }).click();
+        // Switching roadmaps swaps the board to the seeded roadmap's columns.
+        await roadmapSwitcher.click();
+        await visitorPage
+          .getByRole("option", { name: "Q3 Focus", exact: true })
+          .click();
         await expect(visitorPage).toHaveURL(roadmapSwitcherUrlPattern);
         await expect(
-          visitorPage.getByRole("tab", { name: "Q3 Focus" })
-        ).toHaveAttribute("aria-selected", "true");
+          visitorPage.getByRole("heading", { name: "Q3 Focus", exact: true })
+        ).toBeVisible();
         await expect(
           visitorPage.getByText("What we are shipping this quarter.")
         ).toBeVisible();
@@ -215,24 +216,24 @@ test.describe("roadmap", () => {
 
         // Deep links select the requested roadmap directly.
         await visitorPage.goto(
-          `${publicBoardUrl(user.workspaceName)}/roadmap?roadmap=q3-focus`
+          `${publicBoardUrl(user.workspaceName)}/roadmap/q3-focus`
         );
         await expect(
-          visitorPage.getByRole("tab", { name: "Q3 Focus" })
-        ).toHaveAttribute("aria-selected", "true");
+          visitorPage.getByRole("heading", { name: "Q3 Focus", exact: true })
+        ).toBeVisible();
         await expect(
           visitorPage.getByRole("heading", { name: "Shipped", exact: true })
         ).toBeVisible();
 
-        // Unknown slugs fall back to the primary roadmap.
+        // Unknown slugs render the unavailable state.
         await visitorPage.goto(
-          `${publicBoardUrl(user.workspaceName)}/roadmap?roadmap=does-not-exist`
+          `${publicBoardUrl(user.workspaceName)}/roadmap/does-not-exist`
         );
         await expect(
-          visitorPage.getByRole("tab", { name: "Roadmap" })
-        ).toHaveAttribute("aria-selected", "true");
-        await expect(
-          visitorPage.getByRole("heading", { name: "In progress", exact: true })
+          visitorPage.getByText(
+            "This roadmap does not exist or has been removed.",
+            { exact: true }
+          )
         ).toBeVisible();
       } finally {
         await visitorContext.close();
