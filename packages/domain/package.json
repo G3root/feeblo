@@ -58,6 +58,9 @@
     "./membership/policies": {
       "default": "./src/membership/policies.ts"
     },
+    "./membership/schema": {
+      "default": "./src/membership/schema.ts"
+    },
     "./workspace/repository": {
       "default": "./src/workspace/repository.ts"
     },
@@ -72,6 +75,9 @@
     },
     "./session-middleware": {
       "default": "./src/session-middleware.ts"
+    },
+    "./site/repository": {
+      "default": "./src/site/repository.ts"
     },
     "./user/schema": {
       "default": "./src/user/schema.ts"

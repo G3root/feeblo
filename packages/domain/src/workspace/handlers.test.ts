@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
+/** biome-ignore-all lint/style/noNonNullAssertion: test fixtures assert rows that were inserted immediately above */
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
@@ -6,12 +6,8 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
-import {
-  ReservedSubdomainError,
-} from "../site/services/profanity-check-schema";
-import {
-  SubdomainValidationService,
-} from "../site/services/profanity-check-service";
+import { ReservedSubdomainError } from "../site/services/profanity-check-schema";
+import { SubdomainValidationService } from "../site/services/profanity-check-service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspaceRepository } from "./repository";
 
@@ -431,6 +427,105 @@ describe("WorkspaceRpcHandlers", () => {
             organizationId: fixture.organizationId,
             plan: "starter",
           });
+        })
+      );
+
+      it.effect(
+        "grants paid plan entitlements while a subscription is trialing",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* WorkspaceRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const db = yield* currentDb;
+
+            yield* db.insert(schema.productTable).values({
+              id: "prod_trialing",
+              name: "Professional Plan",
+              isRecurring: true,
+              isArchived: false,
+              externalOrganizationId: "ext_trialing",
+              visibility: "PUBLIC",
+              metadata: { plan: "professional", variant: "monthly" },
+            });
+            yield* db.insert(schema.subscriptionTable).values({
+              id: "sub_trialing",
+              externalId: "sub_ext_trialing",
+              organizationId: fixture.organizationId,
+              amount: 4900,
+              cancelAtPeriodEnd: false,
+              currency: "usd",
+              recurringInterval: "month",
+              recurringIntervalCount: 1,
+              status: "trialing",
+              currentPeriodStart: new Date(),
+              currentPeriodEnd: new Date(Date.now() + 30 * 86_400_000),
+              customerId: "cus_trialing",
+              productId: "prod_trialing",
+            });
+
+            const plan = yield* handlers
+              .WorkspacePlanGet({ organizationId: fixture.organizationId })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            expect(plan.plan).toBe("professional");
+          })
+      );
+
+      it.effect("keeps past-due access only until the paid period ends", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+
+          yield* db.insert(schema.productTable).values({
+            id: "prod_past_due",
+            name: "Starter Plan",
+            isRecurring: true,
+            isArchived: false,
+            externalOrganizationId: "ext_past_due",
+            visibility: "PUBLIC",
+            metadata: { plan: "starter", variant: "monthly" },
+          });
+          yield* db.insert(schema.subscriptionTable).values([
+            {
+              id: "sub_past_due_expired",
+              externalId: "sub_ext_past_due_expired",
+              organizationId: fixture.organizationId,
+              amount: 2900,
+              cancelAtPeriodEnd: false,
+              currency: "usd",
+              recurringInterval: "month",
+              recurringIntervalCount: 1,
+              status: "past_due",
+              currentPeriodStart: new Date(Date.now() - 60 * 86_400_000),
+              currentPeriodEnd: new Date(Date.now() - 30 * 86_400_000),
+              customerId: "cus_past_due_expired",
+              productId: "prod_past_due",
+            },
+            {
+              id: "sub_past_due_current",
+              externalId: "sub_ext_past_due_current",
+              organizationId: fixture.organizationId,
+              amount: 2900,
+              cancelAtPeriodEnd: false,
+              currency: "usd",
+              recurringInterval: "month",
+              recurringIntervalCount: 1,
+              status: "past_due",
+              currentPeriodStart: new Date(),
+              currentPeriodEnd: new Date(Date.now() + 86_400_000),
+              customerId: "cus_past_due_current",
+              productId: "prod_past_due",
+            },
+          ]);
+
+          const plan = yield* handlers
+            .WorkspacePlanGet({ organizationId: fixture.organizationId })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(plan.plan).toBe("starter");
         })
       );
     });

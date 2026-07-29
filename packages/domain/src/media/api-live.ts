@@ -67,7 +67,15 @@ export const MediaApiLive = HttpApiBuilder.group(
           });
         }
 
-        const s3Service = yield* S3UploadService;
+        const s3Service = yield* S3UploadService.pipe(
+          Effect.provide(S3UploadServiceLive),
+          Effect.mapError(
+            () =>
+              new InternalServerError({
+                message: "Failed to configure media storage",
+              })
+          )
+        );
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
@@ -83,10 +91,7 @@ export const MediaApiLive = HttpApiBuilder.group(
           );
 
         return { ...uploaded, kind };
-      }).pipe(
-        Effect.provide(S3UploadServiceLive),
-        withRemapDbErrors("Media", "create")
-      )
+      }).pipe(withRemapDbErrors("Media", "create"))
     )
 ).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
 
