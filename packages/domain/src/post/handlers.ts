@@ -15,7 +15,11 @@ import {
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
-import { PostEmbeddingService, postEmbeddingInput } from "./embedding-service";
+import {
+  PostEmbeddingService,
+  postEmbeddingInput,
+  schedulePostEmbeddingBestEffort,
+} from "./embedding-service";
 import { FailedToUpdatePostError } from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -65,23 +69,22 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     organizationId: string;
     title: string;
   }) =>
-    repository.scheduleEmbedding({
-      content,
-      postId: id,
-      organizationId,
-      revision: crypto.randomUUID(),
-      title,
-    }).pipe(
-      Effect.catchCause((cause) =>
-        Effect.logWarning("Failed to schedule post embedding", cause).pipe(
-          Effect.annotateLogs({ postId: id, organizationId })
-        )
-      )
-    );
+    Option.match(embeddingService, {
+      onNone: () => Effect.void,
+      onSome: (service) =>
+        schedulePostEmbeddingBestEffort({
+          content,
+          embeddingService: service,
+          postId: id,
+          organizationId,
+          title,
+        }),
+    });
 
   const suggestionsEffect = (args: TPostSuggestions, publicOnly: boolean) =>
     Effect.gen(function* () {
       const input = postEmbeddingInput(args);
+      const resultLimit = args.limit ?? 5;
       const queryEmbedding = Option.isSome(embeddingService)
         ? yield* embeddingService.value
             .embed(input)
@@ -103,7 +106,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               embeddingModel: queryEmbedding.value.model,
             }
           : {}),
-        limit: args.limit ?? 5,
+        limit: Option.isSome(queryEmbedding)
+          ? resultLimit
+          : Math.max(25, resultLimit * 5),
         publicOnly,
       });
 
@@ -124,7 +129,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         })
         .filter(({ score }) => score > 0)
         .sort((left, right) => right.score - left.score)
-        .slice(0, args.limit ?? 5)
+        .slice(0, resultLimit)
         .map(({ post }) => post);
     });
 
@@ -273,7 +278,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             postId: args.id,
             organizationId: args.organizationId,
           });
-
           yield* Option.match(notifications, {
             onNone: () => Effect.void,
             onSome: (service) =>

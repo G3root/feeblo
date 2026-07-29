@@ -6,6 +6,7 @@ import {
   and,
   asc,
   cosineDistance,
+  desc,
   eq,
   inArray,
   isNotNull,
@@ -21,7 +22,6 @@ import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { FailedToMergePostError } from "./errors";
 import type { TPostAdminUpdate, TPostUpdate } from "./schema";
-import { schedulePostEmbedding } from "./embedding-workflow";
 import { scheduleSubmissionNotificationBatch } from "./workflow";
 
 interface TPostFindMany {
@@ -281,7 +281,7 @@ const makePostRepository = Effect.gen(function* () {
               asc(cosineDistance(schema.postTable.embedding, [...embedding]))
             )
             .limit(limit)
-        : query;
+        : query.orderBy(desc(schema.postTable.updatedAt)).limit(limit);
     },
 
     isPublicPost: ({ id, organizationId }: TPostById) =>
@@ -670,25 +670,6 @@ const makePostRepository = Effect.gen(function* () {
         }
 
         yield* scheduleSubmissionNotificationBatch(organizationId).pipe(
-          Effect.provideService(WorkflowEngine, engineOption.value)
-        );
-      }),
-
-    scheduleEmbedding: (payload: {
-      readonly content: string;
-      readonly postId: string;
-      readonly organizationId: string;
-      readonly revision: string;
-      readonly title: string;
-    }) =>
-      Effect.gen(function* () {
-        const engineOption = yield* Effect.serviceOption(WorkflowEngine);
-
-        if (Option.isNone(engineOption)) {
-          return;
-        }
-
-        yield* schedulePostEmbedding(payload).pipe(
           Effect.provideService(WorkflowEngine, engineOption.value)
         );
       }),

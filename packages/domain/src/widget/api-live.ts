@@ -19,11 +19,12 @@ import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
-import { PostRepository } from "../post/repository";
 import {
   PostEmbeddingService,
   postEmbeddingInput,
+  schedulePostEmbeddingBestEffort,
 } from "../post/embedding-service";
+import { PostRepository } from "../post/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   InternalServerError,
@@ -43,14 +44,16 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const repository = yield* PostRepository;
           const embeddings = yield* PostEmbeddingService;
           const input = postEmbeddingInput(payload);
-          const queryEmbedding = yield* embeddings.embed(input).pipe(
-            Effect.catchCause((cause) =>
-              Effect.logWarning(
-                "Failed to generate widget suggestion embedding",
-                cause
-              ).pipe(Effect.as(Option.none()))
-            )
-          );
+          const queryEmbedding = yield* embeddings
+            .embed(input)
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning(
+                  "Failed to generate widget suggestion embedding",
+                  cause
+                ).pipe(Effect.as(Option.none()))
+              )
+            );
           const candidates = yield* repository.findSuggestionCandidates({
             boardId: payload.boardId,
             organizationId: payload.organizationId,
@@ -241,6 +244,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
               })
             );
           }
+
+          yield* schedulePostEmbeddingBestEffort({
+            content: sanitizedContent,
+            postId: id,
+            organizationId,
+            title,
+          });
 
           return {
             id,

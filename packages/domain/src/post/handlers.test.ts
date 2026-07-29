@@ -9,6 +9,7 @@ import {
 } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { eq } from "drizzle-orm";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -521,12 +522,16 @@ describe("PostRpcHandlers", () => {
       it.effect("does not await embedding generation in the handler", () =>
         Effect.gen(function* () {
           let embedCalls = 0;
+          const releaseEmbedding = yield* Deferred.make<void>();
           const handlers = yield* PostRpcHandlersEffect.pipe(
             Effect.provideService(PostEmbeddingService, {
-              embed: () => {
-                embedCalls += 1;
-                return Effect.never;
-              },
+              embed: () =>
+                Effect.sync(() => {
+                  embedCalls += 1;
+                }).pipe(
+                  Effect.andThen(Deferred.await(releaseEmbedding)),
+                  Effect.as(Option.none()),
+                ),
             }),
           );
           const db = yield* currentDb;
@@ -536,6 +541,7 @@ describe("PostRpcHandlers", () => {
           yield* handlers
             .PostCreate(postCreateInput(fixture, postId, "Embedded feedback"))
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* Effect.yieldNow;
 
           const [post] = yield* db
             .select({
@@ -546,10 +552,11 @@ describe("PostRpcHandlers", () => {
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
 
-          expect(embedCalls).toBe(0);
+          expect(embedCalls).toBe(1);
           expect(post?.embedding).toBeNull();
           expect(post?.embeddingModel).toBeNull();
           expect(post?.embeddedAt).toBeNull();
+          yield* Deferred.succeed(releaseEmbedding, undefined);
         }),
       );
 
