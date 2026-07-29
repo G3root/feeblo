@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { RoadmapColumnRepository } from "./repository";
 import { RoadmapColumnRpcs } from "./rpcs";
@@ -27,7 +28,13 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
     RoadmapColumnListPublic: (args: TRoadmapColumnList) =>
       columns
         .findMany({ organizationId: args.organizationId, visibility: "public" })
-        .pipe(withRemapDbErrors("RoadmapColumn", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "RoadmapColumnListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("RoadmapColumn", "select")
+        ),
     RoadmapColumnCreate: (args: TRoadmapColumnCreate) =>
       columns
         .create(args)

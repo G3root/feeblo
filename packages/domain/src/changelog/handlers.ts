@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
@@ -33,14 +34,16 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     ChangelogListPublic: (args: TChangelogList) =>
-      repository
-        .findManyPublished(args)
-        .pipe(
-          Policy.withPublicPolicy(
-            sitePolicy.canViewChangelog(args.organizationId)
-          ),
-          withRemapDbErrors("Changelog", "select")
+      repository.findManyPublished(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogListPublic",
+          level: "read",
+        }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewChangelog(args.organizationId)
         ),
+        withRemapDbErrors("Changelog", "select")
+      ),
 
     ChangelogCreate: (args: TChangelogCreate) => {
       const { sanitizedMarkdown } = sanitizeMarkdown(args.content);

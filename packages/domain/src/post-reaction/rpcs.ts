@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware } from "../session-middleware";
 import { PostReactionServiceErrors } from "./errors";
 import { PostReaction, PostReactionList, PostReactionToggle } from "./schema";
@@ -26,14 +26,16 @@ export class PostReactionRpcs extends RpcGroup.make(
   Rpc.make("PostReactionListPublic", {
     payload: PostReactionList,
     success: Schema.Array(PostReaction),
-    error: PostReactionServiceErrors,
-  }),
+    error: Schema.Union([PostReactionServiceErrors, RateLimitErrors]),
+  }).middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("PostReactionTogglePublic", {
     payload: PostReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
       emoji: Schema.Union([ReactionEmojiSchema, Schema.Null]),
     }),
-    error: PostReactionServiceErrors,
-  }).middleware(AuthMiddleware)
+    error: Schema.Union([PostReactionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware)
 ) {}
