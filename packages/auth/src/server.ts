@@ -8,6 +8,7 @@ import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { MembershipPolicy } from "@feeblo/domain/membership/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
 import { PolicyDeniedError } from "@feeblo/domain/policy";
+import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { WelcomeUserWorkflow } from "@feeblo/domain/user/workflows";
 import {
   createSsoSession,
@@ -64,7 +65,8 @@ export const initAuthHandler = (
   makeMailerLayer: () => Layer.Layer<
     Mailer,
     Layer.Error<typeof Mailer.layer>
-  > = () => Mailer.layer
+  > = () => Mailer.layer,
+  rateLimitLayer: Layer.Layer<RateLimitService> = RateLimitService.layerMemory
 ) =>
   Effect.gen(function* () {
     const {
@@ -109,6 +111,7 @@ export const initAuthHandler = (
         MembershipRepository.layer,
         makeMailerLayer(),
         WorkspaceRepository.layer,
+        Layer.succeed(RateLimitService, yield* RateLimitService),
         SsoRepositoriesLive
       ).pipe(Layer.provideMerge(dbLayer))
     );
@@ -446,6 +449,35 @@ export const initAuthHandler = (
           overrideDefaultEmailVerification: true,
 
           async sendVerificationOTP({ email, otp, type }) {
+            await callbackRuntime.runPromise(
+              RateLimitService.use((rateLimiter) =>
+                type === "forget-password"
+                  ? rateLimiter.consumePasswordResetOtp(email)
+                  : type === "sign-in"
+                    ? rateLimiter.consumeSignInOtp(email)
+                    : rateLimiter.consumeEmailVerificationOtp(email)
+              ).pipe(
+                Effect.catchTag("RateLimiterError", (error) =>
+                  Effect.fail(
+                    new APIError(
+                      error.reason._tag === "RateLimitExceeded"
+                        ? "TOO_MANY_REQUESTS"
+                        : "INTERNAL_SERVER_ERROR",
+                      {
+                        code:
+                          error.reason._tag === "RateLimitExceeded"
+                            ? "VERIFICATION_OTP_RATE_LIMITED"
+                            : "VERIFICATION_OTP_RATE_LIMIT_UNAVAILABLE",
+                        message:
+                          error.reason._tag === "RateLimitExceeded"
+                            ? "Too many verification codes requested. Please try again later."
+                            : "Unable to send a verification code. Please try again.",
+                      }
+                    )
+                  )
+                )
+              )
+            );
             const flowLabel =
               type === "forget-password"
                 ? "password reset"
@@ -539,6 +571,7 @@ export const initAuthHandler = (
         BillingRepository.layer,
         MembershipRepository.layer,
         makeMailerLayer(),
+        rateLimitLayer,
         WorkspaceRepository.layer
       )
     )

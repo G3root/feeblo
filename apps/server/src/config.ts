@@ -14,6 +14,10 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const nodeEnv = yield* Config.string("NODE_ENV").pipe(
         Config.withDefault("development")
       );
+      const redisUrl = yield* Config.string("REDIS_URL").pipe(
+        Config.option,
+        Effect.map(Option.getOrUndefined)
+      );
       const sentryEnvironment = yield* Config.string(
         "SENTRY_ENVIRONMENT"
       ).pipe(Config.withDefault(nodeEnv));
@@ -30,6 +34,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         appUrl,
         appRootDomain,
         nodeEnv,
+        redisUrl,
         sentryDsn,
         sentryEnvironment,
         sentryTracesSampleRate,
