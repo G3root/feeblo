@@ -11,6 +11,8 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 
+import { PAID_PLAN_KEYS } from "../plan-entitlements";
+
 type SubscriptionPayload = WebhookSubscriptionCreatedPayload["data"];
 type ProductPayload = WebhookProductCreatedPayload["data"];
 
@@ -198,7 +200,10 @@ const makeBillingRepository = Effect.gen(function* () {
             eq(schema.productTable.isArchived, false),
             eq(schema.productTable.isRecurring, true),
             inArray(schema.productTable.recurringInterval, ["month", "year"]),
-            sql`${schema.productTable.metadata}->>'plan' in ('starter', 'professional')`,
+            inArray(
+              sql`${schema.productTable.metadata}->>'plan'`,
+              PAID_PLAN_KEYS
+            ),
             or(
               and(
                 eq(schema.productTable.recurringInterval, "month"),

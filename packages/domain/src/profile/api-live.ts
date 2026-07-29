@@ -61,7 +61,15 @@ export const ProfileApiLive = HttpApiBuilder.group(
           });
         }
 
-        const s3Service = yield* S3UploadService;
+        const s3Service = yield* S3UploadService.pipe(
+          Effect.provide(S3UploadServiceLive),
+          Effect.mapError(
+            () =>
+              new InternalServerError({
+                message: "Failed to configure media storage",
+              })
+          )
+        );
         const uploaded = yield* s3Service
           .uploadProfileImage({
             bytes,
@@ -83,11 +91,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
           .where(eq(schema.userTable.id, session.user.id));
 
         return uploaded;
-      }).pipe(
-        Effect.provide(Layer.orDie(S3UploadServiceLive)),
-
-        withRemapDbErrors("UserProfile", "create")
-      );
+      }).pipe(withRemapDbErrors("UserProfile", "create"));
     })
 ).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
 

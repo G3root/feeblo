@@ -62,6 +62,9 @@ function BillingSettingsPage() {
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
   const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);
+  const [confirmationStatus, setConfirmationStatus] = useState<
+    "pending" | "delayed" | "error"
+  >("pending");
 
   const {
     data: products = [],
@@ -82,12 +85,16 @@ function BillingSettingsPage() {
       return;
     }
 
+    setConfirmationStatus("pending");
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
-      workspacePlanCollection.utils.refetch().catch(() => undefined);
+      workspacePlanCollection.utils
+        .refetch()
+        .catch(() => setConfirmationStatus("error"));
       if (attempts >= 10) {
         window.clearInterval(timer);
+        setConfirmationStatus("delayed");
       }
     }, 3000);
 
@@ -95,6 +102,16 @@ function BillingSettingsPage() {
       window.clearInterval(timer);
     };
   }, [hasPaidPlan, search.checkout_id]);
+
+  const refreshCheckoutConfirmation = async () => {
+    setConfirmationStatus("pending");
+    try {
+      await workspacePlanCollection.utils.refetch();
+      setConfirmationStatus("delayed");
+    } catch {
+      setConfirmationStatus("error");
+    }
+  };
 
   return (
     <SettingsLayout.Root size="large">
@@ -107,17 +124,42 @@ function BillingSettingsPage() {
       <SettingsLayout.Content>
         <div className="space-y-6">
           {search.checkout_id ? (
-            <Alert variant={hasPaidPlan ? "success" : "info"}>
+            <Alert
+              variant={
+                hasPaidPlan
+                  ? "success"
+                  : confirmationStatus === "error"
+                    ? "error"
+                    : "info"
+              }
+            >
               <AlertTitle>
                 {hasPaidPlan
                   ? "Subscription activated"
-                  : "Checkout completed — confirming your subscription"}
+                  : confirmationStatus === "delayed"
+                    ? "Subscription confirmation is taking longer than expected"
+                    : confirmationStatus === "error"
+                      ? "Could not refresh subscription status"
+                      : "Checkout completed — confirming your subscription"}
               </AlertTitle>
               <AlertDescription>
                 {hasPaidPlan
                   ? `This workspace now has the ${PLAN_COPY[currentPlanType].name} plan.`
-                  : "Polar is confirming the subscription. This page will update automatically; it can take a few seconds."}
+                  : confirmationStatus === "pending"
+                    ? "Polar is confirming the subscription. This page will update automatically; it can take a few seconds."
+                    : "Your checkout may still be processing. Refresh the subscription status to try again."}
               </AlertDescription>
+              {!hasPaidPlan && confirmationStatus !== "pending" ? (
+                <Button
+                  className="mt-3"
+                  onClick={refreshCheckoutConfirmation}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Refresh status
+                </Button>
+              ) : null}
             </Alert>
           ) : null}
           <Card className="border border-border shadow-none ring-0">

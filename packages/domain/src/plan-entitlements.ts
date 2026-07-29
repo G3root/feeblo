@@ -58,19 +58,26 @@ export const PLAN_FEATURE_CATALOG = {
   },
 } as const satisfies Record<PlanFeatureKey, PlanFeatureDefinition>;
 
-const LIMIT_FEATURE_ORDER = [
+const defineFeatureOrder =
+  <FeatureKey extends PlanFeatureKey>() =>
+  <const Order extends readonly FeatureKey[]>(
+    order: Order & ([FeatureKey] extends [Order[number]] ? unknown : never)
+  ): Order =>
+    order;
+
+const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "feedbackBoards",
   "privilegedMembers",
-] as const satisfies readonly LimitFeatureKey[];
+] as const);
 
-const CAPABILITY_FEATURE_ORDER = [
+const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
   "roadmap",
   "changelog",
   "unlimitedEndUsers",
   "unlimitedPosts",
   "privateBoards",
   "removeBranding",
-] as const satisfies readonly CapabilityFeatureKey[];
+] as const);
 
 export const PLAN_ENTITLEMENTS = {
   free: {
@@ -116,6 +123,10 @@ export const PLAN_ENTITLEMENTS = {
     },
   },
 } as const satisfies Record<OrganizationPlan, PlanEntitlements>;
+
+export const PAID_PLAN_KEYS = Object.keys(PLAN_ENTITLEMENTS).filter(
+  (plan): plan is Exclude<OrganizationPlan, "free"> => plan !== "free"
+);
 
 export type PlanFeatureRow = {
   key: PlanFeatureKey;

@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 import { getPlanFeatureRows, PLAN_ENTITLEMENTS } from "./plan-entitlements";
 
 describe("plan feature catalog", () => {
+  it("excludes disabled free capabilities while retaining enabled features", () => {
+    const rows = getPlanFeatureRows("free");
+
+    expect(rows).toContainEqual({ key: "roadmap", label: "Roadmap" });
+    expect(rows).toContainEqual({
+      key: "unlimitedPosts",
+      label: "Unlimited Posts",
+    });
+    expect(rows).not.toContainEqual({
+      key: "privateBoards",
+      label: "Private Boards",
+    });
+    expect(rows).not.toContainEqual({
+      key: "removeBranding",
+      label: "Remove Feeblo Branding",
+    });
+  });
+
   it("projects starter enforcement values into customer-facing feature rows", () => {
     expect(PLAN_ENTITLEMENTS.starter).toEqual({
       limits: {
