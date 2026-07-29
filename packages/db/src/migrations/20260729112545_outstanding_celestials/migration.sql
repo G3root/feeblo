@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
 ALTER TABLE "post" ADD COLUMN "embedding" vector(1536);--> statement-breakpoint
 ALTER TABLE "post" ADD COLUMN "embedding_model" text;--> statement-breakpoint
 ALTER TABLE "post" ADD COLUMN "embedded_at" timestamp with time zone;--> statement-breakpoint
