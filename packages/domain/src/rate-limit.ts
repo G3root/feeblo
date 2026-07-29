@@ -3,9 +3,10 @@ import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import * as Headers from "effect/unstable/http/Headers";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
-import { ClientIp } from "./client-ip";
+import { getClientIpFromHeaders } from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";
 
 export const publicRpcLimits = {
@@ -115,10 +116,7 @@ export const withPublicRpcRateLimit =
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     Effect.andThen(publicRpc(options), self);
 
-export class PublicRpcRateLimitMiddleware extends RpcMiddleware.Service<
-  PublicRpcRateLimitMiddleware,
-  { requires: ClientIp }
->()(
+export class PublicRpcRateLimitMiddleware extends RpcMiddleware.Service<PublicRpcRateLimitMiddleware>()(
   "@feeblo/api/PublicRpcRateLimitMiddleware",
   {
     error: RateLimitErrors,
@@ -130,16 +128,14 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const rateLimitService = yield* RateLimitService;
 
-    return PublicRpcRateLimitMiddleware.of((effect) =>
-      ClientIp.use((clientIp) =>
-        Effect.provideService(
-          effect,
-          PublicRpcRateLimiter,
-          makePublicRpcRateLimiter({
-            clientIp,
-            rateLimitService,
-          })
-        )
+    return PublicRpcRateLimitMiddleware.of((effect, options) =>
+      Effect.provideService(
+        effect,
+        PublicRpcRateLimiter,
+        makePublicRpcRateLimiter({
+          clientIp: getClientIpFromHeaders(Headers.fromInput(options.headers)),
+          rateLimitService,
+        })
       )
     );
   })
