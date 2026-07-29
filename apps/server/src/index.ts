@@ -3,6 +3,7 @@ import {
   NodeFileSystem,
   NodeHttpServer,
   NodePath,
+  NodeRedis,
   NodeRuntime,
 } from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
@@ -11,6 +12,7 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
+import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
@@ -35,11 +37,27 @@ import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
+import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import { ServerConfig } from "./config";
 import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
 import { corsVaryFix } from "./middlewares/cors-vary";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
+
+const redisOptions = (redisUrl: string) => {
+  const url = new URL(redisUrl);
+  const database = Number(url.pathname.slice(1));
+
+  return {
+    host: url.hostname,
+    port: Number(url.port) || 6379,
+    ...(url.username ? { username: decodeURIComponent(url.username) } : {}),
+    ...(url.password ? { password: decodeURIComponent(url.password) } : {}),
+    ...(Number.isInteger(database) && database >= 0 ? { db: database } : {}),
+    ...(url.protocol === "rediss:" ? { tls: {} } : {}),
+  };
+};
+
 const BetterAuthRouterLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const auth = yield* Auth;
@@ -135,11 +153,22 @@ const program = Effect.gen(function* () {
         Layer.provide(Database.DatabaseContextLive),
         Layer.provide(Database.SqlClientContextLive)
       );
+  const RateLimitStoreLayer: Layer.Layer<RateLimiter.RateLimiterStore> =
+    config.nodeEnv === "test" || useTestMailer || !config.redisUrl
+      ? RateLimiter.layerStoreMemory
+      : RateLimiter.layerStoreRedis({ prefix: "feeblo:rate-limit" }).pipe(
+          Layer.provide(NodeRedis.layer(redisOptions(config.redisUrl)))
+        );
+  const RateLimitLayer: Layer.Layer<RateLimitService> =
+    RateLimitService.layer.pipe(
+      Layer.provide(RateLimiter.layer),
+      Layer.provide(RateLimitStoreLayer)
+    );
   const AuthLayer = Layer.effect(
     Auth,
-    mailbox ? initAuthHandler(makeMailerLayer) : initAuthHandler()
+    initAuthHandler(makeMailerLayer, RateLimitLayer)
   );
-  const ServiceLayers = Layer.merge(
+  const ServiceLayers = Layer.mergeAll(
     Database.DatabaseContextLive,
     WorkFlowLayer
   );
@@ -246,4 +275,8 @@ const program = Effect.gen(function* () {
   return yield* Layer.launch(server);
 });
 
-program.pipe(Effect.provide(ServerConfig.layer), NodeRuntime.runMain);
+program.pipe(
+  Effect.scoped,
+  Effect.provide(ServerConfig.layer),
+  NodeRuntime.runMain
+);

@@ -43,6 +43,9 @@
     "./billing/repository": {
       "default": "./src/billing/repository.ts"
     },
+    "./rate-limit/service": {
+      "default": "./src/rate-limit/service.ts"
+    },
     "./membership/repository": {
       "default": "./src/membership/repository.ts"
     },
