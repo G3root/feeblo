@@ -101,6 +101,7 @@ function ContactCreateForm() {
           name: data.value.name || null,
           phone: data.value.phone || null,
           avatar: null,
+          source: "DASHBOARD" as const,
           companyId:
             data.value.companyId === "none" ? null : data.value.companyId,
           createdAt: now,

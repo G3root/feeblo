@@ -391,34 +391,6 @@ export const JsonFromString = <S extends Schema.Top>(
   }) as JsonFromString<S>;
 };
 
-export interface UuidV4Insert<B extends string | symbol>
-  extends VariantSchema.Field<{
-    readonly select: Schema.brand<typeof Schema.Uint8Array, B>;
-    readonly insert: VariantSchema.Overrideable<
-      Schema.brand<typeof Schema.Uint8Array, B>
-    >;
-    readonly update: Schema.brand<typeof Schema.Uint8Array, B>;
-    readonly json: Schema.brand<typeof Schema.Uint8Array, B>;
-  }> {}
-
-export const UuidV4WithGenerate = <B extends string | symbol>(
-  schema: Schema.brand<typeof Schema.Uint8Array, B>
-): VariantSchema.Overrideable<Schema.brand<typeof Schema.Uint8Array, B>> =>
-  VariantSchema.Overrideable(schema, {
-    defaultValue: Effect.sync(() => crypto.randomUUID() as any),
-  });
-
-/** A UUID v4 field auto-generated on insert. */
-export const UuidV4Insert = <const B extends string | symbol>(
-  schema: Schema.brand<typeof Schema.Uint8Array, B>
-): UuidV4Insert<B> =>
-  Field({
-    select: schema,
-    insert: UuidV4WithGenerate(schema),
-    update: schema,
-    json: schema,
-  });
-
 /** A boolean parsed from 0 or 1. */
 export const BooleanFromNumber: typeof Schema.BooleanFromBit =
   Schema.BooleanFromBit;

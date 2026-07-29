@@ -21,8 +21,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
-import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostActivityList } from "~/features/post/components/post-activity-list";
+import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
@@ -183,11 +183,7 @@ function RouteComponent() {
               <Separator />
             </div>
 
-            <PostDetails
-              author={post.user?.name}
-              createdAt={post.createdAt}
-              updatedAt={post.updatedAt}
-            />
+            <PostDetails author={post.user?.name} createdAt={post.createdAt} />
           </div>
         </aside>
       </div>
@@ -198,11 +194,9 @@ function RouteComponent() {
 function PostDetails({
   author,
   createdAt,
-  updatedAt,
 }: {
   author: string | null | undefined;
   createdAt: Date | string;
-  updatedAt: Date | string;
 }) {
   const details = [
     {
