@@ -282,6 +282,7 @@ export async function getContactCustomAttributeValueChanges({
     contactId: string;
     createdAt: Date;
     id: string;
+    organizationId: string;
     updatedAt: Date;
   })[];
   organizationId: string;
@@ -329,6 +330,7 @@ export async function getCompanyCustomAttributeValueChanges({
     companyId: string;
     createdAt: Date;
     id: string;
+    organizationId: string;
     updatedAt: Date;
   })[];
   organizationId: string;
@@ -394,16 +396,18 @@ function getAttributeValue(value: CustomAttributeValue): AttributeValueUpsert {
 }
 
 export async function createContactAction(
-  args: {
-    contact: TContact;
-    operation: "create";
-    createAttribute?: TContactAttributeValue[];
-  } | {
-    contact: TContact;
-    operation: "update";
-    createAttribute?: TContactAttributeValue[];
-    upsertAttribute?: TContactAttributeValue[];
-  }
+  args:
+    | {
+        contact: TContact;
+        operation: "create";
+        createAttribute?: TContactAttributeValue[];
+      }
+    | {
+        contact: TContact;
+        operation: "update";
+        createAttribute?: TContactAttributeValue[];
+        upsertAttribute?: TContactAttributeValue[];
+      }
 ): Promise<void> {
   if (args.operation === "create") {
     await fetchRpc((rpc) =>
@@ -441,16 +445,18 @@ export async function createContactAction(
 }
 
 export async function createCompanyAction(
-  args: {
-    company: TCompany;
-    operation: "create";
-    createAttribute?: TCompanyAttributeValue[];
-  } | {
-    company: TCompany;
-    operation: "update";
-    createAttribute?: TCompanyAttributeValue[];
-    upsertAttribute?: TCompanyAttributeValue[];
-  }
+  args:
+    | {
+        company: TCompany;
+        operation: "create";
+        createAttribute?: TCompanyAttributeValue[];
+      }
+    | {
+        company: TCompany;
+        operation: "update";
+        createAttribute?: TCompanyAttributeValue[];
+        upsertAttribute?: TCompanyAttributeValue[];
+      }
 ): Promise<void> {
   if (args.operation === "create") {
     await fetchRpc((rpc) =>
