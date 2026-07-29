@@ -470,6 +470,7 @@ export const postTable = pgTable(
     statusId: text("status_schema_id")
       .notNull()
       .references(() => postStatusTable.id, { onDelete: "restrict" }),
+    etaQuarter: text("eta_quarter"),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -519,6 +520,10 @@ export const postTable = pgTable(
     check(
       "post_no_self_merge_chk",
       sql`${table.mergedIntoPostId} is null or ${table.mergedIntoPostId} <> ${table.id}`
+    ),
+    check(
+      "post_eta_quarter_format_chk",
+      sql`${table.etaQuarter} is null or ${table.etaQuarter} ~ '^[0-9]{4}-Q[1-4]$'`
     ),
     foreignKey({
       name: "post_merged_into_same_organization_fk",

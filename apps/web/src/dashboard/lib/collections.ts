@@ -108,6 +108,7 @@ export const postCollection = createCollection(
           title: updatedPost.title,
           boardId: updatedPost.boardId,
           organizationId: updatedPost.organizationId,
+          etaQuarter: updatedPost.etaQuarter,
         })
       );
 

@@ -23,6 +23,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { PostActivityList } from "~/features/post/components/post-activity-list";
 import { PostBoardField } from "~/features/post/components/post-board-field";
+import { PostEtaField } from "~/features/post/components/post-eta-field";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
@@ -169,6 +170,8 @@ function RouteComponent() {
                   </div>
 
                   <PostBoardField disabled={!canManagePost} />
+
+                  <PostEtaField disabled={!canManagePost} />
                 </>
               )}
             </PostPage.CanManage>

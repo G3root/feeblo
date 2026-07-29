@@ -9,6 +9,7 @@ export const Post = S.Struct({
   content: S.String,
   excerpt: S.String,
   statusId: S.String,
+  etaQuarter: S.NullOr(S.String),
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
   organizationId: S.String,
@@ -58,6 +59,7 @@ export const PostUpdate = S.Struct({
   statusId: PostStatusId.schema,
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
+  etaQuarter: S.optional(S.NullOr(S.String)),
 });
 
 export type TPostUpdate = S.Schema.Type<typeof PostUpdate>;

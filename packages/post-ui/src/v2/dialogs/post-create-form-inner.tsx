@@ -130,6 +130,7 @@ export function PostCreateForm() {
           lockedAt: null,
           mergedAt: null,
           mergedIntoPostId: null,
+          etaQuarter: null,
           statusId: selectedPostStatus.id,
           createdAt: new Date(),
           updatedAt: new Date(),

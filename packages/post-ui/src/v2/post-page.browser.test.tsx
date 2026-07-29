@@ -51,6 +51,7 @@ function state({
     archivedAt: null,
     lockedAt: locked ? new Date() : null,
     mergedIntoPostId: null,
+    etaQuarter: null,
   } as TPost;
 
   return createPostCollectionState({

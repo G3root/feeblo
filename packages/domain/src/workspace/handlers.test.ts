@@ -120,7 +120,7 @@ describe("WorkspaceRpcHandlers", () => {
 
   layer(TestLayer)("handlers", (it) => {
     describe("WorkspaceCreate", () => {
-      it.effect("creates a workspace with default boards and statuses", () =>
+      it.effect("creates a workspace with default boards, statuses, and tags", () =>
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const db = yield* currentDb;
@@ -188,6 +188,19 @@ describe("WorkspaceRpcHandlers", () => {
               eq(schema.postStatusTable.organizationId, result.organizationId)
             );
           expect(statuses).toHaveLength(6);
+
+          // Verify default post tags were created
+          const tags = yield* db
+            .select()
+            .from(schema.tagTable)
+            .where(eq(schema.tagTable.organizationId, result.organizationId));
+          expect(tags).toHaveLength(2);
+          expect(
+            tags.map((tag) => ({ name: tag.name, type: tag.type }))
+          ).toEqual([
+            { name: "High Priority", type: "FEEDBACK" },
+            { name: "Low Priority", type: "FEEDBACK" },
+          ]);
 
           // Verify the primary status roadmap and its ordered columns were created
           const roadmaps = yield* db

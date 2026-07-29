@@ -81,6 +81,7 @@ const selectPostFields = () => ({
   content: schema.postTable.content,
   excerpt: schema.postTable.excerpt,
   statusId: schema.postTable.statusId,
+  etaQuarter: schema.postTable.etaQuarter,
   createdAt: schema.postTable.createdAt,
   updatedAt: schema.postTable.updatedAt,
   organizationId: schema.postTable.organizationId,
@@ -277,6 +278,7 @@ const makePostRepository = Effect.gen(function* () {
       title,
       content,
       excerpt,
+      etaQuarter,
     }: TPostUpdate & { excerpt?: string }) =>
       db
         .update(schema.postTable)
@@ -286,6 +288,7 @@ const makePostRepository = Effect.gen(function* () {
           title,
           content,
           excerpt: excerpt ?? htmlToExcerpt(content),
+          etaQuarter,
         })
         .where(
           and(
