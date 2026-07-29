@@ -37,6 +37,9 @@ services:
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
       AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-dev-key}
+      POLAR_MODE: ${POLAR_MODE:-sandbox}
+      POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
+      POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 
