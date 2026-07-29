@@ -32,10 +32,29 @@ describe("publicRpc", () => {
         limit: 60,
       });
 
-      return error;
+      const secondClientSucceeded = yield* RateLimit.publicRpc({
+        name: "PostListPublic",
+        level: "read",
+        limit: 60,
+      }).pipe(
+        Effect.provideServiceEffect(
+          RateLimit.PublicRpcRateLimiter,
+          RateLimitService.use((rateLimitService) =>
+            Effect.succeed(
+              RateLimit.makePublicRpcRateLimiter({
+                clientIp: "203.0.113.2",
+                rateLimitService,
+              })
+            )
+          )
+        ),
+        Effect.as(true)
+      );
+
+      return { error, secondClientSucceeded };
     });
 
-    const error = await Effect.runPromise(
+    const { error, secondClientSucceeded } = await Effect.runPromise(
       program.pipe(
         Effect.provideServiceEffect(
           RateLimit.PublicRpcRateLimiter,
@@ -53,6 +72,7 @@ describe("publicRpc", () => {
     );
 
     expect(error._tag).toBe("RateLimitExceededError");
+    expect(secondClientSucceeded).toBe(true);
   });
 
   it("uses named level defaults when no override is supplied", async () => {

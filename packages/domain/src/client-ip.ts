@@ -1,7 +1,9 @@
 import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Headers from "effect/unstable/http/Headers";
-import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
+import * as HttpRouter from "effect/unstable/http/HttpRouter";
+import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 
 export class ClientIp extends Context.Service<ClientIp, string>()(
   "@feeblo/domain/ClientIp"
@@ -27,10 +29,19 @@ export const getClientIpFromHeaders = (headers: Headers.Headers): string =>
 
 export const getClientIpFromRequest = (
   request: HttpServerRequest.HttpServerRequest
-): string => {
-  const forwardedIp = getClientIpFromHeaders(request.headers);
+): string =>
+  normalizeIp(Option.getOrUndefined(request.remoteAddress)) ??
+  getClientIpFromHeaders(request.headers);
 
-  return forwardedIp === "unknown"
-    ? Option.getOrElse(request.remoteAddress, () => "unknown")
-    : forwardedIp;
-};
+export const ClientIpMiddlewareLive = HttpRouter.middleware<{
+  provides: ClientIp;
+}>()(
+  (httpEffect) =>
+    Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
+      Effect.provideService(
+        httpEffect,
+        ClientIp,
+        getClientIpFromRequest(request)
+      )
+    )
+).layer;

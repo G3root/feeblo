@@ -33,6 +33,7 @@ import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
+import { ClientIpMiddlewareLive } from "./client-ip";
 
 export const RpcRoute = RpcServer.layerHttp({
   path: "/rpc",
@@ -69,6 +70,7 @@ export const RpcRoute = RpcServer.layerHttp({
   ),
   Layer.provide(WorkspaceRpcHandlers),
   Layer.provide(RpcSerialization.layerNdjson),
+  Layer.provide(ClientIpMiddlewareLive),
   Layer.provide(
     Layer.mergeAll(
       AuthMiddlewareLive,

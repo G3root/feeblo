@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
-import { getClientIpFromHeaders } from "./client-ip";
+import { ClientIp } from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";
 
 export const publicRpcLimits = {
@@ -56,7 +56,12 @@ export const PublicRpcRateLimiter =
     "@feeblo/domain/PublicRpcRateLimiter",
     {
       // Handler unit tests call handlers without running RPC middleware.
-      defaultValue: () => ({ consume: () => Effect.void }),
+      defaultValue: () => ({
+        consume: ({ name }) =>
+          Effect.logWarning(
+            "Public RPC rate limit middleware is not installed"
+          ).pipe(Effect.annotateLogs({ rpc: name })),
+      }),
     }
   );
 
@@ -110,7 +115,10 @@ export const withPublicRpcRateLimit =
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
     Effect.andThen(publicRpc(options), self);
 
-export class PublicRpcRateLimitMiddleware extends RpcMiddleware.Service<PublicRpcRateLimitMiddleware>()(
+export class PublicRpcRateLimitMiddleware extends RpcMiddleware.Service<
+  PublicRpcRateLimitMiddleware,
+  { requires: ClientIp }
+>()(
   "@feeblo/api/PublicRpcRateLimitMiddleware",
   {
     error: RateLimitErrors,
@@ -122,14 +130,16 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
   Effect.gen(function* () {
     const rateLimitService = yield* RateLimitService;
 
-    return PublicRpcRateLimitMiddleware.of((effect, options) =>
-      Effect.provideService(
-        effect,
-        PublicRpcRateLimiter,
-        makePublicRpcRateLimiter({
-          clientIp: getClientIpFromHeaders(options.headers),
-          rateLimitService,
-        })
+    return PublicRpcRateLimitMiddleware.of((effect) =>
+      ClientIp.use((clientIp) =>
+        Effect.provideService(
+          effect,
+          PublicRpcRateLimiter,
+          makePublicRpcRateLimiter({
+            clientIp,
+            rateLimitService,
+          })
+        )
       )
     );
   })

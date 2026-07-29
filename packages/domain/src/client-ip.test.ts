@@ -1,7 +1,9 @@
+import * as Option from "effect/Option";
 import * as Headers from "effect/unstable/http/Headers";
+import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import { describe, expect, it } from "vitest";
 
-import { getClientIpFromHeaders } from "./client-ip";
+import { getClientIpFromHeaders, getClientIpFromRequest } from "./client-ip";
 
 describe("getClientIpFromHeaders", () => {
   it("prefers the Cloudflare connecting IP", () => {
@@ -30,5 +32,17 @@ describe("getClientIpFromHeaders", () => {
 
   it("returns unknown when no client IP header is present", () => {
     expect(getClientIpFromHeaders(Headers.empty)).toBe("unknown");
+  });
+});
+
+describe("getClientIpFromRequest", () => {
+  it("prefers the trusted remote address over forwarded headers", () => {
+    const request = HttpServerRequest.fromWeb(
+      new Request("http://example.com", {
+        headers: { "x-forwarded-for": "198.51.100.1" },
+      })
+    ).modify({ remoteAddress: Option.some("203.0.113.1") });
+
+    expect(getClientIpFromRequest(request)).toBe("203.0.113.1");
   });
 });
