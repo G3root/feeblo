@@ -673,8 +673,8 @@ importers:
         specifier: 'catalog:'
         version: 1.0.0-beta.4(@effect-aws/client-s3@2.0.0-beta.4(effect@4.0.0-beta.66))(effect@4.0.0-beta.66)
       '@effect/ai-openai':
-        specifier: 4.0.0-beta.102
-        version: 4.0.0-beta.102(effect@4.0.0-beta.66)
+        specifier: 4.0.0-beta.66
+        version: 4.0.0-beta.66(effect@4.0.0-beta.66)
       '@feeblo/db':
         specifier: workspace:*
         version: link:../db
@@ -2041,10 +2041,10 @@ packages:
       '@effect-aws/client-s3': ^2.0.0-beta.4
       effect: '>=4.0.0 <5.0.0'
 
-  '@effect/ai-openai@4.0.0-beta.102':
-    resolution: {integrity: sha512-XqoNFJpx+/vLCStPAGPk651eRUJKu7lQ8XHLqJI77j6ZCUvEDlpH2SARQjfk+Ul1np0H7RM5o6m0C572cjvQow==}
+  '@effect/ai-openai@4.0.0-beta.66':
+    resolution: {integrity: sha512-jhLwvQhyRELKXkSpKFrwGztzCp8ZbQZsdXxVyU5AyxMV2WfkclQRmmHG0RsI//oyYq4Pn6gEw+9rN8YaK/G42Q==}
     peerDependencies:
-      effect: ^4.0.0-beta.102
+      effect: ^4.0.0-beta.66
 
   '@effect/atom-react@4.0.0-beta.66':
     resolution: {integrity: sha512-YEUbGXBZsb9dmgQ/FMTsqU6IYp/2rRVqloySSXFzhXlIbRT6b28SvNyTpK3x+HLGavURYfTUjjZ/Y2wEj/7A9g==}
@@ -11684,7 +11684,7 @@ snapshots:
       '@effect-aws/client-s3': 2.0.0-beta.4(effect@4.0.0-beta.66)
       effect: 4.0.0-beta.66
 
-  '@effect/ai-openai@4.0.0-beta.102(effect@4.0.0-beta.66)':
+  '@effect/ai-openai@4.0.0-beta.66(effect@4.0.0-beta.66)':
     dependencies:
       effect: 4.0.0-beta.66
 

@@ -43,6 +43,15 @@ const runMigrate = async () => {
 
   const start = Date.now();
   await prodMigrate(db, migratorConfig);
+  await connection.unsafe(`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS "post_embedding_hnsw_idx"
+    ON "post" USING hnsw ("embedding" vector_cosine_ops)
+    WHERE "embedding" IS NOT NULL
+  `);
+  await connection.unsafe(`
+    ALTER TABLE "post"
+    VALIDATE CONSTRAINT "post_embedding_metadata_chk"
+  `);
   const end = Date.now();
 
   console.log("Migrations completed in", end - start, "ms");

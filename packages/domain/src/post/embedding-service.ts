@@ -1,7 +1,9 @@
 import { OpenAiClient, OpenAiEmbeddingModel } from "@effect/ai-openai";
+import { DEFAULT_POST_EMBEDDING_DIMENSIONS } from "@feeblo/db";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -15,7 +17,7 @@ export interface PostEmbedding {
 }
 
 export const DEFAULT_POST_EMBEDDING_MODEL = "text-embedding-3-small";
-export const DEFAULT_POST_EMBEDDING_DIMENSIONS = 1536;
+export { DEFAULT_POST_EMBEDDING_DIMENSIONS };
 
 export class InvalidPostEmbeddingDimensionsError extends Data.TaggedError(
   "InvalidPostEmbeddingDimensionsError"
@@ -48,6 +50,9 @@ const make = Effect.gen(function* () {
     return yield* new InvalidPostEmbeddingConfigurationError({ dimensions });
   }
   const apiUrl = yield* Config.string("EMBEDDING_API_URL").pipe(Config.option);
+  const timeout = yield* Config.duration("EMBEDDING_TIMEOUT").pipe(
+    Config.withDefault(Duration.seconds(10))
+  );
 
   const embed = Effect.fn("PostEmbeddingService.embed")(function* (
     input: string
@@ -71,7 +76,9 @@ const make = Effect.gen(function* () {
     const embeddingModel = yield* EmbeddingModel.EmbeddingModel.pipe(
       Effect.provide(modelLayer)
     );
-    const response = yield* embeddingModel.embed(input);
+    const response = yield* embeddingModel.embed(input).pipe(
+      Effect.timeout(timeout)
+    );
     if (response.vector.length !== dimensions) {
       return yield* new InvalidPostEmbeddingDimensionsError({
         actual: response.vector.length,

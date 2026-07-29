@@ -44,8 +44,8 @@ export type TWidgetFeedbackResponse = S.Schema.Type<
 export const WidgetSuggestionRequest = S.Struct({
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
-  title: S.String,
-  content: S.String,
+  title: S.String.check(S.isMaxLength(200)),
+  content: S.String.check(S.isMaxLength(20_000)),
 });
 
 export const WidgetSuggestion = S.Struct({

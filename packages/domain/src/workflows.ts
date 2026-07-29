@@ -6,6 +6,8 @@ import {
   TestRunner,
 } from "effect/unstable/cluster";
 import { SubmissionEmailNotificationWorkflowLayer } from "./post/workflow";
+import { PostEmbeddingService } from "./post/embedding-service";
+import { PostEmbeddingWorkflowLayer } from "./post/embedding-workflow";
 import { WelcomeUserWorkflowLayer } from "./user/workflows";
 
 const WorkflowClusterEngineLive = ClusterWorkflowEngine.layer.pipe(
@@ -26,7 +28,8 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
     WelcomeUserWorkflowLayer.pipe(Layer.provide(makeMailerLayer())),
     SubmissionEmailNotificationWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer())
-    )
+    ),
+    PostEmbeddingWorkflowLayer.pipe(Layer.provide(PostEmbeddingService.layer))
   );
 
 export const makeWorkflowsLive = (

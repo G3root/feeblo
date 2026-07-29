@@ -21,6 +21,7 @@ import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { FailedToMergePostError } from "./errors";
 import type { TPostAdminUpdate, TPostUpdate } from "./schema";
+import { schedulePostEmbedding } from "./embedding-workflow";
 import { scheduleSubmissionNotificationBatch } from "./workflow";
 
 interface TPostFindMany {
@@ -365,11 +366,15 @@ const makePostRepository = Effect.gen(function* () {
 
     updateEmbedding: ({
       embedding,
+      expectedContent,
+      expectedTitle,
       id,
       model,
       organizationId,
     }: {
       embedding: readonly number[];
+      expectedContent: string;
+      expectedTitle: string;
       id: string;
       model: string;
       organizationId: string;
@@ -384,7 +389,9 @@ const makePostRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.postTable.id, id),
-            eq(schema.postTable.organizationId, organizationId)
+            eq(schema.postTable.organizationId, organizationId),
+            eq(schema.postTable.title, expectedTitle),
+            eq(schema.postTable.content, expectedContent)
           )
         )
         .pipe(Effect.asVoid),
@@ -663,6 +670,25 @@ const makePostRepository = Effect.gen(function* () {
         }
 
         yield* scheduleSubmissionNotificationBatch(organizationId).pipe(
+          Effect.provideService(WorkflowEngine, engineOption.value)
+        );
+      }),
+
+    scheduleEmbedding: (payload: {
+      readonly content: string;
+      readonly postId: string;
+      readonly organizationId: string;
+      readonly revision: string;
+      readonly title: string;
+    }) =>
+      Effect.gen(function* () {
+        const engineOption = yield* Effect.serviceOption(WorkflowEngine);
+
+        if (Option.isNone(engineOption)) {
+          return;
+        }
+
+        yield* schedulePostEmbedding(payload).pipe(
           Effect.provideService(WorkflowEngine, engineOption.value)
         );
       }),

@@ -7,6 +7,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -517,20 +518,15 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostSuggestions", () => {
-      it.effect("stores the embedding model and generation timestamp", () =>
+      it.effect("does not await embedding generation in the handler", () =>
         Effect.gen(function* () {
+          let embedCalls = 0;
           const handlers = yield* PostRpcHandlersEffect.pipe(
             Effect.provideService(PostEmbeddingService, {
-              embed: () =>
-                Effect.succeed(
-                  Option.some({
-                    model: DEFAULT_POST_EMBEDDING_MODEL,
-                    vector: Array.from(
-                      { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
-                      (_, index) => (index === 0 ? 1 : 0),
-                    ),
-                  }),
-                ),
+              embed: () => {
+                embedCalls += 1;
+                return Effect.never;
+              },
             }),
           );
           const db = yield* currentDb;
@@ -550,12 +546,47 @@ describe("PostRpcHandlers", () => {
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
 
-          expect(post?.embedding).toHaveLength(
-            DEFAULT_POST_EMBEDDING_DIMENSIONS,
+          expect(embedCalls).toBe(0);
+          expect(post?.embedding).toBeNull();
+          expect(post?.embeddingModel).toBeNull();
+          expect(post?.embeddedAt).toBeNull();
+        }),
+      );
+
+      it.effect("does not store an embedding for an older post revision", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const repository = yield* PostRepository;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+          const vector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index === 0 ? 1 : 0),
           );
-          expect(post?.embedding?.[0]).toBe(1);
-          expect(post?.embeddingModel).toBe(DEFAULT_POST_EMBEDDING_MODEL);
-          expect(post?.embeddedAt).toBeInstanceOf(Date);
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Old title"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* repository.update({
+            ...postCreateInput(fixture, postId, "Current title"),
+          });
+          yield* repository.updateEmbedding({
+            embedding: vector,
+            expectedContent:
+              sanitizeMarkdown("Old title").sanitizedMarkdown,
+            expectedTitle: "Old title",
+            id: postId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+
+          const [post] = yield* db
+            .select({ embedding: schema.postTable.embedding })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(post?.embedding).toBeNull();
         }),
       );
 
@@ -587,12 +618,18 @@ describe("PostRpcHandlers", () => {
           }
           yield* repository.updateEmbedding({
             embedding: queryVector,
+            expectedContent:
+              sanitizeMarkdown("Near vector").sanitizedMarkdown,
+            expectedTitle: "Near vector",
             id: nearPostId,
             model: DEFAULT_POST_EMBEDDING_MODEL,
             organizationId: fixture.organizationId,
           });
           yield* repository.updateEmbedding({
             embedding: farVector,
+            expectedContent:
+              sanitizeMarkdown("Far vector").sanitizedMarkdown,
+            expectedTitle: "Far vector",
             id: farPostId,
             model: DEFAULT_POST_EMBEDDING_MODEL,
             organizationId: fixture.organizationId,

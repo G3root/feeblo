@@ -20,17 +20,19 @@ import * as Schema from "effect/Schema";
 import { memberTable, organizationTable, userTable } from "./auth";
 
 const VectorValues = Schema.Array(Schema.Number);
+export const DEFAULT_POST_EMBEDDING_DIMENSIONS = 1536;
 
-const embeddingVector = customType<{
-  data: number[];
-  driverData: string;
-}>({
-  dataType: () => "vector",
-  fromDriver: (value) =>
-    Array.from(Schema.decodeUnknownSync(VectorValues)(JSON.parse(value))),
-  toDriver: (value) =>
-    JSON.stringify(Schema.decodeUnknownSync(VectorValues)(value)),
-});
+const embeddingVector = (dimensions: number) =>
+  customType<{
+    data: number[];
+    driverData: string;
+  }>({
+    dataType: () => `vector(${dimensions})`,
+    fromDriver: (value) =>
+      Array.from(Schema.decodeUnknownSync(VectorValues)(JSON.parse(value))),
+    toDriver: (value) =>
+      JSON.stringify(Schema.decodeUnknownSync(VectorValues)(value)),
+  });
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PUBLIC",
@@ -505,7 +507,7 @@ export const postTable = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     mergedIntoPostId: text("merged_into_post_id"),
     mergedAt: timestamp("merged_at", { withTimezone: true }),
-    embedding: embeddingVector("embedding"),
+    embedding: embeddingVector(DEFAULT_POST_EMBEDDING_DIMENSIONS)("embedding"),
     embeddingModel: text("embedding_model"),
     embeddedAt: timestamp("embedded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),

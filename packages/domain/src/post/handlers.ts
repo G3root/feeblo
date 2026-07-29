@@ -54,7 +54,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
   // -- Shared effect helpers (no policy applied) --
 
-  const generateAndStoreEmbedding = ({
+  const scheduleEmbedding = ({
     content,
     id,
     organizationId,
@@ -65,24 +65,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     organizationId: string;
     title: string;
   }) =>
-    Effect.gen(function* () {
-      if (Option.isNone(embeddingService)) {
-        return;
-      }
-      const embedding = yield* embeddingService.value.embed(
-        postEmbeddingInput({ title, content })
-      );
-      if (Option.isSome(embedding)) {
-        yield* repository.updateEmbedding({
-          embedding: embedding.value.vector,
-          id,
-          model: embedding.value.model,
-          organizationId,
-        });
-      }
+    repository.scheduleEmbedding({
+      content,
+      postId: id,
+      organizationId,
+      revision: crypto.randomUUID(),
+      title,
     }).pipe(
       Effect.catchCause((cause) =>
-        Effect.logWarning("Failed to generate post embedding", cause).pipe(
+        Effect.logWarning("Failed to schedule post embedding", cause).pipe(
           Effect.annotateLogs({ postId: id, organizationId })
         )
       )
@@ -213,7 +204,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           }
         })
       );
-      yield* generateAndStoreEmbedding({
+      yield* scheduleEmbedding({
         content: sanitizedMarkdown,
         id: args.id,
         organizationId: args.organizationId,
@@ -312,7 +303,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             )
           )
         );
-      yield* generateAndStoreEmbedding({
+      yield* scheduleEmbedding({
         content: sanitizedMarkdown,
         id: args.id,
         organizationId: args.organizationId,

@@ -55,7 +55,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             boardId: payload.boardId,
             organizationId: payload.organizationId,
             publicOnly: true,
-            limit: 5,
+            limit: Option.isSome(queryEmbedding) ? 5 : 25,
             ...(Option.isSome(queryEmbedding)
               ? {
                   embedding: queryEmbedding.value.vector,
