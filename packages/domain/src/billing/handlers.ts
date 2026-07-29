@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
+import * as Option from "effect/Option";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -17,12 +17,29 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
     BillingCheckout: ({ organizationId, productId }: TBillingCheckoutInput) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+        const product = yield* repository.findCheckoutProduct({ productId });
+
+        if (Option.isNone(product)) {
+          return yield* new BadRequestError({
+            message: "This billing product is unavailable",
+          });
+        }
+
+        const currentSubscription =
+          yield* repository.findCurrentSubscriptionByOrganizationId({
+            organizationId,
+          });
+
+        if (Option.isSome(currentSubscription)) {
+          return yield* new BadRequestError({
+            message: "Manage the existing subscription in the billing portal",
+          });
+        }
 
         return yield* polarService.createCheckout({
           organizationId,
           productId,
           user: {
-            id: session.session.userId,
             email: session.user.email,
             name: session.user.name,
           },
@@ -36,7 +53,8 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
               Policy.hasOrganizationRole(organizationId, "admin")
             )
           )
-        )
+        ),
+        withRemapDbErrors("Billing", "select")
       ),
     BillingPortal: ({ organizationId }: TBillingPortalInput) =>
       Effect.gen(function* () {
