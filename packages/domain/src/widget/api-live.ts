@@ -20,6 +20,10 @@ import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import { PostRepository } from "../post/repository";
+import {
+  PostEmbeddingService,
+  postEmbeddingInput,
+} from "../post/embedding-service";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   InternalServerError,
@@ -34,6 +38,72 @@ export const WidgetApiLive = HttpApiBuilder.group(
   "WidgetApiGroup",
   (handlers) =>
     handlers
+      .handle("suggestPosts", ({ payload }) =>
+        Effect.gen(function* () {
+          const repository = yield* PostRepository;
+          const embeddings = yield* PostEmbeddingService;
+          const input = postEmbeddingInput(payload);
+          const queryEmbedding = yield* embeddings.embed(input).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning(
+                "Failed to generate widget suggestion embedding",
+                cause
+              ).pipe(Effect.as(Option.none()))
+            )
+          );
+          const candidates = yield* repository.findSuggestionCandidates({
+            boardId: payload.boardId,
+            organizationId: payload.organizationId,
+            publicOnly: true,
+            limit: 5,
+            ...(Option.isSome(queryEmbedding)
+              ? {
+                  embedding: queryEmbedding.value.vector,
+                  embeddingModel: queryEmbedding.value.model,
+                }
+              : {}),
+          });
+          if (Option.isSome(queryEmbedding)) {
+            return candidates.map(({ id, title, excerpt, slug }) => ({
+              id,
+              title,
+              excerpt,
+              slug,
+            }));
+          }
+          const words = (value: string) =>
+            new Set(value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+          const inputWords = words(input);
+          return candidates
+            .map((post) => {
+              const postWords = words(postEmbeddingInput(post));
+              const intersection = [...inputWords].filter((word) =>
+                postWords.has(word)
+              ).length;
+              const union = new Set([...inputWords, ...postWords]).size;
+              return { post, score: union === 0 ? 0 : intersection / union };
+            })
+            .filter(({ score }) => score > 0)
+            .sort((left, right) => right.score - left.score)
+            .slice(0, 5)
+            .map(({ post: { id, title, excerpt, slug } }) => ({
+              id,
+              title,
+              excerpt,
+              slug,
+            }));
+        }).pipe(
+          Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
+          Effect.mapError(
+            (cause) =>
+              new InternalServerError({
+                message: "Failed to find similar posts",
+                cause: String(cause),
+              })
+          ),
+          withRemapDbErrors("Post", "select")
+        )
+      )
       .handle("listBoards", ({ payload }) =>
         Effect.gen(function* () {
           const { organizationId } = payload;

@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
 import { drizzle as devDrizzle } from "drizzle-orm/pglite";
 import { migrate as devMigrate } from "drizzle-orm/pglite/migrator";
 import { drizzle as prodDrizzle } from "drizzle-orm/postgres-js";
@@ -21,7 +22,7 @@ const runMigrate = async () => {
   };
 
   if (DB_URL.startsWith("memory://")) {
-    const pglite = new PGlite(DB_URL);
+    const pglite = new PGlite(DB_URL, { extensions: { vector } });
     const drizzlePglite = devDrizzle({ client: pglite });
     console.log("Running migrations...");
 

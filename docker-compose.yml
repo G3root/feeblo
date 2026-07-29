@@ -1,6 +1,6 @@
 services:
   pg:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: feeblo-database
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-feeblo}
@@ -37,6 +37,10 @@ services:
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
       AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-dev-key}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_API_URL: ${EMBEDDING_API_URL:-https://api.openai.com/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 

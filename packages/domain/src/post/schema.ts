@@ -33,6 +33,16 @@ export const PostList = S.Struct({
 
 export type TPostList = S.Schema.Type<typeof PostList>;
 
+export const PostSuggestions = S.Struct({
+  boardId: S.optional(BoardId.schema),
+  content: S.String,
+  limit: S.optional(S.Int.check(S.isBetween({ minimum: 1, maximum: 20 }))),
+  organizationId: WorkspaceId.schema,
+  title: S.String,
+});
+
+export type TPostSuggestions = S.Schema.Type<typeof PostSuggestions>;
+
 export const PostIds = S.Array(S.String);
 
 export const PostDelete = S.Struct({

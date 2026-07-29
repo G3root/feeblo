@@ -110,6 +110,25 @@ The embeddable SDK lives in `packages/sdk` and ships ESM + UMD builds. See [`pac
 
 Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Cloudflare deployments are managed via Alchemy and Wrangler configuration in `apps/web`. Use `pnpm deploy` / `pnpm destroy` to provision and remove infrastructure.
 
+The Compose database uses the pgvector-enabled PostgreSQL image. Post
+embeddings default to OpenAI `text-embedding-3-small` at 1536 dimensions. Set
+`EMBEDDING_API_KEY` to enable embeddings; OpenAI-compatible self-hosted
+providers can also set `EMBEDDING_API_URL`, `EMBEDDING_MODEL`, and
+`EMBEDDING_DIMENSIONS`.
+
+When changing to a model with a different vector size, reconfigure the database
+column from the published server image before restarting it:
+
+```sh
+docker compose run --rm server \
+  node ./migrate/configure-embeddings.js \
+  --dimensions 768 \
+  --clear-existing
+```
+
+The command clears incompatible vectors and rebuilds the HNSW index. Omit
+`--clear-existing` to make it fail safely when existing vectors would be lost.
+
 ## License
 
 Copyright © Feeblo contributors. Distributed under the [GNU Affero General Public License v3.0](./LICENSE).

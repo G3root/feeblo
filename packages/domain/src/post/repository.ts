@@ -2,7 +2,16 @@
 import { currentDb, schema } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  cosineDistance,
+  eq,
+  inArray,
+  isNotNull,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -63,6 +72,15 @@ interface TPostFindByCreatorIds {
 interface TPostById {
   id: string;
   organizationId: string;
+}
+
+interface TPostSuggestionCandidates {
+  boardId?: string;
+  embedding?: readonly number[];
+  embeddingModel?: string;
+  limit: number;
+  organizationId: string;
+  publicOnly: boolean;
 }
 
 const getWhereClause = (where: SQL[]) =>
@@ -215,6 +233,56 @@ const makePostRepository = Effect.gen(function* () {
         .where(whereClause);
     },
 
+    findSuggestionCandidates: ({
+      boardId,
+      embedding,
+      embeddingModel,
+      limit,
+      organizationId,
+      publicOnly,
+    }: TPostSuggestionCandidates) => {
+      const where: SQL[] = [
+        eq(schema.postTable.organizationId, organizationId),
+        sql`${schema.postTable.archivedAt} is null`,
+        sql`${schema.postTable.mergedIntoPostId} is null`,
+      ];
+      if (boardId) {
+        where.push(eq(schema.postTable.boardId, boardId));
+      }
+      if (publicOnly) {
+        where.push(eq(schema.boardTable.visibility, "PUBLIC"));
+      }
+      if (embedding) {
+        where.push(isNotNull(schema.postTable.embedding));
+        if (embeddingModel) {
+          where.push(eq(schema.postTable.embeddingModel, embeddingModel));
+        }
+      }
+
+      const query = db
+        .select({
+          ...selectPostFields(),
+        })
+        .from(schema.postTable)
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .where(and(...where));
+
+      return embedding
+        ? query
+            .orderBy(
+              asc(cosineDistance(schema.postTable.embedding, [...embedding]))
+            )
+            .limit(limit)
+        : query;
+    },
+
     isPublicPost: ({ id, organizationId }: TPostById) =>
       Effect.gen(function* () {
         const rows = yield* db
@@ -286,6 +354,32 @@ const makePostRepository = Effect.gen(function* () {
           title,
           content,
           excerpt: excerpt ?? htmlToExcerpt(content),
+        })
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
+
+    updateEmbedding: ({
+      embedding,
+      id,
+      model,
+      organizationId,
+    }: {
+      embedding: readonly number[];
+      id: string;
+      model: string;
+      organizationId: string;
+    }) =>
+      db
+        .update(schema.postTable)
+        .set({
+          embeddedAt: new Date(),
+          embedding: [...embedding],
+          embeddingModel: model,
         })
         .where(
           and(

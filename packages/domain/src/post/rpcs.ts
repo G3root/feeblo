@@ -13,6 +13,7 @@ import {
   PostDeletePublic,
   PostList,
   PostMerge,
+  PostSuggestions,
   PostUpdate,
 } from "./schema";
 
@@ -25,6 +26,18 @@ export class PostRpcs extends RpcGroup.make(
 
   Rpc.make("PostListPublic", {
     payload: PostList,
+    success: Schema.Array(Post),
+    error: PostServiceErrors,
+  }).middleware(OptionalAuthMiddleware),
+
+  Rpc.make("PostSuggestions", {
+    payload: PostSuggestions,
+    success: Schema.Array(Post),
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostSuggestionsPublic", {
+    payload: PostSuggestions,
     success: Schema.Array(Post),
     error: PostServiceErrors,
   }).middleware(OptionalAuthMiddleware),

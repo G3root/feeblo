@@ -40,3 +40,17 @@ export const WidgetFeedbackResponse = S.Struct({
 export type TWidgetFeedbackResponse = S.Schema.Type<
   typeof WidgetFeedbackResponse
 >;
+
+export const WidgetSuggestionRequest = S.Struct({
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
+  title: S.String,
+  content: S.String,
+});
+
+export const WidgetSuggestion = S.Struct({
+  id: S.String,
+  title: S.String,
+  excerpt: S.String,
+  slug: S.String,
+});

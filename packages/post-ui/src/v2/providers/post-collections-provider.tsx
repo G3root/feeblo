@@ -26,8 +26,15 @@ export interface PostCollections {
 
 export interface PostCollectionsValue {
   collections: PostCollections;
+  getPostHref?: (post: TPost) => string;
   onAuthRequired?: () => void;
   organizationId: string;
+  suggestPosts?: (input: {
+    boardId?: string;
+    content: string;
+    signal: AbortSignal;
+    title: string;
+  }) => Promise<readonly TPost[]>;
 }
 
 const PostCollectionsContext = createContext<PostCollectionsValue | null>(null);
@@ -45,17 +52,27 @@ export function usePostCollections() {
 export function PostCollectionsProvider({
   children,
   collections,
+  getPostHref,
   onAuthRequired,
   organizationId,
+  suggestPosts,
 }: {
   children: React.ReactNode;
   collections: PostCollections;
+  getPostHref?: (post: TPost) => string;
   onAuthRequired?: () => void;
   organizationId: string;
+  suggestPosts?: PostCollectionsValue["suggestPosts"];
 }) {
   return (
     <PostCollectionsContext.Provider
-      value={{ collections, onAuthRequired, organizationId }}
+      value={{
+        collections,
+        getPostHref,
+        onAuthRequired,
+        organizationId,
+        suggestPosts,
+      }}
     >
       {children}
     </PostCollectionsContext.Provider>

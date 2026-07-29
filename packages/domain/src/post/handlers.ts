@@ -15,6 +15,7 @@ import {
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { PostEmbeddingService, postEmbeddingInput } from "./embedding-service";
 import { FailedToUpdatePostError } from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -25,8 +26,22 @@ import type {
   TPostDelete,
   TPostList,
   TPostMerge,
+  TPostSuggestions,
   TPostUpdate,
 } from "./schema";
+
+const words = (value: string): ReadonlySet<string> =>
+  new Set(value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+
+const lexicalSimilarity = (left: string, right: string): number => {
+  const leftWords = words(left);
+  const rightWords = words(right);
+  const intersection = [...leftWords].filter((word) =>
+    rightWords.has(word)
+  ).length;
+  const union = new Set([...leftWords, ...rightWords]).size;
+  return union === 0 ? 0 : intersection / union;
+};
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
@@ -34,9 +49,93 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
   const notifications = yield* Effect.serviceOption(NotificationService);
+  const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
 
   // -- Shared effect helpers (no policy applied) --
+
+  const generateAndStoreEmbedding = ({
+    content,
+    id,
+    organizationId,
+    title,
+  }: {
+    content: string;
+    id: string;
+    organizationId: string;
+    title: string;
+  }) =>
+    Effect.gen(function* () {
+      if (Option.isNone(embeddingService)) {
+        return;
+      }
+      const embedding = yield* embeddingService.value.embed(
+        postEmbeddingInput({ title, content })
+      );
+      if (Option.isSome(embedding)) {
+        yield* repository.updateEmbedding({
+          embedding: embedding.value.vector,
+          id,
+          model: embedding.value.model,
+          organizationId,
+        });
+      }
+    }).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Failed to generate post embedding", cause).pipe(
+          Effect.annotateLogs({ postId: id, organizationId })
+        )
+      )
+    );
+
+  const suggestionsEffect = (args: TPostSuggestions, publicOnly: boolean) =>
+    Effect.gen(function* () {
+      const input = postEmbeddingInput(args);
+      const queryEmbedding = Option.isSome(embeddingService)
+        ? yield* embeddingService.value
+            .embed(input)
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning(
+                  "Failed to generate suggestion query embedding",
+                  cause
+                ).pipe(Effect.as(Option.none()))
+              )
+            )
+        : Option.none();
+      const candidates = yield* repository.findSuggestionCandidates({
+        organizationId: args.organizationId,
+        ...(args.boardId ? { boardId: args.boardId } : {}),
+        ...(Option.isSome(queryEmbedding)
+          ? {
+              embedding: queryEmbedding.value.vector,
+              embeddingModel: queryEmbedding.value.model,
+            }
+          : {}),
+        limit: args.limit ?? 5,
+        publicOnly,
+      });
+
+      if (Option.isSome(queryEmbedding)) {
+        return candidates;
+      }
+
+      return candidates
+        .map((post) => {
+          const score = lexicalSimilarity(
+            input,
+            postEmbeddingInput({
+              title: post.title,
+              content: post.content,
+            })
+          );
+          return { post, score };
+        })
+        .filter(({ score }) => score > 0)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, args.limit ?? 5)
+        .map(({ post }) => post);
+    });
 
   const deletePostEffect = (args: TPostDelete) =>
     repository.delete({
@@ -114,6 +213,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           }
         })
       );
+      yield* generateAndStoreEmbedding({
+        content: sanitizedMarkdown,
+        id: args.id,
+        organizationId: args.organizationId,
+        title: args.title,
+      });
     });
   };
 
@@ -207,6 +312,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             )
           )
         );
+      yield* generateAndStoreEmbedding({
+        content: sanitizedMarkdown,
+        id: args.id,
+        organizationId: args.organizationId,
+        title: args.title,
+      });
     });
 
   // -- RPC handlers --
@@ -242,6 +353,15 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         });
       }).pipe(withRemapDbErrors("Post", "select"));
     },
+
+    PostSuggestions: (args: TPostSuggestions) =>
+      suggestionsEffect(args, false).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Post", "select")
+      ),
+
+    PostSuggestionsPublic: (args: TPostSuggestions) =>
+      suggestionsEffect(args, true).pipe(withRemapDbErrors("Post", "select")),
 
     PostDelete: (args: TPostDelete) =>
       deletePostEffect(args).pipe(
@@ -386,5 +506,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostRepository.layer),
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
+  Layer.provide(PostEmbeddingService.layer),
   Layer.provide(NotificationService.layer)
 );
