@@ -8,9 +8,10 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
@@ -89,6 +90,7 @@ export function PostCreateForm() {
     postStatuses[0];
 
   const initialBoardId = store.get().context.data.boardId ?? "";
+  const creationSource = store.get().context.data.source;
   const [contentEditorKey, setContentEditorKey] = useState(0);
 
   const form = useAppForm({
@@ -106,8 +108,6 @@ export function PostCreateForm() {
         onAuthRequired?.();
         return;
       }
-
-      const source = store.get().context.data.source;
 
       try {
         const postId = await PostId.unsafeGenerate();
@@ -143,7 +143,7 @@ export function PostCreateForm() {
         });
 
         await tx.isPersisted.promise;
-        trackEvent("post_created", { source, success: true });
+        trackEvent("post_created", { source: creationSource, success: true });
         toastManager.add({
           title: "Post created successfully",
           type: "success",
@@ -160,7 +160,7 @@ export function PostCreateForm() {
         setContentEditorKey((current) => current + 1);
         store.send({ type: "toggle" });
       } catch (_error) {
-        trackEvent("post_created", { source, success: false });
+        trackEvent("post_created", { source: creationSource, success: false });
         console.error(_error);
         toastManager.add({
           title: "Failed to create post",
@@ -187,6 +187,24 @@ export function PostCreateForm() {
       <div className="flex h-full flex-1 flex-col gap-2">
         <PostTitleField form={form} />
         <PostContentField form={form} key={contentEditorKey} />
+        {creationSource === "public_portal" && (
+          <form.Subscribe
+            selector={(state) => [
+              state.values.boardId,
+              state.values.content,
+              state.values.title,
+            ]}
+          >
+            {([boardId, content, title]) => (
+              <SimilarFeedbackSuggestions
+                boardId={boardId}
+                content={content}
+                organizationId={organizationId}
+                title={title}
+              />
+            )}
+          </form.Subscribe>
+        )}
       </div>
 
       <aside className="flex h-full w-full flex-col rounded-xl border bg-muted/40 p-3 text-sm md:min-h-150 md:w-sm md:p-4">
@@ -207,5 +225,83 @@ export function PostCreateForm() {
         </div>
       </aside>
     </form>
+  );
+}
+
+function SimilarFeedbackSuggestions({
+  boardId,
+  content,
+  organizationId,
+  title,
+}: {
+  boardId: string;
+  content: string;
+  organizationId: string;
+  title: string;
+}) {
+  const [candidates, setCandidates] = useState<
+    ReadonlyArray<{
+      excerpt: string;
+      postId: string;
+      score: number;
+      slug: string;
+      title: string;
+    }>
+  >([]);
+
+  useEffect(() => {
+    if (title.trim().length < 3) {
+      setCandidates([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      fetchRpc(
+        (rpc) =>
+          rpc.FeedbackSimilarPostsPublic({
+            organizationId,
+            ...(boardId ? { boardId } : {}),
+            title,
+            text: content,
+          }),
+        { signal: controller.signal }
+      )
+        .then(setCandidates)
+        .catch(() => setCandidates([]));
+    }, 300);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [boardId, content, organizationId, title]);
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg border bg-muted/40 p-3">
+      <p className="font-medium text-sm">This may already exist</p>
+      <p className="mb-2 text-muted-foreground text-xs">
+        Open an existing request to add your vote instead.
+      </p>
+      <ul className="space-y-2">
+        {candidates.map((candidate) => (
+          <li key={candidate.postId}>
+            <a
+              className="block rounded-md p-2 hover:bg-muted"
+              href={`/p/${candidate.slug}`}
+            >
+              <span className="block font-medium text-sm">
+                {candidate.title}
+              </span>
+              <span className="line-clamp-2 block text-muted-foreground text-xs">
+                {candidate.excerpt}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

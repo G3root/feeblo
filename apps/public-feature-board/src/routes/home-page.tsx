@@ -436,7 +436,10 @@ function HomePage() {
                     if (session) {
                       postCreateStore.send({
                         type: "toggle",
-                        data: { boardId: activeBoardId },
+                        data: {
+                          boardId: activeBoardId,
+                          source: "public_portal",
+                        },
                       });
                     } else {
                       authDialogStore.send({

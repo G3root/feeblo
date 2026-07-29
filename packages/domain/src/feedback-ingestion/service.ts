@@ -5,6 +5,8 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schedule from "effect/Schedule";
+import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import { PostRepository } from "../post/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { BadRequestError } from "../rpc-errors";
@@ -36,44 +38,112 @@ const postSourceFor = (
   }
 };
 
+const validateCaptureInput = (input: TCaptureFeedback) =>
+  Effect.gen(function* () {
+    if (!input.message.text.trim()) {
+      return yield* new BadRequestError({
+        message: "Feedback content cannot be empty",
+      });
+    }
+    if (!(input.deliveryKey.trim() && input.channel.key.trim())) {
+      return yield* new BadRequestError({
+        message: "Channel key and delivery key are required",
+      });
+    }
+  });
+
 const makeFeedbackIngestionService = Effect.gen(function* () {
   const db = yield* Database.Database;
   const repository = yield* FeedbackIngestionRepository;
+  const workflowEngine = yield* WorkflowEngine.WorkflowEngine;
   const inTransaction = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     transaction(effect).pipe(Effect.provideService(Database.Database, db));
+  const drainPendingDispatches = Effect.fn(
+    "FeedbackIngestionService.drainPendingDispatches"
+  )(function* () {
+    const pending = yield* repository.listPendingWorkflowDispatches({
+      limit: 100,
+    });
+    yield* Effect.forEach(
+      pending,
+      ({ organizationId, receiptId }) =>
+        FeedbackIngestionWorkflow.execute(
+          { organizationId, receiptId },
+          { discard: true }
+        ).pipe(
+          Effect.provideService(WorkflowEngine.WorkflowEngine, workflowEngine),
+          Effect.tap(() =>
+            repository.recordWorkflowDispatchAttempt({
+              receiptId,
+              result: "succeeded",
+            })
+          ),
+          Effect.tapError(() =>
+            repository.recordWorkflowDispatchAttempt({
+              receiptId,
+              result: "failed",
+            })
+          ),
+          Effect.annotateLogs({ organizationId, receiptId })
+        ),
+      { concurrency: 1 }
+    );
+  });
 
   return {
+    drainPendingDispatches,
+
+    captureAttached: Effect.fn(
+      "FeedbackIngestionService.captureAttached"
+    )(function* (
+      input: TCaptureFeedback & { readonly attachedPostId: string }
+    ) {
+      yield* validateCaptureInput(input);
+      const { attachedPostId, ...capture } = input;
+      const result = yield* inTransaction(
+        Effect.gen(function* () {
+          const postIsAttachable = yield* repository.isPostAttachable({
+            organizationId: input.organizationId,
+            postId: attachedPostId,
+          });
+          if (!postIsAttachable) {
+            return yield* new BadRequestError({
+              message: "Attached post does not belong to this workspace",
+            });
+          }
+          return yield* repository.captureIdempotently(capture, {
+            attachedPostId,
+          });
+        })
+      );
+      return yield* Effect.succeed(result).pipe(
+        Effect.annotateLogs({
+          attachedPostId,
+          channelKind: input.channel.kind,
+          channelKey: input.channel.key,
+          organizationId: input.organizationId,
+          receiptId: result.receiptId,
+        })
+      );
+    }),
+
     capture: Effect.fn("FeedbackIngestionService.capture")(function* (
       input: TCaptureFeedback
     ) {
-      if (!input.message.text.trim()) {
-        return yield* new BadRequestError({
-          message: "Feedback content cannot be empty",
-        });
-      }
-      if (!(input.deliveryKey.trim() && input.channel.key.trim())) {
-        return yield* new BadRequestError({
-          message: "Channel key and delivery key are required",
-        });
-      }
+      yield* validateCaptureInput(input);
 
-      const result = yield* inTransaction(
-        repository.captureIdempotently(input)
-      );
+      const result = yield* inTransaction(repository.captureIdempotently(input));
 
-      yield* FeedbackIngestionWorkflow.execute(
-        {
+      yield* drainPendingDispatches();
+
+      return yield* Effect.succeed(result).pipe(
+        Effect.annotateLogs({
+          channelKind: input.channel.kind,
+          channelKey: input.channel.key,
           organizationId: input.organizationId,
           receiptId: result.receiptId,
-        },
-        { discard: true }
-      ).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning("Failed to schedule feedback ingestion", cause)
-        )
+        })
       );
-
-      return result;
     }),
   };
 });
@@ -84,6 +154,19 @@ export class FeedbackIngestionService extends Context.Service<FeedbackIngestionS
 ) {
   static readonly layer = Layer.effect(this, this.make);
 }
+
+export const FeedbackIngestionRecoveryLive = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const ingestion = yield* FeedbackIngestionService;
+    yield* ingestion.drainPendingDispatches().pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Feedback ingestion recovery pass failed", cause)
+      ),
+      Effect.repeat(Schedule.spaced("30 seconds")),
+      Effect.forkScoped
+    );
+  })
+);
 
 const makeFeedbackTriageService = Effect.gen(function* () {
   const db = yield* Database.Database;

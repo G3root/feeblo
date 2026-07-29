@@ -28,7 +28,13 @@ Source adapter or authenticated client
                                       └─ ignore
 ```
 
-The receipt is committed before workflow scheduling. If the same delivery is captured again, Feeblo returns the original receipt ID and schedules the same workflow identity. Database uniqueness and the workflow idempotency key make retries safe.
+The receipt and a workflow-outbox row are committed in the same transaction. A
+dispatcher records a successful workflow submission on that outbox row; failed
+submissions remain pending. The server runs a recovery pass at startup and every
+30 seconds, and capture requests also drain pending work. If the same delivery
+is captured again, Feeblo returns the original receipt ID and schedules the same
+workflow identity. Receipt uniqueness, the durable outbox, and the workflow
+idempotency key make every retry safe.
 
 ## Domain vocabulary
 
@@ -208,6 +214,45 @@ Contact-backed votes have a unique contact/post constraint. A person represented
 
 A second resolution attempt fails with `FeedbackTriageAlreadyDecidedError`.
 
+## Production transports and compatibility
+
+Widget and public-portal submissions historically create a visible post
+immediately. That behavior and both public response contracts are preserved.
+Each direct post transaction now also calls
+`FeedbackIngestionService.captureAttached`
+with:
+
+- a deterministic delivery key derived from the post/submission ID;
+- widget or public-portal channel identity;
+- the original board, status, authentication mode, and transport in metadata;
+- `attachedPostId`, identifying the already-created canonical post.
+
+Attached captures are stored directly at `READY`, do not create a workflow
+outbox row, and never create a triage item. They therefore cannot leave an open
+`CREATE_POST` decision or create a second post, contact, vote, or notification.
+External adapter captures do not contain an attached post and enter the normal
+open-triage path.
+
+Before widget or public-portal submission, the client calls the shared similar
+feedback lookup. It searches public posts in the workspace (and selected board,
+when supplied), ranks likely matches, and shows up to five suggestions. This is
+advisory semantic duplicate detection; delivery-key idempotency remains the
+separate guarantee against retrying the same submission.
+
+External Slack, email, and API adapters submit:
+
+```text
+POST /api/ingestion/v1/feedback
+Authorization: Bearer <workspace JWT secret>
+```
+
+The body is the normalized capture contract, restricted to `API`, `SLACK`, and
+`EMAIL` channel kinds. Effect Schema validates and normalizes the request. The
+active bearer secret resolves the workspace independently; a body
+`organizationId` that does not match that workspace is rejected. Dashboard
+cookies are neither required nor consulted. Revoked credentials are rejected.
+Successful requests return `CREATED` or `DUPLICATE` with the stable `receiptId`.
+
 ## Permissions
 
 All current ingestion RPCs use authenticated dashboard sessions.
@@ -222,7 +267,7 @@ All current ingestion RPCs use authenticated dashboard sessions.
 
 Handlers derive the acting user and membership from `CurrentSession`. The client cannot choose the deciding member or activity actor.
 
-An unattended source adapter must introduce an appropriate authenticated transport boundary before calling the ingestion service. Supporting a channel kind in the schema does not by itself expose a public webhook.
+Unattended adapters use the bearer-authenticated external endpoint above.
 
 ## Dashboard
 

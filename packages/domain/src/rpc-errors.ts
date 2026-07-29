@@ -49,7 +49,7 @@ export function withRemapDbErrors<R, E, A>(
     | Exclude<
         E,
         | EffectDrizzleQueryError
-        | { _tag: "SqlError" | "SchemaError" | "LegidError" }
+        | { _tag: "SqlError" | "SchemaError" | "LegidError" | "ConfigError" }
       >
     | InternalServerError,
     A
@@ -80,10 +80,7 @@ export function withRemapDbErrors<R, E, A>(
           Predicate.isTagged(e, "LegidError"),
         (err) => {
           if (Predicate.isTagged(err, "SchemaError")) {
-            return toInternalError(
-              err,
-              "There was an error in parsing when"
-            );
+            return toInternalError(err, "There was an error in parsing when");
           }
           if (Predicate.isTagged(err, "LegidError")) {
             return toInternalError(

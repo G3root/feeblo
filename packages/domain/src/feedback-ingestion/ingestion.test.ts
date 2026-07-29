@@ -6,9 +6,11 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as S from "effect/Schema";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
+import { eq, or } from "drizzle-orm";
 import { PostRepository } from "../post/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { UpvoteRepository } from "../upvote/repository";
+import { JwtSecretRepository } from "../jwt-secret/repository";
 import { type FeedbackAssessment, FeedbackAssessor } from "./interpreter";
 import { FeedbackIngestionRepository } from "./repository";
 import { CaptureFeedback } from "./schema";
@@ -44,6 +46,10 @@ const Repositories = Layer.mergeAll(
 
 const TestLayer = FeedbackTriageService.layer.pipe(
   Layer.provideMerge(Repositories)
+);
+
+const CredentialTestLayer = JwtSecretRepository.layer.pipe(
+  Layer.provideMerge(Database.PgliteDatabaseLive)
 );
 
 const WorkflowTestLayer = FeedbackIngestionWorkflowLayer.pipe(
@@ -129,6 +135,146 @@ const makeFixture = Effect.fn("FeedbackIngestionTest.makeFixture")(
 
 describe("feedback ingestion", () => {
   layer(TestLayer)("repository and triage", (it) => {
+    it.effect(
+      "attaches widget and public captures without workflow or triage",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const repository = yield* FeedbackIngestionRepository;
+          const fixture = yield* makeFixture();
+
+          const receiptIds: string[] = [];
+          for (const source of ["widget", "public-portal"] as const) {
+            const captured = yield* transaction(
+              repository.captureIdempotently(
+                {
+                  organizationId: fixture.organizationId,
+                  channel: {
+                    key: `${source}:${fixture.organizationId}`,
+                    kind: source === "widget" ? "WIDGET" : "PUBLIC_PORTAL",
+                    label: source,
+                  },
+                  upstreamItemId: fixture.postId,
+                  deliveryKey: `${source}:${fixture.postId}`,
+                  sender: {},
+                  message: { text: "Attached feedback" },
+                  metadata: { transport: source },
+                },
+                { attachedPostId: fixture.postId }
+              )
+            );
+            receiptIds.push(captured.receiptId);
+          }
+
+          const open = yield* repository.listTriageItems({
+            organizationId: fixture.organizationId,
+            status: "OPEN",
+            pageSize: 100,
+          });
+          const posts = yield* db
+            .select({ id: schema.postTable.id })
+            .from(schema.postTable);
+          const receipts = yield* db
+            .select({
+              attachedPostId: schema.feedbackReceiptTable.attachedPostId,
+              pipelineStage: schema.feedbackReceiptTable.pipelineStage,
+            })
+            .from(schema.feedbackReceiptTable)
+            .where(
+              or(
+                ...receiptIds.map((receiptId) =>
+                  eq(schema.feedbackReceiptTable.id, receiptId)
+                )
+              )
+            );
+          const pending = yield* repository.listPendingWorkflowDispatches({
+            limit: 100,
+          });
+          expect(open.items).toHaveLength(0);
+          expect(posts).toHaveLength(1);
+          expect(receipts).toEqual([
+            {
+              attachedPostId: fixture.postId,
+              pipelineStage: "READY",
+            },
+            {
+              attachedPostId: fixture.postId,
+              pipelineStage: "READY",
+            },
+          ]);
+          expect(
+            pending.some((item) => receiptIds.includes(item.receiptId))
+          ).toBe(false);
+        })
+    );
+
+    it.effect("finds likely duplicate posts on public boards", () =>
+      Effect.gen(function* () {
+        const repository = yield* FeedbackIngestionRepository;
+        const fixture = yield* makeFixture();
+        const candidates = yield* repository.findSimilarPosts({
+          organizationId: fixture.organizationId,
+          boardId: fixture.boardId,
+          title: "Existing export controls",
+          text: "We need export controls",
+        });
+        expect(candidates[0]).toMatchObject({
+          postId: fixture.postId,
+          title: "Existing export controls",
+        });
+        expect(candidates[0]?.score).toBeGreaterThanOrEqual(0.25);
+      })
+    );
+
+    it.effect("keeps failed workflow dispatches pending for recovery", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const repository = yield* FeedbackIngestionRepository;
+        const fixture = yield* makeFixture();
+        const captured = yield* transaction(
+          repository.captureIdempotently({
+            organizationId: fixture.organizationId,
+            channel: { key: "api:recovery", kind: "API", label: "API" },
+            deliveryKey: "recovery-1",
+            sender: {},
+            message: { text: "Recover this feedback" },
+          })
+        );
+
+        yield* repository.recordWorkflowDispatchAttempt({
+          receiptId: captured.receiptId,
+          result: "failed",
+        });
+        expect(
+          yield* repository.listPendingWorkflowDispatches({ limit: 100 })
+        ).toContainEqual({
+          organizationId: fixture.organizationId,
+          receiptId: captured.receiptId,
+        });
+
+        yield* repository.recordWorkflowDispatchAttempt({
+          receiptId: captured.receiptId,
+          result: "succeeded",
+        });
+        expect(
+          (yield* repository.listPendingWorkflowDispatches({ limit: 100 })).some(
+            (item) => item.receiptId === captured.receiptId
+          )
+        ).toBe(false);
+
+        const [outbox] = yield* db
+          .select()
+          .from(schema.feedbackIngestionOutboxTable)
+          .where(
+            eq(
+              schema.feedbackIngestionOutboxTable.receiptId,
+              captured.receiptId
+            )
+          );
+        expect(outbox?.attemptCount).toBe(2);
+      })
+    );
+
     it.effect("validates bounded, non-blank captured feedback", () =>
       Effect.gen(function* () {
         const organizationId = yield* WorkspaceId.generate;
@@ -405,6 +551,47 @@ describe("feedback ingestion", () => {
           })
         );
         expect(error._tag).toBe("FeedbackTriageAlreadyDecidedError");
+      })
+    );
+  });
+
+  layer(CredentialTestLayer)("external credentials", (it) => {
+    it.effect("accepts only an active credential for its own workspace", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const credentials = yield* JwtSecretRepository;
+        const first = yield* makeFixture();
+        const second = yield* makeFixture();
+        const now = new Date();
+        yield* db.insert(schema.jwtSecretTable).values([
+          {
+            id: `jwt_active_${first.organizationId}`,
+            organizationId: first.organizationId,
+            secret: "active-ingestion-secret",
+            createdAt: now,
+          },
+          {
+            id: `jwt_revoked_${second.organizationId}`,
+            organizationId: second.organizationId,
+            secret: "revoked-ingestion-secret",
+            createdAt: now,
+            revokedAt: new Date(now.getTime() + 86_400_000),
+          },
+        ]);
+
+        expect(
+          yield* credentials.findActiveOrganizationForSecret(
+            "active-ingestion-secret"
+          )
+        ).toBe(first.organizationId);
+        expect(
+          yield* credentials.findActiveOrganizationForSecret(
+            "revoked-ingestion-secret"
+          )
+        ).toBeUndefined();
+        expect(
+          yield* credentials.findActiveOrganizationForSecret("invalid-secret")
+        ).toBeUndefined();
       })
     );
   });

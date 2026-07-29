@@ -13,6 +13,15 @@ export interface WidgetBoard {
 
 export type FeedbackResult = { ok: true } | { ok: false; message: string };
 
+export interface SimilarFeedbackCandidate {
+  boardId: string;
+  excerpt: string;
+  postId: string;
+  score: number;
+  slug: string;
+  title: string;
+}
+
 interface FeedbackFormData extends FormData {
   get(name: "content" | "title" | "boardName" | "boardId"): string;
 }
@@ -40,6 +49,29 @@ export const fetchBoards = query(async (): Promise<WidgetBoard[]> => {
 
 export function preloadBoards(_args: RoutePreloadFuncArgs) {
   return fetchBoards();
+}
+
+export async function fetchSimilarFeedback(input: {
+  boardId: string;
+  text: string;
+  title: string;
+}): Promise<SimilarFeedbackCandidate[]> {
+  if (input.title.trim().length < 3) {
+    return [];
+  }
+  const params = new URLSearchParams({
+    organizationId: getOrganizationId(),
+    boardId: input.boardId,
+    title: input.title,
+    text: input.text,
+  });
+  const response = await fetch(
+    `${getApiBaseUrl()}/feedback/similar?${params.toString()}`
+  );
+  if (!response.ok) {
+    return [];
+  }
+  return response.json();
 }
 
 export const createFeedBackAction = action(

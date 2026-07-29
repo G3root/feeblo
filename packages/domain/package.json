@@ -37,6 +37,12 @@
     "./widget/sso": {
       "default": "./src/widget/sso.ts"
     },
+    "./feedback-ingestion/repository": {
+      "default": "./src/feedback-ingestion/repository.ts"
+    },
+    "./feedback-ingestion/service": {
+      "default": "./src/feedback-ingestion/service.ts"
+    },
     "./billing/service": {
       "default": "./src/billing/service.ts"
     },

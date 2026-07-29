@@ -1,14 +1,16 @@
 import { currentDb, schema } from "@feeblo/db";
 import {
   asLegid,
+  BoardId,
   ContactId,
   ContactIdentityLinkId,
   FeedbackChannelId,
   FeedbackReceiptId,
   FeedbackTriageItemId,
+  PostId,
   WorkspaceId,
 } from "@feeblo/id";
-import { and, asc, eq, gt, or } from "drizzle-orm";
+import { and, asc, eq, gt, ilike, isNull, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -21,15 +23,29 @@ import type { FeedbackAssessment } from "./interpreter";
 import type {
   TCaptureFeedback,
   TFeedbackChannelKind,
+  TFeedbackSimilarityQuery,
   TFeedbackTriageList,
 } from "./schema";
 
 const toFeedbackReceiptId = asLegid(FeedbackReceiptId);
 const toFeedbackTriageItemId = asLegid(FeedbackTriageItemId);
+const toBoardId = asLegid(BoardId);
+const toPostId = asLegid(PostId);
 const toWorkspaceId = asLegid(WorkspaceId);
 
 const normalizeEmail = (email: string | undefined) =>
   email?.trim().toLowerCase() || undefined;
+
+const similarityTokens = (value: string) =>
+  Array.from(
+    new Set(
+      value
+        .toLowerCase()
+        .replaceAll(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((token) => token.length >= 3)
+    )
+  ).slice(0, 8);
 
 const contactSourceFor = (
   source: TFeedbackChannelKind
@@ -74,7 +90,72 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
   };
 
   return {
-    captureIdempotently: (input: TCaptureFeedback) =>
+    findSimilarPosts: (input: TFeedbackSimilarityQuery) =>
+      Effect.gen(function* () {
+        const tokens = similarityTokens(
+          `${input.title} ${input.text ?? ""}`
+        );
+        if (tokens.length === 0) {
+          return [];
+        }
+        const rows = yield* db
+          .select({
+            postId: schema.postTable.id,
+            boardId: schema.postTable.boardId,
+            title: schema.postTable.title,
+            excerpt: schema.postTable.excerpt,
+            slug: schema.postTable.slug,
+          })
+          .from(schema.postTable)
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
+          )
+          .where(
+            and(
+              eq(schema.postTable.organizationId, input.organizationId),
+              eq(schema.boardTable.visibility, "PUBLIC"),
+              ...(input.boardId
+                ? [eq(schema.postTable.boardId, input.boardId)]
+                : []),
+              or(
+                ...tokens.flatMap((token) => [
+                  ilike(schema.postTable.title, `%${token}%`),
+                  ilike(schema.postTable.excerpt, `%${token}%`),
+                ])
+              )
+            )
+          )
+          .limit(25);
+
+        return rows
+          .map((row) => {
+            const title = row.title.toLowerCase();
+            const body = row.excerpt.toLowerCase();
+            const matchedTitle = tokens.filter((token) =>
+              title.includes(token)
+            ).length;
+            const matchedBody = tokens.filter((token) =>
+              body.includes(token)
+            ).length;
+            return {
+              ...row,
+              boardId: toBoardId(row.boardId),
+              postId: toPostId(row.postId),
+              score:
+                (matchedTitle * 2 + matchedBody) /
+                Math.max(tokens.length * 2, 1),
+            };
+          })
+          .filter(({ score }) => score >= 0.25)
+          .sort((left, right) => right.score - left.score)
+          .slice(0, 5);
+      }),
+
+    captureIdempotently: (
+      input: TCaptureFeedback,
+      options: { readonly attachedPostId?: string } = {}
+    ) =>
       Effect.gen(function* () {
         const now = new Date();
         const generatedChannelId = yield* FeedbackChannelId.generate;
@@ -145,6 +226,12 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
             sender: input.sender,
             message: input.message,
             metadata: input.metadata ?? {},
+            ...(options.attachedPostId
+              ? {
+                  attachedPostId: options.attachedPostId,
+                  pipelineStage: "READY" as const,
+                }
+              : {}),
             createdAt: now,
             updatedAt: now,
           })
@@ -158,6 +245,13 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
           .returning({ id: schema.feedbackReceiptTable.id });
 
         if (created) {
+          if (!options.attachedPostId) {
+            yield* db.insert(schema.feedbackIngestionOutboxTable).values({
+              receiptId: created.id,
+              organizationId: input.organizationId,
+              createdAt: now,
+            });
+          }
           return {
             status: "CREATED",
             receiptId: toFeedbackReceiptId(created.id),
@@ -191,6 +285,42 @@ const makeFeedbackIngestionRepository = Effect.gen(function* () {
           receiptId: toFeedbackReceiptId(existing.id),
         } as const;
       }),
+
+    listPendingWorkflowDispatches: ({ limit }: { readonly limit: number }) =>
+      db
+        .select({
+          organizationId:
+            schema.feedbackIngestionOutboxTable.organizationId,
+          receiptId: schema.feedbackIngestionOutboxTable.receiptId,
+        })
+        .from(schema.feedbackIngestionOutboxTable)
+        .where(isNull(schema.feedbackIngestionOutboxTable.scheduledAt))
+        .orderBy(asc(schema.feedbackIngestionOutboxTable.createdAt))
+        .limit(limit)
+        .for("update", { skipLocked: true }),
+
+    recordWorkflowDispatchAttempt: ({
+      receiptId,
+      result,
+    }:
+      | {
+          readonly receiptId: string;
+          readonly result: "succeeded";
+        }
+      | {
+          readonly receiptId: string;
+          readonly result: "failed";
+        }
+    ) =>
+      db
+        .update(schema.feedbackIngestionOutboxTable)
+        .set({
+          attemptCount: sql`${schema.feedbackIngestionOutboxTable.attemptCount} + 1`,
+          lastAttemptAt: new Date(),
+          ...(result === "succeeded" ? { scheduledAt: new Date() } : {}),
+        })
+        .where(eq(schema.feedbackIngestionOutboxTable.receiptId, receiptId))
+        .pipe(Effect.asVoid),
 
     getForProcessing: ({
       organizationId,

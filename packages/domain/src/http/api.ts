@@ -5,11 +5,13 @@ import { MediaApiGroup } from "../media/api-contract";
 import { OrganizationApiGroup } from "../organization/api-contract";
 import { ProfileApiGroup } from "../profile/api-contract";
 import { WidgetApi } from "../widget/api-contract";
+import { FeedbackIngestionApiGroup } from "../feedback-ingestion/api-contract";
 
 export class Api extends HttpApi.make("Api")
   .add(AuthApiGroup)
   .add(MediaApiGroup)
   .add(OrganizationApiGroup)
   .add(ProfileApiGroup)
+  .add(FeedbackIngestionApiGroup)
   .prefix("/api")
   .addHttpApi(WidgetApi) {}

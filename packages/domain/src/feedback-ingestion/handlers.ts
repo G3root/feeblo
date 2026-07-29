@@ -37,6 +37,13 @@ export const FeedbackIngestionRpcHandlersEffect = Effect.gen(function* () {
     });
 
   return {
+    FeedbackSimilarPostsPublic: (
+      args: Parameters<typeof repository.findSimilarPosts>[0]
+    ) =>
+      repository
+        .findSimilarPosts(args)
+        .pipe(withRemapDbErrors("Feedback", "select")),
+
     FeedbackCapture: (args: Parameters<typeof ingestion.capture>[0]) =>
       ingestion
         .capture(args)

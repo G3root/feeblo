@@ -6,6 +6,8 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { BoardRepository } from "../board/repository";
+import { FeedbackIngestionRepository } from "../feedback-ingestion/repository";
+import { FeedbackIngestionService } from "../feedback-ingestion/service";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
@@ -34,6 +36,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
   const notifications = yield* Effect.serviceOption(NotificationService);
+  const ingestion = yield* Effect.serviceOption(FeedbackIngestionService);
   // const sitePolicy = yield* SitePolicy;
 
   // -- Shared effect helpers (no policy applied) --
@@ -191,6 +194,36 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
         })
       );
+
+      if (opts.source === "PUBLIC_BOARD" && Option.isSome(ingestion)) {
+        yield* ingestion.value
+          .captureAttached({
+            organizationId: args.organizationId,
+            channel: {
+              key: `public-portal:${args.organizationId}`,
+              kind: "PUBLIC_PORTAL",
+              label: "Public portal",
+            },
+            upstreamItemId: args.id,
+            deliveryKey: `public-portal:${args.id}`,
+            attachedPostId: args.id,
+            sender: {
+              upstreamId: session.session.userId,
+              email: session.session.user.email,
+              name: session.session.user.name,
+            },
+            message: { title: args.title, text: sanitizedMarkdown },
+            metadata: {
+              transport: "public-portal-rpc",
+              boardId: args.boardId,
+              statusId: args.statusId,
+            },
+          })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning("Public feedback receipt capture failed", cause)
+            )
+          );
 
       yield* repository
         .scheduleSubmissionNotification(args.organizationId)
@@ -386,5 +419,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostRepository.layer),
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
-  Layer.provide(NotificationService.layer)
+  Layer.provide(NotificationService.layer),
+  Layer.provide(FeedbackIngestionService.layer),
+  Layer.provide(FeedbackIngestionRepository.layer)
 );

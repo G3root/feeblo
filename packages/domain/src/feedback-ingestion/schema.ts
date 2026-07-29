@@ -39,21 +39,38 @@ export const FeedbackMessage = S.Struct({
   title: S.optional(FeedbackText),
 });
 
-export const CaptureFeedback = S.Struct({
+const CaptureFeedbackCommon = {
   organizationId: WorkspaceId.schema,
-  channel: S.Struct({
-    key: FeedbackKey,
-    kind: FeedbackChannelKind,
-    label: S.String,
-  }),
   upstreamItemId: S.optional(S.String),
   deliveryKey: FeedbackKey,
   sender: FeedbackSender,
   message: FeedbackMessage,
   metadata: S.optional(FeedbackMetadata),
+} as const;
+
+export const CaptureFeedback = S.Struct({
+  ...CaptureFeedbackCommon,
+  channel: S.Struct({
+    key: FeedbackKey,
+    kind: FeedbackChannelKind,
+    label: S.String,
+  }),
 });
 
 export type TCaptureFeedback = S.Schema.Type<typeof CaptureFeedback>;
+
+/**
+ * External variant of {@link CaptureFeedback} restricted to adapter channel kinds
+ * (API, Slack, Email). Shares all non-channel fields via {@link CaptureFeedbackCommon}.
+ */
+export const ExternalFeedbackCapture = S.Struct({
+  ...CaptureFeedbackCommon,
+  channel: S.Struct({
+    key: FeedbackKey,
+    kind: S.Literals(["API", "SLACK", "EMAIL"]),
+    label: S.String,
+  }),
+});
 
 export const CaptureFeedbackResult = S.Struct({
   status: S.Literals(["CREATED", "DUPLICATE"]),
@@ -63,6 +80,34 @@ export const CaptureFeedbackResult = S.Struct({
 export type TCaptureFeedbackResult = S.Schema.Type<
   typeof CaptureFeedbackResult
 >;
+
+export const FeedbackSimilarityQuery = S.Struct({
+  organizationId: WorkspaceId.schema,
+  boardId: S.optional(BoardId.schema),
+  title: FeedbackText,
+  text: S.optional(FeedbackText),
+});
+
+export type TFeedbackSimilarityQuery = S.Schema.Type<
+  typeof FeedbackSimilarityQuery
+>;
+
+const FeedbackSimilarityCandidate = S.Struct({
+  postId: PostId.schema,
+  boardId: BoardId.schema,
+  title: S.String,
+  excerpt: S.String,
+  slug: S.String,
+  score: S.Number,
+});
+
+export type TFeedbackSimilarityCandidate = S.Schema.Type<
+  typeof FeedbackSimilarityCandidate
+>;
+
+export const FeedbackSimilarityCandidates = S.Array(
+  FeedbackSimilarityCandidate
+);
 
 export const FeedbackTriageStatus = S.Literals([
   "OPEN",

@@ -9,6 +9,11 @@ import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
+import { FeedbackIngestionRepository } from "@feeblo/domain/feedback-ingestion/repository";
+import {
+  FeedbackIngestionRecoveryLive,
+  FeedbackIngestionService,
+} from "@feeblo/domain/feedback-ingestion/service";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
@@ -139,9 +144,23 @@ const program = Effect.gen(function* () {
     Auth,
     mailbox ? initAuthHandler(makeMailerLayer) : initAuthHandler()
   );
-  const ServiceLayers = Layer.merge(
+  const FeedbackRepositoryLayer = FeedbackIngestionRepository.layer.pipe(
+    Layer.provide(Database.DatabaseContextLive)
+  );
+  const FeedbackServiceLayer = FeedbackIngestionService.layer.pipe(
+    Layer.provide(FeedbackRepositoryLayer),
+    Layer.provide(WorkFlowLayer),
+    Layer.provide(Database.DatabaseContextLive)
+  );
+  const FeedbackRecoveryLayer = FeedbackIngestionRecoveryLive.pipe(
+    Layer.provide(FeedbackServiceLayer)
+  );
+  const ServiceLayers = Layer.mergeAll(
     Database.DatabaseContextLive,
-    WorkFlowLayer
+    WorkFlowLayer,
+    FeedbackRepositoryLayer,
+    FeedbackServiceLayer,
+    FeedbackRecoveryLayer
   );
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
     mailbox

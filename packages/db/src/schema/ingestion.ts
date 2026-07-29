@@ -4,6 +4,7 @@ import {
   check,
   foreignKey,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -122,6 +123,9 @@ export const feedbackReceiptTable = pgTable(
     contactId: text("contact_id").references(() => contactTable.id, {
       onDelete: "set null",
     }),
+    attachedPostId: text("attached_post_id").references(() => postTable.id, {
+      onDelete: "set null",
+    }),
     failureDetail: text("failure_detail"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -143,6 +147,43 @@ export const feedbackReceiptTable = pgTable(
       table.pipelineStage
     ),
     index("feedback_receipt_contactId_idx").on(table.contactId),
+    index("feedback_receipt_attachedPostId_idx").on(table.attachedPostId),
+    check(
+      "feedback_receipt_attached_post_stage_chk",
+      sql`${table.attachedPostId} is null or ${table.pipelineStage} = 'READY'`
+    ),
+  ]
+);
+
+export const feedbackIngestionOutboxTable = pgTable(
+  "feedback_ingestion_outbox",
+  {
+    receiptId: text("receipt_id")
+      .primaryKey()
+      .references(() => feedbackReceiptTable.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    attemptCount: integer("attempt_count").default(0).notNull(),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("feedback_ingestion_outbox_pending_idx").on(
+      table.scheduledAt,
+      table.createdAt
+    ),
+    foreignKey({
+      name: "feedback_ingestion_outbox_receipt_same_organization_fk",
+      columns: [table.receiptId, table.organizationId],
+      foreignColumns: [
+        feedbackReceiptTable.id,
+        feedbackReceiptTable.organizationId,
+      ],
+    }).onDelete("cascade"),
   ]
 );
 
