@@ -1,2 +1,1 @@
-ALTER TABLE "post" ADD COLUMN "eta_quarter" text;--> statement-breakpoint
-ALTER TABLE "post" ADD CONSTRAINT "post_eta_quarter_format_chk" CHECK ("eta_quarter" is null or "eta_quarter" ~ '^[0-9]{4}-Q[1-4]$');
+ALTER TABLE "post" ADD COLUMN "eta_quarter" text;

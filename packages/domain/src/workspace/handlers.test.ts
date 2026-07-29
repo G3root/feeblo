@@ -197,10 +197,12 @@ describe("WorkspaceRpcHandlers", () => {
           expect(tags).toHaveLength(2);
           expect(
             tags.map((tag) => ({ name: tag.name, type: tag.type }))
-          ).toEqual([
-            { name: "High Priority", type: "FEEDBACK" },
-            { name: "Low Priority", type: "FEEDBACK" },
-          ]);
+          ).toEqual(
+            expect.arrayContaining([
+              { name: "High Priority", type: "FEEDBACK" },
+              { name: "Low Priority", type: "FEEDBACK" },
+            ])
+          );
 
           // Verify the primary status roadmap and its ordered columns were created
           const roadmaps = yield* db

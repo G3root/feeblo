@@ -521,10 +521,6 @@ export const postTable = pgTable(
       "post_no_self_merge_chk",
       sql`${table.mergedIntoPostId} is null or ${table.mergedIntoPostId} <> ${table.id}`
     ),
-    check(
-      "post_eta_quarter_format_chk",
-      sql`${table.etaQuarter} is null or ${table.etaQuarter} ~ '^[0-9]{4}-Q[1-4]$'`
-    ),
     foreignKey({
       name: "post_merged_into_same_organization_fk",
       columns: [table.mergedIntoPostId, table.organizationId],

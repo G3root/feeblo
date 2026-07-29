@@ -27,6 +27,7 @@ import type {
   TPostList,
   TPostMerge,
   TPostUpdate,
+  TPostUpdatePublic,
 } from "./schema";
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
@@ -293,8 +294,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
-    PostUpdatePublic: (args: TPostUpdate) =>
-      updatePostEffect(args).pipe(
+    PostUpdatePublic: (args: TPostUpdatePublic) =>
+      updatePostEffect({ ...args, etaQuarter: undefined }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostUpdatePublic",
           level: "expensive",

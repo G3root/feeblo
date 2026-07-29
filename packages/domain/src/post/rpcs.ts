@@ -14,6 +14,7 @@ import {
   PostList,
   PostMerge,
   PostUpdate,
+  PostUpdatePublic,
 } from "./schema";
 
 export class PostRpcs extends RpcGroup.make(
@@ -67,7 +68,7 @@ export class PostRpcs extends RpcGroup.make(
 
   Rpc.make("PostUpdatePublic", {
     success: Schema.Void,
-    payload: PostUpdate,
+    payload: PostUpdatePublic,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(AuthMiddleware)

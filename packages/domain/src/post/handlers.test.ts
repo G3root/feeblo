@@ -387,15 +387,18 @@ describe("PostRpcHandlers", () => {
           );
           expect(memberOnlyError._tag).toBe("PolicyDenied");
 
+          const publicUpdateWithEta = {
+            id: postId,
+            organizationId: fixture.organizationId,
+            boardId: fixture.boardId,
+            statusId: fixture.statusId,
+            title: "Updated feedback",
+            content: "Updated content",
+            etaQuarter: "2026-Q3",
+          };
+
           yield* handlers
-            .PostUpdatePublic({
-              id: postId,
-              organizationId: fixture.organizationId,
-              boardId: fixture.boardId,
-              statusId: fixture.statusId,
-              title: "Updated feedback",
-              content: "Updated content",
-            })
+            .PostUpdatePublic(publicUpdateWithEta)
             .pipe(Effect.provideService(CurrentSession, session));
 
           const [post] = yield* handlers
@@ -405,7 +408,11 @@ describe("PostRpcHandlers", () => {
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
-          expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
+          expect(post).toMatchObject({
+            etaQuarter: null,
+            id: postId,
+            title: "Updated feedback",
+          });
           expect(post?.content).toContain("Updated content");
         }),
       );

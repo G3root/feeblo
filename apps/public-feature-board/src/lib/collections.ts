@@ -144,7 +144,6 @@ export const publicPostCollection = createCollection(
           content: updatedPost.content,
           title: updatedPost.title,
           boardId: updatedPost.boardId,
-          etaQuarter: updatedPost.etaQuarter,
           organizationId: getMutationOrganizationId(),
         })
       );

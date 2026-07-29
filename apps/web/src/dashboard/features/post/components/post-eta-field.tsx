@@ -37,8 +37,8 @@ function getQuarterDate(value: string | null) {
     : undefined;
 }
 
-function getQuarterValue(date: Date) {
-  return `${date.getFullYear()}-Q${Math.floor(date.getMonth() / 3) + 1}`;
+function getQuarterValue(year: number, quarter: number) {
+  return `${String(year).padStart(4, "0")}-Q${quarter}`;
 }
 
 export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
@@ -113,7 +113,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
                 {month.getFullYear()}
               </p>
               {QUARTERS.map((quarter) => {
-                const value = `${month.getFullYear()}-Q${quarter}`;
+                const value = getQuarterValue(month.getFullYear(), quarter);
                 const selected = value === post.etaQuarter;
                 return (
                   <Button
@@ -154,7 +154,12 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
               onMonthChange={setMonth}
               onSelect={(date) => {
                 if (date) {
-                  return updateEta(getQuarterValue(date));
+                  return updateEta(
+                    getQuarterValue(
+                      date.getFullYear(),
+                      Math.floor(date.getMonth() / 3) + 1
+                    )
+                  );
                 }
                 return undefined;
               }}
