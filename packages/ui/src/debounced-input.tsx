@@ -1,10 +1,9 @@
 import { useDebouncedCallback } from "@tanstack/react-pacer";
 import { useEffect, useState } from "react";
-import { Input } from "./input";
+import { Input, type InputProps } from "./input";
 import { InputGroupInput } from "./input-group";
 
-interface DebouncedInputProps
-  extends Omit<React.ComponentProps<"input">, "onChange" | "value"> {
+interface DebouncedInputProps extends Omit<InputProps, "onChange" | "value"> {
   onChange: (value: string) => void;
   value?: string;
   wait?: number;
@@ -14,8 +13,12 @@ const useDebounce = ({
   onChange,
   value,
   wait = 300,
-}: Pick<DebouncedInputProps, "value" | "onChange" | "wait">) => {
-  const [localValue, setLocalValue] = useState(value ?? "");
+}: {
+  onChange: DebouncedInputProps["onChange"];
+  value: string;
+  wait: number;
+}) => {
+  const [localValue, setLocalValue] = useState(value);
 
   useEffect(() => {
     setLocalValue(value ?? "");
@@ -33,7 +36,7 @@ function DebouncedInput({
   ...props
 }: DebouncedInputProps) {
   const { emitDebounced, localValue, setLocalValue } = useDebounce({
-    value,
+    value: value ?? "",
     onChange,
     wait,
   });
@@ -57,7 +60,7 @@ function DebouncedInputGroupInput({
   ...props
 }: DebouncedInputProps) {
   const { emitDebounced, localValue, setLocalValue } = useDebounce({
-    value,
+    value: value ?? "",
     onChange,
     wait,
   });

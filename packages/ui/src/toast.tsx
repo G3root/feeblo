@@ -45,8 +45,8 @@ function getSwipeDirection(position: ToastPosition): SwipeDirection[] {
 }
 
 function upsertReplayClassName(toast: {
-  type?: string;
-  updateKey?: number;
+  type?: string | undefined;
+  updateKey?: number | undefined;
 }): string | undefined {
   const k = toast.updateKey ?? 0;
   if (k <= 0) {
@@ -299,7 +299,7 @@ export function ToastProvider({
   return (
     <Toast.Provider toastManager={toastManager} {...props}>
       {children}
-      <Toasts portalProps={portalProps} position={position} />
+      <Toasts {...(portalProps ? { portalProps } : {})} position={position} />
     </Toast.Provider>
   );
 }
@@ -316,9 +316,7 @@ export function AnchoredToastProvider({
   return (
     <Toast.Provider toastManager={anchoredToastManager} {...props}>
       {children}
-      <AnchoredToasts portalProps={portalProps} />
+      <AnchoredToasts {...(portalProps ? { portalProps } : {})} />
     </Toast.Provider>
   );
 }
-
-export { Toast as ToastPrimitive };

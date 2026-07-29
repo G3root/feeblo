@@ -60,16 +60,16 @@ export default function ImageView(props: ReactNodeViewProps) {
 
   return (
     <ResizableRoot
-      aspectRatio={aspectRatio}
+      aspectRatio={aspectRatio ?? null}
       className="group relative my-2 box-border flex max-h-150 min-h-16 min-w-16 max-w-full items-center justify-center overflow-hidden outline-2 outline-solid outline-transparent data-selected:outline-primary"
       data-selected={props.selected ? "" : undefined}
-      height={attrs.height ?? undefined}
+      height={attrs.height ?? null}
       onResizeEnd={(event) => props.setAttrs(event.detail)}
-      width={attrs.width ?? undefined}
+      width={attrs.width ?? null}
     >
       {url && !error && (
-        // biome-ignore lint/a11y/noNoninteractiveElementInteractions: <explanation>
-        // biome-ignore lint/correctness/useImageSize: <explanation>
+        // biome-ignore lint/a11y/noNoninteractiveElementInteractions: image load updates editor dimensions
+        // biome-ignore lint/correctness/useImageSize: dimensions are stored in editor node attributes
         <img
           alt="upload preview"
           className="h-full max-h-full w-full max-w-full object-contain"

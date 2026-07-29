@@ -1,6 +1,8 @@
 /** biome-ignore-all lint/style/noNamespace: <explanation> */
 type Runtime = import("@astrojs/cloudflare").Runtime<Env>;
 
+declare module "@feeblo/feedback-widget/styles";
+
 declare namespace App {
   interface Locals extends Runtime {
     authHint: import("@feeblo/web-shared/auth-hint").AuthHint | null;
