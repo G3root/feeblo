@@ -8,6 +8,7 @@ import {
 } from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
+import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
@@ -15,7 +16,9 @@ import { OgImageService } from "@feeblo/domain/og-image/service";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
+import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
+import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
   makeMailerTestLayer,
@@ -169,9 +172,10 @@ const program = Effect.gen(function* () {
     initAuthHandler(makeMailerLayer, RateLimitLayer)
   );
   const ServiceLayers = Layer.mergeAll(
-    Database.DatabaseContextLive,
-    WorkFlowLayer
-  );
+    WorkFlowLayer,
+    SiteRepository.layer,
+    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+  ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
     mailbox
       ? Layer.mergeAll(

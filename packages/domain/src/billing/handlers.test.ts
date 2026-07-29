@@ -10,47 +10,290 @@ import { BillingRepository } from "./repository";
 import { PolarService } from "./service";
 
 describe("BillingRpcHandlers", () => {
-  type Fixture = { membershipId: string; organizationId: string; userId: string };
-  const makeSession = (fixture: Fixture, role: Session["memberships"][number]["role"] | null): Session => ({
-    user: { id: fixture.userId, email: "user@example.com", name: "Test User", restrictedToOrganizationId: null },
+  type Fixture = {
+    membershipId: string;
+    organizationId: string;
+    userId: string;
+  };
+  const makeSession = (
+    fixture: Fixture,
+    role: Session["memberships"][number]["role"] | null
+  ): Session => ({
+    user: {
+      id: fixture.userId,
+      email: "user@example.com",
+      name: "Test User",
+      restrictedToOrganizationId: null,
+    },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
-    memberships: role ? [{ membershipId: fixture.membershipId, organizationId: fixture.organizationId, role }] : [],
+    memberships: role
+      ? [
+          {
+            membershipId: fixture.membershipId,
+            organizationId: fixture.organizationId,
+            role,
+          },
+        ]
+      : [],
   });
-  const makeFixture = () => Effect.gen(function* () {
-    const db = yield* currentDb;
-    const organizationId = yield* WorkspaceId.generate;
-    const userId = `user_${organizationId}`;
-    const membershipId = `membership_${organizationId}`;
-    const now = new Date();
-    yield* db.insert(schema.organizationTable).values({ id: organizationId, name: "Test organization", slug: organizationId, createdAt: now });
-    yield* db.insert(schema.userTable).values({ id: userId, email: `${organizationId}@example.com`, name: "Test User" });
-    yield* db.insert(schema.memberTable).values({ id: membershipId, organizationId, userId, role: "owner", createdAt: now });
-    return { membershipId, organizationId, userId } satisfies Fixture;
-  });
+  const makeFixture = () =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const organizationId = yield* WorkspaceId.generate;
+      const userId = `user_${organizationId}`;
+      const membershipId = `membership_${organizationId}`;
+      const now = new Date();
+      yield* db.insert(schema.organizationTable).values({
+        id: organizationId,
+        name: "Test organization",
+        slug: organizationId,
+        createdAt: now,
+      });
+      yield* db.insert(schema.userTable).values({
+        id: userId,
+        email: `${organizationId}@example.com`,
+        name: "Test User",
+      });
+      yield* db.insert(schema.memberTable).values({
+        id: membershipId,
+        organizationId,
+        userId,
+        role: "owner",
+        createdAt: now,
+      });
+      return { membershipId, organizationId, userId } satisfies Fixture;
+    });
   const PolarServiceTest = Layer.succeed(PolarService, {
     client: undefined,
     webhookSecret: Option.none(),
-    createCheckout: () => Effect.die("Polar checkout should not be called"),
-    createPortal: () => Effect.die("Polar portal should not be called"),
+    createCheckout: () =>
+      Effect.succeed({ url: "https://sandbox.polar.sh/checkout" }),
+    createPortal: ({ customerId }: { customerId: string }) =>
+      Effect.succeed({ url: `https://sandbox.polar.sh/portal/${customerId}` }),
   });
   const TestLayer = Layer.mergeAll(
     BillingRepository.layer,
-    PolarServiceTest,
+    PolarServiceTest
   ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
   layer(TestLayer)("handlers", (it) => {
-    it.effect("rejects members without billing privileges", () => Effect.gen(function* () {
-      const handlers = yield* BillingRpcHandlersEffect;
-      const fixture = yield* makeFixture();
-      const error = yield* Effect.flip(handlers.BillingCheckout({ organizationId: fixture.organizationId, productId: "product" }).pipe(Effect.provideService(CurrentSession, makeSession(fixture, "member"))));
-      expect(error._tag).toBe("PolicyDenied");
-    }));
-    it.effect("rejects users without an organization membership", () => Effect.gen(function* () {
-      const handlers = yield* BillingRpcHandlersEffect;
-      const fixture = yield* makeFixture();
-      const error = yield* Effect.flip(handlers.BillingPortal({ organizationId: fixture.organizationId }).pipe(Effect.provideService(CurrentSession, makeSession(fixture, null))));
-      expect(error._tag).toBe("PolicyDenied");
-    }));
+    it.effect("rejects members without billing privileges", () =>
+      Effect.gen(function* () {
+        const handlers = yield* BillingRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const error = yield* Effect.flip(
+          handlers
+            .BillingCheckout({
+              organizationId: fixture.organizationId,
+              productId: "product",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "member")
+              )
+            )
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+    it.effect("rejects users without an organization membership", () =>
+      Effect.gen(function* () {
+        const handlers = yield* BillingRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const error = yield* Effect.flip(
+          handlers
+            .BillingPortal({ organizationId: fixture.organizationId })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            )
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("creates checkout for a current recurring paid product", () =>
+      Effect.gen(function* () {
+        const handlers = yield* BillingRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        yield* db.insert(schema.productTable).values({
+          id: "prod_checkout_current",
+          name: "Starter monthly",
+          isRecurring: true,
+          isArchived: false,
+          externalOrganizationId: "polar_org",
+          visibility: "PUBLIC",
+          recurringInterval: "month",
+          metadata: { plan: "starter", variant: "monthly" },
+        });
+
+        const result = yield* handlers
+          .BillingCheckout({
+            organizationId: fixture.organizationId,
+            productId: "prod_checkout_current",
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
+          );
+
+        expect(result.url).toBe("https://sandbox.polar.sh/checkout");
+      })
+    );
+
+    it.effect("rejects checkout for products that are not sellable plans", () =>
+      Effect.gen(function* () {
+        const handlers = yield* BillingRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        yield* db.insert(schema.productTable).values({
+          id: "prod_checkout_archived",
+          name: "Retired plan",
+          isRecurring: true,
+          isArchived: true,
+          externalOrganizationId: "polar_org",
+          visibility: "PUBLIC",
+          recurringInterval: "month",
+          metadata: { plan: "starter", variant: "monthly" },
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .BillingCheckout({
+              organizationId: fixture.organizationId,
+              productId: "prod_checkout_archived",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "owner")
+              )
+            )
+        );
+
+        expect(error._tag).toBe("BadRequestError");
+        expect(error.message).toBe("This billing product is unavailable");
+      })
+    );
+
+    it.effect(
+      "rejects a second checkout while a paid subscription exists",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* BillingRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+
+          yield* db.insert(schema.productTable).values({
+            id: "prod_checkout_duplicate",
+            name: "Professional monthly",
+            isRecurring: true,
+            isArchived: false,
+            externalOrganizationId: "polar_org",
+            visibility: "PUBLIC",
+            recurringInterval: "month",
+            metadata: { plan: "professional", variant: "monthly" },
+          });
+          yield* db.insert(schema.subscriptionTable).values({
+            id: "sub_checkout_duplicate",
+            externalId: "sub_ext_checkout_duplicate",
+            organizationId: fixture.organizationId,
+            amount: 4900,
+            cancelAtPeriodEnd: false,
+            currency: "usd",
+            recurringInterval: "month",
+            recurringIntervalCount: 1,
+            status: "trialing",
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: new Date(Date.now() + 86_400_000),
+            customerId: "cus_checkout_duplicate",
+            productId: "prod_checkout_duplicate",
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .BillingCheckout({
+                organizationId: fixture.organizationId,
+                productId: "prod_checkout_duplicate",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "owner")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toBe(
+            "Manage the existing subscription in the billing portal"
+          );
+        })
+    );
+
+    it.effect("opens the portal for the newest relevant subscription", () =>
+      Effect.gen(function* () {
+        const handlers = yield* BillingRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+        const now = Date.now();
+
+        yield* db.insert(schema.productTable).values({
+          id: "prod_portal",
+          name: "Starter monthly",
+          isRecurring: true,
+          isArchived: false,
+          externalOrganizationId: "polar_org",
+          visibility: "PUBLIC",
+          recurringInterval: "month",
+          metadata: { plan: "starter", variant: "monthly" },
+        });
+        yield* db.insert(schema.subscriptionTable).values([
+          {
+            id: "sub_portal_old",
+            externalId: "sub_ext_portal_old",
+            organizationId: fixture.organizationId,
+            amount: 2900,
+            cancelAtPeriodEnd: false,
+            currency: "usd",
+            recurringInterval: "month",
+            recurringIntervalCount: 1,
+            status: "canceled",
+            currentPeriodStart: new Date(now - 60 * 86_400_000),
+            currentPeriodEnd: new Date(now - 30 * 86_400_000),
+            customerId: "cus_old",
+            productId: "prod_portal",
+            createdAt: new Date(now - 60 * 86_400_000),
+          },
+          {
+            id: "sub_portal_current",
+            externalId: "sub_ext_portal_current",
+            organizationId: fixture.organizationId,
+            amount: 2900,
+            cancelAtPeriodEnd: false,
+            currency: "usd",
+            recurringInterval: "month",
+            recurringIntervalCount: 1,
+            status: "active",
+            currentPeriodStart: new Date(now),
+            currentPeriodEnd: new Date(now + 30 * 86_400_000),
+            customerId: "cus_current",
+            productId: "prod_portal",
+            createdAt: new Date(now),
+          },
+        ]);
+
+        const result = yield* handlers
+          .BillingPortal({ organizationId: fixture.organizationId })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
+          );
+
+        expect(result.url).toBe("https://sandbox.polar.sh/portal/cus_current");
+      })
+    );
   });
 });

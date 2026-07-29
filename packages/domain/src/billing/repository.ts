@@ -2,7 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { SubscriptionId } from "@feeblo/id";
 import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
 import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -20,6 +20,19 @@ type ProductInsert = typeof schema.productTable.$inferInsert;
 interface TFindSubscriptionByOrganizationId {
   organizationId: string;
 }
+
+interface TFindCheckoutProduct {
+  productId: string;
+}
+
+const currentlyEntitledSubscription = () =>
+  or(
+    inArray(schema.subscriptionTable.status, ["active", "trialing"]),
+    and(
+      eq(schema.subscriptionTable.status, "past_due"),
+      gt(schema.subscriptionTable.currentPeriodEnd, new Date())
+    )
+  );
 
 const DbSubscriptionStatus = Schema.Literals([
   "incomplete",
@@ -173,6 +186,55 @@ const makeBillingRepository = Effect.gen(function* () {
           },
         })
         .pipe(Effect.asVoid),
+    findCheckoutProduct: ({ productId }: TFindCheckoutProduct) =>
+      db
+        .select({
+          id: schema.productTable.id,
+        })
+        .from(schema.productTable)
+        .where(
+          and(
+            eq(schema.productTable.id, productId),
+            eq(schema.productTable.isArchived, false),
+            eq(schema.productTable.isRecurring, true),
+            inArray(schema.productTable.recurringInterval, ["month", "year"]),
+            sql`${schema.productTable.metadata}->>'plan' in ('starter', 'professional')`,
+            or(
+              and(
+                eq(schema.productTable.recurringInterval, "month"),
+                sql`${schema.productTable.metadata}->>'variant' = 'monthly'`
+              ),
+              and(
+                eq(schema.productTable.recurringInterval, "year"),
+                sql`${schema.productTable.metadata}->>'variant' = 'yearly'`
+              )
+            )
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0))),
+    findCurrentSubscriptionByOrganizationId: ({
+      organizationId,
+    }: TFindSubscriptionByOrganizationId) =>
+      db
+        .select({
+          id: schema.subscriptionTable.id,
+          customerId: schema.subscriptionTable.customerId,
+          organizationId: schema.subscriptionTable.organizationId,
+        })
+        .from(schema.subscriptionTable)
+        .where(
+          and(
+            eq(schema.subscriptionTable.organizationId, organizationId),
+            currentlyEntitledSubscription()
+          )
+        )
+        .orderBy(
+          desc(schema.subscriptionTable.currentPeriodEnd),
+          desc(schema.subscriptionTable.createdAt)
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0))),
     findSubscriptionByOrganizationId: ({
       organizationId,
     }: TFindSubscriptionByOrganizationId) =>
@@ -184,6 +246,12 @@ const makeBillingRepository = Effect.gen(function* () {
         })
         .from(schema.subscriptionTable)
         .where(eq(schema.subscriptionTable.organizationId, organizationId))
+        .orderBy(
+          sql`case when ${schema.subscriptionTable.status} in ('active', 'trialing', 'past_due') then 0 else 1 end`,
+          desc(schema.subscriptionTable.currentPeriodEnd),
+          desc(schema.subscriptionTable.createdAt)
+        )
+        .limit(1)
         .pipe(Effect.map(EffectArray.get(0))),
   };
 });

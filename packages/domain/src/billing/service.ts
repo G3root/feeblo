@@ -38,7 +38,6 @@ const makePolarService = Effect.gen(function* () {
       organizationId: string;
       productId: string;
       user: {
-        id: string;
         email?: string | null;
         name?: string | null;
       };
@@ -56,7 +55,11 @@ const makePolarService = Effect.gen(function* () {
             metadata: {
               org: organizationId,
             },
-            externalCustomerId: user.id,
+            // Billing belongs to the workspace, not the person who happened to
+            // create checkout. This prevents an admin of one workspace from
+            // receiving a portal session that also manages their other
+            // workspaces' subscriptions.
+            externalCustomerId: organizationId,
             customerEmail: user.email ?? undefined,
             customerName: user.name ?? undefined,
             successUrl: `${billingBaseUrl(organizationId)}?checkout_id={CHECKOUT_ID}`,

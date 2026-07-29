@@ -43,7 +43,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     Effect.gen(function* () {
       const { entitlements } = yield* findEntitlements(organizationId);
 
-      if (!entitlements.privateBoards) {
+      if (!entitlements.capabilities.privateBoards) {
         return yield* new Policy.PolicyDeniedError({
           reason: "Private boards require the Starter plan or higher.",
         });
@@ -60,18 +60,21 @@ const makeEntitlementPolicy = Effect.gen(function* () {
         args.organizationId
       );
 
-      if (args.visibility === "PRIVATE" && !entitlements.privateBoards) {
+      if (
+        args.visibility === "PRIVATE" &&
+        !entitlements.capabilities.privateBoards
+      ) {
         return yield* new Policy.PolicyDeniedError({
           reason: "Private boards require the Starter plan or higher.",
         });
       }
 
       if (
-        entitlements.boardLimit !== null &&
-        (yield* args.boardCount) >= entitlements.boardLimit
+        entitlements.limits.feedbackBoards !== null &&
+        (yield* args.boardCount) >= entitlements.limits.feedbackBoards
       ) {
         return yield* new Policy.PolicyDeniedError({
-          reason: `The ${plan} plan allows up to ${entitlements.boardLimit} feedback boards.`,
+          reason: `The ${plan} plan allows up to ${entitlements.limits.feedbackBoards} feedback boards.`,
         });
       }
     });
@@ -87,7 +90,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
 
       const { entitlements } = yield* findEntitlements(args.organizationId);
 
-      if (!entitlements.whitelist) {
+      if (!entitlements.capabilities.removeBranding) {
         return yield* new Policy.PolicyDeniedError({
           reason:
             "Hiding powered by branding requires the Starter plan or higher.",
@@ -105,15 +108,16 @@ const makeEntitlementPolicy = Effect.gen(function* () {
         args.organizationId
       );
 
-      if (entitlements.privilegedRoleLimit === null) {
+      if (entitlements.limits.privilegedMembers === null) {
         return;
       }
 
       if (
-        (yield* args.privilegedRoleCount) >= entitlements.privilegedRoleLimit
+        (yield* args.privilegedRoleCount) >=
+        entitlements.limits.privilegedMembers
       ) {
         return yield* new Policy.PolicyDeniedError({
-          reason: `The ${plan} plan allows up to ${entitlements.privilegedRoleLimit} admin roles.`,
+          reason: `The ${plan} plan allows up to ${entitlements.limits.privilegedMembers} admin roles.`,
         });
       }
     });

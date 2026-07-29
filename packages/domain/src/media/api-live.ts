@@ -84,7 +84,7 @@ export const MediaApiLive = HttpApiBuilder.group(
 
         return { ...uploaded, kind };
       }).pipe(
-        Effect.provide(S3UploadServiceLive),
+        Effect.provide(Layer.orDie(S3UploadServiceLive)),
         withRemapDbErrors("Media", "create")
       )
     )

@@ -105,7 +105,10 @@ export const OrganizationApiLive = HttpApiBuilder.group(
 
           return uploaded;
         }).pipe(
-          Effect.provide([OrganizationRepository.layer, S3UploadServiceLive]),
+          Effect.provide([
+            OrganizationRepository.layer,
+            Layer.orDie(S3UploadServiceLive),
+          ]),
           withRemapDbErrors("Organization", "create")
         );
       }
