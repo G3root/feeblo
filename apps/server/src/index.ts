@@ -258,6 +258,7 @@ const program = Effect.gen(function* () {
     },
   }).pipe(
     Layer.provide(AuthLayer),
+    Layer.provide(RateLimitLayer),
     Layer.provide(ServiceLayers),
     Layer.provide(NodeFileSystem.layer),
     Layer.provide(NodePath.layer),

@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { ChangelogServiceErrors } from "./errors";
 import {
@@ -23,8 +23,10 @@ export class ChangelogRpcs extends RpcGroup.make(
   Rpc.make("ChangelogListPublic", {
     payload: ChangelogList,
     success: Schema.Array(Changelog),
-    error: ChangelogServiceErrors,
-  }).middleware(OptionalAuthMiddleware),
+    error: Schema.Union([ChangelogServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("ChangelogCreate", {
     success: Schema.Void,

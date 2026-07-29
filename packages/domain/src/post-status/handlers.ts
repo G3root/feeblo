@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { PostStatusRepository } from "./repository";
 import { PostStatusRpcs } from "./rpcs";
@@ -26,7 +27,13 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
         .findMany({
           organizationId: args.organizationId,
         })
-        .pipe(withRemapDbErrors("PostStatus", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "PostStatusListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("PostStatus", "select")
+        ),
   };
 });
 

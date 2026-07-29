@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { TagServiceErrors } from "./errors";
 import {
@@ -29,8 +29,10 @@ export class TagRpcs extends RpcGroup.make(
   Rpc.make("TagListPublic", {
     payload: TagList,
     success: Schema.Array(Tag),
-    error: TagServiceErrors,
-  }).middleware(OptionalAuthMiddleware),
+    error: Schema.Union([TagServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("TagCreate", {
     payload: TagCreate,
@@ -59,8 +61,10 @@ export class TagRpcs extends RpcGroup.make(
   Rpc.make("PostTagListPublic", {
     payload: PostTagList,
     success: Schema.Array(PostTagAssignment),
-    error: TagServiceErrors,
-  }).middleware(OptionalAuthMiddleware),
+    error: Schema.Union([TagServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("ChangelogTagList", {
     payload: ChangelogTagList,
@@ -71,8 +75,10 @@ export class TagRpcs extends RpcGroup.make(
   Rpc.make("ChangelogTagListPublic", {
     payload: ChangelogTagList,
     success: Schema.Array(ChangelogTagAssignment),
-    error: TagServiceErrors,
-  }).middleware(OptionalAuthMiddleware),
+    error: Schema.Union([TagServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostTagSet", {
     payload: PostTagSet,

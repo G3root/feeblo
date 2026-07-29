@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostSubscriptionRepository } from "./repository";
@@ -64,6 +65,10 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
     PostSubscriptionListPublic: (args: TPostSubscriptionList) =>
       listSubscribersEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostSubscriptionListPublic",
+          level: "read",
+        }),
         withRemapDbErrors("PostSubscription", "select")
       ),
 
@@ -83,6 +88,10 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
     PostSubscriptionCreatePublic: (args: TPostSubscriptionCreate) =>
       subscribeEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostSubscriptionCreatePublic",
+          level: "write",
+        }),
         Policy.withPolicy(
           Policy.all(
             Policy.hasRestrictedOrganizationScope(args.organizationId),
@@ -111,6 +120,10 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
     PostSubscriptionDeletePublic: (args: TPostSubscriptionDelete) =>
       unsubscribeEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostSubscriptionDeletePublic",
+          level: "write",
+        }),
         Policy.withPolicy(
           Policy.all(
             Policy.hasRestrictedOrganizationScope(args.organizationId),

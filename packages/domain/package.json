@@ -46,6 +46,12 @@
     "./rate-limit/service": {
       "default": "./src/rate-limit/service.ts"
     },
+    "./rate-limit": {
+      "default": "./src/rate-limit.ts"
+    },
+    "./client-ip": {
+      "default": "./src/client-ip.ts"
+    },
     "./membership/repository": {
       "default": "./src/membership/repository.ts"
     },

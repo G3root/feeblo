@@ -21,6 +21,7 @@ import { PostActivityRpcHandlers } from "./post-activity/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { PostStatusRpcHandlers } from "./post-status/handlers";
 import { PostSubscriptionRpcHandlers } from "./post-subscription/handlers";
+import { PublicRpcRateLimitMiddlewareLive } from "./rate-limit";
 import { RoadmapRpcHandlers } from "./roadmap/handlers";
 import { RoadmapColumnRpcHandlers } from "./roadmap-column/handlers";
 import { AllRpcs } from "./rpc-group";
@@ -32,6 +33,7 @@ import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
+import { ClientIpMiddlewareLive } from "./client-ip";
 
 export const RpcRoute = RpcServer.layerHttp({
   path: "/rpc",
@@ -68,6 +70,12 @@ export const RpcRoute = RpcServer.layerHttp({
   ),
   Layer.provide(WorkspaceRpcHandlers),
   Layer.provide(RpcSerialization.layerNdjson),
-  Layer.provide(AuthMiddlewareLive),
-  Layer.provide(OptionalAuthMiddlewareLive)
+  Layer.provide(ClientIpMiddlewareLive),
+  Layer.provide(
+    Layer.mergeAll(
+      AuthMiddlewareLive,
+      OptionalAuthMiddlewareLive,
+      PublicRpcRateLimitMiddlewareLive
+    )
+  )
 );

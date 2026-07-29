@@ -4,6 +4,7 @@ import { ChangelogPolicy } from "../changelog/policies";
 import { ChangelogRepository } from "../changelog/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -31,14 +32,16 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     ChangelogPostListPublic: (args: TChangelogPostList) =>
-      repository
-        .findManyPublished(args)
-        .pipe(
-          Policy.withPublicPolicy(
-            sitePolicy.canViewChangelog(args.organizationId)
-          ),
-          withRemapDbErrors("ChangelogPost", "select")
+      repository.findManyPublished(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogPostListPublic",
+          level: "read",
+        }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewChangelog(args.organizationId)
         ),
+        withRemapDbErrors("ChangelogPost", "select")
+      ),
 
     ChangelogPostCreate: (args: TChangelogPostCreate) =>
       Effect.gen(function* () {

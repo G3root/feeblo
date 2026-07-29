@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { TagPolicy } from "./policies";
@@ -100,7 +101,13 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     TagListPublic: (args: TTagList) =>
-      repository.findMany(args).pipe(withRemapDbErrors("Tag", "select")),
+      repository.findMany(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "TagListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Tag", "select")
+      ),
 
     PostTagList: (args: TPostTagList) =>
       repository
@@ -111,7 +118,13 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     PostTagListPublic: (args: TPostTagList) =>
-      repository.findPostTags(args).pipe(withRemapDbErrors("Tag", "select")),
+      repository.findPostTags(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostTagListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Tag", "select")
+      ),
 
     ChangelogTagList: (args: TChangelogTagList) =>
       repository
@@ -122,9 +135,13 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     ChangelogTagListPublic: (args: TChangelogTagList) =>
-      repository
-        .findChangelogTags(args)
-        .pipe(withRemapDbErrors("Tag", "select")),
+      repository.findChangelogTags(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogTagListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Tag", "select")
+      ),
 
     TagCreate: (args: TTagCreate) =>
       Effect.gen(function* () {

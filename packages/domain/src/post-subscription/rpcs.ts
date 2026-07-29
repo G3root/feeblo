@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { PostSubscriptionServiceErrors } from "./errors";
 import {
@@ -21,8 +21,10 @@ export class PostSubscriptionRpcs extends RpcGroup.make(
   Rpc.make("PostSubscriptionListPublic", {
     payload: PostSubscriptionList,
     success: Schema.Array(PostSubscription),
-    error: PostSubscriptionServiceErrors,
-  }).middleware(OptionalAuthMiddleware),
+    error: Schema.Union([PostSubscriptionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("PostSubscriptionCreate", {
     payload: PostSubscriptionCreate,
     success: Schema.Struct({
@@ -35,8 +37,10 @@ export class PostSubscriptionRpcs extends RpcGroup.make(
     success: Schema.Struct({
       subscribed: Schema.Boolean,
     }),
-    error: PostSubscriptionServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: Schema.Union([PostSubscriptionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("PostSubscriptionDelete", {
     payload: PostSubscriptionDelete,
     success: Schema.Struct({
@@ -49,6 +53,8 @@ export class PostSubscriptionRpcs extends RpcGroup.make(
     success: Schema.Struct({
       subscribed: Schema.Boolean,
     }),
-    error: PostSubscriptionServiceErrors,
-  }).middleware(AuthMiddleware)
+    error: Schema.Union([PostSubscriptionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware)
 ) {}
