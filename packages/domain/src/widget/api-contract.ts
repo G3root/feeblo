@@ -15,8 +15,24 @@ import {
   WidgetFeedbackCreate,
   WidgetFeedbackResponse,
 } from "./schema";
+import {
+  FeedbackSimilarityCandidates,
+  FeedbackSimilarityQuery,
+} from "../feedback-ingestion/schema";
 
 export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
+  .add(
+    HttpApiEndpoint.get("findSimilarFeedback", "/feedback/similar", {
+      query: FeedbackSimilarityQuery,
+      success: FeedbackSimilarityCandidates,
+      error: Schema.Union([InternalServerError]),
+    })
+      .annotate(OpenApi.Title, "Find similar feedback")
+      .annotate(
+        OpenApi.Description,
+        "Returns likely duplicate posts from public boards before submission."
+      )
+  )
   .add(
     HttpApiEndpoint.post("createFeedback", "/feedback", {
       payload: WidgetFeedbackCreate,

@@ -237,6 +237,7 @@ export function UpvoteButton({ variant }: UpvoteButtonProps) {
         organizationId,
         postId,
         userId,
+        contactId: null,
         memberId: membership?.membershipId ?? null,
         user: {
           name: session?.user?.name ?? null,

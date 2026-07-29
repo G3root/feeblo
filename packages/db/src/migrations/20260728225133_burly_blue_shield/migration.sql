@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "feedback_receipt_id_organizationId_uidx" ON "feedback_receipt" ("id","organization_id");--> statement-breakpoint
+ALTER TABLE "feedback_triage_item" ADD CONSTRAINT "feedback_triage_item_receipt_same_organization_fk" FOREIGN KEY ("receipt_id","organization_id") REFERENCES "feedback_receipt"("id","organization_id") ON DELETE CASCADE;

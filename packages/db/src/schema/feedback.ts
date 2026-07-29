@@ -100,6 +100,7 @@ export const postActivityKindEnum = pgEnum("post_activity_kind", [
   "COMMENT_CREATED",
   "COMMENT_UPDATED",
   "COMMENT_DELETED",
+  "FEEDBACK_ATTACHED",
 ]);
 
 export const notificationKindEnum = pgEnum("notification_kind", [
@@ -532,12 +533,19 @@ export const upvoteTable = pgTable(
   "upvote",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => userTable.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => userTable.id, {
+      onDelete: "cascade",
+    }),
+    contactId: text("contact_id").references(() => contactTable.id, {
+      onDelete: "cascade",
+    }),
     memberId: text("member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
+    addedByMemberId: text("added_by_member_id").references(
+      () => memberTable.id,
+      { onDelete: "set null" }
+    ),
     postId: text("post_id")
       .notNull()
       .references(() => postTable.id, { onDelete: "cascade" }),
@@ -554,7 +562,17 @@ export const upvoteTable = pgTable(
   },
   (table) => [
     index("upvote_postId_idx").on(table.postId),
-    uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
+    uniqueIndex("upvote_userId_postId_uidx")
+      .on(table.userId, table.postId)
+      .where(sql`${table.userId} is not null`),
+    uniqueIndex("upvote_contactId_postId_uidx")
+      .on(table.contactId, table.postId)
+      .where(sql`${table.contactId} is not null`),
+    index("upvote_contactId_idx").on(table.contactId),
+    check(
+      "upvote_exactly_one_actor_chk",
+      sql`(${table.userId} is not null and ${table.contactId} is null) or (${table.userId} is null and ${table.contactId} is not null)`
+    ),
   ]
 );
 

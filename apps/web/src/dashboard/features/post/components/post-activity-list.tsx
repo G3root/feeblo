@@ -20,6 +20,7 @@ import {
   Edit01Icon,
   FileAddIcon,
   MessageEdit01Icon,
+  MessageMultiple01Icon,
   MoveIcon,
   NoteEditIcon,
   SquareLock02Icon,
@@ -67,6 +68,7 @@ const activityIconMap: Record<TPostActivityKind, typeof FileAddIcon> = {
   COMMENT_CREATED: CommentAdd01Icon,
   COMMENT_UPDATED: MessageEdit01Icon,
   COMMENT_DELETED: CommentRemove01Icon,
+  FEEDBACK_ATTACHED: MessageMultiple01Icon,
 };
 
 function getActivityDescription({
@@ -94,6 +96,7 @@ function getActivityDescription({
         : "added a comment",
     COMMENT_UPDATED: "updated a comment",
     COMMENT_DELETED: "deleted a comment",
+    FEEDBACK_ATTACHED: "attached customer feedback",
   };
 
   return descriptions[activity.kind];

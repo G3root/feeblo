@@ -126,3 +126,19 @@ export const CompanyAttributeValueId = makeId(
     approximateLength,
   }
 );
+
+export const FeedbackChannelId = makeId("feedback_channel", "fch", {
+  approximateLength,
+});
+
+export const FeedbackReceiptId = makeId("feedback_receipt", "frc", {
+  approximateLength,
+});
+
+export const FeedbackTriageItemId = makeId("feedback_triage_item", "fti", {
+  approximateLength,
+});
+
+export const ContactIdentityLinkId = makeId("contact_identity_link", "cil", {
+  approximateLength,
+});

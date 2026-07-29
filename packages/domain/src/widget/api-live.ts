@@ -15,6 +15,8 @@ import { BoardRepository } from "../board/repository";
 import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
+import { FeedbackIngestionRepository } from "../feedback-ingestion/repository";
+import { FeedbackIngestionService } from "../feedback-ingestion/service";
 import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
@@ -34,6 +36,12 @@ export const WidgetApiLive = HttpApiBuilder.group(
   "WidgetApiGroup",
   (handlers) =>
     handlers
+      .handle("findSimilarFeedback", ({ query }) =>
+        FeedbackIngestionRepository.pipe(
+          Effect.flatMap((repo) => repo.findSimilarPosts(query)),
+          withRemapDbErrors("Feedback", "select")
+        )
+      )
       .handle("listBoards", ({ payload }) =>
         Effect.gen(function* () {
           const { organizationId } = payload;
@@ -59,6 +67,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const attributeDefinitionRepository =
             yield* AttributeDefinitionRepository;
           const postRepository = yield* PostRepository;
+          const ingestion = yield* FeedbackIngestionService;
 
           const board = yield* boardRepository.getById({
             id: boardId,
@@ -172,6 +181,31 @@ export const WidgetApiLive = HttpApiBuilder.group(
             );
           }
 
+          yield* ingestion
+            .captureAttached({
+              organizationId,
+              channel: {
+                key: `widget:${organizationId}`,
+                kind: "WIDGET",
+                label: "Feedback widget",
+              },
+              upstreamItemId: id,
+              deliveryKey: `widget:${id}`,
+              attachedPostId: id,
+              sender: {},
+              message: { title, text: sanitizedContent },
+              metadata: {
+                transport: "widget-http",
+                boardId,
+                authenticatedByWidgetJwt: Boolean(token),
+              },
+            })
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning("Widget feedback receipt capture failed", cause)
+              )
+            );
+
           return {
             id,
             slug,
@@ -186,6 +220,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
             BoardRepository.layer,
             CompanyRepository.layer,
             ContactRepository.layer,
+            FeedbackIngestionRepository.layer,
+            FeedbackIngestionService.layer,
             JwtSecretRepository.layer,
             PostRepository.layer,
             PostStatusRepository.layer,

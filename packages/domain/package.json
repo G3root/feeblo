@@ -37,6 +37,12 @@
     "./widget/sso": {
       "default": "./src/widget/sso.ts"
     },
+    "./feedback-ingestion/repository": {
+      "default": "./src/feedback-ingestion/repository.ts"
+    },
+    "./feedback-ingestion/service": {
+      "default": "./src/feedback-ingestion/service.ts"
+    },
     "./billing/service": {
       "default": "./src/billing/service.ts"
     },
@@ -171,6 +177,18 @@
     },
     "./feature-flags": {
       "default": "./src/feature-flags.ts"
+    },
+    "./feedback-ingestion/schema": {
+      "default": "./src/feedback-ingestion/schema.ts"
+    },
+    "./feedback-ingestion/rpcs": {
+      "default": "./src/feedback-ingestion/rpcs.ts"
+    },
+    "./feedback-ingestion/service": {
+      "default": "./src/feedback-ingestion/service.ts"
+    },
+    "./feedback-ingestion/workflow": {
+      "default": "./src/feedback-ingestion/workflow.ts"
     },
     "./import-export/schema": {
       "default": "./src/import-export/schema.ts"

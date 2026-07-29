@@ -31,6 +31,19 @@ const makeJwtSecretRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
+    findActiveOrganizationForSecret: (secret: string) =>
+      db
+        .select({ organizationId: schema.jwtSecretTable.organizationId })
+        .from(schema.jwtSecretTable)
+        .where(
+          and(
+            eq(schema.jwtSecretTable.secret, secret),
+            isNull(schema.jwtSecretTable.revokedAt)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]?.organizationId)),
+
     getSecretsForOrg: ({ organizationId }: TJwtSecretGetOrCreate) =>
       db.transaction((tx) =>
         Effect.gen(function* () {

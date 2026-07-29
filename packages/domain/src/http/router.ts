@@ -7,6 +7,7 @@ import { MediaApiLive } from "../media/api-live";
 import { OrganizationApiLive } from "../organization/api-live";
 import { ProfileApiLive } from "../profile/api-live";
 import { WidgetApiLive } from "../widget/api-live";
+import { FeedbackIngestionApiLive } from "../feedback-ingestion/api-live";
 import { Api } from "./api";
 
 export const HttpRoute = HttpApiBuilder.layer(Api, {
@@ -16,5 +17,6 @@ export const HttpRoute = HttpApiBuilder.layer(Api, {
   Layer.provide(MediaApiLive),
   Layer.provide(OrganizationApiLive),
   Layer.provide(ProfileApiLive),
+  Layer.provide(FeedbackIngestionApiLive),
   Layer.provide(WidgetApiLive)
 );
