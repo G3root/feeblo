@@ -9,6 +9,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -115,9 +116,7 @@ function CompanyCreateForm() {
       } catch (error) {
         trackEvent("company_created", { success: false });
         toastManager.add({
-          title: hasExistingRecordError(error)
-            ? "A company with this name already exists"
-            : "Failed to create company",
+          title: parseRpcError(error).message,
           type: "error",
         });
       }
@@ -159,8 +158,4 @@ function CompanyCreateForm() {
       </div>
     </form>
   );
-}
-
-function hasExistingRecordError(error: unknown) {
-  return String(error).includes("AlreadyExistsError");
 }

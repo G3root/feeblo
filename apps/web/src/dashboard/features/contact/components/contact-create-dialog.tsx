@@ -16,6 +16,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -129,9 +130,7 @@ function ContactCreateForm() {
       } catch (error) {
         trackEvent("contact_created", { success: false });
         toastManager.add({
-          title: hasExistingRecordError(error)
-            ? "A contact with this email already exists"
-            : "Failed to create contact",
+          title: parseRpcError(error).message,
           type: "error",
         });
       }
@@ -220,8 +219,4 @@ function ContactCreateForm() {
       </div>
     </form>
   );
-}
-
-function hasExistingRecordError(error: unknown) {
-  return String(error).includes("ContactAlreadyExistsError");
 }
