@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware } from "../session-middleware";
 import { CommentServiceErrors } from "./errors";
 import {
@@ -21,9 +21,9 @@ export class CommentRpcs extends RpcGroup.make(
   }).middleware(AuthMiddleware),
   Rpc.make("CommentListPublic", {
     success: Schema.Array(Comment),
-    error: CommentServiceErrors,
+    error: Schema.Union([CommentServiceErrors, RateLimitErrors]),
     payload: CommentList,
-  }),
+  }).middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("CommentCreate", {
     success: Schema.Struct({
       message: Schema.String,
@@ -35,9 +35,11 @@ export class CommentRpcs extends RpcGroup.make(
     success: Schema.Struct({
       message: Schema.String,
     }),
-    error: CommentServiceErrors,
+    error: Schema.Union([CommentServiceErrors, RateLimitErrors]),
     payload: CommentCreate,
-  }).middleware(AuthMiddleware),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("CommentDelete", {
     success: Schema.Struct({
       message: Schema.String,
@@ -49,9 +51,11 @@ export class CommentRpcs extends RpcGroup.make(
     success: Schema.Struct({
       message: Schema.String,
     }),
-    error: CommentServiceErrors,
+    error: Schema.Union([CommentServiceErrors, RateLimitErrors]),
     payload: CommentDelete,
-  }).middleware(AuthMiddleware),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("CommentUpdate", {
     success: Schema.Struct({
       message: Schema.String,
@@ -63,7 +67,9 @@ export class CommentRpcs extends RpcGroup.make(
     success: Schema.Struct({
       message: Schema.String,
     }),
-    error: CommentServiceErrors,
+    error: Schema.Union([CommentServiceErrors, RateLimitErrors]),
     payload: CommentUpdate,
-  }).middleware(AuthMiddleware)
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware)
 ) {}

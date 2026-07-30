@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { RoadmapRepository } from "./repository";
 import { RoadmapRpcs } from "./rpcs";
@@ -26,7 +27,13 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
     RoadmapListPublic: (args: TRoadmapList) =>
       repository
         .findMany({ organizationId: args.organizationId, visibility: "public" })
-        .pipe(withRemapDbErrors("Roadmap", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "RoadmapListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("Roadmap", "select")
+        ),
     RoadmapCreate: (args: TRoadmapCreate) =>
       repository
         .create(args)

@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware } from "../session-middleware";
 import { CommentReactionServiceErrors } from "./errors";
 import {
@@ -29,14 +29,16 @@ export class CommentReactionRpcs extends RpcGroup.make(
   Rpc.make("CommentReactionListPublic", {
     payload: CommentReactionList,
     success: Schema.Array(CommentReaction),
-    error: CommentReactionServiceErrors,
-  }),
+    error: Schema.Union([CommentReactionServiceErrors, RateLimitErrors]),
+  }).middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("CommentReactionTogglePublic", {
     payload: CommentReactionToggle,
     success: Schema.Struct({
       reacted: Schema.Boolean,
       emoji: Schema.Union([ReactionEmojiSchema, Schema.Null]),
     }),
-    error: CommentReactionServiceErrors,
-  }).middleware(AuthMiddleware)
+    error: Schema.Union([CommentReactionServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware)
 ) {}

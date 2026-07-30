@@ -155,8 +155,10 @@ export function useBoardPostsData({
           "inner"
         )
         .select(({ post, postStatus }) => ({
+          archivedAt: post.archivedAt,
           boardId: post.boardId,
           id: post.id,
+          mergedIntoPostId: post.mergedIntoPostId,
           slug: post.slug,
           statusId: post.statusId,
           status: postStatus.type,

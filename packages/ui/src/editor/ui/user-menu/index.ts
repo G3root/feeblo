@@ -1,1 +1,1 @@
-export { default as UserMenu } from './user-menu.tsx'
+export { default as UserMenu } from "./user-menu";

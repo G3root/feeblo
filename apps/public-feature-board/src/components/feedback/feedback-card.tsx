@@ -1,19 +1,11 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
 import { Skeleton } from "@feeblo/ui/skeleton";
-import { cn } from "@feeblo/ui/utils";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { cn } from "@feeblo/ui/utils";
+import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { Link } from "@tanstack/react-router";
 import { formatPostStatus, truncate } from "../../lib/utils";
-
-const statusColors: Record<string, string> = {
-  PENDING: "bg-muted-foreground/50",
-  REVIEW: "bg-amber-500",
-  PLANNED: "bg-blue-500",
-  IN_PROGRESS: "bg-orange-500",
-  COMPLETED: "bg-emerald-500",
-  CLOSED: "bg-muted-foreground/30",
-};
 
 function StatusIndicator({ status }: { status: string }) {
   return (
@@ -21,7 +13,7 @@ function StatusIndicator({ status }: { status: string }) {
       <span
         className={cn(
           "size-2 shrink-0 rounded-full",
-          statusColors[status] ?? "bg-muted-foreground/40"
+          getBoardStatusIndicatorColor(status)
         )}
       />
       <span className="whitespace-nowrap text-muted-foreground text-xs">

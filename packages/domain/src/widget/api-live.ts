@@ -229,18 +229,16 @@ export const WidgetApiLive = HttpApiBuilder.group(
             );
           } else {
             yield* transaction(
-              Effect.gen(function* () {
-                yield* postRepository.create({
-                  id,
-                  boardId,
-                  organizationId,
-                  title,
-                  content: sanitizedContent,
-                  statusId: defaultStatus.id,
-                  excerpt,
-                  contactId: null,
-                  source: "WIDGET",
-                });
+              postRepository.create({
+                id,
+                boardId,
+                organizationId,
+                title,
+                content: sanitizedContent,
+                statusId: defaultStatus.id,
+                excerpt,
+                contactId: null,
+                source: "WIDGET",
               })
             );
           }

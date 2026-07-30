@@ -5,9 +5,10 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
-import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
+import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import {
@@ -192,7 +193,13 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           postId: args.postId,
         })
-        .pipe(withRemapDbErrors("Comment", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "CommentListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("Comment", "select")
+        ),
 
     CommentCreate: (args: TCommentCreate) =>
       createCommentEffect(args).pipe(
@@ -209,6 +216,10 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
     CommentCreatePublic: (args: TCommentCreate) =>
       createCommentEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "CommentCreatePublic",
+          level: "expensive",
+        }),
         Policy.withPolicy(
           commentPolicy.canCreate({
             organizationId: args.organizationId,
@@ -235,6 +246,10 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
     CommentDeletePublic: (args: TCommentDelete) =>
       deleteCommentEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "CommentDeletePublic",
+          level: "write",
+        }),
         Policy.withPolicy(
           commentPolicy.canDelete({
             organizationId: args.organizationId,
@@ -262,6 +277,10 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
     CommentUpdatePublic: (args: TCommentUpdate) =>
       updateCommentEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "CommentUpdatePublic",
+          level: "expensive",
+        }),
         Policy.withPolicy(
           commentPolicy.canUpdate({
             organizationId: args.organizationId,

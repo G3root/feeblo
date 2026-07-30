@@ -106,6 +106,34 @@ packages/
 
 The embeddable SDK lives in `packages/sdk` and ships ESM + UMD builds. See [`packages/sdk/README.md`](./packages/sdk/README.md) for installation and usage.
 
+## Billing
+
+Billing uses Polar. Set `POLAR_MODE`, `POLAR_ACCESS_TOKEN`, and
+`POLAR_WEBHOOK_SECRET` to enable checkout, subscription synchronization, and
+the customer portal.
+
+Configure the Polar webhook URL as:
+
+```text
+https://<API_URL>/api/auth/polar/webhooks
+```
+
+Each recurring product must include metadata that identifies its entitlement
+plan and billing variant:
+
+```json
+{ "plan": "starter", "variant": "monthly" }
+```
+
+Supported plan values are `starter` and `professional`; supported variants are
+`monthly` and `yearly`. The variant must match the product's recurring
+interval. Products without valid metadata, archived products, and one-time
+products are rejected by the checkout API.
+
+After adding the webhook to an existing Polar organization, resend
+`product.created` or `product.updated` events for the current products so the
+local product catalog is populated before enabling billing.
+
 ## Deployment
 
 Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Cloudflare deployments are managed via Alchemy and Wrangler configuration in `apps/web`. Use `pnpm deploy` / `pnpm destroy` to provision and remove infrastructure.

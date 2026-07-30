@@ -1,6 +1,7 @@
 import * as S from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware } from "../session-middleware";
 import { RoadmapColumnServiceErrors } from "./errors";
 import {
@@ -19,8 +20,8 @@ export class RoadmapColumnRpcs extends RpcGroup.make(
   Rpc.make("RoadmapColumnListPublic", {
     success: S.Array(StatusRoadmapColumn),
     payload: RoadmapColumnList,
-    error: RoadmapColumnServiceErrors,
-  }),
+    error: S.Union([RoadmapColumnServiceErrors, RateLimitErrors]),
+  }).middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("RoadmapColumnCreate", {
     success: S.Void,
     payload: RoadmapColumnCreate,

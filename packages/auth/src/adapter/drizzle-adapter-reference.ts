@@ -173,7 +173,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
     (db: DB, inTransaction = false): AdapterFactoryCustomizeAdapterCreator =>
     ({
       getFieldName,
-      getDefaultFieldName,
+      getDefaultFieldName: _getDefaultFieldName,
       getDefaultModelName,
       options,
       schema: baSchema,

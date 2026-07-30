@@ -1,4 +1,9 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+/** biome-ignore-all lint/style/noNestedTernary: compact selection among trial, recurring, and one-time billing copy */
+import {
+  getPlanFeatureRows,
+  type PlanFeatureRow,
+} from "@feeblo/domain/plan-entitlements";
+
 export type BillingInterval = "month" | "year";
 export type PlanType = "free" | "starter" | "professional";
 
@@ -184,56 +189,10 @@ export function getPlanDetails(
   ];
 }
 
-export type PlanFeature = {
-  feature: string;
-};
-
-export const PLAN_FEATURES: Record<PlanType, PlanFeature[]> = {
-  free: [
-    {
-      feature: "2 Feedback Boards",
-    },
-    {
-      feature: "2 Admin Roles",
-    },
-    {
-      feature: "Roadmap",
-    },
-    {
-      feature: "Changelog",
-    },
-    {
-      feature: "Unlimited End Users",
-    },
-    {
-      feature: "Unlimited Posts",
-    },
-  ],
-  starter: [
-    {
-      feature: "Everything in free",
-    },
-    {
-      feature: "5 Feedback Boards",
-    },
-    {
-      feature: "5 Admin Roles",
-    },
-    {
-      feature: "Private Boards",
-    },
-  ],
-  professional: [
-    {
-      feature: "Everything in starter",
-    },
-    {
-      feature: "Unlimited Boards",
-    },
-    {
-      feature: "Unlimited Admin Roles",
-    },
-  ],
+export const PLAN_FEATURES: Record<PlanType, readonly PlanFeatureRow[]> = {
+  free: getPlanFeatureRows("free"),
+  starter: getPlanFeatureRows("starter"),
+  professional: getPlanFeatureRows("professional"),
 };
 
 export const isPaidPlan = (plan?: PlanType): boolean => {

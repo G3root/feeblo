@@ -9,7 +9,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, or } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -214,7 +214,13 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.subscriptionTable.organizationId, args.organizationId),
-            eq(schema.subscriptionTable.status, "active")
+            or(
+              inArray(schema.subscriptionTable.status, ["active", "trialing"]),
+              and(
+                eq(schema.subscriptionTable.status, "past_due"),
+                gt(schema.subscriptionTable.currentPeriodEnd, new Date())
+              )
+            )
           )
         )
         .orderBy(

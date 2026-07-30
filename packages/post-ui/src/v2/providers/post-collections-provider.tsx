@@ -1,6 +1,7 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TCommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TComment } from "@feeblo/domain/comments/schema";
+import type { TOrganizationMember } from "@feeblo/domain/membership/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TPostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
@@ -12,12 +13,7 @@ export interface PostCollections {
   boardCollection: Collection<TBoard, string, any, any>;
   commentCollection: Collection<TComment, string, any, any>;
   commentReactionCollection: Collection<TCommentReaction, string, any, any>;
-  membersCollection?: Collection<
-    { id: string; organizationId: string; userId: string },
-    string,
-    any,
-    any
-  >;
+  membersCollection?: Collection<TOrganizationMember, string, any, any>;
   postCollection: Collection<TPost, string, any, any>;
   postReactionCollection: Collection<TPostReaction, string, any, any>;
   postStatusCollection: Collection<TPostStatus, string, any, any>;

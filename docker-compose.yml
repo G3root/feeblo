@@ -41,6 +41,9 @@ services:
       EMBEDDING_API_URL: ${EMBEDDING_API_URL:-https://api.openai.com/v1}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
+      POLAR_MODE: ${POLAR_MODE:-sandbox}
+      POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
+      POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 

@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
-
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { PostServiceErrors } from "./errors";
 import {
@@ -27,8 +27,10 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostListPublic", {
     payload: PostList,
     success: Schema.Array(Post),
-    error: PostServiceErrors,
-  }).middleware(OptionalAuthMiddleware),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostSuggestions", {
     payload: PostSuggestions,
@@ -51,8 +53,10 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostCreatePublic", {
     success: Schema.Void,
     payload: PostCreate,
-    error: PostServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostDelete", {
     success: Schema.Void,
@@ -63,8 +67,10 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostDeletePublic", {
     success: Schema.Void,
     payload: PostDeletePublic,
-    error: PostServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostUpdate", {
     success: Schema.Void,
@@ -75,8 +81,10 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostUpdatePublic", {
     success: Schema.Void,
     payload: PostUpdate,
-    error: PostServiceErrors,
-  }).middleware(AuthMiddleware),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostAdminUpdate", {
     success: Schema.Void,

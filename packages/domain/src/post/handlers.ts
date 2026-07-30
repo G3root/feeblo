@@ -13,6 +13,7 @@ import {
   PostActivityRepository,
 } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
@@ -346,7 +347,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           boardId: args.boardId,
           userId,
         });
-      }).pipe(withRemapDbErrors("Post", "select"));
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Post", "select")
+      );
     },
 
     PostSuggestions: (args: TPostSuggestions) =>
@@ -373,6 +380,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostDeletePublic: (args: TPostDelete) =>
       deletePostEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostDeletePublic",
+          level: "write",
+        }),
         Policy.withPolicy(
           postPolicy.canDelete({
             organizationId: args.organizationId,
@@ -399,6 +410,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostUpdatePublic: (args: TPostUpdate) =>
       updatePostEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostUpdatePublic",
+          level: "expensive",
+        }),
         Policy.withPolicy(
           postPolicy.canUpdate({
             organizationId: args.organizationId,
@@ -423,6 +438,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
     PostCreatePublic: (args: TPostCreate) =>
       createPostEffect(args, { source: "PUBLIC_BOARD" }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostCreatePublic",
+          level: "expensive",
+        }),
         Policy.withPolicy(
           postPolicy.canCreate({
             organizationId: args.organizationId,

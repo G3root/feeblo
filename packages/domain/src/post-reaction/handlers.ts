@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostReactionRepository } from "./repository";
@@ -56,7 +57,13 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           postId: args.postId,
           organizationId: args.organizationId,
         })
-        .pipe(withRemapDbErrors("PostReaction", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "PostReactionListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("PostReaction", "select")
+        ),
     PostReactionTogglePublic: (args: TPostReactionToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
@@ -70,6 +77,10 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           emoji: args.emoji,
         });
       }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostReactionTogglePublic",
+          level: "write",
+        }),
         Policy.withPolicy(
           Policy.all(
             Policy.hasRestrictedOrganizationScope(args.organizationId),

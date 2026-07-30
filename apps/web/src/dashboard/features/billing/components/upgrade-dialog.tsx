@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+/** biome-ignore-all lint/style/noNestedTernary: compact CTA state labels remain easier to scan inline */
 
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -209,16 +209,12 @@ function UpgradePlanDialogPopup() {
 
             <ItemGroup className="mt-5 gap-1">
               {PLAN_FEATURES[selectedPlan.planType].map((feature) => (
-                <Item
-                  key={feature.feature + selectedPlan.name}
-                  size="sm"
-                  variant="outline"
-                >
+                <Item key={feature.key} size="sm" variant="outline">
                   <ItemMedia>
                     <HugeiconsIcon icon={StarIcon} />
                   </ItemMedia>
                   <ItemContent>
-                    <ItemTitle>{feature.feature}</ItemTitle>
+                    <ItemTitle>{feature.label}</ItemTitle>
                   </ItemContent>
                 </Item>
               ))}
@@ -250,12 +246,13 @@ function UpgradePlanButton({
       className="w-full"
       disabled={
         loading ||
-        (selectedPlan.planType === "free" && !isCurrentPlan) ||
-        (isCurrentPlan && !hasPaidPlan)
+        (!hasPaidPlan &&
+          ((selectedPlan.planType === "free" && !isCurrentPlan) ||
+            isCurrentPlan))
       }
       onClick={async () => {
         try {
-          if (isCurrentPlan && hasPaidPlan) {
+          if (hasPaidPlan) {
             setLoading(true);
             const didStart = await startBillingPortal({
               organizationId,
@@ -290,7 +287,7 @@ function UpgradePlanButton({
     >
       {loading
         ? "Redirecting..."
-        : isCurrentPlan && hasPaidPlan
+        : hasPaidPlan
           ? "Manage Billing"
           : isCurrentPlan
             ? "Current Plan"

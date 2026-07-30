@@ -12,7 +12,7 @@ import { Separator } from "@feeblo/ui/separator";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import { count, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
@@ -22,6 +22,7 @@ import {
   boardCollection,
   postCollection,
   postStatusCollection,
+  upvoteCollection,
 } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/_dashboard-layout/")({
@@ -71,7 +72,23 @@ function RouteComponent() {
     [organizationId]
   );
 
+  const { data: upvoteCounts } = useLiveQuery(
+    (q) =>
+      q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) => eq(upvote.organizationId, organizationId))
+        .groupBy(({ upvote }) => upvote.postId)
+        .select(({ upvote }) => ({
+          count: count(upvote.id),
+          postId: upvote.postId,
+        })),
+    [organizationId]
+  );
+
   const boardMap = new Map((boards ?? []).map((b) => [b.id, b]));
+  const upvoteCountByPostId = new Map(
+    (upvoteCounts ?? []).map((entry) => [entry.postId, entry.count])
+  );
 
   const userName =
     sessionData?.user?.name ?? sessionData?.user?.email ?? "there";
@@ -146,7 +163,7 @@ function RouteComponent() {
                         </Badge>
                       )}
                       <span className="text-muted-foreground text-sm tabular-nums">
-                        {post.upVotes}
+                        {upvoteCountByPostId.get(post.id) ?? 0}
                       </span>
                     </ItemActions>
                   </Item>

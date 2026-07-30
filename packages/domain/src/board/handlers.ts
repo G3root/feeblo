@@ -4,6 +4,7 @@ import * as Option from "effect/Option";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -37,7 +38,13 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           visibility: "PUBLIC",
         })
-        .pipe(withRemapDbErrors("Board", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "BoardListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("Board", "select")
+        ),
     BoardDelete: (args: TBoardDelete) => {
       return repository
         .delete({
@@ -96,7 +103,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
         }
 
         yield* repository.update(args);
-      })      .pipe(
+      }).pipe(
         Policy.withPolicy(
           boardPolicy.canUpdate({
             organizationId: args.organizationId,

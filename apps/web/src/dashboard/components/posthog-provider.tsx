@@ -1,4 +1,4 @@
-import type { AnalyticsClient } from "@feeblo/web-shared/analytics";
+import type { AnalyticsClient } from "@feeblo/web-shared/analytics-provider";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { PostHogProvider as PostHogReactProvider } from "@posthog/react";
 import posthog from "posthog-js";

@@ -5,6 +5,7 @@
 @source "src/**/*.{ts,tsx}";
 @source "../ui/src/**/*.{ts,tsx}";
 @source "../utils/src/**/*.{ts,tsx}";
+@source "../web-shared/src/**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));
 

@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { UpvotePolicy } from "./policies";
@@ -76,7 +77,13 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         .list({
           organizationId: args.organizationId,
         })
-        .pipe(withRemapDbErrors("Upvote", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "UpvoteListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("Upvote", "select")
+        ),
     UpvoteTogglePublic: (args: TUpvoteToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
@@ -109,6 +116,10 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
 
         return result;
       }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "UpvoteTogglePublic",
+          level: "write",
+        }),
         Policy.withPolicy(
           upvotePolicy.canToggle({
             organizationId: args.organizationId,

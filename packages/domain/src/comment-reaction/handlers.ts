@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { CommentReactionRepository } from "./repository";
@@ -56,7 +57,13 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           postId: args.postId,
         })
-        .pipe(withRemapDbErrors("CommentReaction", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "CommentReactionListPublic",
+            level: "read",
+          }),
+          withRemapDbErrors("CommentReaction", "select")
+        ),
     CommentReactionTogglePublic: (args: TCommentReactionToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
@@ -70,6 +77,10 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           emoji: args.emoji,
         });
       }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "CommentReactionTogglePublic",
+          level: "write",
+        }),
         Policy.withPolicy(
           Policy.all(
             Policy.hasRestrictedOrganizationScope(args.organizationId),

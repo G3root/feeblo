@@ -1,1 +1,1 @@
-export { default as TagMenu } from './tag-menu.tsx'
+export { default as TagMenu } from "./tag-menu";

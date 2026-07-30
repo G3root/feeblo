@@ -1,20 +1,22 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+/** biome-ignore-all lint/style/noNestedTernary: compact plan CTA state labels remain easier to scan inline */
 
+import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
   Card,
-  CardPanel,
   CardDescription,
   CardFooter,
   CardHeader,
+  CardPanel,
   CardTitle,
 } from "@feeblo/ui/card";
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { z } from "zod";
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import {
   startBillingCheckout,
@@ -38,6 +40,12 @@ import {
 } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
+  validateSearch: (search) =>
+    z
+      .object({
+        checkout_id: z.string().min(1).optional(),
+      })
+      .parse(search),
   component: BillingSettingsPage,
   beforeLoad: async () => {
     await Promise.all([
@@ -50,9 +58,13 @@ export const Route = createFileRoute("/$organizationId/settings/billing")({
 
 function BillingSettingsPage() {
   const organizationId = useOrganizationId();
+  const search = Route.useSearch();
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
   const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);
+  const [confirmationStatus, setConfirmationStatus] = useState<
+    "pending" | "delayed" | "error"
+  >("pending");
 
   const {
     data: products = [],
@@ -68,6 +80,39 @@ function BillingSettingsPage() {
   const currentPlan = plans.find((plan) => plan.planType === currentPlanType);
   const hasPaidPlan = currentPlanType !== "free";
 
+  useEffect(() => {
+    if (!(search.checkout_id && !hasPaidPlan)) {
+      return;
+    }
+
+    setConfirmationStatus("pending");
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      workspacePlanCollection.utils
+        .refetch()
+        .catch(() => setConfirmationStatus("error"));
+      if (attempts >= 10) {
+        window.clearInterval(timer);
+        setConfirmationStatus("delayed");
+      }
+    }, 3000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [hasPaidPlan, search.checkout_id]);
+
+  const refreshCheckoutConfirmation = async () => {
+    setConfirmationStatus("pending");
+    try {
+      await workspacePlanCollection.utils.refetch();
+      setConfirmationStatus("delayed");
+    } catch {
+      setConfirmationStatus("error");
+    }
+  };
+
   return (
     <SettingsLayout.Root size="large">
       <SettingsLayout.Header>
@@ -78,6 +123,45 @@ function BillingSettingsPage() {
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <div className="space-y-6">
+          {search.checkout_id ? (
+            <Alert
+              variant={
+                hasPaidPlan
+                  ? "success"
+                  : confirmationStatus === "error"
+                    ? "error"
+                    : "info"
+              }
+            >
+              <AlertTitle>
+                {hasPaidPlan
+                  ? "Subscription activated"
+                  : confirmationStatus === "delayed"
+                    ? "Subscription confirmation is taking longer than expected"
+                    : confirmationStatus === "error"
+                      ? "Could not refresh subscription status"
+                      : "Checkout completed — confirming your subscription"}
+              </AlertTitle>
+              <AlertDescription>
+                {hasPaidPlan
+                  ? `This workspace now has the ${PLAN_COPY[currentPlanType].name} plan.`
+                  : confirmationStatus === "pending"
+                    ? "Polar is confirming the subscription. This page will update automatically; it can take a few seconds."
+                    : "Your checkout may still be processing. Refresh the subscription status to try again."}
+              </AlertDescription>
+              {!hasPaidPlan && confirmationStatus !== "pending" ? (
+                <Button
+                  className="mt-3"
+                  onClick={refreshCheckoutConfirmation}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Refresh status
+                </Button>
+              ) : null}
+            </Alert>
+          ) : null}
           <Card className="border border-border shadow-none ring-0">
             <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
@@ -153,16 +237,15 @@ function BillingSettingsPage() {
                   {plans.map((plan) => {
                     const selectedProduct = plan[selectedInterval];
                     const isCurrentPlan = plan.planType === currentPlanType;
-                    const ctaLabel =
-                      isCurrentPlan && hasPaidPlan
-                        ? "Manage billing"
-                        : isCurrentPlan
-                          ? "Current plan"
-                          : plan.planType === "free"
-                            ? "Unavailable"
-                            : selectedProduct
-                              ? "Upgrade"
-                              : "Unavailable";
+                    const ctaLabel = hasPaidPlan
+                      ? "Manage billing"
+                      : isCurrentPlan
+                        ? "Current plan"
+                        : plan.planType === "free"
+                          ? "Unavailable"
+                          : selectedProduct
+                            ? "Upgrade"
+                            : "Unavailable";
 
                     return (
                       <Card key={plan.planType} size="sm">
@@ -195,8 +278,8 @@ function BillingSettingsPage() {
                           <Separator />
                           <div className="space-y-3">
                             {PLAN_FEATURES[plan.planType].map((feature) => (
-                              <div className="text-sm" key={feature.feature}>
-                                {feature.feature}
+                              <div className="text-sm" key={feature.key}>
+                                {feature.label}
                               </div>
                             ))}
                           </div>
@@ -206,12 +289,14 @@ function BillingSettingsPage() {
                             className="w-full"
                             disabled={
                               loadingPlanType !== null ||
-                              (!isCurrentPlan && plan.planType === "free") ||
-                              (isCurrentPlan && !hasPaidPlan) ||
-                              (plan.planType !== "free" && !selectedProduct)
+                              (!hasPaidPlan &&
+                                ((!isCurrentPlan && plan.planType === "free") ||
+                                  isCurrentPlan ||
+                                  (plan.planType !== "free" &&
+                                    !selectedProduct)))
                             }
                             onClick={async () => {
-                              if (isCurrentPlan && hasPaidPlan) {
+                              if (hasPaidPlan) {
                                 setLoadingPlanType(plan.planType);
                                 const didStart = await startBillingPortal({
                                   organizationId,
@@ -257,7 +342,8 @@ function BillingSettingsPage() {
               {hasPaidPlan ? (
                 <div className="rounded-4xl border px-4 py-3 text-muted-foreground text-sm">
                   You are on the {PLAN_COPY[currentPlanType].name} plan. Use the
-                  upgrade action to review plan changes and checkout options.
+                  billing portal to change plans, update payment details, or
+                  cancel.
                 </div>
               ) : null}
             </CardPanel>

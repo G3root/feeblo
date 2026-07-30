@@ -1,1 +1,1 @@
-export { default as SlashMenu } from './slash-menu.tsx'
+export { default as SlashMenu } from "./slash-menu";

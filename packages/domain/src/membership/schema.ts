@@ -27,6 +27,8 @@ export const OrganizationMember = S.Struct({
   }),
 });
 
+export type TOrganizationMember = S.Schema.Type<typeof OrganizationMember>;
+
 export const OrganizationInvitation = S.Struct({
   id: S.String,
   organizationId: S.String,

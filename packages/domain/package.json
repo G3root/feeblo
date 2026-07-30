@@ -43,11 +43,23 @@
     "./billing/repository": {
       "default": "./src/billing/repository.ts"
     },
+    "./rate-limit/service": {
+      "default": "./src/rate-limit/service.ts"
+    },
+    "./rate-limit": {
+      "default": "./src/rate-limit.ts"
+    },
+    "./client-ip": {
+      "default": "./src/client-ip.ts"
+    },
     "./membership/repository": {
       "default": "./src/membership/repository.ts"
     },
     "./membership/policies": {
       "default": "./src/membership/policies.ts"
+    },
+    "./membership/schema": {
+      "default": "./src/membership/schema.ts"
     },
     "./workspace/repository": {
       "default": "./src/workspace/repository.ts"
@@ -63,6 +75,9 @@
     },
     "./session-middleware": {
       "default": "./src/session-middleware.ts"
+    },
+    "./site/repository": {
+      "default": "./src/site/repository.ts"
     },
     "./user/schema": {
       "default": "./src/user/schema.ts"
