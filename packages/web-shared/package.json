@@ -8,6 +8,10 @@
       "types": "./src/lib/runtime.ts",
       "default": "./src/lib/runtime.ts"
     },
+    "./rpc-error": {
+      "types": "./src/lib/rpc-error.ts",
+      "default": "./src/lib/rpc-error.ts"
+    },
     "./xstate": {
       "types": "./src/lib/xstate.tsx",
       "default": "./src/lib/xstate.tsx"
