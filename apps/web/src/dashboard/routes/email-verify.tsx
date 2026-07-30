@@ -253,7 +253,7 @@ function RouteComponent() {
                             isResending,
                           })}
                         </Button>
-                        <span aria-live="polite" className="sr-only">
+                        <span className="sr-only" role="timer">
                           {resendCooldown > 0
                             ? `You can request another code in ${resendCooldown} seconds`
                             : "You can request another verification code now"}
