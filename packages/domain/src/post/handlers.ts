@@ -33,6 +33,8 @@ import type {
   TPostMerge,
   TPostSuggestions,
   TPostUpdate,
+  TPostUpdateContent,
+  TPostUpdateTitle,
 } from "./schema";
 import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 
@@ -129,13 +131,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       boardId: args.boardId,
     });
 
-  const updatePostEffect = (args: TPostUpdate) => {
-    const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
-    return Effect.gen(function* () {
+  const updatePostEffect = (args: TPostUpdate) =>
+    Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
-      let contentChanged = false;
-      let titleChanged = false;
       yield* transaction(
         Effect.gen(function* () {
           const previous = yield* repository.findActivityState({
@@ -145,8 +144,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           if (!previous) {
             return yield* new FailedToUpdatePostError();
           }
-          contentChanged = previous.content !== sanitizedMarkdown;
-          titleChanged = previous.title !== args.title;
           const actor = {
             actorId: session.session.userId,
             actorMemberId: membership?.membershipId ?? null,
@@ -154,17 +151,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             postId: args.id,
           };
           const activities: CreatePostActivity[] = [];
-          if (titleChanged) {
-            activities.push({
-              ...actor,
-              kind: "TITLE_CHANGED",
-              previousValue: previous.title,
-              nextValue: args.title,
-            });
-          }
-          if (contentChanged) {
-            activities.push({ ...actor, kind: "CONTENT_CHANGED" });
-          }
           if (previous.statusId !== args.statusId) {
             activities.push({
               ...actor,
@@ -181,11 +167,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               nextValue: args.boardId,
             });
           }
-          yield* repository.update({
-            ...args,
-            content: sanitizedMarkdown,
-            excerpt: htmlToExcerpt(sanitizedHtml),
-          });
+          yield* repository.update(args);
           yield* activityRepository.createMany(activities);
           if (previous.statusId !== args.statusId) {
             yield* Option.match(notifications, {
@@ -202,16 +184,106 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           }
         })
       );
-      if (titleChanged || contentChanged) {
+    });
+
+  const updatePostContentEffect = (args: TPostUpdateContent) => {
+    const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
+    return Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+      let contentChanged = false;
+      let title = "";
+      yield* transaction(
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          title = previous.title;
+          contentChanged = previous.content !== sanitizedMarkdown;
+          if (!contentChanged) {
+            return;
+          }
+          const actor = {
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+          };
+          yield* repository.update({
+            id: args.id,
+            organizationId: args.organizationId,
+            content: sanitizedMarkdown,
+            excerpt: htmlToExcerpt(sanitizedHtml),
+          });
+          yield* activityRepository.create({
+            ...actor,
+            kind: "CONTENT_CHANGED",
+          });
+        })
+      );
+      if (contentChanged) {
         yield* scheduleEmbedding({
           content: sanitizedMarkdown,
+          id: args.id,
+          organizationId: args.organizationId,
+          title,
+        });
+      }
+    });
+  };
+
+  const updatePostTitleEffect = (args: TPostUpdateTitle) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+      let titleChanged = false;
+      let content = "";
+      yield* transaction(
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          content = previous.content;
+          titleChanged = previous.title !== args.title;
+          if (!titleChanged) {
+            return;
+          }
+          const actor = {
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+          };
+          yield* repository.update({
+            id: args.id,
+            organizationId: args.organizationId,
+            title: args.title,
+          });
+          yield* activityRepository.create({
+            ...actor,
+            kind: "TITLE_CHANGED",
+            previousValue: previous.title,
+            nextValue: args.title,
+          });
+        })
+      );
+      if (titleChanged) {
+        yield* scheduleEmbedding({
+          content,
           id: args.id,
           organizationId: args.organizationId,
           title: args.title,
         });
       }
     });
-  };
 
   const createPostEffect = (
     args: TPostCreate,
@@ -420,6 +492,32 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             postId: args.id,
             boardId: args.boardId,
             source: "public",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateContent: (args: TPostUpdateContent) =>
+      updatePostContentEffect(args).pipe(
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "dashboard",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateTitle: (args: TPostUpdateTitle) =>
+      updatePostTitleEffect(args).pipe(
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "dashboard",
           })
         ),
         withRemapDbErrors("Post", "update")

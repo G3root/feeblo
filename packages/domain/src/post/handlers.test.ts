@@ -339,13 +339,24 @@ describe("PostRpcHandlers", () => {
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .PostUpdate({
+            .PostUpdateContent({
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
-              statusId: fixture.statusId,
-              title: "Updated feedback",
               content: "Updated content",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "member"),
+              ),
+            );
+          yield* handlers
+            .PostUpdateTitle({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              title: "Updated feedback",
             })
             .pipe(
               Effect.provideService(
@@ -388,8 +399,6 @@ describe("PostRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
                 statusId: fixture.statusId,
-                title: "Member-only update",
-                content: "Member-only content",
               })
               .pipe(Effect.provideService(CurrentSession, session)),
           );
@@ -401,8 +410,6 @@ describe("PostRpcHandlers", () => {
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
               statusId: fixture.statusId,
-              title: "Updated feedback",
-              content: "Updated content",
             })
             .pipe(Effect.provideService(CurrentSession, session));
 
@@ -413,8 +420,10 @@ describe("PostRpcHandlers", () => {
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
-          expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
-          expect(post?.content).toContain("Updated content");
+          expect(post).toMatchObject({
+            id: postId,
+            title: "Original feedback",
+          });
         }),
       );
     });

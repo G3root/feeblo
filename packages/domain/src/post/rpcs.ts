@@ -15,6 +15,8 @@ import {
   PostMerge,
   PostSuggestions,
   PostUpdate,
+  PostUpdateContent,
+  PostUpdateTitle,
 } from "./schema";
 
 export class PostRpcs extends RpcGroup.make(
@@ -87,6 +89,18 @@ export class PostRpcs extends RpcGroup.make(
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("PostUpdateContent", {
+    success: Schema.Void,
+    payload: PostUpdateContent,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUpdateTitle", {
+    success: Schema.Void,
+    payload: PostUpdateTitle,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
 
   Rpc.make("PostAdminUpdate", {
     success: Schema.Void,

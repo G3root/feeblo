@@ -141,8 +141,6 @@ export const publicPostCollection = createCollection(
         rpc.PostUpdatePublic({
           id: updatedPost.id,
           statusId: updatedPost.statusId,
-          content: updatedPost.content,
-          title: updatedPost.title,
           boardId: updatedPost.boardId,
           organizationId: getMutationOrganizationId(),
         })

@@ -21,8 +21,18 @@ import * as Option from "effect/Option";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { FailedToMergePostError } from "./errors";
-import type { TPostAdminUpdate, TPostUpdate } from "./schema";
+import type { TPostAdminUpdate } from "./schema";
 import { scheduleSubmissionNotificationBatch } from "./workflow";
+
+interface TPostUpdateInput {
+  boardId?: string;
+  content?: string;
+  excerpt?: string;
+  id: string;
+  organizationId: string;
+  statusId?: string;
+  title?: string;
+}
 
 interface TPostFindMany {
   boardId?: string | null | undefined;
@@ -351,7 +361,7 @@ const makePostRepository = Effect.gen(function* () {
       title,
       content,
       excerpt,
-    }: TPostUpdate & { excerpt?: string }) =>
+    }: TPostUpdateInput) =>
       db
         .update(schema.postTable)
         .set({
@@ -359,7 +369,10 @@ const makePostRepository = Effect.gen(function* () {
           boardId,
           title,
           content,
-          excerpt: excerpt ?? htmlToExcerpt(content),
+          excerpt:
+            content !== undefined
+              ? (excerpt ?? htmlToExcerpt(content))
+              : excerpt,
         })
         .where(
           and(
