@@ -102,6 +102,22 @@ export class PostRpcs extends RpcGroup.make(
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
+  Rpc.make("PostUpdateContentPublic", {
+    success: Schema.Void,
+    payload: PostUpdateContent,
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("PostUpdateTitlePublic", {
+    success: Schema.Void,
+    payload: PostUpdateTitle,
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
   Rpc.make("PostAdminUpdate", {
     success: Schema.Void,
     payload: PostAdminUpdate,

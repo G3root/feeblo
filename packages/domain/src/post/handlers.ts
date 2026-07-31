@@ -523,6 +523,40 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
+    PostUpdateContentPublic: (args: TPostUpdateContent) =>
+      updatePostContentEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostUpdateContentPublic",
+          level: "expensive",
+        }),
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "public",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateTitlePublic: (args: TPostUpdateTitle) =>
+      updatePostTitleEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostUpdateTitlePublic",
+          level: "expensive",
+        }),
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "public",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
     PostCreate: (args: TPostCreate) =>
       createPostEffect(args).pipe(
         Policy.withPolicy(
