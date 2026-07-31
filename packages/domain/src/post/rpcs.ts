@@ -41,8 +41,10 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostSuggestionsPublic", {
     payload: PostSuggestions,
     success: Schema.Array(Post),
-    error: PostServiceErrors,
-  }).middleware(OptionalAuthMiddleware),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostCreate", {
     success: Schema.Void,

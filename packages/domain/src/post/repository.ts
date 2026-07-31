@@ -263,6 +263,11 @@ const makePostRepository = Effect.gen(function* () {
       const query = db
         .select({
           ...selectPostFields(),
+          distance: embedding
+            ? sql<
+                number | null
+              >`${cosineDistance(schema.postTable.embedding, [...embedding])}`
+            : sql<number | null>`null`,
         })
         .from(schema.postTable)
         .innerJoin(

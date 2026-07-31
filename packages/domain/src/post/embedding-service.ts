@@ -35,6 +35,7 @@ export class InvalidPostEmbeddingConfigurationError extends Data.TaggedError(
   "InvalidPostEmbeddingConfigurationError"
 )<{
   readonly dimensions: number;
+  readonly message: string;
 }> {}
 
 const make = Effect.gen(function* () {
@@ -52,7 +53,16 @@ const make = Effect.gen(function* () {
     dimensions < 1 ||
     dimensions > 2000
   ) {
-    return yield* new InvalidPostEmbeddingConfigurationError({ dimensions });
+    return yield* new InvalidPostEmbeddingConfigurationError({
+      dimensions,
+      message: "EMBEDDING_DIMENSIONS must be an integer between 1 and 2000",
+    });
+  }
+  if (dimensions !== defaultPostEmbeddingDimensions) {
+    return yield* new InvalidPostEmbeddingConfigurationError({
+      dimensions,
+      message: `EMBEDDING_DIMENSIONS (${dimensions}) must match the post embedding column dimension (${defaultPostEmbeddingDimensions})`,
+    });
   }
   const apiUrl = yield* Config.string("EMBEDDING_API_URL").pipe(Config.option);
   const normalizedApiUrl = Option.filter(

@@ -34,19 +34,7 @@ import type {
   TPostSuggestions,
   TPostUpdate,
 } from "./schema";
-
-const words = (value: string): ReadonlySet<string> =>
-  new Set(value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
-
-const lexicalSimilarity = (left: string, right: string): number => {
-  const leftWords = words(left);
-  const rightWords = words(right);
-  const intersection = [...leftWords].filter((word) =>
-    rightWords.has(word)
-  ).length;
-  const union = new Set([...leftWords, ...rightWords]).size;
-  return union === 0 ? 0 : intersection / union;
-};
+import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
@@ -114,20 +102,20 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       });
 
       if (Option.isSome(queryEmbedding)) {
-        return candidates;
+        return candidates
+          .filter(
+            (candidate) =>
+              candidate.distance !== null &&
+              candidate.distance <= SUGGESTION_MAX_DISTANCE
+          )
+          .map(({ distance: _distance, ...post }) => post);
       }
 
       return candidates
-        .map((post) => {
-          const score = lexicalSimilarity(
-            input,
-            postEmbeddingInput({
-              title: post.title,
-              content: post.content,
-            })
-          );
-          return { post, score };
-        })
+        .map((post) => ({
+          post,
+          score: postLexicalSimilarity(input, post),
+        }))
         .filter(({ score }) => score > 0)
         .sort((left, right) => right.score - left.score)
         .slice(0, resultLimit)
@@ -146,6 +134,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     return Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
+      let contentChanged = false;
+      let titleChanged = false;
       yield* transaction(
         Effect.gen(function* () {
           const previous = yield* repository.findActivityState({
@@ -155,6 +145,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           if (!previous) {
             return yield* new FailedToUpdatePostError();
           }
+          contentChanged = previous.content !== sanitizedMarkdown;
+          titleChanged = previous.title !== args.title;
           const actor = {
             actorId: session.session.userId,
             actorMemberId: membership?.membershipId ?? null,
@@ -162,7 +154,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             postId: args.id,
           };
           const activities: CreatePostActivity[] = [];
-          if (previous.title !== args.title) {
+          if (titleChanged) {
             activities.push({
               ...actor,
               kind: "TITLE_CHANGED",
@@ -170,7 +162,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               nextValue: args.title,
             });
           }
-          if (previous.content !== sanitizedMarkdown) {
+          if (contentChanged) {
             activities.push({ ...actor, kind: "CONTENT_CHANGED" });
           }
           if (previous.statusId !== args.statusId) {
@@ -210,12 +202,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           }
         })
       );
-      yield* scheduleEmbedding({
-        content: sanitizedMarkdown,
-        id: args.id,
-        organizationId: args.organizationId,
-        title: args.title,
-      });
+      if (titleChanged || contentChanged) {
+        yield* scheduleEmbedding({
+          content: sanitizedMarkdown,
+          id: args.id,
+          organizationId: args.organizationId,
+          title: args.title,
+        });
+      }
     });
   };
 
@@ -363,7 +357,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostSuggestionsPublic: (args: TPostSuggestions) =>
-      suggestionsEffect(args, true).pipe(withRemapDbErrors("Post", "select")),
+      suggestionsEffect(args, true).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostSuggestionsPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Post", "select")
+      ),
 
     PostDelete: (args: TPostDelete) =>
       deletePostEffect(args).pipe(

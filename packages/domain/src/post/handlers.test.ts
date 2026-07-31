@@ -610,7 +610,7 @@ describe("PostRpcHandlers", () => {
           );
           const farVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
-            (_, index) => (index === 1 ? 1 : 0),
+            (_, index) => (index < 2 ? 0.5 : 0),
           );
 
           for (const [id, title] of [
@@ -667,6 +667,76 @@ describe("PostRpcHandlers", () => {
             nearPostId,
             farPostId,
           ]);
+        }),
+      );
+
+      it.effect("filters out semantically unrelated posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const repository = yield* PostRepository;
+          const fixture = yield* makeFixture();
+          const nearPostId = yield* PostId.generate;
+          const unrelatedPostId = yield* PostId.generate;
+          const queryVector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index === 0 ? 1 : 0),
+          );
+          const unrelatedVector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index === 1 ? 1 : 0),
+          );
+
+          for (const [id, title] of [
+            [nearPostId, "Near vector"],
+            [unrelatedPostId, "Unrelated vector"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+              );
+          }
+          yield* repository.updateEmbedding({
+            embedding: queryVector,
+            expectedContent:
+              sanitizeMarkdown("Near vector").sanitizedMarkdown,
+            expectedTitle: "Near vector",
+            id: nearPostId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+          yield* repository.updateEmbedding({
+            embedding: unrelatedVector,
+            expectedContent:
+              sanitizeMarkdown("Unrelated vector").sanitizedMarkdown,
+            expectedTitle: "Unrelated vector",
+            id: unrelatedPostId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+
+          const semanticHandlers = yield* PostRpcHandlersEffect.pipe(
+            Effect.provideService(PostEmbeddingService, {
+              embed: () =>
+                Effect.succeed(
+                  Option.some({
+                    model: DEFAULT_POST_EMBEDDING_MODEL,
+                    vector: queryVector,
+                  }),
+                ),
+            }),
+          );
+          const suggestions = yield* semanticHandlers
+            .PostSuggestions({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              title: "Semantic query",
+              content: "",
+              limit: 2,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(suggestions.map((post) => post.id)).toEqual([nearPostId]);
         }),
       );
 

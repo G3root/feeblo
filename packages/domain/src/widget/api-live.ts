@@ -25,6 +25,10 @@ import {
   schedulePostEmbeddingBestEffort,
 } from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
+import {
+  postLexicalSimilarity,
+  SUGGESTION_MAX_DISTANCE,
+} from "../post/suggestions";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   InternalServerError,
@@ -67,25 +71,24 @@ export const WidgetApiLive = HttpApiBuilder.group(
               : {}),
           });
           if (Option.isSome(queryEmbedding)) {
-            return candidates.map(({ id, title, excerpt, slug }) => ({
-              id,
-              title,
-              excerpt,
-              slug,
-            }));
+            return candidates
+              .filter(
+                (candidate) =>
+                  candidate.distance !== null &&
+                  candidate.distance <= SUGGESTION_MAX_DISTANCE
+              )
+              .map(({ id, title, excerpt, slug }) => ({
+                id,
+                title,
+                excerpt,
+                slug,
+              }));
           }
-          const words = (value: string) =>
-            new Set(value.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
-          const inputWords = words(input);
           return candidates
-            .map((post) => {
-              const postWords = words(postEmbeddingInput(post));
-              const intersection = [...inputWords].filter((word) =>
-                postWords.has(word)
-              ).length;
-              const union = new Set([...inputWords, ...postWords]).size;
-              return { post, score: union === 0 ? 0 : intersection / union };
-            })
+            .map((post) => ({
+              post,
+              score: postLexicalSimilarity(input, post),
+            }))
             .filter(({ score }) => score > 0)
             .sort((left, right) => right.score - left.score)
             .slice(0, 5)
