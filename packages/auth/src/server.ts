@@ -35,6 +35,7 @@ import {
   testUtils,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -472,7 +473,23 @@ export const initAuthHandler = (
                           error.reason._tag === "RateLimitExceeded"
                             ? "Too many verification codes requested. Please try again later."
                             : "Unable to send a verification code. Please try again.",
-                      }
+                        ...(error.reason._tag === "RateLimitExceeded"
+                          ? {
+                              retryAfterSeconds: Math.ceil(
+                                Duration.toSeconds(error.reason.retryAfter)
+                              ),
+                            }
+                          : {}),
+                      },
+                      error.reason._tag === "RateLimitExceeded"
+                        ? {
+                            "Retry-After": String(
+                              Math.ceil(
+                                Duration.toSeconds(error.reason.retryAfter)
+                              )
+                            ),
+                          }
+                        : undefined
                     )
                   )
                 )
