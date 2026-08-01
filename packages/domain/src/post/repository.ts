@@ -2,7 +2,17 @@
 import { currentDb, schema } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq, inArray, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  cosineDistance,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -11,8 +21,18 @@ import * as Option from "effect/Option";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
 import { FailedToMergePostError } from "./errors";
-import type { TPostAdminUpdate, TPostUpdate } from "./schema";
+import type { TPostAdminUpdate } from "./schema";
 import { scheduleSubmissionNotificationBatch } from "./workflow";
+
+interface TPostUpdateInput {
+  boardId?: string;
+  content?: string;
+  excerpt?: string;
+  id: string;
+  organizationId: string;
+  statusId?: string;
+  title?: string;
+}
 
 interface TPostFindMany {
   boardId?: string | null | undefined;
@@ -63,6 +83,15 @@ interface TPostFindByCreatorIds {
 interface TPostById {
   id: string;
   organizationId: string;
+}
+
+interface TPostSuggestionCandidates {
+  boardId?: string;
+  embedding?: readonly number[];
+  embeddingModel?: string;
+  limit: number;
+  organizationId: string;
+  publicOnly: boolean;
 }
 
 const getWhereClause = (where: SQL[]) =>
@@ -215,6 +244,61 @@ const makePostRepository = Effect.gen(function* () {
         .where(whereClause);
     },
 
+    findSuggestionCandidates: ({
+      boardId,
+      embedding,
+      embeddingModel,
+      limit,
+      organizationId,
+      publicOnly,
+    }: TPostSuggestionCandidates) => {
+      const where: SQL[] = [
+        eq(schema.postTable.organizationId, organizationId),
+        sql`${schema.postTable.archivedAt} is null`,
+        sql`${schema.postTable.mergedIntoPostId} is null`,
+      ];
+      if (boardId) {
+        where.push(eq(schema.postTable.boardId, boardId));
+      }
+      if (publicOnly) {
+        where.push(eq(schema.boardTable.visibility, "PUBLIC"));
+      }
+      if (embedding) {
+        where.push(isNotNull(schema.postTable.embedding));
+        if (embeddingModel) {
+          where.push(eq(schema.postTable.embeddingModel, embeddingModel));
+        }
+      }
+
+      const query = db
+        .select({
+          ...selectPostFields(),
+          distance: embedding
+            ? sql<
+                number | null
+              >`${cosineDistance(schema.postTable.embedding, [...embedding])}`
+            : sql<number | null>`null`,
+        })
+        .from(schema.postTable)
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.postTable.creatorId)
+        )
+        .where(and(...where));
+
+      return embedding
+        ? query
+            .orderBy(
+              asc(cosineDistance(schema.postTable.embedding, [...embedding]))
+            )
+            .limit(limit)
+        : query.orderBy(desc(schema.postTable.updatedAt)).limit(limit);
+    },
+
     isPublicPost: ({ id, organizationId }: TPostById) =>
       Effect.gen(function* () {
         const rows = yield* db
@@ -277,7 +361,7 @@ const makePostRepository = Effect.gen(function* () {
       title,
       content,
       excerpt,
-    }: TPostUpdate & { excerpt?: string }) =>
+    }: TPostUpdateInput) =>
       db
         .update(schema.postTable)
         .set({
@@ -285,12 +369,47 @@ const makePostRepository = Effect.gen(function* () {
           boardId,
           title,
           content,
-          excerpt: excerpt ?? htmlToExcerpt(content),
+          excerpt:
+            content !== undefined
+              ? (excerpt ?? htmlToExcerpt(content))
+              : excerpt,
         })
         .where(
           and(
             eq(schema.postTable.id, id),
             eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
+
+    updateEmbedding: ({
+      embedding,
+      expectedContent,
+      expectedTitle,
+      id,
+      model,
+      organizationId,
+    }: {
+      embedding: readonly number[];
+      expectedContent: string;
+      expectedTitle: string;
+      id: string;
+      model: string;
+      organizationId: string;
+    }) =>
+      db
+        .update(schema.postTable)
+        .set({
+          embeddedAt: new Date(),
+          embedding: [...embedding],
+          embeddingModel: model,
+        })
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId),
+            eq(schema.postTable.title, expectedTitle),
+            eq(schema.postTable.content, expectedContent)
           )
         )
         .pipe(Effect.asVoid),

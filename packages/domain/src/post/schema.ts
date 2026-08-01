@@ -33,6 +33,16 @@ export const PostList = S.Struct({
 
 export type TPostList = S.Schema.Type<typeof PostList>;
 
+export const PostSuggestions = S.Struct({
+  boardId: S.optional(BoardId.schema),
+  content: S.String,
+  limit: S.optional(S.Int.check(S.isBetween({ minimum: 1, maximum: 20 }))),
+  organizationId: WorkspaceId.schema,
+  title: S.String,
+});
+
+export type TPostSuggestions = S.Schema.Type<typeof PostSuggestions>;
+
 export const PostIds = S.Array(S.String);
 
 export const PostDelete = S.Struct({
@@ -53,14 +63,35 @@ export type TPostDeletePublic = S.Schema.Type<typeof PostDeletePublic>;
 
 export const PostUpdate = S.Struct({
   id: PostId.schema,
-  title: S.String,
-  content: S.String,
   statusId: PostStatusId.schema,
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
 });
 
 export type TPostUpdate = S.Schema.Type<typeof PostUpdate>;
+
+export const PostUpdateContent = S.Struct({
+  id: PostId.schema,
+  content: S.String,
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TPostUpdateContent = S.Schema.Type<typeof PostUpdateContent>;
+
+export const PostTitle = S.Trim.pipe(
+  S.check(S.isMinLength(1)),
+  S.check(S.isMaxLength(200))
+);
+
+export const PostUpdateTitle = S.Struct({
+  id: PostId.schema,
+  title: PostTitle,
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
+});
+
+export type TPostUpdateTitle = S.Schema.Type<typeof PostUpdateTitle>;
 
 export const PostAdminUpdate = S.Struct({
   id: PostId.schema,

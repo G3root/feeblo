@@ -13,7 +13,10 @@ import {
   PostDeletePublic,
   PostList,
   PostMerge,
+  PostSuggestions,
   PostUpdate,
+  PostUpdateContent,
+  PostUpdateTitle,
 } from "./schema";
 
 export class PostRpcs extends RpcGroup.make(
@@ -25,6 +28,20 @@ export class PostRpcs extends RpcGroup.make(
 
   Rpc.make("PostListPublic", {
     payload: PostList,
+    success: Schema.Array(Post),
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("PostSuggestions", {
+    payload: PostSuggestions,
+    success: Schema.Array(Post),
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostSuggestionsPublic", {
+    payload: PostSuggestions,
     success: Schema.Array(Post),
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
@@ -68,6 +85,34 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostUpdatePublic", {
     success: Schema.Void,
     payload: PostUpdate,
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("PostUpdateContent", {
+    success: Schema.Void,
+    payload: PostUpdateContent,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUpdateTitle", {
+    success: Schema.Void,
+    payload: PostUpdateTitle,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUpdateContentPublic", {
+    success: Schema.Void,
+    payload: PostUpdateContent,
+    error: Schema.Union([PostServiceErrors, RateLimitErrors]),
+  })
+    .middleware(AuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("PostUpdateTitlePublic", {
+    success: Schema.Void,
+    payload: PostUpdateTitle,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })
     .middleware(AuthMiddleware)

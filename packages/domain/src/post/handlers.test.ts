@@ -7,18 +7,26 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { eq } from "drizzle-orm";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { BoardRepository } from "../board/repository";
-import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { PostActivityRepository } from "../post-activity/repository";
+import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
 import {
   CurrentSession,
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import {
+  DEFAULT_POST_EMBEDDING_DIMENSIONS,
+  DEFAULT_POST_EMBEDDING_MODEL,
+  PostEmbeddingService,
+} from "./embedding-service";
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
@@ -331,13 +339,24 @@ describe("PostRpcHandlers", () => {
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
-            .PostUpdate({
+            .PostUpdateContent({
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
-              statusId: fixture.statusId,
-              title: "Updated feedback",
               content: "Updated content",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "member"),
+              ),
+            );
+          yield* handlers
+            .PostUpdateTitle({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              title: "Updated feedback",
             })
             .pipe(
               Effect.provideService(
@@ -380,8 +399,6 @@ describe("PostRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
                 statusId: fixture.statusId,
-                title: "Member-only update",
-                content: "Member-only content",
               })
               .pipe(Effect.provideService(CurrentSession, session)),
           );
@@ -393,8 +410,6 @@ describe("PostRpcHandlers", () => {
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
               statusId: fixture.statusId,
-              title: "Updated feedback",
-              content: "Updated content",
             })
             .pipe(Effect.provideService(CurrentSession, session));
 
@@ -405,8 +420,10 @@ describe("PostRpcHandlers", () => {
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
-          expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
-          expect(post?.content).toContain("Updated content");
+          expect(post).toMatchObject({
+            id: postId,
+            title: "Original feedback",
+          });
         }),
       );
     });
@@ -507,6 +524,320 @@ describe("PostRpcHandlers", () => {
 
           expect(post?.lockedAt).toBeInstanceOf(Date);
         }),
+      );
+    });
+
+    describe("PostSuggestions", () => {
+      it.effect("does not await embedding generation in the handler", () =>
+        Effect.gen(function* () {
+          let embedCalls = 0;
+          const releaseEmbedding = yield* Deferred.make<void>();
+          const handlers = yield* PostRpcHandlersEffect.pipe(
+            Effect.provideService(PostEmbeddingService, {
+              embed: () =>
+                Effect.sync(() => {
+                  embedCalls += 1;
+                }).pipe(
+                  Effect.andThen(Deferred.await(releaseEmbedding)),
+                  Effect.as(Option.none()),
+                ),
+            }),
+          );
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Embedded feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* Effect.yieldNow;
+
+          const [post] = yield* db
+            .select({
+              embeddedAt: schema.postTable.embeddedAt,
+              embedding: schema.postTable.embedding,
+              embeddingModel: schema.postTable.embeddingModel,
+            })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(embedCalls).toBe(1);
+          expect(post?.embedding).toBeNull();
+          expect(post?.embeddingModel).toBeNull();
+          expect(post?.embeddedAt).toBeNull();
+          yield* Deferred.succeed(releaseEmbedding, undefined);
+        }),
+      );
+
+      it.effect("does not store an embedding for an older post revision", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const repository = yield* PostRepository;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+          const vector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index === 0 ? 1 : 0),
+          );
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Old title"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* repository.update({
+            ...postCreateInput(fixture, postId, "Current title"),
+          });
+          yield* repository.updateEmbedding({
+            embedding: vector,
+            expectedContent:
+              sanitizeMarkdown("Old title").sanitizedMarkdown,
+            expectedTitle: "Old title",
+            id: postId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+
+          const [post] = yield* db
+            .select({ embedding: schema.postTable.embedding })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(post?.embedding).toBeNull();
+        }),
+      );
+
+      it.effect("orders stored vectors by cosine distance", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const repository = yield* PostRepository;
+          const fixture = yield* makeFixture();
+          const nearPostId = yield* PostId.generate;
+          const farPostId = yield* PostId.generate;
+          const queryVector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index === 0 ? 1 : 0),
+          );
+          const farVector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index < 2 ? 0.5 : 0),
+          );
+
+          for (const [id, title] of [
+            [nearPostId, "Near vector"],
+            [farPostId, "Far vector"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+              );
+          }
+          yield* repository.updateEmbedding({
+            embedding: queryVector,
+            expectedContent:
+              sanitizeMarkdown("Near vector").sanitizedMarkdown,
+            expectedTitle: "Near vector",
+            id: nearPostId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+          yield* repository.updateEmbedding({
+            embedding: farVector,
+            expectedContent:
+              sanitizeMarkdown("Far vector").sanitizedMarkdown,
+            expectedTitle: "Far vector",
+            id: farPostId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+
+          const semanticHandlers = yield* PostRpcHandlersEffect.pipe(
+            Effect.provideService(PostEmbeddingService, {
+              embed: () =>
+                Effect.succeed(
+                  Option.some({
+                    model: DEFAULT_POST_EMBEDDING_MODEL,
+                    vector: queryVector,
+                  }),
+                ),
+            }),
+          );
+          const suggestions = yield* semanticHandlers
+            .PostSuggestions({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              title: "Semantic query",
+              content: "",
+              limit: 2,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(suggestions.map((post) => post.id)).toEqual([
+            nearPostId,
+            farPostId,
+          ]);
+        }),
+      );
+
+      it.effect("filters out semantically unrelated posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const repository = yield* PostRepository;
+          const fixture = yield* makeFixture();
+          const nearPostId = yield* PostId.generate;
+          const unrelatedPostId = yield* PostId.generate;
+          const queryVector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index === 0 ? 1 : 0),
+          );
+          const unrelatedVector = Array.from(
+            { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+            (_, index) => (index === 1 ? 1 : 0),
+          );
+
+          for (const [id, title] of [
+            [nearPostId, "Near vector"],
+            [unrelatedPostId, "Unrelated vector"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+              );
+          }
+          yield* repository.updateEmbedding({
+            embedding: queryVector,
+            expectedContent:
+              sanitizeMarkdown("Near vector").sanitizedMarkdown,
+            expectedTitle: "Near vector",
+            id: nearPostId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+          yield* repository.updateEmbedding({
+            embedding: unrelatedVector,
+            expectedContent:
+              sanitizeMarkdown("Unrelated vector").sanitizedMarkdown,
+            expectedTitle: "Unrelated vector",
+            id: unrelatedPostId,
+            model: DEFAULT_POST_EMBEDDING_MODEL,
+            organizationId: fixture.organizationId,
+          });
+
+          const semanticHandlers = yield* PostRpcHandlersEffect.pipe(
+            Effect.provideService(PostEmbeddingService, {
+              embed: () =>
+                Effect.succeed(
+                  Option.some({
+                    model: DEFAULT_POST_EMBEDDING_MODEL,
+                    vector: queryVector,
+                  }),
+                ),
+            }),
+          );
+          const suggestions = yield* semanticHandlers
+            .PostSuggestions({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              title: "Semantic query",
+              content: "",
+              limit: 2,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(suggestions.map((post) => post.id)).toEqual([nearPostId]);
+        }),
+      );
+
+      it.effect("ranks similar posts with the lexical fallback", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const billingPostId = yield* PostId.generate;
+          const unrelatedPostId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(
+              postCreateInput(
+                fixture,
+                billingPostId,
+                "Add yearly billing",
+                "Please support annual subscription invoices",
+              ),
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* handlers
+            .PostCreate(
+              postCreateInput(
+                fixture,
+                unrelatedPostId,
+                "Dark mode",
+                "Use a darker color theme",
+              ),
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const suggestions = yield* handlers
+            .PostSuggestions({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              title: "Annual billing",
+              content: "Yearly subscription invoices",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(suggestions.map((post) => post.id)).toEqual([billingPostId]);
+        }),
+      );
+
+      it.effect(
+        "only returns public-board posts from the public endpoint",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const privateBoardId = yield* addBoard(fixture, "PRIVATE");
+            const publicPostId = yield* PostId.generate;
+            const privatePostId = yield* PostId.generate;
+
+            yield* handlers
+              .PostCreate(
+                postCreateInput(
+                  fixture,
+                  publicPostId,
+                  "Export reports",
+                  "Export reports to CSV",
+                ),
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+              );
+            yield* handlers
+              .PostCreate({
+                ...postCreateInput(
+                  fixture,
+                  privatePostId,
+                  "Private export reports",
+                  "Export private reports to CSV",
+                ),
+                boardId: privateBoardId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+              );
+
+            const suggestions = yield* handlers
+              .PostSuggestionsPublic({
+                organizationId: fixture.organizationId,
+                title: "Export reports",
+                content: "CSV reports",
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none()),
+              );
+
+            expect(suggestions.map((post) => post.id)).toEqual([publicPostId]);
+          }),
       );
     });
 

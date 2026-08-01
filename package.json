@@ -30,6 +30,7 @@
     "db:watch": "turbo -F @feeblo/db db:watch",
     "db:stop": "turbo -F @feeblo/db db:stop",
     "db:down": "turbo -F @feeblo/db db:down",
+    "db:configure-embeddings": "pnpm --filter @feeblo/db db:configure-embeddings",
     "deploy": "turbo -F @feeblo/infra deploy",
     "destroy": "turbo -F @feeblo/infra destroy",
     "format": "biome check --write --unsafe .",

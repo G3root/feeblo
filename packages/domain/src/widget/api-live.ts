@@ -19,7 +19,16 @@ import { parsePersonAttributes } from "../contact/utils";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
+import {
+  PostEmbeddingService,
+  postEmbeddingInput,
+  schedulePostEmbeddingBestEffort,
+} from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
+import {
+  postLexicalSimilarity,
+  SUGGESTION_MAX_DISTANCE,
+} from "../post/suggestions";
 import { PostStatusRepository } from "../post-status/repository";
 import {
   InternalServerError,
@@ -34,6 +43,86 @@ export const WidgetApiLive = HttpApiBuilder.group(
   "WidgetApiGroup",
   (handlers) =>
     handlers
+      .handle("suggestPosts", ({ payload }) =>
+        Effect.gen(function* () {
+          const repository = yield* PostRepository;
+          const embeddings = yield* PostEmbeddingService;
+          const input = postEmbeddingInput(payload);
+          const queryEmbedding = yield* embeddings
+            .embed(input)
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning(
+                  "Failed to generate widget suggestion embedding",
+                  cause
+                ).pipe(Effect.as(Option.none()))
+              )
+            );
+          const candidates = yield* repository.findSuggestionCandidates({
+            boardId: payload.boardId,
+            organizationId: payload.organizationId,
+            publicOnly: true,
+            limit: Option.isSome(queryEmbedding) ? 5 : 25,
+            ...(Option.isSome(queryEmbedding)
+              ? {
+                  embedding: queryEmbedding.value.vector,
+                  embeddingModel: queryEmbedding.value.model,
+                }
+              : {}),
+          });
+          if (Option.isSome(queryEmbedding)) {
+            const matches = candidates
+              .filter(
+                (candidate) =>
+                  candidate.distance !== null &&
+                  candidate.distance <= SUGGESTION_MAX_DISTANCE
+              )
+              .map(({ id, title, excerpt, slug }) => ({
+                id,
+                title,
+                excerpt,
+                slug,
+              }));
+            if (matches.length > 0) {
+              return matches;
+            }
+          }
+
+          const lexicalCandidates = Option.isSome(queryEmbedding)
+            ? yield* repository.findSuggestionCandidates({
+                boardId: payload.boardId,
+                organizationId: payload.organizationId,
+                publicOnly: true,
+                limit: 25,
+              })
+            : candidates;
+
+          return lexicalCandidates
+            .map((post) => ({
+              post,
+              score: postLexicalSimilarity(input, post),
+            }))
+            .filter(({ score }) => score > 0)
+            .sort((left, right) => right.score - left.score)
+            .slice(0, 5)
+            .map(({ post: { id, title, excerpt, slug } }) => ({
+              id,
+              title,
+              excerpt,
+              slug,
+            }));
+        }).pipe(
+          Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
+          Effect.mapError(
+            (cause) =>
+              new InternalServerError({
+                message: "Failed to find similar posts",
+                cause: String(cause),
+              })
+          ),
+          withRemapDbErrors("Post", "select")
+        )
+      )
       .handle("listBoards", ({ payload }) =>
         Effect.gen(function* () {
           const { organizationId } = payload;
@@ -169,6 +258,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
               })
             );
           }
+
+          yield* schedulePostEmbeddingBestEffort({
+            content: sanitizedContent,
+            postId: id,
+            organizationId,
+            title,
+          });
 
           return {
             id,

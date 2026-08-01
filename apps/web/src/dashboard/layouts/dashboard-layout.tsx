@@ -13,6 +13,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@feeblo/ui/sidebar";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { AppSidebar } from "~/components/common/app-sidebar";
 import { NotificationsMenu } from "~/components/common/notifications-menu";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";
@@ -59,7 +60,24 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           postReactionCollection,
           commentReactionCollection,
         }}
+        getPostHref={(post) => {
+          const board = boardCollection.get(post.boardId);
+          return board
+            ? `/${organizationId}/post/${board.slug}/${post.slug}`
+            : `/${organizationId}`;
+        }}
         organizationId={organizationId}
+        suggestPosts={({ signal, ...input }) =>
+          fetchRpc(
+            (rpc) =>
+              rpc.PostSuggestions({
+                ...input,
+                limit: 5,
+                organizationId,
+              }),
+            { signal }
+          )
+        }
       >
         <PostCreateDialogProvider>
           <CommentDeleteDialogProvider>
