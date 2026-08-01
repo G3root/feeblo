@@ -1,6 +1,7 @@
 import { Button } from "@feeblo/ui/button";
 import { Editor } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
+import { toastManager } from "@feeblo/ui/toast";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useRef, useState } from "react";
@@ -231,8 +232,15 @@ export function PostContentUpdateInput() {
       disabled={disabled}
       onSubmit={async ({ content }) => {
         if (content !== "") {
-          const tx = updatePostContent({ content });
-          await tx.isPersisted.promise;
+          try {
+            const tx = updatePostContent({ content });
+            await tx.isPersisted.promise;
+          } catch {
+            toastManager.add({
+              title: "Failed to update content",
+              type: "error",
+            });
+          }
         }
       }}
       submitLabel="Update"

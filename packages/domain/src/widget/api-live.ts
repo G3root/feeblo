@@ -71,7 +71,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               : {}),
           });
           if (Option.isSome(queryEmbedding)) {
-            return candidates
+            const matches = candidates
               .filter(
                 (candidate) =>
                   candidate.distance !== null &&
@@ -83,8 +83,21 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 excerpt,
                 slug,
               }));
+            if (matches.length > 0) {
+              return matches;
+            }
           }
-          return candidates
+
+          const lexicalCandidates = Option.isSome(queryEmbedding)
+            ? yield* repository.findSuggestionCandidates({
+                boardId: payload.boardId,
+                organizationId: payload.organizationId,
+                publicOnly: true,
+                limit: 25,
+              })
+            : candidates;
+
+          return lexicalCandidates
             .map((post) => ({
               post,
               score: postLexicalSimilarity(input, post),

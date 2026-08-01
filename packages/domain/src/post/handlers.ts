@@ -104,16 +104,28 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       });
 
       if (Option.isSome(queryEmbedding)) {
-        return candidates
+        const matches = candidates
           .filter(
             (candidate) =>
               candidate.distance !== null &&
               candidate.distance <= SUGGESTION_MAX_DISTANCE
           )
           .map(({ distance: _distance, ...post }) => post);
+        if (matches.length > 0) {
+          return matches;
+        }
       }
 
-      return candidates
+      const lexicalCandidates = Option.isSome(queryEmbedding)
+        ? yield* repository.findSuggestionCandidates({
+            organizationId: args.organizationId,
+            ...(args.boardId ? { boardId: args.boardId } : {}),
+            limit: Math.max(25, resultLimit * 5),
+            publicOnly,
+          })
+        : candidates;
+
+      return lexicalCandidates
         .map((post) => ({
           post,
           score: postLexicalSimilarity(input, post),
@@ -186,9 +198,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       );
     });
 
-  const updatePostContentEffect = (args: TPostUpdateContent) => {
-    const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
-    return Effect.gen(function* () {
+  const updatePostContentEffect = (args: TPostUpdateContent) =>
+    Effect.gen(function* () {
+      const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+        args.content
+      );
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
       let contentChanged = false;
@@ -234,7 +248,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         });
       }
     });
-  };
 
   const updatePostTitleEffect = (args: TPostUpdateTitle) =>
     Effect.gen(function* () {

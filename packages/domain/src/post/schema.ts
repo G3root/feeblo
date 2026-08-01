@@ -79,9 +79,14 @@ export const PostUpdateContent = S.Struct({
 
 export type TPostUpdateContent = S.Schema.Type<typeof PostUpdateContent>;
 
+export const PostTitle = S.Trim.pipe(
+  S.check(S.isMinLength(1)),
+  S.check(S.isMaxLength(200))
+);
+
 export const PostUpdateTitle = S.Struct({
   id: PostId.schema,
-  title: S.String,
+  title: PostTitle,
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
 });
