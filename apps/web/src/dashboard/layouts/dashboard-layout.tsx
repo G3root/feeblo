@@ -4,7 +4,10 @@ import {
   PostCreateDialogProvider,
   PostDeleteDialogProvider,
 } from "@feeblo/post-ui/dialog-stores";
-import { PostCollectionsProvider } from "@feeblo/post-ui/post-collections-provider";
+import {
+  PostCollectionsProvider,
+  type PostCollectionsValue,
+} from "@feeblo/post-ui/post-collections-provider";
 import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
 import { PostDeleteDialog } from "@feeblo/post-ui/post-delete-dialog";
 import { ScrollArea } from "@feeblo/ui/scroll-area";
@@ -14,6 +17,7 @@ import {
   SidebarTrigger,
 } from "@feeblo/ui/sidebar";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { useCallback } from "react";
 import { AppSidebar } from "~/components/common/app-sidebar";
 import { NotificationsMenu } from "~/components/common/notifications-menu";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";
@@ -47,6 +51,32 @@ import {
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const organizationId = useOrganizationId();
+  const getPostHref = useCallback<
+    NonNullable<PostCollectionsValue["getPostHref"]>
+  >(
+    (post) => {
+      const board = boardCollection.get(post.boardId);
+      return board
+        ? `/${organizationId}/post/${board.slug}/${post.slug}`
+        : `/${organizationId}`;
+    },
+    [organizationId]
+  );
+  const suggestPosts = useCallback<
+    NonNullable<PostCollectionsValue["suggestPosts"]>
+  >(
+    ({ signal, ...input }) =>
+      fetchRpc(
+        (rpc) =>
+          rpc.PostSuggestions({
+            ...input,
+            limit: 5,
+            organizationId,
+          }),
+        { signal }
+      ),
+    [organizationId]
+  );
   return (
     <UpgradePlanDialogProvider>
       <PostCollectionsProvider
@@ -60,24 +90,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           postReactionCollection,
           commentReactionCollection,
         }}
-        getPostHref={(post) => {
-          const board = boardCollection.get(post.boardId);
-          return board
-            ? `/${organizationId}/post/${board.slug}/${post.slug}`
-            : `/${organizationId}`;
-        }}
+        getPostHref={getPostHref}
         organizationId={organizationId}
-        suggestPosts={({ signal, ...input }) =>
-          fetchRpc(
-            (rpc) =>
-              rpc.PostSuggestions({
-                ...input,
-                limit: 5,
-                organizationId,
-              }),
-            { signal }
-          )
-        }
+        suggestPosts={suggestPosts}
       >
         <PostCreateDialogProvider>
           <CommentDeleteDialogProvider>
