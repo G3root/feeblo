@@ -22,28 +22,18 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
-      args:
-        APP_RELEASE: ${APP_RELEASE:-dev}
     restart: always
     depends_on:
       pg:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      PORT: ${SERVER_PORT:-8080}
       SERVER_PORT: ${SERVER_PORT:-8080}
       APP_URL: ${APP_URL:-http://localhost:3001}
       API_URL: ${API_URL:-http://localhost:3000}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
       AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-dev-key}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      EMBEDDING_API_URL: ${EMBEDDING_API_URL:-https://api.openai.com/v1}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
-      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1536}
-      POLAR_MODE: ${POLAR_MODE:-sandbox}
-      POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
-      POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
     ports:
       - "${SERVER_PORT:-8080}:8080"
 
