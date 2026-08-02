@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -23,8 +23,9 @@ interface UpsertSsoUserInput {
   name: string;
   /**
    * When set, the SSO user is scoped to a single organization (widget portal
-   * user). Existing global users matched by real email are left untouched so
-   * an SSO token never expands a real account's scope.
+   * user). An SSO token never returns an existing globally-registered account,
+   * so it cannot be used to take over a real user's session, and an SSO user
+   * created for one organization is never re-scoped to another.
    */
   restrictedToOrganizationId?: string | null;
 }
@@ -46,43 +47,29 @@ const makeUserRepository = Effect.gen(function* () {
     upsertSsoUser: (args: UpsertSsoUserInput) =>
       Effect.gen(function* () {
         const emailHash = hashEmail(args.email);
-        const normalizedEmail = args.email.toLowerCase().trim();
 
-        // Prefer linking to an existing Better-Auth user by real email. A real
-        // account is never re-scoped to an organization by an SSO token, so
-        // `restrictedToOrganizationId` is intentionally not applied here.
-        const existingByEmail = yield* db
-          .select({ id: schema.userTable.id })
-          .from(schema.userTable)
-          .where(eq(schema.userTable.email, normalizedEmail))
-          .limit(1)
-          .pipe(Effect.map((rows) => rows[0]));
-
-        if (existingByEmail) {
-          const updatedAt = yield* DateTime.nowAsDate;
-          const [updated = null] = yield* db
-            .update(schema.userTable)
-            .set({
-              name: args.name,
-              emailHash,
-              jwtAutoLoginAt: updatedAt,
-              updatedAt,
-            })
-            .where(eq(schema.userTable.id, existingByEmail.id))
-            .returning();
-          if (!updated) {
-            return yield* new UserPersistenceError({
-              message: "SSO user update did not return a row",
-            });
-          }
-          return updated;
-        }
-
-        // Otherwise look up an existing SSO user by email hash.
+        // Match an existing SSO-only user by its email hash. Only SSO-created
+        // users carry an `emailHash`, so a real (globally registered) account
+        // is never returned by an SSO token. The match is additionally scoped
+        // so an SSO user created for one organization is not claimed or
+        // re-scoped by a token from another organization.
         const existingByHash = yield* db
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
-          .where(eq(schema.userTable.emailHash, emailHash))
+          .where(
+            and(
+              eq(schema.userTable.emailHash, emailHash),
+              args.restrictedToOrganizationId != null
+                ? or(
+                    isNull(schema.userTable.restrictedToOrganizationId),
+                    eq(
+                      schema.userTable.restrictedToOrganizationId,
+                      args.restrictedToOrganizationId
+                    )
+                  )
+                : undefined
+            )
+          )
           .limit(1)
           .pipe(Effect.map((rows) => rows[0]));
 
