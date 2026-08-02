@@ -1,4 +1,4 @@
-import { Copy, EmailShell, Lead } from "./email-shell";
+import { EmailShell } from "./email-shell";
 import { type EmailPost, EmailPostList } from "./weekly-digest";
 
 type NotificationEmailProps = {
@@ -22,21 +22,16 @@ export const NotificationEmail = ({
 }: NotificationEmailProps) => (
   <EmailShell
     cta={{ label: actionLabel, href: actionUrl }}
-    eyebrow={eyebrow}
-    footer={
-      <>
-        You received this because you enabled this notification for this
-        workspace. <a href={unsubscribeUrl}>Unsubscribe from this category</a>.
-      </>
+    footerBlurb={
+      "You received this because you enabled this notification for this workspace. You can manage all email notifications from your workspace settings."
     }
-    preview={title}
+    homeUrl="https://feeblo.com"
+    preview={`${eyebrow}: ${title}`}
     title={title}
+    titleLead={body}
+    unsubscribeUrl={unsubscribeUrl}
   >
-    <Lead>{body}</Lead>
     <EmailPostList heading="Submitted posts" posts={posts} />
-    <Copy>
-      You can manage all email notifications from your workspace settings.
-    </Copy>
   </EmailShell>
 );
 

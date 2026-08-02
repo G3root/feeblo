@@ -3,110 +3,151 @@ import {
   Button,
   Column,
   Container,
-  Font,
   Head,
-  Heading,
-  Hr,
   Html,
+  Img,
+  Link,
   Preview,
-  pixelBasedPreset,
   Row,
   Section,
   Tailwind,
   Text,
-} from "@react-email/components";
-// biome-ignore lint/style/useImportType: the server TSX runtime requires React in scope
-import * as React from "react";
+} from "react-email";
+import { FeebloFonts } from "./fonts";
+import { ditherTailwindConfig } from "./theme";
+
+// The feeblo mark is served from the web app's public dir (apps/web/public).
+// TODO: swap in a properly sized, white-on-transparent logo asset for the dark
+// email theme once finalized; favicon.svg is the current stand-in.
+const logoUrl = process.env.APP_URL
+  ? `${process.env.APP_URL}/favicon.svg`
+  : "https://feeblo.com/favicon.svg";
 
 type EmailShellProps = {
-  readonly preview: string;
-  readonly title: string;
-  readonly eyebrow: string;
   readonly children: React.ReactNode;
   readonly cta?: {
     readonly label: string;
     readonly href: string;
   };
-  readonly footer?: React.ReactNode;
+  readonly companyName?: string;
+  readonly footerBlurb?: React.ReactNode;
+  readonly homeUrl: string;
+  readonly preview: string;
+  readonly title: string;
+  readonly titleLead?: React.ReactNode;
+  readonly titleSize?: "lg" | "md";
+  readonly unsubscribeUrl?: string;
 };
 
 export const EmailShell = ({
   children,
   cta,
-  eyebrow,
-  footer = "This inbox is not monitored.",
+  companyName = "Feeblo",
+  footerBlurb = "Feeblo is a feedback board that helps teams collect, organize, and act on what users really want.",
+  homeUrl,
   preview,
   title,
+  titleLead,
+  titleSize = "lg",
+  unsubscribeUrl,
 }: EmailShellProps) => (
-  <Html>
-    <Head />
-    <Preview>{preview}</Preview>
-    <Tailwind
-      config={{
-        presets: [pixelBasedPreset],
-      }}
-    >
-      <Font
-        fallbackFontFamily="Arial"
-        fontFamily="Inter"
-        webFont={{
-          url: "https://fonts.gstatic.com/s/inter/v19/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIa25L7SUc.woff2",
-          format: "woff2",
-        }}
-      />
-      <Body
-        className="bg-white"
-        style={{
-          fontFamily: "Inter, Arial, sans-serif",
-        }}
-      >
-        <Container className="mx-auto my-0 max-w-[560px] px-0 pt-5 pb-12">
-          <Text className="m-0 font-medium text-[#8892a0] text-[12px] leading-[18px]">
-            {eyebrow}
-          </Text>
-          <Heading className="px-0 pt-[17px] pb-0 font-normal text-[#484848] text-[24px] leading-[1.3] tracking-[-0.5px]">
-            {title}
-          </Heading>
+  <Tailwind config={ditherTailwindConfig}>
+    <Html>
+      <Head>
+        <FeebloFonts />
+      </Head>
 
-          <Section className="px-0 py-[18px]">{children}</Section>
+      <Body className="m-0 bg-bg-2 p-0 font-14 font-sans">
+        <Preview>{preview}</Preview>
+        <Container className="mx-auto max-w-[640px] bg-bg">
+          <Section className="mobile:px-4 px-6 py-6">
+            <Link href={homeUrl}>
+              <Img
+                alt="Feeblo"
+                className="block"
+                height={32}
+                src={logoUrl}
+                width={32}
+              />
+            </Link>
+          </Section>
 
-          {cta ? (
-            <Section className="px-0 py-[12px]">
-              <Button
-                className="block rounded bg-[#5e6ad2] px-[23px] py-[11px] text-center font-semibold text-[15px] text-white no-underline"
-                href={cta.href}
+          <Section className="mobile:px-4 px-6 mobile:pt-10 pt-16 mobile:pb-10 pb-12">
+            <Section align="left" className="mobile:!max-w-full max-w-[490px]">
+              <Text
+                className={`mobile:!max-w-full m-0 max-w-[490px] font-condensed text-fg uppercase ${
+                  titleSize === "md"
+                    ? "font-40 mobile:font-32"
+                    : "font-56 mobile:font-40"
+                }`}
               >
-                {cta.label}
-              </Button>
+                {title}
+              </Text>
+              {titleLead ? (
+                <Text className="mobile:!max-w-full m-0 mt-10 max-w-[490px] font-14 font-sans text-fg-2">
+                  {titleLead}
+                </Text>
+              ) : null}
             </Section>
-          ) : null}
 
-          <Hr className="mt-[42px] mb-[26px] border-[#dfe1e4]" />
+            <Section
+              align="left"
+              className="mobile:!max-w-full mt-10 max-w-[490px]"
+            >
+              {children}
+            </Section>
 
-          <Section className="px-0 py-0">
-            <Row>
-              <Column>
-                <Text className="m-0 text-[#b4becc] text-[14px]">Feeblo</Text>
-                <Text className="mt-2 mb-0 text-[#98a2b3] text-[13px] leading-[20px]">
-                  {footer}
+            {cta ? (
+              <Section className="mt-10">
+                <Button
+                  className="inline-block bg-fg text-center font-sans text-bg"
+                  href={cta.href}
+                  style={{
+                    fontSize: "15px",
+                    fontWeight: 450,
+                    lineHeight: "100%",
+                    padding: "14px 20px",
+                  }}
+                >
+                  {cta.label}
+                </Button>
+              </Section>
+            ) : null}
+          </Section>
+
+          <Section className="border-stroke border-t mobile:px-4 px-6 mobile:py-12 py-16">
+            <Text className="m-0 max-w-[320px] font-13 font-sans text-fg-2">
+              {footerBlurb}
+            </Text>
+            <Row align="left">
+              <Column className="w-full pt-8 align-top">
+                <Text className="m-0 font-11 font-sans text-fg-2">
+                  <Link className="text-fg-2" href={homeUrl}>
+                    {companyName}
+                  </Link>
+                  {unsubscribeUrl ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <Link className="text-fg-2" href={unsubscribeUrl}>
+                        Unsubscribe
+                      </Link>
+                    </>
+                  ) : null}
                 </Text>
               </Column>
             </Row>
           </Section>
         </Container>
       </Body>
-    </Tailwind>
-  </Html>
+    </Html>
+  </Tailwind>
 );
 
 export const Lead = ({ children }: { readonly children: React.ReactNode }) => (
-  <Text className="mx-0 mt-0 mb-[15px] text-[#3c4149] text-[15px] leading-[1.4]">
-    {children}
-  </Text>
+  <Text className="m-0 font-15 font-sans text-fg">{children}</Text>
 );
 
 export const Copy = ({ children }: { readonly children: React.ReactNode }) => (
-  <Text className="mx-0 mt-0 mb-[15px] text-[#3c4149] text-[15px] leading-[1.4]">
-    {children}
-  </Text>
+  <Text className="m-0 mt-3 font-14 font-sans text-fg-2">{children}</Text>
 );
