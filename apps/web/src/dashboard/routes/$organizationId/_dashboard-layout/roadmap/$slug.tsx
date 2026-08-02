@@ -1,9 +1,8 @@
-import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
+import { useRoadmapData } from "@feeblo/post-ui/roadmap/use-roadmap-data";
 import { Button } from "@feeblo/ui/button";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Edit01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
 import {
@@ -39,96 +38,23 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId, slug } = Route.useParams();
 
-  const roadmapQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ roadmap: roadmapCollection })
-        .where(({ roadmap }) =>
-          and(
-            eq(roadmap.organizationId, organizationId),
-            eq(roadmap.slug, slug)
-          )
-        )
-        .select(({ roadmap }) => ({
-          description: roadmap.description,
-          id: roadmap.id,
-          name: roadmap.name,
-          slug: roadmap.slug,
-        })),
-    [organizationId, slug]
-  );
+  const { isError, isLoading, lanesFor, roadmaps } = useRoadmapData({
+    boardCollection,
+    postCollection,
+    postStatusCollection,
+    roadmapCollection,
+    roadmapColumnCollection,
+    organizationId,
+    slug,
+  });
 
-  const columnsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ column: roadmapColumnCollection })
-        .join(
-          { postStatus: postStatusCollection },
-          ({ column, postStatus }) => eq(column.statusId, postStatus.id),
-          "inner"
-        )
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        )
-        .select(({ column, postStatus }) => ({
-          id: postStatus.id,
-          name: column.name,
-          roadmapId: column.roadmapId,
-          type: postStatus.type,
-        }))
-        .orderBy(({ column }) => column.position, "asc"),
-    [organizationId]
-  );
-
-  const postsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ post: postCollection })
-        .join(
-          { postStatus: postStatusCollection },
-          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "inner"
-        )
-        .join(
-          { board: boardCollection },
-          ({ post, board }) => eq(post.boardId, board.id),
-          "inner"
-        )
-        .where(({ board, post, postStatus }) =>
-          and(
-            eq(post.organizationId, organizationId),
-            eq(postStatus.organizationId, organizationId),
-            eq(board.organizationId, organizationId)
-          )
-        )
-        .select(({ board, post, postStatus }) => ({
-          boardName: board.name,
-          boardSlug: board.slug,
-          id: post.id,
-          slug: post.slug,
-          status: postStatus.type,
-          statusId: post.statusId,
-          summary: post.excerpt,
-          title: post.title,
-          updatedAt: post.updatedAt,
-        }))
-        .orderBy(({ post }) => post.createdAt, "desc"),
-    [organizationId]
-  );
-
-  if (roadmapQuery.isError || columnsQuery.isError || postsQuery.isError) {
+  if (isError) {
     throw new Error("Failed to load roadmap");
   }
 
-  if (
-    roadmapQuery.isLoading ||
-    columnsQuery.isLoading ||
-    postsQuery.isLoading
-  ) {
+  if (isLoading) {
     return <RoadmapLoadingState />;
   }
-
-  const roadmaps = roadmapQuery.data ?? [];
 
   if (roadmaps.length === 0) {
     return (
@@ -137,12 +63,8 @@ function RouteComponent() {
   }
 
   const roadmap = roadmaps[0];
-  const columns = columnsQuery.data ?? [];
-  const posts = postsQuery.data ?? [];
 
-  const roadmapColumns = columns.filter((col) => col.roadmapId === roadmap.id);
-
-  const lanes = groupRoadmapPostsByStatus(posts, roadmapColumns);
+  const lanes = lanesFor(roadmap.id);
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">

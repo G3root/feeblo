@@ -20,6 +20,11 @@ export type RoadmapPost = {
   updatedAt: Date | string;
 };
 
+export type RoadmapBoardPost = RoadmapPost & {
+  boardName: string;
+  boardSlug: string;
+};
+
 export type RoadmapLane<TPost extends RoadmapPost = RoadmapPost> = {
   name?: string;
   posts: TPost[];

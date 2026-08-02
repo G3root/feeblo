@@ -1,9 +1,8 @@
-import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
+import { useRoadmapData } from "@feeblo/post-ui/roadmap/use-roadmap-data";
 import { Button } from "@feeblo/ui/button";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
 import { useCreateRoadmapDialogContext } from "~/features/roadmap/dialog-stores";
@@ -35,96 +34,22 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId } = Route.useParams();
 
-  const roadmapsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ roadmap: roadmapCollection })
-        .where(({ roadmap }) =>
-          and(
-            eq(roadmap.organizationId, organizationId),
-            eq(roadmap.mode, "status")
-          )
-        )
-        .select(({ roadmap }) => ({
-          description: roadmap.description,
-          id: roadmap.id,
-          name: roadmap.name,
-        }))
-        .orderBy(({ roadmap }) => roadmap.createdAt, "asc"),
-    [organizationId]
-  );
+  const { isError, isLoading, lanesFor, roadmaps } = useRoadmapData({
+    boardCollection,
+    postCollection,
+    postStatusCollection,
+    roadmapCollection,
+    roadmapColumnCollection,
+    organizationId,
+  });
 
-  const columnsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ column: roadmapColumnCollection })
-        .join(
-          { postStatus: postStatusCollection },
-          ({ column, postStatus }) => eq(column.statusId, postStatus.id),
-          "inner"
-        )
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        )
-        .select(({ column, postStatus }) => ({
-          id: postStatus.id,
-          name: column.name,
-          roadmapId: column.roadmapId,
-          type: postStatus.type,
-        }))
-        .orderBy(({ column }) => column.position, "asc"),
-    [organizationId]
-  );
-
-  const postsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ post: postCollection })
-        .join(
-          { postStatus: postStatusCollection },
-          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "inner"
-        )
-        .join(
-          { board: boardCollection },
-          ({ post, board }) => eq(post.boardId, board.id),
-          "inner"
-        )
-        .where(({ board, post, postStatus }) =>
-          and(
-            eq(post.organizationId, organizationId),
-            eq(postStatus.organizationId, organizationId),
-            eq(board.organizationId, organizationId)
-          )
-        )
-        .select(({ board, post, postStatus }) => ({
-          boardName: board.name,
-          boardSlug: board.slug,
-          id: post.id,
-          slug: post.slug,
-          status: postStatus.type,
-          statusId: post.statusId,
-          summary: post.excerpt,
-          title: post.title,
-          updatedAt: post.updatedAt,
-        }))
-        .orderBy(({ post }) => post.createdAt, "desc"),
-    [organizationId]
-  );
-
-  if (roadmapsQuery.isError || columnsQuery.isError || postsQuery.isError) {
+  if (isError) {
     throw new Error("Failed to load roadmap");
   }
 
-  if (
-    roadmapsQuery.isLoading ||
-    columnsQuery.isLoading ||
-    postsQuery.isLoading
-  ) {
+  if (isLoading) {
     return <RoadmapLoadingState />;
   }
-
-  const roadmaps = roadmapsQuery.data ?? [];
 
   if (roadmaps.length === 0) {
     return (
@@ -132,27 +57,11 @@ function RouteComponent() {
     );
   }
 
-  const columns = columnsQuery.data ?? [];
-  const posts = postsQuery.data ?? [];
-
-  const columnsByRoadmapId = new Map<string, typeof columns>();
-  for (const column of columns) {
-    const grouped = columnsByRoadmapId.get(column.roadmapId);
-    if (grouped) {
-      grouped.push(column);
-    } else {
-      columnsByRoadmapId.set(column.roadmapId, [column]);
-    }
-  }
-
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
       <RoadmapListHeader />
       {roadmaps.map((roadmap) => {
-        const lanes = groupRoadmapPostsByStatus(
-          posts,
-          columnsByRoadmapId.get(roadmap.id) ?? []
-        );
+        const lanes = lanesFor(roadmap.id);
 
         return (
           <section
