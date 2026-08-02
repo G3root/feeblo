@@ -48,6 +48,13 @@ type TCanRemoveMember = {
 type TCanUpdateMemberRole = {
   organizationId: string;
   memberId: string;
+  role: "owner" | "admin" | "member";
+};
+
+const ROLE_RANK: Record<"member" | "admin" | "owner", number> = {
+  member: 0,
+  admin: 1,
+  owner: 2,
 };
 
 const makeMembershipPolicy = Effect.gen(function* () {
@@ -133,12 +140,41 @@ const makeMembershipPolicy = Effect.gen(function* () {
       hasOtherOwners(args)
     );
 
+  const canManageRole = (args: TCanUpdateMemberRole) =>
+    Policy.policy((session) =>
+      Effect.gen(function* () {
+        const actor = Policy.getMembership(session, args.organizationId);
+        if (!actor) {
+          return false;
+        }
+
+        const target = yield* repository.findMemberById({
+          memberId: args.memberId,
+          organizationId: args.organizationId,
+        });
+        if (Option.isNone(target)) {
+          return false;
+        }
+
+        const actorRank = ROLE_RANK[actor.role];
+        const targetRank = ROLE_RANK[target.value.role];
+        const newRank = ROLE_RANK[args.role];
+
+        const canManageTarget =
+          actorRank === ROLE_RANK.owner || targetRank < actorRank;
+        const canAssignRole = newRank <= actorRank;
+
+        return canManageTarget && canAssignRole;
+      })
+    );
+
   const canUpdateMemberRole = (args: TCanUpdateMemberRole) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
       Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
       isMemberAlready(args),
-      hasOtherOwners(args)
+      hasOtherOwners(args),
+      canManageRole(args)
     );
 
   return {

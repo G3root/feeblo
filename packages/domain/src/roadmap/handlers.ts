@@ -3,6 +3,8 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
 import { RoadmapRepository } from "./repository";
 import { RoadmapRpcs } from "./rpcs";
 import type {
@@ -14,6 +16,7 @@ import type {
 
 export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* RoadmapRepository;
+  const sitePolicy = yield* SitePolicy;
   const manage = (organizationId: string) =>
     Policy.hasOrganizationOwnerOrAdmin(organizationId);
   return {
@@ -32,6 +35,9 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
             name: "RoadmapListPublic",
             level: "read",
           }),
+          Policy.withPublicPolicy(
+            sitePolicy.canViewRoadmap(args.organizationId)
+          ),
           withRemapDbErrors("Roadmap", "select")
         ),
     RoadmapCreate: (args: TRoadmapCreate) =>
@@ -60,4 +66,8 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
 
 export const RoadmapRpcHandlers = RoadmapRpcs.toLayer(
   RoadmapRpcHandlersEffect
-).pipe(Layer.provide(RoadmapRepository.layer));
+).pipe(
+  Layer.provide(SitePolicy.layer),
+  Layer.provide(SiteRepository.layer),
+  Layer.provide(RoadmapRepository.layer)
+);

@@ -21,10 +21,16 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
   // -- Shared effect helpers (no policy applied) --
 
-  const listSubscribersEffect = (args: TPostSubscriptionList) =>
+  const listSubscribersEffect = (
+    args: TPostSubscriptionList,
+    options?: { publicOnly?: boolean }
+  ) =>
     repository.findSubscribers({
       organizationId: args.organizationId,
       postId: args.postId,
+      ...(options?.publicOnly !== undefined
+        ? { publicOnly: options.publicOnly }
+        : {}),
     });
 
   const subscribeEffect = (args: TPostSubscriptionCreate) =>
@@ -64,7 +70,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     PostSubscriptionListPublic: (args: TPostSubscriptionList) =>
-      listSubscribersEffect(args).pipe(
+      listSubscribersEffect(args, { publicOnly: true }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostSubscriptionListPublic",
           level: "read",

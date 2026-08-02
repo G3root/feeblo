@@ -147,52 +147,92 @@ describe("ContactRpcHandlers", () => {
       })
     );
 
-    it.effect("rejects attributes from another organization when creating a contact", () =>
+    it.effect(
+      "rejects attributes from another organization when creating a contact",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* ContactRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const foreignOrganizationId = yield* WorkspaceId.generate;
+          const attributeId = yield* ContactAttributeDefinitionId.generate;
+          const now = new Date();
+
+          yield* db.insert(schema.organizationTable).values({
+            id: foreignOrganizationId,
+            name: "Foreign organization",
+            slug: foreignOrganizationId,
+            createdAt: now,
+          });
+          yield* db.insert(schema.contactAttributeDefinitionTable).values({
+            id: attributeId,
+            organizationId: foreignOrganizationId,
+            name: "Foreign field",
+            key: "foreignField",
+            type: "TEXT",
+            isRequired: false,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .ContactCreate({
+                organizationId: fixture.organizationId,
+                name: "Ada",
+                email: "ada@example.com",
+                attributeValues: [{ attributeId, value: "secret" }],
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(error._tag).toBe("PolicyDenied");
+
+          const contacts = yield* handlers
+            .ContactList({ organizationId: fixture.organizationId })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          expect(contacts).toHaveLength(0);
+        })
+    );
+
+    it.effect(
+      "rejects linking a contact to a user outside the organization",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ContactRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+
+          const error = yield* Effect.flip(
+            handlers
+              .ContactCreate({
+                organizationId: fixture.organizationId,
+                name: "Ada",
+                email: "ada@example.com",
+                userId: "some-user-from-another-org",
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(error._tag).toBe("PolicyDenied");
+        })
+    );
+
+    it.effect("allows linking a contact to an organization member", () =>
       Effect.gen(function* () {
-        const db = yield* currentDb;
         const handlers = yield* ContactRpcHandlersEffect;
         const fixture = yield* makeFixture();
-        const foreignOrganizationId = yield* WorkspaceId.generate;
-        const attributeId = yield* ContactAttributeDefinitionId.generate;
-        const now = new Date();
 
-        yield* db.insert(schema.organizationTable).values({
-          id: foreignOrganizationId,
-          name: "Foreign organization",
-          slug: foreignOrganizationId,
-          createdAt: now,
+        const created = yield* handlers
+          .ContactCreate({
+            organizationId: fixture.organizationId,
+            name: "Ada",
+            email: "ada@example.com",
+            userId: fixture.userId,
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        expect(created).toMatchObject({
+          name: "Ada",
+          userId: fixture.userId,
         });
-        yield* db.insert(schema.contactAttributeDefinitionTable).values({
-          id: attributeId,
-          organizationId: foreignOrganizationId,
-          name: "Foreign field",
-          key: "foreignField",
-          type: "TEXT",
-          isRequired: false,
-          createdAt: now,
-          updatedAt: now,
-        });
-
-        const error = yield* Effect.flip(
-          handlers
-            .ContactCreate({
-              organizationId: fixture.organizationId,
-              name: "Ada",
-              email: "ada@example.com",
-              attributeValues: [{ attributeId, value: "secret" }],
-            })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture))
-            )
-        );
-        expect(error._tag).toBe("PolicyDenied");
-
-        const contacts = yield* handlers
-          .ContactList({ organizationId: fixture.organizationId })
-          .pipe(
-            Effect.provideService(CurrentSession, makeSession(fixture))
-          );
-        expect(contacts).toHaveLength(0);
       })
     );
   });

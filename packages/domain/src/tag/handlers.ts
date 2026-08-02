@@ -118,7 +118,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     PostTagListPublic: (args: TPostTagList) =>
-      repository.findPostTags(args).pipe(
+      repository.findPostTags(args, { publicOnly: true }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "PostTagListPublic",
           level: "read",
@@ -135,7 +135,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     ChangelogTagListPublic: (args: TChangelogTagList) =>
-      repository.findChangelogTags(args).pipe(
+      repository.findChangelogTags(args, { publishedOnly: true }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "ChangelogTagListPublic",
           level: "read",

@@ -2,10 +2,9 @@ import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-
+import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
-import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
 import { ContactPolicy } from "./policies";
 import { ContactRepository } from "./repository";
@@ -61,7 +60,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           return contact;
         })
       ).pipe(
-        Policy.withPolicy(contactPolicy.canCreate(args.organizationId)),
+        Policy.withPolicy(contactPolicy.canCreate(args)),
         withRemapDbErrors("Contact", "create")
       ),
 

@@ -1,8 +1,11 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, exists } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import { PolicyDeniedError } from "../policy";
 import { toMutableRoadmapFilter } from "../roadmap/repository";
 import type { TRoadmapVisibility } from "../roadmap/schema";
 import type {
@@ -64,18 +67,36 @@ const makeRoadmapColumnRepository = Effect.gen(function* () {
             })
           )
         ),
-    create: ({
-      organizationId: _organizationId,
-      ...input
-    }: TRoadmapColumnCreate) =>
+    create: ({ organizationId, ...input }: TRoadmapColumnCreate) =>
       db
-        .insert(schema.roadmapColumnTable)
-        .values({ ...input, config: toMutableColumnConfig(input.config) })
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            const roadmap = yield* tx
+              .select({ id: schema.roadmapTable.id })
+              .from(schema.roadmapTable)
+              .where(
+                and(
+                  eq(schema.roadmapTable.id, input.roadmapId),
+                  eq(schema.roadmapTable.organizationId, organizationId)
+                )
+              )
+              .limit(1)
+              .pipe(Effect.map(EffectArray.get(0)));
+
+            if (Option.isNone(roadmap)) {
+              return yield* new PolicyDeniedError({
+                reason: "Roadmap does not belong to this organization",
+              });
+            }
+
+            yield* tx.insert(schema.roadmapColumnTable).values({
+              ...input,
+              config: toMutableColumnConfig(input.config),
+            });
+          })
+        )
         .pipe(Effect.asVoid),
-    update: ({
-      organizationId: _organizationId,
-      ...input
-    }: TRoadmapColumnUpdate) =>
+    update: ({ organizationId, ...input }: TRoadmapColumnUpdate) =>
       db
         .update(schema.roadmapColumnTable)
         .set({
@@ -87,21 +108,45 @@ const makeRoadmapColumnRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.roadmapColumnTable.id, input.id),
-            eq(schema.roadmapColumnTable.roadmapId, input.roadmapId)
+            eq(schema.roadmapColumnTable.roadmapId, input.roadmapId),
+            exists(
+              db
+                .select({ id: schema.roadmapTable.id })
+                .from(schema.roadmapTable)
+                .where(
+                  and(
+                    eq(
+                      schema.roadmapTable.id,
+                      schema.roadmapColumnTable.roadmapId
+                    ),
+                    eq(schema.roadmapTable.organizationId, organizationId)
+                  )
+                )
+            )
           )
         )
         .pipe(Effect.asVoid),
-    delete: ({
-      id,
-      roadmapId,
-      organizationId: _organizationId,
-    }: TRoadmapColumnDelete) =>
+    delete: ({ id, roadmapId, organizationId }: TRoadmapColumnDelete) =>
       db
         .delete(schema.roadmapColumnTable)
         .where(
           and(
             eq(schema.roadmapColumnTable.id, id),
-            eq(schema.roadmapColumnTable.roadmapId, roadmapId)
+            eq(schema.roadmapColumnTable.roadmapId, roadmapId),
+            exists(
+              db
+                .select({ id: schema.roadmapTable.id })
+                .from(schema.roadmapTable)
+                .where(
+                  and(
+                    eq(
+                      schema.roadmapTable.id,
+                      schema.roadmapColumnTable.roadmapId
+                    ),
+                    eq(schema.roadmapTable.organizationId, organizationId)
+                  )
+                )
+            )
           )
         )
         .pipe(Effect.asVoid),

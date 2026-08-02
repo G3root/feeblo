@@ -41,10 +41,24 @@ const makeSitePolicy = Effect.gen(function* () {
       }
     });
 
+  const canViewRoadmap = (organizationId: string) =>
+    Effect.gen(function* () {
+      const site = yield* siteRepository.findByOrganizationId({
+        organizationId,
+      });
+
+      if (Option.isNone(site) || site.value.roadmapVisibility !== "PUBLIC") {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Roadmap is not publicly visible.",
+        });
+      }
+    });
+
   return {
     canManageSite,
     canHidePoweredByBranding,
     canViewChangelog,
+    canViewRoadmap,
   };
 });
 

@@ -1,9 +1,9 @@
 import { currentDb, schema } from "@feeblo/db";
 import { PostSubscriptionId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as EffectArray from "effect/Array";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -28,6 +28,8 @@ interface TIsSubscribed {
 interface TFindSubscribers {
   organizationId: string;
   postId: string;
+  /** Restricts the list to subscriptions on public boards (used by public endpoints). */
+  publicOnly?: boolean;
 }
 
 const makePostSubscriptionRepository = Effect.gen(function* () {
@@ -85,7 +87,11 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map(EffectArray.get(0)), Effect.map(Option.isSome)),
 
-    findSubscribers: ({ organizationId, postId }: TFindSubscribers) =>
+    findSubscribers: ({
+      organizationId,
+      postId,
+      publicOnly = false,
+    }: TFindSubscribers) =>
       db
         .select({
           id: schema.postSubscriptionTable.id,
@@ -97,10 +103,19 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
           updatedAt: schema.postSubscriptionTable.updatedAt,
         })
         .from(schema.postSubscriptionTable)
+        .innerJoin(
+          schema.postTable,
+          eq(schema.postTable.id, schema.postSubscriptionTable.postId)
+        )
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
         .where(
           and(
             eq(schema.postSubscriptionTable.organizationId, organizationId),
-            eq(schema.postSubscriptionTable.postId, postId)
+            eq(schema.postSubscriptionTable.postId, postId),
+            ...(publicOnly ? [eq(schema.boardTable.visibility, "PUBLIC")] : [])
           )
         ),
   };

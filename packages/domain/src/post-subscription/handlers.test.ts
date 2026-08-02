@@ -10,7 +10,7 @@ import { PostSubscriptionRpcHandlersEffect } from "./handlers";
 import { PostSubscriptionRepository } from "./repository";
 
 describe("PostSubscriptionRpcHandlers", () => {
-  type Fixture = { membershipId: string; organizationId: LegidOf<"WorkspaceId">; postId: LegidOf<"PostId">; userId: string };
+  type Fixture = { membershipId: string; organizationId: LegidOf<"WorkspaceId">; postId: LegidOf<"PostId">; statusId: LegidOf<"PostStatusId">; userId: string };
   const session = (f: Fixture, member = true): Session => ({ user: { id: f.userId, email: "user@example.com", name: "User", restrictedToOrganizationId: null }, session: { userId: f.userId, token: "token" }, organizations: [{ id: f.organizationId }], memberships: member ? [{ membershipId: f.membershipId, organizationId: f.organizationId, role: "owner" }] : [] });
   const fixture = (visibility: "PUBLIC" | "PRIVATE" = "PUBLIC") => Effect.gen(function* () {
     const db = yield* currentDb; const organizationId = yield* WorkspaceId.generate; const boardId = yield* BoardId.generate; const postId = yield* PostId.generate; const statusId = yield* PostStatusId.generate; const userId = `user_${organizationId}`; const membershipId = `member_${organizationId}`; const now = new Date();
@@ -20,7 +20,7 @@ describe("PostSubscriptionRpcHandlers", () => {
     yield* db.insert(schema.boardTable).values({ id: boardId, name: "Board", slug: boardId, visibility, organizationId, creatorId: userId, creatorMemberId: membershipId, createdAt: now, updatedAt: now });
     yield* db.insert(schema.postStatusTable).values({ id: statusId, type: "PENDING", orderIndex: 0, organizationId });
     yield* db.insert(schema.postTable).values({ id: postId, title: "Post", content: "Content", slug: postId, excerpt: "Content", boardId, organizationId, statusId, creatorId: userId, creatorMemberId: membershipId, createdAt: now, updatedAt: now });
-    return { membershipId, organizationId, postId, userId } satisfies Fixture;
+    return { membershipId, organizationId, postId, statusId, userId } satisfies Fixture;
   });
   const Repositories = Layer.mergeAll(PostRepository.layer, PostSubscriptionRepository.layer).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
@@ -42,6 +42,11 @@ describe("PostSubscriptionRpcHandlers", () => {
       const handlers = yield* PostSubscriptionRpcHandlersEffect; const f = yield* fixture("PUBLIC"); const input = { organizationId: f.organizationId, postId: f.postId };
       expect(yield* handlers.PostSubscriptionCreatePublic(input).pipe(Effect.provideService(CurrentSession, session(f, false)))).toEqual({ subscribed: true });
       expect(yield* handlers.PostSubscriptionListPublic(input)).toMatchObject([{ userId: f.userId, memberId: null }]);
+    }));
+    it.effect("hides subscribers of private board posts from the public endpoint", () => Effect.gen(function* () {
+      const handlers = yield* PostSubscriptionRpcHandlersEffect; const f = yield* fixture("PRIVATE"); const input = { organizationId: f.organizationId, postId: f.postId };
+      yield* handlers.PostSubscriptionCreate(input).pipe(Effect.provideService(CurrentSession, session(f)));
+      expect(yield* handlers.PostSubscriptionListPublic(input)).toHaveLength(0);
     }));
   });
 });

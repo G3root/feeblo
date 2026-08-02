@@ -130,7 +130,10 @@ const makeTagRepository = Effect.gen(function* () {
         )
         .pipe(Effect.asVoid),
 
-    findPostTags: ({ organizationId }: TPostTagList) =>
+    findPostTags: (
+      { organizationId }: TPostTagList,
+      options?: { publicOnly?: boolean }
+    ) =>
       db
         .select({
           id: schema.postTagTable.id,
@@ -141,9 +144,27 @@ const makeTagRepository = Effect.gen(function* () {
           updatedAt: schema.postTagTable.updatedAt,
         })
         .from(schema.postTagTable)
-        .where(eq(schema.postTagTable.organizationId, organizationId)),
+        .innerJoin(
+          schema.postTable,
+          eq(schema.postTable.id, schema.postTagTable.postId)
+        )
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .where(
+          and(
+            eq(schema.postTagTable.organizationId, organizationId),
+            ...(options?.publicOnly
+              ? [eq(schema.boardTable.visibility, "PUBLIC")]
+              : [])
+          )
+        ),
 
-    findChangelogTags: ({ organizationId }: TChangelogTagList) =>
+    findChangelogTags: (
+      { organizationId }: TChangelogTagList,
+      options?: { publishedOnly?: boolean }
+    ) =>
       db
         .select({
           id: schema.changelogTagTable.id,
@@ -154,7 +175,18 @@ const makeTagRepository = Effect.gen(function* () {
           updatedAt: schema.changelogTagTable.updatedAt,
         })
         .from(schema.changelogTagTable)
-        .where(eq(schema.changelogTagTable.organizationId, organizationId)),
+        .innerJoin(
+          schema.changelogTable,
+          eq(schema.changelogTable.id, schema.changelogTagTable.changelogId)
+        )
+        .where(
+          and(
+            eq(schema.changelogTagTable.organizationId, organizationId),
+            ...(options?.publishedOnly
+              ? [eq(schema.changelogTable.status, "published")]
+              : [])
+          )
+        ),
 
     setPostTags: ({ postId, organizationId, tagIds }: TPostTagSet) =>
       db

@@ -1,6 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { BoardId, type LegidOf, PostId, PostStatusId, TagId, WorkspaceId } from "@feeblo/id";
+import { BoardId, ChangelogId, type LegidOf, PostId, PostStatusId, TagId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -9,7 +9,7 @@ import { TagPolicy } from "./policies";
 import { TagRepository } from "./repository";
 
 describe("TagRpcHandlers", () => {
-  type Fixture = { membershipId: string; organizationId: LegidOf<"WorkspaceId">; postId: LegidOf<"PostId">; userId: string };
+  type Fixture = { membershipId: string; organizationId: LegidOf<"WorkspaceId">; postId: LegidOf<"PostId">; statusId: LegidOf<"PostStatusId">; userId: string };
   const session = (f: Fixture, member = true): Session => ({ user: { id: f.userId, email: "user@example.com", name: "User", restrictedToOrganizationId: null }, session: { userId: f.userId, token: "token" }, organizations: [{ id: f.organizationId }], memberships: member ? [{ membershipId: f.membershipId, organizationId: f.organizationId, role: "owner" }] : [] });
   const fixture = () => Effect.gen(function* () {
     const db = yield* currentDb; const organizationId = yield* WorkspaceId.generate; const boardId = yield* BoardId.generate; const postId = yield* PostId.generate; const statusId = yield* PostStatusId.generate; const userId = `user_${organizationId}`; const membershipId = `member_${organizationId}`; const now = new Date();
@@ -19,7 +19,7 @@ describe("TagRpcHandlers", () => {
     yield* db.insert(schema.boardTable).values({ id: boardId, name: "Board", slug: boardId, visibility: "PUBLIC", organizationId, creatorId: userId, creatorMemberId: membershipId, createdAt: now, updatedAt: now });
     yield* db.insert(schema.postStatusTable).values({ id: statusId, type: "PENDING", orderIndex: 0, organizationId });
     yield* db.insert(schema.postTable).values({ id: postId, title: "Post", content: "Content", slug: postId, excerpt: "Content", boardId, organizationId, statusId, creatorId: userId, creatorMemberId: membershipId, createdAt: now, updatedAt: now });
-    return { membershipId, organizationId, postId, userId } satisfies Fixture;
+    return { membershipId, organizationId, postId, statusId, userId } satisfies Fixture;
   });
   const Repositories = TagRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = TagPolicy.layer.pipe(Layer.provideMerge(Repositories));
@@ -43,6 +43,23 @@ describe("TagRpcHandlers", () => {
       yield* handlers.TagCreate({ id: tagId, name: "Feature", type: "FEEDBACK", organizationId: f.organizationId }).pipe(Effect.provideService(CurrentSession, session(f)));
       yield* handlers.PostTagSet({ organizationId: f.organizationId, postId: f.postId, tagIds: [tagId, tagId] }).pipe(Effect.provideService(CurrentSession, session(f)));
       expect(yield* handlers.PostTagList({ organizationId: f.organizationId }).pipe(Effect.provideService(CurrentSession, session(f)))).toMatchObject([{ postId: f.postId, tagId }]);
+    }));
+    it.effect("hides post tags on private boards from the public endpoint", () => Effect.gen(function* () {
+      const db = yield* currentDb; const handlers = yield* TagRpcHandlersEffect; const f = yield* fixture(); const tagId = yield* TagId.generate; const privateBoardId = yield* BoardId.generate; const privatePostId = yield* PostId.generate;
+      yield* handlers.TagCreate({ id: tagId, name: "Feature", type: "FEEDBACK", organizationId: f.organizationId }).pipe(Effect.provideService(CurrentSession, session(f)));
+      yield* db.insert(schema.boardTable).values({ id: privateBoardId, name: "Private", slug: privateBoardId, visibility: "PRIVATE", organizationId: f.organizationId, creatorId: f.userId, creatorMemberId: f.membershipId, createdAt: new Date(), updatedAt: new Date() });
+      yield* db.insert(schema.postTable).values({ id: privatePostId, title: "Private post", content: "Content", slug: privatePostId, excerpt: "Content", boardId: privateBoardId, organizationId: f.organizationId, statusId: f.statusId, creatorId: f.userId, creatorMemberId: f.membershipId, createdAt: new Date(), updatedAt: new Date() });
+      yield* handlers.PostTagSet({ organizationId: f.organizationId, postId: privatePostId, tagIds: [tagId] }).pipe(Effect.provideService(CurrentSession, session(f)));
+      expect(yield* handlers.PostTagListPublic({ organizationId: f.organizationId })).toHaveLength(0);
+      expect(yield* handlers.PostTagList({ organizationId: f.organizationId }).pipe(Effect.provideService(CurrentSession, session(f)))).toHaveLength(1);
+    }));
+    it.effect("hides changelog tags on unpublished changelogs from the public endpoint", () => Effect.gen(function* () {
+      const db = yield* currentDb; const handlers = yield* TagRpcHandlersEffect; const f = yield* fixture(); const tagId = yield* TagId.generate; const changelogId = yield* ChangelogId.generate;
+      yield* handlers.TagCreate({ id: tagId, name: "Ship", type: "CHANGELOG", organizationId: f.organizationId }).pipe(Effect.provideService(CurrentSession, session(f)));
+      yield* db.insert(schema.changelogTable).values({ id: changelogId, title: "Draft", slug: changelogId, content: "Content", status: "draft", organizationId: f.organizationId, creatorId: f.userId, creatorMemberId: f.membershipId, createdAt: new Date(), updatedAt: new Date() });
+      yield* handlers.ChangelogTagSet({ organizationId: f.organizationId, changelogId, tagIds: [tagId] }).pipe(Effect.provideService(CurrentSession, session(f)));
+      expect(yield* handlers.ChangelogTagListPublic({ organizationId: f.organizationId })).toHaveLength(0);
+      expect(yield* handlers.ChangelogTagList({ organizationId: f.organizationId }).pipe(Effect.provideService(CurrentSession, session(f)))).toHaveLength(1);
     }));
   });
 });
