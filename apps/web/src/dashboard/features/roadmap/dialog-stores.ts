@@ -20,3 +20,15 @@ export const [EditRoadmapDialogProvider, useEditRoadmapDialogContext] =
     hookName: "useEditRoadmapDialogContext",
     providerName: "EditRoadmapDialogProvider",
   });
+
+export const [
+  ToggleRoadmapVisibilityDialogProvider,
+  useToggleRoadmapVisibilityDialogContext,
+] = createModalStoreContext<{
+  roadmapId: string;
+  currentVisibility: "public" | "private";
+}>({
+  name: "ToggleRoadmapVisibilityDialogContext",
+  hookName: "useToggleRoadmapVisibilityDialogContext",
+  providerName: "ToggleRoadmapVisibilityDialogProvider",
+});

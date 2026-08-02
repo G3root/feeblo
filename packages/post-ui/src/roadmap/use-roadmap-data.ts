@@ -39,6 +39,7 @@ type RoadmapRowLike = Pick<
   | "name"
   | "organizationId"
   | "slug"
+  | "visibility"
 >;
 
 type RoadmapColumnRowLike = Pick<
@@ -86,6 +87,7 @@ export type RoadmapSummary = {
   id: string;
   name: string;
   slug: string;
+  visibility: "public" | "private";
 };
 
 export type UseRoadmapDataResult = {
@@ -127,18 +129,22 @@ export function useRoadmapData<
 
       return q
         .from({ roadmap: roadmapCollection })
-        .where(({ roadmap }) =>
-          and(
+        .where(({ roadmap }) => {
+          const statusRoadmap = and(
             eq(roadmap.organizationId, organizationId),
-            eq(roadmap.mode, "status"),
-            slug === undefined ? undefined : eq(roadmap.slug, slug)
-          )
-        )
+            eq(roadmap.mode, "status")
+          );
+
+          return slug === undefined
+            ? statusRoadmap
+            : and(statusRoadmap, eq(roadmap.slug, slug));
+        })
         .select(({ roadmap }) => ({
           description: roadmap.description,
           id: roadmap.id,
           name: roadmap.name,
           slug: roadmap.slug,
+          visibility: roadmap.visibility,
         }))
         .orderBy(({ roadmap }) => roadmap.createdAt, "asc");
     },
@@ -164,6 +170,7 @@ export function useRoadmapData<
           id: roadmap.id,
           name: roadmap.name,
           slug: roadmap.slug,
+          visibility: roadmap.visibility,
         }))
         .orderBy(({ roadmap }) => roadmap.createdAt, "asc");
     },

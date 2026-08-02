@@ -24,6 +24,15 @@ type TCanAssignPrivilegedRole = {
   organizationId: string;
 };
 
+type TCanCreateRoadmap = {
+  organizationId: string;
+  visibility: "public" | "private";
+};
+
+type TCanUpdateRoadmapVisibility = {
+  organizationId: string;
+};
+
 const makeEntitlementPolicy = Effect.gen(function* () {
   const workspaceRepository = yield* WorkspaceRepository;
 
@@ -82,6 +91,29 @@ const makeEntitlementPolicy = Effect.gen(function* () {
   const canUpdateBoardVisibility = (args: TCanUpdateBoardVisibility) =>
     canUsePrivateBoards(args.organizationId);
 
+  const canUsePrivateRoadmaps = (organizationId: string) =>
+    Effect.gen(function* () {
+      const { entitlements } = yield* findEntitlements(organizationId);
+
+      if (!entitlements.capabilities.privateRoadmaps) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Private roadmaps require the Starter plan or higher.",
+        });
+      }
+    });
+
+  const canCreateRoadmap = (args: TCanCreateRoadmap) =>
+    Effect.gen(function* () {
+      if (args.visibility !== "private") {
+        return;
+      }
+
+      yield* canUsePrivateRoadmaps(args.organizationId);
+    });
+
+  const canUpdateRoadmapVisibility = (args: TCanUpdateRoadmapVisibility) =>
+    canUsePrivateRoadmaps(args.organizationId);
+
   const canHidePoweredByBranding = (args: TCanHidePoweredByBranding) =>
     Effect.gen(function* () {
       if (!args.hidePoweredBy) {
@@ -127,6 +159,8 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canUpdateBoardVisibility,
     canHidePoweredByBranding,
     canAssignPrivilegedRole,
+    canCreateRoadmap,
+    canUpdateRoadmapVisibility,
   };
 });
 

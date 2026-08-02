@@ -7,6 +7,7 @@ export type CapabilityFeatureKey =
   | "unlimitedEndUsers"
   | "unlimitedPosts"
   | "privateBoards"
+  | "privateRoadmaps"
   | "removeBranding";
 export type PlanFeatureKey = LimitFeatureKey | CapabilityFeatureKey;
 
@@ -52,6 +53,7 @@ export const PLAN_FEATURE_CATALOG = {
   },
   unlimitedPosts: { kind: "capability", label: "Unlimited Posts" },
   privateBoards: { kind: "capability", label: "Private Boards" },
+  privateRoadmaps: { kind: "capability", label: "Private Roadmaps" },
   removeBranding: {
     kind: "capability",
     label: "Remove Feeblo Branding",
@@ -76,6 +78,7 @@ const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
   "unlimitedEndUsers",
   "unlimitedPosts",
   "privateBoards",
+  "privateRoadmaps",
   "removeBranding",
 ] as const);
 
@@ -91,6 +94,7 @@ export const PLAN_ENTITLEMENTS = {
       unlimitedEndUsers: true,
       unlimitedPosts: true,
       privateBoards: false,
+      privateRoadmaps: false,
       removeBranding: false,
     },
   },
@@ -105,6 +109,7 @@ export const PLAN_ENTITLEMENTS = {
       unlimitedEndUsers: true,
       unlimitedPosts: true,
       privateBoards: true,
+      privateRoadmaps: true,
       removeBranding: true,
     },
   },
@@ -119,6 +124,7 @@ export const PLAN_ENTITLEMENTS = {
       unlimitedEndUsers: true,
       unlimitedPosts: true,
       privateBoards: true,
+      privateRoadmaps: true,
       removeBranding: true,
     },
   },

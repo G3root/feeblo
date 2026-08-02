@@ -1,7 +1,15 @@
 import { useRoadmapData } from "@feeblo/post-ui/roadmap/use-roadmap-data";
 import { Button } from "@feeblo/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@feeblo/ui/empty";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
-import { Plus } from "@hugeicons/core-free-icons";
+import { LayoutThreeColumnIcon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
@@ -53,7 +61,10 @@ function RouteComponent() {
 
   if (roadmaps.length === 0) {
     return (
-      <RoadmapEmptyState message="This workspace does not have a roadmap yet." />
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
+        <RoadmapListHeader />
+        <RoadmapEmptyState />
+      </div>
     );
   }
 
@@ -79,7 +90,7 @@ function RouteComponent() {
             {lanes.length > 0 ? (
               <RoadmapBoard lanes={lanes} organizationId={organizationId} />
             ) : (
-              <RoadmapEmptyState message="This roadmap has no columns configured." />
+              <RoadmapEmptyMessage message="This roadmap has no columns configured." />
             )}
           </section>
         );
@@ -118,10 +129,41 @@ function RoadmapLoadingState() {
   );
 }
 
-function RoadmapEmptyState({ message }: { message: string }) {
+function RoadmapEmptyState() {
+  const organizationId = useOrganizationId();
+  const createStore = useCreateRoadmapDialogContext();
+  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
+
   return (
-    <div className="flex min-h-64 flex-1 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
-      {message}
-    </div>
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HugeiconsIcon icon={LayoutThreeColumnIcon} />
+        </EmptyMedia>
+        <EmptyTitle>No roadmaps yet</EmptyTitle>
+        <EmptyDescription>
+          Create a roadmap to visualize how feedback moves from idea to shipped.
+        </EmptyDescription>
+      </EmptyHeader>
+      {canManage ? (
+        <EmptyContent>
+          <Button onClick={() => createStore.send({ type: "toggle" })}>
+            <HugeiconsIcon icon={Plus} />
+            Create roadmap
+          </Button>
+        </EmptyContent>
+      ) : null}
+    </Empty>
+  );
+}
+
+function RoadmapEmptyMessage({ message }: { message: string }) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyTitle>Nothing here yet</EmptyTitle>
+        <EmptyDescription>{message}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

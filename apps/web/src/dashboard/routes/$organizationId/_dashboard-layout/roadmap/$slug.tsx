@@ -1,7 +1,13 @@
 import { useRoadmapData } from "@feeblo/post-ui/roadmap/use-roadmap-data";
 import { Button } from "@feeblo/ui/button";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
-import { Delete02Icon, Edit01Icon, Plus } from "@hugeicons/core-free-icons";
+import {
+  CircleLockIcon,
+  CircleUnlockIcon,
+  Delete02Icon,
+  Edit01Icon,
+  Plus,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
@@ -9,6 +15,7 @@ import {
   useCreateRoadmapDialogContext,
   useDeleteRoadmapDialogContext,
   useEditRoadmapDialogContext,
+  useToggleRoadmapVisibilityDialogContext,
 } from "~/features/roadmap/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
@@ -78,7 +85,10 @@ function RouteComponent() {
               </p>
             ) : null}
           </div>
-          <RoadmapDetailActions roadmapId={roadmap.id} />
+          <RoadmapDetailActions
+            roadmapId={roadmap.id}
+            visibility={roadmap.visibility}
+          />
         </header>
         {lanes.length > 0 ? (
           <RoadmapBoard lanes={lanes} organizationId={organizationId} />
@@ -90,12 +100,21 @@ function RouteComponent() {
   );
 }
 
-function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
+function RoadmapDetailActions({
+  roadmapId,
+  visibility,
+}: {
+  roadmapId: string;
+  visibility: "public" | "private";
+}) {
   const organizationId = useOrganizationId();
   const createStore = useCreateRoadmapDialogContext();
   const deleteStore = useDeleteRoadmapDialogContext();
   const editStore = useEditRoadmapDialogContext();
+  const visibilityStore = useToggleRoadmapVisibilityDialogContext();
   const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
+
+  const isPrivate = visibility === "private";
 
   const handleDeleteClick = () => {
     deleteStore.send({ type: "toggle", data: { roadmapId } });
@@ -103,6 +122,13 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
 
   const handleEditClick = () => {
     editStore.send({ type: "toggle", data: { roadmapId } });
+  };
+
+  const handleVisibilityClick = () => {
+    visibilityStore.send({
+      type: "toggle",
+      data: { roadmapId, currentVisibility: visibility },
+    });
   };
 
   if (!canManage) {
@@ -118,6 +144,15 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
       >
         <HugeiconsIcon icon={Plus} />
         New Roadmap
+      </Button>
+      <Button
+        aria-label={isPrivate ? "Make roadmap public" : "Make roadmap private"}
+        onClick={handleVisibilityClick}
+        size="sm"
+        variant="outline"
+      >
+        <HugeiconsIcon icon={isPrivate ? CircleUnlockIcon : CircleLockIcon} />
+        {isPrivate ? "Private" : "Public"}
       </Button>
       <Button
         aria-label="Edit roadmap"

@@ -9,6 +9,7 @@ import {
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -20,6 +21,58 @@ export function DeleteRoadmapDialog() {
   const open = useSelector(store, (state) => state.context.open);
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
+
+  const { data: roadmaps } = useLiveQuery(
+    (q) =>
+      q
+        .from({ roadmap: roadmapCollection })
+        .where(({ roadmap }) => eq(roadmap.organizationId, organizationId))
+        .orderBy(({ roadmap }) => roadmap.createdAt, "asc"),
+    [organizationId]
+  );
+
+  const handleDelete = async () => {
+    try {
+      const id = store.get().context.data.roadmapId;
+      const deletedRoadmap = roadmapCollection.get(id);
+
+      const tx = roadmapCollection.delete(id);
+      await tx.isPersisted.promise;
+
+      if (deletedRoadmap?.isPrimary) {
+        const nextRoadmap = (roadmaps ?? []).find(
+          (roadmap) => roadmap.id !== id
+        );
+
+        if (nextRoadmap) {
+          const primaryTx = roadmapCollection.update(
+            nextRoadmap.id,
+            (draft) => {
+              draft.isPrimary = true;
+              draft.updatedAt = new Date();
+            }
+          );
+          await primaryTx.isPersisted.promise;
+        }
+      }
+
+      store.send({ type: "toggle" });
+      toastManager.add({
+        title: "Roadmap deleted successfully",
+        type: "success",
+      });
+
+      await navigate({
+        to: "/$organizationId/roadmap",
+        params: { organizationId },
+      });
+    } catch (_error) {
+      toastManager.add({
+        title: "Failed to delete roadmap",
+        type: "error",
+      });
+    }
+  };
 
   return (
     <AlertDialog
@@ -36,32 +89,7 @@ export function DeleteRoadmapDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <Button
-            onClick={async () => {
-              try {
-                const id = store.get().context.data.roadmapId;
-
-                const tx = roadmapCollection.delete(id);
-                await tx.isPersisted.promise;
-                store.send({ type: "toggle" });
-                toastManager.add({
-                  title: "Roadmap deleted successfully",
-                  type: "success",
-                });
-
-                await navigate({
-                  to: "/$organizationId/roadmap",
-                  params: { organizationId },
-                });
-              } catch (_error) {
-                toastManager.add({
-                  title: "Failed to delete roadmap",
-                  type: "error",
-                });
-              }
-            }}
-            variant="destructive"
-          >
+          <Button onClick={handleDelete} variant="destructive">
             Continue
           </Button>
         </AlertDialogFooter>
