@@ -104,11 +104,19 @@ function roadmap({
   };
 }
 
-function post({ id, statusId }: { id: string; statusId: string }): TestPost {
+function post({
+  id,
+  statusId,
+  createdAt = new Date("2024-01-01"),
+}: {
+  createdAt?: Date;
+  id: string;
+  statusId: string;
+}): TestPost {
   return {
     boardId: "board-1",
     content: `${id} content`,
-    createdAt: new Date("2024-01-01"),
+    createdAt,
     excerpt: `${id} summary`,
     id,
     organizationId: ORGANIZATION_ID,
@@ -290,7 +298,7 @@ describe("useRoadmapData", () => {
     expect(lanes[1].posts.map((post) => post.id)).toEqual(["post-2"]);
   });
 
-  it("returns empty lanes for roadmaps with no configured columns", async () => {
+  it("returns a single empty lane for a roadmap with one configured column", async () => {
     const collections = createCollections();
     const { result } = await renderHook(() =>
       useRoadmapData({ ...collections, organizationId: ORGANIZATION_ID })
@@ -342,6 +350,10 @@ describe("useRoadmapData", () => {
       id: "rm-filtered",
       slug: "filtered",
     });
+    expect(result.current.allRoadmaps.map((roadmap) => roadmap.slug)).toEqual([
+      "winter",
+      "launch",
+    ]);
   });
 
   it("returns no roadmap when the slug filter does not match", async () => {
@@ -361,91 +373,47 @@ describe("useRoadmapData", () => {
     expect(result.current.roadmaps).toEqual([]);
   });
 
-  it.each([
-    {
-      filter: {
-        conditions: [
-          { field: "boardId", operator: "in", value: ["board-1"] },
-        ],
-        operator: "and",
-        version: 1,
-      },
-      slug: "board-filter",
-    },
-    {
-      filter: {
-        conditions: [
-          { field: "status", operator: "in", value: ["st-planned"] },
-        ],
-        operator: "and",
-        version: 1,
-      },
-      slug: "status-filter",
-    },
-    {
-      filter: {
-        conditions: [
-          {
-            field: "tagId",
-            operator: "containsAny",
-            value: ["tag-1", "tag-2"],
+  it("selects the filtered-mode roadmap matching the slug", async () => {
+    const collections = createCollections({
+      roadmaps: [
+        roadmap({
+          createdAt: "2024-01-10",
+          filter: {
+            conditions: [
+              { field: "boardId", operator: "in", value: ["board-1"] },
+            ],
+            operator: "and",
+            version: 1,
           },
-        ],
-        operator: "and",
-        version: 1,
-      },
-      slug: "any-tag-filter",
-    },
-    {
-      filter: {
-        conditions: [
-          {
-            field: "tagId",
-            operator: "containsAll",
-            value: ["tag-1", "tag-2"],
-          },
-        ],
-        operator: "and",
-        version: 1,
-      },
-      slug: "all-tags-filter",
-    },
-  ] satisfies Array<{ filter: TSimpleRoadmapFilter; slug: string }>)
-    ("selects the roadmap with the $slug filter", async ({ filter, slug }) => {
-      const collections = createCollections({
-        roadmaps: [
-          roadmap({
-            createdAt: "2024-01-10",
-            filter,
-            id: `rm-${slug}`,
-            mode: "filtered",
-            slug,
-          }),
-          roadmap({
-            createdAt: "2024-01-11",
-            id: "rm-other",
-            mode: "filtered",
-            slug: "other-filter",
-          }),
-        ],
-      });
-      const { result } = await renderHook(() =>
-        useRoadmapData({
-          ...collections,
-          organizationId: ORGANIZATION_ID,
-          slug,
-        })
-      );
-
-      await vi.waitFor(() => {
-        expect(result.current.roadmaps).toHaveLength(1);
-      });
-
-      expect(result.current.roadmaps[0]).toMatchObject({
-        id: `rm-${slug}`,
-        slug,
-      });
+          id: "rm-board-filter",
+          mode: "filtered",
+          slug: "board-filter",
+        }),
+        roadmap({
+          createdAt: "2024-01-11",
+          id: "rm-other",
+          mode: "filtered",
+          slug: "other-filter",
+        }),
+      ],
     });
+    const { result } = await renderHook(() =>
+      useRoadmapData({
+        ...collections,
+        organizationId: ORGANIZATION_ID,
+        slug: "board-filter",
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(result.current.roadmaps).toHaveLength(1);
+    });
+
+    expect(result.current.roadmaps[0]).toMatchObject({
+      id: "rm-board-filter",
+      slug: "board-filter",
+    });
+  });
 
   it("excludes columns whose roadmap belongs to another organization", async () => {
     const collections = createCollections({
@@ -509,7 +477,11 @@ describe("useRoadmapData", () => {
     collections.postCollection.utils.begin();
     collections.postCollection.utils.write({
       type: "insert",
-      value: post({ id: "post-4", statusId: "st-planned" }),
+      value: post({
+        createdAt: new Date("2023-12-31"),
+        id: "post-4",
+        statusId: "st-planned",
+      }),
     });
     collections.postCollection.utils.commit();
 

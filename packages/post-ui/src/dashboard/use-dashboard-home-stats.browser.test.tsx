@@ -174,22 +174,19 @@ describe("useDashboardHomeStats", () => {
     ]);
   });
 
-  it("counts upvotes per post within the organization", async () => {
+  it("counts upvotes only for the recent posts within the organization", async () => {
     const collections = createCollections();
     const { result } = await renderHook(() =>
       useDashboardHomeStats({ ...collections, organizationId: ORGANIZATION_ID })
     );
 
     await vi.waitFor(() => {
-      expect(result.current.upvoteCounts).toHaveLength(2);
+      expect(result.current.upvoteCounts).toHaveLength(1);
     });
 
-    expect(result.current.upvoteCounts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ count: 2, postId: "post-1" }),
-        expect.objectContaining({ count: 1, postId: "post-2" }),
-      ])
-    );
+    expect(result.current.upvoteCounts).toEqual([
+      expect.objectContaining({ count: 1, postId: "post-2" }),
+    ]);
   });
 
   it("updates reactively when a post is inserted", async () => {

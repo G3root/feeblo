@@ -42,9 +42,33 @@ export function createMockCollection<T extends object>({
   };
 
   const utils = {
-    begin: () => begin?.(),
-    write: ((value) => write?.(value)) as WriteOp<T>,
-    commit: () => commit?.(),
+    begin: () => {
+      const handle = begin;
+      if (!handle) {
+        throw new Error(
+          "In-memory collection sync has not been initialized; cannot begin a transaction."
+        );
+      }
+      handle();
+    },
+    write: ((value) => {
+      const handle = write;
+      if (!handle) {
+        throw new Error(
+          "In-memory collection sync has not been initialized; cannot write."
+        );
+      }
+      return handle(value);
+    }) as WriteOp<T>,
+    commit: () => {
+      const handle = commit;
+      if (!handle) {
+        throw new Error(
+          "In-memory collection sync has not been initialized; cannot commit a transaction."
+        );
+      }
+      handle();
+    },
   };
 
   return createCollection<T, string, typeof utils>({

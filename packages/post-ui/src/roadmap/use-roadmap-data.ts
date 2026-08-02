@@ -5,7 +5,12 @@ import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
 import type { TStatusRoadmapColumn } from "@feeblo/domain/roadmap-column/schema";
 import type { Collection, UtilsRecord } from "@tanstack/db";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import type { RoadmapBoardPost, RoadmapLane, RoadmapStatus } from "./types";
+import { useCallback, useMemo } from "react";
+import type {
+  RoadmapBoardPost,
+  RoadmapColumnDefinition,
+  RoadmapLane,
+} from "./types";
 import { groupRoadmapPostsByStatus } from "./utils";
 
 type BoardRowLike = Pick<TBoard, "id" | "name" | "organizationId" | "slug">;
@@ -76,20 +81,16 @@ export type UseRoadmapDataOptions<
   slug?: string;
 };
 
-export type RoadmapColumnDefinition = {
+export type RoadmapSummary = {
+  description: string | null;
   id: string;
   name: string;
-  roadmapId: string;
-  type: RoadmapStatus;
+  slug: string;
 };
 
 export type UseRoadmapDataResult = {
-  roadmaps: Array<{
-    description: string | null;
-    id: string;
-    name: string;
-    slug: string;
-  }>;
+  roadmaps: RoadmapSummary[];
+  allRoadmaps: RoadmapSummary[];
   columns: RoadmapColumnDefinition[];
   posts: RoadmapBoardPost[];
   isError: boolean;
@@ -145,6 +146,31 @@ export function useRoadmapData<
     [organizationId, slug]
   );
 
+  const allRoadmapsQuery = useLiveQuery(
+    (q) => {
+      if (!organizationId || slug === undefined) {
+        return undefined;
+      }
+
+      return q
+        .from({ roadmap: roadmapCollection })
+        .where(({ roadmap }) =>
+          and(
+            eq(roadmap.organizationId, organizationId),
+            eq(roadmap.mode, "status")
+          )
+        )
+        .select(({ roadmap }) => ({
+          description: roadmap.description,
+          id: roadmap.id,
+          name: roadmap.name,
+          slug: roadmap.slug,
+        }))
+        .orderBy(({ roadmap }) => roadmap.createdAt, "asc");
+    },
+    [organizationId, slug]
+  );
+
   const columnsQuery = useLiveQuery(
     (q) => {
       if (!organizationId) {
@@ -170,9 +196,10 @@ export function useRoadmapData<
           )
         )
         .select(({ column, postStatus }) => ({
-          id: postStatus.id,
+          id: column.id,
           name: column.name,
           roadmapId: column.roadmapId,
+          statusId: postStatus.id,
           type: postStatus.type,
         }))
         .orderBy(({ column }) => column.position, "asc");
@@ -222,22 +249,63 @@ export function useRoadmapData<
   );
 
   const isError =
-    roadmapsQuery.isError || columnsQuery.isError || postsQuery.isError;
+    roadmapsQuery.isError ||
+    allRoadmapsQuery.isError ||
+    columnsQuery.isError ||
+    postsQuery.isError;
   const isLoading =
-    roadmapsQuery.isLoading || columnsQuery.isLoading || postsQuery.isLoading;
+    roadmapsQuery.isLoading ||
+    allRoadmapsQuery.isLoading ||
+    columnsQuery.isLoading ||
+    postsQuery.isLoading;
 
-  return {
-    roadmaps: roadmapsQuery.data ?? [],
-    columns: columnsQuery.data ?? [],
-    posts: postsQuery.data ?? [],
-    isError,
-    isLoading,
-    lanesFor: (roadmapId) =>
-      groupRoadmapPostsByStatus(
-        postsQuery.data ?? [],
-        (columnsQuery.data ?? []).filter(
-          (column) => column.roadmapId === roadmapId
+  const lanesByRoadmap = useMemo(() => {
+    const posts = postsQuery.data ?? [];
+    const columns = columnsQuery.data ?? [];
+    const map = new Map<string, RoadmapLane<RoadmapBoardPost>[]>();
+
+    for (const roadmapId of new Set(
+      columns.map((column) => column.roadmapId)
+    )) {
+      map.set(
+        roadmapId,
+        groupRoadmapPostsByStatus(
+          posts,
+          columns.filter((column) => column.roadmapId === roadmapId)
         )
-      ),
-  };
+      );
+    }
+
+    return map;
+  }, [postsQuery.data, columnsQuery.data]);
+
+  const lanesFor = useCallback(
+    (roadmapId: string) => lanesByRoadmap.get(roadmapId) ?? [],
+    [lanesByRoadmap]
+  );
+
+  return useMemo(
+    () => ({
+      roadmaps: roadmapsQuery.data ?? [],
+      allRoadmaps:
+        slug === undefined
+          ? (roadmapsQuery.data ?? [])
+          : (allRoadmapsQuery.data ?? []),
+      columns: columnsQuery.data ?? [],
+      posts: postsQuery.data ?? [],
+      isError,
+      isLoading,
+      lanesFor,
+    }),
+    [
+      roadmapsQuery.data,
+      allRoadmapsQuery.data,
+      columnsQuery.data,
+      postsQuery.data,
+      isError,
+      isLoading,
+      lanesFor,
+      slug,
+    ]
+  );
 }

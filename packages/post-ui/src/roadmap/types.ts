@@ -2,9 +2,11 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 
 export type RoadmapStatus = BoardPostStatus;
 
-export type RoadmapStatusDefinition = {
+export type RoadmapColumnDefinition = {
   id: string;
-  name?: string;
+  name: string;
+  roadmapId: string;
+  statusId: string;
   type: RoadmapStatus;
 };
 

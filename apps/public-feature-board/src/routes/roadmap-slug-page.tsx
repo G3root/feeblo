@@ -34,14 +34,16 @@ function RoadmapSlugPage() {
     publicRoadmapColumnCollection,
   } = usePublicCollections();
 
-  const { isError, isLoading, lanesFor, roadmaps } = useRoadmapData({
-    boardCollection: publicBoardCollection,
-    postCollection: publicPostCollection,
-    postStatusCollection: publicPostStatusCollection,
-    roadmapCollection: publicRoadmapCollection,
-    roadmapColumnCollection: publicRoadmapColumnCollection,
-    organizationId: site.organizationId,
-  });
+  const { allRoadmaps, isError, isLoading, lanesFor, roadmaps } =
+    useRoadmapData({
+      boardCollection: publicBoardCollection,
+      postCollection: publicPostCollection,
+      postStatusCollection: publicPostStatusCollection,
+      roadmapCollection: publicRoadmapCollection,
+      roadmapColumnCollection: publicRoadmapColumnCollection,
+      organizationId: site.organizationId,
+      slug,
+    });
 
   if (isError) {
     return (
@@ -65,8 +67,8 @@ function RoadmapSlugPage() {
     );
   }
 
-  const primaryRoadmap = roadmaps[0];
-  const selectedRoadmap = roadmaps.find((r) => r.slug === slug);
+  const primaryRoadmap = allRoadmaps[0];
+  const selectedRoadmap = roadmaps[0];
 
   if (!selectedRoadmap) {
     return (
@@ -116,7 +118,7 @@ function RoadmapSlugPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectPopup>
-              {roadmaps.map((roadmap) => (
+              {allRoadmaps.map((roadmap) => (
                 <SelectItem key={roadmap.id} value={roadmap.slug}>
                   {roadmap.name}
                 </SelectItem>

@@ -1,5 +1,5 @@
 import type { Collection, UtilsRecord } from "@tanstack/db";
-import { count, eq, useLiveQuery } from "@tanstack/react-db";
+import { and, count, eq, inArray, useLiveQuery } from "@tanstack/react-db";
 
 type BoardRowLike = {
   id: string;
@@ -55,7 +55,6 @@ export type UseDashboardHomeStatsResult<
   TBoard extends BoardRowLike = BoardRowLike,
   TPost extends PostRowLike = PostRowLike,
   TPostStatus extends PostStatusRowLike = PostStatusRowLike,
-  _TUpvote extends UpvoteRowLike = UpvoteRowLike,
 > = {
   boards: TBoard[];
   statuses: TPostStatus[];
@@ -81,7 +80,7 @@ export function useDashboardHomeStats<
   TPost,
   TPostStatus,
   TUpvote
->): UseDashboardHomeStatsResult<TBoard, TPost, TPostStatus, TUpvote> {
+>): UseDashboardHomeStatsResult<TBoard, TPost, TPostStatus> {
   const boardsQuery = useLiveQuery(
     (q) => {
       if (!organizationId) {
@@ -125,22 +124,30 @@ export function useDashboardHomeStats<
     [organizationId]
   );
 
+  const recentPostIds = (recentPostsQuery.data ?? []).map((post) => post.id);
+  const recentPostIdsKey = recentPostIds.join(",");
+
   const upvoteCountsQuery = useLiveQuery(
     (q) => {
-      if (!organizationId) {
+      if (!organizationId || recentPostIds.length === 0) {
         return undefined;
       }
 
       return q
         .from({ upvote: upvoteCollection })
-        .where(({ upvote }) => eq(upvote.organizationId, organizationId))
+        .where(({ upvote }) =>
+          and(
+            eq(upvote.organizationId, organizationId),
+            inArray(upvote.postId, recentPostIds)
+          )
+        )
         .groupBy(({ upvote }) => upvote.postId)
         .select(({ upvote }) => ({
           count: count(upvote.id),
           postId: upvote.postId,
         }));
     },
-    [organizationId]
+    [organizationId, recentPostIdsKey]
   );
 
   const isError =
