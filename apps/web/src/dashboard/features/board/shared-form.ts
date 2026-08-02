@@ -2,7 +2,7 @@ import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
 export const boardFormSchema = z.object({
-  name: z.string(),
+  name: z.string().trim().min(1, "Board name is required"),
   visibility: z.enum(["PUBLIC", "PRIVATE"]),
 });
 

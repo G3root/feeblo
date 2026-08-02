@@ -41,8 +41,10 @@ export const usePrivilegedMemberLimit = () => {
 
   const limit = entitlements.limits.privilegedMembers;
   const atLimit =
-    limit !== null &&
-    privilegedMemberCount + pendingPrivilegedInvitationsCount >= limit;
+    membersQuery.isLoading ||
+    invitationsQuery.isLoading ||
+    (limit !== null &&
+      privilegedMemberCount + pendingPrivilegedInvitationsCount >= limit);
 
   return {
     atLimit,
