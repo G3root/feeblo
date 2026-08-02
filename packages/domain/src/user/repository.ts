@@ -22,12 +22,13 @@ interface UpsertSsoUserInput {
   email: string;
   name: string;
   /**
-   * When set, the SSO user is scoped to a single organization (widget portal
-   * user). An SSO token never returns an existing globally-registered account,
-   * so it cannot be used to take over a real user's session, and an SSO user
-   * created for one organization is never re-scoped to another.
+   * The SSO user is always scoped to a single organization (widget portal
+   * user). The value is required: an SSO token never returns an existing
+   * globally-registered account, so it cannot be used to take over a real
+   * user's session, and an SSO user created for one organization is never
+   * re-scoped to another.
    */
-  restrictedToOrganizationId?: string | null;
+  restrictedToOrganizationId: string;
 }
 
 const makeUserRepository = Effect.gen(function* () {
@@ -48,21 +49,28 @@ const makeUserRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const emailHash = hashEmail(args.email);
 
+        // Explicit type guard: an SSO portal upsert must always be scoped to an
+        // organization. Guard before the lookup so the query below can never
+        // fall back to matching a globally-registered Better Auth user that
+        // merely carries an email hash from an earlier SSO login.
+        const restrictedToOrganizationId = args.restrictedToOrganizationId;
+        if (restrictedToOrganizationId == null) {
+          return yield* new UserPersistenceError({
+            message: "SSO portal upsert requires a restrictedToOrganizationId",
+          });
+        }
+
         // Match an existing SSO-only user by its email hash and organization.
-        // Global Better Auth users may carry an email hash from earlier SSO
-        // logins, so an unscoped user must never be matched here.
         const existingByHash = yield* db
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
           .where(
             and(
               eq(schema.userTable.emailHash, emailHash),
-              args.restrictedToOrganizationId != null
-                ? eq(
-                    schema.userTable.restrictedToOrganizationId,
-                    args.restrictedToOrganizationId
-                  )
-                : undefined
+              eq(
+                schema.userTable.restrictedToOrganizationId,
+                restrictedToOrganizationId
+              )
             )
           )
           .limit(1)
@@ -74,9 +82,7 @@ const makeUserRepository = Effect.gen(function* () {
             .update(schema.userTable)
             .set({
               name: args.name,
-              ...(args.restrictedToOrganizationId !== undefined && {
-                restrictedToOrganizationId: args.restrictedToOrganizationId,
-              }),
+              restrictedToOrganizationId,
               jwtAutoLoginAt: updatedAt,
               updatedAt,
             })
@@ -102,7 +108,7 @@ const makeUserRepository = Effect.gen(function* () {
             emailVerified: true,
             emailHash,
             jwtAutoLoginAt: now,
-            restrictedToOrganizationId: args.restrictedToOrganizationId ?? null,
+            restrictedToOrganizationId,
             createdAt: now,
             updatedAt: now,
           })
