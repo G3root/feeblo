@@ -54,7 +54,7 @@ export const PostTitleField = withForm({
             />
             <FieldError
               errors={field.state.meta.errors}
-              match={!field.state.meta.isValid}
+              match={field.state.meta.isTouched && !field.state.meta.isValid}
             />
           </Field>
         )}

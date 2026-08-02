@@ -51,8 +51,8 @@ function SimilarPosts({
     // each keystroke unmounted the panel and caused it to flash.
     const controller = new AbortController();
     let isCurrent = true;
+    setLoading(true);
     const timer = window.setTimeout(() => {
-      setLoading(true);
       suggestPosts({
         ...(boardId ? { boardId } : {}),
         content,
