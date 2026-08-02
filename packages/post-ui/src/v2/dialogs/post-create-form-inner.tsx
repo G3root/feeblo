@@ -24,6 +24,8 @@ import {
 } from "../forms/post-create-form-shared";
 import { usePostCollections } from "../providers/post-collections-provider";
 
+const SUGGESTIONS_DEBOUNCE_MS = 450;
+
 function SimilarPosts({
   boardId,
   content,
@@ -44,9 +46,11 @@ function SimilarPosts({
       setLoading(false);
       return;
     }
-    setPosts([]);
-    setLoading(false);
+
+    // Preserve matching posts while the next query settles. Resetting them on
+    // each keystroke unmounted the panel and caused it to flash.
     const controller = new AbortController();
+    let isCurrent = true;
     const timer = window.setTimeout(() => {
       setLoading(true);
       suggestPosts({
@@ -55,30 +59,38 @@ function SimilarPosts({
         signal: controller.signal,
         title: normalizedTitle,
       })
-        .then(setPosts)
+        .then((nextPosts) => {
+          if (isCurrent) {
+            setPosts(nextPosts);
+          }
+        })
         .catch(() => {
-          if (!controller.signal.aborted) {
+          if (isCurrent && !controller.signal.aborted) {
             setPosts([]);
           }
         })
         .finally(() => {
-          if (!controller.signal.aborted) {
+          if (isCurrent) {
             setLoading(false);
           }
         });
-    }, 450);
+    }, SUGGESTIONS_DEBOUNCE_MS);
     return () => {
+      isCurrent = false;
       window.clearTimeout(timer);
       controller.abort();
     };
   }, [boardId, content, suggestPosts, title]);
 
-  if (!(loading || posts.length > 0)) {
+  // Do not render an empty/loading panel. If the request returns no matches,
+  // the suggestions area should stay absent instead of flashing briefly.
+  if (posts.length === 0) {
     return null;
   }
 
   return (
     <section
+      aria-busy={loading}
       aria-label="Similar posts"
       aria-live="polite"
       className="overflow-hidden rounded-lg border bg-muted/30"
@@ -89,40 +101,34 @@ function SimilarPosts({
           Check whether your idea already exists.
         </p>
       </div>
-      {loading && posts.length === 0 ? (
-        <p className="px-3 py-3 text-muted-foreground text-sm">
-          Looking for similar posts…
-        </p>
-      ) : (
-        <div className="divide-y">
-          {posts.map((post) => {
-            const href = getPostHref?.(post);
-            const body = (
-              <>
-                <span className="font-medium text-sm">{post.title}</span>
-                {post.excerpt ? (
-                  <span className="line-clamp-1 text-muted-foreground text-xs">
-                    {post.excerpt}
-                  </span>
-                ) : null}
-              </>
-            );
-            return href ? (
-              <a
-                className="flex flex-col gap-0.5 px-3 py-2.5 transition-colors hover:bg-muted"
-                href={href}
-                key={post.id}
-              >
-                {body}
-              </a>
-            ) : (
-              <div className="flex flex-col gap-0.5 px-3 py-2.5" key={post.id}>
-                {body}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className="divide-y">
+        {posts.map((post) => {
+          const href = getPostHref?.(post);
+          const body = (
+            <>
+              <span className="font-medium text-sm">{post.title}</span>
+              {post.excerpt ? (
+                <span className="line-clamp-1 text-muted-foreground text-xs">
+                  {post.excerpt}
+                </span>
+              ) : null}
+            </>
+          );
+          return href ? (
+            <a
+              className="flex flex-col gap-0.5 px-3 py-2.5 transition-colors hover:bg-muted"
+              href={href}
+              key={post.id}
+            >
+              {body}
+            </a>
+          ) : (
+            <div className="flex flex-col gap-0.5 px-3 py-2.5" key={post.id}>
+              {body}
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { EditorProps } from "@feeblo/ui/editor";
-import { FieldError } from "@feeblo/ui/field";
+import { Field, FieldError } from "@feeblo/ui/field";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Label } from "@feeblo/ui/label";
 import { Switch } from "@feeblo/ui/switch";
@@ -37,7 +37,13 @@ export const PostTitleField = withForm({
     return (
       <form.AppField name="title">
         {(field) => (
-          <div className="flex flex-col gap-1">
+          <Field
+            className="gap-1"
+            dirty={field.state.meta.isDirty}
+            invalid={!field.state.meta.isValid}
+            name={field.name}
+            touched={field.state.meta.isTouched}
+          >
             <PostTitleInput
               name={field.name}
               onBlur={field.handleBlur}
@@ -46,11 +52,11 @@ export const PostTitleField = withForm({
               size="sm"
               value={field.state.value}
             />
-            {field.state.meta.isTouched &&
-              field.state.meta.errors.length > 0 && (
-                <FieldError errors={field.state.meta.errors} />
-              )}
-          </div>
+            <FieldError
+              errors={field.state.meta.errors}
+              match={!field.state.meta.isValid}
+            />
+          </Field>
         )}
       </form.AppField>
     );
@@ -64,17 +70,23 @@ export const PostContentField = withForm({
     return (
       <form.AppField name="content">
         {(field) => (
-          <div className="flex flex-col gap-1">
+          <Field
+            className="flex flex-col items-stretch gap-1"
+            dirty={field.state.meta.isDirty}
+            invalid={!field.state.meta.isValid}
+            name={field.name}
+            touched={field.state.meta.isTouched}
+          >
             <PostEditor
               content={field.state.value}
               onContentChange={field.handleChange}
               {...rest}
             />
-            {field.state.meta.isTouched &&
-              field.state.meta.errors.length > 0 && (
-                <FieldError errors={field.state.meta.errors} />
-              )}
-          </div>
+            <FieldError
+              errors={field.state.meta.errors}
+              match={field.state.meta.isTouched && !field.state.meta.isValid}
+            />
+          </Field>
         )}
       </form.AppField>
     );
@@ -90,7 +102,7 @@ export const PostBoardField = withForm({
     return (
       <form.AppField name="boardId">
         {(field) => (
-          <div className="flex flex-col gap-1">
+          <Field className="gap-1">
             <div>
               <PostBoardSelect
                 boards={boards}
@@ -103,11 +115,11 @@ export const PostBoardField = withForm({
                 }}
               />
             </div>
-            {field.state.meta.isTouched &&
-              field.state.meta.errors.length > 0 && (
-                <FieldError errors={field.state.meta.errors} />
-              )}
-          </div>
+            <FieldError
+              errors={field.state.meta.errors}
+              match={field.state.meta.isTouched && !field.state.meta.isValid}
+            />
+          </Field>
         )}
       </form.AppField>
     );
@@ -123,7 +135,7 @@ export const PostStatusField = withForm({
     return (
       <form.AppField name="statusId">
         {(field) => (
-          <div className="flex flex-col gap-1">
+          <Field className="gap-1">
             <div>
               <StatusField
                 currentStatusId={field.state.value}
@@ -136,11 +148,11 @@ export const PostStatusField = withForm({
                 statuses={statuses}
               />
             </div>
-            {field.state.meta.isTouched &&
-              field.state.meta.errors.length > 0 && (
-                <FieldError errors={field.state.meta.errors} />
-              )}
-          </div>
+            <FieldError
+              errors={field.state.meta.errors}
+              match={field.state.meta.isTouched && !field.state.meta.isValid}
+            />
+          </Field>
         )}
       </form.AppField>
     );
