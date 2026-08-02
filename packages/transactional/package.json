@@ -26,19 +26,19 @@
   },
   "dependencies": {
     "@feeblo/config": "workspace:*",
-    "@react-email/components": "^1.0.9",
     "@react-email/render": "^2.0.4",
     "effect": "catalog:",
     "nodemailer": "^8.0.2",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "react-email": "^6.9.1"
   },
   "devDependencies": {
     "@react-email/preview-server": "^5.2.11",
+    "@react-email/ui": "6.9.1",
     "@types/nodemailer": "^7.0.11",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "react-email": "^5.2.9",
     "typescript": "catalog:"
   }
 }
