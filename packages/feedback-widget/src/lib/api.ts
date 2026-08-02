@@ -12,6 +12,12 @@ export interface WidgetBoard {
 }
 
 export type FeedbackResult = { ok: true } | { ok: false; message: string };
+export interface WidgetSuggestion {
+  excerpt: string;
+  id: string;
+  slug: string;
+  title: string;
+}
 
 interface FeedbackFormData extends FormData {
   get(name: "content" | "title" | "boardName" | "boardId"): string;
@@ -40,6 +46,22 @@ export const fetchBoards = query(async (): Promise<WidgetBoard[]> => {
 
 export function preloadBoards(_args: RoutePreloadFuncArgs) {
   return fetchBoards();
+}
+
+export async function fetchSuggestions(
+  input: { boardId: string; content: string; title: string },
+  signal: AbortSignal
+): Promise<WidgetSuggestion[]> {
+  const response = await fetch(`${getApiBaseUrl()}/suggestions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, organizationId: getOrganizationId() }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch suggestions: ${response.status}`);
+  }
+  return response.json();
 }
 
 export const createFeedBackAction = action(

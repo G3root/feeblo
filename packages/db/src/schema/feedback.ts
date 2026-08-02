@@ -3,6 +3,7 @@ import {
   type AnyPgColumn,
   boolean,
   check,
+  customType,
   foreignKey,
   index,
   integer,
@@ -15,7 +16,23 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import * as Schema from "effect/Schema";
 import { memberTable, organizationTable, userTable } from "./auth";
+
+const VectorValues = Schema.Array(Schema.Number);
+export const DEFAULT_POST_EMBEDDING_DIMENSIONS = 1536;
+
+const embeddingVector = (dimensions: number) =>
+  customType<{
+    data: number[];
+    driverData: string;
+  }>({
+    dataType: () => `vector(${dimensions})`,
+    fromDriver: (value) =>
+      Array.from(Schema.decodeUnknownSync(VectorValues)(JSON.parse(value))),
+    toDriver: (value) =>
+      JSON.stringify(Schema.decodeUnknownSync(VectorValues)(value)),
+  });
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PUBLIC",
@@ -491,6 +508,9 @@ export const postTable = pgTable(
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     mergedIntoPostId: text("merged_into_post_id"),
     mergedAt: timestamp("merged_at", { withTimezone: true }),
+    embedding: embeddingVector(DEFAULT_POST_EMBEDDING_DIMENSIONS)("embedding"),
+    embeddingModel: text("embedding_model"),
+    embeddedAt: timestamp("embedded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
@@ -500,6 +520,9 @@ export const postTable = pgTable(
     index("post_statusId_idx").on(table.statusId),
     index("post_archivedAt_idx").on(table.archivedAt),
     index("post_mergedIntoPostId_idx").on(table.mergedIntoPostId),
+    index("post_embedding_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops"))
+      .where(sql`${table.embedding} is not null`),
     uniqueIndex("post_id_organizationId_uidx").on(
       table.id,
       table.organizationId
@@ -520,6 +543,10 @@ export const postTable = pgTable(
     check(
       "post_no_self_merge_chk",
       sql`${table.mergedIntoPostId} is null or ${table.mergedIntoPostId} <> ${table.id}`
+    ),
+    check(
+      "post_embedding_metadata_chk",
+      sql`(${table.embedding} is null and ${table.embeddingModel} is null and ${table.embeddedAt} is null) or (${table.embedding} is not null and ${table.embeddingModel} is not null and ${table.embeddedAt} is not null)`
     ),
     foreignKey({
       name: "post_merged_into_same_organization_fk",

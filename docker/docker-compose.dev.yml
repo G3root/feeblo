@@ -1,7 +1,7 @@
 name: feeblo
 services:
   pg:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: feeblo-database
     environment:
       - POSTGRES_USER=feeblo

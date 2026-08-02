@@ -31,18 +31,6 @@ RUN pnpm turbo build
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 
-ARG APP_RELEASE="dev"
-ARG APP_URL=""
-ARG API_URL=""
-ARG APP_ROOT_DOMAIN=""
-
-ENV NODE_ENV=production
-ENV SERVER_PORT=8080
-ENV APP_RELEASE="${APP_RELEASE}"
-ENV APP_URL="${APP_URL}"
-ENV API_URL="${API_URL}"
-ENV APP_ROOT_DOMAIN="${APP_ROOT_DOMAIN}"
-
 LABEL org.opencontainers.image.source=https://github.com/g3root/feeblo
 LABEL org.opencontainers.image.description="API server of Feeblo — an open-source customer feedback platform"
 LABEL org.opencontainers.image.licenses=AGPL-3.0-or-later

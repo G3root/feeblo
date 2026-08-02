@@ -1,13 +1,10 @@
 import { Button } from "@feeblo/ui/button";
 import { Editor } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
-import {
-  createContext,
-  type ReactNode,
-  use,
-  useRef,
-  useState,
-} from "react";
+import { toastManager } from "@feeblo/ui/toast";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { createOptimisticAction } from "@tanstack/react-db";
+import { createContext, type ReactNode, use, useRef, useState } from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -197,10 +194,37 @@ export const PostEditor = Object.assign(PostEditorComponent, {
 export function PostContentUpdateInput() {
   const {
     collections: { postCollection },
+    organizationId,
   } = usePostCollections();
-  const { canManagePost, isLocked, post } = usePostCollectionData();
+  const { canManagePost, isLocked, post, pageType } = usePostCollectionData();
 
   const disabled = isLocked || !canManagePost;
+
+  const updatePostContent = createOptimisticAction<{ content: string }>({
+    onMutate: ({ content }) => {
+      postCollection.update(post.id, (draft) => {
+        draft.content = content;
+      });
+    },
+    mutationFn: async ({ content }) => {
+      await fetchRpc((rpc) =>
+        pageType === "Dashboard"
+          ? rpc.PostUpdateContent({
+              id: post.id,
+              boardId: post.boardId,
+              organizationId,
+              content,
+            })
+          : rpc.PostUpdateContentPublic({
+              id: post.id,
+              boardId: post.boardId,
+              organizationId,
+              content,
+            })
+      );
+      await postCollection.utils.refetch();
+    },
+  });
 
   return (
     <PostEditor
@@ -208,11 +232,15 @@ export function PostContentUpdateInput() {
       disabled={disabled}
       onSubmit={async ({ content }) => {
         if (content !== "") {
-          const tx = postCollection.update(post.id, (draft) => {
-            draft.content = content;
-          });
-
-          await tx.isPersisted.promise;
+          try {
+            const tx = updatePostContent({ content });
+            await tx.isPersisted.promise;
+          } catch {
+            toastManager.add({
+              title: "Failed to update content",
+              type: "error",
+            });
+          }
         }
       }}
       submitLabel="Update"

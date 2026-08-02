@@ -1,4 +1,6 @@
 /** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
+
+import type { TPost } from "@feeblo/domain/post/schema";
 import { PostId } from "@feeblo/id";
 import { FieldRow } from "@feeblo/post-ui/post-properties";
 import { Button } from "@feeblo/ui/button";
@@ -10,7 +12,7 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
@@ -21,6 +23,109 @@ import {
   postCreateFormOpts,
 } from "../forms/post-create-form-shared";
 import { usePostCollections } from "../providers/post-collections-provider";
+
+function SimilarPosts({
+  boardId,
+  content,
+  title,
+}: {
+  boardId: string;
+  content: string;
+  title: string;
+}) {
+  const { getPostHref, suggestPosts } = usePostCollections();
+  const [posts, setPosts] = useState<readonly TPost[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const normalizedTitle = title.trim();
+    if (!suggestPosts || normalizedTitle.length < 3) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+    setPosts([]);
+    setLoading(false);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      suggestPosts({
+        ...(boardId ? { boardId } : {}),
+        content,
+        signal: controller.signal,
+        title: normalizedTitle,
+      })
+        .then(setPosts)
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            setPosts([]);
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setLoading(false);
+          }
+        });
+    }, 450);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [boardId, content, suggestPosts, title]);
+
+  if (!(loading || posts.length > 0)) {
+    return null;
+  }
+
+  return (
+    <section
+      aria-label="Similar posts"
+      aria-live="polite"
+      className="overflow-hidden rounded-lg border bg-muted/30"
+    >
+      <div className="border-b px-3 py-2">
+        <p className="font-medium text-sm">Similar posts</p>
+        <p className="text-muted-foreground text-xs">
+          Check whether your idea already exists.
+        </p>
+      </div>
+      {loading && posts.length === 0 ? (
+        <p className="px-3 py-3 text-muted-foreground text-sm">
+          Looking for similar posts…
+        </p>
+      ) : (
+        <div className="divide-y">
+          {posts.map((post) => {
+            const href = getPostHref?.(post);
+            const body = (
+              <>
+                <span className="font-medium text-sm">{post.title}</span>
+                {post.excerpt ? (
+                  <span className="line-clamp-1 text-muted-foreground text-xs">
+                    {post.excerpt}
+                  </span>
+                ) : null}
+              </>
+            );
+            return href ? (
+              <a
+                className="flex flex-col gap-0.5 px-3 py-2.5 transition-colors hover:bg-muted"
+                href={href}
+                key={post.id}
+              >
+                {body}
+              </a>
+            ) : (
+              <div className="flex flex-col gap-0.5 px-3 py-2.5" key={post.id}>
+                {body}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function PostCreateForm() {
   const store = usePostCreateDialogContext();
@@ -188,6 +293,19 @@ export function PostCreateForm() {
       <div className="flex h-full flex-1 flex-col gap-2">
         <PostTitleField form={form} />
         <PostContentField form={form} key={contentEditorKey} />
+        <form.Subscribe
+          selector={(state) =>
+            [
+              state.values.boardId,
+              state.values.content,
+              state.values.title,
+            ] as const
+          }
+        >
+          {([boardId, content, title]) => (
+            <SimilarPosts boardId={boardId} content={content} title={title} />
+          )}
+        </form.Subscribe>
       </div>
 
       <aside className="flex h-full w-full flex-col rounded-xl border bg-muted/40 p-3 text-sm md:min-h-150 md:w-sm md:p-4">

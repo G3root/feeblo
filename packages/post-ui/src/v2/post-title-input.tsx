@@ -2,6 +2,8 @@ import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { createOptimisticAction } from "@tanstack/react-db";
 import { useId, useRef } from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
@@ -38,15 +40,41 @@ export function PostTitleInput({
 }
 
 export function PostTitleUpdateInput() {
-  const { canManagePost, post } = usePostCollectionData();
+  const { canManagePost, post, pageType } = usePostCollectionData();
+  const {
+    collections: { postCollection },
+    organizationId,
+  } = usePostCollections();
 
   const defaultValue = post.title;
   const postId = post.id;
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const {
-    collections: { postCollection },
-  } = usePostCollections();
+  const updatePostTitle = createOptimisticAction<{ title: string }>({
+    onMutate: ({ title }) => {
+      postCollection.update(postId, (draft) => {
+        draft.title = title;
+      });
+    },
+    mutationFn: async ({ title }) => {
+      await fetchRpc((rpc) =>
+        pageType === "Dashboard"
+          ? rpc.PostUpdateTitle({
+              id: postId,
+              boardId: post.boardId,
+              organizationId,
+              title,
+            })
+          : rpc.PostUpdateTitlePublic({
+              id: postId,
+              boardId: post.boardId,
+              organizationId,
+              title,
+            })
+      );
+      await postCollection.utils.refetch();
+    },
+  });
 
   const handleBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -65,9 +93,7 @@ export function PostTitleUpdateInput() {
     }
 
     try {
-      const tx = postCollection.update(postId, (draft) => {
-        draft.title = newValue;
-      });
+      const tx = updatePostTitle({ title: newValue });
 
       await tx.isPersisted.promise;
       trackEvent("post_updated", { field: "title", success: true });

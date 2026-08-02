@@ -14,9 +14,20 @@ import {
   WidgetBoard,
   WidgetFeedbackCreate,
   WidgetFeedbackResponse,
+  WidgetSuggestion,
+  WidgetSuggestionRequest,
 } from "./schema";
 
 export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
+  .add(
+    HttpApiEndpoint.post("suggestPosts", "/suggestions", {
+      payload: WidgetSuggestionRequest,
+      success: Schema.Array(WidgetSuggestion),
+      error: Schema.Union([DataValidationError, InternalServerError]),
+    })
+      .annotate(OpenApi.Title, "Suggest Posts")
+      .annotate(OpenApi.Summary, "Find similar public posts")
+  )
   .add(
     HttpApiEndpoint.post("createFeedback", "/feedback", {
       payload: WidgetFeedbackCreate,
