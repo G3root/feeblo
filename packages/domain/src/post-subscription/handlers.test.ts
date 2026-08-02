@@ -164,19 +164,46 @@ describe("PostSubscriptionRpcHandlers", () => {
           ).toHaveLength(0);
         })
       );
-      it.effect("creates public subscriptions without a membership", () =>
+      it.effect("lists only the authenticated public subscriber", () =>
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture("PUBLIC");
+          const db = yield* currentDb;
           const input = { organizationId: f.organizationId, postId: f.postId };
+          const otherUserId = `other_${f.organizationId}`;
+          const otherSession: Session = {
+            ...session(f, false),
+            user: {
+              id: otherUserId,
+              email: "other@example.com",
+              name: "Other user",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId: otherUserId, token: "other-token" },
+          };
+          yield* db.insert(schema.userTable).values({
+            id: otherUserId,
+            email: "other@example.com",
+            name: "Other user",
+          });
           expect(
             yield* handlers
               .PostSubscriptionCreatePublic(input)
-              .pipe(Effect.provideService(CurrentSession, session(f, false)))
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toEqual({ subscribed: true });
+          yield* handlers
+            .PostSubscriptionCreatePublic(input)
+            .pipe(Effect.provideService(CurrentSession, otherSession));
           expect(
-            yield* handlers.PostSubscriptionListPublic(input)
+            yield* handlers
+              .PostSubscriptionListPublic(input)
+              .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toMatchObject([{ userId: f.userId, memberId: null }]);
+          expect(
+            yield* handlers
+              .PostSubscriptionListPublic(input)
+              .pipe(Effect.provideService(CurrentSession, session(f, false)))
+          ).toHaveLength(1);
         })
       );
       it.effect(
@@ -193,7 +220,9 @@ describe("PostSubscriptionRpcHandlers", () => {
               .PostSubscriptionCreate(input)
               .pipe(Effect.provideService(CurrentSession, session(f)));
             expect(
-              yield* handlers.PostSubscriptionListPublic(input)
+              yield* handlers
+                .PostSubscriptionListPublic(input)
+                .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toHaveLength(0);
           })
       );

@@ -30,6 +30,7 @@ interface TFindSubscribers {
   postId: string;
   /** Restricts the list to subscriptions on public boards (used by public endpoints). */
   publicOnly?: boolean;
+  userId?: string;
 }
 
 const makePostSubscriptionRepository = Effect.gen(function* () {
@@ -91,6 +92,7 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
       organizationId,
       postId,
       publicOnly = false,
+      userId,
     }: TFindSubscribers) =>
       db
         .select({
@@ -115,6 +117,9 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
           and(
             eq(schema.postSubscriptionTable.organizationId, organizationId),
             eq(schema.postSubscriptionTable.postId, postId),
+            ...(userId
+              ? [eq(schema.postSubscriptionTable.userId, userId)]
+              : []),
             ...(publicOnly ? [eq(schema.boardTable.visibility, "PUBLIC")] : [])
           )
         ),

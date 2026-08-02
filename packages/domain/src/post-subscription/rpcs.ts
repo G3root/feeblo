@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
-import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
+import { AuthMiddleware } from "../session-middleware";
 import { PostSubscriptionServiceErrors } from "./errors";
 import {
   PostSubscription,
@@ -23,7 +23,7 @@ export class PostSubscriptionRpcs extends RpcGroup.make(
     success: Schema.Array(PostSubscription),
     error: Schema.Union([PostSubscriptionServiceErrors, RateLimitErrors]),
   })
-    .middleware(OptionalAuthMiddleware)
+    .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("PostSubscriptionCreate", {
     payload: PostSubscriptionCreate,
