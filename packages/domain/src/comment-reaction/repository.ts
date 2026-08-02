@@ -88,6 +88,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.commentTable.postId, postId),
+            eq(schema.commentTable.visibility, "PUBLIC"),
             eq(schema.boardTable.visibility, "PUBLIC")
           )
         )
@@ -187,6 +188,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
               eq(schema.commentTable.id, args.commentId),
               eq(schema.commentTable.organizationId, args.organizationId),
               eq(schema.commentTable.postId, args.postId),
+              eq(schema.commentTable.visibility, "PUBLIC"),
               eq(schema.boardTable.visibility, "PUBLIC")
             )
           )

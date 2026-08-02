@@ -12,7 +12,7 @@ import { CommentReactionRepository } from "./repository";
 describe("CommentReactionRpcHandlers", () => {
   type Fixture = { commentId: LegidOf<"CommentId">; membershipId: string; organizationId: LegidOf<"WorkspaceId">; postId: LegidOf<"PostId">; userId: string };
   const session = (f: Fixture, member = true): Session => ({ user: { id: f.userId, email: "user@example.com", name: "User", restrictedToOrganizationId: null }, session: { userId: f.userId, token: "token" }, organizations: [{ id: f.organizationId }], memberships: member ? [{ membershipId: f.membershipId, organizationId: f.organizationId, role: "owner" }] : [] });
-  const fixture = (visibility: "PUBLIC" | "PRIVATE" = "PUBLIC") => Effect.gen(function* () {
+  const fixture = (visibility: "PUBLIC" | "PRIVATE" = "PUBLIC", commentVisibility: "PUBLIC" | "INTERNAL" = "PUBLIC") => Effect.gen(function* () {
     const db = yield* currentDb; const organizationId = yield* WorkspaceId.generate; const boardId = yield* BoardId.generate; const postId = yield* PostId.generate; const commentId = yield* CommentId.generate; const statusId = yield* PostStatusId.generate; const userId = `user_${organizationId}`; const membershipId = `member_${organizationId}`; const now = new Date();
     yield* db.insert(schema.organizationTable).values({ id: organizationId, name: "Organization", slug: organizationId, createdAt: now });
     yield* db.insert(schema.userTable).values({ id: userId, email: `${organizationId}@example.com`, name: "User" });
@@ -20,7 +20,7 @@ describe("CommentReactionRpcHandlers", () => {
     yield* db.insert(schema.boardTable).values({ id: boardId, name: "Board", slug: boardId, visibility, organizationId, creatorId: userId, creatorMemberId: membershipId, createdAt: now, updatedAt: now });
     yield* db.insert(schema.postStatusTable).values({ id: statusId, type: "PENDING", orderIndex: 0, organizationId });
     yield* db.insert(schema.postTable).values({ id: postId, title: "Post", content: "Content", slug: postId, excerpt: "Content", boardId, organizationId, statusId, creatorId: userId, creatorMemberId: membershipId, createdAt: now, updatedAt: now });
-    yield* db.insert(schema.commentTable).values({ id: commentId, content: "Comment", organizationId, postId, userId, memberId: membershipId, visibility: "PUBLIC", createdAt: now, updatedAt: now, parentCommentId: null });
+    yield* db.insert(schema.commentTable).values({ id: commentId, content: "Comment", organizationId, postId, userId, memberId: membershipId, visibility: commentVisibility, createdAt: now, updatedAt: now, parentCommentId: null });
     return { commentId, membershipId, organizationId, postId, userId } satisfies Fixture;
   });
   const Repositories = Layer.mergeAll(PostRepository.layer, CommentReactionRepository.layer).pipe(Layer.provide(Database.PgliteDatabaseLive));
@@ -43,6 +43,13 @@ describe("CommentReactionRpcHandlers", () => {
       const handlers = yield* CommentReactionRpcHandlersEffect; const f = yield* fixture("PRIVATE");
       const error = yield* Effect.flip(handlers.CommentReactionTogglePublic({ organizationId: f.organizationId, postId: f.postId, commentId: f.commentId, emoji: "fire" }).pipe(Effect.provideService(CurrentSession, session(f, false))));
       expect(error._tag).toBe("PolicyDenied");
+    }));
+    it.effect("hides reactions on internal comments from the public endpoint", () => Effect.gen(function* () {
+      const handlers = yield* CommentReactionRpcHandlersEffect; const f = yield* fixture("PUBLIC", "INTERNAL");
+      const input = { organizationId: f.organizationId, postId: f.postId, commentId: f.commentId };
+      yield* handlers.CommentReactionToggle({ ...input, emoji: "thumbs_up" }).pipe(Effect.provideService(CurrentSession, session(f)));
+      expect(yield* handlers.CommentReactionListPublic(input)).toHaveLength(0);
+      expect(yield* handlers.CommentReactionTogglePublic({ ...input, emoji: "fire" }).pipe(Effect.provideService(CurrentSession, session(f, false)))).toEqual({ reacted: false, emoji: null });
     }));
   });
 });
