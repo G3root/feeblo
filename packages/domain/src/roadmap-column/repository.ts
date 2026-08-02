@@ -97,59 +97,75 @@ const makeRoadmapColumnRepository = Effect.gen(function* () {
         )
         .pipe(Effect.asVoid),
     update: ({ organizationId, ...input }: TRoadmapColumnUpdate) =>
-      db
-        .update(schema.roadmapColumnTable)
-        .set({
-          name: input.name,
-          position: input.position,
-          config: toMutableColumnConfig(input.config),
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.roadmapColumnTable.id, input.id),
-            eq(schema.roadmapColumnTable.roadmapId, input.roadmapId),
-            exists(
-              db
-                .select({ id: schema.roadmapTable.id })
-                .from(schema.roadmapTable)
-                .where(
-                  and(
-                    eq(
-                      schema.roadmapTable.id,
-                      schema.roadmapColumnTable.roadmapId
-                    ),
-                    eq(schema.roadmapTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const [updated] = yield* db
+          .update(schema.roadmapColumnTable)
+          .set({
+            name: input.name,
+            position: input.position,
+            config: toMutableColumnConfig(input.config),
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(schema.roadmapColumnTable.id, input.id),
+              eq(schema.roadmapColumnTable.roadmapId, input.roadmapId),
+              exists(
+                db
+                  .select({ id: schema.roadmapTable.id })
+                  .from(schema.roadmapTable)
+                  .where(
+                    and(
+                      eq(
+                        schema.roadmapTable.id,
+                        schema.roadmapColumnTable.roadmapId
+                      ),
+                      eq(schema.roadmapTable.organizationId, organizationId)
+                    )
                   )
-                )
+              )
             )
           )
-        )
-        .pipe(Effect.asVoid),
+          .returning({ id: schema.roadmapColumnTable.id });
+
+        if (!updated) {
+          return yield* new PolicyDeniedError({
+            reason: "Roadmap column does not belong to this organization",
+          });
+        }
+      }),
     delete: ({ id, roadmapId, organizationId }: TRoadmapColumnDelete) =>
-      db
-        .delete(schema.roadmapColumnTable)
-        .where(
-          and(
-            eq(schema.roadmapColumnTable.id, id),
-            eq(schema.roadmapColumnTable.roadmapId, roadmapId),
-            exists(
-              db
-                .select({ id: schema.roadmapTable.id })
-                .from(schema.roadmapTable)
-                .where(
-                  and(
-                    eq(
-                      schema.roadmapTable.id,
-                      schema.roadmapColumnTable.roadmapId
-                    ),
-                    eq(schema.roadmapTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const [deleted] = yield* db
+          .delete(schema.roadmapColumnTable)
+          .where(
+            and(
+              eq(schema.roadmapColumnTable.id, id),
+              eq(schema.roadmapColumnTable.roadmapId, roadmapId),
+              exists(
+                db
+                  .select({ id: schema.roadmapTable.id })
+                  .from(schema.roadmapTable)
+                  .where(
+                    and(
+                      eq(
+                        schema.roadmapTable.id,
+                        schema.roadmapColumnTable.roadmapId
+                      ),
+                      eq(schema.roadmapTable.organizationId, organizationId)
+                    )
                   )
-                )
+              )
             )
           )
-        )
-        .pipe(Effect.asVoid),
+          .returning({ id: schema.roadmapColumnTable.id });
+
+        if (!deleted) {
+          return yield* new PolicyDeniedError({
+            reason: "Roadmap column does not belong to this organization",
+          });
+        }
+      }),
   };
 });
 export class RoadmapColumnRepository extends Context.Service<RoadmapColumnRepository>()(

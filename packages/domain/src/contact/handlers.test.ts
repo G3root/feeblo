@@ -198,8 +198,32 @@ describe("ContactRpcHandlers", () => {
       "rejects linking a contact to a user outside the organization",
       () =>
         Effect.gen(function* () {
+          const db = yield* currentDb;
           const handlers = yield* ContactRpcHandlersEffect;
           const fixture = yield* makeFixture();
+          const foreignOrganizationId = yield* WorkspaceId.generate;
+          const foreignUserId = `user_${foreignOrganizationId}`;
+          const foreignMembershipId = `membership_${foreignOrganizationId}`;
+          const now = new Date();
+
+          yield* db.insert(schema.organizationTable).values({
+            id: foreignOrganizationId,
+            name: "Foreign organization",
+            slug: foreignOrganizationId,
+            createdAt: now,
+          });
+          yield* db.insert(schema.userTable).values({
+            id: foreignUserId,
+            email: `${foreignOrganizationId}@example.com`,
+            name: "Foreign User",
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: foreignMembershipId,
+            organizationId: foreignOrganizationId,
+            userId: foreignUserId,
+            role: "owner",
+            createdAt: now,
+          });
 
           const error = yield* Effect.flip(
             handlers
@@ -207,7 +231,7 @@ describe("ContactRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 name: "Ada",
                 email: "ada@example.com",
-                userId: "some-user-from-another-org",
+                userId: foreignUserId,
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
