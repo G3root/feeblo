@@ -53,6 +53,7 @@ interface TPostCreate {
   content: string;
   creatorId?: string | null;
   creatorMemberId?: string | null;
+  etaQuarter?: string | null | undefined;
   excerpt?: string;
   id: string;
   organizationId: string;
@@ -469,6 +470,7 @@ const makePostRepository = Effect.gen(function* () {
       contactId,
       source,
       excerpt: inputExcerpt,
+      etaQuarter,
     }: TPostCreate) =>
       Effect.gen(function* () {
         const excerpt = inputExcerpt ?? htmlToExcerpt(content);
@@ -490,6 +492,7 @@ const makePostRepository = Effect.gen(function* () {
             createdAt: new Date(),
             slug: slugify(title),
             updatedAt: new Date(),
+            etaQuarter: etaQuarter ?? null,
           })
           .pipe(Effect.asVoid);
       }),

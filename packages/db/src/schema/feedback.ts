@@ -548,6 +548,10 @@ export const postTable = pgTable(
       "post_embedding_metadata_chk",
       sql`(${table.embedding} is null and ${table.embeddingModel} is null and ${table.embeddedAt} is null) or (${table.embedding} is not null and ${table.embeddingModel} is not null and ${table.embeddedAt} is not null)`
     ),
+    check(
+      "post_eta_quarter_format_chk",
+      sql`${table.etaQuarter} is null or ${table.etaQuarter} ~ '^[0-9]{4}-Q[1-4]$'`
+    ),
     foreignKey({
       name: "post_merged_into_same_organization_fk",
       columns: [table.mergedIntoPostId, table.organizationId],

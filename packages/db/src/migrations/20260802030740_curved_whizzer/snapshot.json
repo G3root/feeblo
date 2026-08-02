@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "73759b1d-17f2-4235-89a7-8d175f646073",
+  "id": "53f3082d-f48c-4678-b139-e396942f2fd5",
   "prevIds": [
-    "d43a6215-cba0-4966-9b35-a03b2e02092f"
+    "f5ddaf17-f283-434e-be34-2d54d2d573c1"
   ],
   "ddl": [
     {
@@ -4079,6 +4079,45 @@
       "table": "post"
     },
     {
+      "type": "vector(1536)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "embedding",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "embedding_model",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "embedded_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post"
+    },
+    {
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -6220,6 +6259,30 @@
       "method": "btree",
       "concurrently": false,
       "name": "post_mergedIntoPostId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "post"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "embedding",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": {
+            "name": "vector_cosine_ops",
+            "default": false
+          }
+        }
+      ],
+      "isUnique": false,
+      "where": "\"embedding\" is not null",
+      "with": "",
+      "method": "hnsw",
+      "concurrently": false,
+      "name": "post_embedding_hnsw_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "post"
@@ -8476,6 +8539,13 @@
     {
       "value": "\"merged_into_post_id\" is null or \"merged_into_post_id\" <> \"id\"",
       "name": "post_no_self_merge_chk",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "post"
+    },
+    {
+      "value": "(\"embedding\" is null and \"embedding_model\" is null and \"embedded_at\" is null) or (\"embedding\" is not null and \"embedding_model\" is not null and \"embedded_at\" is not null)",
+      "name": "post_embedding_metadata_chk",
       "entityType": "checks",
       "schema": "public",
       "table": "post"

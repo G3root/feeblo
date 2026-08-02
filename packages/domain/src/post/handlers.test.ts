@@ -286,6 +286,29 @@ describe("PostRpcHandlers", () => {
           expect(error._tag).toBe("PolicyDenied");
         }),
       );
+
+      it.effect("persists an etaQuarter when provided", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Eta post"),
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [row] = yield* db
+            .select({ etaQuarter: schema.postTable.etaQuarter })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(row?.etaQuarter).toBe("2026-Q3");
+        }),
+      );
     });
 
     describe("PostListPublic", () => {

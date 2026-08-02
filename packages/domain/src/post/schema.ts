@@ -123,6 +123,7 @@ export const PostCreate = S.Struct({
   content: S.String,
   statusId: PostStatusId.schema,
   organizationId: WorkspaceId.schema,
+  etaQuarter: S.optional(S.NullOr(EtaQuarter)),
 });
 
 export type TPostCreate = S.Schema.Type<typeof PostCreate>;
