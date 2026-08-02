@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -48,11 +48,9 @@ const makeUserRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const emailHash = hashEmail(args.email);
 
-        // Match an existing SSO-only user by its email hash. Only SSO-created
-        // users carry an `emailHash`, so a real (globally registered) account
-        // is never returned by an SSO token. The match is additionally scoped
-        // so an SSO user created for one organization is not claimed or
-        // re-scoped by a token from another organization.
+        // Match an existing SSO-only user by its email hash and organization.
+        // Global Better Auth users may carry an email hash from earlier SSO
+        // logins, so an unscoped user must never be matched here.
         const existingByHash = yield* db
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
@@ -60,12 +58,9 @@ const makeUserRepository = Effect.gen(function* () {
             and(
               eq(schema.userTable.emailHash, emailHash),
               args.restrictedToOrganizationId != null
-                ? or(
-                    isNull(schema.userTable.restrictedToOrganizationId),
-                    eq(
-                      schema.userTable.restrictedToOrganizationId,
-                      args.restrictedToOrganizationId
-                    )
+                ? eq(
+                    schema.userTable.restrictedToOrganizationId,
+                    args.restrictedToOrganizationId
                   )
                 : undefined
             )

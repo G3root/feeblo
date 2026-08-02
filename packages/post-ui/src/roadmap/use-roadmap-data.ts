@@ -130,9 +130,8 @@ export function useRoadmapData<
         .where(({ roadmap }) =>
           and(
             eq(roadmap.organizationId, organizationId),
-            slug === undefined
-              ? eq(roadmap.mode, "status")
-              : eq(roadmap.slug, slug)
+            eq(roadmap.mode, "status"),
+            slug === undefined ? undefined : eq(roadmap.slug, slug)
           )
         )
         .select(({ roadmap }) => ({

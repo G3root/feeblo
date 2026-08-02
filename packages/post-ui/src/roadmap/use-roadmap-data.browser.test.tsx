@@ -332,7 +332,7 @@ describe("useRoadmapData", () => {
     });
   });
 
-  it("allows a slug filter to select a filtered-mode roadmap", async () => {
+  it("does not select a filtered-mode roadmap by slug", async () => {
     const collections = createCollections();
     const { result } = await renderHook(() =>
       useRoadmapData({
@@ -343,13 +343,10 @@ describe("useRoadmapData", () => {
     );
 
     await vi.waitFor(() => {
-      expect(result.current.roadmaps).toHaveLength(1);
+      expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.roadmaps[0]).toMatchObject({
-      id: "rm-filtered",
-      slug: "filtered",
-    });
+    expect(result.current.roadmaps).toEqual([]);
     expect(result.current.allRoadmaps.map((roadmap) => roadmap.slug)).toEqual([
       "winter",
       "launch",
@@ -373,7 +370,7 @@ describe("useRoadmapData", () => {
     expect(result.current.roadmaps).toEqual([]);
   });
 
-  it("selects the filtered-mode roadmap matching the slug", async () => {
+  it("does not select a filtered-mode roadmap matching the slug", async () => {
     const collections = createCollections({
       roadmaps: [
         roadmap({
@@ -381,6 +378,18 @@ describe("useRoadmapData", () => {
           filter: {
             conditions: [
               { field: "boardId", operator: "in", value: ["board-1"] },
+              {
+                field: "status",
+                operator: "in",
+                value: [
+                  "PENDING",
+                  "REVIEW",
+                  "PLANNED",
+                  "IN_PROGRESS",
+                  "COMPLETED",
+                  "CLOSED",
+                ],
+              },
             ],
             operator: "and",
             version: 1,
@@ -406,13 +415,10 @@ describe("useRoadmapData", () => {
     );
 
     await vi.waitFor(() => {
-      expect(result.current.roadmaps).toHaveLength(1);
+      expect(result.current.isLoading).toBe(false);
     });
 
-    expect(result.current.roadmaps[0]).toMatchObject({
-      id: "rm-board-filter",
-      slug: "board-filter",
-    });
+    expect(result.current.roadmaps).toEqual([]);
   });
 
   it("excludes columns whose roadmap belongs to another organization", async () => {

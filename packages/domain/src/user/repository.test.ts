@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
@@ -20,6 +21,9 @@ describe("UserRepository", () => {
           id: "user_real",
           name: "Real User",
           email: "victim@example.com",
+          emailHash: createHash("sha256")
+            .update("victim@example.com")
+            .digest("hex"),
           emailVerified: true,
         });
 
