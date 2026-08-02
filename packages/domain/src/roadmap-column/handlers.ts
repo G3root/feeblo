@@ -1,10 +1,12 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { RoadmapColumnRepository } from "./repository";
 import { RoadmapColumnRpcs } from "./rpcs";
 import type {
@@ -68,6 +70,8 @@ export const RoadmapColumnRpcHandlers = RoadmapColumnRpcs.toLayer(
   RoadmapColumnRpcHandlersEffect
 ).pipe(
   Layer.provide(SitePolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
   Layer.provide(RoadmapColumnRepository.layer)
 );
