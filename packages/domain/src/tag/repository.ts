@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ChangelogTagId, PostTagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, exists, inArray, or } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -38,6 +38,11 @@ interface TTagDelete {
 
 interface TFindManyTags {
   organizationId: string;
+}
+
+interface TFindManyPublicTags extends TFindManyTags {
+  includeChangelog: boolean;
+  includeFeedback: boolean;
 }
 
 interface TCountExistingTags {
@@ -78,6 +83,82 @@ const makeTagRepository = Effect.gen(function* () {
         })
         .from(schema.tagTable)
         .where(eq(schema.tagTable.organizationId, organizationId)),
+
+    findManyPublic: ({
+      organizationId,
+      includeChangelog,
+      includeFeedback,
+    }: TFindManyPublicTags) => {
+      const visibleContent = [
+        ...(includeFeedback
+          ? [
+              exists(
+                db
+                  .select({ id: schema.postTagTable.id })
+                  .from(schema.postTagTable)
+                  .innerJoin(
+                    schema.postTable,
+                    eq(schema.postTable.id, schema.postTagTable.postId)
+                  )
+                  .innerJoin(
+                    schema.boardTable,
+                    eq(schema.boardTable.id, schema.postTable.boardId)
+                  )
+                  .where(
+                    and(
+                      eq(schema.postTagTable.tagId, schema.tagTable.id),
+                      eq(schema.boardTable.visibility, "PUBLIC")
+                    )
+                  )
+              ),
+            ]
+          : []),
+        ...(includeChangelog
+          ? [
+              exists(
+                db
+                  .select({ id: schema.changelogTagTable.id })
+                  .from(schema.changelogTagTable)
+                  .innerJoin(
+                    schema.changelogTable,
+                    eq(
+                      schema.changelogTable.id,
+                      schema.changelogTagTable.changelogId
+                    )
+                  )
+                  .where(
+                    and(
+                      eq(schema.changelogTagTable.tagId, schema.tagTable.id),
+                      eq(schema.changelogTable.status, "published")
+                    )
+                  )
+              ),
+            ]
+          : []),
+      ];
+
+      if (visibleContent.length === 0) {
+        return Effect.succeed([]);
+      }
+
+      return db
+        .select({
+          id: schema.tagTable.id,
+          name: schema.tagTable.name,
+          slug: schema.tagTable.slug,
+          type: schema.tagTable.type,
+          organizationId: schema.tagTable.organizationId,
+          createdAt: schema.tagTable.createdAt,
+          updatedAt: schema.tagTable.updatedAt,
+        })
+        .from(schema.tagTable)
+        .where(
+          and(
+            eq(schema.tagTable.organizationId, organizationId),
+            or(...visibleContent)
+          )
+        );
+    },
 
     create: ({
       id,

@@ -6,12 +6,17 @@ import {
   type LegidOf,
   PostId,
   PostStatusId,
+  SiteId,
   TagId,
   WorkspaceId,
 } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
+import { EntitlementPolicy } from "../entitlement/policies";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { TagRpcHandlersEffect } from "./handlers";
 import { TagPolicy } from "./policies";
 import { TagRepository } from "./repository";
@@ -50,6 +55,7 @@ describe("TagRpcHandlers", () => {
       const boardId = yield* BoardId.generate;
       const postId = yield* PostId.generate;
       const statusId = yield* PostStatusId.generate;
+      const siteId = yield* SiteId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `member_${organizationId}`;
       const now = new Date();
@@ -70,6 +76,19 @@ describe("TagRpcHandlers", () => {
         userId,
         role: "owner",
         createdAt: now,
+      });
+      yield* db.insert(schema.siteTable).values({
+        id: siteId,
+        name: "Organization",
+        subdomain: `org-${organizationId}`,
+        customDomain: null,
+        changelogVisibility: "PUBLIC",
+        roadmapVisibility: "PUBLIC",
+        hidePoweredBy: false,
+        noIndex: false,
+        organizationId,
+        createdAt: now,
+        updatedAt: now,
       });
       yield* db.insert(schema.boardTable).values({
         id: boardId,
@@ -110,10 +129,19 @@ describe("TagRpcHandlers", () => {
         userId,
       } satisfies Fixture;
     });
-  const Repositories = TagRepository.layer.pipe(
-    Layer.provide(Database.PgliteDatabaseLive)
+  const Repositories = Layer.mergeAll(
+    TagRepository.layer,
+    SiteRepository.layer,
+    WorkspaceRepository.layer
+  ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+  const Entitlements = EntitlementPolicy.layer.pipe(
+    Layer.provide(Repositories)
   );
-  const TestLayer = TagPolicy.layer.pipe(Layer.provideMerge(Repositories));
+  const Policies = Layer.mergeAll(TagPolicy.layer, SitePolicy.layer).pipe(
+    Layer.provide(Entitlements),
+    Layer.provide(Repositories)
+  );
+  const TestLayer = Layer.mergeAll(Repositories, Entitlements, Policies);
 
   layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
     "handlers",
@@ -131,6 +159,13 @@ describe("TagRpcHandlers", () => {
                 name: "Feature",
                 type: "FEEDBACK",
                 organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+            yield* handlers
+              .PostTagSet({
+                organizationId: f.organizationId,
+                postId: f.postId,
+                tagIds: [tagId],
               })
               .pipe(Effect.provideService(CurrentSession, session(f)));
             const error = yield* Effect.flip(
@@ -257,6 +292,11 @@ describe("TagRpcHandlers", () => {
               })
             ).toHaveLength(0);
             expect(
+              yield* handlers.TagListPublic({
+                organizationId: f.organizationId,
+              })
+            ).toHaveLength(0);
+            expect(
               yield* handlers
                 .PostTagList({ organizationId: f.organizationId })
                 .pipe(Effect.provideService(CurrentSession, session(f)))
@@ -301,6 +341,11 @@ describe("TagRpcHandlers", () => {
               .pipe(Effect.provideService(CurrentSession, session(f)));
             expect(
               yield* handlers.ChangelogTagListPublic({
+                organizationId: f.organizationId,
+              })
+            ).toHaveLength(0);
+            expect(
+              yield* handlers.TagListPublic({
                 organizationId: f.organizationId,
               })
             ).toHaveLength(0);

@@ -1,10 +1,14 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { TagPolicy } from "./policies";
 import { TagRepository } from "./repository";
 import { TagRpcs } from "./rpcs";
@@ -90,6 +94,8 @@ const validateChangelog = ({
 export const TagRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* TagRepository;
   const tagPolicy = yield* TagPolicy;
+  const sitePolicy = yield* SitePolicy;
+  const siteRepository = yield* SiteRepository;
 
   return {
     TagList: (args: TTagList) =>
@@ -101,7 +107,19 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     TagListPublic: (args: TTagList) =>
-      repository.findMany(args).pipe(
+      Effect.gen(function* () {
+        const site = yield* siteRepository.findByOrganizationId(args);
+        if (site._tag === "None") {
+          return [];
+        }
+        return yield* repository.findManyPublic({
+          organizationId: args.organizationId,
+          // Feedback tags are rendered alongside public-board posts and are
+          // independent from the roadmap's visibility setting.
+          includeFeedback: true,
+          includeChangelog: site.value.changelogVisibility === "PUBLIC",
+        });
+      }).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "TagListPublic",
           level: "read",
@@ -140,6 +158,9 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           name: "ChangelogTagListPublic",
           level: "read",
         }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
         withRemapDbErrors("Tag", "select")
       ),
 
@@ -225,6 +246,10 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 });
 
 export const TagRpcHandlers = TagRpcs.toLayer(TagRpcHandlersEffect).pipe(
+  Layer.provide(SitePolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
   Layer.provide(TagPolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provide(SiteRepository.layer),
   Layer.provide(TagRepository.layer)
 );
