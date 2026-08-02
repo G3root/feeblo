@@ -1,8 +1,13 @@
+import { Button } from "@feeblo/ui/button";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
-  SheetPopup,
+  SheetClose,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
+  SheetPanel,
+  SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
@@ -10,11 +15,11 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
-import { z } from "zod";
-import { useAppForm } from "@feeblo/ui/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useRenameBoardDialogContext } from "../dialog-stores";
+import { boardFormOpts } from "../shared-form";
+import { BoardVisibilityField } from "./board-visibility-field";
 
 export function RenameBoardDialog() {
   const store = useRenameBoardDialogContext();
@@ -28,7 +33,7 @@ export function RenameBoardDialog() {
           <SheetTitle>Rename Board</SheetTitle>
           <SheetDescription>Rename the board to a new name.</SheetDescription>
         </SheetHeader>
-        <div className="p-4">{open ? <RenameBoardForm /> : null}</div>
+        <RenameBoardForm />
       </SheetPopup>
     </Sheet>
   );
@@ -59,15 +64,10 @@ function RenameBoardForm() {
   const board = data[0];
 
   const form = useAppForm({
+    ...boardFormOpts,
     defaultValues: {
       name: board.name,
       visibility: board.visibility,
-    },
-    validators: {
-      onSubmit: z.object({
-        name: z.string(),
-        visibility: z.enum(["PUBLIC", "PRIVATE"]),
-      }),
     },
     onSubmit: async (data) => {
       try {
@@ -102,22 +102,26 @@ function RenameBoardForm() {
 
   return (
     <form
+      className="contents"
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <form.AppField
-        children={(field) => <field.TextField label="Name" />}
-        name="name"
-      />
-
-      <div className="fixed right-2 bottom-8 w-full sm:max-w-[370px]">
+      <SheetPanel className="grid gap-4">
+        <form.AppField
+          children={(field) => <field.TextField label="Name" />}
+          name="name"
+        />
+        <BoardVisibilityField form={form} />
+      </SheetPanel>
+      <SheetFooter>
+        <SheetClose render={<Button variant="ghost" />}>Cancel</SheetClose>
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Save" />
+          <form.SubscribeButton label="Save" />
         </form.AppForm>
-      </div>
+      </SheetFooter>
     </form>
   );
 }
