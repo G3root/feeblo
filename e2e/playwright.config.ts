@@ -59,24 +59,33 @@ export default defineConfig({
     },
   ],
 
-  webServer: [
-    {
-      command: reuseBuiltApps
-        ? "../node_modules/.bin/tsx scripts/migrate-pglite.ts && ../node_modules/.bin/tsx ../apps/server/src/index.ts"
-        : "pnpm run dev:server:e2e",
-      env: e2eEnv,
-      reuseExistingServer: false,
-      timeout: 240_000,
-      url: `${apiURL}/health`,
-    },
-    {
-      command: reuseBuiltApps
-        ? "node ../apps/web/dist/server/entry.mjs"
-        : "pnpm run dev:web:e2e",
-      env: e2eEnv,
-      reuseExistingServer: false,
-      timeout: 240_000,
-      url: baseURL,
-    },
-  ],
+  // CI starts the web app only after the API has migrated and passed its
+  // health check. Starting both servers concurrently made a cold runner's
+  // failure indistinguishable from a Playwright readiness timeout.
+  webServer: reuseBuiltApps
+    ? [
+        {
+          command: "node scripts/start-built-apps.mjs",
+          env: e2eEnv,
+          reuseExistingServer: false,
+          timeout: 300_000,
+          url: baseURL,
+        },
+      ]
+    : [
+        {
+          command: "pnpm run dev:server:e2e",
+          env: e2eEnv,
+          reuseExistingServer: false,
+          timeout: 240_000,
+          url: `${apiURL}/health`,
+        },
+        {
+          command: "pnpm run dev:web:e2e",
+          env: e2eEnv,
+          reuseExistingServer: false,
+          timeout: 240_000,
+          url: baseURL,
+        },
+      ],
 });
