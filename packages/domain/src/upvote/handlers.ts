@@ -76,6 +76,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
       repository
         .list({
           organizationId: args.organizationId,
+          publicOnly: true,
         })
         .pipe(
           RateLimit.withPublicRpcRateLimit({

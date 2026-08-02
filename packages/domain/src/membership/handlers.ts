@@ -68,7 +68,11 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         })
       ).pipe(
         Policy.withPolicy(
-          membershipPolicy.canUpdateMemberRole({ organizationId, memberId })
+          membershipPolicy.canUpdateMemberRole({
+            organizationId,
+            memberId,
+            role,
+          })
         ),
         withRemapDbErrors("Membership", "update")
       ),

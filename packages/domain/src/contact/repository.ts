@@ -115,6 +115,25 @@ const makeContactRepository = Effect.gen(function* () {
         return contact !== undefined;
       }),
 
+    memberExistsByUserId: ({
+      organizationId,
+      userId,
+    }: {
+      organizationId: string;
+      userId: string;
+    }) =>
+      db
+        .select({ id: schema.memberTable.id })
+        .from(schema.memberTable)
+        .where(
+          and(
+            eq(schema.memberTable.organizationId, organizationId),
+            eq(schema.memberTable.userId, userId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0] !== undefined)),
+
     upsertContact: (args: TContactUpsert) =>
       Effect.gen(function* () {
         if (!(args.externalId || args.email)) {
