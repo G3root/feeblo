@@ -35,9 +35,11 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
+import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { usePrivilegedMemberLimit } from "~/hooks/use-privileged-member-limit";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -96,6 +98,7 @@ function MembersSettingsPage() {
 function MembersSection() {
   const organizationId = useOrganizationId();
   const { data: session } = useAuthState();
+  const { atLimit: atPrivilegedLimit } = usePrivilegedMemberLimit();
   const [search, setSearch] = React.useState("");
 
   const membersQuery = useLiveQuery(
@@ -230,6 +233,7 @@ function MembersSection() {
 
             return (
               <MemberListItem
+                atPrivilegedLimit={atPrivilegedLimit}
                 email={member.user?.email || "No email"}
                 id={member.id}
                 isCurrentUser={isCurrentUser}
@@ -428,6 +432,7 @@ function MembersSectionErrorState({
 }
 
 function MemberListItem({
+  atPrivilegedLimit,
   email,
   id,
   isCurrentUser,
@@ -436,6 +441,7 @@ function MemberListItem({
   organizationId,
   role,
 }: {
+  atPrivilegedLimit: boolean;
   email: string;
   id: string;
   isCurrentUser: boolean;
@@ -495,7 +501,12 @@ function MemberListItem({
             <SelectPopup>
               {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
               <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem
+                disabled={atPrivilegedLimit && role !== "admin"}
+                value="admin"
+              >
+                Admin
+              </SelectItem>
             </SelectPopup>
           </Select>
 
@@ -647,6 +658,7 @@ const InviteMemberFormSchema = z.object({
 
 function InviteMemberForm() {
   const organizationId = useOrganizationId();
+  const { atLimit, limit } = usePrivilegedMemberLimit();
 
   const form = useAppForm({
     defaultValues: {
@@ -690,7 +702,7 @@ function InviteMemberForm() {
 
   return (
     <form
-      className="grid grid-cols-[1fr_130px_auto] gap-2"
+      className="grid grid-cols-[1fr_180px_auto] gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -711,27 +723,36 @@ function InviteMemberForm() {
         name="email"
       />
 
-      <form.AppField
-        children={(field) => (
-          <Select
-            onValueChange={(value) =>
-              field.handleChange(value as "member" | "admin")
-            }
-            value={field.state.value}
-          >
-            <SkeletonWrapper>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-            </SkeletonWrapper>
-            <SelectPopup>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectPopup>
-          </Select>
-        )}
-        name="role"
-      />
+      <div className="flex items-center gap-2">
+        <form.AppField
+          children={(field) => (
+            <Select
+              onValueChange={(value) =>
+                field.handleChange(value as "member" | "admin")
+              }
+              value={field.state.value}
+            >
+              <SkeletonWrapper>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+              </SkeletonWrapper>
+              <SelectPopup>
+                <SelectItem value="member">Member</SelectItem>
+                <SelectItem disabled={atLimit} value="admin">
+                  Admin
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          )}
+          name="role"
+        />
+        {atLimit ? (
+          <SettingsItem.PaidPlanIndicator
+            content={`Admin roles are limited to ${limit} on this plan. Upgrade to add more.`}
+          />
+        ) : null}
+      </div>
       <form.AppForm>
         <SkeletonWrapper>
           <form.SubscribeButton type="submit">
