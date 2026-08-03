@@ -15,7 +15,7 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService } from "../services/s3";
+import { S3UploadService, S3UploadServiceLive } from "../services/s3";
 import {
   currentHttpApiSession,
   HttpApiAuthMiddlewareLive,
@@ -84,7 +84,15 @@ export const OrganizationApiLive = HttpApiBuilder.group(
             });
           }
 
-          const s3Service = yield* S3UploadService;
+          const s3Service = yield* S3UploadService.pipe(
+            Effect.provide(S3UploadServiceLive),
+            Effect.mapError(
+              () =>
+                new InternalServerError({
+                  message: "Failed to configure media storage",
+                })
+            )
+          );
           const uploaded = yield* s3Service
             .uploadOrganizationLogo({
               bytes,
@@ -109,7 +117,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
                 .set({ logo: uploaded.url })
                 .where(eq(schema.organizationTable.id, organizationId));
             }),
-          });
+          }).pipe(Effect.provideService(S3UploadService, s3Service));
 
           return uploaded;
         }).pipe(

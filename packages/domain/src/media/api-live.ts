@@ -11,7 +11,7 @@ import {
   UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService } from "../services/s3";
+import { S3UploadService, S3UploadServiceLive } from "../services/s3";
 import {
   currentHttpApiSession,
   HttpApiAuthMiddlewareLive,
@@ -68,7 +68,6 @@ export const MediaApiLive = HttpApiBuilder.group(
           });
         }
 
-        const s3Service = yield* S3UploadService;
         if (
           organizationId &&
           !session.organizations.some(({ id }) => id === organizationId)
@@ -77,6 +76,15 @@ export const MediaApiLive = HttpApiBuilder.group(
             message: "You are not a member of this organization",
           });
         }
+        const s3Service = yield* S3UploadService.pipe(
+          Effect.provide(S3UploadServiceLive),
+          Effect.mapError(
+            () =>
+              new InternalServerError({
+                message: "Failed to configure media storage",
+              })
+          )
+        );
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
@@ -97,7 +105,7 @@ export const MediaApiLive = HttpApiBuilder.group(
             : { type: "user", id: session.user.id },
           kind: kind === "image" ? "editor_image" : "editor_video",
           uploaded,
-        });
+        }).pipe(Effect.provideService(S3UploadService, s3Service));
 
         return { ...uploaded, kind };
       }).pipe(withRemapDbErrors("Media", "create"))

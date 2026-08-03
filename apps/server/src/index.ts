@@ -15,7 +15,6 @@ import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
-import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
@@ -283,6 +282,6 @@ const program = Effect.gen(function* () {
 
 program.pipe(
   Effect.scoped,
-  Effect.provide(Layer.mergeAll(ServerConfig.layer, S3UploadServiceLive)),
+  Effect.provide(ServerConfig.layer),
   NodeRuntime.runMain
 );
