@@ -503,6 +503,10 @@ export const postTable = pgTable(
       onDelete: "set null",
     }),
     source: postSourceEnum("source").default("DASHBOARD").notNull(),
+    metadata: jsonb("metadata")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     mergedIntoPostId: text("merged_into_post_id"),

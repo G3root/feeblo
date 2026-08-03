@@ -177,6 +177,21 @@ describe("FeebloWidget methods", () => {
     expect(identifyMsg).toBeDefined();
   });
 
+  it("sends context metadata to the iframe", () => {
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    widget.metadata({ page: "/pricing", source: "nav" });
+
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      {
+        event: "SET_CONTEXT",
+        data: { page: "/pricing", source: "nav" },
+      },
+      MOCK_ORIGIN
+    );
+  });
+
   it("methods return the widget for chaining", () => {
     expect(widget.open()).toBe(widget);
     expect(widget.close()).toBe(widget);
@@ -333,7 +348,7 @@ describe("Widget events via postMessage", () => {
     window.removeEventListener("feedbackSubmitted", handler);
   });
 
-  it("only emits feedbackSubmitted once per embed", () => {
+  it("emits feedbackSubmitted for every submission", () => {
     const handler = vi.fn();
     window.addEventListener("feedbackSubmitted", handler);
 
@@ -351,7 +366,7 @@ describe("Widget events via postMessage", () => {
       },
     });
 
-    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledTimes(2);
     window.removeEventListener("feedbackSubmitted", handler);
   });
 });

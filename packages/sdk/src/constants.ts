@@ -27,5 +27,7 @@ export const CONTAINER_STYLES: Partial<CSSStyleDeclaration> = {
 export const EVENT_NAMES = [
   "widgetReady",
   "widgetOpened",
+  "widgetClosed",
+  "identityChanged",
   "feedbackSubmitted",
 ] as const;

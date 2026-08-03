@@ -140,7 +140,14 @@ export const WidgetApiLive = HttpApiBuilder.group(
       )
       .handle("createFeedback", ({ payload }) =>
         Effect.gen(function* () {
-          const { boardId, organizationId, title, content, token } = payload;
+          const {
+            boardId,
+            organizationId,
+            title,
+            content,
+            metadata,
+            token,
+          } = payload;
 
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
@@ -239,6 +246,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   statusId: defaultStatus.id,
                   excerpt,
                   contactId: contactId ?? null,
+                  metadata: metadata ?? {},
                   source: "WIDGET",
                 });
               })
@@ -254,6 +262,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 statusId: defaultStatus.id,
                 excerpt,
                 contactId: null,
+                metadata: metadata ?? {},
                 source: "WIDGET",
               })
             );

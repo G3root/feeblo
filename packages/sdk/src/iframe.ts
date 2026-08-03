@@ -23,6 +23,12 @@ export function createIframe(
   if (options.theme) {
     params.set("theme", options.theme);
   }
+  if (options.locale) {
+    params.set("locale", options.locale);
+  }
+  if (options.defaultBoard) {
+    params.set("board", options.defaultBoard);
+  }
 
   const path = `${baseUrl}/feedback-widget/${organizationId}`;
   const query = params.toString();
@@ -30,6 +36,11 @@ export function createIframe(
   iframe.style.width = "100%";
   iframe.style.height = "100%";
   iframe.style.border = "none";
+  iframe.title = "Feeblo feedback widget";
+  iframe.setAttribute(
+    "sandbox",
+    "allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"
+  );
   iframe.setAttribute("allow", "clipboard-write");
 
   if (logger?.enabled) {

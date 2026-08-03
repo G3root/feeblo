@@ -1,4 +1,8 @@
-import { CONTAINER_ID, CONTAINER_STYLES, FADE_DURATION_MS } from "./constants";
+import {
+  CONTAINER_ID,
+  CONTAINER_STYLES,
+  FADE_DURATION_MS,
+} from "./constants";
 import { createLogger, type Logger } from "./debug";
 import { EmbedError as EmbedErrorCtor } from "./errors";
 import { emitWidgetEvent } from "./events";
@@ -25,8 +29,8 @@ export class Embed {
   private identity: NormalizedUserIdentity | null;
   private isLoaded = false;
   private isOpen = false;
-  private pendingBoard: string | null = null;
-  private submittedFeedbackSent = false;
+  private pendingBoard: string | null;
+  private context: Record<string, string> = {};
   private cleanupPositioning: (() => void) | null = null;
   private currentTrigger: HTMLElement | null = null;
   private escHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -36,7 +40,10 @@ export class Embed {
     this.organizationId = organizationId;
     this.options = options;
     this.logger = createLogger(options.debug === true);
-    this.identity = options.user ? normalizeUserIdentity(options.user) : null;
+    this.identity = options.user
+      ? normalizeUserIdentity(options.user)
+      : null;
+    this.pendingBoard = options.defaultBoard ?? null;
     this.iframe = createIframe(organizationId, options, this.logger);
     this.container = this.createContainer();
 
@@ -52,10 +59,8 @@ export class Embed {
     const existing = document.getElementById(
       CONTAINER_ID
     ) as CleanupContainer | null;
-    if (existing) {
-      existing._feebloCleanup?.();
-      existing.remove();
-    }
+    existing?._feebloCleanup?.();
+    existing?.remove();
 
     const container = document.createElement("div");
     container.id = CONTAINER_ID;
@@ -78,7 +83,7 @@ export class Embed {
       }
 
       switch (message?.event) {
-        case "ERROR": {
+        case "ERROR":
           onError?.(
             new EmbedErrorCtor({
               code: message.data?.code ?? "",
@@ -86,7 +91,6 @@ export class Embed {
             })
           );
           break;
-        }
         case "PAGE_HEIGHT": {
           const height = message.data?.height;
           if (height !== undefined && height > 80) {
@@ -96,32 +100,32 @@ export class Embed {
           break;
         }
         case "CLOSE": {
+          const wasOpen = this.isOpen;
           this.close();
-          onClose?.();
-          break;
-        }
-        case "READY": {
-          this.markReady();
-          break;
-        }
-        case "WIDGET_OPENED": {
-          emitWidgetEvent("widgetOpened", message.data, this.logger);
-          break;
-        }
-        case "FEEDBACK_SUBMITTED": {
-          if (!this.submittedFeedbackSent) {
-            this.submittedFeedbackSent = true;
-            emitWidgetEvent(
-              "feedbackSubmitted",
-              message.data?.post,
-              this.logger
-            );
+          if (wasOpen) {
+            onClose?.();
           }
           break;
         }
-        default: {
+        case "READY":
+          this.markReady();
           break;
-        }
+        case "WIDGET_OPENED":
+          emitWidgetEvent("widgetOpened", message.data, this.logger);
+          break;
+        case "WIDGET_CLOSED":
+          // The host owns the close state and emits widgetClosed exactly once.
+          break;
+        case "IDENTITY_CHANGED":
+          if (message.data) {
+            emitWidgetEvent("identityChanged", message.data, this.logger);
+          }
+          break;
+        case "FEEDBACK_SUBMITTED":
+          emitWidgetEvent("feedbackSubmitted", message.data?.post, this.logger);
+          break;
+        default:
+          break;
       }
     };
 
@@ -136,7 +140,6 @@ export class Embed {
     );
 
     window.addEventListener("message", handleMessage);
-
     (container as CleanupContainer)._feebloCleanup = () => {
       window.removeEventListener("message", handleMessage);
     };
@@ -151,6 +154,8 @@ export class Embed {
     }
     this.isLoaded = true;
     this.sendIdentify();
+    this.sendContext();
+    this.flushPendingBoard();
     emitWidgetEvent("widgetReady", undefined, this.logger);
   }
 
@@ -166,39 +171,36 @@ export class Embed {
     }
   }
 
-  open(trigger?: HTMLElement, _metadata?: Record<string, string>): void {
+  open(trigger?: HTMLElement, metadata: Record<string, string> = {}): void {
     if (this.isOpen) {
       return;
     }
 
     this.isOpen = true;
+    this.currentTrigger = trigger ?? null;
     this.container.style.display = "";
 
     if (trigger) {
-      this.currentTrigger = trigger;
       this.cleanupPositioning = createFloatingInstance(
         trigger,
         this.container,
         this.logger
       );
-      this.addCloseListeners();
     }
 
-    if (this.pendingBoard) {
-      this.sendSetBoard(this.pendingBoard);
-      this.pendingBoard = null;
+    this.context = { ...this.context, ...metadata };
+    if (metadata.board) {
+      this.pendingBoard = metadata.board;
     }
+    this.addCloseListeners();
+
+    this.flushPendingBoard();
+    this.sendContext();
 
     requestAnimationFrame(() => {
       this.container.style.opacity = "1";
     });
-
     this.post({ event: "SHOW" });
-    if (this.logger.enabled) {
-      this.logger("lifecycle", "open");
-    }
-
-    emitWidgetEvent("widgetOpened", undefined, this.logger);
   }
 
   close(): void {
@@ -210,7 +212,6 @@ export class Embed {
     this.cleanupPositioning?.();
     this.cleanupPositioning = null;
     this.currentTrigger = null;
-
     this.container.style.opacity = "0";
     this.isOpen = false;
 
@@ -219,11 +220,8 @@ export class Embed {
         this.container.style.display = "none";
       }
     }, FADE_DURATION_MS);
-
     this.post({ event: "HIDE" });
-    if (this.logger.enabled) {
-      this.logger("lifecycle", "close");
-    }
+    emitWidgetEvent("widgetClosed", undefined, this.logger);
   }
 
   setBoard(board: string): void {
@@ -238,14 +236,43 @@ export class Embed {
     this.post({ event: "SET_BOARD", data: { board } });
   }
 
+  private flushPendingBoard(): void {
+    if (!(this.isLoaded && this.pendingBoard)) {
+      return;
+    }
+    this.sendSetBoard(this.pendingBoard);
+    this.pendingBoard = null;
+  }
+
+  metadata(patch: Record<string, string | null>): void {
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) {
+        delete this.context[key];
+      } else {
+        this.context[key] = String(value);
+      }
+    }
+    this.sendContext();
+  }
+
+  private sendContext(): void {
+    if (this.isLoaded) {
+      this.post({ event: "SET_CONTEXT", data: this.context });
+    }
+  }
+
   identify(user: UserIdentity): void {
     this.identity = normalizeUserIdentity(user);
     if (this.logger.enabled) {
-      this.logger("identity", user.id);
+      this.logger("identity", this.identity.id);
     }
     if (this.isLoaded) {
       this.sendIdentify();
     }
+  }
+
+  isOpenState(): boolean {
+    return this.isOpen;
   }
 
   getAutoLoginToken(): string | undefined {
@@ -256,7 +283,10 @@ export class Embed {
     if (!this.identity) {
       return;
     }
-    this.post({ event: "IDENTIFY", data: compact(this.identity) });
+    this.post({
+      event: "IDENTIFY",
+      data: compact(this.identity),
+    });
   }
 
   private addCloseListeners(): void {
@@ -267,7 +297,11 @@ export class Embed {
     };
     this.outsideClickHandler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!this.container.contains(target) && this.currentTrigger !== target) {
+      if (
+        this.currentTrigger &&
+        !this.container.contains(target) &&
+        this.currentTrigger !== target
+      ) {
         this.close();
       }
     };
@@ -298,10 +332,8 @@ export class Embed {
     const container = document.getElementById(
       CONTAINER_ID
     ) as CleanupContainer | null;
-    if (container) {
-      container._feebloCleanup?.();
-      container.remove();
-    }
+    container?._feebloCleanup?.();
+    container?.remove();
     if (this.logger.enabled) {
       this.logger("lifecycle", "destroy");
     }

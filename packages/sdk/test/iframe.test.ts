@@ -41,6 +41,13 @@ describe("createIframe", () => {
     expect(iframe.getAttribute("allow")).toBe("clipboard-write");
   });
 
+  it("sandboxes the widget iframe", () => {
+    const iframe = createIframe("org_test", {});
+
+    expect(iframe.getAttribute("sandbox")).toContain("allow-scripts");
+    expect(iframe.title).toBe("Feeblo feedback widget");
+  });
+
   it("uses custom baseUrl in the iframe src", () => {
     const iframe = createIframe("org_test", {
       baseUrl: "https://staging.feeblo.com",

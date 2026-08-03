@@ -54,6 +54,7 @@ interface TPostCreate {
   creatorMemberId?: string | null;
   excerpt?: string;
   id: string;
+  metadata?: Record<string, string>;
   organizationId: string;
   source?: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "PUBLIC_BOARD";
   statusId: string;
@@ -119,6 +120,7 @@ const selectPostFields = () => ({
   },
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
+  metadata: schema.postTable.metadata,
   lockedAt: schema.postTable.lockedAt,
   archivedAt: schema.postTable.archivedAt,
   mergedIntoPostId: schema.postTable.mergedIntoPostId,
@@ -463,6 +465,7 @@ const makePostRepository = Effect.gen(function* () {
       creatorId,
       creatorMemberId,
       contactId,
+      metadata,
       source,
       excerpt: inputExcerpt,
     }: TPostCreate) =>
@@ -483,6 +486,7 @@ const makePostRepository = Effect.gen(function* () {
             creatorMemberId: creatorMemberId ?? null,
             contactId: contactId ?? null,
             source: source ?? "DASHBOARD",
+            metadata: metadata ?? {},
             createdAt: new Date(),
             slug: slugify(title),
             updatedAt: new Date(),

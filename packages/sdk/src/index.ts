@@ -39,6 +39,8 @@ export interface Feeblo {
   destroy(): void;
   identify(user: UserIdentity): Feeblo;
   init: typeof init;
+  isOpen(): boolean;
+  metadata(patch: Record<string, string | null>): Feeblo;
   off: typeof unsubscribe;
   on: typeof subscribe;
   open(): Feeblo;
@@ -62,6 +64,13 @@ export const Feeblo = {
   close(): Feeblo {
     getCurrentEmbed()?.close();
     return Feeblo;
+  },
+  metadata(patch: Record<string, string | null>): Feeblo {
+    getCurrentEmbed()?.metadata(patch);
+    return Feeblo;
+  },
+  isOpen(): boolean {
+    return getCurrentEmbed()?.isOpenState() ?? false;
   },
   setBoard(board: string): Feeblo {
     getCurrentEmbed()?.setBoard(board);

@@ -15,10 +15,10 @@ export type OrganizationId = string & {
 };
 
 export interface WidgetCompany {
-  id: string;
-  name: string;
   avatar?: string | undefined;
   customFields?: Record<string, unknown> | undefined;
+  id: string;
+  name: string;
 }
 
 export interface UserIdentity {
@@ -44,6 +44,7 @@ export interface NormalizedUserIdentity {
 export interface SubmittedFeedback {
   boardId: string;
   boardName: string;
+  metadata?: Record<string, string> | undefined;
   title: string;
 }
 
@@ -51,6 +52,8 @@ export interface EmbedOptions {
   baseUrl?: string | undefined;
   containerStyles?: Partial<CSSStyleDeclaration> | undefined;
   debug?: boolean | undefined;
+  defaultBoard?: string | undefined;
+  locale?: string | undefined;
   onClose?: (() => void) | undefined;
   onError?: ((error: EmbedError) => void) | undefined;
   onHeightChange?: ((height: number) => void) | undefined;
@@ -79,6 +82,8 @@ export interface FeebloWidget {
   close: () => FeebloWidget;
   destroy: () => void;
   identify: (user: UserIdentity) => FeebloWidget;
+  isOpen: () => boolean;
+  metadata: (patch: Record<string, string | null>) => FeebloWidget;
   open: (
     trigger?: HTMLElement,
     metadata?: Record<string, string>
@@ -93,10 +98,14 @@ export interface FeebloWidget {
 export type FeebloEventName =
   | "widgetReady"
   | "widgetOpened"
+  | "widgetClosed"
+  | "identityChanged"
   | "feedbackSubmitted";
 
 export interface FeebloEventMap {
   feedbackSubmitted: SubmittedFeedback | undefined;
+  identityChanged: UserIdentity;
+  widgetClosed: undefined;
   widgetOpened: unknown;
   widgetReady: undefined;
 }
@@ -138,8 +147,10 @@ export type IncomingMessage =
     }
   | { event: "PAGE_HEIGHT"; data?: { height?: number | undefined } | undefined }
   | { event: "CLOSE" }
+  | { event: "IDENTITY_CHANGED"; data?: UserIdentity | undefined }
   | { event: "READY" }
   | { event: "WIDGET_OPENED"; data?: unknown }
+  | { event: "WIDGET_CLOSED" }
   | {
       event: "FEEDBACK_SUBMITTED";
       data?: { post?: SubmittedFeedback | undefined } | undefined;
@@ -149,6 +160,7 @@ export type OutgoingMessage =
   | { event: "SHOW" }
   | { event: "HIDE" }
   | { event: "IDENTIFY"; data: Record<string, unknown> }
+  | { event: "SET_CONTEXT"; data: Record<string, string> }
   | { event: "SET_BOARD"; data: { board: string } };
 
 export type ExternalMessageData = {

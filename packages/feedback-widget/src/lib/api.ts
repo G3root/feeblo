@@ -1,4 +1,5 @@
 import { action, query, type RoutePreloadFuncArgs } from "@solidjs/router";
+import { getWidgetContext } from "./context";
 import { getWidgetToken } from "./identity";
 import { sendToParent } from "./messages";
 
@@ -77,11 +78,19 @@ export const createFeedBackAction = action(
 
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/feedback`;
-    const body: Record<string, string> = {
+    const body: {
+      boardId: string;
+      content: string;
+      metadata: Record<string, string>;
+      organizationId: string;
+      title: string;
+      token?: string;
+    } = {
       boardId,
       content,
       title,
       organizationId,
+      metadata: getWidgetContext(),
     };
     if (token) {
       body.token = token;
@@ -102,7 +111,9 @@ export const createFeedBackAction = action(
 
     sendToParent({
       event: "FEEDBACK_SUBMITTED",
-      data: { post: { boardId, boardName, title } },
+      data: {
+        post: { boardId, boardName, title, metadata: getWidgetContext() },
+      },
     });
 
     return { ok: true };

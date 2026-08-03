@@ -1,4 +1,4 @@
-export type IdentityData = {
+export type UserIdentityData = {
   avatar?: string;
   companies?: Array<{
     id: string;
@@ -10,28 +10,43 @@ export type IdentityData = {
   email?: string;
   id: string;
   name?: string;
-  token: string;
+  token?: string;
 };
+
+export type IdentityData = UserIdentityData;
 
 export type ParentMessage =
   | { event: "SHOW" }
   | { event: "HIDE" }
+  | { event: "SET_CONTEXT"; data: Record<string, string> }
   | { event: "SET_BOARD"; data: { board: string } }
+  | { event: "SET_LOCALE"; data: { locale: string } }
   | { event: "IDENTIFY"; data: IdentityData };
 
 export type ChildMessage =
   | { event: "READY" }
   | { event: "CLOSE" }
   | { event: "WIDGET_OPENED" }
+  | { event: "WIDGET_CLOSED" }
+  | { event: "IDENTITY_CHANGED"; data: IdentityData }
   | {
       event: "FEEDBACK_SUBMITTED";
-      data: { post: { boardId: string; boardName: string; title: string } };
+      data: {
+        post: {
+          boardId: string;
+          boardName: string;
+          metadata?: Record<string, string>;
+          title: string;
+        };
+      };
     };
 
 const PARENT_EVENT_NAMES = new Set<string>([
   "SHOW",
   "HIDE",
+  "SET_CONTEXT",
   "SET_BOARD",
+  "SET_LOCALE",
   "IDENTIFY",
 ]);
 
@@ -47,14 +62,22 @@ export function sendToParent(message: ChildMessage): void {
   if (typeof window === "undefined" || window.parent === window) {
     return;
   }
-  window.parent.postMessage(message, "*");
+  let targetOrigin = "*";
+  if (document.referrer) {
+    try {
+      targetOrigin = new URL(document.referrer).origin;
+    } catch {
+      targetOrigin = "*";
+    }
+  }
+  window.parent.postMessage(message, targetOrigin);
 }
 
 export function subscribeToParentMessages(
   handler: (message: ParentMessage) => void
 ): () => void {
   const listener = (e: MessageEvent<unknown>) => {
-    if (!isParentMessage(e.data)) {
+    if (e.source !== window.parent || !isParentMessage(e.data)) {
       return;
     }
     handler(e.data);

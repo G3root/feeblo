@@ -10,6 +10,7 @@ import {
 import { ErrorFallback } from "../components/error-fallback";
 import { Button } from "../components/ui/button";
 import { Icon } from "../components/ui/icon";
+import { setWidgetContext } from "../lib/context";
 import { setWidgetIdentity } from "../lib/identity";
 import {
   type ParentMessage,
@@ -30,33 +31,30 @@ export function RootComponent(props: RouteSectionProps) {
         break;
       case "HIDE":
         setIsOpen(false);
+        sendToParent({ event: "WIDGET_CLOSED" });
+        break;
+      case "SET_CONTEXT":
+        setWidgetContext(message.data);
         break;
       case "SET_BOARD":
         if (message.data?.board) {
           navigate(`/board/${message.data.board}`);
         }
         break;
+      case "SET_LOCALE":
+        document.documentElement.lang = message.data.locale;
+        break;
       case "IDENTIFY":
-        setWidgetIdentity({
-          id: message.data.id,
-          name: message.data.name,
-          email: message.data.email,
-          avatar: message.data.avatar,
-          customFields: message.data.customFields,
-          companies: message.data.companies,
-          token: message.data.token,
-        });
+        setWidgetIdentity(message.data);
+        sendToParent({ event: "IDENTITY_CHANGED", data: message.data });
         break;
     }
   };
 
   onMount(() => {
-    sendToParent({ event: "READY" });
-  });
-
-  onMount(() => {
     const unsubscribe = subscribeToParentMessages(handleParentMessage);
     onCleanup(unsubscribe);
+    sendToParent({ event: "READY" });
   });
 
   const handleClose = () => {

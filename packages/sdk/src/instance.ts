@@ -70,14 +70,19 @@ export function destroyInstance(embed: Embed | null): void {
 
 function createWidgetProxy(embed: Embed): FeebloWidget {
   const widget: FeebloWidget = {
-    identify: (user) => {
-      embed.identify(user);
+    identify: (identity) => {
+      embed.identify(identity);
       return widget;
     },
     setBoard: (board) => {
       embed.setBoard(board);
       return widget;
     },
+    metadata: (patch) => {
+      embed.metadata(patch);
+      return widget;
+    },
+    isOpen: () => embed.isOpenState(),
     open: (trigger, metadata) => {
       embed.open(trigger, metadata);
       return widget;
@@ -97,9 +102,11 @@ function noopWidget(): FeebloWidget {
   const self: FeebloWidget = {
     identify: () => self,
     setBoard: () => self,
+    metadata: () => self,
     open: () => self,
     close: () => self,
     destroy: () => undefined,
+    isOpen: () => false,
   };
   return self;
 }
