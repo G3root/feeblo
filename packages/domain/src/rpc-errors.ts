@@ -1,7 +1,46 @@
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
+
+const DatabaseDriverError = Schema.Struct({
+  code: Schema.String,
+});
+
+const getDatabaseErrorCode = (cause: unknown): string | undefined =>
+  Option.match(Schema.decodeUnknownOption(DatabaseDriverError)(cause), {
+    onNone: () => undefined,
+    onSome: ({ code }) => code,
+  });
+
+const isUniqueViolation = (error: unknown): boolean =>
+  error instanceof EffectDrizzleQueryError &&
+  getDatabaseErrorCode(error.cause) === "23505";
+
+type DbAction = "update" | "create" | "delete" | "select" | "upsert";
+
+export type RemapDbErrorsOptions = {
+  readonly uniqueViolationMessage?: string;
+};
+
+export type RemapDbErrorsConfig<UniqueViolationError = never> = {
+  readonly entity: string;
+  readonly action: DbAction;
+  readonly entityId?: unknown | { value: unknown; key: string }[];
+  readonly onUniqueViolation?: () => UniqueViolationError;
+  readonly uniqueViolationMessage?: string;
+};
+
+type RemappedDbError =
+  | EffectDrizzleQueryError
+  | { _tag: "SqlError" | "SchemaError" | "LegidError" };
+
+type RemappedDbEffect<R, E, A, UniqueViolationError> = Effect.Effect<
+  R,
+  Exclude<E, RemappedDbError> | InternalServerError | UniqueViolationError,
+  A
+>;
 
 export class BadRequestError extends Schema.TaggedErrorClass<BadRequestError>()(
   "BadRequestError",
@@ -32,36 +71,75 @@ export class InternalServerError extends Schema.TaggedErrorClass<InternalServerE
   {
     message: Schema.String,
     detail: Schema.optional(Schema.String),
-    cause: Schema.optional(Schema.Any),
   },
   { httpApiStatus: 500, identifier: "InternalServerError" }
 ) {}
 
+export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
+  config: RemapDbErrorsConfig<UniqueViolationError>
+): (
+  effect: Effect.Effect<R, E, A>
+) => RemappedDbEffect<R, E, A, UniqueViolationError>;
 export function withRemapDbErrors<R, E, A>(
   entityType: string,
-  action: "update" | "create" | "delete" | "select" | "upsert",
-  entityId?: unknown | { value: unknown; key: string }[]
+  action: DbAction,
+  entityId?: unknown | { value: unknown; key: string }[],
+  options?: RemapDbErrorsOptions
+): (effect: Effect.Effect<R, E, A>) => RemappedDbEffect<R, E, A, never>;
+export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
+  entityOrConfig: string | RemapDbErrorsConfig<UniqueViolationError>,
+  action?: DbAction,
+  entityId?: unknown | { value: unknown; key: string }[],
+  options?: RemapDbErrorsOptions
 ) {
+  let config: RemapDbErrorsConfig<UniqueViolationError>;
+  if (typeof entityOrConfig === "string") {
+    if (action === undefined) {
+      throw new TypeError("withRemapDbErrors requires a database action");
+    }
+    config = {
+      action,
+      entity: entityOrConfig,
+      ...(entityId === undefined ? {} : { entityId }),
+      ...(options?.uniqueViolationMessage === undefined
+        ? {}
+        : { uniqueViolationMessage: options.uniqueViolationMessage }),
+    };
+  } else {
+    config = entityOrConfig;
+  }
+
   return (
     effect: Effect.Effect<R, E, A>
-  ): Effect.Effect<
-    R,
-    | Exclude<
-        E,
-        | EffectDrizzleQueryError
-        | { _tag: "SqlError" | "SchemaError" | "LegidError" }
-      >
-    | InternalServerError,
-    A
-  > => {
-    const toInternalError = (err: unknown, detailPrefix: string) =>
+  ): RemappedDbEffect<R, E, A, UniqueViolationError> => {
+    const toInternalError = (
+      detailPrefix: string
+    ): Effect.Effect<never, InternalServerError, never> =>
       Effect.fail(
         new InternalServerError({
-          message: `Error ${action}ing ${entityType}`,
-          detail: constructDetailMessage(detailPrefix, entityType, entityId),
-          cause: String(err),
+          message: `Error ${config.action}ing ${config.entity}`,
+          detail: constructDetailMessage(
+            detailPrefix,
+            config.entity,
+            config.entityId
+          ),
         })
       );
+
+    const toUniqueViolationError = (): Effect.Effect<
+      never,
+      InternalServerError | UniqueViolationError,
+      never
+    > =>
+      config.onUniqueViolation
+        ? Effect.fail(config.onUniqueViolation())
+        : Effect.fail(
+            new InternalServerError({
+              message:
+                config.uniqueViolationMessage ??
+                `A ${config.entity.toLowerCase()} already exists`,
+            })
+          );
 
     return effect.pipe(
       Effect.catchIf(
@@ -80,18 +158,15 @@ export function withRemapDbErrors<R, E, A>(
           Predicate.isTagged(e, "LegidError"),
         (err) => {
           if (Predicate.isTagged(err, "SchemaError")) {
-            return toInternalError(
-              err,
-              "There was an error in parsing when"
-            );
+            return toInternalError("There was an error in parsing when");
           }
           if (Predicate.isTagged(err, "LegidError")) {
-            return toInternalError(
-              err,
-              "There was an error generating an id when"
-            );
+            return toInternalError("There was an error generating an id when");
           }
-          return toInternalError(err, "There was a database error when");
+          if (isUniqueViolation(err)) {
+            return toUniqueViolationError();
+          }
+          return toInternalError("There was a database error when");
         }
       )
     );

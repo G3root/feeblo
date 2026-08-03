@@ -114,10 +114,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
         }).pipe(
           Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
           Effect.mapError(
-            (cause) =>
+            () =>
               new InternalServerError({
                 message: "Failed to find similar posts",
-                cause: String(cause),
               })
           ),
           withRemapDbErrors("Post", "select")
@@ -222,10 +221,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   parsedContact
                 ).pipe(
                   Effect.mapError(
-                    (cause) =>
+                    () =>
                       new InternalServerError({
                         message: "Failed to create feedback contact",
-                        cause: String(cause),
                       })
                   )
                 );
