@@ -8,8 +8,10 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+/// <reference path="../styles.d.ts" />
+
 import "prosekit/basic/style.css";
-import "prosekit/basic/typography.css";
+import "./typeset.css";
 import { markdownToHtml } from "@feeblo/utils/markdown";
 import { createEditor } from "prosekit/core";
 import { ProseKit } from "prosekit/react";
@@ -59,7 +61,7 @@ export function Editor(props: EditorProps) {
     <ProseKit editor={editor}>
       <div
         className={cn(
-          'ProseMirror box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-primary'
+          'ProseMirror typeset box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-primary'
         )}
         ref={editor.mount}
       />

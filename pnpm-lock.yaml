@@ -730,6 +730,9 @@ importers:
 
   packages/feedback-widget:
     dependencies:
+      '@feeblo/web-shared':
+        specifier: workspace:*
+        version: link:../web-shared
       '@solidjs/router':
         specifier: 'catalog:'
         version: 0.16.1(solid-js@1.9.13)
@@ -1136,6 +1139,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.5(react@19.2.5)
+      tw-animate-css:
+        specifier: 'catalog:'
+        version: 1.4.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3

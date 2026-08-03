@@ -4,6 +4,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Separator } from "@feeblo/ui/separator";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link } from "@tanstack/react-router";
@@ -102,11 +103,7 @@ export function ChangelogPage() {
                     </Link>
                   </header>
 
-                  <div
-                    className="typography"
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: <explanation>
-                    dangerouslySetInnerHTML={{ __html: item.content }}
-                  />
+                  <MarkdownContent content={item.content} />
                 </ChangelogTimelineBody>
               </ChangelogTimelineItem>
             ))}

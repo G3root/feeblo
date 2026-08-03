@@ -4,12 +4,19 @@ import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 import { toastManager } from "@feeblo/ui/toast";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
-import { createContext, type ReactNode, use, useRef, useState } from "react";
+import {
+  createContext,
+  memo,
+  type ReactNode,
+  use,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 type PostEditorState = {
-  content: string;
   disabled: boolean;
   placeholder: string;
   resetKey: number;
@@ -32,6 +39,16 @@ type PostEditorContextValue = {
 
 const PostEditorContext = createContext<PostEditorContextValue | null>(null);
 
+type PostEditorInitialContent = {
+  value: string;
+};
+
+const PostEditorInitialContentContext =
+  createContext<PostEditorInitialContent | null>(null);
+
+const DEFAULT_PLACEHOLDER = "Type '/' for commands or start typing...";
+const noop = () => undefined;
+
 function usePostEditor() {
   const value = use(PostEditorContext);
 
@@ -40,6 +57,32 @@ function usePostEditor() {
   }
 
   return value;
+}
+
+function usePostEditorInitialContent() {
+  const value = use(PostEditorInitialContentContext);
+
+  if (!value) {
+    throw new Error("PostEditor components must be used within Provider.");
+  }
+
+  return value.value;
+}
+
+function PostEditorInitialContentProvider({
+  children,
+  content,
+}: {
+  children?: ReactNode;
+  content: string;
+}) {
+  const initialContent = useRef({ value: content });
+
+  return (
+    <PostEditorInitialContentContext value={initialContent.current}>
+      {children}
+    </PostEditorInitialContentContext>
+  );
 }
 
 type PostEditorProviderProps = {
@@ -58,51 +101,65 @@ function PostEditorProvider({
   content = "",
   disabled = false,
   onContentChange,
-  onSubmit = () => {},
+  onSubmit = noop,
   placeholder,
   resetKey = 0,
   submitLabel = "Publish",
 }: PostEditorProviderProps) {
+  const onContentChangeRef = useRef(onContentChange);
+  const onSubmitRef = useRef(onSubmit);
+  onContentChangeRef.current = onContentChange;
+  onSubmitRef.current = onSubmit;
+
+  const actions = useMemo<PostEditorActions>(
+    () => ({
+      onContentChange: (nextContent) => {
+        onContentChangeRef.current?.(nextContent);
+      },
+      onSubmit: () => onSubmitRef.current(),
+    }),
+    []
+  );
+  const state = useMemo<PostEditorState>(
+    () => ({
+      disabled,
+      placeholder: placeholder ?? DEFAULT_PLACEHOLDER,
+      resetKey,
+    }),
+    [disabled, placeholder, resetKey]
+  );
+  const meta = useMemo<PostEditorMeta>(() => ({ submitLabel }), [submitLabel]);
+  const contextValue = useMemo<PostEditorContextValue>(
+    () => ({ actions, meta, state }),
+    [actions, meta, state]
+  );
+
   return (
-    <PostEditorContext
-      value={{
-        actions: {
-          onContentChange: onContentChange ?? (() => {}),
-          onSubmit,
-        },
-        meta: { submitLabel },
-        state: {
-          content,
-          disabled,
-          placeholder:
-            placeholder ?? "Type '/' for commands or start typing...",
-          resetKey,
-        },
-      }}
-    >
-      {children}
-    </PostEditorContext>
+    <PostEditorInitialContentProvider content={content} key={resetKey}>
+      <PostEditorContext value={contextValue}>{children}</PostEditorContext>
+    </PostEditorInitialContentProvider>
   );
 }
 
-function PostEditorEditor() {
+const PostEditorEditor = memo(function PostEditorEditor() {
   const { actions, state } = usePostEditor();
+  const initialContent = usePostEditorInitialContent();
 
   return (
     <EditorProvider
-      defaultValue={{ postContent: state.content }}
+      defaultValue={{ postContent: initialContent }}
       key={state.resetKey}
     >
       <Editor
-        onChange={(doc) => actions.onContentChange(doc)}
+        onChange={actions.onContentChange}
         placeholder={state.placeholder}
         readOnly={state.disabled}
       />
     </EditorProvider>
   );
-}
+});
 
-function PostEditorSubmit() {
+const PostEditorSubmit = memo(function PostEditorSubmit() {
   const { actions, meta, state } = usePostEditor();
 
   return (
@@ -117,7 +174,7 @@ function PostEditorSubmit() {
       </Button>
     </div>
   );
-}
+});
 
 type PostEditorRootProps = {
   children?: ReactNode;
@@ -134,7 +191,7 @@ function PostEditorComponent({
   content: externalContent,
   disabled,
   onContentChange: externalOnContentChange,
-  onSubmit = () => {},
+  onSubmit = noop,
   placeholder,
   submitLabel,
 }: PostEditorRootProps) {
