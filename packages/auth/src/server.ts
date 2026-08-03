@@ -2,11 +2,8 @@
 
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
-import {
-  AssetRepository,
-  deleteAssetRows,
-  deleteBucketObjects,
-} from "@feeblo/domain/asset/repository";
+import { deleteStoredAssets } from "@feeblo/domain/asset/deletion";
+import { AssetRepository } from "@feeblo/domain/asset/repository";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
@@ -14,6 +11,7 @@ import { MembershipPolicy } from "@feeblo/domain/membership/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
 import { PolicyDeniedError } from "@feeblo/domain/policy";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
+import { S3UploadService } from "@feeblo/domain/services/s3";
 import { WelcomeUserWorkflow } from "@feeblo/domain/user/workflows";
 import {
   createSsoSession,
@@ -94,6 +92,7 @@ export const initAuthHandler = (
     const polarService = yield* PolarService;
 
     const isTest = nodeEnv === "test";
+    const previousProfileImages = new Map<string, string | null>();
 
     const trustedOrigins = yield* getTrustedOrigins;
     const db = yield* Database.Database;
@@ -117,6 +116,8 @@ export const initAuthHandler = (
         MembershipRepository.layer,
         makeMailerLayer(),
         WorkspaceRepository.layer,
+        Layer.succeed(S3UploadService, yield* S3UploadService),
+        Layer.succeed(WorkflowEngine, workflowEngine),
         Layer.succeed(RateLimitService, yield* RateLimitService),
         SsoRepositoriesLive
       ).pipe(Layer.provideMerge(dbLayer))
@@ -173,14 +174,13 @@ export const initAuthHandler = (
         Effect.gen(function* () {
           const repository = yield* AssetRepository;
           const assets = yield* repository.findByOwnerAndKind({
-            userId,
             kind: "profile_image",
+            owner: { type: "user", id: userId },
           });
           if (assets.length === 0) {
             return;
           }
-          yield* deleteAssetRows(assets);
-          yield* deleteBucketObjects(assets.map(({ key }) => key));
+          yield* deleteStoredAssets(assets);
         }).pipe(
           Effect.provide(AssetRepository.layer),
           Effect.catchCause((cause) =>
@@ -593,8 +593,23 @@ export const initAuthHandler = (
         },
         user: {
           update: {
+            async before(user) {
+              if (user.image !== null || !user.id) {
+                return;
+              }
+              const previousImage = await callbackRuntime.runPromise(
+                db
+                  .select({ image: schema.userTable.image })
+                  .from(schema.userTable)
+                  .where(eq(schema.userTable.id, user.id))
+                  .pipe(Effect.map((rows) => rows[0]?.image ?? null))
+              );
+              previousProfileImages.set(user.id, previousImage);
+            },
             async after(user) {
-              if (user.image) {
+              const previousImage = previousProfileImages.get(user.id);
+              previousProfileImages.delete(user.id);
+              if (user.image || !previousImage) {
                 return;
               }
               await deleteRemovedProfileAssets(user.id);

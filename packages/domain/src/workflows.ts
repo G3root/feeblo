@@ -5,6 +5,7 @@ import {
   SingleRunner,
   TestRunner,
 } from "effect/unstable/cluster";
+import { AssetDeletionWorkflowLayer } from "./asset/workflow";
 import { SubmissionEmailNotificationWorkflowLayer } from "./post/workflow";
 import { WelcomeUserWorkflowLayer } from "./user/workflows";
 
@@ -23,6 +24,7 @@ type MakeMailerLayer = () => Layer.Layer<
 
 const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
   Layer.mergeAll(
+    AssetDeletionWorkflowLayer,
     WelcomeUserWorkflowLayer.pipe(Layer.provide(makeMailerLayer())),
     SubmissionEmailNotificationWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer())

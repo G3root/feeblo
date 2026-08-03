@@ -5,14 +5,14 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-
+import { compensateUploadedAsset } from "../asset/deletion";
 import { Api } from "../http/api";
 import {
   BadRequestError,
   InternalServerError,
   withRemapDbErrors,
 } from "../rpc-errors";
-import { S3UploadService, S3UploadServiceLive } from "../services/s3";
+import { S3UploadService } from "../services/s3";
 import {
   currentHttpApiSession,
   HttpApiAuthMiddlewareLive,
@@ -69,15 +69,7 @@ export const MediaApiLive = HttpApiBuilder.group(
           });
         }
 
-        const s3Service = yield* S3UploadService.pipe(
-          Effect.provide(S3UploadServiceLive),
-          Effect.mapError(
-            () =>
-              new InternalServerError({
-                message: "Failed to configure media storage",
-              })
-          )
-        );
+        const s3Service = yield* S3UploadService;
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
@@ -95,15 +87,22 @@ export const MediaApiLive = HttpApiBuilder.group(
         const db = yield* currentDb;
         const assetId = yield* AssetId.generate;
 
-        yield* transaction(
-          db.insert(schema.assetTable).values({
-            id: assetId,
-            bucket: uploaded.bucket,
-            key: uploaded.key,
-            url: uploaded.url,
-            kind: kind === "image" ? "editor_image" : "editor_video",
-            userId: session.user.id,
-          })
+        yield* Effect.tapError(
+          transaction(
+            db.insert(schema.assetTable).values({
+              id: assetId,
+              bucket: uploaded.bucket,
+              key: uploaded.key,
+              url: uploaded.url,
+              kind: kind === "image" ? "editor_image" : "editor_video",
+              userId: session.user.id,
+            })
+          ),
+          () =>
+            compensateUploadedAsset(
+              uploaded,
+              "Failed media metadata transaction"
+            )
         );
 
         return { ...uploaded, kind };

@@ -2,7 +2,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { AssetRepository, deleteStoredAssets } from "../asset/repository";
+import { deleteStoredAssets } from "../asset/deletion";
+import { AssetRepository } from "../asset/repository";
 import * as Policy from "../policy";
 import { NotFoundError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -28,10 +29,17 @@ export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
   const removeStoredLogo = (organizationId: string) =>
     Effect.gen(function* () {
       const assets = yield* assetRepository.findByOwnerAndKind({
-        organizationId,
         kind: "organization_logo",
+        owner: { type: "organization", id: organizationId },
       });
-      yield* deleteStoredAssets(assets);
+      yield* deleteStoredAssets(assets).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning(
+            "Failed to clean up removed organization logo",
+            cause
+          )
+        )
+      );
     });
 
   return {

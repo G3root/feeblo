@@ -5,11 +5,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import {
-  AssetRepository,
-  deleteBucketObjects,
-  extractAssetUrlsFromContent,
-} from "../asset/repository";
+import { scheduleAssetDeletions, stageAssetDeletions } from "../asset/deletion";
+import { AssetRepository } from "../asset/repository";
+import { extractAssetUrlsFromContent } from "../asset/urls";
 import { BoardRepository } from "../board/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -160,12 +158,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
       yield* transaction(
         Effect.gen(function* () {
-          yield* assetRepository.deleteByIds(editorAssets.map(({ id }) => id));
+          yield* stageAssetDeletions(editorAssets);
           yield* repository.delete(args);
         })
       );
-
-      yield* deleteBucketObjects(editorAssets.map(({ key }) => key));
+      yield* scheduleAssetDeletions(editorAssets);
     });
 
   const updatePostEffect = (args: TPostUpdate) =>

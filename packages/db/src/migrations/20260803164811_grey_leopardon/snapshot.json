@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "01ffe29d-3d18-4916-974b-e966940375bf",
+  "id": "29cb0209-c9f6-49e4-8661-4e7910354559",
   "prevIds": [
-    "eb863c9d-49e9-4d95-a3e2-34ece6aae450"
+    "f5ddaf17-f283-434e-be34-2d54d2d573c1"
   ],
   "ddl": [
     {
@@ -394,6 +394,12 @@
     {
       "isRlsEnabled": false,
       "name": "upvote",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "asset_deletion",
       "entityType": "tables",
       "schema": "public"
     },
@@ -2089,19 +2095,6 @@
       "generated": null,
       "identity": null,
       "name": "content",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "changelog"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "''",
-      "generated": null,
-      "identity": null,
-      "name": "excerpt",
       "entityType": "columns",
       "schema": "public",
       "table": "changelog"
@@ -4044,19 +4037,6 @@
       "table": "post"
     },
     {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "'{}'",
-      "generated": null,
-      "identity": null,
-      "name": "metadata",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "post"
-    },
-    {
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": false,
@@ -4913,6 +4893,97 @@
       "entityType": "columns",
       "schema": "public",
       "table": "upvote"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset_deletion"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "bucket",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset_deletion"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset_deletion"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "error",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset_deletion"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "attempts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset_deletion"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset_deletion"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset_deletion"
     },
     {
       "type": "text",
@@ -6872,6 +6943,41 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "bucket",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "key",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_deletion_bucket_key_uidx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset_deletion"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "bucket",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "key",
           "isExpression": false,
           "asc": true,
@@ -6927,6 +7033,27 @@
       "method": "btree",
       "concurrently": false,
       "name": "asset_organizationId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "url",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_url_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "asset"
@@ -8703,6 +8830,16 @@
         "id"
       ],
       "nameExplicit": false,
+      "name": "asset_deletion_pkey",
+      "schema": "public",
+      "table": "asset_deletion",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
       "name": "asset_pkey",
       "schema": "public",
       "table": "asset",
@@ -8803,6 +8940,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "post"
+    },
+    {
+      "value": "(\"user_id\" IS NOT NULL) <> (\"organization_id\" IS NOT NULL)",
+      "name": "asset_owner_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "asset"
     }
   ],
   "renames": []

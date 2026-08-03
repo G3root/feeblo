@@ -13,11 +13,14 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import { AssetRepository } from "../asset/repository";
+import { AssetDeletionWorkflowLayer } from "../asset/workflow";
 import { BoardRepository } from "../board/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
+import { S3UploadService } from "../services/s3";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -166,7 +169,24 @@ describe("PostRpcHandlers", () => {
     Layer.provideMerge(RepositoriesTest)
   );
 
-  const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
+  const S3Test = Layer.succeed(S3UploadService, {
+    uploadProfileImage: () => Effect.die("not used in this test"),
+    uploadOrganizationLogo: () => Effect.die("not used in this test"),
+    uploadEditorMedia: () => Effect.die("not used in this test"),
+    deleteObject: () => Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
+  });
+
+  const AssetDeletionTest = AssetDeletionWorkflowLayer.pipe(
+    Layer.provideMerge(S3Test),
+    Layer.provideMerge(WorkflowEngine.layerMemory),
+    Layer.provideMerge(Database.PgliteDatabaseLive)
+  );
+
+  const TestLayer = Layer.mergeAll(
+    HandlerTest,
+    AssetDeletionTest,
+    Database.PgliteDatabaseLive
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("PostList", () => {

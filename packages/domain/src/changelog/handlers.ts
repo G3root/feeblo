@@ -2,11 +2,9 @@ import { transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import {
-  AssetRepository,
-  deleteBucketObjects,
-  extractAssetUrlsFromContent,
-} from "../asset/repository";
+import { scheduleAssetDeletions, stageAssetDeletions } from "../asset/deletion";
+import { AssetRepository } from "../asset/repository";
+import { extractAssetUrlsFromContent } from "../asset/urls";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -85,14 +83,11 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
         yield* transaction(
           Effect.gen(function* () {
-            yield* assetRepository.deleteByIds(
-              editorAssets.map(({ id }) => id)
-            );
+            yield* stageAssetDeletions(editorAssets);
             yield* repository.delete(args);
           })
         );
-
-        yield* deleteBucketObjects(editorAssets.map(({ key }) => key));
+        yield* scheduleAssetDeletions(editorAssets);
       }).pipe(
         Policy.withPolicy(
           changelogPolicy.canDelete({

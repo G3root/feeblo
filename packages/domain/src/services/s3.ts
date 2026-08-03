@@ -100,7 +100,7 @@ const makeS3UploadService = Effect.gen(function* () {
         yield* fileSystem.writeFile(fileKey, bytes);
         return resolvePublicUrl(fileKey);
       }),
-    deleteObject: (key: string) =>
+    deleteObject: (bucket: string, key: string) =>
       s3.deleteObject({ Bucket: bucket, Key: key }),
   };
 });

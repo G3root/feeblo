@@ -10,6 +10,9 @@
     "./asset/repository": {
       "default": "./src/asset/repository.ts"
     },
+    "./asset/deletion": {
+      "default": "./src/asset/deletion.ts"
+    },
     "./rpc-group": {
       "default": "./src/rpc-group.ts"
     },
