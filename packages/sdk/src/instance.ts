@@ -1,3 +1,4 @@
+import { normalizeWidgetConfig, widgetConfigKey } from "./config";
 import { banner } from "./debug";
 import { Embed } from "./embed";
 import { EmbedError } from "./errors";
@@ -37,7 +38,10 @@ function setupGlobalListeners(): void {
       if (msg.data.setBoard) {
         currentEmbed.setBoard(msg.data.setBoard);
       }
-      currentEmbed.open();
+      currentEmbed.openModule("feedback");
+      if (!currentEmbed.isOpenState()) {
+        currentEmbed.open();
+      }
     }
   };
 
@@ -87,6 +91,10 @@ function createWidgetProxy(embed: Embed): FeebloWidget {
       embed.open(trigger, metadata);
       return widget;
     },
+    openModule: (module) => {
+      embed.openModule(module);
+      return widget;
+    },
     close: () => {
       embed.close();
       return widget;
@@ -104,6 +112,7 @@ function noopWidget(): FeebloWidget {
     setBoard: () => self,
     metadata: () => self,
     open: () => self,
+    openModule: () => self,
     close: () => self,
     destroy: () => undefined,
     isOpen: () => false,
@@ -151,7 +160,12 @@ export function init(
     return noopWidget();
   }
 
-  if (currentEmbed && currentOrgId === organizationId) {
+  const nextConfigKey = widgetConfigKey(normalizeWidgetConfig(resolvedOptions));
+  if (
+    currentEmbed &&
+    currentOrgId === organizationId &&
+    currentEmbed.getConfigKey() === nextConfigKey
+  ) {
     if (resolvedOptions.user) {
       currentEmbed.identify(resolvedOptions.user);
     }

@@ -7,8 +7,11 @@ interface GlobalAutoConfig {
   debug?: boolean | undefined;
   defaultBoard?: string | undefined;
   locale?: string | undefined;
+  mode?: EmbedOptions["mode"];
+  modules?: EmbedOptions["modules"];
   organizationId?: string | undefined;
   orgId?: string | undefined;
+  placement?: EmbedOptions["placement"];
   theme?: string | undefined;
 }
 
@@ -53,6 +56,16 @@ function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
     globalConfig?.defaultBoard ?? scriptDataset.feebloDefaultBoard;
   const locale = globalConfig?.locale ?? scriptDataset.feebloLocale;
   const theme = globalConfig?.theme ?? scriptDataset.feebloTheme;
+  const mode = globalConfig?.mode ?? scriptDataset.feebloMode;
+  const placement = globalConfig?.placement ?? scriptDataset.feebloPlacement;
+  const modulesValue = scriptDataset.feebloModules;
+  const modules =
+    globalConfig?.modules ??
+    (modulesValue
+      ? (modulesValue
+          .split(",")
+          .map((value) => value.trim()) as EmbedOptions["modules"])
+      : undefined);
   const debug = globalConfig?.debug ?? scriptDataset.feebloDebug === "true";
 
   const options: EmbedOptions = {};
@@ -67,6 +80,15 @@ function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
   }
   if (locale) {
     options.locale = locale;
+  }
+  if (mode) {
+    options.mode = mode as EmbedOptions["mode"];
+  }
+  if (modules) {
+    options.modules = modules;
+  }
+  if (placement) {
+    options.placement = placement as EmbedOptions["placement"];
   }
   if (debug) {
     options.debug = true;

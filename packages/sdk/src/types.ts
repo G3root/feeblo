@@ -48,15 +48,22 @@ export interface SubmittedFeedback {
   title: string;
 }
 
+export type WidgetMode = "feedback" | "updates" | "hub";
+export type WidgetModule = Exclude<WidgetMode, "hub">;
+export type WidgetPlacement = "bottom-left" | "bottom-right";
+
 export interface EmbedOptions {
   baseUrl?: string | undefined;
   containerStyles?: Partial<CSSStyleDeclaration> | undefined;
   debug?: boolean | undefined;
   defaultBoard?: string | undefined;
   locale?: string | undefined;
+  mode?: WidgetMode | undefined;
+  modules?: WidgetModule[] | undefined;
   onClose?: (() => void) | undefined;
   onError?: ((error: EmbedError) => void) | undefined;
   onHeightChange?: ((height: number) => void) | undefined;
+  placement?: WidgetPlacement | undefined;
   root?: HTMLElement | undefined;
   theme?: string | undefined;
   user?: UserIdentity | undefined;
@@ -88,6 +95,7 @@ export interface FeebloWidget {
     trigger?: HTMLElement,
     metadata?: Record<string, string>
   ) => FeebloWidget;
+  openModule: (module: WidgetModule) => FeebloWidget;
   setBoard: (board: string) => FeebloWidget;
 }
 
@@ -106,7 +114,7 @@ export interface FeebloEventMap {
   feedbackSubmitted: SubmittedFeedback | undefined;
   identityChanged: UserIdentity;
   widgetClosed: undefined;
-  widgetOpened: unknown;
+  widgetOpened: { module: WidgetModule } | undefined;
   widgetReady: undefined;
 }
 
@@ -149,7 +157,7 @@ export type IncomingMessage =
   | { event: "CLOSE" }
   | { event: "IDENTITY_CHANGED"; data?: UserIdentity | undefined }
   | { event: "READY" }
-  | { event: "WIDGET_OPENED"; data?: unknown }
+  | { event: "WIDGET_OPENED"; data?: { module: WidgetModule } | undefined }
   | { event: "WIDGET_CLOSED" }
   | {
       event: "FEEDBACK_SUBMITTED";
@@ -161,6 +169,7 @@ export type OutgoingMessage =
   | { event: "HIDE" }
   | { event: "IDENTIFY"; data: Record<string, unknown> }
   | { event: "SET_CONTEXT"; data: Record<string, string> }
+  | { event: "SET_MODULE"; data: { module: WidgetModule } }
   | { event: "SET_BOARD"; data: { board: string } };
 
 export type ExternalMessageData = {

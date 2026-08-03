@@ -60,6 +60,7 @@ describe("init", () => {
     expect(typeof widget.close).toBe("function");
     expect(typeof widget.identify).toBe("function");
     expect(typeof widget.setBoard).toBe("function");
+    expect(typeof widget.openModule).toBe("function");
     expect(typeof widget.destroy).toBe("function");
   });
 
@@ -101,6 +102,15 @@ describe("init", () => {
     expect(w2).toBeDefined();
     expect(embedBefore).not.toBeNull();
     expect(embedAfter).toBe(embedBefore);
+  });
+
+  it("replaces the embed when the mode changes for the same organization", () => {
+    init("org_mode", { mode: "feedback" });
+    const feedbackEmbed = getCurrentEmbed();
+
+    init("org_mode", { mode: "updates" });
+
+    expect(getCurrentEmbed()).not.toBe(feedbackEmbed);
   });
 
   it("identifies user when passed in options", () => {
@@ -196,6 +206,56 @@ describe("FeebloWidget methods", () => {
     expect(widget.open()).toBe(widget);
     expect(widget.close()).toBe(widget);
     expect(widget.setBoard("b")).toBe(widget);
+    expect(widget.openModule("feedback")).toBe(widget);
+  });
+
+  it("renders and toggles a placed launcher", () => {
+    Feeblo.destroy();
+    widget = init("org_launcher", { placement: "bottom-right" });
+    const launcher = document.getElementById("feeblo-widget-launcher");
+
+    expect(launcher).not.toBeNull();
+    launcher?.click();
+    expect(widget.isOpen()).toBe(true);
+    expect(launcher?.getAttribute("aria-expanded")).toBe("true");
+    launcher?.click();
+    expect(widget.isOpen()).toBe(false);
+  });
+
+  it("opens enabled Hub modules and ignores disabled modules", () => {
+    Feeblo.destroy();
+    widget = init("org_hub", { mode: "hub", modules: ["updates"] });
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    widget.openModule("feedback");
+    expect(widget.isOpen()).toBe(false);
+
+    widget.openModule("updates");
+    expect(widget.isOpen()).toBe(true);
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      { event: "SET_MODULE", data: { module: "updates" } },
+      MOCK_ORIGIN
+    );
+  });
+
+  it("feedback triggers select the Feedback module in Hub", () => {
+    Feeblo.destroy();
+    widget = init("org_trigger_hub", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+    });
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+    const trigger = document.createElement("button");
+    trigger.setAttribute("data-feeblo-feedback", "");
+
+    widget.open(trigger);
+
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      { event: "SET_MODULE", data: { module: "feedback" } },
+      MOCK_ORIGIN
+    );
   });
 
   it("destroy removes the container from DOM", () => {

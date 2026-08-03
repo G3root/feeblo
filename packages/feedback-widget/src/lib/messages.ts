@@ -1,3 +1,5 @@
+import type { WidgetModule } from "./config";
+
 export type UserIdentityData = {
   avatar?: string;
   companies?: Array<{
@@ -19,6 +21,7 @@ export type ParentMessage =
   | { event: "SHOW" }
   | { event: "HIDE" }
   | { event: "SET_CONTEXT"; data: Record<string, string> }
+  | { event: "SET_MODULE"; data: { module: WidgetModule } }
   | { event: "SET_BOARD"; data: { board: string } }
   | { event: "SET_LOCALE"; data: { locale: string } }
   | { event: "IDENTIFY"; data: IdentityData };
@@ -26,7 +29,7 @@ export type ParentMessage =
 export type ChildMessage =
   | { event: "READY" }
   | { event: "CLOSE" }
-  | { event: "WIDGET_OPENED" }
+  | { event: "WIDGET_OPENED"; data: { module: WidgetModule } }
   | { event: "WIDGET_CLOSED" }
   | { event: "IDENTITY_CHANGED"; data: IdentityData }
   | {
@@ -45,6 +48,7 @@ const PARENT_EVENT_NAMES = new Set<string>([
   "SHOW",
   "HIDE",
   "SET_CONTEXT",
+  "SET_MODULE",
   "SET_BOARD",
   "SET_LOCALE",
   "IDENTIFY",

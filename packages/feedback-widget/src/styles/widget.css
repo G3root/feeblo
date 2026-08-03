@@ -5,6 +5,36 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.widget-update-content {
+  color: var(--foreground);
+}
+
+.widget-update-content > * + * {
+  margin-top: 1rem;
+}
+
+.widget-update-content h2,
+.widget-update-content h3 {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.widget-update-content img {
+  width: 100%;
+  border-radius: 0.75rem;
+}
+
+.widget-update-content a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.widget-update-content ul,
+.widget-update-content ol {
+  padding-left: 1.25rem;
+}
+
 @theme inline {
   --animate-skeleton: skeleton 2s -1s infinite linear;
   --animate-caret-blink: 1s ease-out infinite caret-blink;

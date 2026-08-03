@@ -1,8 +1,9 @@
 import type { RouteSectionProps } from "@solidjs/router";
-import { useNavigate } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import {
   createSignal,
   ErrorBoundary,
+  For,
   onCleanup,
   onMount,
   Show,
@@ -10,6 +11,7 @@ import {
 import { ErrorFallback } from "../components/error-fallback";
 import { Button } from "../components/ui/button";
 import { Icon } from "../components/ui/icon";
+import { getWidgetConfig, moduleForPath } from "../lib/config";
 import { setWidgetContext } from "../lib/context";
 import { setWidgetIdentity } from "../lib/identity";
 import {
@@ -21,13 +23,18 @@ import {
 export function RootComponent(props: RouteSectionProps) {
   const [isOpen, setIsOpen] = createSignal(true);
   const navigate = useNavigate();
+  const location = useLocation();
+  const config = getWidgetConfig();
 
   const handleParentMessage = (message: ParentMessage) => {
-    // biome-ignore lint/style/useDefaultSwitchClause: <explanation>
+    // biome-ignore lint/style/useDefaultSwitchClause: ParentMessage is an exhaustive union.
     switch (message.event) {
       case "SHOW":
         setIsOpen(true);
-        sendToParent({ event: "WIDGET_OPENED" });
+        sendToParent({
+          event: "WIDGET_OPENED",
+          data: { module: moduleForPath(location.pathname) },
+        });
         break;
       case "HIDE":
         setIsOpen(false);
@@ -35,6 +42,11 @@ export function RootComponent(props: RouteSectionProps) {
         break;
       case "SET_CONTEXT":
         setWidgetContext(message.data);
+        break;
+      case "SET_MODULE":
+        if (config.modules.includes(message.data.module)) {
+          navigate(message.data.module === "updates" ? "/updates" : "/");
+        }
         break;
       case "SET_BOARD":
         if (message.data?.board) {
@@ -84,6 +96,32 @@ export function RootComponent(props: RouteSectionProps) {
             {props.children}
           </ErrorBoundary>
         </main>
+
+        <Show when={config.mode === "hub"}>
+          <nav
+            aria-label="Feeblo Hub modules"
+            class="z-10 m-3 mt-0 flex shrink-0 gap-1 rounded-xl border bg-popover/95 p-1 shadow-lg backdrop-blur"
+          >
+            <For each={config.modules}>
+              {(module) => (
+                <A
+                  aria-current={
+                    moduleForPath(location.pathname) === module
+                      ? "page"
+                      : undefined
+                  }
+                  class="flex h-10 flex-1 items-center justify-center gap-2 rounded-lg font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-foreground aria-[current=page]:text-background"
+                  href={module === "updates" ? "/updates" : "/"}
+                >
+                  <span aria-hidden="true">
+                    {module === "feedback" ? "✦" : "◫"}
+                  </span>
+                  {module === "feedback" ? "Feedback" : "Updates"}
+                </A>
+              )}
+            </For>
+          </nav>
+        </Show>
       </div>
     </Show>
   );

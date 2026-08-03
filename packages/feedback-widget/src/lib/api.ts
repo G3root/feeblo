@@ -20,6 +20,16 @@ export interface WidgetSuggestion {
   title: string;
 }
 
+export interface WidgetUpdate {
+  content: string;
+  excerpt: string;
+  id: string;
+  imageUrl: string | null;
+  publishedAt: string;
+  slug: string;
+  title: string;
+}
+
 interface FeedbackFormData extends FormData {
   get(name: "content" | "title" | "boardName" | "boardId"): string;
 }
@@ -44,6 +54,16 @@ export const fetchBoards = query(async (): Promise<WidgetBoard[]> => {
   }
   return res.json();
 }, "boards");
+
+export const fetchUpdates = query(async (): Promise<WidgetUpdate[]> => {
+  const organizationId = getOrganizationId();
+  const url = `${getApiBaseUrl()}/updates?organizationId=${encodeURIComponent(organizationId)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch updates: ${res.status}`);
+  }
+  return res.json();
+}, "updates");
 
 export function preloadBoards(_args: RoutePreloadFuncArgs) {
   return fetchBoards();

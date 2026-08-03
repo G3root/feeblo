@@ -11,9 +11,13 @@ interface Props {
   organizationId: string;
   theme: string;
   title?: string;
+  widgetConfig: {
+    mode: "feedback" | "updates" | "hub";
+    modules: Array<"feedback" | "updates">;
+  };
 }
 
-const { title = "feeblo", organizationId, locale = "en", theme } = Astro.props;
+const { title = "feeblo", organizationId, locale = "en", theme, widgetConfig } = Astro.props;
 const noIndex = Boolean(getSecret("NO_INDEX"));
 
 const isDark = theme === "dark";
@@ -23,7 +27,7 @@ const spriteSvg = spriteSvgRaw.slice(spriteSvgRaw.indexOf("<svg"));
 <!doctype html>
 <html lang={locale} data-theme={theme} class={isDark ? "dark" : ""}>
   <CommonHead title={title} noIndex={noIndex} />
-  <EnvScript organizationId={organizationId} />
+  <EnvScript organizationId={organizationId} widgetConfig={widgetConfig} />
   <style is:inline>
     html,
     body {

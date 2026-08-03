@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -98,7 +98,8 @@ const makeChangelogRepository = Effect.gen(function* () {
             eq(schema.changelogTable.organizationId, organizationId),
             eq(schema.changelogTable.status, "published")
           )
-        ),
+        )
+        .orderBy(desc(schema.changelogTable.publishedAt)),
 
     create: ({
       id,

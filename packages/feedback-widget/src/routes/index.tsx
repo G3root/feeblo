@@ -1,9 +1,15 @@
 import { createAsync } from "@solidjs/router";
 import { Show } from "solid-js";
 import { BoardList } from "../components/board-list/board-list";
+import { UpdatesList } from "../components/updates/updates-list";
 import { fetchBoards } from "../lib/api";
+import { getWidgetConfig } from "../lib/config";
 
 export function IndexComponent() {
+  const config = getWidgetConfig();
+  if (config.mode === "updates" || config.modules[0] === "updates") {
+    return <UpdatesList />;
+  }
   const boards = createAsync(() => fetchBoards());
 
   return (

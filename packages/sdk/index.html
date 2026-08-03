@@ -3,46 +3,607 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feeblo Embed Preview</title>
+    <title>Feeblo Widget Workbench</title>
     <style>
+      :root {
+        --canvas: #eef0f5;
+        --panel: #ffffff;
+        --ink: #17181c;
+        --muted: #656a76;
+        --line: #dcdfe7;
+        --accent: #4b5cff;
+        --accent-soft: #eef0ff;
+        --success: #147d64;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
-        padding: 2rem;
+        min-width: 320px;
+        min-height: 100vh;
         margin: 0;
-        font-family:
-          system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          sans-serif;
-        background: #f6f6f6;
+        color: var(--ink);
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+          var(--canvas);
+        background-size: 28px 28px;
       }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:focus-visible,
+      input:focus-visible {
+        outline: 3px solid rgba(75, 92, 255, 0.24);
+        outline-offset: 2px;
+      }
+
+      .shell {
+        width: min(1180px, calc(100% - 32px));
+        padding: 42px 0 92px;
+        margin: 0 auto;
+      }
+
+      .masthead {
+        display: flex;
+        gap: 24px;
+        align-items: end;
+        justify-content: space-between;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        margin: 0 0 10px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .eyebrow::before {
+        width: 7px;
+        height: 7px;
+        content: "";
+        background: var(--success);
+        border-radius: 50%;
+        box-shadow: 0 0 0 4px rgba(20, 125, 100, 0.12);
+      }
+
       h1 {
-        margin-bottom: 0.5rem;
-        font-size: 1.5rem;
+        max-width: 680px;
+        margin: 0;
+        font-size: clamp(32px, 5vw, 58px);
+        font-weight: 650;
+        line-height: 0.98;
+        letter-spacing: -0.055em;
       }
-      p {
-        margin-bottom: 1rem;
-        color: #555;
+
+      .masthead-copy {
+        max-width: 360px;
+        margin: 0 0 4px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--muted);
       }
-      code {
-        padding: 0.125rem 0.375rem;
-        background: #eee;
-        border-radius: 0.25rem;
+
+      .workbench {
+        display: grid;
+        grid-template-columns: minmax(270px, 340px) minmax(0, 1fr);
+        overflow: hidden;
+        background: var(--panel);
+        border: 1px solid rgba(23, 24, 28, 0.12);
+        border-radius: 22px;
+        box-shadow: 0 24px 80px rgba(36, 42, 68, 0.13);
       }
+
+      .controls {
+        max-height: 720px;
+        overflow-y: auto;
+        background: #fafbfc;
+        border-right: 1px solid var(--line);
+      }
+
+      .controls-header,
+      .control-section {
+        padding: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .controls-header h2,
+      .stage-header h2 {
+        margin: 0;
+        font-size: 14px;
+        letter-spacing: -0.01em;
+      }
+
+      .controls-header p,
+      .stage-header p {
+        margin: 5px 0 0;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+
+      .control-section h3 {
+        margin: 0 0 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+        margin-top: 12px;
+      }
+
+      .field:first-of-type {
+        margin-top: 0;
+      }
+
+      .field label {
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .field input {
+        width: 100%;
+        height: 38px;
+        padding: 0 11px;
+        font-size: 13px;
+        color: var(--ink);
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+
+      .button-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+      }
+
+      .button-grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .choice,
+      .action {
+        min-height: 38px;
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--ink);
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        transition: 140ms ease;
+      }
+
+      .choice:hover,
+      .action:hover {
+        border-color: #b8bdca;
+        transform: translateY(-1px);
+      }
+
+      .choice[aria-pressed="true"] {
+        color: #3544dd;
+        background: var(--accent-soft);
+        border-color: rgba(75, 92, 255, 0.35);
+        box-shadow: inset 0 0 0 1px rgba(75, 92, 255, 0.08);
+      }
+
+      .choice:disabled,
+      .action:disabled {
+        cursor: not-allowed;
+        opacity: 0.42;
+        transform: none;
+      }
+
+      .hub-options[hidden] {
+        display: none;
+      }
+
+      .stage {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 650px;
+        background: #f5f6fa;
+      }
+
+      .stage-header {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 22px;
+        background: rgba(255, 255, 255, 0.82);
+        border-bottom: 1px solid var(--line);
+      }
+
+      #preview-status {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: var(--success);
+      }
+
+      .host-app {
+        position: relative;
+        display: grid;
+        flex: 1;
+        place-items: center;
+        min-height: 0;
+        padding: 36px;
+        overflow: hidden;
+      }
+
+      .host-app::before {
+        position: absolute;
+        inset: 9% 12%;
+        content: "";
+        border: 1px dashed #ccd0db;
+        border-radius: 28px;
+      }
+
+      .fake-product {
+        position: relative;
+        width: min(500px, 92%);
+        overflow: hidden;
+        background: white;
+        border: 1px solid #d7dae3;
+        border-radius: 18px;
+        box-shadow: 0 16px 48px rgba(36, 42, 68, 0.1);
+      }
+
+      .fake-toolbar {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        height: 42px;
+        padding: 0 14px;
+        border-bottom: 1px solid #e6e8ee;
+      }
+
+      .fake-toolbar span {
+        width: 7px;
+        height: 7px;
+        background: #d3d6de;
+        border-radius: 50%;
+      }
+
+      .fake-content {
+        padding: 26px;
+      }
+
+      .fake-content strong {
+        display: block;
+        font-size: 17px;
+      }
+
+      .fake-content p {
+        max-width: 360px;
+        margin: 8px 0 22px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+
+      .action.primary {
+        color: white;
+        background: var(--ink);
+        border-color: var(--ink);
+      }
+
+      .fake-lines {
+        display: grid;
+        gap: 9px;
+        margin-top: 24px;
+      }
+
+      .fake-lines span {
+        height: 9px;
+        background: #eceef3;
+        border-radius: 999px;
+      }
+
+      .fake-lines span:nth-child(2) {
+        width: 78%;
+      }
+
+      .fake-lines span:nth-child(3) {
+        width: 52%;
+      }
+
       #embed-root {
-        min-height: 200px;
-        padding: 1rem;
-        background: #fff;
-        border: 1px dashed #ccc;
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      #embed-root > * {
+        pointer-events: auto;
+      }
+
+      .url-tape {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 11px 13px;
+        margin-top: 16px;
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(23, 24, 28, 0.12);
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(36, 42, 68, 0.08);
+        backdrop-filter: blur(10px);
+      }
+
+      .url-tape span {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      #url-output {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: #454a56;
+        white-space: nowrap;
+      }
+
+      #copy-url {
+        padding: 6px 9px;
+        font-size: 11px;
+        font-weight: 650;
+        color: var(--muted);
+        background: #eff1f5;
+        border: 0;
+        border-radius: 7px;
+      }
+
+      @media (max-width: 800px) {
+        .masthead {
+          flex-direction: column;
+          align-items: start;
+        }
+
+        .workbench {
+          grid-template-columns: 1fr;
+        }
+
+        .controls {
+          max-height: none;
+          border-right: 0;
+        }
+
+        .stage {
+          min-height: 560px;
+          border-top: 1px solid var(--line);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>Feeblo Embed Preview</h1>
-    <p>
-      Configure the embed via URL query params:
-      <code>?org=demo-org&baseUrl=http://localhost:3001&theme=light</code>
-    </p>
+    <div class="shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">SDK preview · live</p>
+          <h1>Configure the widget in place.</h1>
+        </div>
+        <p class="masthead-copy">
+          Every control writes to the page URL, making any preview state
+          shareable and reproducible.
+        </p>
+      </header>
 
-    <button data-feeblo-feedback>feedback</button>
-    <div id="embed-root"></div>
+      <main class="workbench">
+        <aside class="controls" aria-label="Widget configuration">
+          <header class="controls-header">
+            <h2>Configuration</h2>
+            <p>Changes reinitialize the local widget automatically.</p>
+          </header>
+
+          <section class="control-section">
+            <h3>Connection</h3>
+            <div class="field">
+              <label for="organization-id">Organization ID</label>
+              <input id="organization-id" name="org" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="base-url">Widget host</label>
+              <input id="base-url" name="baseUrl" inputmode="url">
+            </div>
+          </section>
+
+          <section class="control-section">
+            <h3>Experience</h3>
+            <div class="button-grid three" data-control="mode">
+              <button class="choice" data-value="feedback" type="button">
+                Feedback
+              </button>
+              <button class="choice" data-value="updates" type="button">
+                Updates
+              </button>
+              <button class="choice" data-value="hub" type="button">Hub</button>
+            </div>
+            <div class="hub-options" id="hub-options">
+              <h3 style="margin-top: 18px">Hub modules</h3>
+              <div class="button-grid" data-control="modules">
+                <button
+                  class="choice"
+                  data-value="feedback,updates"
+                  type="button"
+                >
+                  Feedback → Updates
+                </button>
+                <button
+                  class="choice"
+                  data-value="updates,feedback"
+                  type="button"
+                >
+                  Updates → Feedback
+                </button>
+                <button class="choice" data-value="feedback" type="button">
+                  Feedback only
+                </button>
+                <button class="choice" data-value="updates" type="button">
+                  Updates only
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="control-section">
+            <h3>Appearance</h3>
+            <div class="button-grid" data-control="theme">
+              <button class="choice" data-value="light" type="button">
+                Light
+              </button>
+              <button class="choice" data-value="dark" type="button">
+                Dark
+              </button>
+            </div>
+            <h3 style="margin-top: 18px">Placement</h3>
+            <div class="button-grid three" data-control="placement">
+              <button class="choice" data-value="" type="button">
+                Trigger
+              </button>
+              <button class="choice" data-value="bottom-left" type="button">
+                Bottom left
+              </button>
+              <button class="choice" data-value="bottom-right" type="button">
+                Bottom right
+              </button>
+            </div>
+          </section>
+
+          <section class="control-section">
+            <h3>Preview identity</h3>
+            <div class="field">
+              <label for="user-id">User ID</label>
+              <input
+                id="user-id"
+                name="userId"
+                autocomplete="off"
+                placeholder="Optional"
+              >
+            </div>
+            <div class="field">
+              <label for="user-name">Name</label>
+              <input
+                id="user-name"
+                name="name"
+                autocomplete="name"
+                placeholder="Ada Lovelace"
+              >
+            </div>
+            <div class="field">
+              <label for="user-email">Email</label>
+              <input
+                id="user-email"
+                name="email"
+                autocomplete="email"
+                placeholder="ada@example.com"
+              >
+            </div>
+          </section>
+
+          <section class="control-section">
+            <h3>Widget actions</h3>
+            <div class="button-grid">
+              <button class="action primary" id="open-widget" type="button">
+                Open widget
+              </button>
+              <button class="action" id="close-widget" type="button">
+                Close
+              </button>
+              <button class="action" id="open-feedback" type="button">
+                Open feedback
+              </button>
+              <button class="action" id="open-updates" type="button">
+                Open updates
+              </button>
+            </div>
+          </section>
+        </aside>
+
+        <section class="stage" aria-label="Host application preview">
+          <header class="stage-header">
+            <div>
+              <h2>Host application</h2>
+              <p>Use the controls or the in-product trigger below.</p>
+            </div>
+            <output id="preview-status" aria-live="polite">initializing</output>
+          </header>
+          <div class="host-app">
+            <div class="fake-product">
+              <div class="fake-toolbar" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="fake-content">
+                <strong>Acme workspace</strong>
+                <p>
+                  This mock product surface lets you test anchored and placed
+                  widget behavior without leaving the preview.
+                </p>
+                <button
+                  class="action primary"
+                  id="product-feedback"
+                  type="button"
+                >
+                  Give feedback
+                </button>
+                <div class="fake-lines" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </div>
+            <div id="embed-root"></div>
+          </div>
+        </section>
+      </main>
+
+      <div class="url-tape">
+        <span>Live URL</span>
+        <output id="url-output"></output>
+        <button id="copy-url" type="button">Copy</button>
+      </div>
+    </div>
+
     <script type="module" src="/src/preview.ts"></script>
   </body>
 </html>

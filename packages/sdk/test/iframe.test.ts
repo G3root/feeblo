@@ -27,6 +27,18 @@ describe("createIframe", () => {
     expect(iframe.src).toContain("theme=dark");
   });
 
+  it("includes normalized mode and ordered modules", () => {
+    const iframe = createIframe("org_test", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+    });
+
+    expect(iframe.src).toContain("mode=hub");
+    expect(iframe.src).toContain("modules=updates%2Cfeedback");
+    expect(iframe.src).toContain("#/updates");
+    expect(iframe.title).toBe("Feeblo Hub");
+  });
+
   it("sets default iframe styles", () => {
     const iframe = createIframe("org_test", {});
 

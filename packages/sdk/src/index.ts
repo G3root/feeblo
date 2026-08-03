@@ -1,7 +1,7 @@
 import "./auto-init";
 import { subscribe, unsubscribe } from "./events";
 import { destroyInstance, getCurrentEmbed, init } from "./instance";
-import type { UserIdentity } from "./types";
+import type { UserIdentity, WidgetModule } from "./types";
 import { organizationId } from "./types";
 import { VERSION } from "./version";
 
@@ -26,6 +26,9 @@ export type {
   SubmittedFeedback,
   UserIdentity,
   WidgetCompany,
+  WidgetMode,
+  WidgetModule,
+  WidgetPlacement,
 } from "./types";
 export { organizationId } from "./types";
 export { VERSION } from "./version";
@@ -44,6 +47,7 @@ export interface Feeblo {
   off: typeof unsubscribe;
   on: typeof subscribe;
   open(): Feeblo;
+  openModule(module: WidgetModule): Feeblo;
   organizationId: typeof organizationId;
   setBoard(board: string): Feeblo;
   readonly version: string;
@@ -59,6 +63,10 @@ export const Feeblo = {
   },
   open(): Feeblo {
     getCurrentEmbed()?.open();
+    return Feeblo;
+  },
+  openModule(module: WidgetModule): Feeblo {
+    getCurrentEmbed()?.openModule(module);
     return Feeblo;
   },
   close(): Feeblo {

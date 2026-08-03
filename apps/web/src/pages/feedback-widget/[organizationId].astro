@@ -12,9 +12,34 @@ if (!organizationId) {
 
 const theme = Astro.url.searchParams.get("theme") ?? "light";
 const locale = Astro.url.searchParams.get("locale") ?? "en";
+const requestedMode = Astro.url.searchParams.get("mode");
+const mode =
+  requestedMode === "updates" || requestedMode === "hub"
+    ? requestedMode
+    : "feedback";
+const requestedModules = (Astro.url.searchParams.get("modules") ?? "")
+  .split(",")
+  .filter((module): module is "feedback" | "updates" =>
+    module === "feedback" || module === "updates"
+  );
+const modules: Array<"feedback" | "updates"> =
+  mode === "hub"
+    ? [
+        ...new Set(
+          requestedModules.length > 0
+            ? requestedModules
+            : (["feedback", "updates"] as const)
+        ),
+      ]
+    : [mode];
 ---
 
-<Layout organizationId={organizationId} theme={theme} locale={locale}>
+<Layout
+  organizationId={organizationId}
+  theme={theme}
+  locale={locale}
+  widgetConfig={{ mode, modules }}
+>
   <WidgetApp client:only="solid-js" />
 
   <script is:inline>

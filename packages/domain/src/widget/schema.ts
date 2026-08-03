@@ -55,3 +55,15 @@ export const WidgetSuggestion = S.Struct({
   excerpt: S.String,
   slug: S.String,
 });
+
+export const WidgetUpdate = S.Struct({
+  id: S.String,
+  title: S.String,
+  slug: S.String,
+  content: S.String,
+  excerpt: S.String,
+  imageUrl: S.NullOr(S.String),
+  publishedAt: S.DateFromString,
+});
+
+export type TWidgetUpdate = S.Schema.Type<typeof WidgetUpdate>;
