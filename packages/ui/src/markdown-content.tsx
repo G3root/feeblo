@@ -1,3 +1,4 @@
+// import "@feeblo/web-shared/typeset.css";
 import { markdownToHtml } from "@feeblo/utils/markdown";
 import { type ComponentProps, useMemo } from "react";
 import { cn } from "./utils";
@@ -18,7 +19,7 @@ export function MarkdownContent({
 
   return (
     <div
-      className={cn("typeset", className)}
+      className={cn("typeset whitespace-pre-wrap", className)}
       // biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized Markdown rendered to HTML
       dangerouslySetInnerHTML={{ __html: html }}
       {...props}
