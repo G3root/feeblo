@@ -1,21 +1,9 @@
+/** biome-ignore-all lint/style/useDefaultSwitchClause: <explanation> */
 import type { WidgetModule } from "./config";
+import { isSupportedLocale } from "./config";
+import type { WidgetIdentity } from "./identity";
 
-export type UserIdentityData = {
-  avatar?: string;
-  companies?: Array<{
-    id: string;
-    name: string;
-    avatar?: string;
-    customFields?: Record<string, unknown>;
-  }>;
-  customFields?: Record<string, unknown>;
-  email?: string;
-  id: string;
-  name?: string;
-  token?: string;
-};
-
-export type IdentityData = UserIdentityData;
+export type IdentityData = WidgetIdentity;
 
 export type ParentMessage =
   | { event: "SHOW" }
@@ -59,20 +47,59 @@ export function isParentMessage(value: unknown): value is ParentMessage {
     return false;
   }
   const event = (value as { event: unknown }).event;
-  return typeof event === "string" && PARENT_EVENT_NAMES.has(event);
+  if (typeof event !== "string" || !PARENT_EVENT_NAMES.has(event)) {
+    return false;
+  }
+  if (event === "SHOW" || event === "HIDE") {
+    return true;
+  }
+
+  const data = (value as { data?: unknown }).data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return false;
+  }
+
+  switch (event) {
+    case "SET_CONTEXT":
+      return Object.values(data).every((item) => typeof item === "string");
+    case "SET_MODULE":
+      return (
+        "module" in data &&
+        (data.module === "feedback" || data.module === "updates")
+      );
+    case "SET_BOARD":
+      return (
+        "board" in data &&
+        typeof data.board === "string" &&
+        data.board.length > 0
+      );
+    case "SET_LOCALE":
+      return (
+        "locale" in data &&
+        typeof data.locale === "string" &&
+        isSupportedLocale(data.locale)
+      );
+    case "IDENTIFY":
+      return "id" in data && typeof data.id === "string" && data.id.length > 0;
+  }
+  return false;
 }
 
 export function sendToParent(message: ChildMessage): void {
   if (typeof window === "undefined" || window.parent === window) {
     return;
   }
-  let targetOrigin = "*";
-  if (document.referrer) {
-    try {
-      targetOrigin = new URL(document.referrer).origin;
-    } catch {
-      targetOrigin = "*";
-    }
+  if (!document.referrer) {
+    return;
+  }
+  let targetOrigin: string;
+  try {
+    targetOrigin = new URL(document.referrer).origin;
+  } catch {
+    return;
+  }
+  if (targetOrigin === "null") {
+    return;
   }
   window.parent.postMessage(message, targetOrigin);
 }

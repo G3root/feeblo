@@ -41,7 +41,7 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
       ]),
     })
   );
-  await page.route("**/api/widget/v1/feedback", (route) =>
+  await page.route("**/api/widget/v1/feedback**", (route) =>
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({

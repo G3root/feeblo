@@ -170,7 +170,8 @@ export type OutgoingMessage =
   | { event: "IDENTIFY"; data: Record<string, unknown> }
   | { event: "SET_CONTEXT"; data: Record<string, string> }
   | { event: "SET_MODULE"; data: { module: WidgetModule } }
-  | { event: "SET_BOARD"; data: { board: string } };
+  | { event: "SET_BOARD"; data: { board: string } }
+  | { event: "SET_LOCALE"; data: { locale: string } };
 
 export type ExternalMessageData = {
   target: string;

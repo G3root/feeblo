@@ -35,4 +35,16 @@ describe("normalizeWidgetConfig", () => {
       })
     ).toThrow(EmbedError);
   });
+
+  it("rejects an unrecognized mode", () => {
+    expect(() =>
+      normalizeWidgetConfig({ mode: "unsupported" as never })
+    ).toThrow(EmbedError);
+  });
+
+  it("rejects an unrecognized placement", () => {
+    expect(() =>
+      normalizeWidgetConfig({ placement: "unsupported" as never })
+    ).toThrow(EmbedError);
+  });
 });

@@ -64,7 +64,8 @@ function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
     (modulesValue
       ? (modulesValue
           .split(",")
-          .map((value) => value.trim()) as EmbedOptions["modules"])
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0) as EmbedOptions["modules"])
       : undefined);
   const debug = globalConfig?.debug ?? scriptDataset.feebloDebug === "true";
 

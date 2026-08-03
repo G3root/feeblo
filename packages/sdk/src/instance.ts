@@ -160,7 +160,8 @@ export function init(
     return noopWidget();
   }
 
-  const nextConfigKey = widgetConfigKey(normalizeWidgetConfig(resolvedOptions));
+  const normalizedConfig = normalizeWidgetConfig(resolvedOptions);
+  const nextConfigKey = widgetConfigKey(normalizedConfig);
   if (
     currentEmbed &&
     currentOrgId === organizationId &&
@@ -176,7 +177,7 @@ export function init(
     destroyInstance(currentEmbed);
   }
 
-  const embed = new Embed(organizationId, resolvedOptions);
+  const embed = new Embed(organizationId, resolvedOptions, normalizedConfig);
   currentEmbed = embed;
   currentOrgId = organizationId;
 

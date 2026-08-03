@@ -2,6 +2,7 @@
 import "@feeblo/feedback-widget/styles";
 
 import { getSecret } from "astro:env/server";
+import type { WidgetConfig } from "@feeblo/feedback-widget";
 import spriteSvgRaw from "@feeblo/feedback-widget/icons/sprite.svg?raw";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
@@ -11,13 +12,16 @@ interface Props {
   organizationId: string;
   theme: string;
   title?: string;
-  widgetConfig: {
-    mode: "feedback" | "updates" | "hub";
-    modules: Array<"feedback" | "updates">;
-  };
+  widgetConfig: WidgetConfig;
 }
 
-const { title = "feeblo", organizationId, locale = "en", theme, widgetConfig } = Astro.props;
+const {
+  title = "feeblo",
+  organizationId,
+  locale = "en",
+  theme,
+  widgetConfig,
+} = Astro.props;
 const noIndex = Boolean(getSecret("NO_INDEX"));
 
 const isDark = theme === "dark";

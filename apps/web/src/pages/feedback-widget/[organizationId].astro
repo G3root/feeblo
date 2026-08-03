@@ -1,5 +1,5 @@
 ---
-import { WidgetApp } from "@feeblo/feedback-widget";
+import { isSupportedLocale, WidgetApp } from "@feeblo/feedback-widget";
 import Layout from "../../layouts/FeedbackWidgetLayout.astro";
 
 export const prerender = false;
@@ -11,7 +11,8 @@ if (!organizationId) {
 }
 
 const theme = Astro.url.searchParams.get("theme") ?? "light";
-const locale = Astro.url.searchParams.get("locale") ?? "en";
+const requestedLocale = Astro.url.searchParams.get("locale");
+const locale = isSupportedLocale(requestedLocale) ? requestedLocale : "en";
 const requestedMode = Astro.url.searchParams.get("mode");
 const mode =
   requestedMode === "updates" || requestedMode === "hub"
@@ -19,8 +20,9 @@ const mode =
     : "feedback";
 const requestedModules = (Astro.url.searchParams.get("modules") ?? "")
   .split(",")
-  .filter((module): module is "feedback" | "updates" =>
-    module === "feedback" || module === "updates"
+  .filter(
+    (module): module is "feedback" | "updates" =>
+      module === "feedback" || module === "updates",
   );
 const modules: Array<"feedback" | "updates"> =
   mode === "hub"
@@ -28,7 +30,7 @@ const modules: Array<"feedback" | "updates"> =
         ...new Set(
           requestedModules.length > 0
             ? requestedModules
-            : (["feedback", "updates"] as const)
+            : (["feedback", "updates"] as const),
         ),
       ]
     : [mode];

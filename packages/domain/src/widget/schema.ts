@@ -23,7 +23,11 @@ export const WidgetFeedbackCreate = S.Struct({
   organizationId: WorkspaceId.schema,
   title: S.String,
   content: S.String,
-  metadata: S.optional(S.Record(S.String, S.String)),
+  metadata: S.optional(
+    S.Record(S.String, S.String.check(S.isMaxLength(500))).check(
+      S.isMaxProperties(20)
+    )
+  ),
   token: S.optional(S.String),
 });
 

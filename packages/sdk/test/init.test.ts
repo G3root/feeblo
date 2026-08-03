@@ -220,6 +220,7 @@ describe("FeebloWidget methods", () => {
     expect(launcher?.getAttribute("aria-expanded")).toBe("true");
     launcher?.click();
     expect(widget.isOpen()).toBe(false);
+    expect(launcher?.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("opens enabled Hub modules and ignores disabled modules", () => {

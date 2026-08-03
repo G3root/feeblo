@@ -41,13 +41,21 @@ export function createIframe(
   iframe.style.width = "100%";
   iframe.style.height = "100%";
   iframe.style.border = "none";
+  const titles: Record<string, Record<string, string>> = {
+    en: {
+      feedback: "Feeblo feedback widget",
+      updates: "Feeblo updates widget",
+      hub: "Feeblo Hub",
+    },
+  };
+  const language = options.locale?.split("-")[0]?.toLowerCase() ?? "en";
+  let defaultTitle = "Feeblo feedback widget";
   if (config.mode === "hub") {
-    iframe.title = "Feeblo Hub";
+    defaultTitle = "Feeblo Hub";
   } else if (config.mode === "updates") {
-    iframe.title = "Feeblo updates widget";
-  } else {
-    iframe.title = "Feeblo feedback widget";
+    defaultTitle = "Feeblo updates widget";
   }
+  iframe.title = titles[language]?.[config.mode] ?? defaultTitle;
   iframe.setAttribute(
     "sandbox",
     "allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"

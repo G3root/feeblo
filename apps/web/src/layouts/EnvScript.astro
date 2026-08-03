@@ -1,10 +1,9 @@
 ---
+import type { WidgetConfig } from "@feeblo/feedback-widget";
+
 interface Props {
   organizationId?: string;
-  widgetConfig?: {
-    mode: "feedback" | "updates" | "hub";
-    modules: Array<"feedback" | "updates">;
-  };
+  widgetConfig?: WidgetConfig;
 }
 
 const { organizationId, widgetConfig } = Astro.props;

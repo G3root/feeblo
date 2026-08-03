@@ -222,6 +222,10 @@
         display: none;
       }
 
+      .hub-options-heading {
+        margin-top: 18px;
+      }
+
       .stage {
         position: relative;
         display: flex;
@@ -451,7 +455,7 @@
 
           <section class="control-section">
             <h3>Experience</h3>
-            <div class="button-grid three" data-control="mode">
+            <div class="button-grid three" data-control="mode" role="group" aria-label="Mode">
               <button class="choice" data-value="feedback" type="button">
                 Feedback
               </button>
@@ -461,8 +465,8 @@
               <button class="choice" data-value="hub" type="button">Hub</button>
             </div>
             <div class="hub-options" id="hub-options">
-              <h3 style="margin-top: 18px">Hub modules</h3>
-              <div class="button-grid" data-control="modules">
+              <h3 class="hub-options-heading">Hub modules</h3>
+              <div class="button-grid" data-control="modules" role="group" aria-label="Hub modules">
                 <button
                   class="choice"
                   data-value="feedback,updates"
@@ -489,7 +493,7 @@
 
           <section class="control-section">
             <h3>Appearance</h3>
-            <div class="button-grid" data-control="theme">
+            <div class="button-grid" data-control="theme" role="group" aria-label="Theme">
               <button class="choice" data-value="light" type="button">
                 Light
               </button>
@@ -497,8 +501,8 @@
                 Dark
               </button>
             </div>
-            <h3 style="margin-top: 18px">Placement</h3>
-            <div class="button-grid three" data-control="placement">
+            <h3 class="hub-options-heading">Placement</h3>
+            <div class="button-grid three" data-control="placement" role="group" aria-label="Placement">
               <button class="choice" data-value="" type="button">
                 Trigger
               </button>

@@ -95,6 +95,7 @@ export const createFeedBackAction = action(
     const organizationId = getOrganizationId();
 
     const token = getWidgetToken();
+    const metadata = getWidgetContext();
 
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/feedback`;
@@ -110,7 +111,7 @@ export const createFeedBackAction = action(
       content,
       title,
       organizationId,
-      metadata: getWidgetContext(),
+      metadata,
     };
     if (token) {
       body.token = token;
@@ -132,7 +133,7 @@ export const createFeedBackAction = action(
     sendToParent({
       event: "FEEDBACK_SUBMITTED",
       data: {
-        post: { boardId, boardName, title, metadata: getWidgetContext() },
+        post: { boardId, boardName, title, metadata },
       },
     });
 

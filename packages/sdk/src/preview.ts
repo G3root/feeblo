@@ -97,7 +97,7 @@ const productFeedbackButton =
 const copyUrlButton = requiredElement<HTMLButtonElement>("#copy-url");
 
 let widget: FeebloWidget;
-let inputTimer: number | undefined;
+const inputTimers = new WeakMap<HTMLInputElement, number>();
 
 function updateUrl(patch: Record<string, string | undefined>): void {
   const url = new URL(window.location.href);
@@ -138,11 +138,18 @@ function setChoiceState(config: PreviewConfig): void {
 }
 
 function syncControls(config: PreviewConfig): void {
-  organizationInput.value = config.organizationId;
-  baseUrlInput.value = config.baseUrl;
-  userIdInput.value = config.user?.id ?? "";
-  userNameInput.value = config.user?.name ?? "";
-  userEmailInput.value = config.user?.email ?? "";
+  const values = new Map<HTMLInputElement, string>([
+    [organizationInput, config.organizationId],
+    [baseUrlInput, config.baseUrl],
+    [userIdInput, config.user?.id ?? ""],
+    [userNameInput, config.user?.name ?? ""],
+    [userEmailInput, config.user?.email ?? ""],
+  ]);
+  for (const [input, value] of values) {
+    if (document.activeElement !== input) {
+      input.value = value;
+    }
+  }
   hubOptions.hidden = config.mode !== "hub";
   const enabledModules: WidgetModule[] =
     config.mode === "hub" ? config.modules : [config.mode];
@@ -199,10 +206,14 @@ function bindChoiceControls(): void {
 
 function bindTextInput(input: HTMLInputElement): void {
   input.addEventListener("input", () => {
-    window.clearTimeout(inputTimer);
-    inputTimer = window.setTimeout(() => {
-      updateUrl({ [input.name]: input.value.trim() || undefined });
-    }, 300);
+    const timer = inputTimers.get(input);
+    window.clearTimeout(timer);
+    inputTimers.set(
+      input,
+      window.setTimeout(() => {
+        updateUrl({ [input.name]: input.value.trim() || undefined });
+      }, 300)
+    );
   });
 }
 
@@ -246,8 +257,12 @@ productFeedbackButton.addEventListener("click", () => {
   widget.open(productFeedbackButton);
 });
 copyUrlButton.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(window.location.href);
-  copyUrlButton.textContent = "Copied";
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    copyUrlButton.textContent = "Copied";
+  } catch {
+    copyUrlButton.textContent = "Copy failed";
+  }
   window.setTimeout(() => {
     copyUrlButton.textContent = "Copy";
   }, 1200);

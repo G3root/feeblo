@@ -7,7 +7,7 @@ import { getWidgetConfig } from "../lib/config";
 
 export function IndexComponent() {
   const config = getWidgetConfig();
-  if (config.mode === "updates" || config.modules[0] === "updates") {
+  if (config.mode === "updates" || !config.modules.includes("feedback")) {
     return <UpdatesList />;
   }
   const boards = createAsync(() => fetchBoards());

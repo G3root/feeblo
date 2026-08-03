@@ -1,8 +1,4 @@
-import {
-  type NormalizedWidgetConfig,
-  normalizeWidgetConfig,
-  widgetConfigKey,
-} from "./config";
+import { type NormalizedWidgetConfig, widgetConfigKey } from "./config";
 import {
   CONTAINER_ID,
   CONTAINER_STYLES,
@@ -46,10 +42,14 @@ export class Embed {
   private escHandler: ((e: KeyboardEvent) => void) | null = null;
   private outsideClickHandler: ((e: MouseEvent) => void) | null = null;
 
-  constructor(organizationId: string, options: EmbedOptions) {
+  constructor(
+    organizationId: string,
+    options: EmbedOptions,
+    config: NormalizedWidgetConfig
+  ) {
     this.organizationId = organizationId;
     this.options = options;
-    this.config = normalizeWidgetConfig(options);
+    this.config = config;
     this.logger = createLogger(options.debug === true);
     this.identity = options.user ? normalizeUserIdentity(options.user) : null;
     this.pendingBoard = options.defaultBoard ?? null;
@@ -218,6 +218,7 @@ export class Embed {
     this.isLoaded = true;
     this.sendIdentify();
     this.sendContext();
+    this.sendLocale();
     this.flushPendingBoard();
     this.flushPendingModule();
     emitWidgetEvent("widgetReady", undefined, this.logger);
@@ -240,6 +241,12 @@ export class Embed {
       this.pendingModule = "feedback";
       this.flushPendingModule();
     }
+    this.context = { ...this.context, ...metadata };
+    if (metadata.board) {
+      this.pendingBoard = metadata.board;
+    }
+    this.flushPendingBoard();
+    this.sendContext();
     if (this.isOpen) {
       return;
     }
@@ -258,15 +265,9 @@ export class Embed {
       );
     }
 
-    this.context = { ...this.context, ...metadata };
-    if (metadata.board) {
-      this.pendingBoard = metadata.board;
-    }
     this.addCloseListeners();
 
-    this.flushPendingBoard();
     this.flushPendingModule();
-    this.sendContext();
 
     requestAnimationFrame(() => {
       this.container.style.opacity = "1";
@@ -355,6 +356,12 @@ export class Embed {
     }
   }
 
+  private sendLocale(): void {
+    if (this.isLoaded && this.options.locale) {
+      this.post({ event: "SET_LOCALE", data: { locale: this.options.locale } });
+    }
+  }
+
   identify(user: UserIdentity): void {
     this.identity = normalizeUserIdentity(user);
     if (this.logger.enabled) {
@@ -394,7 +401,7 @@ export class Embed {
       if (
         (this.currentTrigger || this.launcher) &&
         !this.container.contains(target) &&
-        this.currentTrigger !== target &&
+        !this.currentTrigger?.contains(target) &&
         !this.launcher?.contains(target)
       ) {
         this.close();
