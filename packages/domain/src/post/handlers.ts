@@ -21,7 +21,7 @@ import {
   postEmbeddingInput,
   schedulePostEmbeddingBestEffort,
 } from "./embedding-service";
-import { FailedToUpdatePostError } from "./errors";
+import { FailedToUpdatePostError, PostAlreadyExistsError } from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -578,7 +578,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             source: "dashboard",
           })
         ),
-        withRemapDbErrors("Post", "create")
+        withRemapDbErrors({
+          action: "create",
+          entity: "Post",
+          onUniqueViolation: () =>
+            new PostAlreadyExistsError({
+              message: "A post with this slug already exists",
+            }),
+        })
       ),
 
     PostCreatePublic: (args: TPostCreate) =>
@@ -593,7 +600,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             source: "public",
           })
         ),
-        withRemapDbErrors("Post", "create")
+        withRemapDbErrors({
+          action: "create",
+          entity: "Post",
+          onUniqueViolation: () =>
+            new PostAlreadyExistsError({
+              message: "A post with this slug already exists",
+            }),
+        })
       ),
 
     PostAdminUpdate: (args: TPostAdminUpdate) =>
