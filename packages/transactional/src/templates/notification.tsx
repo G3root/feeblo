@@ -1,4 +1,6 @@
+import * as React from "react";
 import { EmailShell } from "./email-shell";
+
 import { type EmailPost, EmailPostList } from "./weekly-digest";
 
 type NotificationEmailProps = {
@@ -37,7 +39,7 @@ export const NotificationEmail = ({
 
 export const createNotificationEmail = (props: NotificationEmailProps) => ({
   subject: props.title,
-  react: <NotificationEmail {...props} />,
+  react: React.createElement(NotificationEmail, props),
 });
 
 NotificationEmail.PreviewProps = {

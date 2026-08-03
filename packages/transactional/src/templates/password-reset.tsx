@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Section, Text } from "react-email";
 import { EmailShell } from "./email-shell";
 
@@ -31,7 +32,7 @@ export const PasswordResetEmail = ({
 
 export const createPasswordResetEmail = (props: PasswordResetEmailProps) => ({
   subject: "Reset your Feeblo password",
-  react: <PasswordResetEmail {...props} />,
+  react: React.createElement(PasswordResetEmail, props),
 });
 
 PasswordResetEmail.PreviewProps = {

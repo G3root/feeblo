@@ -8,9 +8,44 @@ const DatabaseDriverError = Schema.Struct({
   code: Schema.String,
 });
 
+const DatabaseCauseFailure = Schema.TaggedStruct("Fail", {
+  error: DatabaseDriverError,
+});
+
+const DatabaseSqlError = Schema.Struct({
+  cause: Schema.Struct({
+    cause: DatabaseDriverError,
+  }),
+});
+
+const DatabaseSqlCauseFailure = Schema.TaggedStruct("Fail", {
+  error: DatabaseSqlError,
+});
+
+const DatabaseErrorCause = Schema.Struct({
+  "~effect/Cause": Schema.Literal("~effect/Cause"),
+  reasons: Schema.Array(DatabaseCauseFailure),
+});
+
+const DatabaseSqlErrorCause = Schema.Struct({
+  "~effect/Cause": Schema.Literal("~effect/Cause"),
+  reasons: Schema.Array(DatabaseSqlCauseFailure),
+});
+
 const getDatabaseErrorCode = (cause: unknown): string | undefined =>
   Option.match(Schema.decodeUnknownOption(DatabaseDriverError)(cause), {
-    onNone: () => undefined,
+    onNone: () =>
+      Option.match(Schema.decodeUnknownOption(DatabaseErrorCause)(cause), {
+        onNone: () =>
+          Option.match(
+            Schema.decodeUnknownOption(DatabaseSqlErrorCause)(cause),
+            {
+              onNone: () => undefined,
+              onSome: ({ reasons }) => reasons[0]?.error.cause.cause.code,
+            }
+          ),
+        onSome: ({ reasons }) => reasons[0]?.error.code,
+      }),
     onSome: ({ code }) => code,
   });
 
