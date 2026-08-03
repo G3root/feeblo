@@ -1,6 +1,9 @@
 import { createStore, createStoreContext } from "@feeblo/web-shared/xstate";
 
-export const editorStore = (defaultValue?: { postContent: string }) =>
+export const editorStore = (defaultValue?: {
+  organizationId?: string;
+  postContent: string;
+}) =>
   createStore({
     context: {
       postContent: "",

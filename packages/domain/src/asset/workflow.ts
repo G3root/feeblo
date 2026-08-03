@@ -6,6 +6,8 @@ import * as W from "effect/unstable/workflow";
 import { S3UploadService } from "../services/s3";
 import {
   clearObjectDeletion,
+  getObjectDeletionAttempts,
+  MAX_ASSET_DELETION_ROUNDS,
   recordObjectDeletionFailure,
 } from "./deletion-repository";
 
@@ -37,9 +39,26 @@ export const AssetDeletionWorkflowLayer = AssetDeletionWorkflow.toLayer(
     });
 
     while (true) {
+      const attempts = yield* getObjectDeletionAttempts(payload).pipe(
+        Effect.mapError((error) => String(error))
+      );
+      if (attempts === undefined) {
+        return;
+      }
+      if (attempts >= MAX_ASSET_DELETION_ROUNDS) {
+        yield* Effect.logError("Asset deletion retry limit reached").pipe(
+          Effect.annotateLogs({
+            bucket: payload.bucket,
+            key: payload.key,
+            attempts,
+          })
+        );
+        return;
+      }
+
       const attempt = yield* Effect.result(
         W.Activity.make({
-          name: "DeleteAssetObject",
+          name: `DeleteAssetObject-${attempts}`,
           error: AssetDeletionAttemptError,
           execute: Effect.gen(function* () {
             const s3Service = yield* S3UploadService;

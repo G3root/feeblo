@@ -143,23 +143,31 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const assetRepository = yield* AssetRepository;
       const ids = typeof args.id === "string" ? [args.id] : [...args.id];
-      const contents = yield* repository.findContentsForDelete({
-        ids,
-        organizationId: args.organizationId,
-        boardId: args.boardId,
-      });
-      const urls = contents.flatMap(({ content }) =>
-        extractAssetUrlsFromContent(content)
-      );
-      const editorAssets = (yield* assetRepository.findByUrls(urls)).filter(
-        (asset) =>
-          asset.kind === "editor_image" || asset.kind === "editor_video"
-      );
-
-      yield* transaction(
+      const editorAssets = yield* transaction(
         Effect.gen(function* () {
+          const contents = yield* repository.findContentsForDelete({
+            ids,
+            organizationId: args.organizationId,
+            boardId: args.boardId,
+          });
+          const urls = contents.flatMap(({ content }) =>
+            extractAssetUrlsFromContent(content)
+          );
+          const remainingUrls = new Set(
+            yield* assetRepository.findReferencedUrls({
+              excludeChangelogIds: [],
+              excludePostIds: ids,
+              organizationId: args.organizationId,
+            })
+          );
+          const editorAssets = yield* assetRepository.findByUrls({
+            organizationId: args.organizationId,
+            urls: urls.filter((url) => !remainingUrls.has(url)),
+          });
+
           yield* stageAssetDeletions(editorAssets);
           yield* repository.delete(args);
+          return editorAssets;
         })
       );
       yield* scheduleAssetDeletions(editorAssets);

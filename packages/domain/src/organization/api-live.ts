@@ -103,40 +103,43 @@ export const OrganizationApiLive = HttpApiBuilder.group(
               )
             );
 
-          const db = yield* currentDb;
-          const assetRepository = yield* AssetRepository;
-          const assetId = yield* AssetId.generate;
           const obsoleteAssets = yield* Effect.tapError(
-            transaction(
-              Effect.gen(function* () {
-                const previousAssets =
-                  yield* assetRepository.findByOwnerAndKind({
+            Effect.gen(function* () {
+              const db = yield* currentDb;
+              const assetRepository = yield* AssetRepository;
+              const assetId = yield* AssetId.generate;
+
+              return yield* transaction(
+                Effect.gen(function* () {
+                  const previousAssets =
+                    yield* assetRepository.findByOwnerAndKind({
+                      kind: "organization_logo",
+                      owner: { type: "organization", id: organizationId },
+                    });
+                  const obsoleteAssets = previousAssets.filter(
+                    ({ key }) => key !== uploaded.key
+                  );
+
+                  yield* db
+                    .update(schema.organizationTable)
+                    .set({ logo: uploaded.url })
+                    .where(eq(schema.organizationTable.id, organizationId));
+
+                  yield* db.insert(schema.assetTable).values({
+                    id: assetId,
+                    bucket: uploaded.bucket,
+                    key: uploaded.key,
+                    url: uploaded.url,
                     kind: "organization_logo",
-                    owner: { type: "organization", id: organizationId },
+                    organizationId,
                   });
-                const obsoleteAssets = previousAssets.filter(
-                  ({ key }) => key !== uploaded.key
-                );
 
-                yield* db
-                  .update(schema.organizationTable)
-                  .set({ logo: uploaded.url })
-                  .where(eq(schema.organizationTable.id, organizationId));
+                  yield* stageAssetDeletions(obsoleteAssets);
 
-                yield* db.insert(schema.assetTable).values({
-                  id: assetId,
-                  bucket: uploaded.bucket,
-                  key: uploaded.key,
-                  url: uploaded.url,
-                  kind: "organization_logo",
-                  organizationId,
-                });
-
-                yield* stageAssetDeletions(obsoleteAssets);
-
-                return obsoleteAssets;
-              })
-            ),
+                  return obsoleteAssets;
+                })
+              );
+            }),
             () =>
               compensateUploadedAsset(
                 uploaded,

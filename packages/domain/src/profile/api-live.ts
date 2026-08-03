@@ -82,39 +82,43 @@ export const ProfileApiLive = HttpApiBuilder.group(
             )
           );
 
-        const db = yield* currentDb;
-        const assetRepository = yield* AssetRepository;
-        const assetId = yield* AssetId.generate;
         const obsoleteAssets = yield* Effect.tapError(
-          transaction(
-            Effect.gen(function* () {
-              const previousAssets = yield* assetRepository.findByOwnerAndKind({
-                kind: "profile_image",
-                owner: { type: "user", id: session.user.id },
-              });
-              const obsoleteAssets = previousAssets.filter(
-                ({ key }) => key !== uploaded.key
-              );
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const assetRepository = yield* AssetRepository;
+            const assetId = yield* AssetId.generate;
 
-              yield* db
-                .update(schema.userTable)
-                .set({ image: uploaded.url })
-                .where(eq(schema.userTable.id, session.user.id));
+            return yield* transaction(
+              Effect.gen(function* () {
+                const previousAssets =
+                  yield* assetRepository.findByOwnerAndKind({
+                    kind: "profile_image",
+                    owner: { type: "user", id: session.user.id },
+                  });
+                const obsoleteAssets = previousAssets.filter(
+                  ({ key }) => key !== uploaded.key
+                );
 
-              yield* db.insert(schema.assetTable).values({
-                id: assetId,
-                bucket: uploaded.bucket,
-                key: uploaded.key,
-                url: uploaded.url,
-                kind: "profile_image",
-                userId: session.user.id,
-              });
+                yield* db
+                  .update(schema.userTable)
+                  .set({ image: uploaded.url })
+                  .where(eq(schema.userTable.id, session.user.id));
 
-              yield* stageAssetDeletions(obsoleteAssets);
+                yield* db.insert(schema.assetTable).values({
+                  id: assetId,
+                  bucket: uploaded.bucket,
+                  key: uploaded.key,
+                  url: uploaded.url,
+                  kind: "profile_image",
+                  userId: session.user.id,
+                });
 
-              return obsoleteAssets;
-            })
-          ),
+                yield* stageAssetDeletions(obsoleteAssets);
+
+                return obsoleteAssets;
+              })
+            );
+          }),
           () =>
             compensateUploadedAsset(
               uploaded,

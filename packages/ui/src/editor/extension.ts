@@ -11,12 +11,14 @@ import { definePlaceholder } from "prosekit/extensions/placeholder";
 import { defineReadonly } from "prosekit/extensions/readonly";
 import { defineCodeBlockView } from "./ui/code-block-view/index.js";
 import { defineImageView } from "./ui/image-view/index.js";
-import { editorUploader } from "./uploader";
+import { createEditorUploader } from "./uploader";
 
 export function defineExtension({
+  organizationId,
   readonly = false,
   placeholder = "Press / for commands...",
 }: {
+  organizationId?: string | undefined;
   readonly?: boolean | undefined;
   placeholder?: string | undefined;
 } = {}) {
@@ -34,7 +36,9 @@ export function defineExtension({
     defineCodeBlockView(),
     defineImageView(),
     defineImageUploadHandler({
-      uploader: editorUploader,
+      uploader: createEditorUploader(
+        organizationId ? { organizationId } : undefined
+      ),
     }),
   ];
 

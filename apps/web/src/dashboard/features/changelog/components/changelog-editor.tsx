@@ -370,7 +370,7 @@ export function ChangelogEditorSubmitAction() {
 }
 
 export function ChangelogEditorContentField() {
-  const { form, formResetKey, isOwner } = useChangelogEditor();
+  const { form, formResetKey, isOwner, organizationId } = useChangelogEditor();
 
   const isDisabled = !isOwner;
   return (
@@ -379,6 +379,7 @@ export function ChangelogEditorContentField() {
         <PostContentEditor
           key={formResetKey}
           onChange={field.handleChange}
+          organizationId={organizationId}
           readOnly={isDisabled}
           showBlockHandle={!isDisabled}
           value={field.state.value}

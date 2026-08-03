@@ -32,7 +32,7 @@ export const MediaApiLive = HttpApiBuilder.group(
   Api,
   "MediaApiGroup",
   (handlers) =>
-    handlers.handle("uploadMedia", ({ payload: { file } }) =>
+    handlers.handle("uploadMedia", ({ payload: { file, organizationId } }) =>
       Effect.gen(function* () {
         const session = yield* currentHttpApiSession;
 
@@ -70,6 +70,10 @@ export const MediaApiLive = HttpApiBuilder.group(
         }
 
         const s3Service = yield* S3UploadService;
+        const assetOrganizationId = organizationId &&
+          session.organizations.some(({ id }) => id === organizationId)
+          ? organizationId
+          : undefined;
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
@@ -84,20 +88,24 @@ export const MediaApiLive = HttpApiBuilder.group(
             )
           );
 
-        const db = yield* currentDb;
-        const assetId = yield* AssetId.generate;
-
         yield* Effect.tapError(
-          transaction(
-            db.insert(schema.assetTable).values({
-              id: assetId,
-              bucket: uploaded.bucket,
-              key: uploaded.key,
-              url: uploaded.url,
-              kind: kind === "image" ? "editor_image" : "editor_video",
-              userId: session.user.id,
-            })
-          ),
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const assetId = yield* AssetId.generate;
+
+            yield* transaction(
+              db.insert(schema.assetTable).values({
+                id: assetId,
+                bucket: uploaded.bucket,
+                key: uploaded.key,
+                url: uploaded.url,
+                kind: kind === "image" ? "editor_image" : "editor_video",
+                ...(assetOrganizationId
+                  ? { organizationId: assetOrganizationId }
+                  : { userId: session.user.id }),
+              })
+            );
+          }),
           () =>
             compensateUploadedAsset(
               uploaded,

@@ -187,6 +187,7 @@ const makeChangelogRepository = Effect.gen(function* () {
           )
         )
         .pipe(Effect.map((rows) => rows[0]?.content ?? "")),
+
   };
 });
 

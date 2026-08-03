@@ -32,6 +32,7 @@ export class MediaApiGroup extends HttpApiGroup.make("MediaApiGroup")
       ]),
       payload: Schema.Struct({
         file: Multipart.SingleFileSchema,
+        organizationId: Schema.optional(Schema.String),
       }).pipe(HttpApiSchema.asMultipart()),
     })
       .annotate(OpenApi.Title, "Upload Editor Media")

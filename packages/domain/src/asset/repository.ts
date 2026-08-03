@@ -1,14 +1,12 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { assetKindEnum } from "@feeblo/db/schema";
+import { and, eq, inArray, not } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { extractAssetUrlsFromContent } from "./urls";
 
-type AssetKind =
-  | "profile_image"
-  | "organization_logo"
-  | "editor_image"
-  | "editor_video";
+type AssetKind = (typeof assetKindEnum.enumValues)[number];
 
 type AssetOwner =
   | { readonly type: "organization"; readonly id: string }
@@ -36,13 +34,78 @@ const makeAssetRepository = Effect.gen(function* () {
               : eq(schema.assetTable.organizationId, owner.id)
           )
         ),
-    findByUrls: (urls: readonly string[]) =>
+    findByUrls: ({
+      urls,
+      organizationId,
+    }: {
+      readonly organizationId: string;
+      readonly urls: readonly string[];
+    }) =>
       urls.length === 0
         ? Effect.succeed([])
         : db
             .select()
             .from(schema.assetTable)
-            .where(inArray(schema.assetTable.url, urls)),
+            .where(
+              and(
+                inArray(schema.assetTable.url, urls),
+                eq(schema.assetTable.organizationId, organizationId),
+                inArray(schema.assetTable.kind, [
+                  "editor_image",
+                  "editor_video",
+                ])
+              )
+            ),
+    findReferencedUrls: ({
+      organizationId,
+      excludePostIds,
+      excludeChangelogIds,
+    }: {
+      readonly organizationId: string;
+      readonly excludePostIds: readonly string[];
+      readonly excludeChangelogIds: readonly string[];
+    }) =>
+      Effect.gen(function* () {
+        const posts = yield* db
+          .select({ content: schema.postTable.content })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.organizationId, organizationId),
+              excludePostIds.length > 0
+                ? not(inArray(schema.postTable.id, excludePostIds))
+                : undefined
+            )
+          );
+        const changelogs = yield* db
+          .select({ content: schema.changelogTable.content })
+          .from(schema.changelogTable)
+          .where(
+            and(
+              eq(schema.changelogTable.organizationId, organizationId),
+              excludeChangelogIds.length > 0
+                ? not(inArray(schema.changelogTable.id, excludeChangelogIds))
+                : undefined
+            )
+          );
+        const comments = yield* db
+          .select({ content: schema.commentTable.content })
+          .from(schema.commentTable)
+          .where(
+            and(
+              eq(schema.commentTable.organizationId, organizationId),
+              excludePostIds.length > 0
+                ? not(inArray(schema.commentTable.postId, excludePostIds))
+                : undefined
+            )
+          );
+
+        return [
+          ...posts,
+          ...changelogs,
+          ...comments,
+        ].flatMap(({ content }) => extractAssetUrlsFromContent(content));
+      }),
     deleteByIds: (ids: readonly string[]) =>
       ids.length === 0
         ? Effect.succeed([])

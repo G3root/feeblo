@@ -5,6 +5,7 @@ import {
   SingleRunner,
   TestRunner,
 } from "effect/unstable/cluster";
+import { AssetDeletionSweeperLayer } from "./asset/deletion";
 import { AssetDeletionWorkflowLayer } from "./asset/workflow";
 import { SubmissionEmailNotificationWorkflowLayer } from "./post/workflow";
 import { WelcomeUserWorkflowLayer } from "./user/workflows";
@@ -34,7 +35,10 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
 export const makeWorkflowsLive = (
   makeMailerLayer: MakeMailerLayer = () => Mailer.layer
 ) =>
-  makeWorkflowLayers(makeMailerLayer).pipe(
+  Layer.mergeAll(
+    makeWorkflowLayers(makeMailerLayer),
+    AssetDeletionSweeperLayer
+  ).pipe(
     Layer.provideMerge(WorkflowClusterEngineLive)
   );
 

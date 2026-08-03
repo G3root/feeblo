@@ -18,6 +18,7 @@ import { usePostCollections } from "./providers/post-collections-provider";
 
 type PostEditorState = {
   disabled: boolean;
+  organizationId?: string;
   placeholder: string;
   resetKey: number;
 };
@@ -89,6 +90,7 @@ type PostEditorProviderProps = {
   children?: ReactNode;
   content?: string;
   disabled?: boolean;
+  organizationId?: string;
   onContentChange?: (content: string) => void;
   onSubmit?: () => void | Promise<void>;
   placeholder?: string;
@@ -100,6 +102,7 @@ function PostEditorProvider({
   children,
   content = "",
   disabled = false,
+  organizationId,
   onContentChange,
   onSubmit = noop,
   placeholder,
@@ -123,10 +126,11 @@ function PostEditorProvider({
   const state = useMemo<PostEditorState>(
     () => ({
       disabled,
+      organizationId,
       placeholder: placeholder ?? DEFAULT_PLACEHOLDER,
       resetKey,
     }),
-    [disabled, placeholder, resetKey]
+    [disabled, organizationId, placeholder, resetKey]
   );
   const meta = useMemo<PostEditorMeta>(() => ({ submitLabel }), [submitLabel]);
   const contextValue = useMemo<PostEditorContextValue>(
@@ -147,11 +151,15 @@ const PostEditorEditor = memo(function PostEditorEditor() {
 
   return (
     <EditorProvider
-      defaultValue={{ postContent: initialContent }}
+      defaultValue={{
+        organizationId: state.organizationId,
+        postContent: initialContent,
+      }}
       key={state.resetKey}
     >
       <Editor
         onChange={actions.onContentChange}
+        organizationId={state.organizationId}
         placeholder={state.placeholder}
         readOnly={state.disabled}
       />
@@ -180,6 +188,7 @@ type PostEditorRootProps = {
   children?: ReactNode;
   content?: string;
   disabled?: boolean;
+  organizationId?: string;
   onContentChange?: (content: string) => void;
   onSubmit?: (value: { content: string }) => void | Promise<void>;
   placeholder?: string;
@@ -190,6 +199,7 @@ function PostEditorComponent({
   children,
   content: externalContent,
   disabled,
+  organizationId,
   onContentChange: externalOnContentChange,
   onSubmit = noop,
   placeholder,
@@ -228,6 +238,7 @@ function PostEditorComponent({
     <PostEditorProvider
       content={content}
       disabled={disabled}
+      organizationId={organizationId}
       onContentChange={handleContentChange}
       onSubmit={handleSubmit}
       placeholder={placeholder}
@@ -287,6 +298,7 @@ export function PostContentUpdateInput() {
     <PostEditor
       content={post.content}
       disabled={disabled}
+      organizationId={organizationId}
       onSubmit={async ({ content }) => {
         if (content !== "") {
           try {

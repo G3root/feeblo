@@ -18,6 +18,10 @@ export const uploadedEditorMediaSchema = z.object({
   url: z.url(),
 });
 
+export type EditorMediaUploadOptions = {
+  readonly organizationId?: string;
+};
+
 export const authClient = createAuthClient(baseUrl, {
   getTimeZone: getClientTimeZone,
 });

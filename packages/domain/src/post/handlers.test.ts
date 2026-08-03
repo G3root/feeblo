@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
+  AssetId,
   BoardId,
   type LegidOf,
   PostId,
@@ -518,6 +519,58 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(posts).toHaveLength(0);
+        })
+      );
+
+      it.effect("does not delete an asset owned by another organization", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const assetId = yield* AssetId.generate;
+          const foreignUserId = `foreign_${assetId}`;
+          const foreignUrl = `https://assets.example/${assetId}.png`;
+
+          yield* db.insert(schema.userTable).values({
+            id: foreignUserId,
+            email: `${foreignUserId}@example.com`,
+            name: "Foreign User",
+          });
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: "test-bucket",
+            key: `editor-media/${assetId}.png`,
+            url: foreignUrl,
+            kind: "editor_image",
+            userId: foreignUserId,
+          });
+
+          const session = makeSession(fixture, null);
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(
+                fixture,
+                postId,
+                "Feedback with foreign image",
+                `![image](${foreignUrl})`
+              )
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* handlers
+            .PostDeletePublic({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const assets = yield* db
+            .select({ id: schema.assetTable.id })
+            .from(schema.assetTable)
+            .where(eq(schema.assetTable.id, assetId));
+          expect(assets).toHaveLength(1);
         })
       );
     });

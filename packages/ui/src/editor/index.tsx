@@ -30,6 +30,7 @@ export interface EditorProps {
   className?: string;
   minimal?: boolean;
   onChange?: (doc: string) => void;
+  organizationId?: string;
   placeholder?: string;
   readOnly?: boolean;
   showBlockHandle?: boolean;
@@ -46,6 +47,7 @@ export function Editor(props: EditorProps) {
 
   const editor = useMemo(() => {
     const extension = defineExtension({
+      organizationId: props.organizationId,
       placeholder: props.placeholder,
       readonly: props.readOnly,
     });
@@ -53,7 +55,7 @@ export function Editor(props: EditorProps) {
       extension,
       ...(defaultContent ? { defaultContent } : {}),
     });
-  }, [props.placeholder, props.readOnly, defaultContent]);
+  }, [props.organizationId, props.placeholder, props.readOnly, defaultContent]);
 
   useContentChange(editor, props.onChange);
 

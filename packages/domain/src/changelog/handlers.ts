@@ -70,21 +70,28 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     ChangelogDelete: (args: TChangelogDelete) =>
       Effect.gen(function* () {
         const assetRepository = yield* AssetRepository;
-        const content = yield* repository.findContent({
-          id: args.id,
-          organizationId: args.organizationId,
-        });
-        const editorAssets = (yield* assetRepository.findByUrls(
-          extractAssetUrlsFromContent(content)
-        )).filter(
-          (asset) =>
-            asset.kind === "editor_image" || asset.kind === "editor_video"
-        );
-
-        yield* transaction(
+        const editorAssets = yield* transaction(
           Effect.gen(function* () {
+            const content = yield* repository.findContent({
+              id: args.id,
+              organizationId: args.organizationId,
+            });
+            const urls = extractAssetUrlsFromContent(content);
+            const remainingUrls = new Set(
+              yield* assetRepository.findReferencedUrls({
+                excludeChangelogIds: [args.id],
+                excludePostIds: [],
+                organizationId: args.organizationId,
+              })
+            );
+            const editorAssets = yield* assetRepository.findByUrls({
+              organizationId: args.organizationId,
+              urls: urls.filter((url) => !remainingUrls.has(url)),
+            });
+
             yield* stageAssetDeletions(editorAssets);
             yield* repository.delete(args);
+            return editorAssets;
           })
         );
         yield* scheduleAssetDeletions(editorAssets);
