@@ -2,6 +2,11 @@
 
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
+import {
+  AssetRepository,
+  deleteAssetRows,
+  deleteBucketObjects,
+} from "@feeblo/domain/asset/repository";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
@@ -162,6 +167,27 @@ export const initAuthHandler = (
           )
       );
     };
+
+    const deleteRemovedProfileAssets = (userId: string) =>
+      callbackRuntime.runPromise(
+        Effect.gen(function* () {
+          const repository = yield* AssetRepository;
+          const assets = yield* repository.findByOwnerAndKind({
+            userId,
+            kind: "profile_image",
+          });
+          if (assets.length === 0) {
+            return;
+          }
+          yield* deleteAssetRows(assets);
+          yield* deleteBucketObjects(assets.map(({ key }) => key));
+        }).pipe(
+          Effect.provide(AssetRepository.layer),
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Failed to clean up removed profile image", cause)
+          )
+        )
+      );
 
     const ssoOptions: JwtAutoLoginOptions = {
       createSsoUser: async ({ organizationId, token }) => {
@@ -562,6 +588,16 @@ export const initAuthHandler = (
                 session.userId,
                 context?.getHeader(clientTimeZoneHeader)
               );
+            },
+          },
+        },
+        user: {
+          update: {
+            async after(user) {
+              if (user.image) {
+                return;
+              }
+              await deleteRemovedProfileAssets(user.id);
             },
           },
         },

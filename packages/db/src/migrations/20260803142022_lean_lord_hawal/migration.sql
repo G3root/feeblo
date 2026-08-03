@@ -1,0 +1,18 @@
+CREATE TYPE "asset_kind" AS ENUM('profile_image', 'organization_logo', 'editor_image', 'editor_video');--> statement-breakpoint
+CREATE TABLE "asset" (
+	"id" text PRIMARY KEY,
+	"bucket" text NOT NULL,
+	"key" text NOT NULL,
+	"url" text NOT NULL,
+	"kind" "asset_kind" NOT NULL,
+	"user_id" text,
+	"organization_id" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX "asset_key_uidx" ON "asset" ("key");--> statement-breakpoint
+CREATE INDEX "asset_userId_idx" ON "asset" ("user_id");--> statement-breakpoint
+CREATE INDEX "asset_organizationId_idx" ON "asset" ("organization_id");--> statement-breakpoint
+ALTER TABLE "asset" ADD CONSTRAINT "asset_user_id_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "asset" ADD CONSTRAINT "asset_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;

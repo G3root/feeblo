@@ -1,6 +1,7 @@
 import { defineRelations } from "drizzle-orm";
 import {
   accountTable,
+  assetTable,
   boardTable,
   changelogPostTable,
   changelogTable,
@@ -19,13 +20,13 @@ import {
   organizationTable,
   postActivityTable,
   postReactionTable,
-  roadmapColumnTable,
-  roadmapTable,
   postStatusTable,
   postSubscriptionTable,
   postTable,
   postTagTable,
   productTable,
+  roadmapColumnTable,
+  roadmapTable,
   sessionTable,
   siteTable,
   submissionNotificationBatchTable,
@@ -40,6 +41,7 @@ import {
 export const relations = defineRelations(
   {
     userTable,
+    assetTable,
     sessionTable,
     accountTable,
     twoFactorTable,
@@ -128,6 +130,20 @@ export const relations = defineRelations(
       postSubscriptions: r.many.postSubscriptionTable({
         from: r.userTable.id,
         to: r.postSubscriptionTable.userId,
+      }),
+      assets: r.many.assetTable({
+        from: r.userTable.id,
+        to: r.assetTable.userId,
+      }),
+    },
+    assetTable: {
+      user: r.one.userTable({
+        from: r.assetTable.userId,
+        to: r.userTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.assetTable.organizationId,
+        to: r.organizationTable.id,
       }),
     },
     sessionTable: {
@@ -242,6 +258,10 @@ export const relations = defineRelations(
       submissionNotificationQueue: r.many.submissionNotificationQueueTable({
         from: r.organizationTable.id,
         to: r.submissionNotificationQueueTable.organizationId,
+      }),
+      assets: r.many.assetTable({
+        from: r.organizationTable.id,
+        to: r.assetTable.organizationId,
       }),
     },
     memberTable: {

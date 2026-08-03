@@ -37,6 +37,7 @@ const makeS3UploadService = Effect.gen(function* () {
   const config = yield* S3Config;
   const bucket = config.publicBucketName;
   const fileSystem = yield* FileSystem.FileSystem;
+  const s3 = yield* S3;
   const resolvePublicUrl = (fileKey: string) => {
     const encodedKey = fileKey
       .split("/")
@@ -99,6 +100,8 @@ const makeS3UploadService = Effect.gen(function* () {
         yield* fileSystem.writeFile(fileKey, bytes);
         return resolvePublicUrl(fileKey);
       }),
+    deleteObject: (key: string) =>
+      s3.deleteObject({ Bucket: bucket, Key: key }),
   };
 });
 
@@ -118,6 +121,9 @@ export const S3UploadServiceLive = Layer.unwrap(
       bucketName: publicBucketName,
     }).pipe(Layer.provide(S3Layer));
 
-    return S3UploadService.layer.pipe(Layer.provide(S3FileSystemLive));
+    return S3UploadService.layer.pipe(
+      Layer.provide(S3FileSystemLive),
+      Layer.provide(S3Layer)
+    );
   }).pipe(Effect.provide(S3Config.layer))
 );

@@ -5,6 +5,11 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import {
+  AssetRepository,
+  deleteBucketObjects,
+  extractAssetUrlsFromContent,
+} from "../asset/repository";
 import { BoardRepository } from "../board/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -137,10 +142,30 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const deletePostEffect = (args: TPostDelete) =>
-    repository.delete({
-      id: args.id,
-      organizationId: args.organizationId,
-      boardId: args.boardId,
+    Effect.gen(function* () {
+      const assetRepository = yield* AssetRepository;
+      const ids = typeof args.id === "string" ? [args.id] : [...args.id];
+      const contents = yield* repository.findContentsForDelete({
+        ids,
+        organizationId: args.organizationId,
+        boardId: args.boardId,
+      });
+      const urls = contents.flatMap(({ content }) =>
+        extractAssetUrlsFromContent(content)
+      );
+      const editorAssets = (yield* assetRepository.findByUrls(urls)).filter(
+        (asset) =>
+          asset.kind === "editor_image" || asset.kind === "editor_video"
+      );
+
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* assetRepository.deleteByIds(editorAssets.map(({ id }) => id));
+          yield* repository.delete(args);
+        })
+      );
+
+      yield* deleteBucketObjects(editorAssets.map(({ key }) => key));
     });
 
   const updatePostEffect = (args: TPostUpdate) =>
@@ -680,5 +705,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(PostEmbeddingService.layer),
-  Layer.provide(NotificationService.layer)
+  Layer.provide(NotificationService.layer),
+  Layer.provide(AssetRepository.layer)
 );

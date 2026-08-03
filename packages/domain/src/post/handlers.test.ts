@@ -13,6 +13,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { AssetRepository } from "../asset/repository";
 import { BoardRepository } from "../board/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -157,7 +158,8 @@ describe("PostRpcHandlers", () => {
     BoardRepository.layer,
     PostRepository.layer,
     PostActivityRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    AssetRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = PostPolicy.layer.pipe(

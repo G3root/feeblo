@@ -4,6 +4,7 @@ import { type LegidOf, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { AssetRepository } from "../asset/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { OrganizationRpcHandlersEffect } from "./handlers";
 import { OrganizationRepository } from "./repository";
@@ -76,7 +77,15 @@ describe("OrganizationRpcHandlers", () => {
     Layer.provide(Database.PgliteDatabaseLive)
   );
 
-  const TestLayer = Layer.merge(RepositoryTest, Database.PgliteDatabaseLive);
+  const AssetTest = AssetRepository.layer.pipe(
+    Layer.provide(Database.PgliteDatabaseLive)
+  );
+
+  const TestLayer = Layer.mergeAll(
+    RepositoryTest,
+    AssetTest,
+    Database.PgliteDatabaseLive
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("OrganizationList", () => {

@@ -1,4 +1,5 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
+import { AssetId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -6,6 +7,7 @@ import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { AssetRepository, deleteBucketObjects } from "../asset/repository";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -105,15 +107,45 @@ export const OrganizationApiLive = HttpApiBuilder.group(
             );
 
           const db = yield* currentDb;
+          const assetRepository = yield* AssetRepository;
+          const assetId = yield* AssetId.generate;
+          const previousAssets = yield* assetRepository.findByOwnerAndKind({
+            organizationId,
+            kind: "organization_logo",
+          });
+          const obsoleteAssets = previousAssets.filter(
+            ({ key }) => key !== uploaded.key
+          );
 
-          yield* db
-            .update(schema.organizationTable)
-            .set({ logo: uploaded.url })
-            .where(eq(schema.organizationTable.id, organizationId));
+          yield* transaction(
+            Effect.gen(function* () {
+              yield* db
+                .update(schema.organizationTable)
+                .set({ logo: uploaded.url })
+                .where(eq(schema.organizationTable.id, organizationId));
+
+              yield* db.insert(schema.assetTable).values({
+                id: assetId,
+                bucket: uploaded.bucket,
+                key: uploaded.key,
+                url: uploaded.url,
+                kind: "organization_logo",
+                organizationId,
+              });
+
+              yield* assetRepository.deleteByIds(
+                obsoleteAssets.map(({ id }) => id)
+              );
+            })
+          );
+
+          yield* deleteBucketObjects(obsoleteAssets.map(({ key }) => key));
 
           return uploaded;
         }).pipe(
-          Effect.provide(OrganizationRepository.layer),
+          Effect.provide(
+            Layer.mergeAll(OrganizationRepository.layer, AssetRepository.layer)
+          ),
           withRemapDbErrors("Organization", "create")
         );
       }

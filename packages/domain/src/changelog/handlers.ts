@@ -1,6 +1,12 @@
+import { transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import {
+  AssetRepository,
+  deleteBucketObjects,
+  extractAssetUrlsFromContent,
+} from "../asset/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -64,7 +70,30 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     },
 
     ChangelogDelete: (args: TChangelogDelete) =>
-      repository.delete(args).pipe(
+      Effect.gen(function* () {
+        const assetRepository = yield* AssetRepository;
+        const content = yield* repository.findContent({
+          id: args.id,
+          organizationId: args.organizationId,
+        });
+        const editorAssets = (yield* assetRepository.findByUrls(
+          extractAssetUrlsFromContent(content)
+        )).filter(
+          (asset) =>
+            asset.kind === "editor_image" || asset.kind === "editor_video"
+        );
+
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* assetRepository.deleteByIds(
+              editorAssets.map(({ id }) => id)
+            );
+            yield* repository.delete(args);
+          })
+        );
+
+        yield* deleteBucketObjects(editorAssets.map(({ key }) => key));
+      }).pipe(
         Policy.withPolicy(
           changelogPolicy.canDelete({
             organizationId: args.organizationId,
@@ -102,5 +131,6 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   Layer.provide(ChangelogPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
-  Layer.provide(ChangelogRepository.layer)
+  Layer.provide(ChangelogRepository.layer),
+  Layer.provide(AssetRepository.layer)
 );

@@ -1,3 +1,5 @@
+import { currentDb, schema, transaction } from "@feeblo/db";
+import { AssetId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -89,6 +91,20 @@ export const MediaApiLive = HttpApiBuilder.group(
                 new InternalServerError({ message: "Failed to upload media" })
             )
           );
+
+        const db = yield* currentDb;
+        const assetId = yield* AssetId.generate;
+
+        yield* transaction(
+          db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: uploaded.bucket,
+            key: uploaded.key,
+            url: uploaded.url,
+            kind: kind === "image" ? "editor_image" : "editor_video",
+            userId: session.user.id,
+          })
+        );
 
         return { ...uploaded, kind };
       }).pipe(withRemapDbErrors("Media", "create"))
