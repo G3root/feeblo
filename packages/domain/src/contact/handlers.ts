@@ -34,6 +34,23 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
     ContactCreate: (args: TContactCreate) =>
       transaction(
         Effect.gen(function* () {
+          const attributeValues = args.attributeValues ?? [];
+          const definitions =
+            yield* attributeDefinitionRepository.findContactAttributeDefinitions(
+              args.organizationId
+            );
+          yield* Effect.forEach(
+            definitions.filter(
+              (definition) =>
+                definition.isRequired &&
+                !attributeValues.some(
+                  (attributeValue) =>
+                    attributeValue.attributeId === definition.id
+                )
+            ),
+            (definition) => validateAttributeValueEffect(definition, null)
+          );
+
           const contact = yield* repository.create(args);
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
             Effect.gen(function* () {

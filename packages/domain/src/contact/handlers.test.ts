@@ -150,45 +150,73 @@ describe("ContactRpcHandlers", () => {
       })
     );
 
-    it.effect(
-      "rejects invalid attribute values when creating a contact",
-      () =>
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const handlers = yield* ContactRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-          const attributeId = yield* ContactAttributeDefinitionId.generate;
-          const now = new Date();
+    it.effect("rejects a contact missing a required attribute", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const attributeId = yield* ContactAttributeDefinitionId.generate;
 
-          yield* db.insert(schema.contactAttributeDefinitionTable).values({
-            id: attributeId,
-            organizationId: fixture.organizationId,
-            name: "Age",
-            key: "age",
-            type: "INTEGER",
-            config: { min: 18 },
-            isRequired: false,
-            createdAt: now,
-            updatedAt: now,
-          });
+        yield* db.insert(schema.contactAttributeDefinitionTable).values({
+          id: attributeId,
+          organizationId: fixture.organizationId,
+          name: "Plan",
+          key: "plan",
+          type: "TEXT",
+          isRequired: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
-          const error = yield* Effect.flip(
-            handlers
-              .ContactCreate({
-                organizationId: fixture.organizationId,
-                name: "Ada",
-                email: "ada@example.com",
-                attributeValues: [{ attributeId, value: 17 }],
-              })
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
-          );
-          expect(error._tag).toBe("BadRequestError");
+        const error = yield* Effect.flip(
+          handlers
+            .ContactCreate({
+              organizationId: fixture.organizationId,
+              name: "Ada",
+              email: "ada@example.com",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(error._tag).toBe("BadRequestError");
 
-          const contacts = yield* handlers
-            .ContactList({ organizationId: fixture.organizationId })
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-          expect(contacts).toHaveLength(0);
-        })
+        const contacts = yield* handlers
+          .ContactList({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(contacts).toHaveLength(0);
+      })
+    );
+
+    it.effect("rejects an invalid contact attribute value", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const attributeId = yield* ContactAttributeDefinitionId.generate;
+
+        yield* db.insert(schema.contactAttributeDefinitionTable).values({
+          id: attributeId,
+          organizationId: fixture.organizationId,
+          name: "Age",
+          key: "age",
+          type: "INTEGER",
+          config: { min: 18 },
+          isRequired: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .ContactCreate({
+              organizationId: fixture.organizationId,
+              name: "Ada",
+              email: "ada@example.com",
+              attributeValues: [{ attributeId, value: 17 }],
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(error._tag).toBe("BadRequestError");
+      })
     );
 
     it.effect(

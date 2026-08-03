@@ -34,6 +34,23 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
     CompanyCreate: (args: TCompanyCreate) =>
       transaction(
         Effect.gen(function* () {
+          const attributeValues = args.attributeValues ?? [];
+          const definitions =
+            yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
+              args.organizationId
+            );
+          yield* Effect.forEach(
+            definitions.filter(
+              (definition) =>
+                definition.isRequired &&
+                !attributeValues.some(
+                  (attributeValue) =>
+                    attributeValue.attributeId === definition.id
+                )
+            ),
+            (definition) => validateAttributeValueEffect(definition, null)
+          );
+
           const company = yield* repository.create(args);
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
             Effect.gen(function* () {
