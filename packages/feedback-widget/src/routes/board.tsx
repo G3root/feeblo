@@ -20,6 +20,8 @@ import {
 } from "../lib/api";
 import type { Board } from "../lib/boards";
 
+const SUGGESTIONS_DEBOUNCE_MS = 450;
+
 export function BoardDetailComponent() {
   const params = useParams();
   const boards = createAsync(() => fetchBoards());
@@ -41,16 +43,23 @@ function FeedbackFormView(props: { board: Board }) {
   const [title, setTitle] = createSignal("");
   const [content, setContent] = createSignal("");
   const [suggestions, setSuggestions] = createSignal<WidgetSuggestion[]>([]);
+  const [suggestionsPending, setSuggestionsPending] = createSignal(false);
 
   createEffect(() => {
     const nextTitle = title().trim();
     const nextContent = content();
     if (nextTitle.length < 3) {
       setSuggestions([]);
+      setSuggestionsPending(false);
       return;
     }
-    setSuggestions([]);
+
+    // Keep the previous results visible while the input settles and the next
+    // request is in flight. Clearing here made the suggestion panel flash on
+    // every keystroke.
+    setSuggestionsPending(true);
     const controller = new AbortController();
+    let isCurrent = true;
     const timer = window.setTimeout(() => {
       fetchSuggestions(
         {
@@ -60,14 +69,24 @@ function FeedbackFormView(props: { board: Board }) {
         },
         controller.signal
       )
-        .then(setSuggestions)
+        .then((nextSuggestions) => {
+          if (isCurrent) {
+            setSuggestions(nextSuggestions);
+          }
+        })
         .catch(() => {
-          if (!controller.signal.aborted) {
+          if (isCurrent && !controller.signal.aborted) {
             setSuggestions([]);
           }
+        })
+        .finally(() => {
+          if (isCurrent) {
+            setSuggestionsPending(false);
+          }
         });
-    }, 450);
+    }, SUGGESTIONS_DEBOUNCE_MS);
     onCleanup(() => {
+      isCurrent = false;
       window.clearTimeout(timer);
       controller.abort();
     });
@@ -99,10 +118,13 @@ function FeedbackFormView(props: { board: Board }) {
           <Show when={suggestions().length > 0}>
             <section
               aria-label="Similar posts"
+              aria-busy={suggestionsPending()}
               class="overflow-hidden rounded-lg border bg-muted/40"
             >
               <div class="border-b px-3 py-2">
-                <p class="font-medium text-sm">Similar posts</p>
+                <p class="font-medium text-sm">
+                  {suggestionsPending() ? "Updating similar posts" : "Similar posts"}
+                </p>
                 <p class="text-muted-foreground text-xs">
                   Your idea may already have been shared.
                 </p>
