@@ -62,7 +62,7 @@ function RouteComponent() {
   if (roadmaps.length === 0) {
     return (
       <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
-        <RoadmapListHeader />
+        <RoadmapListHeader showCreateAction={false} />
         <RoadmapEmptyState />
       </div>
     );
@@ -99,7 +99,11 @@ function RouteComponent() {
   );
 }
 
-function RoadmapListHeader() {
+function RoadmapListHeader({
+  showCreateAction = true,
+}: {
+  showCreateAction?: boolean;
+}) {
   const organizationId = useOrganizationId();
   const createStore = useCreateRoadmapDialogContext();
   const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
@@ -107,7 +111,7 @@ function RoadmapListHeader() {
   return (
     <div className="flex items-center justify-between px-3">
       <h1 className="font-semibold text-xl">Roadmaps</h1>
-      {canManage && (
+      {canManage && showCreateAction && (
         <Button onClick={() => createStore.send({ type: "toggle" })} size="sm">
           <HugeiconsIcon icon={Plus} />
           New Roadmap

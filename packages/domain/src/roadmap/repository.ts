@@ -1,5 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, count, eq, ne } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -63,10 +63,10 @@ const makeRoadmapRepository = Effect.gen(function* () {
         .pipe(Effect.map(EffectArray.get(0))),
     countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
       db
-        .select({ id: schema.roadmapTable.id })
+        .select({ count: count() })
         .from(schema.roadmapTable)
         .where(eq(schema.roadmapTable.organizationId, organizationId))
-        .pipe(Effect.map((roadmaps) => roadmaps.length)),
+        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
     delegatePrimary: ({
       organizationId,
       exceptRoadmapId,
@@ -115,14 +115,13 @@ const makeRoadmapRepository = Effect.gen(function* () {
           filter: toMutableRoadmapFilter(input.filter),
         })
         .pipe(Effect.asVoid),
-    update: (input: TRoadmapUpdate) =>
+    update: (input: Omit<TRoadmapUpdate, "isPrimary">) =>
       db
         .update(schema.roadmapTable)
         .set({
           name: input.name,
           slug: input.slug,
           description: input.description,
-          isPrimary: input.isPrimary,
           mode: input.mode,
           visibility: input.visibility,
           filter: toMutableRoadmapFilter(input.filter),

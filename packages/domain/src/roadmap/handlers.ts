@@ -1,3 +1,4 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -44,21 +45,25 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Roadmap", "select")
         ),
     RoadmapCreate: (args: TRoadmapCreate) =>
-      Effect.gen(function* () {
-        const roadmapCount = yield* repository.countByOrganizationId({
-          organizationId: args.organizationId,
-        });
+      transaction(
+        Effect.gen(function* () {
+          const roadmapCount = yield* repository.countByOrganizationId({
+            organizationId: args.organizationId,
+          });
 
-        yield* repository.create({
-          ...args,
-          isPrimary: roadmapCount === 0,
-        });
-      }).pipe(
+          yield* repository.create({
+            ...args,
+            isPrimary: roadmapCount === 0,
+          });
+        })
+      ).pipe(
         Policy.withPolicy(roadmapPolicy.canCreate(args)),
         withRemapDbErrors("Roadmap", "create")
       ),
-    RoadmapUpdate: (args: TRoadmapUpdate) =>
-      repository.update(args).pipe(
+    RoadmapUpdate: (args: TRoadmapUpdate) => {
+      const { isPrimary: _isPrimary, ...updateArgs } = args;
+
+      return transaction(repository.update(updateArgs)).pipe(
         Policy.withPolicy(
           roadmapPolicy.canUpdate({
             organizationId: args.organizationId,
@@ -67,23 +72,26 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           })
         ),
         withRemapDbErrors("Roadmap", "update")
-      ),
+      );
+    },
     RoadmapDelete: (args: TRoadmapDelete) =>
-      Effect.gen(function* () {
-        const roadmap = yield* repository.getById({
-          id: args.id,
-          organizationId: args.organizationId,
-        });
-
-        yield* repository.delete(args);
-
-        if (Option.isSome(roadmap) && roadmap.value.isPrimary) {
-          yield* repository.delegatePrimary({
+      transaction(
+        Effect.gen(function* () {
+          const roadmap = yield* repository.getById({
+            id: args.id,
             organizationId: args.organizationId,
-            exceptRoadmapId: args.id,
           });
-        }
-      }).pipe(
+
+          yield* repository.delete(args);
+
+          if (Option.isSome(roadmap) && roadmap.value.isPrimary) {
+            yield* repository.delegatePrimary({
+              organizationId: args.organizationId,
+              exceptRoadmapId: args.id,
+            });
+          }
+        })
+      ).pipe(
         Policy.withPolicy(
           roadmapPolicy.canDelete({ organizationId: args.organizationId })
         ),

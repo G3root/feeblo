@@ -48,7 +48,7 @@ function CreateRoadmapForm() {
   const organizationId = useOrganizationId();
   const store = useCreateRoadmapDialogContext();
 
-  const { data: roadmaps } = useLiveQuery(
+  const { data: roadmaps, isLoading } = useLiveQuery(
     (q) =>
       q
         .from({ roadmap: roadmapCollection })
@@ -56,7 +56,8 @@ function CreateRoadmapForm() {
     [organizationId]
   );
 
-  const isFirstRoadmap = roadmaps !== undefined && roadmaps.length === 0;
+  const isFirstRoadmap =
+    !isLoading && roadmaps !== undefined && roadmaps.length === 0;
 
   const form = useAppForm({
     ...roadmapFormOpts,

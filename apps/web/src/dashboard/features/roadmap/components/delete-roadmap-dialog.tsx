@@ -22,7 +22,7 @@ export function DeleteRoadmapDialog() {
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
 
-  const { data: roadmaps } = useLiveQuery(
+  const { data: roadmaps, isLoading } = useLiveQuery(
     (q) =>
       q
         .from({ roadmap: roadmapCollection })
@@ -32,14 +32,22 @@ export function DeleteRoadmapDialog() {
   );
 
   const handleDelete = async () => {
-    try {
-      const id = store.get().context.data.roadmapId;
-      const deletedRoadmap = roadmapCollection.get(id);
+    const id = store.get().context.data.roadmapId;
+    const deletedRoadmap = isLoading ? undefined : roadmapCollection.get(id);
 
+    try {
       const tx = roadmapCollection.delete(id);
       await tx.isPersisted.promise;
+    } catch (_error) {
+      toastManager.add({
+        title: "Failed to delete roadmap",
+        type: "error",
+      });
+      return;
+    }
 
-      if (deletedRoadmap?.isPrimary) {
+    if (!isLoading && deletedRoadmap?.isPrimary) {
+      try {
         const nextRoadmap = (roadmaps ?? []).find(
           (roadmap) => roadmap.id !== id
         );
@@ -54,24 +62,24 @@ export function DeleteRoadmapDialog() {
           );
           await primaryTx.isPersisted.promise;
         }
+      } catch (_error) {
+        toastManager.add({
+          title: "Failed to promote a replacement primary roadmap",
+          type: "error",
+        });
       }
-
-      store.send({ type: "toggle" });
-      toastManager.add({
-        title: "Roadmap deleted successfully",
-        type: "success",
-      });
-
-      await navigate({
-        to: "/$organizationId/roadmap",
-        params: { organizationId },
-      });
-    } catch (_error) {
-      toastManager.add({
-        title: "Failed to delete roadmap",
-        type: "error",
-      });
     }
+
+    store.send({ type: "toggle" });
+    toastManager.add({
+      title: "Roadmap deleted successfully",
+      type: "success",
+    });
+
+    await navigate({
+      to: "/$organizationId/roadmap",
+      params: { organizationId },
+    });
   };
 
   return (

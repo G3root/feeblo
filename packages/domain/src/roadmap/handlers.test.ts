@@ -203,6 +203,28 @@ describe("RoadmapRpcHandlers", () => {
         });
       })
     );
+    it.effect("denies members from creating a roadmap", () =>
+      Effect.gen(function* () {
+        const handlers = yield* RoadmapRpcHandlersEffect;
+        const fixture = yield* makeFixture("PUBLIC");
+        const roadmapId = yield* RoadmapId.generate;
+
+        const error = yield* Effect.flip(
+          handlers
+            .RoadmapCreate(
+              roadmapCreateInput(fixture, roadmapId, "Member roadmap")
+            )
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "member")
+              )
+            )
+        );
+
+        expect(error).toMatchObject({ _tag: "PolicyDenied" });
+      })
+    );
     it.effect("rejects creating a private roadmap on free plan", () =>
       Effect.gen(function* () {
         const handlers = yield* RoadmapRpcHandlersEffect;
@@ -386,6 +408,49 @@ describe("RoadmapRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         expect(
           roadmaps.find((roadmap) => roadmap.id === firstId)
+        ).toMatchObject({
+          isPrimary: true,
+        });
+        expect(
+          roadmaps.find((roadmap) => roadmap.id === secondId)
+        ).toMatchObject({
+          isPrimary: false,
+        });
+      })
+    );
+    it.effect("does not allow updates to change primary status", () =>
+      Effect.gen(function* () {
+        const handlers = yield* RoadmapRpcHandlersEffect;
+        const fixture = yield* makeFixture("PUBLIC");
+        const secondId = yield* RoadmapId.generate;
+
+        yield* handlers
+          .RoadmapCreate(
+            roadmapCreateInput(fixture, secondId, "Second roadmap")
+          )
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        yield* handlers
+          .RoadmapUpdate({
+            id: secondId,
+            organizationId: fixture.organizationId,
+            name: "Second roadmap",
+            slug: "second-roadmap",
+            description: null,
+            isPrimary: true,
+            mode: "status",
+            visibility: "public",
+            filter: { version: 1, operator: "and", conditions: [] },
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        const roadmaps = yield* handlers
+          .RoadmapList({
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(
+          roadmaps.find((roadmap) => roadmap.id === fixture.roadmapId)
         ).toMatchObject({
           isPrimary: true,
         });
