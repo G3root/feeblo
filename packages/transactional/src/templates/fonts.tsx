@@ -1,7 +1,10 @@
+import * as React from "react";
 import { Font } from "react-email";
 
 export function FeebloFonts() {
-  return (
+  return React.createElement(
+    React.Fragment,
+    null,
     <>
       <Font
         fallbackFontFamily={["Arial", "sans-serif"]}

@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Text } from "react-email";
 import { EmailShell } from "./email-shell";
 
@@ -34,7 +35,7 @@ export const UserFeedbackEmail = ({
 
 export const createUserFeedbackEmail = (props: UserFeedbackEmailProps) => ({
   subject: "How's your first week with Feeblo going?",
-  react: <UserFeedbackEmail {...props} />,
+  react: React.createElement(UserFeedbackEmail, props),
 });
 
 UserFeedbackEmail.PreviewProps = {
