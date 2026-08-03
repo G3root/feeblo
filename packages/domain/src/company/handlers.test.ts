@@ -7,9 +7,8 @@ import {
 } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
-import { CurrentSession, type Session } from "../session-middleware";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import { CurrentSession, type Session } from "../session-middleware";
 import { CompanyRpcHandlersEffect } from "./handlers";
 import { CompanyPolicy } from "./policies";
 import { CompanyRepository } from "./repository";
@@ -21,7 +20,10 @@ describe("CompanyRpcHandlers", () => {
     userId: string;
   };
 
-  const makeSession = (fixture: Fixture, isMember = true): Session => ({
+  const makeSession = (
+    fixture: Fixture,
+    role: Session["memberships"][number]["role"] | false = "owner"
+  ): Session => ({
     user: {
       id: fixture.userId,
       email: "user@example.com",
@@ -30,12 +32,12 @@ describe("CompanyRpcHandlers", () => {
     },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
-    memberships: isMember
+    memberships: role
       ? [
           {
             membershipId: fixture.membershipId,
             organizationId: fixture.organizationId,
-            role: "owner",
+            role,
           },
         ]
       : [],
@@ -156,52 +158,81 @@ describe("CompanyRpcHandlers", () => {
       })
     );
 
-    it.effect("rejects attributes from another organization when creating a company", () =>
+    it.effect("rejects a non-admin member from deleting a company", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
         const handlers = yield* CompanyRpcHandlersEffect;
         const fixture = yield* makeFixture();
-        const foreignOrganizationId = yield* WorkspaceId.generate;
-        const attributeId = yield* CompanyAttributeDefinitionId.generate;
-        const now = new Date();
-
-        yield* db.insert(schema.organizationTable).values({
-          id: foreignOrganizationId,
-          name: "Foreign organization",
-          slug: foreignOrganizationId,
-          createdAt: now,
-        });
-        yield* db.insert(schema.companyAttributeDefinitionTable).values({
-          id: attributeId,
-          organizationId: foreignOrganizationId,
-          name: "Foreign field",
-          key: "foreignField",
-          type: "TEXT",
-          isRequired: false,
-          createdAt: now,
-          updatedAt: now,
+        const companyId = yield* CompanyId.generate;
+        yield* db.insert(schema.companyTable).values({
+          id: companyId,
+          organizationId: fixture.organizationId,
+          name: "Acme",
+          createdAt: new Date(),
+          updatedAt: new Date(),
         });
 
         const error = yield* Effect.flip(
           handlers
-            .CompanyCreate({
+            .CompanyDelete({
+              id: companyId,
               organizationId: fixture.organizationId,
-              name: "Acme",
-              attributeValues: [{ attributeId, value: "secret" }],
             })
             .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture))
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "member")
+              )
             )
         );
         expect(error._tag).toBe("PolicyDenied");
-
-        const companies = yield* handlers
-          .CompanyList({ organizationId: fixture.organizationId })
-          .pipe(
-            Effect.provideService(CurrentSession, makeSession(fixture))
-          );
-        expect(companies).toHaveLength(0);
       })
+    );
+
+    it.effect(
+      "rejects attributes from another organization when creating a company",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* CompanyRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const foreignOrganizationId = yield* WorkspaceId.generate;
+          const attributeId = yield* CompanyAttributeDefinitionId.generate;
+          const now = new Date();
+
+          yield* db.insert(schema.organizationTable).values({
+            id: foreignOrganizationId,
+            name: "Foreign organization",
+            slug: foreignOrganizationId,
+            createdAt: now,
+          });
+          yield* db.insert(schema.companyAttributeDefinitionTable).values({
+            id: attributeId,
+            organizationId: foreignOrganizationId,
+            name: "Foreign field",
+            key: "foreignField",
+            type: "TEXT",
+            isRequired: false,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .CompanyCreate({
+                organizationId: fixture.organizationId,
+                name: "Acme",
+                attributeValues: [{ attributeId, value: "secret" }],
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(error._tag).toBe("PolicyDenied");
+
+          const companies = yield* handlers
+            .CompanyList({ organizationId: fixture.organizationId })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          expect(companies).toHaveLength(0);
+        })
     );
   });
 });

@@ -15,6 +15,7 @@ import {
   currentHttpApiSession,
   HttpApiAuthMiddlewareLive,
 } from "../session-middleware";
+import { MediaUploadLimitsMiddlewareLive } from "./api-contract";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
@@ -51,6 +52,26 @@ export const MediaApiLive = HttpApiBuilder.group(
         }
 
         const fs = yield* FileSystem.FileSystem;
+
+        // Check the on-disk size before reading the file into memory so an
+        // oversized upload cannot exhaust server memory.
+        const fileInfo = yield* fs
+          .stat(file.path)
+          .pipe(
+            Effect.mapError(
+              () => new InternalServerError({ message: "Failed to read file" })
+            )
+          );
+        const maxSize = FileSystem.Size(
+          kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES
+        );
+        if (fileInfo.size === FileSystem.Size(0) || fileInfo.size > maxSize) {
+          const maxSizeMb = Math.round(Number(maxSize) / (1024 * 1024));
+          return yield* new BadRequestError({
+            message: `File must be between 1B and ${maxSizeMb}MB`,
+          });
+        }
+
         const bytes = yield* fs
           .readFile(file.path)
           .pipe(
@@ -59,11 +80,11 @@ export const MediaApiLive = HttpApiBuilder.group(
             )
           );
 
-        const maxSize = kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
-        if (bytes.length === 0 || bytes.length > maxSize) {
-          const maxSizeMb = Math.round(maxSize / (1024 * 1024));
+        const sniffedKind = sniffMediaKind(bytes);
+        if (sniffedKind === null || sniffedKind !== kind) {
           return yield* new BadRequestError({
-            message: `File must be between 1B and ${maxSizeMb}MB`,
+            message:
+              "File content does not match its declared type. Use PNG/JPEG/WEBP/GIF or MP4/WebM/MOV",
           });
         }
 
@@ -93,7 +114,10 @@ export const MediaApiLive = HttpApiBuilder.group(
         return { ...uploaded, kind };
       }).pipe(withRemapDbErrors("Media", "create"))
     )
-).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
+).pipe(
+  Layer.provide(HttpApiAuthMiddlewareLive),
+  Layer.provide(MediaUploadLimitsMiddlewareLive)
+);
 
 function getMediaKind(contentType: string): MediaKind | null {
   if (CONTENT_TYPE_BY_KIND.image.has(contentType)) {
@@ -125,3 +149,43 @@ function getFileExtension(contentType: string): string | null {
       return null;
   }
 }
+
+function sniffMediaKind(bytes: Uint8Array): MediaKind | null {
+  if (isPng(bytes) || isJpeg(bytes) || isGif(bytes) || isWebp(bytes)) {
+    return "image";
+  }
+  if (isMp4OrMov(bytes) || isWebm(bytes)) {
+    return "video";
+  }
+  return null;
+}
+
+function hasBytes(
+  bytes: Uint8Array,
+  offset: number,
+  signature: number[]
+): boolean {
+  if (bytes.length < offset + signature.length) {
+    return false;
+  }
+  return signature.every((byte, index) => bytes[offset + index] === byte);
+}
+
+const isPng = (bytes: Uint8Array): boolean =>
+  hasBytes(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+const isJpeg = (bytes: Uint8Array): boolean =>
+  hasBytes(bytes, 0, [0xff, 0xd8, 0xff]);
+
+const isGif = (bytes: Uint8Array): boolean =>
+  hasBytes(bytes, 0, [0x47, 0x49, 0x46, 0x38]);
+
+const isWebp = (bytes: Uint8Array): boolean =>
+  hasBytes(bytes, 0, [0x52, 0x49, 0x46, 0x46]) &&
+  hasBytes(bytes, 8, [0x57, 0x45, 0x42, 0x50]);
+
+const isMp4OrMov = (bytes: Uint8Array): boolean =>
+  hasBytes(bytes, 4, [0x66, 0x74, 0x79, 0x70]);
+
+const isWebm = (bytes: Uint8Array): boolean =>
+  hasBytes(bytes, 0, [0x1a, 0x45, 0xdf, 0xa3]);

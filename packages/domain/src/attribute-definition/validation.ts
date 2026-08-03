@@ -1,6 +1,8 @@
 import type { schema } from "@feeblo/db";
+import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 
+import { BadRequestError } from "../rpc-errors";
 import { AttributeConfig } from "./schema";
 
 export type AttributeDefinition =
@@ -56,7 +58,14 @@ const validateConfig = (
       if (typeof value !== "string") {
         return false;
       }
-      return !(config.pattern && !new RegExp(config.pattern).test(value));
+      if (config.pattern === undefined) {
+        return true;
+      }
+      try {
+        return new RegExp(config.pattern).test(value);
+      } catch {
+        return true;
+      }
     }
     case "INTEGER":
     case "DECIMAL": {
@@ -93,3 +102,19 @@ export const validateAttributeValue = (
 
   return { valid: true };
 };
+
+/**
+ * Validates an attribute value against its definition and fails with a
+ * BadRequestError when the value does not match the definition's type or
+ * configured rules (min/max/pattern) or when a required value is missing.
+ */
+export const validateAttributeValueEffect = (
+  definition: AttributeDefinition,
+  value: AttributeValue
+): Effect.Effect<void, BadRequestError> =>
+  Effect.gen(function* () {
+    const result = validateAttributeValue(definition, value);
+    if (!result.valid) {
+      return yield* new BadRequestError({ message: result.error });
+    }
+  });

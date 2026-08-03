@@ -20,7 +20,10 @@ describe("ContactRpcHandlers", () => {
     userId: string;
   };
 
-  const makeSession = (fixture: Fixture, isMember = true): Session => ({
+  const makeSession = (
+    fixture: Fixture,
+    role: Session["memberships"][number]["role"] | false = "owner"
+  ): Session => ({
     user: {
       id: fixture.userId,
       email: "user@example.com",
@@ -29,12 +32,12 @@ describe("ContactRpcHandlers", () => {
     },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
-    memberships: isMember
+    memberships: role
       ? [
           {
             membershipId: fixture.membershipId,
             organizationId: fixture.organizationId,
-            role: "owner",
+            role,
           },
         ]
       : [],
@@ -192,6 +195,38 @@ describe("ContactRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           expect(contacts).toHaveLength(0);
         })
+    );
+
+    it.effect("rejects a non-admin member from deleting a contact", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const contactId = yield* ContactId.generate;
+        yield* db.insert(schema.contactTable).values({
+          id: contactId,
+          organizationId: fixture.organizationId,
+          name: "Ada",
+          email: "ada@example.com",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .ContactDelete({
+              id: contactId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "member")
+              )
+            )
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
     );
 
     it.effect(
