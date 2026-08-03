@@ -190,6 +190,46 @@ describe("CompanyRpcHandlers", () => {
     );
 
     it.effect(
+      "rejects invalid attribute values when creating a company",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* CompanyRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const attributeId = yield* CompanyAttributeDefinitionId.generate;
+          const now = new Date();
+
+          yield* db.insert(schema.companyAttributeDefinitionTable).values({
+            id: attributeId,
+            organizationId: fixture.organizationId,
+            name: "Employees",
+            key: "employees",
+            type: "INTEGER",
+            config: { min: 1 },
+            isRequired: false,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .CompanyCreate({
+                organizationId: fixture.organizationId,
+                name: "Acme",
+                attributeValues: [{ attributeId, value: 0 }],
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+          expect(error._tag).toBe("BadRequestError");
+
+          const companies = yield* handlers
+            .CompanyList({ organizationId: fixture.organizationId })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          expect(companies).toHaveLength(0);
+        })
+    );
+
+    it.effect(
       "rejects attributes from another organization when creating a company",
       () =>
         Effect.gen(function* () {

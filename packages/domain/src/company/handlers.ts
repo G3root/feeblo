@@ -6,6 +6,7 @@ import * as Option from "effect/Option";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import { validateAttributeValueEffect } from "../attribute-definition/validation";
 import { CompanyNotFoundError, FailedToCreateCompanyError } from "./errors";
 import { CompanyPolicy } from "./policies";
 import { CompanyRepository } from "./repository";
@@ -35,27 +36,43 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
         Effect.gen(function* () {
           const company = yield* repository.create(args);
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
-            attributeDefinitionRepository
-              .upsertCompanyAttributeValue({
-                ...attributeValue,
-                companyId: company.id,
-                organizationId: args.organizationId,
-              })
-              .pipe(
-                Policy.withPolicy(
-                  Policy.policy(() =>
-                    attributeDefinitionRepository.companyAttributeDefinitionExists(
-                      {
-                        id: attributeValue.attributeId,
-                        organizationId: args.organizationId,
-                      }
-                    )
-                  )
-                ),
-                Effect.catchTag("FailedToUpsertAttributeValueError", () =>
-                  Effect.fail(new FailedToCreateCompanyError())
+            Effect.gen(function* () {
+              yield* Policy.policy(() =>
+                attributeDefinitionRepository.companyAttributeDefinitionExists(
+                  {
+                    id: attributeValue.attributeId,
+                    organizationId: args.organizationId,
+                  }
                 )
-              )
+              );
+
+              const definition =
+                yield* attributeDefinitionRepository.findCompanyAttributeDefinitionById(
+                  {
+                    id: attributeValue.attributeId,
+                    organizationId: args.organizationId,
+                  }
+                );
+              if (definition === undefined) {
+                return yield* new Policy.PolicyDeniedError();
+              }
+
+              yield* validateAttributeValueEffect(
+                definition,
+                attributeValue.value
+              );
+              yield* attributeDefinitionRepository
+                .upsertCompanyAttributeValue({
+                  ...attributeValue,
+                  companyId: company.id,
+                  organizationId: args.organizationId,
+                })
+                .pipe(
+                  Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+                    Effect.fail(new FailedToCreateCompanyError())
+                  )
+                );
+            })
           );
           return company;
         })

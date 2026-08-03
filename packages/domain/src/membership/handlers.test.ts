@@ -279,6 +279,55 @@ describe("MembershipRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
       })
     );
+    it.effect("prevents an owner from removing or demoting another owner", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const otherOwnerMemberId = yield* MemberId.generate;
+        const otherOwnerUserId = `other_owner_${fixture.organizationId}`;
+
+        yield* db.insert(schema.userTable).values({
+          id: otherOwnerUserId,
+          email: `${otherOwnerUserId}@example.com`,
+          name: "Other Owner",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: otherOwnerMemberId,
+          organizationId: fixture.organizationId,
+          userId: otherOwnerUserId,
+          role: "owner",
+          createdAt: new Date(),
+        });
+
+        const removeError = yield* Effect.flip(
+          handlers
+            .OrganizationRemoveMember({
+              organizationId: fixture.organizationId,
+              memberId: otherOwnerMemberId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(removeError._tag).toBe("PolicyDenied");
+
+        const demoteError = yield* Effect.flip(
+          handlers
+            .OrganizationUpdateMemberRole({
+              organizationId: fixture.organizationId,
+              memberId: otherOwnerMemberId,
+              role: "admin",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(demoteError._tag).toBe("PolicyDenied");
+
+        const [otherOwner] = yield* db
+          .select({ role: schema.memberTable.role })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.id, otherOwnerMemberId));
+        expect(otherOwner?.role).toBe("owner");
+      })
+    );
     it.effect("prevents an admin from removing an owner", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;

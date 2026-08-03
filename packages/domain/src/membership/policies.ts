@@ -60,8 +60,7 @@ const ROLE_RANK: Record<"member" | "admin" | "owner", number> = {
 const canManageMember = (
   actorRole: "owner" | "admin" | "member",
   targetRole: "owner" | "admin" | "member"
-): boolean =>
-  actorRole === "owner" || ROLE_RANK[targetRole] < ROLE_RANK[actorRole];
+): boolean => ROLE_RANK[targetRole] < ROLE_RANK[actorRole];
 
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;

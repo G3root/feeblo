@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import { validateAttributeValueEffect } from "../attribute-definition/validation";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { ContactNotFoundError, FailedToCreateContactError } from "./errors";
@@ -35,27 +36,43 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         Effect.gen(function* () {
           const contact = yield* repository.create(args);
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
-            attributeDefinitionRepository
-              .upsertContactAttributeValue({
-                ...attributeValue,
-                contactId: contact.id,
-                organizationId: args.organizationId,
-              })
-              .pipe(
-                Policy.withPolicy(
-                  Policy.policy(() =>
-                    attributeDefinitionRepository.contactAttributeDefinitionExists(
-                      {
-                        id: attributeValue.attributeId,
-                        organizationId: args.organizationId,
-                      }
-                    )
-                  )
-                ),
-                Effect.catchTag("FailedToUpsertAttributeValueError", () =>
-                  Effect.fail(new FailedToCreateContactError())
+            Effect.gen(function* () {
+              yield* Policy.policy(() =>
+                attributeDefinitionRepository.contactAttributeDefinitionExists(
+                  {
+                    id: attributeValue.attributeId,
+                    organizationId: args.organizationId,
+                  }
                 )
-              )
+              );
+
+              const definition =
+                yield* attributeDefinitionRepository.findContactAttributeDefinitionById(
+                  {
+                    id: attributeValue.attributeId,
+                    organizationId: args.organizationId,
+                  }
+                );
+              if (definition === undefined) {
+                return yield* new Policy.PolicyDeniedError();
+              }
+
+              yield* validateAttributeValueEffect(
+                definition,
+                attributeValue.value
+              );
+              yield* attributeDefinitionRepository
+                .upsertContactAttributeValue({
+                  ...attributeValue,
+                  contactId: contact.id,
+                  organizationId: args.organizationId,
+                })
+                .pipe(
+                  Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+                    Effect.fail(new FailedToCreateContactError())
+                  )
+                );
+            })
           );
           return contact;
         })
