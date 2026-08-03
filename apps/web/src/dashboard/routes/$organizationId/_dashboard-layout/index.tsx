@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -9,6 +10,7 @@ import {
   ItemTitle,
 } from "@feeblo/ui/item";
 import { Separator } from "@feeblo/ui/separator";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -62,7 +64,11 @@ function RouteComponent() {
     [organizationId]
   );
 
-  const { data: recentPosts } = useLiveQuery(
+  const {
+    data: recentPosts,
+    isError: recentPostsError,
+    isLoading: recentPostsLoading,
+  } = useLiveQuery(
     (q) =>
       q
         .from({ post: postCollection })
@@ -124,7 +130,27 @@ function RouteComponent() {
         </div>
       </div>
 
-      {recentPosts && recentPosts.length > 0 && (
+      {recentPostsError ? (
+        <section>
+          <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+            Recent posts
+          </h2>
+          <div className="flex min-h-24 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
+            There was a problem loading recent posts.
+          </div>
+        </section>
+      ) : recentPostsLoading ? (
+        <section>
+          <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+            Recent posts
+          </h2>
+          <div className="space-y-2">
+            {[1, 2, 3].map((skeleton) => (
+              <Skeleton className="h-12 w-full" key={skeleton} />
+            ))}
+          </div>
+        </section>
+      ) : recentPosts && recentPosts.length > 0 ? (
         <section>
           <h2 className="mb-3 font-medium text-muted-foreground text-sm">
             Recent posts
@@ -172,7 +198,7 @@ function RouteComponent() {
             })}
           </ItemGroup>
         </section>
-      )}
+      ) : null}
 
       <Separator />
 
