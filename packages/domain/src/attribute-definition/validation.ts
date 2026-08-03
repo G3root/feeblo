@@ -64,7 +64,7 @@ const validateConfig = (
       try {
         return new RegExp(config.pattern).test(value);
       } catch {
-        return true;
+        return false;
       }
     }
     case "INTEGER":

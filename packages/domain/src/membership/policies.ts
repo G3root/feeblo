@@ -162,8 +162,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
       Policy.hasMembership(args.organizationId),
       Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
       isMemberAlready(args),
-      hasOtherOwners(args),
-      canManageTarget(args)
+      hasOtherOwners(args)
     );
 
   const canManageRole = (args: TCanUpdateMemberRole) =>
@@ -196,8 +195,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
       Policy.hasMembership(args.organizationId),
       Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
       isMemberAlready(args),
-      hasOtherOwners(args),
-      canManageRole(args)
+      hasOtherOwners(args)
     );
 
   return {
@@ -207,6 +205,8 @@ const makeMembershipPolicy = Effect.gen(function* () {
     canRemoveMember,
     canUpdateMemberRole,
     canChangeRoleWithinPlan,
+    canManageTarget,
+    canManageRole,
   };
 });
 

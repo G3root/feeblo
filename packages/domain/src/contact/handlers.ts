@@ -39,6 +39,9 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
             yield* attributeDefinitionRepository.findContactAttributeDefinitions(
               args.organizationId
             );
+          const definitionsById = new Map(
+            definitions.map((definition) => [definition.id, definition])
+          );
           yield* Effect.forEach(
             definitions.filter(
               (definition) =>
@@ -54,22 +57,9 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           const contact = yield* repository.create(args);
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
             Effect.gen(function* () {
-              yield* Policy.policy(() =>
-                attributeDefinitionRepository.contactAttributeDefinitionExists(
-                  {
-                    id: attributeValue.attributeId,
-                    organizationId: args.organizationId,
-                  }
-                )
+              const definition = definitionsById.get(
+                attributeValue.attributeId
               );
-
-              const definition =
-                yield* attributeDefinitionRepository.findContactAttributeDefinitionById(
-                  {
-                    id: attributeValue.attributeId,
-                    organizationId: args.organizationId,
-                  }
-                );
               if (definition === undefined) {
                 return yield* new Policy.PolicyDeniedError();
               }

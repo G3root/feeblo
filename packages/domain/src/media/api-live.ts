@@ -27,6 +27,15 @@ const CONTENT_TYPE_BY_KIND = {
 
 type MediaKind = keyof typeof CONTENT_TYPE_BY_KIND;
 
+type SupportedContentType =
+  | "image/gif"
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "video/mp4"
+  | "video/quicktime"
+  | "video/webm";
+
 export const MediaApiLive = HttpApiBuilder.group(
   Api,
   "MediaApiGroup",
@@ -80,8 +89,11 @@ export const MediaApiLive = HttpApiBuilder.group(
             )
           );
 
-        const sniffedKind = sniffMediaKind(bytes);
-        if (sniffedKind === null || sniffedKind !== kind) {
+        const sniffedContentType = sniffMediaType(bytes);
+        if (
+          sniffedContentType === null ||
+          sniffedContentType !== file.contentType
+        ) {
           return yield* new BadRequestError({
             message:
               "File content does not match its declared type. Use PNG/JPEG/WEBP/GIF or MP4/WebM/MOV",
@@ -150,12 +162,27 @@ function getFileExtension(contentType: string): string | null {
   }
 }
 
-function sniffMediaKind(bytes: Uint8Array): MediaKind | null {
-  if (isPng(bytes) || isJpeg(bytes) || isGif(bytes) || isWebp(bytes)) {
-    return "image";
+export function sniffMediaType(bytes: Uint8Array): SupportedContentType | null {
+  if (isPng(bytes)) {
+    return "image/png";
   }
-  if (isMp4OrMov(bytes) || isWebm(bytes)) {
-    return "video";
+  if (isJpeg(bytes)) {
+    return "image/jpeg";
+  }
+  if (isGif(bytes)) {
+    return "image/gif";
+  }
+  if (isWebp(bytes)) {
+    return "image/webp";
+  }
+  if (isMp4(bytes)) {
+    return "video/mp4";
+  }
+  if (isMov(bytes)) {
+    return "video/quicktime";
+  }
+  if (isWebm(bytes)) {
+    return "video/webm";
   }
   return null;
 }
@@ -163,7 +190,7 @@ function sniffMediaKind(bytes: Uint8Array): MediaKind | null {
 function hasBytes(
   bytes: Uint8Array,
   offset: number,
-  signature: number[]
+  signature: readonly number[]
 ): boolean {
   if (bytes.length < offset + signature.length) {
     return false;
@@ -178,14 +205,171 @@ const isJpeg = (bytes: Uint8Array): boolean =>
   hasBytes(bytes, 0, [0xff, 0xd8, 0xff]);
 
 const isGif = (bytes: Uint8Array): boolean =>
-  hasBytes(bytes, 0, [0x47, 0x49, 0x46, 0x38]);
+  hasBytes(bytes, 0, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
+  hasBytes(bytes, 0, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
 
 const isWebp = (bytes: Uint8Array): boolean =>
   hasBytes(bytes, 0, [0x52, 0x49, 0x46, 0x46]) &&
   hasBytes(bytes, 8, [0x57, 0x45, 0x42, 0x50]);
 
-const isMp4OrMov = (bytes: Uint8Array): boolean =>
-  hasBytes(bytes, 4, [0x66, 0x74, 0x79, 0x70]);
+const isFtyp = (bytes: Uint8Array): boolean =>
+  bytes.length >= 16 && hasBytes(bytes, 4, [0x66, 0x74, 0x79, 0x70]);
 
-const isWebm = (bytes: Uint8Array): boolean =>
-  hasBytes(bytes, 0, [0x1a, 0x45, 0xdf, 0xa3]);
+const MP4_BRANDS = new Set([
+  "isom",
+  "iso2",
+  "iso3",
+  "iso4",
+  "iso5",
+  "iso6",
+  "iso7",
+  "iso8",
+  "iso9",
+  "isoM",
+  "mp41",
+  "mp42",
+  "mp4v",
+  "mp71",
+  "mp72",
+  "avc1",
+  "avc2",
+  "avc3",
+  "avc4",
+  "hvc1",
+  "hev1",
+  "av01",
+  "dash",
+  "cmfc",
+  "cmff",
+  "M4V ",
+]);
+
+const readFourCc = (bytes: Uint8Array, offset: number): string | null => {
+  if (bytes.length < offset + 4) {
+    return null;
+  }
+  return String.fromCharCode(...bytes.slice(offset, offset + 4));
+};
+
+const readUint32 = (bytes: Uint8Array, offset: number): number | null => {
+  if (bytes.length < offset + 4) {
+    return null;
+  }
+  return (
+    bytes[offset]! * 0x1_00_00_00 +
+    bytes[offset + 1]! * 0x1_00_00 +
+    bytes[offset + 2]! * 0x1_00 +
+    bytes[offset + 3]!
+  );
+};
+
+const isMp4 = (bytes: Uint8Array): boolean => {
+  if (!isFtyp(bytes)) {
+    return false;
+  }
+
+  const boxSize = readUint32(bytes, 0);
+  if (boxSize === null || (boxSize !== 0 && boxSize < 16)) {
+    return false;
+  }
+
+  const boxEnd = boxSize === 0 ? bytes.length : Math.min(boxSize, bytes.length);
+  const brands = [readFourCc(bytes, 8)];
+  for (let offset = 16; offset + 4 <= boxEnd; offset += 4) {
+    brands.push(readFourCc(bytes, offset));
+  }
+
+  return brands.some((brand) => brand !== null && MP4_BRANDS.has(brand));
+};
+
+const isMov = (bytes: Uint8Array): boolean =>
+  isFtyp(bytes) && readFourCc(bytes, 8) === "qt  ";
+
+const readEbmlVarint = (
+  bytes: Uint8Array,
+  offset: number
+): { value: number; length: number } | null => {
+  if (offset >= bytes.length) {
+    return null;
+  }
+  const first = bytes[offset];
+  if (first === undefined) {
+    return null;
+  }
+
+  let length = 1;
+  if (first < 0x02) {
+    length = 8;
+  } else if (first < 0x04) {
+    length = 7;
+  } else if (first < 0x08) {
+    length = 6;
+  } else if (first < 0x10) {
+    length = 5;
+  } else if (first < 0x20) {
+    length = 4;
+  } else if (first < 0x40) {
+    length = 3;
+  } else if (first < 0x80) {
+    length = 2;
+  }
+
+  if (offset + length > bytes.length) {
+    return null;
+  }
+
+  let value = first % 2 ** (8 - length);
+  for (let index = 1; index < length; index += 1) {
+    const byte = bytes[offset + index];
+    if (byte === undefined) {
+      return null;
+    }
+    value = value * 0x1_00 + byte;
+  }
+  return { value, length };
+};
+
+const isWebm = (bytes: Uint8Array): boolean => {
+  if (!hasBytes(bytes, 0, [0x1a, 0x45, 0xdf, 0xa3])) {
+    return false;
+  }
+
+  const headerSize = readEbmlVarint(bytes, 4);
+  if (headerSize === null) {
+    return false;
+  }
+
+  const headerStart = 4 + headerSize.length;
+  const headerEnd = headerStart + headerSize.value;
+  if (headerEnd > bytes.length) {
+    return false;
+  }
+
+  let offset = headerStart;
+  while (offset < headerEnd) {
+    const id = readEbmlVarint(bytes, offset);
+    if (id === null) {
+      return false;
+    }
+
+    const idOffset = offset;
+    offset += id.length;
+
+    const size = readEbmlVarint(bytes, offset);
+    if (size === null) {
+      return false;
+    }
+    offset += size.length;
+
+    if (hasBytes(bytes, idOffset, [0x42, 0x82])) {
+      // DocType element
+      return (
+        size.value === 4 && hasBytes(bytes, offset, [0x77, 0x65, 0x62, 0x6d]) // "webm"
+      );
+    }
+
+    offset += size.value;
+  }
+
+  return false;
+};

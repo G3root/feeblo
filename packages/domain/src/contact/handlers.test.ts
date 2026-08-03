@@ -216,6 +216,11 @@ describe("ContactRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
         expect(error._tag).toBe("BadRequestError");
+
+        const contacts = yield* handlers
+          .ContactList({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(contacts).toHaveLength(0);
       })
     );
 

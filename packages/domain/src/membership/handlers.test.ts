@@ -442,6 +442,12 @@ describe("MembershipRpcHandlers", () => {
           .pipe(
             Effect.provideService(CurrentSession, makeSession(fixture, "admin"))
           );
+
+        const remaining = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.id, memberId));
+        expect(remaining).toHaveLength(0);
       })
     );
   });
