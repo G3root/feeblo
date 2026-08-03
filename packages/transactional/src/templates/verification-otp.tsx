@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Section, Text } from "react-email";
 import { EmailShell } from "./email-shell";
 
@@ -32,7 +33,7 @@ export const createVerificationOtpEmail = (
   props: VerificationOtpEmailProps
 ) => ({
   subject: `Your Feeblo ${props.flowLabel.toLowerCase()} code`,
-  react: <VerificationOtpEmail {...props} />,
+  react: React.createElement(VerificationOtpEmail, props),
 });
 
 VerificationOtpEmail.PreviewProps = {
