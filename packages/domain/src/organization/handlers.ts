@@ -26,13 +26,15 @@ export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* OrganizationRepository;
   const assetRepository = yield* AssetRepository;
 
-  const removeStoredLogo = (organizationId: string) =>
+  const removeStoredLogo = (organizationId: string, removedLogo: string) =>
     Effect.gen(function* () {
       const assets = yield* assetRepository.findByOwnerAndKind({
         kind: "organization_logo",
         owner: { type: "organization", id: organizationId },
       });
-      yield* deleteStoredAssets(assets).pipe(
+      yield* deleteStoredAssets(
+        assets.filter(({ url }) => url === removedLogo)
+      ).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning(
             "Failed to clean up removed organization logo",
@@ -61,8 +63,15 @@ export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
           });
         }
 
-        if (args.logo === null) {
-          yield* removeStoredLogo(args.organizationId);
+        if (
+          args.logo === null &&
+          organization.value.logo === null &&
+          organization.value.previousLogo !== null
+        ) {
+          yield* removeStoredLogo(
+            args.organizationId,
+            organization.value.previousLogo
+          );
         }
 
         return;

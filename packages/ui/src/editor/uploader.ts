@@ -43,6 +43,14 @@ export const createEditorUploader =
         reject(new Error("Upload failed"));
       });
 
+      xhr.addEventListener("abort", () => {
+        reject(new Error("Upload aborted"));
+      });
+
+      xhr.addEventListener("timeout", () => {
+        reject(new Error("Upload timed out"));
+      });
+
       xhr.open("POST", editorMediaUploadEndpoint, true);
       xhr.withCredentials = true;
       xhr.send(formData);

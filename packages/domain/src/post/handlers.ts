@@ -155,6 +155,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           );
           const remainingUrls = new Set(
             yield* assetRepository.findReferencedUrls({
+              urls,
               excludeChangelogIds: [],
               excludePostIds: ids,
               organizationId: args.organizationId,
@@ -170,7 +171,19 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           return editorAssets;
         })
       );
-      yield* scheduleAssetDeletions(editorAssets);
+      yield* scheduleAssetDeletions(editorAssets).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning(
+            "Failed to schedule deleted post asset cleanup",
+            cause
+          ).pipe(
+            Effect.annotateLogs({
+              postIds: ids,
+              organizationId: args.organizationId,
+            })
+          )
+        )
+      );
     });
 
   const updatePostEffect = (args: TPostUpdate) =>

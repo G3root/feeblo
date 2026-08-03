@@ -1,5 +1,6 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
-import { lt } from "drizzle-orm";
+import { AssetId } from "@feeblo/id";
+import { asc, lt } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schedule from "effect/Schedule";
@@ -10,7 +11,7 @@ import {
   queueObjectDeletions,
   type StoredObject,
 } from "./deletion-repository";
-import { AssetRepository } from "./repository";
+import { type AssetKind, type AssetOwner, AssetRepository } from "./repository";
 import { AssetDeletionWorkflow } from "./workflow";
 
 export interface StoredAsset extends StoredObject {
@@ -18,6 +19,7 @@ export interface StoredAsset extends StoredObject {
 }
 
 const DELETE_CONCURRENCY = 10;
+const ASSET_DELETION_BATCH_SIZE = 100;
 const SWEEP_INTERVAL = "1 minute";
 
 export const stageAssetDeletions = (assets: readonly StoredAsset[]) =>
@@ -35,7 +37,9 @@ export const sweepAssetDeletions = Effect.gen(function* () {
       key: schema.assetDeletionTable.key,
     })
     .from(schema.assetDeletionTable)
-    .where(lt(schema.assetDeletionTable.attempts, MAX_ASSET_DELETION_ROUNDS));
+    .where(lt(schema.assetDeletionTable.attempts, MAX_ASSET_DELETION_ROUNDS))
+    .orderBy(asc(schema.assetDeletionTable.updatedAt))
+    .limit(ASSET_DELETION_BATCH_SIZE);
 
   yield* scheduleAssetDeletions(pending);
 });
@@ -64,13 +68,69 @@ export const deleteStoredAssets = (assets: readonly StoredAsset[]) =>
 export const compensateUploadedAsset = (object: StoredObject, reason: string) =>
   queueObjectDeletions([object], reason).pipe(
     Effect.andThen(scheduleAssetDeletions([object])),
+    Effect.retry(
+      Schedule.spaced("1 second").pipe(Schedule.both(Schedule.recurs(3)))
+    ),
     Effect.catchCause((cause) =>
-      Effect.logWarning(
+      Effect.logError(
         `Failed to compensate uploaded asset: ${object.key}`,
         cause
       )
     )
   );
+
+export const replaceUploadedAsset = <E, R>({
+  owner,
+  kind,
+  uploaded,
+  updateOwner,
+}: {
+  readonly owner: AssetOwner;
+  readonly kind: AssetKind;
+  readonly uploaded: StoredObject & { readonly url: string };
+  readonly updateOwner: Effect.Effect<unknown, E, R>;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const assetRepository = yield* AssetRepository;
+    const assetId = yield* AssetId.generate;
+
+    const obsoleteAssets = yield* Effect.tapError(
+      transaction(
+        Effect.gen(function* () {
+          const previousAssets = yield* assetRepository.findByOwnerAndKind({
+            kind,
+            owner,
+          });
+          const obsoleteAssets = previousAssets.filter(
+            ({ key }) => key !== uploaded.key
+          );
+
+          yield* updateOwner;
+
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: uploaded.bucket,
+            key: uploaded.key,
+            url: uploaded.url,
+            kind,
+            ...(owner.type === "user"
+              ? { userId: owner.id }
+              : { organizationId: owner.id }),
+          });
+
+          yield* stageAssetDeletions(obsoleteAssets);
+
+          return obsoleteAssets;
+        })
+      ),
+      () =>
+        compensateUploadedAsset(uploaded, `Failed ${kind} metadata transaction`)
+    );
+
+    yield* scheduleAssetDeletions(obsoleteAssets);
+    return uploaded;
+  });
 
 export const AssetDeletionSweeperLayer = Layer.effectDiscard(
   sweepAssetDeletions.pipe(

@@ -1,11 +1,10 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
-import { AssetId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-import { compensateUploadedAsset } from "../asset/deletion";
+import { replaceUploadedAsset } from "../asset/deletion";
+import { AssetRepository } from "../asset/repository";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -70,10 +69,11 @@ export const MediaApiLive = HttpApiBuilder.group(
         }
 
         const s3Service = yield* S3UploadService;
-        const assetOrganizationId = organizationId &&
+        const assetOrganizationId =
+          organizationId &&
           session.organizations.some(({ id }) => id === organizationId)
-          ? organizationId
-          : undefined;
+            ? organizationId
+            : undefined;
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
@@ -88,35 +88,22 @@ export const MediaApiLive = HttpApiBuilder.group(
             )
           );
 
-        yield* Effect.tapError(
-          Effect.gen(function* () {
-            const db = yield* currentDb;
-            const assetId = yield* AssetId.generate;
-
-            yield* transaction(
-              db.insert(schema.assetTable).values({
-                id: assetId,
-                bucket: uploaded.bucket,
-                key: uploaded.key,
-                url: uploaded.url,
-                kind: kind === "image" ? "editor_image" : "editor_video",
-                ...(assetOrganizationId
-                  ? { organizationId: assetOrganizationId }
-                  : { userId: session.user.id }),
-              })
-            );
-          }),
-          () =>
-            compensateUploadedAsset(
-              uploaded,
-              "Failed media metadata transaction"
-            )
-        );
+        yield* replaceUploadedAsset({
+          owner: assetOrganizationId
+            ? { type: "organization", id: assetOrganizationId }
+            : { type: "user", id: session.user.id },
+          kind: kind === "image" ? "editor_image" : "editor_video",
+          uploaded,
+          updateOwner: Effect.void,
+        });
 
         return { ...uploaded, kind };
       }).pipe(withRemapDbErrors("Media", "create"))
     )
-).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
+).pipe(
+  Layer.provide(HttpApiAuthMiddlewareLive),
+  Layer.provide(AssetRepository.layer)
+);
 
 function getMediaKind(contentType: string): MediaKind | null {
   if (CONTENT_TYPE_BY_KIND.image.has(contentType)) {

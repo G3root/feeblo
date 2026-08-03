@@ -1,5 +1,4 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
-import { AssetId } from "@feeblo/id";
+import { currentDb, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -7,11 +6,7 @@ import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
-import {
-  compensateUploadedAsset,
-  scheduleAssetDeletions,
-  stageAssetDeletions,
-} from "../asset/deletion";
+import { replaceUploadedAsset } from "../asset/deletion";
 import { AssetRepository } from "../asset/repository";
 import { Api } from "../http/api";
 import {
@@ -103,51 +98,18 @@ export const OrganizationApiLive = HttpApiBuilder.group(
               )
             );
 
-          const obsoleteAssets = yield* Effect.tapError(
-            Effect.gen(function* () {
+          yield* replaceUploadedAsset({
+            owner: { type: "organization", id: organizationId },
+            kind: "organization_logo",
+            uploaded,
+            updateOwner: Effect.gen(function* () {
               const db = yield* currentDb;
-              const assetRepository = yield* AssetRepository;
-              const assetId = yield* AssetId.generate;
-
-              return yield* transaction(
-                Effect.gen(function* () {
-                  const previousAssets =
-                    yield* assetRepository.findByOwnerAndKind({
-                      kind: "organization_logo",
-                      owner: { type: "organization", id: organizationId },
-                    });
-                  const obsoleteAssets = previousAssets.filter(
-                    ({ key }) => key !== uploaded.key
-                  );
-
-                  yield* db
-                    .update(schema.organizationTable)
-                    .set({ logo: uploaded.url })
-                    .where(eq(schema.organizationTable.id, organizationId));
-
-                  yield* db.insert(schema.assetTable).values({
-                    id: assetId,
-                    bucket: uploaded.bucket,
-                    key: uploaded.key,
-                    url: uploaded.url,
-                    kind: "organization_logo",
-                    organizationId,
-                  });
-
-                  yield* stageAssetDeletions(obsoleteAssets);
-
-                  return obsoleteAssets;
-                })
-              );
+              yield* db
+                .update(schema.organizationTable)
+                .set({ logo: uploaded.url })
+                .where(eq(schema.organizationTable.id, organizationId));
             }),
-            () =>
-              compensateUploadedAsset(
-                uploaded,
-                "Failed organization metadata transaction"
-              )
-          );
-
-          yield* scheduleAssetDeletions(obsoleteAssets);
+          });
 
           return uploaded;
         }).pipe(

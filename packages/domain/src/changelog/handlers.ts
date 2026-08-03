@@ -79,6 +79,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             const urls = extractAssetUrlsFromContent(content);
             const remainingUrls = new Set(
               yield* assetRepository.findReferencedUrls({
+                urls,
                 excludeChangelogIds: [args.id],
                 excludePostIds: [],
                 organizationId: args.organizationId,
@@ -94,7 +95,19 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             return editorAssets;
           })
         );
-        yield* scheduleAssetDeletions(editorAssets);
+        yield* scheduleAssetDeletions(editorAssets).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to schedule deleted changelog asset cleanup",
+              cause
+            ).pipe(
+              Effect.annotateLogs({
+                changelogId: args.id,
+                organizationId: args.organizationId,
+              })
+            )
+          )
+        );
       }).pipe(
         Policy.withPolicy(
           changelogPolicy.canDelete({

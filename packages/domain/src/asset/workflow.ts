@@ -90,7 +90,7 @@ export const AssetDeletionWorkflowLayer = AssetDeletionWorkflow.toLayer(
         )
       );
       yield* W.DurableClock.sleep({
-        name: `asset-deletion-retry-${payload.bucket}-${payload.key}`,
+        name: `asset-deletion-retry-${payload.bucket}-${payload.key}-${attempts}`,
         duration: RETRY_DELAY,
       });
     }

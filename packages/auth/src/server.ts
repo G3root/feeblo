@@ -169,7 +169,7 @@ export const initAuthHandler = (
       );
     };
 
-    const deleteRemovedProfileAssets = (userId: string) =>
+    const deleteRemovedProfileAssets = (userId: string, removedImage: string) =>
       callbackRuntime.runPromise(
         Effect.gen(function* () {
           const repository = yield* AssetRepository;
@@ -177,10 +177,13 @@ export const initAuthHandler = (
             kind: "profile_image",
             owner: { type: "user", id: userId },
           });
-          if (assets.length === 0) {
+          const removedAssets = assets.filter(
+            ({ url }) => url === removedImage
+          );
+          if (removedAssets.length === 0) {
             return;
           }
-          yield* deleteStoredAssets(assets);
+          yield* deleteStoredAssets(removedAssets);
         }).pipe(
           Effect.provide(AssetRepository.layer),
           Effect.catchCause((cause) =>
@@ -612,7 +615,16 @@ export const initAuthHandler = (
               if (user.image || !previousImage) {
                 return;
               }
-              await deleteRemovedProfileAssets(user.id);
+              const [persistedUser] = await callbackRuntime.runPromise(
+                db
+                  .select({ image: schema.userTable.image })
+                  .from(schema.userTable)
+                  .where(eq(schema.userTable.id, user.id))
+              );
+              if (persistedUser?.image !== null) {
+                return;
+              }
+              await deleteRemovedProfileAssets(user.id, previousImage);
             },
           },
         },
