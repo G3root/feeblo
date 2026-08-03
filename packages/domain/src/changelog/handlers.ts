@@ -1,10 +1,6 @@
-import { transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { scheduleAssetDeletions, stageAssetDeletions } from "../asset/deletion";
-import { AssetRepository } from "../asset/repository";
-import { extractAssetUrlsFromContent } from "../asset/urls";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -68,47 +64,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     },
 
     ChangelogDelete: (args: TChangelogDelete) =>
-      Effect.gen(function* () {
-        const assetRepository = yield* AssetRepository;
-        const editorAssets = yield* transaction(
-          Effect.gen(function* () {
-            const content = yield* repository.findContent({
-              id: args.id,
-              organizationId: args.organizationId,
-            });
-            const urls = extractAssetUrlsFromContent(content);
-            const remainingUrls = new Set(
-              yield* assetRepository.findReferencedUrls({
-                urls,
-                excludeChangelogIds: [args.id],
-                excludePostIds: [],
-                organizationId: args.organizationId,
-              })
-            );
-            const editorAssets = yield* assetRepository.findByUrls({
-              organizationId: args.organizationId,
-              urls: urls.filter((url) => !remainingUrls.has(url)),
-            });
-
-            yield* stageAssetDeletions(editorAssets);
-            yield* repository.delete(args);
-            return editorAssets;
-          })
-        );
-        yield* scheduleAssetDeletions(editorAssets).pipe(
-          Effect.catchCause((cause) =>
-            Effect.logWarning(
-              "Failed to schedule deleted changelog asset cleanup",
-              cause
-            ).pipe(
-              Effect.annotateLogs({
-                changelogId: args.id,
-                organizationId: args.organizationId,
-              })
-            )
-          )
-        );
-      }).pipe(
+      repository.delete(args).pipe(
         Policy.withPolicy(
           changelogPolicy.canDelete({
             organizationId: args.organizationId,
@@ -146,6 +102,5 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   Layer.provide(ChangelogPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
-  Layer.provide(ChangelogRepository.layer),
-  Layer.provide(AssetRepository.layer)
+  Layer.provide(ChangelogRepository.layer)
 );

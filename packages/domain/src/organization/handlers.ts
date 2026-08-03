@@ -2,8 +2,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { deleteStoredAssets } from "../asset/deletion";
-import { AssetRepository } from "../asset/repository";
 import * as Policy from "../policy";
 import { NotFoundError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -24,25 +22,6 @@ const canManageOrganization = (organizationId: string) =>
 
 export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* OrganizationRepository;
-  const assetRepository = yield* AssetRepository;
-
-  const removeStoredLogo = (organizationId: string, removedLogo: string) =>
-    Effect.gen(function* () {
-      const assets = yield* assetRepository.findByOwnerAndKind({
-        kind: "organization_logo",
-        owner: { type: "organization", id: organizationId },
-      });
-      yield* deleteStoredAssets(
-        assets.filter(({ url }) => url === removedLogo)
-      ).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning(
-            "Failed to clean up removed organization logo",
-            cause
-          )
-        )
-      );
-    });
 
   return {
     OrganizationList: () =>
@@ -63,17 +42,6 @@ export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
           });
         }
 
-        if (
-          args.logo === null &&
-          organization.value.logo === null &&
-          organization.value.previousLogo !== null
-        ) {
-          yield* removeStoredLogo(
-            args.organizationId,
-            organization.value.previousLogo
-          );
-        }
-
         return;
       }).pipe(
         Policy.withPolicy(canManageOrganization(args.organizationId)),
@@ -84,7 +52,4 @@ export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
 
 export const OrganizationRpcHandlers = OrganizationRpcs.toLayer(
   OrganizationRpcHandlersEffect
-).pipe(
-  Layer.provide(OrganizationRepository.layer),
-  Layer.provide(AssetRepository.layer)
-);
+).pipe(Layer.provide(OrganizationRepository.layer));

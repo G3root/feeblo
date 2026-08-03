@@ -169,25 +169,6 @@ const makeChangelogRepository = Effect.gen(function* () {
           )
         )
         .pipe(Effect.asVoid),
-
-    findContent: ({
-      id,
-      organizationId,
-    }: {
-      id: string;
-      organizationId: string;
-    }) =>
-      db
-        .select({ content: schema.changelogTable.content })
-        .from(schema.changelogTable)
-        .where(
-          and(
-            eq(schema.changelogTable.id, id),
-            eq(schema.changelogTable.organizationId, organizationId)
-          )
-        )
-        .pipe(Effect.map((rows) => rows[0]?.content ?? "")),
-
   };
 });
 

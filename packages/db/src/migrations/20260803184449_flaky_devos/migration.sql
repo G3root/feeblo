@@ -1,14 +1,4 @@
 CREATE TYPE "asset_kind" AS ENUM('profile_image', 'organization_logo', 'editor_image', 'editor_video');--> statement-breakpoint
-CREATE TABLE "asset_deletion" (
-	"id" text PRIMARY KEY,
-	"bucket" text NOT NULL,
-	"key" text NOT NULL,
-	"error" text NOT NULL,
-	"attempts" integer DEFAULT 0 NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "asset" (
 	"id" text PRIMARY KEY,
 	"bucket" text NOT NULL,
@@ -22,7 +12,6 @@ CREATE TABLE "asset" (
 	CONSTRAINT "asset_owner_check" CHECK (("user_id" IS NOT NULL) <> ("organization_id" IS NOT NULL))
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX "asset_deletion_bucket_key_uidx" ON "asset_deletion" ("bucket","key");--> statement-breakpoint
 CREATE UNIQUE INDEX "asset_key_uidx" ON "asset" ("bucket","key");--> statement-breakpoint
 CREATE INDEX "asset_userId_idx" ON "asset" ("user_id");--> statement-breakpoint
 CREATE INDEX "asset_organizationId_idx" ON "asset" ("organization_id");--> statement-breakpoint

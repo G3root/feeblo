@@ -2,8 +2,6 @@
 
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
-import { deleteStoredAssets } from "@feeblo/domain/asset/deletion";
-import { AssetRepository } from "@feeblo/domain/asset/repository";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
@@ -11,7 +9,6 @@ import { MembershipPolicy } from "@feeblo/domain/membership/policies";
 import { MembershipRepository } from "@feeblo/domain/membership/repository";
 import { PolicyDeniedError } from "@feeblo/domain/policy";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
-import { S3UploadService } from "@feeblo/domain/services/s3";
 import { WelcomeUserWorkflow } from "@feeblo/domain/user/workflows";
 import {
   createSsoSession,
@@ -92,7 +89,6 @@ export const initAuthHandler = (
     const polarService = yield* PolarService;
 
     const isTest = nodeEnv === "test";
-    const previousProfileImages = new Map<string, string | null>();
 
     const trustedOrigins = yield* getTrustedOrigins;
     const db = yield* Database.Database;
@@ -116,8 +112,6 @@ export const initAuthHandler = (
         MembershipRepository.layer,
         makeMailerLayer(),
         WorkspaceRepository.layer,
-        Layer.succeed(S3UploadService, yield* S3UploadService),
-        Layer.succeed(WorkflowEngine, workflowEngine),
         Layer.succeed(RateLimitService, yield* RateLimitService),
         SsoRepositoriesLive
       ).pipe(Layer.provideMerge(dbLayer))
@@ -168,29 +162,6 @@ export const initAuthHandler = (
           )
       );
     };
-
-    const deleteRemovedProfileAssets = (userId: string, removedImage: string) =>
-      callbackRuntime.runPromise(
-        Effect.gen(function* () {
-          const repository = yield* AssetRepository;
-          const assets = yield* repository.findByOwnerAndKind({
-            kind: "profile_image",
-            owner: { type: "user", id: userId },
-          });
-          const removedAssets = assets.filter(
-            ({ url }) => url === removedImage
-          );
-          if (removedAssets.length === 0) {
-            return;
-          }
-          yield* deleteStoredAssets(removedAssets);
-        }).pipe(
-          Effect.provide(AssetRepository.layer),
-          Effect.catchCause((cause) =>
-            Effect.logWarning("Failed to clean up removed profile image", cause)
-          )
-        )
-      );
 
     const ssoOptions: JwtAutoLoginOptions = {
       createSsoUser: async ({ organizationId, token }) => {
@@ -591,40 +562,6 @@ export const initAuthHandler = (
                 session.userId,
                 context?.getHeader(clientTimeZoneHeader)
               );
-            },
-          },
-        },
-        user: {
-          update: {
-            async before(user) {
-              if (user.image !== null || !user.id) {
-                return;
-              }
-              const previousImage = await callbackRuntime.runPromise(
-                db
-                  .select({ image: schema.userTable.image })
-                  .from(schema.userTable)
-                  .where(eq(schema.userTable.id, user.id))
-                  .pipe(Effect.map((rows) => rows[0]?.image ?? null))
-              );
-              previousProfileImages.set(user.id, previousImage);
-            },
-            async after(user) {
-              const previousImage = previousProfileImages.get(user.id);
-              previousProfileImages.delete(user.id);
-              if (user.image || !previousImage) {
-                return;
-              }
-              const [persistedUser] = await callbackRuntime.runPromise(
-                db
-                  .select({ image: schema.userTable.image })
-                  .from(schema.userTable)
-                  .where(eq(schema.userTable.id, user.id))
-              );
-              if (persistedUser?.image !== null) {
-                return;
-              }
-              await deleteRemovedProfileAssets(user.id, previousImage);
             },
           },
         },

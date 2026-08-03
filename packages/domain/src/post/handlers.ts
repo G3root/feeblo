@@ -5,9 +5,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { scheduleAssetDeletions, stageAssetDeletions } from "../asset/deletion";
-import { AssetRepository } from "../asset/repository";
-import { extractAssetUrlsFromContent } from "../asset/urls";
 import { BoardRepository } from "../board/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -140,50 +137,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const deletePostEffect = (args: TPostDelete) =>
-    Effect.gen(function* () {
-      const assetRepository = yield* AssetRepository;
-      const ids = typeof args.id === "string" ? [args.id] : [...args.id];
-      const editorAssets = yield* transaction(
-        Effect.gen(function* () {
-          const contents = yield* repository.findContentsForDelete({
-            ids,
-            organizationId: args.organizationId,
-            boardId: args.boardId,
-          });
-          const urls = contents.flatMap(({ content }) =>
-            extractAssetUrlsFromContent(content)
-          );
-          const remainingUrls = new Set(
-            yield* assetRepository.findReferencedUrls({
-              urls,
-              excludeChangelogIds: [],
-              excludePostIds: ids,
-              organizationId: args.organizationId,
-            })
-          );
-          const editorAssets = yield* assetRepository.findByUrls({
-            organizationId: args.organizationId,
-            urls: urls.filter((url) => !remainingUrls.has(url)),
-          });
-
-          yield* stageAssetDeletions(editorAssets);
-          yield* repository.delete(args);
-          return editorAssets;
-        })
-      );
-      yield* scheduleAssetDeletions(editorAssets).pipe(
-        Effect.catchCause((cause) =>
-          Effect.logWarning(
-            "Failed to schedule deleted post asset cleanup",
-            cause
-          ).pipe(
-            Effect.annotateLogs({
-              postIds: ids,
-              organizationId: args.organizationId,
-            })
-          )
-        )
-      );
+    repository.delete({
+      id: args.id,
+      organizationId: args.organizationId,
+      boardId: args.boardId,
     });
 
   const updatePostEffect = (args: TPostUpdate) =>
@@ -723,6 +680,5 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(PostEmbeddingService.layer),
-  Layer.provide(NotificationService.layer),
-  Layer.provide(AssetRepository.layer)
+  Layer.provide(NotificationService.layer)
 );

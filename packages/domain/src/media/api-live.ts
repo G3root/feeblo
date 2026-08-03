@@ -3,8 +3,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-import { replaceUploadedAsset } from "../asset/deletion";
-import { AssetRepository } from "../asset/repository";
+import { registerUploadedAsset } from "../asset/service";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -88,22 +87,18 @@ export const MediaApiLive = HttpApiBuilder.group(
             )
           );
 
-        yield* replaceUploadedAsset({
+        yield* registerUploadedAsset({
           owner: assetOrganizationId
             ? { type: "organization", id: assetOrganizationId }
             : { type: "user", id: session.user.id },
           kind: kind === "image" ? "editor_image" : "editor_video",
           uploaded,
-          updateOwner: Effect.void,
         });
 
         return { ...uploaded, kind };
       }).pipe(withRemapDbErrors("Media", "create"))
     )
-).pipe(
-  Layer.provide(HttpApiAuthMiddlewareLive),
-  Layer.provide(AssetRepository.layer)
-);
+).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
 
 function getMediaKind(contentType: string): MediaKind | null {
   if (CONTENT_TYPE_BY_KIND.image.has(contentType)) {

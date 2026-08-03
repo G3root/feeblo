@@ -453,29 +453,6 @@ const makePostRepository = Effect.gen(function* () {
         .pipe(Effect.asVoid);
     },
 
-    findContentsForDelete: ({
-      ids,
-      organizationId,
-      boardId,
-    }: {
-      boardId: string;
-      ids: readonly string[];
-      organizationId: string;
-    }) =>
-      db
-        .select({
-          id: schema.postTable.id,
-          content: schema.postTable.content,
-        })
-        .from(schema.postTable)
-        .where(
-          and(
-            inArray(schema.postTable.id, ids),
-            eq(schema.postTable.organizationId, organizationId),
-            eq(schema.postTable.boardId, boardId)
-          )
-        ),
-
     create: ({
       id,
       boardId,

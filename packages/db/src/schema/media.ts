@@ -2,7 +2,6 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
-  integer,
   pgEnum,
   pgTable,
   text,
@@ -53,27 +52,5 @@ export const assetTable = pgTable(
   ]
 );
 
-export const assetDeletionTable = pgTable(
-  "asset_deletion",
-  {
-    id: text("id").primaryKey(),
-    bucket: text("bucket").notNull(),
-    key: text("key").notNull(),
-    error: text("error").notNull(),
-    attempts: integer("attempts").default(0).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [
-    uniqueIndex("asset_deletion_bucket_key_uidx").on(table.bucket, table.key),
-  ]
-);
-
 export type Asset = typeof assetTable.$inferSelect;
 export type NewAsset = typeof assetTable.$inferInsert;
-export type AssetDeletion = typeof assetDeletionTable.$inferSelect;

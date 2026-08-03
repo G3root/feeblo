@@ -1,17 +1,9 @@
 import { describe, expect, layer } from "@effect/vitest";
-import { S3ServiceError } from "@effect-aws/client-s3";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { AssetId, type LegidOf, WorkspaceId } from "@feeblo/id";
+import { type LegidOf, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
-import { AssetRepository } from "../asset/repository";
-import {
-  AssetDeletionWorkflow,
-  AssetDeletionWorkflowLayer,
-} from "../asset/workflow";
-import { S3UploadService } from "../services/s3";
 import { CurrentSession, type Session } from "../session-middleware";
 import { OrganizationRpcHandlersEffect } from "./handlers";
 import { OrganizationRepository } from "./repository";
@@ -84,50 +76,7 @@ describe("OrganizationRpcHandlers", () => {
     Layer.provide(Database.PgliteDatabaseLive)
   );
 
-  const AssetTest = AssetRepository.layer.pipe(
-    Layer.provide(Database.PgliteDatabaseLive)
-  );
-
-  const S3Test = Layer.succeed(S3UploadService, {
-    uploadProfileImage: () => Effect.die("not used in this test"),
-    uploadOrganizationLogo: () => Effect.die("not used in this test"),
-    uploadEditorMedia: () => Effect.die("not used in this test"),
-    deleteObject: () => Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
-  });
-
-  const AssetDeletionTest = AssetDeletionWorkflowLayer.pipe(
-    Layer.provideMerge(S3Test),
-    Layer.provideMerge(WorkflowEngine.layerMemory),
-    Layer.provideMerge(Database.PgliteDatabaseLive)
-  );
-
-  const S3FailureTest = Layer.succeed(S3UploadService, {
-    uploadProfileImage: () => Effect.die("not used in this test"),
-    uploadOrganizationLogo: () => Effect.die("not used in this test"),
-    uploadEditorMedia: () => Effect.die("not used in this test"),
-    deleteObject: () =>
-      Effect.fail(
-        new S3ServiceError({
-          name: "S3ServiceError",
-          message: "S3 delete failed",
-          $fault: "client",
-          $metadata: {},
-        })
-      ),
-  });
-
-  const AssetDeletionFailureTest = AssetDeletionWorkflowLayer.pipe(
-    Layer.provideMerge(S3FailureTest),
-    Layer.provideMerge(WorkflowEngine.layerMemory),
-    Layer.provideMerge(Database.PgliteDatabaseLive)
-  );
-
-  const TestLayer = Layer.mergeAll(
-    RepositoryTest,
-    AssetTest,
-    AssetDeletionTest,
-    Database.PgliteDatabaseLive
-  );
+  const TestLayer = Layer.merge(RepositoryTest, Database.PgliteDatabaseLive);
 
   layer(TestLayer)("handlers", (it) => {
     describe("OrganizationList", () => {
@@ -419,48 +368,5 @@ describe("OrganizationRpcHandlers", () => {
         })
       );
     });
-  });
-
-  layer(AssetDeletionFailureTest)("asset deletion failure", (it) => {
-    it.effect("retains the row after an S3 deletion failure", () =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const payload = {
-          bucket: "test-bucket",
-          key: `organization-logos/${crypto.randomUUID()}.png`,
-        };
-
-        yield* db.insert(schema.assetDeletionTable).values({
-          id: yield* AssetId.generate,
-          ...payload,
-          error: "Queued for deletion",
-        });
-
-        yield* AssetDeletionWorkflow.execute(payload, { discard: true });
-        yield* Effect.yieldNow;
-
-        const deletion = yield* Effect.retry(
-          Effect.gen(function* () {
-            const [row] = yield* db
-              .select()
-              .from(schema.assetDeletionTable)
-              .where(eq(schema.assetDeletionTable.key, payload.key));
-            if (row?.attempts !== 1) {
-              return yield* Effect.fail(
-                "Deletion failure has not been recorded"
-              );
-            }
-            return row;
-          }),
-          { times: 10 }
-        );
-
-        expect(deletion).toMatchObject({
-          bucket: payload.bucket,
-          key: payload.key,
-          attempts: 1,
-        });
-      })
-    );
   });
 });

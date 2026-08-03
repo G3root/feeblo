@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "29cb0209-c9f6-49e4-8661-4e7910354559",
+  "id": "0fcef8f3-40dc-4f6c-953a-5192f32c0547",
   "prevIds": [
     "f5ddaf17-f283-434e-be34-2d54d2d573c1"
   ],
@@ -394,12 +394,6 @@
     {
       "isRlsEnabled": false,
       "name": "upvote",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "asset_deletion",
       "entityType": "tables",
       "schema": "public"
     },
@@ -4905,97 +4899,6 @@
       "name": "id",
       "entityType": "columns",
       "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "bucket",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "key",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "error",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "0",
-      "generated": null,
-      "identity": null,
-      "name": "attempts",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
       "table": "asset"
     },
     {
@@ -6962,34 +6865,6 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "asset_deletion_bucket_key_uidx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "asset_deletion"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "bucket",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "key",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
       "name": "asset_key_uidx",
       "entityType": "indexes",
       "schema": "public",
@@ -8823,16 +8698,6 @@
       "name": "upvote_pkey",
       "schema": "public",
       "table": "upvote",
-      "entityType": "pks"
-    },
-    {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "asset_deletion_pkey",
-      "schema": "public",
-      "table": "asset_deletion",
       "entityType": "pks"
     },
     {

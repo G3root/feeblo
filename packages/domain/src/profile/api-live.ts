@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
-import { replaceUploadedAsset } from "../asset/deletion";
+import { replaceSingletonAsset } from "../asset/service";
 import { AssetRepository } from "../asset/repository";
 import { Api } from "../http/api";
 import {
@@ -77,7 +77,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
             )
           );
 
-        yield* replaceUploadedAsset({
+        yield* replaceSingletonAsset({
           owner: { type: "user", id: session.user.id },
           kind: "profile_image",
           uploaded,

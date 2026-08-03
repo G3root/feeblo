@@ -1,4 +1,4 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
@@ -41,37 +41,21 @@ const makeOrganizationRepository = Effect.gen(function* () {
         )
         .where(eq(schema.memberTable.userId, userId)),
     update: ({ organizationId, name, logo }: TUpdate) =>
-      transaction(
-        Effect.gen(function* () {
-          const [previous] = yield* db
-            .select({ logo: schema.organizationTable.logo })
-            .from(schema.organizationTable)
-            .where(eq(schema.organizationTable.id, organizationId))
-            .for("update");
-          const organizations = yield* db
-            .update(schema.organizationTable)
-            .set({
-              logo,
-              name,
-            })
-            .where(eq(schema.organizationTable.id, organizationId))
-            .returning({
-              id: schema.organizationTable.id,
-              name: schema.organizationTable.name,
-              slug: schema.organizationTable.slug,
-              logo: schema.organizationTable.logo,
-              createdAt: schema.organizationTable.createdAt,
-            });
-
-          return Option.map(
-            EffectArray.get(0)(organizations),
-            (organization) => ({
-              ...organization,
-              previousLogo: previous?.logo ?? null,
-            })
-          );
+      db
+        .update(schema.organizationTable)
+        .set({
+          logo,
+          name,
         })
-      ),
+        .where(eq(schema.organizationTable.id, organizationId))
+        .returning({
+          id: schema.organizationTable.id,
+          name: schema.organizationTable.name,
+          slug: schema.organizationTable.slug,
+          logo: schema.organizationTable.logo,
+          createdAt: schema.organizationTable.createdAt,
+        })
+        .pipe(Effect.map(EffectArray.get(0))),
     findMemberRole: ({ organizationId, userId }: TFindMemberRole) =>
       db
         .select({
