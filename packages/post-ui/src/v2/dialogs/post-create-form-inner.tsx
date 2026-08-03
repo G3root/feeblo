@@ -10,6 +10,7 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useEffect, useState } from "react";
@@ -272,9 +273,11 @@ export function PostCreateForm() {
         store.send({ type: "toggle" });
       } catch (_error) {
         trackEvent("post_created", { source, success: false });
-        console.error(_error);
+
+        const error = parseRpcError(_error);
+
         toastManager.add({
-          title: "Failed to create post",
+          title: error.message,
           type: "error",
         });
       }
