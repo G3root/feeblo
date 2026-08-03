@@ -20,6 +20,7 @@ export const uploadedEditorMediaSchema = z.object({
 
 export type EditorMediaUploadOptions = {
   readonly organizationId?: string;
+  readonly timeoutMs?: number;
 };
 
 export const authClient = createAuthClient(baseUrl, {

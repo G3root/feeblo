@@ -69,7 +69,7 @@ export const registerUploadedAsset = ({
     });
     return uploaded;
   }).pipe(
-    Effect.tapError(() =>
+    Effect.tapCause(() =>
       deleteObjectBestEffort(
         uploaded,
         "Failed to remove an unregistered uploaded asset"
@@ -90,7 +90,7 @@ export const replaceSingletonAsset = <E, R>({
 }) =>
   Effect.gen(function* () {
     const repository = yield* AssetRepository;
-    const previousAssets = yield* Effect.tapError(
+    const previousAssets = yield* Effect.tapCause(
       transaction(
         Effect.gen(function* () {
           const previousAssets = yield* repository.findByOwnerAndKind({

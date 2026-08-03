@@ -8,6 +8,7 @@ import { Api } from "../http/api";
 import {
   BadRequestError,
   InternalServerError,
+  UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
@@ -68,11 +69,14 @@ export const MediaApiLive = HttpApiBuilder.group(
         }
 
         const s3Service = yield* S3UploadService;
-        const assetOrganizationId =
+        if (
           organizationId &&
-          session.organizations.some(({ id }) => id === organizationId)
-            ? organizationId
-            : undefined;
+          !session.organizations.some(({ id }) => id === organizationId)
+        ) {
+          return yield* new UnauthorizedError({
+            message: "You are not a member of this organization",
+          });
+        }
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
@@ -88,8 +92,8 @@ export const MediaApiLive = HttpApiBuilder.group(
           );
 
         yield* registerUploadedAsset({
-          owner: assetOrganizationId
-            ? { type: "organization", id: assetOrganizationId }
+          owner: organizationId
+            ? { type: "organization", id: organizationId }
             : { type: "user", id: session.user.id },
           kind: kind === "image" ? "editor_image" : "editor_video",
           uploaded,

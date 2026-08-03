@@ -52,6 +52,7 @@ export const createEditorUploader =
       });
 
       xhr.open("POST", editorMediaUploadEndpoint, true);
+      xhr.timeout = options.timeoutMs ?? 120_000;
       xhr.withCredentials = true;
       xhr.send(formData);
     });
