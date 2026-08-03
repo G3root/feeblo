@@ -1,0 +1,86 @@
+/*
+ * Use the read-only renderer's typography as the editor's source of truth.
+ * The rules below only adapt ProseKit-specific DOM that has no equivalent in
+ * the semantic HTML targeted by the shared stylesheet.
+ */
+@import "@feeblo/web-shared/typeset.css";
+
+/* Keep this compatibility layer unlayered. ProseKit's structural CSS is also
+   unlayered, so putting these overrides in `components` would make them lose
+   in the cascade regardless of selector specificity. */
+
+/* ProseKit renders each list item as a flat node instead of a native
+   `ul > li` / `ol > li` tree while editing. */
+.ProseMirror.typeset .prosemirror-flat-list {
+  padding-inline-start: 0.4em;
+  margin-block-start: 0.5em;
+}
+
+.ProseMirror.typeset
+  > .prosemirror-flat-list:not(
+    :where(.prosemirror-flat-list + .prosemirror-flat-list)
+  ) {
+  margin-block-start: calc(var(--typeset-flow) + 0.5em);
+}
+
+.ProseMirror.typeset > :is(h1, h2, h3, h4, h5, h6) + .prosemirror-flat-list {
+  margin-block-start: 1.5em;
+}
+
+.ProseMirror.typeset > .prosemirror-flat-list:first-child {
+  margin-block-start: 0.5em;
+}
+
+.ProseMirror.typeset
+  .list-content
+  > .prosemirror-flat-list:not(
+    :where(.prosemirror-flat-list + .prosemirror-flat-list)
+  ) {
+  margin-block-start: 1em;
+}
+
+.ProseMirror.typeset .prosemirror-flat-list > .list-marker,
+.ProseMirror.typeset .prosemirror-flat-list[data-list-kind="ordered"]::before {
+  color: var(--typeset-muted);
+}
+
+.ProseMirror.typeset .prosemirror-flat-list > .list-content {
+  margin-inline-start: 1.5em;
+}
+
+.ProseMirror.typeset .prosemirror-flat-list > .list-content > :first-child {
+  margin-block-start: 0;
+}
+
+.ProseMirror.typeset
+  .prosemirror-flat-list[data-list-kind="task"]
+  input[type="checkbox"] {
+  accent-color: var(--color-primary, currentColor);
+}
+
+/* The table extension owns a scrolling wrapper and adds editing borders.
+   Normalize those before applying the shared typeset table treatment. */
+.ProseMirror.typeset .tableWrapper {
+  margin-block-start: var(--typeset-flow);
+  margin-block-end: 0;
+  overflow-x: auto;
+}
+
+.ProseMirror.typeset > .tableWrapper:first-child,
+.ProseMirror.typeset :is(li, blockquote, td, th) > .tableWrapper:first-child {
+  margin-block-start: 0;
+}
+
+.ProseMirror.typeset .tableWrapper table {
+  width: 100%;
+  margin-block-start: 0;
+  table-layout: auto;
+}
+
+.ProseMirror.typeset .tableWrapper :is(td, th) {
+  border: 0;
+}
+
+.ProseMirror.typeset .tableWrapper :is(tbody, tfoot) :is(td, th) {
+  border-block-start: 1px solid var(--typeset-rule);
+}

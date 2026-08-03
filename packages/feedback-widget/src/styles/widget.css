@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @import "@feeblo/web-shared/styles.css";
+@import "@feeblo/web-shared/typeset.css";
 
 @source "../**/*.{ts,tsx}";
 

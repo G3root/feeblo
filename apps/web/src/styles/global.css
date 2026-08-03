@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@feeblo/web-shared/styles.css";
+@import "@feeblo/web-shared/typeset.css";
 
 @plugin "@egoist/tailwindcss-icons";
 

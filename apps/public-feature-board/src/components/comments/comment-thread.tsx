@@ -3,11 +3,11 @@ import { Button } from "@feeblo/ui/button";
 import {
   Item,
   ItemContent,
-  ItemDescription,
   ItemHeader,
   ItemMedia,
   ItemTitle,
 } from "@feeblo/ui/item";
+import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useState } from "react";
 import { formatDate } from "../../lib/utils";
@@ -59,9 +59,7 @@ export function CommentThread({
               </Button>
             ) : null}
           </ItemHeader>
-          <ItemDescription className="line-clamp-none whitespace-pre-wrap text-foreground">
-            {comment.content}
-          </ItemDescription>
+          <MarkdownContent className="text-sm" content={comment.content} />
         </ItemContent>
       </Item>
 

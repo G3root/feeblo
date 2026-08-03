@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { buttonVariants } from "@feeblo/ui/button";
 import {
   Empty,
@@ -5,6 +6,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { cn } from "@feeblo/ui/utils";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -149,20 +151,25 @@ export function ChangeLogDetailPage() {
             </div>
           </header>
 
-          <div
-            className="typography"
-            dangerouslySetInnerHTML={{ __html: changelog.content }}
-          />
+          <MarkdownContent content={changelog.content} />
 
           {isLinkedPostsError ? (
             <p className="text-muted-foreground text-sm">
               Linked posts are unavailable.
             </p>
           ) : isLinkedPostsLoading ? (
-            <p className="text-muted-foreground text-sm">Loading linked posts...</p>
+            <p className="text-muted-foreground text-sm">
+              Loading linked posts...
+            </p>
           ) : linkedPosts.length > 0 ? (
-            <section aria-labelledby="linked-posts-heading" className="space-y-3">
-              <h2 className="font-semibold text-xl tracking-tight" id="linked-posts-heading">
+            <section
+              aria-labelledby="linked-posts-heading"
+              className="space-y-3"
+            >
+              <h2
+                className="font-semibold text-xl tracking-tight"
+                id="linked-posts-heading"
+              >
                 Linked posts
               </h2>
               <div className="divide-y rounded-xl border">
