@@ -1,3 +1,4 @@
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -46,7 +47,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     ChangelogCreate: (args: TChangelogCreate) => {
-      const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
+      const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
         const isMember = Policy.getMembership(session, args.organizationId);
@@ -54,6 +55,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         yield* repository.create({
           ...args,
           content: sanitizedMarkdown,
+          excerpt: htmlToExcerpt(sanitizedHtml),
           creatorId: session.session.userId,
           ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
         });
@@ -75,11 +77,12 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     ChangelogUpdate: (args: TChangelogUpdate) => {
-      const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
+      const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
       return repository
         .update({
           ...args,
           content: sanitizedMarkdown,
+          excerpt: htmlToExcerpt(sanitizedHtml),
         })
         .pipe(
           Policy.withPolicy(

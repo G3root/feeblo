@@ -50,6 +50,7 @@ export const useChangelogAction = () => {
         title,
         slug,
         content: "",
+        excerpt: "",
         status: "draft" as ChangelogStatus,
         scheduledAt: null,
         publishedAt: null,

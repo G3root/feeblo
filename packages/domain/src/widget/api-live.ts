@@ -52,6 +52,7 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   return entries.map((entry) => {
     const { sanitizedHtml } = sanitizeMarkdown(entry.content);
     const imageMatch = sanitizedHtml.match(UPDATE_IMAGE_SOURCE);
+    //TODO IMAGE
     return {
       id: entry.id,
       title: entry.title,

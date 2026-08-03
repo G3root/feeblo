@@ -10,6 +10,7 @@ export const Changelog = S.Struct({
   title: S.String,
   slug: S.String,
   content: S.String,
+  excerpt: S.String,
   status: ChangelogStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),

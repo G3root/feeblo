@@ -16,6 +16,7 @@ import type {
 interface TChangelogCreateInternal extends TChangelogCreate {
   creatorId: string;
   creatorMemberId?: string;
+  excerpt?: string;
 }
 
 interface TFindByCreatorId {
@@ -24,9 +25,21 @@ interface TFindByCreatorId {
   organizationId: string;
 }
 
+interface TFindMany {
+  limit?: number;
+  organizationId: string;
+}
+
+interface TChangelogUpdateInternal extends TChangelogUpdate {
+  excerpt?: string;
+}
+
+const PUBLIC_CHANGELOG_LIMIT = 100;
+
 const makeChangelogRepository = Effect.gen(function* () {
   const db = yield* currentDb;
-
+  const effectivePublishedAt = sql<Date>`COALESCE(${schema.changelogTable.publishedAt}, ${schema.changelogTable.createdAt})`;
+  // TODO handle pagination
   return {
     findByCreatorId: ({ id, organizationId, memberId }: TFindByCreatorId) =>
       db
@@ -41,13 +54,14 @@ const makeChangelogRepository = Effect.gen(function* () {
         )
         .pipe(Effect.map(EffectArray.get(0))),
 
-    findMany: ({ organizationId }: TChangelogList) =>
-      db
+    findMany: ({ organizationId, limit }: TFindMany) => {
+      const query = db
         .select({
           id: schema.changelogTable.id,
           title: schema.changelogTable.title,
           slug: schema.changelogTable.slug,
           content: schema.changelogTable.content,
+          excerpt: schema.changelogTable.excerpt,
           status: schema.changelogTable.status,
           scheduledAt: schema.changelogTable.scheduledAt,
           publishedAt: schema.changelogTable.publishedAt,
@@ -66,7 +80,10 @@ const makeChangelogRepository = Effect.gen(function* () {
           schema.userTable,
           eq(schema.userTable.id, schema.changelogTable.creatorId)
         )
-        .where(eq(schema.changelogTable.organizationId, organizationId)),
+        .where(eq(schema.changelogTable.organizationId, organizationId));
+
+      return limit === undefined ? query : query.limit(limit);
+    },
 
     findManyPublished: ({ organizationId }: TChangelogList) =>
       db
@@ -75,6 +92,7 @@ const makeChangelogRepository = Effect.gen(function* () {
           title: schema.changelogTable.title,
           slug: schema.changelogTable.slug,
           content: schema.changelogTable.content,
+          excerpt: schema.changelogTable.excerpt,
           status: schema.changelogTable.status,
           scheduledAt: schema.changelogTable.scheduledAt,
           publishedAt: schema.changelogTable.publishedAt,
@@ -99,13 +117,15 @@ const makeChangelogRepository = Effect.gen(function* () {
             eq(schema.changelogTable.status, "published")
           )
         )
-        .orderBy(desc(schema.changelogTable.publishedAt)),
+        .orderBy(desc(effectivePublishedAt))
+        .limit(PUBLIC_CHANGELOG_LIMIT),
 
     create: ({
       id,
       title,
       slug,
       content,
+      excerpt,
       status,
       scheduledAt,
       publishedAt,
@@ -120,6 +140,7 @@ const makeChangelogRepository = Effect.gen(function* () {
           title,
           slug: slug || slugify(title),
           content,
+          excerpt,
           status,
           scheduledAt,
           publishedAt,
@@ -136,17 +157,19 @@ const makeChangelogRepository = Effect.gen(function* () {
       title,
       slug,
       content,
+      excerpt,
       status,
       scheduledAt,
       publishedAt,
       organizationId,
-    }: TChangelogUpdate) =>
+    }: TChangelogUpdateInternal) =>
       db
         .update(schema.changelogTable)
         .set({
           title,
           slug: slug || slugify(title),
           content,
+          excerpt,
           status,
           scheduledAt,
           publishedAt,

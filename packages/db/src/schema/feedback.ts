@@ -787,6 +787,7 @@ export const changelogTable = pgTable(
     title: text("title").notNull(),
     slug: text("slug").notNull(),
     content: text("content").notNull(),
+    excerpt: text("excerpt").notNull().default(""),
     status: changelogStatusEnum("status").notNull().default("draft"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     publishedAt: timestamp("published_at", { withTimezone: true }),

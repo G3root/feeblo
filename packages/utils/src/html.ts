@@ -34,8 +34,14 @@ function decodeHtmlEntities(value: string) {
   );
 }
 
-export function htmlToExcerpt(value: string) {
-  return decodeHtmlEntities(value.replace(/<[^>]+>/g, " "))
+export function htmlToExcerpt(value: string, limit = 160) {
+  const excerpt = decodeHtmlEntities(value.replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
+
+  if (excerpt.length <= limit) {
+    return excerpt;
+  }
+
+  return `${excerpt.slice(0, limit - 1).trimEnd()}...`;
 }
