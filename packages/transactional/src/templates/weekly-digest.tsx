@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Link, Section, Text } from "react-email";
 import { EmailShell } from "./email-shell";
 
@@ -51,7 +52,7 @@ export const WeeklyDigestEmail = (props: WeeklyDigestEmailProps) => (
 
 export const createWeeklyDigestEmail = (props: WeeklyDigestEmailProps) => ({
   subject: `${props.organizationName}: weekly digest`,
-  react: <WeeklyDigestEmail {...props} />,
+  react: React.createElement(WeeklyDigestEmail, props),
 });
 
 WeeklyDigestEmail.PreviewProps = {
