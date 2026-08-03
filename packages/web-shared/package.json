@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./styles.css": "./src/styles/theme.css",
     "./runtime": {
       "types": "./src/lib/runtime.ts",
       "default": "./src/lib/runtime.ts"
