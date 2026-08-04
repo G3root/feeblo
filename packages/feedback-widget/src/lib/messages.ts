@@ -19,7 +19,6 @@ export type ChildMessage =
   | { event: "READY" }
   | { event: "CLOSE" }
   | { event: "WIDGET_OPENED"; data: { module: WidgetModule } }
-  | { event: "WIDGET_CLOSED" }
   | { event: "IDENTITY_CHANGED"; data: PublicIdentityData }
   | {
       event: "FEEDBACK_SUBMITTED";
@@ -86,30 +85,53 @@ export function isParentMessage(value: unknown): value is ParentMessage {
   return false;
 }
 
+/**
+ * The host origin the widget should post messages to. Prefer the explicit
+ * `hostOrigin` query param the SDK adds to the iframe src; fall back to the
+ * referrer for other embedders, and finally to `*` (which still only reaches
+ * the immediate parent frame) so events keep flowing under no-referrer hosts.
+ */
+function resolveParentOrigin(): string | null {
+  const param = new URLSearchParams(window.location.search).get("hostOrigin");
+  if (param) {
+    try {
+      const origin = new URL(param).origin;
+      if (origin !== "null") {
+        return origin;
+      }
+    } catch {
+      // ignore malformed param
+    }
+  }
+  if (document.referrer) {
+    try {
+      const origin = new URL(document.referrer).origin;
+      if (origin !== "null") {
+        return origin;
+      }
+    } catch {
+      // ignore malformed referrer
+    }
+  }
+  return null;
+}
+
 export function sendToParent(message: ChildMessage): void {
   if (typeof window === "undefined" || window.parent === window) {
     return;
   }
-  if (!document.referrer) {
-    return;
-  }
-  let targetOrigin: string;
-  try {
-    targetOrigin = new URL(document.referrer).origin;
-  } catch {
-    return;
-  }
-  if (targetOrigin === "null") {
-    return;
-  }
-  window.parent.postMessage(message, targetOrigin);
+  window.parent.postMessage(message, resolveParentOrigin() ?? "*");
 }
 
 export function subscribeToParentMessages(
   handler: (message: ParentMessage) => void
 ): () => void {
+  const parentOrigin = resolveParentOrigin();
   const listener = (e: MessageEvent<unknown>) => {
     if (e.source !== window.parent || !isParentMessage(e.data)) {
+      return;
+    }
+    if (parentOrigin !== null && e.origin !== parentOrigin) {
       return;
     }
     handler(e.data);

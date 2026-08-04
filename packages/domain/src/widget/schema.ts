@@ -24,9 +24,10 @@ export const WidgetFeedbackCreate = S.Struct({
   title: S.String,
   content: S.String,
   metadata: S.optional(
-    S.Record(S.String, S.String.check(S.isMaxLength(500))).check(
-      S.isMaxProperties(20)
-    )
+    S.Record(
+      S.String.pipe(S.check(S.isMaxLength(64))),
+      S.String.check(S.isMaxLength(500))
+    ).check(S.isMaxProperties(20))
   ),
   token: S.optional(S.String),
 });

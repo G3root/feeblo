@@ -39,6 +39,13 @@ describe("createIframe", () => {
     expect(iframe.title).toBe("Feeblo Hub");
   });
 
+  it("passes the host origin to the widget iframe", () => {
+    const iframe = createIframe("org_test", {});
+
+    const hostOrigin = new URL(iframe.src).searchParams.get("hostOrigin");
+    expect(hostOrigin).toBe(window.location.origin);
+  });
+
   it("sets default iframe styles", () => {
     const iframe = createIframe("org_test", {});
 

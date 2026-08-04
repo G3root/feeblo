@@ -38,7 +38,6 @@ export function RootComponent(props: RouteSectionProps) {
         break;
       case "HIDE":
         setIsOpen(false);
-        sendToParent({ event: "WIDGET_CLOSED" });
         break;
       case "SET_CONTEXT":
         setWidgetContext(message.data);

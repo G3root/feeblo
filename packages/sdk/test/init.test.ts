@@ -596,6 +596,99 @@ describe("navigation sync ordering", () => {
   });
 });
 
+describe("ready handshake", () => {
+  afterEach(() => {
+    Feeblo.destroy();
+    fakePostMessage.mockClear();
+  });
+
+  function showMessages(): number {
+    return fakePostMessage.mock.calls.filter(
+      ([message]: [any]) => message?.event === "SHOW"
+    ).length;
+  }
+
+  it("re-posts SHOW when the widget becomes ready while the host is already open", () => {
+    const widget = init("org_handshake_open", {});
+    widget.open();
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    expect(showMessages()).toBe(1);
+  });
+
+  it("does not re-post SHOW on READY when the widget acknowledged the open", () => {
+    const widget = init("org_handshake_ack", {});
+    widget.open();
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    expect(showMessages()).toBe(0);
+  });
+
+  it("emits widgetOpened when a pre-ready open is acknowledged after READY", () => {
+    const widget = init("org_handshake_event", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    widget.open();
+    postWidgetMessage({ event: "READY" });
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    const detail = (listener.mock.calls[0]?.[0] as CustomEvent).detail;
+    expect(detail.data).toEqual({ module: "feedback" });
+    window.removeEventListener("widgetOpened", listener);
+  });
+
+  it("emits widgetOpened at most once when READY races an acknowledged open", () => {
+    const widget = init("org_handshake_once", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    // The widget subscribed early: open()'s SHOW was received and acknowledged
+    // before the host processed the queued READY message.
+    widget.open();
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+    fakePostMessage.mockClear();
+    postWidgetMessage({ event: "READY" });
+
+    expect(showMessages()).toBe(0);
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("widgetOpened", listener);
+  });
+
+  it("emits widgetOpened once when both SHOW messages are acknowledged", () => {
+    const widget = init("org_handshake_duplicate", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    widget.open();
+    postWidgetMessage({ event: "READY" });
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("widgetOpened", listener);
+  });
+
+  it("ignores a delayed open acknowledgement after the widget closes", () => {
+    const widget = init("org_handshake_closed", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    widget.open();
+    widget.close();
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("widgetOpened", listener);
+  });
+});
+
 describe("Widget events via postMessage", () => {
   afterEach(() => {
     Feeblo.destroy();
@@ -617,7 +710,8 @@ describe("Widget events via postMessage", () => {
     const handler = vi.fn();
     window.addEventListener("widgetOpened", handler);
 
-    init("org_widget_open");
+    const widget = init("org_widget_open");
+    widget.open();
     postWidgetMessage({ event: "WIDGET_OPENED", data: { some: "data" } });
 
     expect(handler).toHaveBeenCalledTimes(1);

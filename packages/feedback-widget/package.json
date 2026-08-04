@@ -9,7 +9,11 @@
       "default": "./src/main.tsx"
     },
     "./styles": "./src/styles/widget.css",
-    "./icons/sprite.svg": "./src/icons/sprite.svg"
+    "./icons/sprite.svg": "./src/icons/sprite.svg",
+    "./config": {
+      "types": "./src/lib/config.ts",
+      "default": "./src/lib/config.ts"
+    }
   },
   "scripts": {
     "dev": "vite",

@@ -33,6 +33,13 @@ export function createIframe(
   if (options.defaultBoard && supportsBoardSelection(config)) {
     params.set("board", options.defaultBoard);
   }
+  // The widget targets its postMessages at the host origin. Passing it
+  // explicitly (rather than relying on document.referrer) keeps messaging
+  // working under Referrer-Policy: no-referrer hosts.
+  const hostOrigin = window.location.origin;
+  if (hostOrigin && hostOrigin !== "null") {
+    params.set("hostOrigin", hostOrigin);
+  }
 
   const path = `${baseUrl}/feedback-widget/${organizationId}`;
   const query = params.toString();

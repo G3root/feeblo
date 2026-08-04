@@ -160,7 +160,6 @@ export type IncomingMessage =
   | { event: "IDENTITY_CHANGED"; data?: PublicUserIdentity | undefined }
   | { event: "READY" }
   | { event: "WIDGET_OPENED"; data?: { module: WidgetModule } | undefined }
-  | { event: "WIDGET_CLOSED" }
   | {
       event: "FEEDBACK_SUBMITTED";
       data?: { post?: SubmittedFeedback | undefined } | undefined;

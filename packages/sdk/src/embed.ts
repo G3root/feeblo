@@ -38,6 +38,7 @@ export class Embed {
   private identity: NormalizedUserIdentity | null;
   private isLoaded = false;
   private isOpen = false;
+  private openAcknowledged = false;
   private module: WidgetModule;
   private board: string | null;
   private context: Record<string, string> = {};
@@ -138,12 +139,19 @@ export class Embed {
         }
         case "READY":
           this.markReady();
+          if (this.isOpen && !this.openAcknowledged) {
+            // A SHOW sent before the widget finished loading may have been
+            // lost; re-send it so the widget confirms WIDGET_OPENED and the
+            // host can emit widgetOpened.
+            this.post({ event: "SHOW" });
+          }
           break;
         case "WIDGET_OPENED":
+          if (!this.isOpen || this.openAcknowledged) {
+            break;
+          }
+          this.openAcknowledged = true;
           emitWidgetEvent("widgetOpened", message.data, this.logger);
-          break;
-        case "WIDGET_CLOSED":
-          // The host owns the close state and emits widgetClosed exactly once.
           break;
         case "IDENTITY_CHANGED":
           if (message.data) {
@@ -222,14 +230,21 @@ export class Embed {
 
   private markReady(): void {
     if (this.isLoaded) {
+      // The widget (re)loaded; re-assert state in case the load-time flush
+      // raced with the widget's message subscription.
+      this.syncState();
       return;
     }
     this.isLoaded = true;
+    this.syncState();
+    emitWidgetEvent("widgetReady", undefined, this.logger);
+  }
+
+  private syncState(): void {
     this.sendIdentify();
     this.sendContext();
     this.sendLocale();
     this.syncNavigation();
-    emitWidgetEvent("widgetReady", undefined, this.logger);
   }
 
   private post(message: OutgoingMessage): void {
@@ -275,6 +290,7 @@ export class Embed {
     }
 
     this.addCloseListeners();
+    this.openAcknowledged = false;
 
     requestAnimationFrame(() => {
       this.container.style.opacity = "1";
