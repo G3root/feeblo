@@ -46,7 +46,7 @@ const makeContactPolicy = Effect.gen(function* () {
 
   const canDelete = (args: TContactDelete) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
+      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
       belongsToOrganization(args)
     );
 

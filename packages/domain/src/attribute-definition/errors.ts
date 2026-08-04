@@ -1,7 +1,11 @@
 import * as Schema from "effect/Schema";
 
 import { PolicyDeniedError } from "../policy";
-import { InternalServerError, UnauthorizedError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../rpc-errors";
 
 export class AttributeDefinitionNotFoundError extends Schema.TaggedErrorClass<AttributeDefinitionNotFoundError>()(
   "AttributeDefinitionNotFoundError",
@@ -21,4 +25,5 @@ export const AttributeDefinitionServiceErrors = Schema.Union([
   PolicyDeniedError,
   AttributeDefinitionNotFoundError,
   FailedToUpsertAttributeValueError,
+  BadRequestError,
 ]);

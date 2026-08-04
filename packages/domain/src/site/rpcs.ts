@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware } from "../session-middleware";
 import { SiteServiceErrors } from "./errors";
 import {
@@ -22,8 +23,8 @@ export class SiteRpcs extends RpcGroup.make(
   Rpc.make("SiteListBySubdomain", {
     success: Schema.Array(Site),
     payload: SiteListBySubdomain,
-    error: SiteServiceErrors,
-  }),
+    error: Schema.Union([SiteServiceErrors, RateLimitErrors]),
+  }).middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("SiteUpdate", {
     success: Schema.Void,
     payload: SiteUpdate,

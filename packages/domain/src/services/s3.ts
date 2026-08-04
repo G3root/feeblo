@@ -96,7 +96,7 @@ const makeS3UploadService = Effect.gen(function* () {
     }: {
       bytes: Uint8Array;
       extension: string;
-      kind: "image" | "video";
+      kind: "image";
       userId: string;
     }) =>
       Effect.gen(function* () {

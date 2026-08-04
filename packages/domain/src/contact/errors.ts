@@ -1,7 +1,11 @@
 import * as Schema from "effect/Schema";
 
 import { PolicyDeniedError } from "../policy";
-import { InternalServerError, UnauthorizedError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../rpc-errors";
 
 export class DataValidationError extends Schema.TaggedErrorClass<DataValidationError>()(
   "DataValidationError",
@@ -47,6 +51,7 @@ export const ContactServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  BadRequestError,
   DataValidationError,
   ContactAlreadyExistsError,
   ContactNotFoundError,
