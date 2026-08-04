@@ -227,8 +227,8 @@ export class Embed {
     this.sendIdentify();
     this.sendContext();
     this.sendLocale();
-    this.flushPendingBoard();
     this.flushPendingModule();
+    this.flushPendingBoard();
     emitWidgetEvent("widgetReady", undefined, this.logger);
   }
 

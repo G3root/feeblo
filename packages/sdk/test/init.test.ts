@@ -418,6 +418,23 @@ describe("defaultBoard handling", () => {
     expect(boardMsg?.[0].data.board).toBe("roadmap");
   });
 
+  it("sends a queued feedback module before its queued board", () => {
+    const widget = init("org_db_module_order", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    widget.openModule("feedback");
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    const navigationEvents = fakePostMessage.mock.calls
+      .map(([message]: [any]) => message?.event)
+      .filter((event) => event === "SET_MODULE" || event === "SET_BOARD");
+    expect(navigationEvents).toEqual(["SET_MODULE", "SET_BOARD"]);
+  });
+
   it("ignores defaultBoard in updates mode", () => {
     init("org_db_updates", {
       mode: "updates",
