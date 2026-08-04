@@ -93,3 +93,18 @@ export const validateAttributeValue = (
 
   return { valid: true };
 };
+
+export const noDuplicateAttributeIds = S.makeFilter<
+  readonly { readonly attributeId: string }[]
+>((attributeValues) => {
+  const attributeIds = new Set<string>();
+
+  for (const { attributeId } of attributeValues) {
+    if (attributeIds.has(attributeId)) {
+      return "attributeValues must not contain duplicate attributeId values";
+    }
+    attributeIds.add(attributeId);
+  }
+
+  return true;
+});
