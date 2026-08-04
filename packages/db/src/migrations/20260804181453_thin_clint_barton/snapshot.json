@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "09345ead-c7a4-4cfb-9a5c-42d30a1b888e",
+  "id": "ad237dd4-871d-499e-b163-d8001afea6a5",
   "prevIds": [
-    "f5ddaf17-f283-434e-be34-2d54d2d573c1"
+    "659de645-f0bf-4b88-8ab3-4489cf7f31bd"
   ],
   "ddl": [
     {
@@ -161,6 +161,17 @@
         "CHANGELOG"
       ],
       "name": "tag_type",
+      "entityType": "enums",
+      "schema": "public"
+    },
+    {
+      "values": [
+        "profile_image",
+        "organization_logo",
+        "editor_image",
+        "editor_video"
+      ],
+      "name": "asset_kind",
       "entityType": "enums",
       "schema": "public"
     },
@@ -383,6 +394,24 @@
     {
       "isRlsEnabled": false,
       "name": "upvote",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "asset",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "changelog_asset",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "post_asset",
       "entityType": "tables",
       "schema": "public"
     },
@@ -2053,6 +2082,19 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cover_image",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "changelog"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -2072,6 +2114,19 @@
       "generated": null,
       "identity": null,
       "name": "content",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "changelog"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "''",
+      "generated": null,
+      "identity": null,
+      "name": "excerpt",
       "entityType": "columns",
       "schema": "public",
       "table": "changelog"
@@ -4885,6 +4940,175 @@
       "table": "upvote"
     },
     {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "bucket",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "key",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "asset_kind",
+      "typeSchema": "public",
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "organization_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "changelog_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "asset_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "post_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "asset_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
       "nameExplicit": true,
       "columns": [
         {
@@ -6722,6 +6946,167 @@
       "table": "upvote"
     },
     {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "bucket",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "key",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_key_uidx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "COALESCE(\"user_id\", \"organization_id\")",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"kind\" IN ('profile_image', 'organization_logo')",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_owner_kind_singleton_uidx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "user_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_userId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "organization_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_organizationId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "url",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_url_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "asset_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "changelog_asset_assetId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "asset_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "post_asset_assetId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
       "nameExplicit": false,
       "columns": [
         "user_id"
@@ -8084,6 +8469,108 @@
       "table": "upvote"
     },
     {
+      "nameExplicit": false,
+      "columns": [
+        "user_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "user",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "asset_user_id_user_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "organization_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "organization",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "asset_organization_id_organization_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "changelog_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "changelog",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "changelog_asset_changelog_id_changelog_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "asset_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "asset",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "changelog_asset_asset_id_asset_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "post_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "post_asset_post_id_post_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "asset_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "asset",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "post_asset_asset_id_asset_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
       "columns": [
         "changelog_id",
         "post_id"
@@ -8093,6 +8580,28 @@
       "entityType": "pks",
       "schema": "public",
       "table": "changelog_post"
+    },
+    {
+      "columns": [
+        "changelog_id",
+        "asset_id"
+      ],
+      "nameExplicit": false,
+      "name": "changelog_asset_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "columns": [
+        "post_id",
+        "asset_id"
+      ],
+      "nameExplicit": false,
+      "name": "post_asset_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "post_asset"
     },
     {
       "columns": [
@@ -8455,6 +8964,16 @@
       "entityType": "pks"
     },
     {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "asset_pkey",
+      "schema": "public",
+      "table": "asset",
+      "entityType": "pks"
+    },
+    {
       "nameExplicit": true,
       "columns": [
         "organization_id",
@@ -8549,6 +9068,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "post"
+    },
+    {
+      "value": "(\"user_id\" IS NOT NULL) <> (\"organization_id\" IS NOT NULL)",
+      "name": "asset_owner_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "asset"
     }
   ],
   "renames": []
