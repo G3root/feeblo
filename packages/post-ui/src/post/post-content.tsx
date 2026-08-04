@@ -16,8 +16,15 @@ export function PostContentEditor({
 }: PostContentEditorProps) {
   return (
     <div className="space-y-3">
-      <EditorProvider defaultValue={{ organizationId, postContent: value }}>
+      <EditorProvider
+        defaultValue={{
+          deferUploads: true,
+          organizationId,
+          postContent: value,
+        }}
+      >
         <Editor
+          deferUploads
           onChange={(doc) => {
             onChange(doc);
           }}

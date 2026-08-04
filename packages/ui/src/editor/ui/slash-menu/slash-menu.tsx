@@ -31,12 +31,23 @@ export default function SlashMenu() {
     }
 
     const organizationId = editorStore.get().context.organizationId;
-    editor.commands.uploadImage({
-      file,
-      uploader: createEditorUploader(
-        organizationId ? { organizationId } : undefined
-      ),
-    });
+      editor.commands.uploadImage({
+        file,
+        uploader: createEditorUploader(
+          organizationId
+            ? {
+                deferUploads: Boolean(
+                  editorStore.get().context.deferUploads
+                ),
+                organizationId,
+              }
+            : {
+                deferUploads: Boolean(
+                  editorStore.get().context.deferUploads
+                ),
+              }
+        ),
+      });
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";

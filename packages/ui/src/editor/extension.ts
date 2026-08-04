@@ -14,10 +14,12 @@ import { defineImageView } from "./ui/image-view/index.js";
 import { createEditorUploader } from "./uploader";
 
 export function defineExtension({
+  deferUploads = false,
   organizationId,
   readonly = false,
   placeholder = "Press / for commands...",
 }: {
+  deferUploads?: boolean | undefined;
   organizationId?: string | undefined;
   readonly?: boolean | undefined;
   placeholder?: string | undefined;
@@ -37,7 +39,9 @@ export function defineExtension({
     defineImageView(),
     defineImageUploadHandler({
       uploader: createEditorUploader(
-        organizationId ? { organizationId } : undefined
+        organizationId
+          ? { deferUploads, organizationId }
+          : { deferUploads }
       ),
     }),
   ];

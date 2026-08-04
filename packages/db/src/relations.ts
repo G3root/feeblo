@@ -3,6 +3,7 @@ import {
   accountTable,
   assetTable,
   boardTable,
+  changelogAssetTable,
   changelogPostTable,
   changelogTable,
   changelogTagTable,
@@ -19,6 +20,7 @@ import {
   memberTable,
   organizationTable,
   postActivityTable,
+  postAssetTable,
   postReactionTable,
   postStatusTable,
   postSubscriptionTable,
@@ -42,6 +44,8 @@ export const relations = defineRelations(
   {
     userTable,
     assetTable,
+    postAssetTable,
+    changelogAssetTable,
     sessionTable,
     accountTable,
     twoFactorTable,
@@ -144,6 +148,34 @@ export const relations = defineRelations(
       organization: r.one.organizationTable({
         from: r.assetTable.organizationId,
         to: r.organizationTable.id,
+      }),
+      posts: r.many.postAssetTable({
+        from: r.assetTable.id,
+        to: r.postAssetTable.assetId,
+      }),
+      changelogs: r.many.changelogAssetTable({
+        from: r.assetTable.id,
+        to: r.changelogAssetTable.assetId,
+      }),
+    },
+    postAssetTable: {
+      post: r.one.postTable({
+        from: r.postAssetTable.postId,
+        to: r.postTable.id,
+      }),
+      asset: r.one.assetTable({
+        from: r.postAssetTable.assetId,
+        to: r.assetTable.id,
+      }),
+    },
+    changelogAssetTable: {
+      changelog: r.one.changelogTable({
+        from: r.changelogAssetTable.changelogId,
+        to: r.changelogTable.id,
+      }),
+      asset: r.one.assetTable({
+        from: r.changelogAssetTable.assetId,
+        to: r.assetTable.id,
       }),
     },
     sessionTable: {
@@ -397,6 +429,10 @@ export const relations = defineRelations(
         from: r.postTable.id,
         to: r.submissionNotificationQueueTable.postId,
       }),
+      assets: r.many.postAssetTable({
+        from: r.postTable.id,
+        to: r.postAssetTable.postId,
+      }),
     },
     postActivityTable: {
       post: r.one.postTable({
@@ -612,6 +648,10 @@ export const relations = defineRelations(
       changelogPosts: r.many.changelogPostTable({
         from: r.changelogTable.id,
         to: r.changelogPostTable.changelogId,
+      }),
+      assets: r.many.changelogAssetTable({
+        from: r.changelogTable.id,
+        to: r.changelogAssetTable.changelogId,
       }),
     },
     changelogPostTable: {

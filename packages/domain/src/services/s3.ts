@@ -32,6 +32,10 @@ const TRAILING_SLASH_REGEX = /\/$/;
 const PROFILE_IMAGE_PREFIX = "profile-images";
 const ORGANIZATION_LOGO_PREFIX = "organization-logos";
 const EDITOR_MEDIA_PREFIX = "editor-media";
+export const TEMPORARY_EDITOR_MEDIA_PREFIX = `tmp/${EDITOR_MEDIA_PREFIX}`;
+
+export const isTemporaryEditorMediaKey = (key: string) =>
+  key.startsWith(`${TEMPORARY_EDITOR_MEDIA_PREFIX}/`);
 
 const makeS3UploadService = Effect.gen(function* () {
   const config = yield* S3Config;
@@ -96,9 +100,22 @@ const makeS3UploadService = Effect.gen(function* () {
       userId: string;
     }) =>
       Effect.gen(function* () {
-        const fileKey = `${EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
         yield* fileSystem.writeFile(fileKey, bytes);
         return resolvePublicUrl(fileKey);
+      }),
+    promoteEditorMedia: ({
+      bucket: sourceBucket,
+      key: sourceKey,
+    }: { bucket: string; key: string }) =>
+      Effect.gen(function* () {
+        const finalKey = sourceKey.slice("tmp/".length);
+        yield* s3.copyObject({
+          Bucket: sourceBucket,
+          CopySource: encodeURIComponent(`${sourceBucket}/${sourceKey}`),
+          Key: finalKey,
+        });
+        return resolvePublicUrl(finalKey);
       }),
     deleteObject: (bucket: string, key: string) =>
       s3.deleteObject({ Bucket: bucket, Key: key }),

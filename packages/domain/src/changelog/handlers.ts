@@ -1,6 +1,15 @@
+import { transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import {
+  cleanupOrphanedEditorAssets,
+  cleanupPreparedEditorAssets,
+  commitPreparedEditorAssets,
+  prepareEditorAssetContent,
+  rollbackPreparedEditorAssets,
+  syncChangelogAssetReferences,
+} from "../asset/service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -48,15 +57,36 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     ChangelogCreate: (args: TChangelogCreate) => {
       const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
       return Effect.gen(function* () {
+        const prepared = yield* prepareEditorAssetContent({
+          organizationId: args.organizationId,
+          content: sanitizedMarkdown,
+          assetIds: args.assetIds,
+        });
         const session = yield* CurrentSession;
         const isMember = Policy.getMembership(session, args.organizationId);
 
-        yield* repository.create({
-          ...args,
-          content: sanitizedMarkdown,
-          creatorId: session.session.userId,
-          ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
-        });
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.create({
+              ...args,
+              content: prepared.content,
+              creatorId: session.session.userId,
+              ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
+            });
+            yield* commitPreparedEditorAssets(prepared.promotions);
+            yield* syncChangelogAssetReferences({
+              changelogId: args.id,
+              organizationId: args.organizationId,
+              content: prepared.content,
+              assetIds: prepared.promotions.map(({ asset }) => asset.id),
+            });
+          })
+        ).pipe(
+          Effect.tapError(() =>
+            rollbackPreparedEditorAssets(prepared.promotions)
+          )
+        );
+        yield* cleanupPreparedEditorAssets(prepared.promotions);
       }).pipe(
         Policy.withPolicy(changelogPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Changelog", "create")
@@ -65,6 +95,9 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
     ChangelogDelete: (args: TChangelogDelete) =>
       repository.delete(args).pipe(
+        Effect.tap(() =>
+          cleanupOrphanedEditorAssets({ organizationId: args.organizationId })
+        ),
         Policy.withPolicy(
           changelogPolicy.canDelete({
             organizationId: args.organizationId,
@@ -76,20 +109,42 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
     ChangelogUpdate: (args: TChangelogUpdate) => {
       const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
-      return repository
-        .update({
-          ...args,
+      return Effect.gen(function* () {
+        const prepared = yield* prepareEditorAssetContent({
+          organizationId: args.organizationId,
           content: sanitizedMarkdown,
-        })
-        .pipe(
-          Policy.withPolicy(
-            changelogPolicy.canUpdate({
-              organizationId: args.organizationId,
+          assetIds: args.assetIds,
+        });
+
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.update({
+              ...args,
+              content: prepared.content,
+            });
+            yield* commitPreparedEditorAssets(prepared.promotions);
+            yield* syncChangelogAssetReferences({
               changelogId: args.id,
-            })
-          ),
-          withRemapDbErrors("Changelog", "update")
+              organizationId: args.organizationId,
+              content: prepared.content,
+              assetIds: prepared.promotions.map(({ asset }) => asset.id),
+            });
+          })
+        ).pipe(
+          Effect.tapError(() =>
+            rollbackPreparedEditorAssets(prepared.promotions)
+          )
         );
+        yield* cleanupPreparedEditorAssets(prepared.promotions);
+      }).pipe(
+        Policy.withPolicy(
+          changelogPolicy.canUpdate({
+            organizationId: args.organizationId,
+            changelogId: args.id,
+          })
+        ),
+        withRemapDbErrors("Changelog", "update")
+      );
     },
   };
 });

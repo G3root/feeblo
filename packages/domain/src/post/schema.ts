@@ -2,6 +2,7 @@ import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const Post = S.Struct({
+  assetIds: S.optional(S.Array(S.String)),
   id: S.String,
   boardId: S.String,
   title: S.String,
@@ -71,6 +72,7 @@ export const PostUpdate = S.Struct({
 export type TPostUpdate = S.Schema.Type<typeof PostUpdate>;
 
 export const PostUpdateContent = S.Struct({
+  assetIds: S.Array(S.String),
   id: PostId.schema,
   content: S.String,
   boardId: BoardId.schema,
@@ -111,6 +113,7 @@ export const PostMerge = S.Struct({
 export type TPostMerge = S.Schema.Type<typeof PostMerge>;
 
 export const PostCreate = S.Struct({
+  assetIds: S.Array(S.String),
   id: PostId.schema,
   boardId: BoardId.schema,
   title: S.String,

@@ -8,6 +8,7 @@ import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
+import { S3UploadService } from "../services/s3";
 import { ChangelogRpcHandlersEffect } from "./handlers";
 import { ChangelogPolicy } from "./policies";
 import { ChangelogRepository } from "./repository";
@@ -80,7 +81,14 @@ describe("ChangelogRpcHandlers", () => {
     Repositories,
     Entitlements,
     Policies,
-    Database.PgliteDatabaseLive
+    Database.PgliteDatabaseLive,
+    Layer.succeed(S3UploadService, {
+      uploadProfileImage: () => Effect.die("not used in this test"),
+      uploadOrganizationLogo: () => Effect.die("not used in this test"),
+      uploadEditorMedia: () => Effect.die("not used in this test"),
+      promoteEditorMedia: () => Effect.die("not used in this test"),
+      deleteObject: () => Effect.die("not used in this test"),
+    })
   );
 
   layer(TestLayer)("handlers", (it) => {
@@ -91,6 +99,7 @@ describe("ChangelogRpcHandlers", () => {
         const id = yield* ChangelogId.generate;
         yield* handlers
           .ChangelogCreate({
+            assetIds: [],
             id,
             organizationId: fixture.organizationId,
             title: "Release",

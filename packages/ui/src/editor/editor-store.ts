@@ -1,6 +1,7 @@
 import { createStore, createStoreContext } from "@feeblo/web-shared/xstate";
 
 export const editorStore = (defaultValue?: {
+  deferUploads?: boolean;
   organizationId?: string;
   postContent: string;
 }) =>

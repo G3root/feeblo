@@ -1,5 +1,5 @@
 import { Button } from "@feeblo/ui/button";
-import { Editor } from "@feeblo/ui/editor";
+import { Editor, finalizeEditorContent } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 import { toastManager } from "@feeblo/ui/toast";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
@@ -152,12 +152,14 @@ const PostEditorEditor = memo(function PostEditorEditor() {
   return (
     <EditorProvider
       defaultValue={{
+        deferUploads: true,
         organizationId: state.organizationId,
         postContent: initialContent,
       }}
       key={state.resetKey}
     >
       <Editor
+        deferUploads
         onChange={actions.onContentChange}
         organizationId={state.organizationId}
         placeholder={state.placeholder}
@@ -190,7 +192,10 @@ type PostEditorRootProps = {
   disabled?: boolean;
   organizationId?: string;
   onContentChange?: (content: string) => void;
-  onSubmit?: (value: { content: string }) => void | Promise<void>;
+  onSubmit?: (value: {
+    assetIds: string[];
+    content: string;
+  }) => void | Promise<void>;
   placeholder?: string;
   submitLabel?: string;
 };
@@ -226,7 +231,11 @@ function PostEditorComponent({
   };
 
   const handleSubmit = async () => {
-    await onSubmit({ content: contentRef.current });
+    const finalized = await finalizeEditorContent(
+      contentRef.current,
+      organizationId
+    );
+    await onSubmit(finalized);
     setResetKey((k) => k + 1);
     if (!isContentControlled) {
       setInternalContent("");
@@ -238,9 +247,9 @@ function PostEditorComponent({
     <PostEditorProvider
       content={content}
       disabled={disabled}
-      organizationId={organizationId}
       onContentChange={handleContentChange}
       onSubmit={handleSubmit}
+      organizationId={organizationId}
       placeholder={placeholder}
       resetKey={resetKey}
       submitLabel={submitLabel}
@@ -268,13 +277,17 @@ export function PostContentUpdateInput() {
 
   const disabled = isLocked || !canManagePost;
 
-  const updatePostContent = createOptimisticAction<{ content: string }>({
-    onMutate: ({ content }) => {
+  const updatePostContent = createOptimisticAction<{
+    assetIds: string[];
+    content: string;
+  }>({
+    onMutate: ({ assetIds, content }) => {
       postCollection.update(post.id, (draft) => {
         draft.content = content;
+        draft.assetIds = assetIds;
       });
     },
-    mutationFn: async ({ content }) => {
+    mutationFn: async ({ assetIds, content }) => {
       await fetchRpc((rpc) =>
         pageType === "Dashboard"
           ? rpc.PostUpdateContent({
@@ -282,12 +295,14 @@ export function PostContentUpdateInput() {
               boardId: post.boardId,
               organizationId,
               content,
+              assetIds,
             })
           : rpc.PostUpdateContentPublic({
               id: post.id,
               boardId: post.boardId,
               organizationId,
               content,
+              assetIds,
             })
       );
       await postCollection.utils.refetch();
@@ -298,11 +313,10 @@ export function PostContentUpdateInput() {
     <PostEditor
       content={post.content}
       disabled={disabled}
-      organizationId={organizationId}
-      onSubmit={async ({ content }) => {
+      onSubmit={async ({ assetIds, content }) => {
         if (content !== "") {
           try {
-            const tx = updatePostContent({ content });
+            const tx = updatePostContent({ assetIds, content });
             await tx.isPersisted.promise;
           } catch {
             toastManager.add({
@@ -312,6 +326,7 @@ export function PostContentUpdateInput() {
           }
         }
       }}
+      organizationId={organizationId}
       submitLabel="Update"
     >
       <PostEditor.Submit />

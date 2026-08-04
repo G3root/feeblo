@@ -4,11 +4,13 @@ import {
   index,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { organizationTable, userTable } from "./auth";
+import { changelogTable, postTable } from "./feedback";
 
 export const assetKindEnum = pgEnum("asset_kind", [
   "profile_image",
@@ -49,6 +51,38 @@ export const assetTable = pgTable(
     index("asset_userId_idx").on(table.userId),
     index("asset_organizationId_idx").on(table.organizationId),
     index("asset_url_idx").on(table.url),
+  ]
+);
+
+export const postAssetTable = pgTable(
+  "post_asset",
+  {
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    assetId: text("asset_id")
+      .notNull()
+      .references(() => assetTable.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.postId, table.assetId] }),
+    index("post_asset_assetId_idx").on(table.assetId),
+  ]
+);
+
+export const changelogAssetTable = pgTable(
+  "changelog_asset",
+  {
+    changelogId: text("changelog_id")
+      .notNull()
+      .references(() => changelogTable.id, { onDelete: "cascade" }),
+    assetId: text("asset_id")
+      .notNull()
+      .references(() => assetTable.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.changelogId, table.assetId] }),
+    index("changelog_asset_assetId_idx").on(table.assetId),
   ]
 );
 

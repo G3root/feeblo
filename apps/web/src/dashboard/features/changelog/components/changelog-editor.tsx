@@ -1,6 +1,7 @@
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
+import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
@@ -31,6 +32,7 @@ import { ChangelogPublishDialog } from "./changelog-publish-dialog";
 import { ChangelogStatusBadge } from "./changelog-status";
 
 export type TChangelogEditorRecord = {
+  assetIds?: readonly string[];
   id: string;
   title: string;
   slug: string;
@@ -95,11 +97,17 @@ function useChangelogEditorForm({
       const submitMeta = meta as ChangelogSubmitMeta | undefined;
 
       try {
+        const finalized = await finalizeEditorContent(
+          value.content,
+          organizationId
+        );
+        const { assetIds, content } = finalized;
         const payload = updatedChangelogSchema.parse({
           id: changelog.id,
           title: value.title.trim(),
           slug: submitMeta?.overrides?.slug ?? changelog.slug,
-          content: value.content,
+          content,
+          assetIds,
           status: submitMeta?.overrides?.status ?? changelog.status,
           scheduledAt:
             submitMeta?.overrides && "scheduledAt" in submitMeta.overrides
@@ -116,6 +124,7 @@ function useChangelogEditorForm({
           draft.title = payload.title;
           draft.slug = payload.slug;
           draft.content = payload.content;
+          draft.assetIds = payload.assetIds;
           draft.status = payload.status;
           draft.scheduledAt = payload.scheduledAt;
           draft.publishedAt = payload.publishedAt;

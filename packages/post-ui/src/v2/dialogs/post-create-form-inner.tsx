@@ -4,6 +4,7 @@ import type { TPost } from "@feeblo/domain/post/schema";
 import { PostId } from "@feeblo/id";
 import { FieldRow } from "@feeblo/post-ui/post-properties";
 import { Button } from "@feeblo/ui/button";
+import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
@@ -224,6 +225,11 @@ export function PostCreateForm() {
       try {
         const postId = await PostId.unsafeGenerate();
         const title = value.title.trim();
+        const finalized = await finalizeEditorContent(
+          value.content,
+          organizationId
+        );
+        const { assetIds, content } = finalized;
         const selectedPostStatus = postStatuses.find(
           (postStatus) => postStatus.id === value.statusId
         );
@@ -233,12 +239,13 @@ export function PostCreateForm() {
         }
         const tx = postCollection.insert({
           id: postId,
+          assetIds,
           archivedAt: null,
           boardId: value.boardId,
           title,
           slug: slugify(title) || "untitled",
-          content: value.content,
-          excerpt: htmlToExcerpt(value.content),
+          content,
+          excerpt: htmlToExcerpt(content),
           lockedAt: null,
           mergedAt: null,
           mergedIntoPostId: null,

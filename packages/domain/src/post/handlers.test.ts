@@ -30,6 +30,7 @@ import {
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
+import { S3UploadService } from "../services/s3";
 
 describe("PostRpcHandlers", () => {
   type Fixture = {
@@ -124,6 +125,7 @@ describe("PostRpcHandlers", () => {
     title: string,
     content = title
   ) => ({
+    assetIds: [],
     id,
     organizationId: fixture.organizationId,
     boardId: fixture.boardId,
@@ -164,7 +166,19 @@ describe("PostRpcHandlers", () => {
     Layer.provideMerge(RepositoriesTest)
   );
 
-  const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
+  const S3Test = Layer.succeed(S3UploadService, {
+    uploadProfileImage: () => Effect.die("not used in this test"),
+    uploadOrganizationLogo: () => Effect.die("not used in this test"),
+    uploadEditorMedia: () => Effect.die("not used in this test"),
+    promoteEditorMedia: () => Effect.die("not used in this test"),
+    deleteObject: () => Effect.die("not used in this test"),
+  });
+
+  const TestLayer = Layer.mergeAll(
+    HandlerTest,
+    Database.PgliteDatabaseLive,
+    S3Test
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("PostList", () => {
@@ -367,6 +381,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
             .PostUpdateContent({
+              assetIds: [],
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,

@@ -15,6 +15,7 @@ import {
 import { HttpApiAuthMiddleware } from "../session-middleware";
 
 export const MediaUploadResponseSchema = Schema.Struct({
+  assetId: Schema.String,
   bucket: Schema.String,
   key: Schema.String,
   kind: Schema.Literals(["image", "video"]),

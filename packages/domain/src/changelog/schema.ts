@@ -6,6 +6,7 @@ export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
 export type TChangelogStatus = S.Schema.Type<typeof ChangelogStatus>;
 
 export const Changelog = S.Struct({
+  assetIds: S.optional(S.Array(S.String)),
   id: S.String,
   title: S.String,
   slug: S.String,
@@ -33,6 +34,7 @@ export const ChangelogList = S.Struct({
 export type TChangelogList = S.Schema.Type<typeof ChangelogList>;
 
 export const ChangelogCreate = S.Struct({
+  assetIds: S.Array(S.String),
   id: ChangelogId.schema,
   title: S.String,
   slug: S.String,
@@ -46,6 +48,7 @@ export const ChangelogCreate = S.Struct({
 export type TChangelogCreate = S.Schema.Type<typeof ChangelogCreate>;
 
 export const ChangelogUpdate = S.Struct({
+  assetIds: S.Array(S.String),
   id: ChangelogId.schema,
   title: S.String,
   slug: S.String,

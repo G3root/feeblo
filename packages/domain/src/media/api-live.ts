@@ -99,7 +99,7 @@ export const MediaApiLive = HttpApiBuilder.group(
             )
           );
 
-        yield* registerUploadedAsset({
+        const registered = yield* registerUploadedAsset({
           owner: organizationId
             ? { type: "organization", id: organizationId }
             : { type: "user", id: session.user.id },
@@ -107,7 +107,7 @@ export const MediaApiLive = HttpApiBuilder.group(
           uploaded,
         }).pipe(Effect.provideService(S3UploadService, s3Service));
 
-        return { ...uploaded, kind };
+        return { ...registered, kind };
       }).pipe(withRemapDbErrors("Media", "create"))
     )
 ).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
