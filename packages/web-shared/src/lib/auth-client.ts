@@ -14,7 +14,7 @@ export const editorMediaUploadEndpoint = `${baseUrl}api/media/upload`;
 export const uploadedEditorMediaSchema = z.object({
   bucket: z.string(),
   key: z.string(),
-  kind: z.enum(["image", "video"]),
+  kind: z.literal("image"),
   url: z.url(),
 });
 

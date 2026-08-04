@@ -16,7 +16,7 @@ import {
 } from "../rpc-errors";
 import { HttpApiAuthMiddleware } from "../session-middleware";
 
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_FIELD_BYTES = 1 * 1024 * 1024;
 
 /**
@@ -34,10 +34,10 @@ export const MediaUploadLimitsMiddlewareLive = Layer.succeed(
     Effect.provide(
       effect,
       Multipart.limitsServices({
-        maxFileSize: MAX_VIDEO_BYTES,
+        maxFileSize: MAX_IMAGE_BYTES,
         maxParts: 20,
         maxFieldSize: MAX_FIELD_BYTES,
-        maxTotalSize: MAX_VIDEO_BYTES + MAX_FIELD_BYTES,
+        maxTotalSize: MAX_IMAGE_BYTES + MAX_FIELD_BYTES,
       })
     )
   )
@@ -46,7 +46,7 @@ export const MediaUploadLimitsMiddlewareLive = Layer.succeed(
 export const MediaUploadResponseSchema = Schema.Struct({
   bucket: Schema.String,
   key: Schema.String,
-  kind: Schema.Literals(["image", "video"]),
+  kind: Schema.Literal("image"),
   url: Schema.String,
 });
 
