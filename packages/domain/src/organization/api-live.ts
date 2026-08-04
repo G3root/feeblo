@@ -6,6 +6,8 @@ import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { replaceSingletonAsset } from "../asset/service";
+import { AssetRepository } from "../asset/repository";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -104,16 +106,24 @@ export const OrganizationApiLive = HttpApiBuilder.group(
               )
             );
 
-          const db = yield* currentDb;
-
-          yield* db
-            .update(schema.organizationTable)
-            .set({ logo: uploaded.url })
-            .where(eq(schema.organizationTable.id, organizationId));
+          yield* replaceSingletonAsset({
+            owner: { type: "organization", id: organizationId },
+            kind: "organization_logo",
+            uploaded,
+            updateOwner: Effect.gen(function* () {
+              const db = yield* currentDb;
+              yield* db
+                .update(schema.organizationTable)
+                .set({ logo: uploaded.url })
+                .where(eq(schema.organizationTable.id, organizationId));
+            }),
+          }).pipe(Effect.provideService(S3UploadService, s3Service));
 
           return uploaded;
         }).pipe(
-          Effect.provide(OrganizationRepository.layer),
+          Effect.provide(
+            Layer.mergeAll(OrganizationRepository.layer, AssetRepository.layer)
+          ),
           withRemapDbErrors("Organization", "create")
         );
       }

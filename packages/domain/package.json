@@ -7,6 +7,12 @@
     "./src/*": {
       "default": "./src/*"
     },
+    "./asset/repository": {
+      "default": "./src/asset/repository.ts"
+    },
+    "./asset/service": {
+      "default": "./src/asset/service.ts"
+    },
     "./rpc-group": {
       "default": "./src/rpc-group.ts"
     },

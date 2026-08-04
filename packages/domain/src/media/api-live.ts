@@ -3,11 +3,12 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-
+import { registerUploadedAsset } from "../asset/service";
 import { Api } from "../http/api";
 import {
   BadRequestError,
   InternalServerError,
+  UnauthorizedError,
   withRemapDbErrors,
 } from "../rpc-errors";
 import { S3UploadService, S3UploadServiceLive } from "../services/s3";
@@ -35,7 +36,7 @@ export const MediaApiLive = HttpApiBuilder.group(
   Api,
   "MediaApiGroup",
   (handlers) =>
-    handlers.handle("uploadMedia", ({ payload: { file } }) =>
+    handlers.handle("uploadMedia", ({ payload: { file, organizationId } }) =>
       Effect.gen(function* () {
         const session = yield* currentHttpApiSession;
 
@@ -93,6 +94,14 @@ export const MediaApiLive = HttpApiBuilder.group(
           });
         }
 
+        if (
+          organizationId &&
+          !session.organizations.some(({ id }) => id === organizationId)
+        ) {
+          return yield* new UnauthorizedError({
+            message: "You are not a member of this organization",
+          });
+        }
         const s3Service = yield* S3UploadService.pipe(
           Effect.provide(S3UploadServiceLive),
           Effect.mapError(
@@ -116,7 +125,15 @@ export const MediaApiLive = HttpApiBuilder.group(
             )
           );
 
-        return { ...uploaded, kind };
+        const registered = yield* registerUploadedAsset({
+          owner: organizationId
+            ? { type: "organization", id: organizationId }
+            : { type: "user", id: session.user.id },
+          kind: kind === "image" ? "editor_image" : "editor_video",
+          uploaded,
+        }).pipe(Effect.provideService(S3UploadService, s3Service));
+
+        return { ...registered, kind };
       }).pipe(withRemapDbErrors("Media", "create"))
     )
 ).pipe(

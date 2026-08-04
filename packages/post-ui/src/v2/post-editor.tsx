@@ -1,5 +1,5 @@
 import { Button } from "@feeblo/ui/button";
-import { Editor } from "@feeblo/ui/editor";
+import { Editor, finalizeEditorContent } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 import { toastManager } from "@feeblo/ui/toast";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
@@ -18,6 +18,8 @@ import { usePostCollections } from "./providers/post-collections-provider";
 
 type PostEditorState = {
   disabled: boolean;
+  editorScope: string;
+  organizationId?: string;
   placeholder: string;
   resetKey: number;
 };
@@ -89,6 +91,8 @@ type PostEditorProviderProps = {
   children?: ReactNode;
   content?: string;
   disabled?: boolean;
+  editorScope?: string;
+  organizationId?: string;
   onContentChange?: (content: string) => void;
   onSubmit?: () => void | Promise<void>;
   placeholder?: string;
@@ -100,6 +104,8 @@ function PostEditorProvider({
   children,
   content = "",
   disabled = false,
+  editorScope: providedEditorScope,
+  organizationId,
   onContentChange,
   onSubmit = noop,
   placeholder,
@@ -108,6 +114,8 @@ function PostEditorProvider({
 }: PostEditorProviderProps) {
   const onContentChangeRef = useRef(onContentChange);
   const onSubmitRef = useRef(onSubmit);
+  const generatedEditorScope = useRef(crypto.randomUUID()).current;
+  const editorScope = providedEditorScope ?? generatedEditorScope;
   onContentChangeRef.current = onContentChange;
   onSubmitRef.current = onSubmit;
 
@@ -123,10 +131,12 @@ function PostEditorProvider({
   const state = useMemo<PostEditorState>(
     () => ({
       disabled,
+      editorScope,
+      organizationId,
       placeholder: placeholder ?? DEFAULT_PLACEHOLDER,
       resetKey,
     }),
-    [disabled, placeholder, resetKey]
+    [disabled, editorScope, organizationId, placeholder, resetKey]
   );
   const meta = useMemo<PostEditorMeta>(() => ({ submitLabel }), [submitLabel]);
   const contextValue = useMemo<PostEditorContextValue>(
@@ -147,11 +157,19 @@ const PostEditorEditor = memo(function PostEditorEditor() {
 
   return (
     <EditorProvider
-      defaultValue={{ postContent: initialContent }}
+      defaultValue={{
+        deferUploads: true,
+        editorScope: state.editorScope,
+        organizationId: state.organizationId,
+        postContent: initialContent,
+      }}
       key={state.resetKey}
     >
       <Editor
+        deferUploads
+        editorScope={state.editorScope}
         onChange={actions.onContentChange}
+        organizationId={state.organizationId}
         placeholder={state.placeholder}
         readOnly={state.disabled}
       />
@@ -180,8 +198,14 @@ type PostEditorRootProps = {
   children?: ReactNode;
   content?: string;
   disabled?: boolean;
+  editorScope?: string;
+  existingAssetIds?: readonly string[];
+  organizationId?: string;
   onContentChange?: (content: string) => void;
-  onSubmit?: (value: { content: string }) => void | Promise<void>;
+  onSubmit?: (value: {
+    assetIds: string[];
+    content: string;
+  }) => void | Promise<void>;
   placeholder?: string;
   submitLabel?: string;
 };
@@ -190,6 +214,9 @@ function PostEditorComponent({
   children,
   content: externalContent,
   disabled,
+  editorScope: providedEditorScope,
+  existingAssetIds = [],
+  organizationId,
   onContentChange: externalOnContentChange,
   onSubmit = noop,
   placeholder,
@@ -198,6 +225,8 @@ function PostEditorComponent({
   const [internalContent, setInternalContent] = useState(externalContent ?? "");
   const [resetKey, setResetKey] = useState(0);
   const contentRef = useRef(externalContent ?? "");
+  const generatedEditorScope = useRef(crypto.randomUUID()).current;
+  const editorScope = providedEditorScope ?? generatedEditorScope;
 
   const isContentControlled = externalContent !== undefined;
 
@@ -216,7 +245,20 @@ function PostEditorComponent({
   };
 
   const handleSubmit = async () => {
-    await onSubmit({ content: contentRef.current });
+    const finalized = await finalizeEditorContent(
+      contentRef.current,
+      organizationId,
+      { assetIds: existingAssetIds, scope: editorScope }
+    );
+    try {
+      await onSubmit({
+        assetIds: finalized.assetIds,
+        content: finalized.content,
+      });
+    } catch {
+      return;
+    }
+    finalized.commit();
     setResetKey((k) => k + 1);
     if (!isContentControlled) {
       setInternalContent("");
@@ -228,8 +270,10 @@ function PostEditorComponent({
     <PostEditorProvider
       content={content}
       disabled={disabled}
+      editorScope={editorScope}
       onContentChange={handleContentChange}
       onSubmit={handleSubmit}
+      organizationId={organizationId}
       placeholder={placeholder}
       resetKey={resetKey}
       submitLabel={submitLabel}
@@ -257,13 +301,17 @@ export function PostContentUpdateInput() {
 
   const disabled = isLocked || !canManagePost;
 
-  const updatePostContent = createOptimisticAction<{ content: string }>({
-    onMutate: ({ content }) => {
+  const updatePostContent = createOptimisticAction<{
+    assetIds: string[];
+    content: string;
+  }>({
+    onMutate: ({ assetIds, content }) => {
       postCollection.update(post.id, (draft) => {
         draft.content = content;
+        draft.assetIds = assetIds;
       });
     },
-    mutationFn: async ({ content }) => {
+    mutationFn: async ({ assetIds, content }) => {
       await fetchRpc((rpc) =>
         pageType === "Dashboard"
           ? rpc.PostUpdateContent({
@@ -271,12 +319,14 @@ export function PostContentUpdateInput() {
               boardId: post.boardId,
               organizationId,
               content,
+              assetIds,
             })
           : rpc.PostUpdateContentPublic({
               id: post.id,
               boardId: post.boardId,
               organizationId,
               content,
+              assetIds,
             })
       );
       await postCollection.utils.refetch();
@@ -287,19 +337,23 @@ export function PostContentUpdateInput() {
     <PostEditor
       content={post.content}
       disabled={disabled}
-      onSubmit={async ({ content }) => {
-        if (content !== "") {
-          try {
-            const tx = updatePostContent({ content });
-            await tx.isPersisted.promise;
-          } catch {
-            toastManager.add({
-              title: "Failed to update content",
-              type: "error",
-            });
-          }
+      existingAssetIds={post.assetIds}
+      onSubmit={async ({ assetIds, content }) => {
+        try {
+          const tx = updatePostContent({
+            assetIds: content === "" ? [] : assetIds,
+            content,
+          });
+          await tx.isPersisted.promise;
+        } catch (error) {
+          toastManager.add({
+            title: "Failed to update content",
+            type: "error",
+          });
+          throw error;
         }
       }}
+      organizationId={organizationId}
       submitLabel="Update"
     >
       <PostEditor.Submit />

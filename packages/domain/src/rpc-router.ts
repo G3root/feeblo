@@ -25,6 +25,7 @@ import { PublicRpcRateLimitMiddlewareLive } from "./rate-limit";
 import { RoadmapRpcHandlers } from "./roadmap/handlers";
 import { RoadmapColumnRpcHandlers } from "./roadmap-column/handlers";
 import { AllRpcs } from "./rpc-group";
+import { S3UploadServiceLive } from "./services/s3";
 import {
   AuthMiddlewareLive,
   OptionalAuthMiddlewareLive,
@@ -68,6 +69,7 @@ export const RpcRoute = RpcServer.layerHttp({
     )
   ),
   Layer.provide(WorkspaceRpcHandlers),
+  Layer.provide(S3UploadServiceLive),
   Layer.provide(RpcSerialization.layerNdjson),
   Layer.provide(
     Layer.mergeAll(

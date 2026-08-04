@@ -44,6 +44,7 @@ export const MediaUploadLimitsMiddlewareLive = Layer.succeed(
 );
 
 export const MediaUploadResponseSchema = Schema.Struct({
+  assetId: Schema.String,
   bucket: Schema.String,
   key: Schema.String,
   kind: Schema.Literal("image"),
@@ -61,6 +62,7 @@ export class MediaApiGroup extends HttpApiGroup.make("MediaApiGroup")
       ]),
       payload: Schema.Struct({
         file: Multipart.SingleFileSchema,
+        organizationId: Schema.optional(Schema.String),
       }).pipe(HttpApiSchema.asMultipart()),
     })
       .annotate(OpenApi.Title, "Upload Editor Media")

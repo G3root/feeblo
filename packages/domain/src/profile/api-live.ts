@@ -6,6 +6,8 @@ import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 
+import { replaceSingletonAsset } from "../asset/service";
+import { AssetRepository } from "../asset/repository";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -83,15 +85,24 @@ export const ProfileApiLive = HttpApiBuilder.group(
             )
           );
 
-        const db = yield* currentDb;
-
-        yield* db
-          .update(schema.userTable)
-          .set({ image: uploaded.url })
-          .where(eq(schema.userTable.id, session.user.id));
+        yield* replaceSingletonAsset({
+          owner: { type: "user", id: session.user.id },
+          kind: "profile_image",
+          uploaded,
+          updateOwner: Effect.gen(function* () {
+            const db = yield* currentDb;
+            yield* db
+              .update(schema.userTable)
+              .set({ image: uploaded.url })
+              .where(eq(schema.userTable.id, session.user.id));
+          }),
+        }).pipe(Effect.provideService(S3UploadService, s3Service));
 
         return uploaded;
-      }).pipe(withRemapDbErrors("UserProfile", "create"));
+      }).pipe(
+        Effect.provide(AssetRepository.layer),
+        withRemapDbErrors("UserProfile", "create")
+      );
     })
 ).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
 
