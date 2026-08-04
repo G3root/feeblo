@@ -1,4 +1,4 @@
-import { NAMESPACE } from "./constants";
+import { EVENT_NAMES, NAMESPACE } from "./constants";
 import type { Logger } from "./debug";
 import type {
   FeebloEventDetail,
@@ -40,16 +40,11 @@ export function subscribe<E extends FeebloEventName | "*">(
   const listener = callback as EventListener;
 
   if (target === "*") {
-    const names = [
-      "widgetReady",
-      "widgetOpened",
-      "feedbackSubmitted",
-    ] as const satisfies readonly FeebloEventName[];
-    for (const name of names) {
+    for (const name of EVENT_NAMES) {
       window.addEventListener(name, listener);
     }
     return () => {
-      for (const name of names) {
+      for (const name of EVENT_NAMES) {
         window.removeEventListener(name, listener);
       }
     };
@@ -73,11 +68,7 @@ export function unsubscribe<E extends FeebloEventName | "*">(
   const listener = callback as EventListener;
 
   if (target === "*") {
-    for (const name of [
-      "widgetReady",
-      "widgetOpened",
-      "feedbackSubmitted",
-    ] as const) {
+    for (const name of EVENT_NAMES) {
       window.removeEventListener(name, listener);
     }
     return;

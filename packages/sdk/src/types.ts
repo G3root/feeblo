@@ -15,10 +15,10 @@ export type OrganizationId = string & {
 };
 
 export interface WidgetCompany {
-  id: string;
-  name: string;
   avatar?: string | undefined;
   customFields?: Record<string, unknown> | undefined;
+  id: string;
+  name: string;
 }
 
 export interface UserIdentity {
@@ -30,6 +30,8 @@ export interface UserIdentity {
   name?: string | undefined;
   token?: string | undefined;
 }
+
+export type PublicUserIdentity = Omit<UserIdentity, "token">;
 
 export interface NormalizedUserIdentity {
   avatar?: string | undefined;
@@ -44,16 +46,26 @@ export interface NormalizedUserIdentity {
 export interface SubmittedFeedback {
   boardId: string;
   boardName: string;
+  metadata?: Record<string, string> | undefined;
   title: string;
 }
+
+export type WidgetMode = "feedback" | "updates" | "hub";
+export type WidgetModule = Exclude<WidgetMode, "hub">;
+export type WidgetPlacement = "bottom-left" | "bottom-right";
 
 export interface EmbedOptions {
   baseUrl?: string | undefined;
   containerStyles?: Partial<CSSStyleDeclaration> | undefined;
   debug?: boolean | undefined;
+  defaultBoard?: string | undefined;
+  locale?: string | undefined;
+  mode?: WidgetMode | undefined;
+  modules?: WidgetModule[] | undefined;
   onClose?: (() => void) | undefined;
   onError?: ((error: EmbedError) => void) | undefined;
   onHeightChange?: ((height: number) => void) | undefined;
+  placement?: WidgetPlacement | undefined;
   root?: HTMLElement | undefined;
   theme?: string | undefined;
   user?: UserIdentity | undefined;
@@ -79,10 +91,13 @@ export interface FeebloWidget {
   close: () => FeebloWidget;
   destroy: () => void;
   identify: (user: UserIdentity) => FeebloWidget;
+  isOpen: () => boolean;
+  metadata: (patch: Record<string, string | null>) => FeebloWidget;
   open: (
     trigger?: HTMLElement,
     metadata?: Record<string, string>
   ) => FeebloWidget;
+  openModule: (module: WidgetModule) => FeebloWidget;
   setBoard: (board: string) => FeebloWidget;
 }
 
@@ -93,11 +108,15 @@ export interface FeebloWidget {
 export type FeebloEventName =
   | "widgetReady"
   | "widgetOpened"
+  | "widgetClosed"
+  | "identityChanged"
   | "feedbackSubmitted";
 
 export interface FeebloEventMap {
   feedbackSubmitted: SubmittedFeedback | undefined;
-  widgetOpened: unknown;
+  identityChanged: PublicUserIdentity;
+  widgetClosed: undefined;
+  widgetOpened: { module: WidgetModule } | undefined;
   widgetReady: undefined;
 }
 
@@ -138,8 +157,9 @@ export type IncomingMessage =
     }
   | { event: "PAGE_HEIGHT"; data?: { height?: number | undefined } | undefined }
   | { event: "CLOSE" }
+  | { event: "IDENTITY_CHANGED"; data?: PublicUserIdentity | undefined }
   | { event: "READY" }
-  | { event: "WIDGET_OPENED"; data?: unknown }
+  | { event: "WIDGET_OPENED"; data?: { module: WidgetModule } | undefined }
   | {
       event: "FEEDBACK_SUBMITTED";
       data?: { post?: SubmittedFeedback | undefined } | undefined;
@@ -149,7 +169,10 @@ export type OutgoingMessage =
   | { event: "SHOW" }
   | { event: "HIDE" }
   | { event: "IDENTIFY"; data: Record<string, unknown> }
-  | { event: "SET_BOARD"; data: { board: string } };
+  | { event: "SET_CONTEXT"; data: Record<string, string> }
+  | { event: "SET_MODULE"; data: { module: WidgetModule } }
+  | { event: "SET_BOARD"; data: { board: string } }
+  | { event: "SET_LOCALE"; data: { locale: string } };
 
 export type ExternalMessageData = {
   target: string;

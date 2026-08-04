@@ -23,6 +23,12 @@ export const WidgetFeedbackCreate = S.Struct({
   organizationId: WorkspaceId.schema,
   title: S.String,
   content: S.String,
+  metadata: S.optional(
+    S.Record(
+      S.String.pipe(S.check(S.isMaxLength(64))),
+      S.String.check(S.isMaxLength(500))
+    ).check(S.isMaxProperties(20))
+  ),
   token: S.optional(S.String),
 });
 
@@ -54,3 +60,15 @@ export const WidgetSuggestion = S.Struct({
   excerpt: S.String,
   slug: S.String,
 });
+
+export const WidgetUpdate = S.Struct({
+  id: S.String,
+  title: S.String,
+  slug: S.String,
+  content: S.String,
+  excerpt: S.String,
+  imageUrl: S.NullOr(S.String),
+  publishedAt: S.DateFromString,
+});
+
+export type TWidgetUpdate = S.Schema.Type<typeof WidgetUpdate>;

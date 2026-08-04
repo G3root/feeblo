@@ -114,6 +114,7 @@ describe("ChangelogRpcHandlers", () => {
           id,
           slug: "release",
           content: "Safe\n",
+          excerpt: "Safe",
           creatorMemberId: fixture.membershipId,
         });
       })

@@ -27,6 +27,25 @@ describe("createIframe", () => {
     expect(iframe.src).toContain("theme=dark");
   });
 
+  it("includes normalized mode and ordered modules", () => {
+    const iframe = createIframe("org_test", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+    });
+
+    expect(iframe.src).toContain("mode=hub");
+    expect(iframe.src).toContain("modules=updates%2Cfeedback");
+    expect(iframe.src).toContain("#/updates");
+    expect(iframe.title).toBe("Feeblo Hub");
+  });
+
+  it("passes the host origin to the widget iframe", () => {
+    const iframe = createIframe("org_test", {});
+
+    const hostOrigin = new URL(iframe.src).searchParams.get("hostOrigin");
+    expect(hostOrigin).toBe(window.location.origin);
+  });
+
   it("sets default iframe styles", () => {
     const iframe = createIframe("org_test", {});
 
@@ -41,12 +60,54 @@ describe("createIframe", () => {
     expect(iframe.getAttribute("allow")).toBe("clipboard-write");
   });
 
+  it("sandboxes the widget iframe", () => {
+    const iframe = createIframe("org_test", {});
+
+    expect(iframe.getAttribute("sandbox")).toContain("allow-scripts");
+    expect(iframe.title).toBe("Feeblo feedback widget");
+  });
+
   it("uses custom baseUrl in the iframe src", () => {
     const iframe = createIframe("org_test", {
       baseUrl: "https://staging.feeblo.com",
     });
 
     expect(iframe.src).toContain("staging.feeblo.com");
+  });
+
+  it("includes board query param when feedback is the landing module", () => {
+    const iframe = createIframe("org_test", { defaultBoard: "roadmap" });
+
+    expect(iframe.src).toContain("board=roadmap");
+  });
+
+  it("omits board query param in updates mode", () => {
+    const iframe = createIframe("org_test", {
+      mode: "updates",
+      defaultBoard: "roadmap",
+    });
+
+    expect(iframe.src).not.toContain("board=");
+  });
+
+  it("omits board query param for hub whose first module is updates", () => {
+    const iframe = createIframe("org_test", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+      defaultBoard: "roadmap",
+    });
+
+    expect(iframe.src).not.toContain("board=");
+  });
+
+  it("includes board query param for hub whose first module is feedback", () => {
+    const iframe = createIframe("org_test", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+
+    expect(iframe.src).toContain("board=roadmap");
   });
 });
 

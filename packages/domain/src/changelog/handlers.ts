@@ -1,4 +1,5 @@
 import { transaction } from "@feeblo/db";
+import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -55,7 +56,9 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     ChangelogCreate: (args: TChangelogCreate) => {
-      const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
+      const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+        args.content
+      );
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
         const prepared = yield* prepareEditorAssetContent({
@@ -73,6 +76,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               content: prepared.content,
               creatorId: session.session.userId,
               ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
+              excerpt: htmlToExcerpt(sanitizedHtml),
             });
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
@@ -121,7 +125,9 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     ChangelogUpdate: (args: TChangelogUpdate) => {
-      const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
+      const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+        args.content
+      );
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
         const prepared = yield* prepareEditorAssetContent({
@@ -136,6 +142,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             yield* repository.update({
               ...args,
               content: prepared.content,
+              excerpt: htmlToExcerpt(sanitizedHtml),
             });
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({

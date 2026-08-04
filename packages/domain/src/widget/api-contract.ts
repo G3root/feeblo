@@ -16,6 +16,7 @@ import {
   WidgetFeedbackResponse,
   WidgetSuggestion,
   WidgetSuggestionRequest,
+  WidgetUpdate,
 } from "./schema";
 
 export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
@@ -44,6 +45,21 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
       .annotate(
         OpenApi.Description,
         "Creates a new feedback post on a public board. The default open status for the organization is assigned automatically."
+      )
+  )
+  .add(
+    HttpApiEndpoint.get("listUpdates", "/updates", {
+      payload: {
+        organizationId: Schema.String,
+      },
+      success: Schema.Array(WidgetUpdate),
+      error: Schema.Union([DataValidationError, InternalServerError]),
+    })
+      .annotate(OpenApi.Title, "List Updates")
+      .annotate(OpenApi.Summary, "List published product updates")
+      .annotate(
+        OpenApi.Description,
+        "Returns published changelog entries for the requested organization, newest first."
       )
   )
   .add(

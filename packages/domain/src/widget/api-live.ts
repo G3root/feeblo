@@ -12,6 +12,7 @@ import type {
   TContactAttributeDefinition,
 } from "../attribute-definition/schema";
 import { BoardRepository } from "../board/repository";
+import { ChangelogRepository } from "../changelog/repository";
 import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
@@ -38,11 +39,43 @@ import {
 } from "../rpc-errors";
 import { upsertContactFromParsed } from "./sso";
 
+const UPDATE_IMAGE_SOURCE = /<img[^>]+src=["']([^"']+)["']/i;
+
+export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
+  const repository = yield* ChangelogRepository;
+  const entries = yield* repository.findManyPublished({ organizationId });
+
+  return entries.map((entry) => {
+    const { sanitizedHtml } = sanitizeMarkdown(entry.content);
+    const imageMatch = sanitizedHtml.match(UPDATE_IMAGE_SOURCE);
+    //TODO IMAGE
+    return {
+      id: entry.id,
+      title: entry.title,
+      slug: entry.slug,
+      content: sanitizedHtml,
+      excerpt: htmlToExcerpt(sanitizedHtml),
+      imageUrl: imageMatch?.[1] ?? null,
+      publishedAt: entry.publishedAt ?? entry.createdAt,
+    };
+  });
+});
+
 export const WidgetApiLive = HttpApiBuilder.group(
   Api,
   "WidgetApiGroup",
   (handlers) =>
     handlers
+      .handle("listUpdates", ({ payload }) =>
+        listWidgetUpdates(payload).pipe(
+          Effect.provide(ChangelogRepository.layer),
+          withRemapDbErrors("Changelog", "select")
+        )
+      )
       .handle("suggestPosts", ({ payload }) =>
         Effect.gen(function* () {
           const repository = yield* PostRepository;
@@ -139,7 +172,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
       )
       .handle("createFeedback", ({ payload }) =>
         Effect.gen(function* () {
-          const { boardId, organizationId, title, content, token } = payload;
+          const { boardId, organizationId, title, content, metadata, token } =
+            payload;
 
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
@@ -237,6 +271,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   statusId: defaultStatus.id,
                   excerpt,
                   contactId: contactId ?? null,
+                  metadata: metadata ?? {},
                   source: "WIDGET",
                 });
               })
@@ -252,6 +287,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 statusId: defaultStatus.id,
                 excerpt,
                 contactId: null,
+                metadata: metadata ?? {},
                 source: "WIDGET",
               })
             );
