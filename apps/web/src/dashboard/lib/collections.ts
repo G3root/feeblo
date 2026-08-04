@@ -134,6 +134,7 @@ export const postCollection = createCollection(
           organizationId: newPost.organizationId,
           title: newPost.title,
           content: newPost.content,
+          assetIds: newPost.assetIds ?? [],
           statusId: newPost.statusId,
         })
       );
@@ -204,6 +205,7 @@ export const changelogCollection = createCollection(
           title: updatedChangelog.title,
           slug: updatedChangelog.slug,
           content: updatedChangelog.content,
+          assetIds: updatedChangelog.assetIds ?? [],
           status: updatedChangelog.status,
           scheduledAt: updatedChangelog.scheduledAt,
           publishedAt: updatedChangelog.publishedAt,
@@ -232,6 +234,7 @@ export const changelogCollection = createCollection(
           title: newChangelog.title,
           slug: newChangelog.slug,
           content: newChangelog.content,
+          assetIds: newChangelog.assetIds ?? [],
           status: newChangelog.status,
           scheduledAt: newChangelog.scheduledAt,
           publishedAt: newChangelog.publishedAt,

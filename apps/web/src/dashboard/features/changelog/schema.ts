@@ -4,6 +4,7 @@ import { CHANGELOG_STATUSES } from "./constants";
 export const changelogStatusSchema = z.enum(CHANGELOG_STATUSES);
 
 export const updatedChangelogSchema = z.object({
+  assetIds: z.array(z.string()),
   id: z.string(),
   title: z.string(),
   slug: z.string(),

@@ -5,6 +5,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import * as S from "effect/Schema";
+import { noDuplicateAttributeIds } from "../attribute-definition/validation";
 
 export const CommonContactFields = S.Struct({
   userId: S.String,
@@ -47,7 +48,7 @@ export const ContactCreate = S.Struct({
           S.Union([S.String, S.Number, S.Boolean, S.DateFromString])
         ),
       })
-    )
+    ).check(noDuplicateAttributeIds)
   ),
 });
 

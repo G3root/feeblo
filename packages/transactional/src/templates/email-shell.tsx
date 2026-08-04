@@ -1,3 +1,4 @@
+import * as React from "react";
 import {
   Body,
   Button,
@@ -13,6 +14,7 @@ import {
   Tailwind,
   Text,
 } from "react-email";
+
 import { FeebloFonts } from "./fonts";
 import { ditherTailwindConfig } from "./theme";
 
@@ -144,10 +146,16 @@ export const EmailShell = ({
   </Tailwind>
 );
 
-export const Lead = ({ children }: { readonly children: React.ReactNode }) => (
-  <Text className="m-0 font-15 font-sans text-fg">{children}</Text>
-);
+export const Lead = ({ children }: { readonly children: React.ReactNode }) =>
+  React.createElement(
+    Text,
+    { className: "m-0 font-15 font-sans text-fg" },
+    children
+  );
 
-export const Copy = ({ children }: { readonly children: React.ReactNode }) => (
-  <Text className="m-0 mt-3 font-14 font-sans text-fg-2">{children}</Text>
-);
+export const Copy = ({ children }: { readonly children: React.ReactNode }) =>
+  React.createElement(
+    Text,
+    { className: "m-0 mt-3 font-14 font-sans text-fg-2" },
+    children
+  );

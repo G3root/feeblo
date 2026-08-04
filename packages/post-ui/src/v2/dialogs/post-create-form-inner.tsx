@@ -4,6 +4,7 @@ import type { TPost } from "@feeblo/domain/post/schema";
 import { PostId } from "@feeblo/id";
 import { FieldRow } from "@feeblo/post-ui/post-properties";
 import { Button } from "@feeblo/ui/button";
+import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { htmlToExcerpt } from "@feeblo/utils/html";
@@ -13,7 +14,7 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
@@ -202,6 +203,7 @@ export function PostCreateForm() {
 
   const initialBoardId = store.get().context.data.boardId ?? "";
   const [contentEditorKey, setContentEditorKey] = useState(0);
+  const editorScope = useRef(crypto.randomUUID()).current;
 
   const form = useAppForm({
     ...postCreateFormOpts,
@@ -224,6 +226,13 @@ export function PostCreateForm() {
       try {
         const postId = await PostId.unsafeGenerate();
         const title = value.title.trim();
+        const assetOrganizationId = member ? organizationId : undefined;
+        const finalized = await finalizeEditorContent(
+          value.content,
+          assetOrganizationId,
+          { scope: editorScope }
+        );
+        const { assetIds, content } = finalized;
         const selectedPostStatus = postStatuses.find(
           (postStatus) => postStatus.id === value.statusId
         );
@@ -233,12 +242,13 @@ export function PostCreateForm() {
         }
         const tx = postCollection.insert({
           id: postId,
+          assetIds,
           archivedAt: null,
           boardId: value.boardId,
           title,
           slug: slugify(title) || "untitled",
-          content: value.content,
-          excerpt: htmlToExcerpt(value.content),
+          content,
+          excerpt: htmlToExcerpt(content),
           lockedAt: null,
           mergedAt: null,
           mergedIntoPostId: null,
@@ -255,6 +265,8 @@ export function PostCreateForm() {
         });
 
         await tx.isPersisted.promise;
+        finalized.commit();
+        await postCollection.utils.refetch().catch(() => undefined);
         trackEvent("post_created", { source, success: true });
         toastManager.add({
           title: "Post created successfully",
@@ -300,7 +312,12 @@ export function PostCreateForm() {
     >
       <div className="flex h-full flex-1 flex-col gap-2">
         <PostTitleField form={form} />
-        <PostContentField form={form} key={contentEditorKey} />
+        <PostContentField
+          assetOwner={member ? "organization" : "user"}
+          editorScope={editorScope}
+          form={form}
+          key={contentEditorKey}
+        />
         <form.Subscribe
           selector={(state) =>
             [

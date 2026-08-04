@@ -7,7 +7,10 @@ import { type SyntheticEvent, useEffect, useState } from "react";
 export default function ImageView(props: ReactNodeViewProps) {
   const attrs = props.node.attrs as ImageAttrs;
   const url = attrs.src || "";
-  const uploading = url.startsWith("blob:");
+  const uploadTask = url.startsWith("blob:")
+    ? UploadTask.get<string>(url)
+    : undefined;
+  const uploading = Boolean(uploadTask);
 
   const [aspectRatio, setAspectRatio] = useState<number | undefined>();
   const [error, setError] = useState<string | undefined>();
@@ -18,7 +21,6 @@ export default function ImageView(props: ReactNodeViewProps) {
       return;
     }
 
-    const uploadTask = UploadTask.get<string>(url);
     if (!uploadTask) {
       return;
     }

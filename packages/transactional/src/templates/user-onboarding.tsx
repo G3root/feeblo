@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Link, Text } from "react-email";
 import { EmailShell } from "./email-shell";
 
@@ -47,7 +48,7 @@ export const UserOnboardingEmail = ({
 
 export const createUserOnboardingEmail = (props: UserOnboardingEmailProps) => ({
   subject: "Welcome to Feeblo",
-  react: <UserOnboardingEmail {...props} />,
+  react: React.createElement(UserOnboardingEmail, props),
 });
 
 UserOnboardingEmail.PreviewProps = {

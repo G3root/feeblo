@@ -17,6 +17,7 @@ import { BoardRepository } from "../board/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
+import { S3Test } from "../services/s3-test";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -124,6 +125,7 @@ describe("PostRpcHandlers", () => {
     title: string,
     content = title
   ) => ({
+    assetIds: [],
     id,
     organizationId: fixture.organizationId,
     boardId: fixture.boardId,
@@ -164,7 +166,11 @@ describe("PostRpcHandlers", () => {
     Layer.provideMerge(RepositoriesTest)
   );
 
-  const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
+  const TestLayer = Layer.mergeAll(
+    HandlerTest,
+    Database.PgliteDatabaseLive,
+    S3Test
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("PostList", () => {
@@ -367,6 +373,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
             .PostUpdateContent({
+              assetIds: [],
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,

@@ -28,8 +28,11 @@ import { TableHandle } from "./ui/table-handle/index";
 
 export interface EditorProps {
   className?: string;
+  deferUploads?: boolean;
+  editorScope?: string;
   minimal?: boolean;
   onChange?: (doc: string) => void;
+  organizationId?: string;
   placeholder?: string;
   readOnly?: boolean;
   showBlockHandle?: boolean;
@@ -46,6 +49,9 @@ export function Editor(props: EditorProps) {
 
   const editor = useMemo(() => {
     const extension = defineExtension({
+      deferUploads: props.deferUploads,
+      editorScope: props.editorScope,
+      organizationId: props.organizationId,
       placeholder: props.placeholder,
       readonly: props.readOnly,
     });
@@ -53,17 +59,26 @@ export function Editor(props: EditorProps) {
       extension,
       ...(defaultContent ? { defaultContent } : {}),
     });
-  }, [props.placeholder, props.readOnly, defaultContent]);
+  }, [
+    props.deferUploads,
+    props.editorScope,
+    props.organizationId,
+    props.placeholder,
+    props.readOnly,
+    defaultContent,
+  ]);
 
   useContentChange(editor, props.onChange);
 
   return (
     <ProseKit editor={editor}>
       <div
+        aria-multiline="true"
         className={cn(
           'ProseMirror typeset box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-primary'
         )}
         ref={editor.mount}
+        role="textbox"
       />
       {props.readOnly || props.minimal ? null : (
         <>
@@ -81,3 +96,4 @@ export function Editor(props: EditorProps) {
 
 // biome-ignore lint/performance/noBarrelFile: <explanation>
 export { EditorProvider, useEditorContext } from "./editor-store";
+export { finalizeEditorContent } from "./uploader";

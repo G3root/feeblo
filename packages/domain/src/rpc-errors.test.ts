@@ -1,4 +1,5 @@
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 import { PostAlreadyExistsError } from "./post/errors";
@@ -61,6 +62,35 @@ describe("withRemapDbErrors", () => {
       })
     );
     expect(error).not.toHaveProperty("cause");
+  });
+
+  it("maps unique violations wrapped in an Effect cause", async () => {
+    const error = await Effect.runPromise(
+      Effect.flip(
+        Effect.fail(
+          new EffectDrizzleQueryError({
+            query: 'insert into "post" ...',
+            params: [],
+            cause: Cause.fail({ cause: { cause: { code: "23505" } } }),
+          })
+        ).pipe(
+          withRemapDbErrors({
+            action: "create",
+            entity: "Post",
+            onUniqueViolation: () =>
+              new PostAlreadyExistsError({
+                message: "A post with this slug already exists",
+              }),
+          })
+        )
+      )
+    );
+
+    expect(error).toEqual(
+      new PostAlreadyExistsError({
+        message: "A post with this slug already exists",
+      })
+    );
   });
 
   it("does not expose the database error in the public error", async () => {
