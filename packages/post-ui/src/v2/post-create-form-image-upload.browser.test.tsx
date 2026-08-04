@@ -201,17 +201,14 @@ async function pasteImage(screen: RenderScreen, text: string) {
 
 async function submit(screen: RenderScreen): Promise<string> {
   await screen.getByRole("button", { name: "Create Post" }).click();
-  await new Promise<void>((resolve) => {
-    const poll = () => {
-      if (insertSpy.mock.calls.length > 0) {
-        resolve();
-      } else {
-        setTimeout(poll, 20);
-      }
-    };
-    poll();
-  });
+  await waitForInsertCount(1);
   return insertSpy.mock.calls[0]?.[0]?.content as string;
+}
+
+async function waitForInsertCount(expectedCount: number): Promise<void> {
+  await vi.waitFor(() => {
+    expect(insertSpy.mock.calls.length).toBeGreaterThanOrEqual(expectedCount);
+  });
 }
 
 beforeEach(() => {
@@ -290,5 +287,33 @@ describe("PostCreateForm image upload", () => {
     expect(content).toContain(
       "https://assets.example/tmp/editor-media/upload.png"
     );
+  });
+
+  it("reuploads for the organization when ownership changes after a failed save", async () => {
+    setMemberData(undefined);
+    insertSpy
+      .mockImplementationOnce(() => ({
+        isPersisted: { promise: Promise.reject(new Error("Save failed")) },
+      }))
+      .mockReturnValue({ isPersisted: { promise: Promise.resolve() } });
+    const screen = await render(<FormHarness />);
+
+    await fillForm(screen);
+    await pasteImage(screen, "A post with an image");
+    const submitButton = screen.getByRole("button", { name: "Create Post" });
+    await submitButton.click();
+    await waitForInsertCount(1);
+    await expect.element(submitButton).toBeEnabled();
+
+    setMemberData({
+      id: "member-1",
+      organizationId: "organization-id",
+      userId: "user-1",
+    });
+    await submitButton.click();
+    await waitForInsertCount(2);
+
+    expect(MockXMLHttpRequest.sendCount).toBe(2);
+    expect(insertSpy.mock.calls[1]?.[0]?.content).not.toContain("blob:");
   });
 });

@@ -9,7 +9,9 @@ type PendingEditorUpload = {
   readonly file: File;
   readonly organizationId?: string;
   readonly scope: string;
-  readonly uploaded?: UploadedEditorMedia;
+  readonly uploaded?: UploadedEditorMedia & {
+    readonly organizationId?: string;
+  };
 };
 
 type UploadedEditorMedia = {
@@ -147,11 +149,16 @@ export const finalizeEditorContent = async (
     }
 
     const uploaded =
-      pending.uploaded ??
-      (await uploadEditorMediaFile({
-        file: pending.file,
-        options: organizationId ? { organizationId } : {},
-      }));
+      pending.uploaded !== undefined &&
+      pending.uploaded.organizationId === organizationId
+        ? pending.uploaded
+        : {
+            ...(await uploadEditorMediaFile({
+              file: pending.file,
+              options: organizationId ? { organizationId } : {},
+            })),
+            ...(organizationId ? { organizationId } : {}),
+          };
     const uploadedPending = { ...pending, uploaded };
     pendingEditorUploads.set(previewUrl, uploadedPending);
     finalizedContent = finalizedContent.split(previewUrl).join(uploaded.url);
