@@ -8,6 +8,7 @@ import type { Uploader } from "prosekit/extensions/file";
 type PendingEditorUpload = {
   readonly file: File;
   readonly organizationId?: string;
+  readonly uploaded?: UploadedEditorMedia;
 };
 
 type UploadedEditorMedia = {
@@ -97,6 +98,7 @@ export const createEditorUploader = (
 
 export type FinalizedEditorContent = {
   readonly assetIds: string[];
+  readonly commit: () => void;
   readonly content: string;
 };
 
@@ -106,6 +108,10 @@ export const finalizeEditorContent = async (
 ): Promise<FinalizedEditorContent> => {
   let finalizedContent = content;
   const assetIds: string[] = [];
+  const finalizedUploads: Array<{
+    pending: PendingEditorUpload;
+    previewUrl: string;
+  }> = [];
 
   for (const [previewUrl, pending] of pendingEditorUploads) {
     if (pending.organizationId !== organizationId) {
@@ -118,17 +124,32 @@ export const finalizeEditorContent = async (
       continue;
     }
 
-    const uploaded = await uploadEditorMediaFile({
-      file: pending.file,
-      options: organizationId ? { organizationId } : {},
-    });
+    const uploaded =
+      pending.uploaded ??
+      (await uploadEditorMediaFile({
+        file: pending.file,
+        options: organizationId ? { organizationId } : {},
+      }));
+    const uploadedPending = { ...pending, uploaded };
+    pendingEditorUploads.set(previewUrl, uploadedPending);
     finalizedContent = finalizedContent.split(previewUrl).join(uploaded.url);
     assetIds.push(uploaded.assetId);
-    URL.revokeObjectURL(previewUrl);
-    pendingEditorUploads.delete(previewUrl);
+    finalizedUploads.push({ pending: uploadedPending, previewUrl });
   }
 
-  return { assetIds, content: finalizedContent };
+  return {
+    assetIds,
+    commit: () => {
+      for (const { pending, previewUrl } of finalizedUploads) {
+        if (pendingEditorUploads.get(previewUrl) !== pending) {
+          continue;
+        }
+        URL.revokeObjectURL(previewUrl);
+        pendingEditorUploads.delete(previewUrl);
+      }
+    },
+    content: finalizedContent,
+  };
 };
 
 export const editorUploader = createEditorUploader();

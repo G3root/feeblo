@@ -276,6 +276,73 @@ describe("registerUploadedAsset", () => {
       })
     );
 
+    it.effect("removes completed copies when a later promotion fails", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const organizationId = "org_failed_asset_promotion";
+        const deletedKeys = yield* Ref.make<string[]>([]);
+
+        yield* db.insert(schema.organizationTable).values({
+          id: organizationId,
+          name: "Failed Asset Promotion",
+          slug: organizationId,
+          createdAt: new Date(),
+        });
+        yield* db.insert(schema.assetTable).values([
+          {
+            id: "asset_promoted_before_failure",
+            bucket: "test-bucket",
+            key: "tmp/editor-media/user/image/first.png",
+            url: "https://assets.example/tmp/first.png",
+            kind: "editor_image",
+            organizationId,
+          },
+          {
+            id: "asset_failed_promotion",
+            bucket: "test-bucket",
+            key: "tmp/editor-media/user/image/second.png",
+            url: "https://assets.example/tmp/second.png",
+            kind: "editor_image",
+            organizationId,
+          },
+        ]);
+
+        const result = yield* prepareEditorAssetContent({
+          organizationId,
+          content:
+            "![first](https://assets.example/tmp/first.png) ![second](https://assets.example/tmp/second.png)",
+          assetIds: [
+            "asset_promoted_before_failure",
+            "asset_failed_promotion",
+          ],
+        }).pipe(
+          Effect.provideService(S3UploadService, {
+            uploadProfileImage: () => Effect.die("not used in this test"),
+            uploadOrganizationLogo: () => Effect.die("not used in this test"),
+            uploadEditorMedia: () => Effect.die("not used in this test"),
+            promoteEditorMedia: ({ key }) =>
+              key.endsWith("second.png")
+                ? Effect.die("copy failed")
+                : Effect.succeed({
+                    bucket: "test-bucket",
+                    key: "editor-media/user/image/first.png",
+                    url: "https://assets.example/first.png",
+                  }),
+            deleteObject: (_bucket, key) =>
+              Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
+                Effect.as({ $metadata: { httpStatusCode: 204 } })
+              ),
+          }),
+          Effect.exit
+        );
+
+        expect(Exit.isFailure(result)).toBe(true);
+        expect(yield* Ref.get(deletedKeys)).toEqual([
+          "editor-media/user/image/first.png",
+        ]);
+      })
+    );
+
     it.effect("removes committed editor assets with no references", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;

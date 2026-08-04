@@ -230,16 +230,24 @@ export const prepareEditorAssetContent = ({
     }
 
     const s3 = yield* S3UploadService;
+    const completedPromotions: PromotedEditorAsset[] = [];
     const promotions = yield* Effect.forEach(temporaryAssets, (asset) =>
       s3.promoteEditorMedia({ bucket: asset.bucket, key: asset.key }).pipe(
-        Effect.catchCause(() =>
-          Effect.die("Failed to promote temporary editor asset")
-        ),
         Effect.map((permanentObject) => ({
           asset,
           temporaryObject: { bucket: asset.bucket, key: asset.key },
           permanentObject,
-        }))
+        })),
+        Effect.tap((promotion) =>
+          Effect.sync(() => {
+            completedPromotions.push(promotion);
+          })
+        )
+      )
+    ).pipe(
+      Effect.onError(() => rollbackPreparedEditorAssets(completedPromotions)),
+      Effect.catchCause(() =>
+        Effect.die("Failed to promote temporary editor asset")
       )
     );
     const rewrittenContent = promotions.reduce(

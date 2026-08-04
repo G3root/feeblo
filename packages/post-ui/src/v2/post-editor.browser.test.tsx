@@ -102,4 +102,49 @@ describe("PostEditor", () => {
       ]);
     });
   });
+
+  it("reuses an uploaded image when saving the post fails", async () => {
+    MockXMLHttpRequest.sendCount = 0;
+    vi.stubGlobal("XMLHttpRequest", MockXMLHttpRequest);
+    const onSubmit = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Save failed"))
+      .mockResolvedValueOnce(undefined);
+    const screen = await render(
+      <PostEditor
+        onSubmit={onSubmit}
+        organizationId="organization-id"
+        submitLabel="Save"
+      >
+        <PostEditor.Submit />
+      </PostEditor>
+    );
+
+    const editor = screen.getByRole("textbox");
+    await editor.click();
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(
+      new File([new Uint8Array([137, 80, 78, 71])], "retry.png", {
+        type: "image/png",
+      })
+    );
+    editor.element().dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, clipboardData })
+    );
+
+    await expect.element(screen.getByRole("img")).toBeVisible();
+    await screen.getByRole("button", { name: "Save" }).click();
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+
+    await screen.getByRole("button", { name: "Save" }).click();
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+
+    expect(MockXMLHttpRequest.sendCount).toBe(1);
+    expect(onSubmit.mock.calls[1]?.[0]).toEqual({
+      assetIds: ["asset-uploaded-on-save"],
+      content: expect.stringContaining(
+        "https://assets.example/tmp/editor-media/upload.png"
+      ),
+    });
+  });
 });

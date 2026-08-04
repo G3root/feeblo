@@ -235,7 +235,15 @@ function PostEditorComponent({
       contentRef.current,
       organizationId
     );
-    await onSubmit(finalized);
+    try {
+      await onSubmit({
+        assetIds: finalized.assetIds,
+        content: finalized.content,
+      });
+    } catch {
+      return;
+    }
+    finalized.commit();
     setResetKey((k) => k + 1);
     if (!isContentControlled) {
       setInternalContent("");
@@ -318,11 +326,12 @@ export function PostContentUpdateInput() {
           try {
             const tx = updatePostContent({ assetIds, content });
             await tx.isPersisted.promise;
-          } catch {
+          } catch (error) {
             toastManager.add({
               title: "Failed to update content",
               type: "error",
             });
+            throw error;
           }
         }
       }}

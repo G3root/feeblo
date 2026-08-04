@@ -262,6 +262,7 @@ export function PostCreateForm() {
         });
 
         await tx.isPersisted.promise;
+        finalized.commit();
         trackEvent("post_created", { source, success: true });
         toastManager.add({
           title: "Post created successfully",

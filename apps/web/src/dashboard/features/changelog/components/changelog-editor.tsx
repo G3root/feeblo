@@ -131,6 +131,7 @@ function useChangelogEditorForm({
         });
 
         await tx.isPersisted.promise;
+        finalized.commit();
         trackEvent("changelog_saved", {
           status: payload.status,
           success: true,
