@@ -38,8 +38,8 @@ export class Embed {
   private identity: NormalizedUserIdentity | null;
   private isLoaded = false;
   private isOpen = false;
-  private pendingBoard: string | null;
-  private pendingModule: WidgetModule | null = null;
+  private module: WidgetModule;
+  private board: string | null;
   private context: Record<string, string> = {};
   private cleanupPositioning: (() => void) | null = null;
   private currentTrigger: HTMLElement | null = null;
@@ -56,7 +56,8 @@ export class Embed {
     this.config = config;
     this.logger = createLogger(options.debug === true);
     this.identity = options.user ? normalizeUserIdentity(options.user) : null;
-    this.pendingBoard = supportsBoardSelection(config)
+    this.module = config.modules[0] ?? "feedback";
+    this.board = supportsBoardSelection(config)
       ? (options.defaultBoard ?? null)
       : null;
     this.iframe = createIframe(organizationId, options, this.logger);
@@ -227,8 +228,7 @@ export class Embed {
     this.sendIdentify();
     this.sendContext();
     this.sendLocale();
-    this.flushPendingModule();
-    this.flushPendingBoard();
+    this.syncNavigation();
     emitWidgetEvent("widgetReady", undefined, this.logger);
   }
 
@@ -246,14 +246,15 @@ export class Embed {
 
   open(trigger?: HTMLElement, metadata: Record<string, string> = {}): void {
     if (trigger && this.config.modules.includes("feedback")) {
-      this.pendingModule = "feedback";
-      this.flushPendingModule();
+      this.module = "feedback";
     }
     this.context = { ...this.context, ...metadata };
     if (metadata.board) {
-      this.pendingBoard = metadata.board;
+      this.board = metadata.board;
     }
-    this.flushPendingBoard();
+    if (trigger || metadata.board) {
+      this.syncNavigation();
+    }
     this.sendContext();
     if (this.isOpen) {
       return;
@@ -274,8 +275,6 @@ export class Embed {
     }
 
     this.addCloseListeners();
-
-    this.flushPendingModule();
 
     requestAnimationFrame(() => {
       this.container.style.opacity = "1";
@@ -310,44 +309,31 @@ export class Embed {
     if (!supportsBoardSelection(this.config)) {
       return;
     }
-    if (this.isLoaded && this.isOpen) {
-      this.sendSetBoard(board);
-    } else {
-      this.pendingBoard = board;
-    }
+    this.board = board;
+    this.syncNavigation();
   }
 
   openModule(module: WidgetModule): void {
     if (!this.config.modules.includes(module)) {
       return;
     }
-    this.pendingModule = module;
-    this.flushPendingModule();
+    this.module = module;
+    this.syncNavigation();
     this.open();
   }
 
-  private flushPendingModule(): void {
-    if (!(this.isLoaded && this.pendingModule)) {
+  private syncNavigation(): void {
+    if (!this.isLoaded) {
       return;
     }
-    this.post({ event: "SET_MODULE", data: { module: this.pendingModule } });
-    this.pendingModule = null;
+    this.post({ event: "SET_MODULE", data: { module: this.module } });
+    if (this.module === "feedback" && this.board) {
+      this.post({ event: "SET_BOARD", data: { board: this.board } });
+    }
   }
 
   getConfigKey(): string {
     return widgetConfigKey(this.config);
-  }
-
-  private sendSetBoard(board: string): void {
-    this.post({ event: "SET_BOARD", data: { board } });
-  }
-
-  private flushPendingBoard(): void {
-    if (!(this.isLoaded && this.pendingBoard)) {
-      return;
-    }
-    this.sendSetBoard(this.pendingBoard);
-    this.pendingBoard = null;
   }
 
   metadata(patch: Record<string, string | null>): void {
