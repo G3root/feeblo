@@ -66,8 +66,10 @@ export const PostTitleField = withForm({
 
 export const PostContentField = withForm({
   ...postCreateFormOpts,
-  props: {} as EditorProps,
-  render: ({ form, ...rest }) => {
+  props: {} as EditorProps & {
+    assetOwner?: "organization" | "user";
+  },
+  render: ({ assetOwner = "organization", form, ...rest }) => {
     const { organizationId } = usePostCollections();
     return (
       <form.AppField name="content">
@@ -82,7 +84,7 @@ export const PostContentField = withForm({
             <PostEditor
               content={field.state.value}
               onContentChange={field.handleChange}
-              organizationId={organizationId}
+              {...(assetOwner === "organization" ? { organizationId } : {})}
               {...rest}
             />
             <FieldError

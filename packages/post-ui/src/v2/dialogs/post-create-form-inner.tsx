@@ -226,9 +226,10 @@ export function PostCreateForm() {
       try {
         const postId = await PostId.unsafeGenerate();
         const title = value.title.trim();
+        const assetOrganizationId = member ? organizationId : undefined;
         const finalized = await finalizeEditorContent(
           value.content,
-          organizationId,
+          assetOrganizationId,
           { scope: editorScope }
         );
         const { assetIds, content } = finalized;
@@ -312,6 +313,7 @@ export function PostCreateForm() {
       <div className="flex h-full flex-1 flex-col gap-2">
         <PostTitleField form={form} />
         <PostContentField
+          assetOwner={member ? "organization" : "user"}
           editorScope={editorScope}
           form={form}
           key={contentEditorKey}
