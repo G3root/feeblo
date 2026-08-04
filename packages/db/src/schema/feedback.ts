@@ -785,6 +785,7 @@ export const changelogTable = pgTable(
   {
     id: text("id").primaryKey(),
     title: text("title").notNull(),
+    coverImage: text("cover_image"),
     slug: text("slug").notNull(),
     content: text("content").notNull(),
     excerpt: text("excerpt").notNull().default(""),
