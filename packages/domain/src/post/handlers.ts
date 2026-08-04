@@ -4,16 +4,15 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-
-import { BoardRepository } from "../board/repository";
 import {
+  cleanupOrphanedEditorAssets,
   cleanupPreparedEditorAssets,
   commitPreparedEditorAssets,
-  cleanupOrphanedEditorAssets,
   prepareEditorAssetContent,
   rollbackPreparedEditorAssets,
   syncPostAssetReferences,
 } from "../asset/service";
+import { BoardRepository } from "../board/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
@@ -145,15 +144,28 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const deletePostEffect = (args: TPostDelete) =>
-    repository.delete({
-      id: args.id,
-      organizationId: args.organizationId,
-      boardId: args.boardId,
-    }).pipe(
-      Effect.tap(() =>
-        cleanupOrphanedEditorAssets({ organizationId: args.organizationId })
-      )
-    );
+    repository
+      .delete({
+        id: args.id,
+        organizationId: args.organizationId,
+        boardId: args.boardId,
+      })
+      .pipe(
+        Effect.tap(() =>
+          cleanupOrphanedEditorAssets({
+            organizationId: args.organizationId,
+          }).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning(
+                "Failed to clean up orphaned editor assets",
+                cause
+              ).pipe(
+                Effect.annotateLogs({ organizationId: args.organizationId })
+              )
+            )
+          )
+        )
+      );
 
   const updatePostEffect = (args: TPostUpdate) =>
     Effect.gen(function* () {
@@ -212,15 +224,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
   const updatePostContentEffect = (args: TPostUpdateContent) =>
     Effect.gen(function* () {
+      const session = yield* CurrentSession;
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
       const prepared = yield* prepareEditorAssetContent({
         organizationId: args.organizationId,
+        userId: session.session.userId,
         content: sanitizedMarkdown,
         assetIds: args.assetIds,
       });
-      const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
       let contentChanged = false;
       let title = "";
@@ -240,8 +253,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             yield* syncPostAssetReferences({
               postId: args.id,
               organizationId: args.organizationId,
+              userId: session.session.userId,
               content: prepared.content,
-              assetIds: prepared.promotions.map(({ asset }) => asset.id),
+              assetIds: args.assetIds,
             });
             return;
           }
@@ -261,8 +275,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* syncPostAssetReferences({
             postId: args.id,
             organizationId: args.organizationId,
+            userId: session.session.userId,
             content: prepared.content,
-            assetIds: prepared.promotions.map(({ asset }) => asset.id),
+            assetIds: args.assetIds,
           });
           yield* activityRepository.create({
             ...actor,
@@ -270,7 +285,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
         })
       ).pipe(
-        Effect.tapError(() => rollbackPreparedEditorAssets(prepared.promotions))
+        Effect.tapCause(() => rollbackPreparedEditorAssets(prepared.promotions))
       );
       yield* cleanupPreparedEditorAssets(prepared.promotions);
       if (contentChanged) {
@@ -362,6 +377,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       );
       const prepared = yield* prepareEditorAssetContent({
         organizationId: args.organizationId,
+        userId: session.session.userId,
         content: sanitizedMarkdown,
         assetIds: args.assetIds,
       });
@@ -380,8 +396,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* syncPostAssetReferences({
             postId: args.id,
             organizationId: args.organizationId,
+            userId: session.session.userId,
             content: prepared.content,
-            assetIds: prepared.promotions.map(({ asset }) => asset.id),
+            assetIds: args.assetIds,
           });
 
           yield* activityRepository.create({
@@ -417,7 +434,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
         })
       ).pipe(
-        Effect.tapError(() => rollbackPreparedEditorAssets(prepared.promotions))
+        Effect.tapCause(() => rollbackPreparedEditorAssets(prepared.promotions))
       );
       yield* cleanupPreparedEditorAssets(prepared.promotions);
 

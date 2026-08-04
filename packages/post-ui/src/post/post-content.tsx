@@ -12,6 +12,7 @@ export function PostContentEditor({
   value,
   readOnly,
   organizationId,
+  editorScope,
   ...rest
 }: PostContentEditorProps) {
   return (
@@ -20,11 +21,13 @@ export function PostContentEditor({
         defaultValue={{
           deferUploads: true,
           organizationId,
+          editorScope,
           postContent: value,
         }}
       >
         <Editor
           deferUploads
+          editorScope={editorScope}
           onChange={(doc) => {
             onChange(doc);
           }}

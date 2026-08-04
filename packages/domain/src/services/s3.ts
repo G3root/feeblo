@@ -109,10 +109,12 @@ const makeS3UploadService = Effect.gen(function* () {
       key: sourceKey,
     }: { bucket: string; key: string }) =>
       Effect.gen(function* () {
-        const finalKey = sourceKey.slice("tmp/".length);
+        const finalKey = sourceKey.slice(
+          `${TEMPORARY_EDITOR_MEDIA_PREFIX}/`.length
+        );
         yield* s3.copyObject({
           Bucket: sourceBucket,
-          CopySource: encodeURIComponent(`${sourceBucket}/${sourceKey}`),
+          CopySource: `${encodeURIComponent(sourceBucket)}/${encodeURIComponent(sourceKey)}`,
           Key: finalKey,
         });
         return resolvePublicUrl(finalKey);

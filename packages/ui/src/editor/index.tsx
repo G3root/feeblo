@@ -29,6 +29,7 @@ import { TableHandle } from "./ui/table-handle/index";
 export interface EditorProps {
   className?: string;
   deferUploads?: boolean;
+  editorScope?: string;
   minimal?: boolean;
   onChange?: (doc: string) => void;
   organizationId?: string;
@@ -49,6 +50,7 @@ export function Editor(props: EditorProps) {
   const editor = useMemo(() => {
     const extension = defineExtension({
       deferUploads: props.deferUploads,
+      editorScope: props.editorScope,
       organizationId: props.organizationId,
       placeholder: props.placeholder,
       readonly: props.readOnly,
@@ -59,6 +61,7 @@ export function Editor(props: EditorProps) {
     });
   }, [
     props.deferUploads,
+    props.editorScope,
     props.organizationId,
     props.placeholder,
     props.readOnly,

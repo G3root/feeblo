@@ -1,4 +1,5 @@
 import { ChangelogId, WorkspaceId } from "@feeblo/id";
+import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 
 export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
@@ -34,7 +35,9 @@ export const ChangelogList = S.Struct({
 export type TChangelogList = S.Schema.Type<typeof ChangelogList>;
 
 export const ChangelogCreate = S.Struct({
-  assetIds: S.Array(S.String),
+  assetIds: S.Array(S.String).pipe(
+    S.withDecodingDefaultKey(Effect.succeed([] as string[]))
+  ),
   id: ChangelogId.schema,
   title: S.String,
   slug: S.String,
@@ -48,7 +51,9 @@ export const ChangelogCreate = S.Struct({
 export type TChangelogCreate = S.Schema.Type<typeof ChangelogCreate>;
 
 export const ChangelogUpdate = S.Struct({
-  assetIds: S.Array(S.String),
+  assetIds: S.Array(S.String).pipe(
+    S.withDecodingDefaultKey(Effect.succeed([] as string[]))
+  ),
   id: ChangelogId.schema,
   title: S.String,
   slug: S.String,

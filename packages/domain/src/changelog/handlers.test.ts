@@ -1,14 +1,17 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { ChangelogId, WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Ref from "effect/Ref";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { S3UploadService } from "../services/s3";
+import { S3Test } from "../services/s3-test";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
-import { S3UploadService } from "../services/s3";
 import { ChangelogRpcHandlersEffect } from "./handlers";
 import { ChangelogPolicy } from "./policies";
 import { ChangelogRepository } from "./repository";
@@ -82,13 +85,7 @@ describe("ChangelogRpcHandlers", () => {
     Entitlements,
     Policies,
     Database.PgliteDatabaseLive,
-    Layer.succeed(S3UploadService, {
-      uploadProfileImage: () => Effect.die("not used in this test"),
-      uploadOrganizationLogo: () => Effect.die("not used in this test"),
-      uploadEditorMedia: () => Effect.die("not used in this test"),
-      promoteEditorMedia: () => Effect.die("not used in this test"),
-      deleteObject: () => Effect.die("not used in this test"),
-    })
+    S3Test
   );
 
   layer(TestLayer)("handlers", (it) => {
@@ -119,6 +116,134 @@ describe("ChangelogRpcHandlers", () => {
           content: "Safe\n",
           creatorMemberId: fixture.membershipId,
         });
+      })
+    );
+    it.effect(
+      "promotes temporary media and stores its changelog reference",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ChangelogRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+          const id = yield* ChangelogId.generate;
+          const assetId = `asset_${id}`;
+          const temporaryUrl =
+            "https://assets.example/tmp/editor-media/image.png";
+          const permanentUrl = "https://assets.example/editor-media/image.png";
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: "test-bucket",
+            key: "tmp/editor-media/user/image.png",
+            url: temporaryUrl,
+            kind: "editor_image",
+            userId: fixture.userId,
+          });
+
+          yield* handlers
+            .ChangelogCreate({
+              assetIds: [assetId],
+              id,
+              organizationId: fixture.organizationId,
+              title: "Release",
+              slug: "release",
+              content: `![image](${temporaryUrl})`,
+              status: "draft",
+              scheduledAt: null,
+              publishedAt: null,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [entry] = yield* db
+            .select({ content: schema.changelogTable.content })
+            .from(schema.changelogTable)
+            .where(eq(schema.changelogTable.id, id));
+          const references = yield* db
+            .select()
+            .from(schema.changelogAssetTable)
+            .where(eq(schema.changelogAssetTable.changelogId, id));
+          expect(entry?.content).toContain(permanentUrl);
+          expect(references).toEqual([{ changelogId: id, assetId }]);
+        }).pipe(
+          Effect.provideService(S3UploadService, {
+            uploadProfileImage: () => Effect.die("not used in this test"),
+            uploadOrganizationLogo: () => Effect.die("not used in this test"),
+            uploadEditorMedia: () => Effect.die("not used in this test"),
+            promoteEditorMedia: ({ bucket }) =>
+              Effect.succeed({
+                bucket,
+                key: "editor-media/user/image.png",
+                url: "https://assets.example/editor-media/image.png",
+              }),
+            deleteObject: () =>
+              Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
+          })
+        )
+    );
+    it.effect("removes promoted media when the transaction fails", () =>
+      Effect.gen(function* () {
+        const deletedKeys = yield* Ref.make<string[]>([]);
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+        const id = yield* ChangelogId.generate;
+        const assetId = `asset_${id}`;
+        const temporaryUrl = "https://assets.example/tmp/editor-media/fail.png";
+        yield* db.insert(schema.assetTable).values({
+          id: assetId,
+          bucket: "test-bucket",
+          key: "tmp/editor-media/user/fail.png",
+          url: temporaryUrl,
+          kind: "editor_image",
+          userId: fixture.userId,
+        });
+        yield* db.insert(schema.changelogTable).values({
+          id,
+          organizationId: fixture.organizationId,
+          title: "Existing",
+          slug: "existing",
+          content: "",
+          status: "draft",
+          creatorId: fixture.userId,
+        });
+
+        const exit = yield* Effect.exit(
+          handlers
+            .ChangelogCreate({
+              assetIds: [assetId],
+              id,
+              organizationId: fixture.organizationId,
+              title: "Duplicate",
+              slug: "duplicate",
+              content: `![image](${temporaryUrl})`,
+              status: "draft",
+              scheduledAt: null,
+              publishedAt: null,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(S3UploadService, {
+                uploadProfileImage: () => Effect.die("not used in this test"),
+                uploadOrganizationLogo: () =>
+                  Effect.die("not used in this test"),
+                uploadEditorMedia: () => Effect.die("not used in this test"),
+                promoteEditorMedia: ({ bucket }) =>
+                  Effect.succeed({
+                    bucket,
+                    key: "editor-media/user/fail.png",
+                    url: "https://assets.example/editor-media/fail.png",
+                  }),
+                deleteObject: (_bucket, key) =>
+                  Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
+                    Effect.as({ $metadata: { httpStatusCode: 204 } })
+                  ),
+              })
+            )
+        );
+
+        expect(exit._tag).toBe("Failure");
+        expect(yield* Ref.get(deletedKeys)).toContain(
+          "editor-media/user/fail.png"
+        );
       })
     );
     it.effect("rejects non-members from listing changelog entries", () =>

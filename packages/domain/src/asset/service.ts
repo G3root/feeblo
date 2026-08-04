@@ -1,6 +1,6 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
-import { and, eq, inArray, notExists } from "drizzle-orm";
+import { and, eq, inArray, notExists, or } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
 import { isTemporaryEditorMediaKey, S3UploadService } from "../services/s3";
@@ -146,9 +146,11 @@ export type PromotedEditorAsset = {
 
 const findEditorAssetsByIds = ({
   organizationId,
+  userId,
   assetIds,
 }: {
   readonly organizationId: string;
+  readonly userId?: string;
   readonly assetIds: readonly string[];
 }) =>
   Effect.gen(function* () {
@@ -167,7 +169,12 @@ const findEditorAssetsByIds = ({
       .from(schema.assetTable)
       .where(
         and(
-          eq(schema.assetTable.organizationId, organizationId),
+          userId
+            ? or(
+                eq(schema.assetTable.organizationId, organizationId),
+                eq(schema.assetTable.userId, userId)
+              )
+            : eq(schema.assetTable.organizationId, organizationId),
           inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
           inArray(schema.assetTable.id, assetIds)
         )
@@ -178,10 +185,12 @@ const findEditorAssetsByIds = ({
 
 const findCurrentEditorAssetsInContent = ({
   organizationId,
+  userId,
   content,
   currentAssetIds,
 }: {
   readonly organizationId: string;
+  readonly userId?: string;
   readonly content: string;
   readonly currentAssetIds: readonly string[];
 }) =>
@@ -201,7 +210,12 @@ const findCurrentEditorAssetsInContent = ({
       .from(schema.assetTable)
       .where(
         and(
-          eq(schema.assetTable.organizationId, organizationId),
+          userId
+            ? or(
+                eq(schema.assetTable.organizationId, organizationId),
+                eq(schema.assetTable.userId, userId)
+              )
+            : eq(schema.assetTable.organizationId, organizationId),
           inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
           inArray(schema.assetTable.id, currentAssetIds)
         )
@@ -212,15 +226,21 @@ const findCurrentEditorAssetsInContent = ({
 
 export const prepareEditorAssetContent = ({
   organizationId,
+  userId,
   content,
   assetIds,
 }: {
   readonly organizationId: string;
+  readonly userId?: string;
   readonly content: string;
   readonly assetIds: readonly string[];
 }) =>
   Effect.gen(function* () {
-    const assets = yield* findEditorAssetsByIds({ organizationId, assetIds });
+    const assets = yield* findEditorAssetsByIds({
+      organizationId,
+      ...(userId ? { userId } : {}),
+      assetIds,
+    });
     const temporaryAssets = assets.filter(({ key }) =>
       isTemporaryEditorMediaKey(key)
     );
@@ -296,6 +316,41 @@ export const cleanupPreparedEditorAssets = (
     { discard: true }
   );
 
+const syncReferences = <E1, R1, E2, R2, E3, R3>({
+  assets,
+  findCurrent,
+  deleteStale,
+  insertNew,
+}: {
+  readonly assets: readonly EditorAsset[];
+  readonly findCurrent: Effect.Effect<
+    readonly { readonly assetId: string }[],
+    E1,
+    R1
+  >;
+  readonly deleteStale: (
+    assetIds: readonly string[]
+  ) => Effect.Effect<unknown, E2, R2>;
+  readonly insertNew: (
+    assetIds: readonly string[]
+  ) => Effect.Effect<unknown, E3, R3>;
+}) =>
+  Effect.gen(function* () {
+    const assetIds = assets.map(({ id }) => id);
+    const current = yield* findCurrent;
+    const currentIds = current.map(({ assetId }) => assetId);
+    const staleIds = currentIds.filter((id) => !assetIds.includes(id));
+    const newIds = assetIds.filter((id) => !currentIds.includes(id));
+
+    if (staleIds.length > 0) {
+      yield* deleteStale(staleIds);
+    }
+
+    if (newIds.length > 0) {
+      yield* insertNew(newIds);
+    }
+  });
+
 const syncPostReferences = ({
   postId,
   assets,
@@ -304,33 +359,28 @@ const syncPostReferences = ({
   readonly assets: readonly EditorAsset[];
 }) =>
   Effect.gen(function* () {
-    const assetIds = assets.map(({ id }) => id);
     const db = yield* currentDb;
-    const current = yield* db
-      .select({ assetId: schema.postAssetTable.assetId })
-      .from(schema.postAssetTable)
-      .where(eq(schema.postAssetTable.postId, postId));
-    const currentIds = current.map(({ assetId }) => assetId);
-    const staleIds = currentIds.filter((id) => !assetIds.includes(id));
-    const newIds = assetIds.filter((id) => !currentIds.includes(id));
-
-    if (staleIds.length > 0) {
-      yield* db
-        .delete(schema.postAssetTable)
-        .where(
-          and(
-            eq(schema.postAssetTable.postId, postId),
-            inArray(schema.postAssetTable.assetId, staleIds)
-          )
-        );
-    }
-
-    if (newIds.length > 0) {
-      yield* db
-        .insert(schema.postAssetTable)
-        .values(newIds.map((assetId) => ({ postId, assetId })))
-        .onConflictDoNothing();
-    }
+    yield* syncReferences({
+      assets,
+      findCurrent: db
+        .select({ assetId: schema.postAssetTable.assetId })
+        .from(schema.postAssetTable)
+        .where(eq(schema.postAssetTable.postId, postId)),
+      deleteStale: (assetIds) =>
+        db
+          .delete(schema.postAssetTable)
+          .where(
+            and(
+              eq(schema.postAssetTable.postId, postId),
+              inArray(schema.postAssetTable.assetId, assetIds)
+            )
+          ),
+      insertNew: (assetIds) =>
+        db
+          .insert(schema.postAssetTable)
+          .values(assetIds.map((assetId) => ({ postId, assetId })))
+          .onConflictDoNothing(),
+    });
   });
 
 const syncChangelogReferences = ({
@@ -341,43 +391,40 @@ const syncChangelogReferences = ({
   readonly assets: readonly EditorAsset[];
 }) =>
   Effect.gen(function* () {
-    const assetIds = assets.map(({ id }) => id);
     const db = yield* currentDb;
-    const current = yield* db
-      .select({ assetId: schema.changelogAssetTable.assetId })
-      .from(schema.changelogAssetTable)
-      .where(eq(schema.changelogAssetTable.changelogId, changelogId));
-    const currentIds = current.map(({ assetId }) => assetId);
-    const staleIds = currentIds.filter((id) => !assetIds.includes(id));
-    const newIds = assetIds.filter((id) => !currentIds.includes(id));
-
-    if (staleIds.length > 0) {
-      yield* db
-        .delete(schema.changelogAssetTable)
-        .where(
-          and(
-            eq(schema.changelogAssetTable.changelogId, changelogId),
-            inArray(schema.changelogAssetTable.assetId, staleIds)
-          )
-        );
-    }
-
-    if (newIds.length > 0) {
-      yield* db
-        .insert(schema.changelogAssetTable)
-        .values(newIds.map((assetId) => ({ changelogId, assetId })))
-        .onConflictDoNothing();
-    }
+    yield* syncReferences({
+      assets,
+      findCurrent: db
+        .select({ assetId: schema.changelogAssetTable.assetId })
+        .from(schema.changelogAssetTable)
+        .where(eq(schema.changelogAssetTable.changelogId, changelogId)),
+      deleteStale: (assetIds) =>
+        db
+          .delete(schema.changelogAssetTable)
+          .where(
+            and(
+              eq(schema.changelogAssetTable.changelogId, changelogId),
+              inArray(schema.changelogAssetTable.assetId, assetIds)
+            )
+          ),
+      insertNew: (assetIds) =>
+        db
+          .insert(schema.changelogAssetTable)
+          .values(assetIds.map((assetId) => ({ changelogId, assetId })))
+          .onConflictDoNothing(),
+    });
   });
 
 export const syncPostAssetReferences = ({
   postId,
   organizationId,
+  userId,
   content,
   assetIds,
 }: {
   readonly postId: string;
   readonly organizationId: string;
+  readonly userId?: string;
   readonly content: string;
   readonly assetIds: readonly string[];
 }) =>
@@ -389,11 +436,13 @@ export const syncPostAssetReferences = ({
       .where(eq(schema.postAssetTable.postId, postId));
     const currentAssets = yield* findCurrentEditorAssetsInContent({
       organizationId,
+      ...(userId ? { userId } : {}),
       content,
       currentAssetIds: current.map(({ assetId }) => assetId),
     });
     const submittedAssets = yield* findEditorAssetsByIds({
       organizationId,
+      ...(userId ? { userId } : {}),
       assetIds,
     });
     const assets = [
@@ -408,11 +457,13 @@ export const syncPostAssetReferences = ({
 export const syncChangelogAssetReferences = ({
   changelogId,
   organizationId,
+  userId,
   content,
   assetIds,
 }: {
   readonly changelogId: string;
   readonly organizationId: string;
+  readonly userId?: string;
   readonly content: string;
   readonly assetIds: readonly string[];
 }) =>
@@ -424,11 +475,13 @@ export const syncChangelogAssetReferences = ({
       .where(eq(schema.changelogAssetTable.changelogId, changelogId));
     const currentAssets = yield* findCurrentEditorAssetsInContent({
       organizationId,
+      ...(userId ? { userId } : {}),
       content,
       currentAssetIds: current.map(({ assetId }) => assetId),
     });
     const submittedAssets = yield* findEditorAssetsByIds({
       organizationId,
+      ...(userId ? { userId } : {}),
       assetIds,
     });
     const assets = [
@@ -446,36 +499,54 @@ export const cleanupOrphanedEditorAssets = ({
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
-    const db = yield* currentDb;
-    const assets = yield* db
-      .select({
-        id: schema.assetTable.id,
-        bucket: schema.assetTable.bucket,
-        key: schema.assetTable.key,
-      })
-      .from(schema.assetTable)
-      .where(
-        and(
-          eq(schema.assetTable.organizationId, organizationId),
-          inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
-          notExists(
-            db
-              .select({ assetId: schema.postAssetTable.assetId })
-              .from(schema.postAssetTable)
-              .where(eq(schema.postAssetTable.assetId, schema.assetTable.id))
-          ),
-          notExists(
-            db
-              .select({ assetId: schema.changelogAssetTable.assetId })
-              .from(schema.changelogAssetTable)
-              .where(
-                eq(schema.changelogAssetTable.assetId, schema.assetTable.id)
+    const committedAssets = yield* transaction(
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const assets = yield* db
+          .select({
+            id: schema.assetTable.id,
+            bucket: schema.assetTable.bucket,
+            key: schema.assetTable.key,
+          })
+          .from(schema.assetTable)
+          .where(
+            and(
+              eq(schema.assetTable.organizationId, organizationId),
+              inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
+              notExists(
+                db
+                  .select({ assetId: schema.postAssetTable.assetId })
+                  .from(schema.postAssetTable)
+                  .where(
+                    eq(schema.postAssetTable.assetId, schema.assetTable.id)
+                  )
+              ),
+              notExists(
+                db
+                  .select({ assetId: schema.changelogAssetTable.assetId })
+                  .from(schema.changelogAssetTable)
+                  .where(
+                    eq(schema.changelogAssetTable.assetId, schema.assetTable.id)
+                  )
               )
+            )
           )
-        )
-      );
-    const committedAssets = assets.filter(
-      ({ key }) => !isTemporaryEditorMediaKey(key)
+          .for("update");
+        const committed = assets.filter(
+          ({ key }) => !isTemporaryEditorMediaKey(key)
+        );
+
+        if (committed.length > 0) {
+          yield* db.delete(schema.assetTable).where(
+            inArray(
+              schema.assetTable.id,
+              committed.map(({ id }) => id)
+            )
+          );
+        }
+
+        return committed;
+      })
     );
 
     if (committedAssets.length === 0) {
@@ -490,12 +561,6 @@ export const cleanupOrphanedEditorAssets = ({
           "Failed to remove an orphaned editor asset"
         ),
       { discard: true }
-    );
-    yield* db.delete(schema.assetTable).where(
-      inArray(
-        schema.assetTable.id,
-        committedAssets.map(({ id }) => id)
-      )
     );
   });
 

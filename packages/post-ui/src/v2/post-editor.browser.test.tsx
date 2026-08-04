@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
 vi.mock("@feeblo/web-shared/auth-client", () => ({
@@ -55,9 +55,17 @@ class MockXMLHttpRequest {
   }
 }
 
+beforeEach(() => {
+  MockXMLHttpRequest.sendCount = 0;
+  vi.stubGlobal("XMLHttpRequest", MockXMLHttpRequest);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("PostEditor", () => {
   it("uploads an image and submits the editor content", async () => {
-    vi.stubGlobal("XMLHttpRequest", MockXMLHttpRequest);
     const onSubmit = vi.fn();
     const screen = await render(
       <PostEditor
@@ -104,8 +112,6 @@ describe("PostEditor", () => {
   });
 
   it("reuses an uploaded image when saving the post fails", async () => {
-    MockXMLHttpRequest.sendCount = 0;
-    vi.stubGlobal("XMLHttpRequest", MockXMLHttpRequest);
     const onSubmit = vi
       .fn()
       .mockRejectedValueOnce(new Error("Save failed"))

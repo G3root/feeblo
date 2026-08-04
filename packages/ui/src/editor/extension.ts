@@ -15,11 +15,13 @@ import { createEditorUploader } from "./uploader";
 
 export function defineExtension({
   deferUploads = false,
+  editorScope,
   organizationId,
   readonly = false,
   placeholder = "Press / for commands...",
 }: {
   deferUploads?: boolean | undefined;
+  editorScope?: string | undefined;
   organizationId?: string | undefined;
   readonly?: boolean | undefined;
   placeholder?: string | undefined;
@@ -40,8 +42,12 @@ export function defineExtension({
     defineImageUploadHandler({
       uploader: createEditorUploader(
         organizationId
-          ? { deferUploads, organizationId }
-          : { deferUploads }
+          ? {
+              deferUploads,
+              organizationId,
+              ...(editorScope ? { scope: editorScope } : {}),
+            }
+          : { deferUploads, ...(editorScope ? { scope: editorScope } : {}) }
       ),
     }),
   ];

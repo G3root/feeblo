@@ -8,6 +8,7 @@ import type { Uploader } from "prosekit/extensions/file";
 type PendingEditorUpload = {
   readonly file: File;
   readonly organizationId?: string;
+  readonly scope: string;
   readonly uploaded?: UploadedEditorMedia;
 };
 
@@ -77,13 +78,17 @@ const uploadEditorMediaFile = ({
   });
 
 export const createEditorUploader = (
-  options: EditorMediaUploadOptions & { deferUploads?: boolean } = {}
+  options: EditorMediaUploadOptions & {
+    deferUploads?: boolean;
+    scope?: string;
+  } = {}
 ): Uploader<string> => {
   if (options.deferUploads) {
     return ({ file }) => {
       const previewUrl = URL.createObjectURL(file);
       pendingEditorUploads.set(previewUrl, {
         file,
+        scope: options.scope ?? previewUrl,
         ...(options.organizationId
           ? { organizationId: options.organizationId }
           : {}),
@@ -104,17 +109,24 @@ export type FinalizedEditorContent = {
 
 export const finalizeEditorContent = async (
   content: string,
-  organizationId?: string
+  organizationId?: string,
+  options: {
+    readonly assetIds?: readonly string[];
+    readonly scope?: string;
+  } = {}
 ): Promise<FinalizedEditorContent> => {
   let finalizedContent = content;
-  const assetIds: string[] = [];
+  const assetIds = [...(options.assetIds ?? [])];
   const finalizedUploads: Array<{
     pending: PendingEditorUpload;
     previewUrl: string;
   }> = [];
 
   for (const [previewUrl, pending] of pendingEditorUploads) {
-    if (pending.organizationId !== organizationId) {
+    if (
+      pending.organizationId !== organizationId ||
+      (options.scope !== undefined && pending.scope !== options.scope)
+    ) {
       continue;
     }
 
@@ -133,7 +145,9 @@ export const finalizeEditorContent = async (
     const uploadedPending = { ...pending, uploaded };
     pendingEditorUploads.set(previewUrl, uploadedPending);
     finalizedContent = finalizedContent.split(previewUrl).join(uploaded.url);
-    assetIds.push(uploaded.assetId);
+    if (!assetIds.includes(uploaded.assetId)) {
+      assetIds.push(uploaded.assetId);
+    }
     finalizedUploads.push({ pending: uploadedPending, previewUrl });
   }
 

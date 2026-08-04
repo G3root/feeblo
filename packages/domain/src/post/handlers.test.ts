@@ -17,6 +17,7 @@ import { BoardRepository } from "../board/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
+import { S3Test } from "../services/s3-test";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -30,7 +31,6 @@ import {
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
-import { S3UploadService } from "../services/s3";
 
 describe("PostRpcHandlers", () => {
   type Fixture = {
@@ -165,14 +165,6 @@ describe("PostRpcHandlers", () => {
   const HandlerTest = PostPolicy.layer.pipe(
     Layer.provideMerge(RepositoriesTest)
   );
-
-  const S3Test = Layer.succeed(S3UploadService, {
-    uploadProfileImage: () => Effect.die("not used in this test"),
-    uploadOrganizationLogo: () => Effect.die("not used in this test"),
-    uploadEditorMedia: () => Effect.die("not used in this test"),
-    promoteEditorMedia: () => Effect.die("not used in this test"),
-    deleteObject: () => Effect.die("not used in this test"),
-  });
 
   const TestLayer = Layer.mergeAll(
     HandlerTest,
@@ -513,7 +505,6 @@ describe("PostRpcHandlers", () => {
           expect(posts).toHaveLength(0);
         })
       );
-
     });
 
     describe("PostAdminUpdate", () => {

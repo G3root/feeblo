@@ -7,7 +7,10 @@
         "Prefix": "tmp/editor-media/"
       },
       "Expiration": {
-        "Days": 1
+        "Days": 7
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
       }
     }
   ]

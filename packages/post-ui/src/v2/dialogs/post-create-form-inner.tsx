@@ -14,7 +14,7 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
@@ -203,6 +203,7 @@ export function PostCreateForm() {
 
   const initialBoardId = store.get().context.data.boardId ?? "";
   const [contentEditorKey, setContentEditorKey] = useState(0);
+  const editorScope = useRef(crypto.randomUUID()).current;
 
   const form = useAppForm({
     ...postCreateFormOpts,
@@ -227,7 +228,8 @@ export function PostCreateForm() {
         const title = value.title.trim();
         const finalized = await finalizeEditorContent(
           value.content,
-          organizationId
+          organizationId,
+          { scope: editorScope }
         );
         const { assetIds, content } = finalized;
         const selectedPostStatus = postStatuses.find(
@@ -308,7 +310,11 @@ export function PostCreateForm() {
     >
       <div className="flex h-full flex-1 flex-col gap-2">
         <PostTitleField form={form} />
-        <PostContentField form={form} key={contentEditorKey} />
+        <PostContentField
+          editorScope={editorScope}
+          form={form}
+          key={contentEditorKey}
+        />
         <form.Subscribe
           selector={(state) =>
             [

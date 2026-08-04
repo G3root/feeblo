@@ -57,12 +57,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     ChangelogCreate: (args: TChangelogCreate) => {
       const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
       return Effect.gen(function* () {
+        const session = yield* CurrentSession;
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
+          userId: session.session.userId,
           content: sanitizedMarkdown,
           assetIds: args.assetIds,
         });
-        const session = yield* CurrentSession;
         const isMember = Policy.getMembership(session, args.organizationId);
 
         yield* transaction(
@@ -77,12 +78,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
               organizationId: args.organizationId,
+              userId: session.session.userId,
               content: prepared.content,
-              assetIds: prepared.promotions.map(({ asset }) => asset.id),
+              assetIds: args.assetIds,
             });
           })
         ).pipe(
-          Effect.tapError(() =>
+          Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
           )
         );
@@ -96,7 +98,18 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     ChangelogDelete: (args: TChangelogDelete) =>
       repository.delete(args).pipe(
         Effect.tap(() =>
-          cleanupOrphanedEditorAssets({ organizationId: args.organizationId })
+          cleanupOrphanedEditorAssets({
+            organizationId: args.organizationId,
+          }).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning(
+                "Failed to clean up orphaned editor assets",
+                cause
+              ).pipe(
+                Effect.annotateLogs({ organizationId: args.organizationId })
+              )
+            )
+          )
         ),
         Policy.withPolicy(
           changelogPolicy.canDelete({
@@ -110,8 +123,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     ChangelogUpdate: (args: TChangelogUpdate) => {
       const { sanitizedMarkdown } = sanitizeMarkdown(args.content);
       return Effect.gen(function* () {
+        const session = yield* CurrentSession;
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
+          userId: session.session.userId,
           content: sanitizedMarkdown,
           assetIds: args.assetIds,
         });
@@ -126,12 +141,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
               organizationId: args.organizationId,
+              userId: session.session.userId,
               content: prepared.content,
-              assetIds: prepared.promotions.map(({ asset }) => asset.id),
+              assetIds: args.assetIds,
             });
           })
         ).pipe(
-          Effect.tapError(() =>
+          Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
           )
         );
