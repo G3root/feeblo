@@ -285,9 +285,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
         })
       ).pipe(
-        Effect.tapCause(() => rollbackPreparedEditorAssets(prepared.promotions))
+        Effect.tapCause(() =>
+          rollbackPreparedEditorAssets(prepared.promotions)
+        ),
+        Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
       );
-      yield* cleanupPreparedEditorAssets(prepared.promotions);
       if (contentChanged) {
         yield* scheduleEmbedding({
           content: prepared.content,
@@ -434,9 +436,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           });
         })
       ).pipe(
-        Effect.tapCause(() => rollbackPreparedEditorAssets(prepared.promotions))
+        Effect.tapCause(() =>
+          rollbackPreparedEditorAssets(prepared.promotions)
+        ),
+        Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
       );
-      yield* cleanupPreparedEditorAssets(prepared.promotions);
 
       yield* repository
         .scheduleSubmissionNotification(args.organizationId)

@@ -48,6 +48,9 @@ export const assetTable = pgTable(
       sql`(${table.userId} IS NOT NULL) <> (${table.organizationId} IS NOT NULL)`
     ),
     uniqueIndex("asset_key_uidx").on(table.bucket, table.key),
+    uniqueIndex("asset_owner_kind_singleton_uidx")
+      .on(sql`COALESCE(${table.userId}, ${table.organizationId})`, table.kind)
+      .where(sql`${table.kind} IN ('profile_image', 'organization_logo')`),
     index("asset_userId_idx").on(table.userId),
     index("asset_organizationId_idx").on(table.organizationId),
     index("asset_url_idx").on(table.url),

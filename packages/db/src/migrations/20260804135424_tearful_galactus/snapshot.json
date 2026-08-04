@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "0fcef8f3-40dc-4f6c-953a-5192f32c0547",
+  "id": "659de645-f0bf-4b88-8ab3-4489cf7f31bd",
   "prevIds": [
     "f5ddaf17-f283-434e-be34-2d54d2d573c1"
   ],
@@ -400,6 +400,18 @@
     {
       "isRlsEnabled": false,
       "name": "asset",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "changelog_asset",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "post_asset",
       "entityType": "tables",
       "schema": "public"
     },
@@ -5006,6 +5018,58 @@
       "table": "asset"
     },
     {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "changelog_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "asset_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "post_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "asset_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
       "nameExplicit": true,
       "columns": [
         {
@@ -6874,6 +6938,34 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "COALESCE(\"user_id\", \"organization_id\")",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "kind",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"kind\" IN ('profile_image', 'organization_logo')",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "asset_owner_kind_singleton_uidx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "user_id",
           "isExpression": false,
           "asc": true,
@@ -6932,6 +7024,48 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "asset_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "changelog_asset_assetId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "asset_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "post_asset_assetId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "post_asset"
     },
     {
       "nameExplicit": false,
@@ -8330,6 +8464,74 @@
       "table": "asset"
     },
     {
+      "nameExplicit": false,
+      "columns": [
+        "changelog_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "changelog",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "changelog_asset_changelog_id_changelog_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "asset_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "asset",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "changelog_asset_asset_id_asset_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "post_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "post_asset_post_id_post_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "asset_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "asset",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "post_asset_asset_id_asset_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "post_asset"
+    },
+    {
       "columns": [
         "changelog_id",
         "post_id"
@@ -8339,6 +8541,28 @@
       "entityType": "pks",
       "schema": "public",
       "table": "changelog_post"
+    },
+    {
+      "columns": [
+        "changelog_id",
+        "asset_id"
+      ],
+      "nameExplicit": false,
+      "name": "changelog_asset_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "changelog_asset"
+    },
+    {
+      "columns": [
+        "post_id",
+        "asset_id"
+      ],
+      "nameExplicit": false,
+      "name": "post_asset_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "post_asset"
     },
     {
       "columns": [

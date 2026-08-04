@@ -265,6 +265,7 @@ export function PostCreateForm() {
 
         await tx.isPersisted.promise;
         finalized.commit();
+        await postCollection.utils.refetch().catch(() => undefined);
         trackEvent("post_created", { source, success: true });
         toastManager.add({
           title: "Post created successfully",

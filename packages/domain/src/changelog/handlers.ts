@@ -86,9 +86,9 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         ).pipe(
           Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
-          )
+          ),
+          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
-        yield* cleanupPreparedEditorAssets(prepared.promotions);
       }).pipe(
         Policy.withPolicy(changelogPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Changelog", "create")
@@ -149,9 +149,9 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         ).pipe(
           Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
-          )
+          ),
+          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
-        yield* cleanupPreparedEditorAssets(prepared.promotions);
       }).pipe(
         Policy.withPolicy(
           changelogPolicy.canUpdate({

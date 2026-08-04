@@ -1,8 +1,10 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
 import { and, eq, inArray, notExists, or } from "drizzle-orm";
+import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as Effect from "effect/Effect";
 
+import { InternalServerError } from "../rpc-errors";
 import { isTemporaryEditorMediaKey, S3UploadService } from "../services/s3";
 import { type AssetKind, type AssetOwner, AssetRepository } from "./repository";
 
@@ -97,19 +99,19 @@ export const replaceSingletonAsset = <E, R>({
     const previousAssets = yield* Effect.tapCause(
       transaction(
         Effect.gen(function* () {
+          yield* updateOwner;
           const previousAssets = yield* repository.findByOwnerAndKind({
             kind,
             owner,
           });
 
-          yield* updateOwner;
+          yield* repository.deleteByIds(previousAssets.map(({ id }) => id));
           yield* insertAsset({
             id: yield* AssetId.generate,
             owner,
             kind,
             uploaded,
           });
-          yield* repository.deleteByIds(previousAssets.map(({ id }) => id));
 
           return previousAssets;
         })
@@ -266,8 +268,11 @@ export const prepareEditorAssetContent = ({
       )
     ).pipe(
       Effect.onError(() => rollbackPreparedEditorAssets(completedPromotions)),
-      Effect.catchCause(() =>
-        Effect.die("Failed to promote temporary editor asset")
+      Effect.mapError(
+        () =>
+          new InternalServerError({
+            message: "Failed to promote temporary editor asset",
+          })
       )
     );
     const rewrittenContent = promotions.reduce(
@@ -448,7 +453,9 @@ export const syncPostAssetReferences = ({
     const assets = [
       ...currentAssets,
       ...submittedAssets.filter(
-        ({ id }) => !currentAssets.some((asset) => asset.id === id)
+        ({ id, url }) =>
+          !currentAssets.some((asset) => asset.id === id) &&
+          content.includes(url)
       ),
     ];
     yield* syncPostReferences({ postId, assets });
@@ -487,11 +494,29 @@ export const syncChangelogAssetReferences = ({
     const assets = [
       ...currentAssets,
       ...submittedAssets.filter(
-        ({ id }) => !currentAssets.some((asset) => asset.id === id)
+        ({ id, url }) =>
+          !currentAssets.some((asset) => asset.id === id) &&
+          content.includes(url)
       ),
     ];
     yield* syncChangelogReferences({ changelogId, assets });
   });
+
+const unreferencedByPostOrChangelog = (db: PgDrizzle.EffectPgDatabase) =>
+  and(
+    notExists(
+      db
+        .select({ assetId: schema.postAssetTable.assetId })
+        .from(schema.postAssetTable)
+        .where(eq(schema.postAssetTable.assetId, schema.assetTable.id))
+    ),
+    notExists(
+      db
+        .select({ assetId: schema.changelogAssetTable.assetId })
+        .from(schema.changelogAssetTable)
+        .where(eq(schema.changelogAssetTable.assetId, schema.assetTable.id))
+    )
+  );
 
 export const cleanupOrphanedEditorAssets = ({
   organizationId,
@@ -502,7 +527,23 @@ export const cleanupOrphanedEditorAssets = ({
     const committedAssets = yield* transaction(
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const assets = yield* db
+        const candidates = yield* db
+          .select({ id: schema.assetTable.id })
+          .from(schema.assetTable)
+          .where(
+            and(
+              eq(schema.assetTable.organizationId, organizationId),
+              inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
+              unreferencedByPostOrChangelog(db)
+            )
+          )
+          .for("update");
+
+        if (candidates.length === 0) {
+          return [];
+        }
+
+        const unreferenced = yield* db
           .select({
             id: schema.assetTable.id,
             bucket: schema.assetTable.bucket,
@@ -511,28 +552,14 @@ export const cleanupOrphanedEditorAssets = ({
           .from(schema.assetTable)
           .where(
             and(
-              eq(schema.assetTable.organizationId, organizationId),
-              inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
-              notExists(
-                db
-                  .select({ assetId: schema.postAssetTable.assetId })
-                  .from(schema.postAssetTable)
-                  .where(
-                    eq(schema.postAssetTable.assetId, schema.assetTable.id)
-                  )
+              inArray(
+                schema.assetTable.id,
+                candidates.map(({ id }) => id)
               ),
-              notExists(
-                db
-                  .select({ assetId: schema.changelogAssetTable.assetId })
-                  .from(schema.changelogAssetTable)
-                  .where(
-                    eq(schema.changelogAssetTable.assetId, schema.assetTable.id)
-                  )
-              )
+              unreferencedByPostOrChangelog(db)
             )
-          )
-          .for("update");
-        const committed = assets.filter(
+          );
+        const committed = unreferenced.filter(
           ({ key }) => !isTemporaryEditorMediaKey(key)
         );
 

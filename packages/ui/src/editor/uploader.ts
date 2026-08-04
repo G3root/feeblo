@@ -165,5 +165,3 @@ export const finalizeEditorContent = async (
     content: finalizedContent,
   };
 };
-
-export const editorUploader = createEditorUploader();

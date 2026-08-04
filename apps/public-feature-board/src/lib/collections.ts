@@ -129,6 +129,7 @@ export const publicPostCollection = createCollection(
           organizationId: getMutationOrganizationId(),
           title: newPost.title,
           content: newPost.content,
+          assetIds: newPost.assetIds ?? [],
           statusId: newPost.statusId,
         })
       );
