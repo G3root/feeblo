@@ -116,17 +116,31 @@ function resolveParentOrigin(): string | null {
   return null;
 }
 
+let cachedParentOrigin: string | null | undefined;
+
+/**
+ * Lazily resolved parent origin, shared by all message senders/listeners.
+ * `window.location` and `document.referrer` are stable for a widget document,
+ * so URL parsing happens at most once per widget instance.
+ */
+function getParentOrigin(): string | null {
+  if (cachedParentOrigin === undefined) {
+    cachedParentOrigin = resolveParentOrigin();
+  }
+  return cachedParentOrigin;
+}
+
 export function sendToParent(message: ChildMessage): void {
   if (typeof window === "undefined" || window.parent === window) {
     return;
   }
-  window.parent.postMessage(message, resolveParentOrigin() ?? "*");
+  window.parent.postMessage(message, getParentOrigin() ?? "*");
 }
 
 export function subscribeToParentMessages(
   handler: (message: ParentMessage) => void
 ): () => void {
-  const parentOrigin = resolveParentOrigin();
+  const parentOrigin = getParentOrigin();
   const listener = (e: MessageEvent<unknown>) => {
     if (e.source !== window.parent || !isParentMessage(e.data)) {
       return;

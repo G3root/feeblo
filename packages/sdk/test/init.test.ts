@@ -712,7 +712,7 @@ describe("Widget events via postMessage", () => {
 
     const widget = init("org_widget_open");
     widget.open();
-    postWidgetMessage({ event: "WIDGET_OPENED", data: { some: "data" } });
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
 
     expect(handler).toHaveBeenCalledTimes(1);
     window.removeEventListener("widgetOpened", handler);

@@ -57,6 +57,12 @@ export function normalizeWidgetConfig(
   };
 }
 
+/**
+ * Whether board selection is supported for this config. Board selection is
+ * intentionally limited to configs whose landing module is `feedback`: the
+ * landing module is `modules[0]` (the initially active module), and the widget
+ * only applies board selection while the feedback module is active.
+ */
 export function supportsBoardSelection(
   config: NormalizedWidgetConfig
 ): boolean {
