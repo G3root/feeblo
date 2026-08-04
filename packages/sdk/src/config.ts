@@ -57,6 +57,12 @@ export function normalizeWidgetConfig(
   };
 }
 
+export function supportsBoardSelection(
+  config: NormalizedWidgetConfig
+): boolean {
+  return config.modules[0] === "feedback";
+}
+
 export function widgetConfigKey(config: NormalizedWidgetConfig): string {
   return `${config.mode}:${config.modules.join(",")}:${config.placement ?? "trigger"}`;
 }

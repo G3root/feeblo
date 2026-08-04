@@ -175,6 +175,21 @@ describe("FeebloWidget methods", () => {
     expect(boardMsg?.[0].data.board).toBe("roadmap");
   });
 
+  it("setBoard is ignored when feedback is not the landing module", () => {
+    Feeblo.destroy();
+    widget = init("org_updates_board", { mode: "updates" });
+    postWidgetMessage({ event: "READY" });
+    widget.open();
+    fakePostMessage.mockClear();
+
+    widget.setBoard("roadmap");
+
+    expect(fakePostMessage).not.toHaveBeenCalledWith(
+      { event: "SET_BOARD", data: { board: "roadmap" } },
+      MOCK_ORIGIN
+    );
+  });
+
   it("identify sends IDENTIFY message when loaded", () => {
     postWidgetMessage({ event: "READY" });
     fakePostMessage.mockClear();
@@ -365,6 +380,72 @@ describe("Embed postMessage callbacks", () => {
   });
 });
 
+describe("defaultBoard handling", () => {
+  afterEach(() => {
+    Feeblo.destroy();
+    fakePostMessage.mockClear();
+  });
+
+  it("defers SET_BOARD for defaultBoard until READY", () => {
+    init("org_db", { defaultBoard: "roadmap" });
+
+    const boardBeforeReady = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardBeforeReady).toBeUndefined();
+
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeDefined();
+    expect(boardMsg?.[0].data.board).toBe("roadmap");
+  });
+
+  it("sends defaultBoard for hub whose first module is feedback", () => {
+    init("org_db_hub", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeDefined();
+    expect(boardMsg?.[0].data.board).toBe("roadmap");
+  });
+
+  it("ignores defaultBoard in updates mode", () => {
+    init("org_db_updates", {
+      mode: "updates",
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeUndefined();
+  });
+
+  it("ignores defaultBoard for hub whose first module is updates", () => {
+    init("org_db_hub_updates_first", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeUndefined();
+  });
+});
+
 describe("Widget events via postMessage", () => {
   afterEach(() => {
     Feeblo.destroy();
@@ -391,6 +472,24 @@ describe("Widget events via postMessage", () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
     window.removeEventListener("widgetOpened", handler);
+  });
+
+  it("does not expose identity tokens through identityChanged events", () => {
+    const handler = vi.fn();
+    window.addEventListener("identityChanged", handler);
+
+    init("org_identity_changed");
+    postWidgetMessage({
+      event: "IDENTITY_CHANGED",
+      data: { id: "user_1", email: "person@example.com", token: "secret" },
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0]?.[0].detail.data).toEqual({
+      id: "user_1",
+      email: "person@example.com",
+    });
+    window.removeEventListener("identityChanged", handler);
   });
 
   it("emits feedbackSubmitted event when FEEDBACK_SUBMITTED message is received", () => {

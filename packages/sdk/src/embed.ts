@@ -1,4 +1,8 @@
-import { type NormalizedWidgetConfig, widgetConfigKey } from "./config";
+import {
+  type NormalizedWidgetConfig,
+  supportsBoardSelection,
+  widgetConfigKey,
+} from "./config";
 import {
   CONTAINER_ID,
   CONTAINER_STYLES,
@@ -52,7 +56,9 @@ export class Embed {
     this.config = config;
     this.logger = createLogger(options.debug === true);
     this.identity = options.user ? normalizeUserIdentity(options.user) : null;
-    this.pendingBoard = options.defaultBoard ?? null;
+    this.pendingBoard = supportsBoardSelection(config)
+      ? (options.defaultBoard ?? null)
+      : null;
     this.iframe = createIframe(organizationId, options, this.logger);
     this.container = this.createContainer();
     this.launcher = this.createLauncher();
@@ -140,7 +146,9 @@ export class Embed {
           break;
         case "IDENTITY_CHANGED":
           if (message.data) {
-            emitWidgetEvent("identityChanged", message.data, this.logger);
+            const { token: _token, ...publicIdentity } =
+              message.data as UserIdentity;
+            emitWidgetEvent("identityChanged", publicIdentity, this.logger);
           }
           break;
         case "FEEDBACK_SUBMITTED":
@@ -299,6 +307,9 @@ export class Embed {
   }
 
   setBoard(board: string): void {
+    if (!supportsBoardSelection(this.config)) {
+      return;
+    }
     if (this.isLoaded && this.isOpen) {
       this.sendSetBoard(board);
     } else {

@@ -23,6 +23,7 @@ export type {
   FeebloWidget,
   InitConfig,
   OrganizationId,
+  PublicUserIdentity,
   SubmittedFeedback,
   UserIdentity,
   WidgetCompany,

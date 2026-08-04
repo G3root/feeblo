@@ -4,6 +4,7 @@ import { isSupportedLocale } from "./config";
 import type { WidgetIdentity } from "./identity";
 
 export type IdentityData = WidgetIdentity;
+export type PublicIdentityData = Omit<IdentityData, "token">;
 
 export type ParentMessage =
   | { event: "SHOW" }
@@ -19,7 +20,7 @@ export type ChildMessage =
   | { event: "CLOSE" }
   | { event: "WIDGET_OPENED"; data: { module: WidgetModule } }
   | { event: "WIDGET_CLOSED" }
-  | { event: "IDENTITY_CHANGED"; data: IdentityData }
+  | { event: "IDENTITY_CHANGED"; data: PublicIdentityData }
   | {
       event: "FEEDBACK_SUBMITTED";
       data: {

@@ -43,5 +43,5 @@ export function htmlToExcerpt(value: string, limit = 160) {
     return excerpt;
   }
 
-  return `${excerpt.slice(0, limit - 1).trimEnd()}...`;
+  return `${excerpt.slice(0, limit - 3).trimEnd()}...`;
 }

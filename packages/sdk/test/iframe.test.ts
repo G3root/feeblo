@@ -67,6 +67,41 @@ describe("createIframe", () => {
 
     expect(iframe.src).toContain("staging.feeblo.com");
   });
+
+  it("includes board query param when feedback is the landing module", () => {
+    const iframe = createIframe("org_test", { defaultBoard: "roadmap" });
+
+    expect(iframe.src).toContain("board=roadmap");
+  });
+
+  it("omits board query param in updates mode", () => {
+    const iframe = createIframe("org_test", {
+      mode: "updates",
+      defaultBoard: "roadmap",
+    });
+
+    expect(iframe.src).not.toContain("board=");
+  });
+
+  it("omits board query param for hub whose first module is updates", () => {
+    const iframe = createIframe("org_test", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+      defaultBoard: "roadmap",
+    });
+
+    expect(iframe.src).not.toContain("board=");
+  });
+
+  it("includes board query param for hub whose first module is feedback", () => {
+    const iframe = createIframe("org_test", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+
+    expect(iframe.src).toContain("board=roadmap");
+  });
 });
 
 describe("iframeOrigin", () => {

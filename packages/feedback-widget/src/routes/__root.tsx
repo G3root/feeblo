@@ -49,7 +49,7 @@ export function RootComponent(props: RouteSectionProps) {
         }
         break;
       case "SET_BOARD":
-        if (message.data?.board) {
+        if (config.modules.includes("feedback") && message.data?.board) {
           navigate(`/board/${message.data.board}`);
         }
         break;
@@ -58,7 +58,10 @@ export function RootComponent(props: RouteSectionProps) {
         break;
       case "IDENTIFY":
         setWidgetIdentity(message.data);
-        sendToParent({ event: "IDENTITY_CHANGED", data: message.data });
+        {
+          const { token: _token, ...publicIdentity } = message.data;
+          sendToParent({ event: "IDENTITY_CHANGED", data: publicIdentity });
+        }
         break;
     }
   };

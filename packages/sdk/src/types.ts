@@ -31,6 +31,8 @@ export interface UserIdentity {
   token?: string | undefined;
 }
 
+export type PublicUserIdentity = Omit<UserIdentity, "token">;
+
 export interface NormalizedUserIdentity {
   avatar?: string | undefined;
   companies?: WidgetCompany[] | undefined;
@@ -112,7 +114,7 @@ export type FeebloEventName =
 
 export interface FeebloEventMap {
   feedbackSubmitted: SubmittedFeedback | undefined;
-  identityChanged: UserIdentity;
+  identityChanged: PublicUserIdentity;
   widgetClosed: undefined;
   widgetOpened: { module: WidgetModule } | undefined;
   widgetReady: undefined;
@@ -155,7 +157,7 @@ export type IncomingMessage =
     }
   | { event: "PAGE_HEIGHT"; data?: { height?: number | undefined } | undefined }
   | { event: "CLOSE" }
-  | { event: "IDENTITY_CHANGED"; data?: UserIdentity | undefined }
+  | { event: "IDENTITY_CHANGED"; data?: PublicUserIdentity | undefined }
   | { event: "READY" }
   | { event: "WIDGET_OPENED"; data?: { module: WidgetModule } | undefined }
   | { event: "WIDGET_CLOSED" }

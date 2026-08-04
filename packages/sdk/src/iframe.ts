@@ -1,4 +1,4 @@
-import { normalizeWidgetConfig } from "./config";
+import { normalizeWidgetConfig, supportsBoardSelection } from "./config";
 import type { Logger } from "./debug";
 import type { EmbedOptions } from "./types";
 
@@ -30,7 +30,7 @@ export function createIframe(
   if (options.locale) {
     params.set("locale", options.locale);
   }
-  if (options.defaultBoard) {
+  if (options.defaultBoard && supportsBoardSelection(config)) {
     params.set("board", options.defaultBoard);
   }
 
