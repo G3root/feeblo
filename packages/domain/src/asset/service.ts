@@ -1,7 +1,9 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
-import { and, eq, inArray, notExists, or } from "drizzle-orm";
+import { and, eq, inArray, lt, notExists, or } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 
 import { InternalServerError } from "../rpc-errors";
@@ -9,6 +11,7 @@ import { isTemporaryEditorMediaKey, S3UploadService } from "../services/s3";
 import { type AssetKind, type AssetOwner, AssetRepository } from "./repository";
 
 const EDITOR_ASSET_KINDS = ["editor_image", "editor_video"] as const;
+const ORPHANED_EDITOR_ASSET_GRACE_PERIOD = Duration.hours(1);
 
 interface UploadedAsset {
   readonly bucket: string;
@@ -524,6 +527,12 @@ export const cleanupOrphanedEditorAssets = ({
   readonly organizationId: string;
 }) =>
   Effect.gen(function* () {
+    const createdBefore = DateTime.toDate(
+      DateTime.subtractDuration(
+        yield* DateTime.now,
+        ORPHANED_EDITOR_ASSET_GRACE_PERIOD
+      )
+    );
     const committedAssets = yield* transaction(
       Effect.gen(function* () {
         const db = yield* currentDb;
@@ -534,10 +543,11 @@ export const cleanupOrphanedEditorAssets = ({
             and(
               eq(schema.assetTable.organizationId, organizationId),
               inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
+              lt(schema.assetTable.createdAt, createdBefore),
               unreferencedByPostOrChangelog(db)
             )
           )
-          .for("update");
+          .for("update", { skipLocked: true });
 
         if (candidates.length === 0) {
           return [];

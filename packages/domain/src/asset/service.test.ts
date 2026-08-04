@@ -1,6 +1,8 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -86,7 +88,8 @@ describe("registerUploadedAsset", () => {
     it.effect("tracks shared post and changelog asset references", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const now = new Date();
+        const nowUtc = yield* DateTime.now;
+        const now = DateTime.toDate(nowUtc);
         const organizationId = "org_asset_references";
         const boardId = "board_asset_references";
         const statusId = "status_asset_references";
@@ -343,10 +346,11 @@ describe("registerUploadedAsset", () => {
       })
     );
 
-    it.effect("removes committed editor assets with no references", () =>
+    it.effect("removes only aged editor assets with no references", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
-        const now = new Date();
+        const nowUtc = yield* DateTime.now;
+        const now = DateTime.toDate(nowUtc);
         const organizationId = "org_orphaned_editor_assets";
         const deletedKeys = yield* Ref.make<string[]>([]);
 
@@ -356,14 +360,28 @@ describe("registerUploadedAsset", () => {
           slug: organizationId,
           createdAt: now,
         });
-        yield* db.insert(schema.assetTable).values({
-          id: "asset_orphaned_editor",
-          bucket: "test-bucket",
-          key: "editor-media/user/image/orphaned.png",
-          url: "https://assets.example/orphaned.png",
-          kind: "editor_image",
-          organizationId,
-        });
+        yield* db.insert(schema.assetTable).values([
+          {
+            id: "asset_orphaned_editor",
+            bucket: "test-bucket",
+            key: "editor-media/user/image/orphaned.png",
+            url: "https://assets.example/orphaned.png",
+            kind: "editor_image",
+            organizationId,
+            createdAt: DateTime.toDate(
+              DateTime.subtractDuration(nowUtc, Duration.hours(2))
+            ),
+          },
+          {
+            id: "asset_recent_editor",
+            bucket: "test-bucket",
+            key: "editor-media/user/image/recent.png",
+            url: "https://assets.example/recent.png",
+            kind: "editor_image",
+            organizationId,
+            createdAt: now,
+          },
+        ]);
 
         const s3 = recordingS3(deletedKeys);
         yield* cleanupOrphanedEditorAssets({ organizationId }).pipe(
@@ -373,8 +391,8 @@ describe("registerUploadedAsset", () => {
         const assets = yield* db
           .select({ id: schema.assetTable.id })
           .from(schema.assetTable)
-          .where(eq(schema.assetTable.id, "asset_orphaned_editor"));
-        expect(assets).toEqual([]);
+          .where(eq(schema.assetTable.organizationId, organizationId));
+        expect(assets).toEqual([{ id: "asset_recent_editor" }]);
         expect(yield* Ref.get(deletedKeys)).toEqual([
           "editor-media/user/image/orphaned.png",
         ]);
