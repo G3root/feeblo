@@ -21,7 +21,11 @@ const makeCompanyPolicy = Effect.gen(function* () {
       belongsToOrganization(args)
     );
 
-  const canDelete = canUpdate;
+  const canDelete = (args: TCompanyDelete) =>
+    Policy.all(
+      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      belongsToOrganization(args)
+    );
 
   return { belongsToOrganization, canCreate, canUpdate, canDelete };
 });

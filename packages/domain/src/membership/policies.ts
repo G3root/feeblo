@@ -57,6 +57,11 @@ const ROLE_RANK: Record<"member" | "admin" | "owner", number> = {
   owner: 2,
 };
 
+const canManageMember = (
+  actorRole: "owner" | "admin" | "member",
+  targetRole: "owner" | "admin" | "member"
+): boolean => ROLE_RANK[targetRole] < ROLE_RANK[actorRole];
+
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
@@ -132,6 +137,26 @@ const makeMembershipPolicy = Effect.gen(function* () {
       Policy.hasOrganizationOwnerOrAdmin(args.organizationId)
     );
 
+  const canManageTarget = (args: TCanRemoveMember) =>
+    Policy.policy((session) =>
+      Effect.gen(function* () {
+        const actor = Policy.getMembership(session, args.organizationId);
+        if (!actor) {
+          return false;
+        }
+
+        const target = yield* repository.findMemberById({
+          memberId: args.memberId,
+          organizationId: args.organizationId,
+        });
+        if (Option.isNone(target)) {
+          return false;
+        }
+
+        return canManageMember(actor.role, target.value.role);
+      })
+    );
+
   const canRemoveMember = (args: TCanRemoveMember) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
@@ -156,15 +181,12 @@ const makeMembershipPolicy = Effect.gen(function* () {
           return false;
         }
 
-        const actorRank = ROLE_RANK[actor.role];
-        const targetRank = ROLE_RANK[target.value.role];
         const newRank = ROLE_RANK[args.role];
 
-        const canManageTarget =
-          actorRank === ROLE_RANK.owner || targetRank < actorRank;
-        const canAssignRole = newRank <= actorRank;
-
-        return canManageTarget && canAssignRole;
+        return (
+          canManageMember(actor.role, target.value.role) &&
+          newRank <= ROLE_RANK[actor.role]
+        );
       })
     );
 
@@ -173,8 +195,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
       Policy.hasMembership(args.organizationId),
       Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
       isMemberAlready(args),
-      hasOtherOwners(args),
-      canManageRole(args)
+      hasOtherOwners(args)
     );
 
   return {
@@ -184,6 +205,8 @@ const makeMembershipPolicy = Effect.gen(function* () {
     canRemoveMember,
     canUpdateMemberRole,
     canChangeRoleWithinPlan,
+    canManageTarget,
+    canManageRole,
   };
 });
 
