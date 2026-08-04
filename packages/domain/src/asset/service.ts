@@ -11,6 +11,9 @@ import { isTemporaryEditorMediaKey, S3UploadService } from "../services/s3";
 import { type AssetKind, type AssetOwner, AssetRepository } from "./repository";
 
 const EDITOR_ASSET_KINDS = ["editor_image", "editor_video"] as const;
+// TODO: Move to two-phase deletion if aged orphan reuse becomes supported.
+// Cleanup can still win the lock race against a concurrent reference insert
+// after this grace period, causing that save to fail its foreign-key check.
 const ORPHANED_EDITOR_ASSET_GRACE_PERIOD = Duration.hours(1);
 
 interface UploadedAsset {
