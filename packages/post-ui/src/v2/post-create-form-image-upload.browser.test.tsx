@@ -1,0 +1,294 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render } from "vitest-browser-react";
+
+vi.mock("@feeblo/web-shared/auth-client", () => ({
+  editorMediaUploadEndpoint: "/api/media/upload",
+  uploadedEditorMediaSchema: {
+    parse: (value: unknown) => value,
+  },
+}));
+vi.mock("@feeblo/web-shared/runtime", () => ({
+  fetchRpc: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("@feeblo/web-shared/use-auth-state", () => ({
+  useAuthState: () => ({
+    data: {
+      session: { user: { id: "user-1", name: "nafees", image: null } },
+      user: { id: "user-1", name: "nafees", image: null },
+      memberships: [],
+    },
+  }),
+}));
+
+import { useEffect, useState } from "react";
+
+let memberData: unknown = {
+  id: "member-1",
+  organizationId: "organization-id",
+  userId: "user-1",
+};
+let bumpRender: (() => void) | null = null;
+function setMemberData(value: unknown) {
+  memberData = value;
+  bumpRender?.();
+}
+vi.mock("@tanstack/react-db", () => ({
+  and: (...args: unknown[]) => args,
+  createOptimisticAction: vi.fn(),
+  eq: () => ({ __eq: true }),
+  queryOnce: vi.fn(),
+  useLiveQuery: vi.fn((query: (q: never) => unknown) => {
+    let alias = "";
+    const fakeQ = {
+      from: (arg: Record<string, unknown>) => {
+        alias = Object.keys(arg)[0] ?? "";
+        const chain = { where: () => chain, findOne: () => undefined };
+        return chain;
+      },
+    };
+    query(fakeQ as never);
+    if (alias === "member") {
+      return { data: memberData };
+    }
+    if (alias === "board") {
+      return { data: [board] };
+    }
+    if (alias === "postStatus") {
+      return { data: [postStatus] };
+    }
+    return { data: undefined };
+  }),
+}));
+vi.mock("@feeblo/id", () => ({
+  PostId: { unsafeGenerate: vi.fn().mockResolvedValue("post-1") },
+}));
+
+import { PostId } from "@feeblo/id";
+import { PostCreateDialogProvider } from "./dialog-stores/post";
+import { PostCreateForm } from "./dialogs/post-create-form-inner";
+import { PostCollectionsProvider } from "./providers/post-collections-provider";
+
+class MockXMLHttpRequest {
+  static sendCount = 0;
+
+  readonly upload = new EventTarget();
+  readonly open = vi.fn();
+  readonly addEventListener = vi.fn(
+    (type: string, listener: EventListenerOrEventListenerObject) => {
+      this.listeners.set(type, listener);
+    }
+  );
+  readonly send = vi.fn(() => {
+    MockXMLHttpRequest.sendCount += 1;
+    this.status = 200;
+    this.responseText = JSON.stringify({
+      assetId: "asset-uploaded-on-save",
+      bucket: "test-bucket",
+      key: "tmp/editor-media/user/image/upload.png",
+      kind: "image",
+      url: "https://assets.example/tmp/editor-media/upload.png",
+    });
+    queueMicrotask(() => this.dispatch("load"));
+  });
+  responseText = "";
+  status = 0;
+  timeout = 0;
+  withCredentials = false;
+
+  private readonly listeners = new Map<
+    string,
+    EventListenerOrEventListenerObject
+  >();
+
+  private dispatch(type: string) {
+    const listener = this.listeners.get(type);
+    if (typeof listener === "function") {
+      listener(new Event(type));
+    } else {
+      listener?.handleEvent(new Event(type));
+    }
+  }
+}
+
+const board = {
+  archivedAt: null,
+  createdAt: new Date(),
+  id: "board-1",
+  name: "Board",
+  organizationId: "organization-id",
+  slug: "board",
+  updatedAt: new Date(),
+  visibility: "PUBLIC",
+};
+const postStatus = {
+  archivedAt: null,
+  boardIds: null,
+  createdAt: new Date(),
+  id: "status-1",
+  name: "Planned",
+  organizationId: "organization-id",
+  type: "PLANNED",
+  updatedAt: new Date(),
+};
+
+const insertSpy = vi.fn().mockReturnValue({
+  isPersisted: { promise: Promise.resolve() },
+});
+
+function FormHarness() {
+  const [, forceRender] = useState(0);
+  useEffect(() => {
+    bumpRender = () => forceRender((count) => count + 1);
+    return () => {
+      bumpRender = null;
+    };
+  }, []);
+
+  return (
+    <PostCreateDialogProvider>
+      <PostCollectionsProvider
+        collections={
+          {
+            boardCollection: {},
+            membersCollection: {},
+            postCollection: {
+              insert: insertSpy,
+              utils: { refetch: vi.fn().mockResolvedValue(undefined) },
+            },
+            postStatusCollection: {},
+            commentCollection: {},
+            postReactionCollection: {},
+            commentReactionCollection: {},
+            upvoteCollection: {},
+          } as never
+        }
+        organizationId="organization-id"
+      >
+        <PostCreateForm />
+      </PostCollectionsProvider>
+    </PostCreateDialogProvider>
+  );
+}
+
+type RenderScreen = Awaited<ReturnType<typeof render>>;
+
+async function fillForm(screen: RenderScreen) {
+  const title = screen.getByRole("textbox", { name: "Post Title" });
+  await title.fill("My great idea");
+
+  const boardCombo = screen.getByRole("combobox").all()[0];
+  await boardCombo.click();
+  await screen.getByRole("option", { name: "Board" }).click();
+}
+
+async function pasteImage(screen: RenderScreen, text: string) {
+  const editor = screen.getByRole("textbox", { name: "" }).all()[1];
+  await editor.click();
+  await editor.fill(text);
+
+  const clipboardData = new DataTransfer();
+  clipboardData.items.add(
+    new File([new Uint8Array([137, 80, 78, 71])], "upload.png", {
+      type: "image/png",
+    })
+  );
+  editor
+    .element()
+    .dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, clipboardData })
+    );
+}
+
+async function submit(screen: RenderScreen): Promise<string> {
+  await screen.getByRole("button", { name: "Create Post" }).click();
+  await new Promise<void>((resolve) => {
+    const poll = () => {
+      if (insertSpy.mock.calls.length > 0) {
+        resolve();
+      } else {
+        setTimeout(poll, 20);
+      }
+    };
+    poll();
+  });
+  return insertSpy.mock.calls[0]?.[0]?.content as string;
+}
+
+beforeEach(() => {
+  MockXMLHttpRequest.sendCount = 0;
+  insertSpy.mockClear();
+  vi.mocked(PostId.unsafeGenerate).mockClear();
+  vi.stubGlobal("XMLHttpRequest", MockXMLHttpRequest);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("PostCreateForm image upload", () => {
+  it("saves the uploaded asset url instead of the blob url for an org member", async () => {
+    setMemberData({
+      id: "member-1",
+      organizationId: "organization-id",
+      userId: "user-1",
+    });
+    const screen = await render(<FormHarness />);
+
+    await fillForm(screen);
+    await pasteImage(screen, "A post with an image");
+    await expect
+      .element(screen.getByRole("img", { name: "upload preview" }))
+      .toBeVisible();
+    const content = await submit(screen);
+
+    expect(insertSpy).toHaveBeenCalled();
+    expect(content).not.toContain("blob:");
+    expect(content).toContain(
+      "https://assets.example/tmp/editor-media/upload.png"
+    );
+  });
+
+  it("saves the uploaded asset url when the user is not a member (user owner)", async () => {
+    setMemberData(undefined);
+    const screen = await render(<FormHarness />);
+
+    await fillForm(screen);
+    await pasteImage(screen, "A post with an image");
+    await expect
+      .element(screen.getByRole("img", { name: "upload preview" }))
+      .toBeVisible();
+    const content = await submit(screen);
+
+    expect(insertSpy).toHaveBeenCalled();
+    expect(content).not.toContain("blob:");
+    expect(content).toContain(
+      "https://assets.example/tmp/editor-media/upload.png"
+    );
+  });
+
+  it("uploads images deferred before the member query resolves", async () => {
+    // The editor mounts with a user-owned uploader (membership is still
+    // loading), then the member query resolves before submit.
+    setMemberData(undefined);
+    const screen = await render(<FormHarness />);
+
+    await fillForm(screen);
+    await pasteImage(screen, "A post with an image");
+    await expect
+      .element(screen.getByRole("img", { name: "upload preview" }))
+      .toBeVisible();
+
+    setMemberData({
+      id: "member-1",
+      organizationId: "organization-id",
+      userId: "user-1",
+    });
+    const content = await submit(screen);
+
+    expect(insertSpy).toHaveBeenCalled();
+    expect(content).not.toContain("blob:");
+    expect(content).toContain(
+      "https://assets.example/tmp/editor-media/upload.png"
+    );
+  });
+});

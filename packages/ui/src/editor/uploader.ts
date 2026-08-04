@@ -123,8 +123,18 @@ export const finalizeEditorContent = async (
   }> = [];
 
   for (const [previewUrl, pending] of pendingEditorUploads) {
+    // Asset ownership is decided at finalize time, not at insert time. The
+    // editor may be mounted before the member/organization check resolves
+    // (e.g. the create-post form mounts with a user-owned uploader, then the
+    // member query resolves and finalize runs with the organization id).
+    // A pending upload that was deferred without an organization can therefore
+    // be finalized under the current owner; an explicitly org-owned upload must
+    // still match the same organization.
+    const organizationMismatch =
+      pending.organizationId !== undefined &&
+      pending.organizationId !== organizationId;
     if (
-      pending.organizationId !== organizationId ||
+      organizationMismatch ||
       (options.scope !== undefined && pending.scope !== options.scope)
     ) {
       continue;
