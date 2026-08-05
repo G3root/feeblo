@@ -1,8 +1,11 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { toastManager } from "@feeblo/ui/toast";
 import {
+  allPolicy,
+  anyPolicy,
   hasMembership,
   hasPermission,
+  isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -18,7 +21,16 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 
 export function PostTagField() {
   const { post, organizationId, isLocked } = usePostCollectionData();
-  const { allowed: canChangeTags } = usePolicy(hasMembership(organizationId));
+  // Backend mirror: TagPolicy.canSetPostTags = membership AND
+  // (posts.* OR tags.* OR post creator). Contributors keep the tag field on
+  // their own posts; everyone else needs manager-level posts/tags grants.
+  const { allowed: canChangeTags } = usePolicy(
+    anyPolicy(
+      hasPermission(organizationId, "posts.*"),
+      hasPermission(organizationId, "tags.*"),
+      allPolicy(hasMembership(organizationId), isUser(post.creatorId ?? ""))
+    )
+  );
   const { allowed: canCreateTags } = usePolicy(
     hasPermission(organizationId, "tags.create")
   );
@@ -115,11 +127,12 @@ export function PostTagField() {
         tags={tags}
         type="FEEDBACK"
       />
-      {canCreateTags ? (
-        <TagCreateDialog
-          onCreated={(tag) => handleTagSelect(tag, false, false)}
-        />
-      ) : null}
+      {/* Always mounted like the settings routes; the create button in
+          TagSelect is disabled without tags.create, so the dialog can never
+          open for users who lack the permission. */}
+      <TagCreateDialog
+        onCreated={(tag) => handleTagSelect(tag, false, false)}
+      />
     </TagCreateDialogProvider>
   );
 }

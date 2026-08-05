@@ -15,8 +15,17 @@ type TCanUpdate = {
   tagId: string;
 };
 
+type TCanSetPostTags = {
+  organizationId: string;
+  postId: string;
+};
+
+type TCanSetChangelogTags = {
+  organizationId: string;
+  changelogId: string;
+};
 const makeTagPolicy = Effect.gen(function* () {
-  yield* TagRepository;
+  const repository = yield* TagRepository;
 
   // TODO ADD ORG OWNERSHIP CHECK
   const canCreate = (organizationId: string) =>
@@ -28,10 +37,53 @@ const makeTagPolicy = Effect.gen(function* () {
   const canUpdate = (args: TCanUpdate) =>
     Policy.canPermission(args.organizationId, "tags.*");
 
+  const isPostCreator = (args: TCanSetPostTags) =>
+    Policy.policy((user) =>
+      repository.hasPostCreator({
+        postId: args.postId,
+        organizationId: args.organizationId,
+        userId: user.session.userId,
+      })
+    );
+
+  /**
+   * Post tag assignments are manager-scoped (tags.* / posts.*), but
+   * contributors may tag posts they created. Mirrors PostPolicy.canUpdate
+   * (posts.* OR creator) with tags.* added, since assignment is also a tag
+   * management action.
+   */
+  const canSetPostTags = (args: TCanSetPostTags) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.any(
+        Policy.canPermission(args.organizationId, "posts.*"),
+        Policy.canPermission(args.organizationId, "tags.*"),
+        isPostCreator(args)
+      )
+    );
+
+  /**
+   * Strictly manager-scoped: contributors can never set changelog tags. No
+   * creator branch — unlike posts, changelog creation itself is manager-only
+   * (changelog.create), so a contributor can never legitimately be a
+   * changelog creator, and a demoted creator shouldn't retain tag rights
+   * they no longer hold for editing.
+   */
+  const canSetChangelogTags = (args: TCanSetChangelogTags) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.any(
+        Policy.canPermission(args.organizationId, "changelog.*"),
+        Policy.canPermission(args.organizationId, "tags.*")
+      )
+    );
+
   return {
     canCreate,
     canDelete,
     canUpdate,
+    canSetPostTags,
+    canSetChangelogTags,
   };
 });
 

@@ -10,10 +10,11 @@ import {
   TagId,
   WorkspaceId,
 } from "@feeblo/id";
+import type { Role } from "@feeblo/permissions";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { CurrentSession, type Session } from "../session-middleware";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -29,7 +30,7 @@ describe("TagRpcHandlers", () => {
     statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
-  const session = (f: Fixture, member = true): Session => ({
+  const session = (f: Fixture, role: Role | "none" = "owner"): Session => ({
     user: {
       id: f.userId,
       email: "user@example.com",
@@ -38,16 +39,47 @@ describe("TagRpcHandlers", () => {
     },
     session: { userId: f.userId, token: "token" },
     organizations: [{ id: f.organizationId }],
-    memberships: member
-      ? [
-          {
-            membershipId: f.membershipId,
-            organizationId: f.organizationId,
-            role: "owner",
-          },
-        ]
-      : [],
+    memberships:
+      role === "none"
+        ? []
+        : [
+            {
+              membershipId: f.membershipId,
+              organizationId: f.organizationId,
+              role,
+            },
+          ],
   });
+  // A different member of the same organization (not the post/changelog creator).
+  const otherContributor = (
+    f: Fixture
+  ): {
+    session: Session;
+    membershipId: string;
+  } => {
+    const userId = `other_${f.userId}`;
+    const membershipId = `other_member_${f.membershipId}`;
+    return {
+      session: {
+        user: {
+          id: userId,
+          email: "other@example.com",
+          name: "Other",
+          restrictedToOrganizationId: null,
+        },
+        session: { userId, token: "token" },
+        organizations: [{ id: f.organizationId }],
+        memberships: [
+          {
+            membershipId,
+            organizationId: f.organizationId,
+            role: "contributor",
+          },
+        ],
+      },
+      membershipId,
+    };
+  };
   const fixture = () =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -171,7 +203,7 @@ describe("TagRpcHandlers", () => {
             const error = yield* Effect.flip(
               handlers
                 .TagList({ organizationId: f.organizationId })
-                .pipe(Effect.provideService(CurrentSession, session(f, false)))
+                .pipe(Effect.provideService(CurrentSession, session(f, "none")))
             );
             expect(error._tag).toBe("PolicyDenied");
             const publicTags = yield* handlers.TagListPublic({
@@ -237,6 +269,208 @@ describe("TagRpcHandlers", () => {
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toMatchObject([{ postId: f.postId, tagId }]);
         })
+      );
+      it.effect("allows contributors to set tags on posts they created", () =>
+        Effect.gen(function* () {
+          const handlers = yield* TagRpcHandlersEffect;
+          const f = yield* fixture();
+          const tagId = yield* TagId.generate;
+          yield* handlers
+            .TagCreate({
+              id: tagId,
+              name: "Feature",
+              type: "FEEDBACK",
+              organizationId: f.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .PostTagSet({
+              organizationId: f.organizationId,
+              postId: f.postId,
+              tagIds: [tagId],
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, session(f, "contributor"))
+            );
+          expect(
+            yield* handlers
+              .PostTagList({ organizationId: f.organizationId })
+              .pipe(Effect.provideService(CurrentSession, session(f)))
+          ).toMatchObject([{ postId: f.postId, tagId }]);
+        })
+      );
+      it.effect(
+        "denies contributors from setting tags on posts they did not create",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* TagRpcHandlersEffect;
+            const f = yield* fixture();
+            const tagId = yield* TagId.generate;
+            yield* handlers
+              .TagCreate({
+                id: tagId,
+                name: "Feature",
+                type: "FEEDBACK",
+                organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+            const error = yield* Effect.flip(
+              handlers
+                .PostTagSet({
+                  organizationId: f.organizationId,
+                  postId: f.postId,
+                  tagIds: [tagId],
+                })
+                .pipe(
+                  Effect.provideService(
+                    CurrentSession,
+                    otherContributor(f).session
+                  )
+                )
+            );
+            expect(error._tag).toBe("PolicyDenied");
+            expect(
+              yield* handlers
+                .PostTagList({ organizationId: f.organizationId })
+                .pipe(Effect.provideService(CurrentSession, session(f)))
+            ).toHaveLength(0);
+          })
+      );
+      it.effect(
+        "allows managers to set tags on posts they did not create",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* TagRpcHandlersEffect;
+            const f = yield* fixture();
+            const tagId = yield* TagId.generate;
+            yield* handlers
+              .TagCreate({
+                id: tagId,
+                name: "Feature",
+                type: "FEEDBACK",
+                organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+            yield* handlers
+              .PostTagSet({
+                organizationId: f.organizationId,
+                postId: f.postId,
+                tagIds: [tagId],
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, session(f, "manager"))
+              );
+            expect(
+              yield* handlers
+                .PostTagList({ organizationId: f.organizationId })
+                .pipe(Effect.provideService(CurrentSession, session(f)))
+            ).toMatchObject([{ postId: f.postId, tagId }]);
+          })
+      );
+      it.effect(
+        "denies contributors from setting tags on changelogs they did not create",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* TagRpcHandlersEffect;
+            const f = yield* fixture();
+            const tagId = yield* TagId.generate;
+            const changelogId = yield* ChangelogId.generate;
+            yield* handlers
+              .TagCreate({
+                id: tagId,
+                name: "Ship",
+                type: "CHANGELOG",
+                organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+            yield* db.insert(schema.changelogTable).values({
+              id: changelogId,
+              title: "Draft",
+              slug: changelogId,
+              content: "Content",
+              status: "draft",
+              organizationId: f.organizationId,
+              creatorId: f.userId,
+              creatorMemberId: f.membershipId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            const error = yield* Effect.flip(
+              handlers
+                .ChangelogTagSet({
+                  organizationId: f.organizationId,
+                  changelogId,
+                  tagIds: [tagId],
+                })
+                .pipe(
+                  Effect.provideService(
+                    CurrentSession,
+                    otherContributor(f).session
+                  )
+                )
+            );
+            expect(error._tag).toBe("PolicyDenied");
+          })
+      );
+      it.effect(
+        "denies contributors from setting tags on changelogs even when they created them",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* TagRpcHandlersEffect;
+            const f = yield* fixture();
+            const tagId = yield* TagId.generate;
+            const changelogId = yield* ChangelogId.generate;
+            const other = otherContributor(f);
+            yield* db.insert(schema.userTable).values({
+              id: other.session.user.id,
+              email: "other@example.com",
+              name: "Other",
+            });
+            yield* db.insert(schema.memberTable).values({
+              id: other.membershipId,
+              organizationId: f.organizationId,
+              userId: other.session.user.id,
+              role: "contributor",
+              createdAt: new Date(),
+            });
+            yield* handlers
+              .TagCreate({
+                id: tagId,
+                name: "Ship",
+                type: "CHANGELOG",
+                organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+            yield* db.insert(schema.changelogTable).values({
+              id: changelogId,
+              title: "Draft",
+              slug: changelogId,
+              content: "Content",
+              status: "draft",
+              organizationId: f.organizationId,
+              creatorId: other.session.user.id,
+              creatorMemberId: other.membershipId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            const error = yield* Effect.flip(
+              handlers
+                .ChangelogTagSet({
+                  organizationId: f.organizationId,
+                  changelogId,
+                  tagIds: [tagId],
+                })
+                .pipe(Effect.provideService(CurrentSession, other.session))
+            );
+            expect(error._tag).toBe("PolicyDenied");
+            expect(
+              yield* handlers
+                .ChangelogTagList({ organizationId: f.organizationId })
+                .pipe(Effect.provideService(CurrentSession, session(f)))
+            ).toHaveLength(0);
+          })
       );
       it.effect(
         "hides post tags on private boards from the public endpoint",

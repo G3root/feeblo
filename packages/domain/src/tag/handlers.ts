@@ -205,7 +205,6 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 
     PostTagSet: (args: TPostTagSet) =>
       Effect.gen(function* () {
-        //TODO add ownership Policy
         const tagIds = normalizeTagIds(args.tagIds);
         yield* validatePost({
           postId: args.postId,
@@ -219,13 +218,12 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 
         yield* repository.setPostTags({ ...args, tagIds });
       }).pipe(
-        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        Policy.withPolicy(tagPolicy.canSetPostTags(args)),
         withRemapDbErrors("Tag", "update")
       ),
 
     ChangelogTagSet: (args: TChangelogTagSet) =>
       Effect.gen(function* () {
-        //TODO add ownership Policy
         const tagIds = normalizeTagIds(args.tagIds);
         yield* validateChangelog({
           changelogId: args.changelogId,
@@ -239,7 +237,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 
         yield* repository.setChangelogTags({ ...args, tagIds });
       }).pipe(
-        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        Policy.withPolicy(tagPolicy.canSetChangelogTags(args)),
         withRemapDbErrors("Tag", "update")
       ),
   };
