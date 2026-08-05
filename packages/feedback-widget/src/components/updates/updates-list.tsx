@@ -1,6 +1,7 @@
 import { A, createAsync } from "@solidjs/router";
 import { ErrorBoundary, For, Show } from "solid-js";
 import { fetchUpdates } from "../../lib/api";
+import { Card } from "../ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 import { PoweredByBadge } from "../ui/powered-by-badge";
 
@@ -61,9 +62,10 @@ export function UpdatesList() {
               <div class="mt-6 space-y-3">
                 <For each={items}>
                   {(update) => (
-                    <A
-                      class="group block overflow-hidden rounded-xl border bg-card transition-[border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-sm focus-visible:ring-3 focus-visible:ring-ring/30"
+                    <Card
+                      class="group overflow-hidden rounded-xl transition-[border-color,transform,box-shadow] before:rounded-[calc(var(--radius-xl)-1px)] hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-sm focus-visible:ring-3 focus-visible:ring-ring/30"
                       href={`/updates/${update.id}`}
+                      render={A}
                     >
                       <Show when={update.imageUrl}>
                         {(imageUrl) => (
@@ -85,10 +87,12 @@ export function UpdatesList() {
                           {update.title}
                         </h2>
                         <Show when={update.excerpt}>
-                          <p class="">{update.excerpt}</p>
+                          <p class="text-muted-foreground text-sm">
+                            {update.excerpt}
+                          </p>
                         </Show>
                       </article>
-                    </A>
+                    </Card>
                   )}
                 </For>
               </div>
