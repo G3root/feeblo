@@ -244,6 +244,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
   const updatePostEtaEffect = (args: TPostUpdateEta) =>
     Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
       const previous = yield* repository.findActivityState({
         id: args.id,
         organizationId: args.organizationId,
@@ -251,11 +253,27 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       if (!previous) {
         return yield* new FailedToUpdatePostError();
       }
-      yield* repository.updateEta({
-        id: args.id,
-        organizationId: args.organizationId,
-        etaQuarter: args.etaQuarter,
-      });
+      if (previous.etaQuarter === args.etaQuarter) {
+        return;
+      }
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* repository.updateEta({
+            id: args.id,
+            organizationId: args.organizationId,
+            etaQuarter: args.etaQuarter,
+          });
+          yield* activityRepository.create({
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+            kind: "ETA_CHANGED",
+            previousValue: previous.etaQuarter,
+            nextValue: args.etaQuarter,
+          });
+        })
+      );
     });
 
   const updatePostContentEffect = (args: TPostUpdateContent) =>

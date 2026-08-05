@@ -164,6 +164,7 @@ const makePostRepository = Effect.gen(function* () {
           archivedAt: schema.postTable.archivedAt,
           boardId: schema.postTable.boardId,
           content: schema.postTable.content,
+          etaQuarter: schema.postTable.etaQuarter,
           lockedAt: schema.postTable.lockedAt,
           statusId: schema.postTable.statusId,
           title: schema.postTable.title,

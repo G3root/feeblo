@@ -10,7 +10,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -538,6 +538,26 @@ describe("PostRpcHandlers", () => {
             .where(eq(schema.postTable.id, postId));
 
           expect(row?.etaQuarter).toBe("2026-Q3");
+
+          const [activity] = yield* db
+            .select({
+              kind: schema.postActivityTable.kind,
+              previousValue: schema.postActivityTable.previousValue,
+              nextValue: schema.postActivityTable.nextValue,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, postId),
+                eq(schema.postActivityTable.kind, "ETA_CHANGED")
+              )
+            );
+
+          expect(activity).toMatchObject({
+            kind: "ETA_CHANGED",
+            previousValue: null,
+            nextValue: "2026-Q3",
+          });
         })
       );
 
@@ -574,6 +594,26 @@ describe("PostRpcHandlers", () => {
             .where(eq(schema.postTable.id, postId));
 
           expect(row?.etaQuarter).toBeNull();
+
+          const [activity] = yield* db
+            .select({
+              kind: schema.postActivityTable.kind,
+              previousValue: schema.postActivityTable.previousValue,
+              nextValue: schema.postActivityTable.nextValue,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, postId),
+                eq(schema.postActivityTable.kind, "ETA_CHANGED")
+              )
+            );
+
+          expect(activity).toMatchObject({
+            kind: "ETA_CHANGED",
+            previousValue: "2026-Q3",
+            nextValue: null,
+          });
         })
       );
 

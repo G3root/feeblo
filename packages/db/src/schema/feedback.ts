@@ -17,6 +17,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
+import type { TPostActivityKind } from "../activity-kind";
 import { memberTable, organizationTable, userTable } from "./auth";
 
 const VectorValues = Schema.Array(Schema.Number);
@@ -104,21 +105,11 @@ export const postSourceEnum = pgEnum("post_source", [
   "PUBLIC_BOARD",
 ]);
 
-export const postActivityKindEnum = pgEnum("post_activity_kind", [
-  "POST_CREATED",
-  "TITLE_CHANGED",
-  "CONTENT_CHANGED",
-  "STATUS_CHANGED",
-  "BOARD_CHANGED",
-  "POST_LOCKED",
-  "POST_UNLOCKED",
-  "POST_ARCHIVED",
-  "POST_UNARCHIVED",
-  "COMMENT_CREATED",
-  "COMMENT_UPDATED",
-  "COMMENT_DELETED",
-]);
-
+/**
+ * Activity kinds are validated at the domain boundary; the DB column is plain
+ * text so new kinds don't require enum migrations. The column type is derived
+ * from the canonical `PostActivityKind` Effect Schema in `../activity-kind`.
+ */
 export const notificationKindEnum = pgEnum("notification_kind", [
   "feedback.submitted",
   "feedback.commented",
@@ -739,7 +730,7 @@ export const postActivityTable = pgTable(
     actorMemberId: text("actor_member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
-    kind: postActivityKindEnum("kind").notNull(),
+    kind: text("kind").$type<TPostActivityKind>().notNull(),
     previousValue: text("previous_value"),
     nextValue: text("next_value"),
     commentId: text("comment_id"),
