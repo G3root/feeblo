@@ -5,6 +5,7 @@ import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as OpenApi from "effect/unstable/httpapi/OpenApi";
 import { DataValidationError } from "../contact/errors";
+import { RateLimitErrors } from "../rate-limit";
 import {
   InternalServerError,
   NotFoundError,
@@ -24,7 +25,11 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
     HttpApiEndpoint.post("suggestPosts", "/suggestions", {
       payload: WidgetSuggestionRequest,
       success: Schema.Array(WidgetSuggestion),
-      error: Schema.Union([DataValidationError, InternalServerError]),
+      error: Schema.Union([
+        DataValidationError,
+        InternalServerError,
+        RateLimitErrors,
+      ]),
     })
       .annotate(OpenApi.Title, "Suggest Posts")
       .annotate(OpenApi.Summary, "Find similar public posts")
@@ -38,6 +43,7 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
         NotFoundError,
         InternalServerError,
         UnauthorizedError,
+        RateLimitErrors,
       ]),
     })
       .annotate(OpenApi.Title, "Create Feedback")
@@ -53,7 +59,11 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
         organizationId: Schema.String,
       },
       success: Schema.Array(WidgetUpdate),
-      error: Schema.Union([DataValidationError, InternalServerError]),
+      error: Schema.Union([
+        DataValidationError,
+        InternalServerError,
+        RateLimitErrors,
+      ]),
     })
       .annotate(OpenApi.Title, "List Updates")
       .annotate(OpenApi.Summary, "List published product updates")
@@ -68,7 +78,11 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
         organizationId: Schema.String,
       },
       success: Schema.Array(WidgetBoard),
-      error: Schema.Union([DataValidationError, InternalServerError]),
+      error: Schema.Union([
+        DataValidationError,
+        InternalServerError,
+        RateLimitErrors,
+      ]),
     })
       .annotate(OpenApi.Title, "List Boards")
       .annotate(OpenApi.Summary, "List all public boards")
