@@ -246,18 +246,18 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
-      const previous = yield* repository.findActivityState({
-        id: args.id,
-        organizationId: args.organizationId,
-      });
-      if (!previous) {
-        return yield* new FailedToUpdatePostError();
-      }
-      if (previous.etaQuarter === args.etaQuarter) {
-        return;
-      }
       yield* transaction(
         Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          if (previous.etaQuarter === args.etaQuarter) {
+            return;
+          }
           yield* repository.updateEta({
             id: args.id,
             organizationId: args.organizationId,
