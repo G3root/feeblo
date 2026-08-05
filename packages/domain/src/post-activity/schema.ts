@@ -1,9 +1,9 @@
-import { PostActivityKind } from "@feeblo/db";
+import { PostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
 import { PostId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 /**
- * `PostActivityKind` comes from `@feeblo/db/activity-kind` — the canonical
+ * `PostActivityKind` comes from `@feeblo/db/validation-schema/activity-kind` — the canonical
  * vocabulary the `post_activity.kind` column type is derived from.
  */
 

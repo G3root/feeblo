@@ -1,3 +1,4 @@
+import { EntitySource } from "@feeblo/db/validation-schema/entity-source";
 import {
   ContactAttributeDefinitionId,
   ContactAttributeValueId,
@@ -82,7 +83,7 @@ export const Contact = S.Struct({
   phone: S.NullOr(S.String),
   avatar: S.NullOr(S.String),
   companyId: S.NullOr(S.String),
-  source: S.Literals(["DASHBOARD", "WIDGET", "API", "IMPORT"]),
+  source: EntitySource,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

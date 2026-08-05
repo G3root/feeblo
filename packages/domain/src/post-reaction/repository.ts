@@ -1,10 +1,10 @@
-import { schema, currentDb } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
 import { PostReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { and, eq } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as EffectArray from "effect/Array";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
@@ -176,16 +176,19 @@ const makePostReactionRepository = Effect.gen(function* () {
 
         const postReactionId = yield* PostReactionId.generate;
 
-        yield* db.insert(schema.postReactionTable).values({
-          id: postReactionId,
-          postId,
-          userId,
-          memberId: Option.match(member, {
-            onNone: () => null,
-            onSome: (value) => value.id,
-          }),
-          emoji,
-        }).onConflictDoNothing();
+        yield* db
+          .insert(schema.postReactionTable)
+          .values({
+            id: postReactionId,
+            postId,
+            userId,
+            memberId: Option.match(member, {
+              onNone: () => null,
+              onSome: (value) => value.id,
+            }),
+            emoji,
+          })
+          .onConflictDoNothing();
 
         return { reacted: true, emoji };
       }),
@@ -252,16 +255,19 @@ const makePostReactionRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         const postReactionId = yield* PostReactionId.generate;
-        yield* db.insert(schema.postReactionTable).values({
-          id: postReactionId,
-          postId,
-          userId,
-          memberId: Option.match(member, {
-            onNone: () => null,
-            onSome: (value) => value.id,
-          }),
-          emoji,
-        }).onConflictDoNothing();
+        yield* db
+          .insert(schema.postReactionTable)
+          .values({
+            id: postReactionId,
+            postId,
+            userId,
+            memberId: Option.match(member, {
+              onNone: () => null,
+              onSome: (value) => value.id,
+            }),
+            emoji,
+          })
+          .onConflictDoNothing();
 
         return { reacted: true, emoji };
       }),

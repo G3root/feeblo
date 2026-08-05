@@ -1,6 +1,5 @@
 /** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 
-export { PostActivityKind, type TPostActivityKind } from "./activity-kind";
 export * as Database from "./database";
 export { currentDb, transaction } from "./database";
 export * as DrizzleEffect from "./drizzle-effect";

@@ -17,7 +17,17 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
-import type { TPostActivityKind } from "../activity-kind";
+import type { TPostActivityKind } from "../validation-schema/activity-kind";
+import type { TAttributeType } from "../validation-schema/attribute-type";
+import type { TEntitySource } from "../validation-schema/entity-source";
+import type { TNotificationEventType } from "../validation-schema/notification-kind";
+import type { TPostSource } from "../validation-schema/post-source";
+import {
+  PostStatusType,
+  type TPostStatusType,
+} from "../validation-schema/post-status-type";
+import type { TRoadmapMode } from "../validation-schema/roadmap-mode";
+import type { TTagType } from "../validation-schema/tag-type";
 import { memberTable, organizationTable, userTable } from "./auth";
 
 const VectorValues = Schema.Array(Schema.Number);
@@ -40,18 +50,10 @@ export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PRIVATE",
 ]);
 
-export const postStatusEnum = pgEnum("post_status_types", [
-  "PENDING",
-  "REVIEW",
-  "PLANNED",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "CLOSED",
-]);
+/** Post-status types are plain text; vocabulary lives in `../post-status-type`. */
+export type TPostStatus = TPostStatusType;
 
-export type TPostStatus = (typeof postStatusEnum.enumValues)[number];
-
-export const POST_STATUS_TYPES = postStatusEnum.enumValues;
+export const POST_STATUS_TYPES = PostStatusType.literals;
 
 export const DEFAULT_POST_STATUSES = [
   { orderIndex: 0, type: "PENDING" },
@@ -81,54 +83,14 @@ export const roadmapVisibilityEnum = pgEnum("roadmap_visibility", [
   "HIDDEN",
 ]);
 
-export const roadmapModeEnum = pgEnum("roadmap_mode", ["status", "filtered"]);
-
 export const savedRoadmapVisibilityEnum = pgEnum("saved_roadmap_visibility", [
   "public",
   "private",
 ]);
 
-export const postIconTypeEnum = pgEnum("post_icon_type", ["EMOJI"]);
-
 export const postCommentVisibilityEnum = pgEnum("post_comment_visibility", [
   "PUBLIC",
   "INTERNAL",
-]);
-
-export const tagTypeEnum = pgEnum("tag_type", ["FEEDBACK", "CHANGELOG"]);
-
-export const postSourceEnum = pgEnum("post_source", [
-  "DASHBOARD",
-  "WIDGET",
-  "API",
-  "IMPORT",
-  "PUBLIC_BOARD",
-]);
-
-/**
- * Activity kinds are validated at the domain boundary; the DB column is plain
- * text so new kinds don't require enum migrations. The column type is derived
- * from the canonical `PostActivityKind` Effect Schema in `../activity-kind`.
- */
-export const notificationKindEnum = pgEnum("notification_kind", [
-  "feedback.submitted",
-  "feedback.commented",
-  "feedback.status_changed",
-]);
-
-export const contactCompanySourceEnum = pgEnum("contact_company_source", [
-  "DASHBOARD",
-  "WIDGET",
-  "API",
-  "IMPORT",
-]);
-
-export const attributeDataTypeEnum = pgEnum("attribute_data_type", [
-  "TEXT",
-  "INTEGER",
-  "DECIMAL",
-  "BOOLEAN",
-  "DATE",
 ]);
 
 export const boardTable = pgTable(
@@ -169,7 +131,7 @@ export const tagTable = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
-    type: tagTypeEnum("type").notNull(),
+    type: text("type").$type<TTagType>().notNull(),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -208,7 +170,7 @@ export const postStatusTable = pgTable(
   "post_status",
   {
     id: text("id").primaryKey(),
-    type: postStatusEnum("type").notNull(),
+    type: text("type").$type<TPostStatusType>().notNull(),
     orderIndex: integer("order_index").notNull(),
     organizationId: text("organization_id")
       .notNull()
@@ -242,7 +204,7 @@ export const roadmapTable = pgTable(
     slug: text("slug").notNull(),
     description: text("description"),
     isPrimary: boolean("is_primary").default(false).notNull(),
-    mode: roadmapModeEnum("mode").notNull(),
+    mode: text("mode").$type<TRoadmapMode>().notNull(),
     visibility: savedRoadmapVisibilityEnum("visibility").notNull(),
     // An empty condition list deliberately means every post in the workspace.
     filter: jsonb("filter")
@@ -400,7 +362,10 @@ export const companyTable = pgTable(
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
     externalCreatedAt: timestamp("external_created_at", { withTimezone: true }),
-    source: contactCompanySourceEnum("source").default("DASHBOARD").notNull(),
+    source: text("source")
+      .$type<TEntitySource>()
+      .default("DASHBOARD")
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -440,7 +405,10 @@ export const contactTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    source: contactCompanySourceEnum("source").default("DASHBOARD").notNull(),
+    source: text("source")
+      .$type<TEntitySource>()
+      .default("DASHBOARD")
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -494,7 +462,7 @@ export const postTable = pgTable(
     contactId: text("contact_id").references(() => contactTable.id, {
       onDelete: "set null",
     }),
-    source: postSourceEnum("source").default("DASHBOARD").notNull(),
+    source: text("source").$type<TPostSource>().default("DASHBOARD").notNull(),
     metadata: jsonb("metadata")
       .$type<Record<string, string>>()
       .notNull()
@@ -846,7 +814,7 @@ export const contactAttributeDefinitionTable = pgTable(
     name: text("name").notNull(),
     key: text("key").notNull(),
     description: text("description"),
-    type: attributeDataTypeEnum("type").notNull(),
+    type: text("type").$type<TAttributeType>().notNull(),
     config: jsonb("config").$type<{
       min?: number;
       max?: number;
@@ -923,7 +891,7 @@ export const companyAttributeDefinitionTable = pgTable(
     name: text("name").notNull(),
     key: text("key").notNull(),
     description: text("description"),
-    type: attributeDataTypeEnum("type").notNull(),
+    type: text("type").$type<TAttributeType>().notNull(),
     config: jsonb("config").$type<{
       min?: number;
       max?: number;
@@ -1040,7 +1008,7 @@ export const notificationTable = pgTable(
     actorMemberId: text("actor_member_id").references(() => memberTable.id, {
       onDelete: "set null",
     }),
-    kind: notificationKindEnum("kind").notNull(),
+    kind: text("kind").$type<TNotificationEventType>().notNull(),
     resourceType: text("resource_type").notNull(),
     resourceId: text("resource_id").notNull(),
     title: text("title").notNull(),

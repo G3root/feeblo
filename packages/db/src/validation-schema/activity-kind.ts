@@ -7,7 +7,7 @@ import * as S from "effect/Schema";
  * kinds don't require migrations; this Effect Schema is the single source of
  * truth. The column type is derived from it in `schema/feedback.ts`
  * (`$type<TPostActivityKind>()`), and `@feeblo/domain/post-activity/schema`
- * re-exports it for the RPC boundary.
+ * builds its structs on it.
  */
 export const PostActivityKind = S.Literals([
   "POST_CREATED",

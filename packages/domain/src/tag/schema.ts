@@ -1,7 +1,6 @@
+import { TagType } from "@feeblo/db/validation-schema/tag-type";
 import { ChangelogId, PostId, TagId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
-
-export const TagType = S.Literals(["FEEDBACK", "CHANGELOG"]);
 
 export const Tag = S.Struct({
   id: S.String,

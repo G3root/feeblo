@@ -1,4 +1,5 @@
-import { currentDb, schema, type TPostActivityKind } from "@feeblo/db";
+import { currentDb, schema } from "@feeblo/db";
+import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
 import { PostActivityId } from "@feeblo/id";
 import { and, asc, eq, gte } from "drizzle-orm";
 import * as Context from "effect/Context";
