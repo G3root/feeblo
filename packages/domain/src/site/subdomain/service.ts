@@ -29,6 +29,8 @@ const profanityError = (matches: string[]) =>
     message: `Subdomain contains profanity: ${matches.join(", ")}`,
   });
 
+const TOKEN_REGEX = /[^a-z]+/;
+
 export class SubdomainValidationService extends Context.Service<SubdomainValidationService>()(
   "SubdomainValidationService",
   {
@@ -52,7 +54,7 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
             return Effect.fail(reservedError(subdomain));
           }
 
-          const tokens = normalized.split(/[^a-z]+/).filter(Boolean);
+          const tokens = normalized.split(TOKEN_REGEX).filter(Boolean);
 
           const matches: string[] = [];
           for (const token of tokens) {
