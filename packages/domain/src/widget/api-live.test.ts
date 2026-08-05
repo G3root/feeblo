@@ -3,8 +3,11 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import { ChangelogId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import { ChangelogRepository } from "../changelog/repository";
-import { listWidgetUpdates } from "./api-live";
+import { RateLimitService } from "../rate-limit/service";
+import { InternalServerError } from "../rpc-errors";
+import { listWidgetUpdates, withWidgetRateLimit } from "./api-live";
 
 const TestLayer = Layer.mergeAll(
   Database.PgliteDatabaseLive,
@@ -97,5 +100,37 @@ layer(TestLayer)("widget updates", (it) => {
         });
         expect(updates[0]?.content).toContain("<img");
       })
+  );
+
+  it.effect(
+    "preserves suggestion rate-limit errors instead of mapping them to 500",
+    () => {
+      const request = HttpServerRequest.fromWeb(
+        new Request("http://localhost/api/widget/v1/suggestions")
+      );
+      const rateLimitedSuggestion = Effect.succeed("suggestions").pipe(
+        Effect.mapError(
+          () =>
+            new InternalServerError({
+              message: "Failed to find similar posts",
+            })
+        ),
+        withWidgetRateLimit({
+          name: "WidgetSuggestPostsTest",
+          level: "expensive",
+          limit: 1,
+        })
+      );
+
+      return Effect.gen(function* () {
+        yield* rateLimitedSuggestion;
+        const error = yield* Effect.flip(rateLimitedSuggestion);
+
+        expect(error._tag).toBe("RateLimitExceededError");
+      }).pipe(
+        Effect.provide(RateLimitService.layerMemory),
+        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+      );
+    }
   );
 });

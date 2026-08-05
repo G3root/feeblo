@@ -43,7 +43,7 @@ import {
 } from "../rpc-errors";
 import { upsertContactFromParsed } from "./sso";
 
-const withWidgetRateLimit =
+export const withWidgetRateLimit =
   (options: RateLimit.PublicRpcRateLimitOptions) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     Effect.gen(function* () {
@@ -167,10 +167,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
               slug,
             }));
         }).pipe(
-          withWidgetRateLimit({
-            name: "WidgetSuggestPosts",
-            level: "expensive",
-          }),
           Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
           Effect.mapError(
             () =>
@@ -178,7 +174,11 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 message: "Failed to find similar posts",
               })
           ),
-          withRemapDbErrors("Post", "select")
+          withRemapDbErrors("Post", "select"),
+          withWidgetRateLimit({
+            name: "WidgetSuggestPosts",
+            level: "expensive",
+          })
         )
       )
       .handle("listBoards", ({ payload }) =>
