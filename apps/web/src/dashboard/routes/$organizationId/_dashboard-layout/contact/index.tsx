@@ -1,11 +1,5 @@
 import { Button } from "@feeblo/ui/button";
 import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
-import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -13,6 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import {
   Table,
   TableBody,
@@ -21,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   ArrowUpRight01Icon,
   Delete02Icon,
@@ -130,6 +126,17 @@ function ContactPage() {
   const companiesById = new Map(companies.map((c) => [c.id, c]));
 
   const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
+  // Backend mirrors: ContactPolicy.canCreate requires contacts.create,
+  // canUpdate requires contacts.update, canDelete requires contacts.manage.
+  const { allowed: canCreate } = usePolicy(
+    hasPermission(organizationId, "contacts.create")
+  );
+  const { allowed: canUpdate } = usePolicy(
+    hasPermission(organizationId, "contacts.update")
+  );
+  const { allowed: canManage } = usePolicy(
+    hasPermission(organizationId, "contacts.manage")
+  );
 
   if (!contactsQuery.isLoading && contacts.length === 0) {
     return (
@@ -145,10 +152,12 @@ function ContactPage() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={openCreateDialog} type="button">
-              <HugeiconsIcon icon={UserAdd01Icon} />
-              Create contact
-            </Button>
+            {canCreate ? (
+              <Button onClick={openCreateDialog} type="button">
+                <HugeiconsIcon icon={UserAdd01Icon} />
+                Create contact
+              </Button>
+            ) : null}
           </EmptyContent>
         </Empty>
       </div>
@@ -158,10 +167,12 @@ function ContactPage() {
   return (
     <div className="p-3">
       <div className="mb-3 flex justify-end">
-        <Button onClick={openCreateDialog} type="button">
-          <HugeiconsIcon icon={UserAdd01Icon} />
-          Create contact
-        </Button>
+        {canCreate ? (
+          <Button onClick={openCreateDialog} type="button">
+            <HugeiconsIcon icon={UserAdd01Icon} />
+            Create contact
+          </Button>
+        ) : null}
       </div>
       <Table>
         <TableHeader>
@@ -184,6 +195,8 @@ function ContactPage() {
         <TableBody>
           {contacts.map((contact) => (
             <ContactTableRow
+              canManage={canManage}
+              canUpdate={canUpdate}
               company={
                 contact.companyId
                   ? companiesById.get(contact.companyId)
@@ -219,6 +232,8 @@ function ContactPage() {
 }
 
 function ContactTableRow({
+  canManage,
+  canUpdate,
   company,
   contact,
   definitions,
@@ -226,6 +241,8 @@ function ContactTableRow({
   onDelete,
   onEdit,
 }: {
+  canManage: boolean;
+  canUpdate: boolean;
   company?: { id: string; name: string };
   contact: {
     companyId: string | null;
@@ -283,33 +300,42 @@ function ContactTableRow({
       ))}
       <TableCell>{formatDate(contact.updatedAt)}</TableCell>
       <TableCell className="text-right">
-        <Menu>
-          <MenuTrigger
-            render={(triggerProps) => (
-              <Button
-                {...triggerProps}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <HugeiconsIcon icon={Ellipsis} />
-                <span className="sr-only">
-                  Open actions for {contact.name ?? "contact"}
-                </span>
-              </Button>
-            )}
-          />
-          <MenuPopup align="end" className="w-40">
-            <MenuItem onClick={onEdit}>
-              <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
-              <span>Edit</span>
-            </MenuItem>
-            <MenuItem onClick={onDelete} variant="destructive">
-              <HugeiconsIcon icon={Delete02Icon} />
-              <span>Delete</span>
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
+        {canUpdate || canManage ? (
+          <Menu>
+            <MenuTrigger
+              render={(triggerProps) => (
+                <Button
+                  {...triggerProps}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <HugeiconsIcon icon={Ellipsis} />
+                  <span className="sr-only">
+                    Open actions for {contact.name ?? "contact"}
+                  </span>
+                </Button>
+              )}
+            />
+            <MenuPopup align="end" className="w-40">
+              {canUpdate ? (
+                <MenuItem onClick={onEdit}>
+                  <HugeiconsIcon
+                    className="text-muted-foreground"
+                    icon={Edit}
+                  />
+                  <span>Edit</span>
+                </MenuItem>
+              ) : null}
+              {canManage ? (
+                <MenuItem onClick={onDelete} variant="destructive">
+                  <HugeiconsIcon icon={Delete02Icon} />
+                  <span>Delete</span>
+                </MenuItem>
+              ) : null}
+            </MenuPopup>
+          </Menu>
+        ) : null}
       </TableCell>
     </TableRow>
   );

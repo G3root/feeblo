@@ -1,15 +1,9 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
 import { TagRepository } from "./repository";
-
-type TIsOwner = {
-  organizationId: string;
-  tagId: string;
-};
 
 type TCanDelete = {
   organizationId: string;
@@ -24,40 +18,15 @@ type TCanUpdate = {
 const makeTagPolicy = Effect.gen(function* () {
   const repository = yield* TagRepository;
 
-  const isCreator = (args: TIsOwner) =>
-    Policy.policy((user) =>
-      repository
-        .findById({ id: args.tagId, organizationId: args.organizationId })
-        .pipe(
-          Effect.map((tag) => {
-            if (Option.isSome(tag)) {
-              return tag.value.creatorId === user.session.userId;
-            }
-            return false;
-          })
-        )
-    );
-
-  const isOwner = (args: TIsOwner) =>
-    Policy.any(
-      Policy.canPermission(args.organizationId, "tags.manage"),
-      isCreator(args)
-    );
-
+  // TODO ADD ORG OWNERSHIP CHECK
   const canCreate = (organizationId: string) =>
-    Policy.hasMembership(organizationId);
+    Policy.canPermission(organizationId, "tags.create");
 
   const canDelete = (args: TCanDelete) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({ organizationId: args.organizationId, tagId: args.tagId })
-    );
+    Policy.canPermission(args.organizationId, "tags.manage");
 
   const canUpdate = (args: TCanUpdate) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({ organizationId: args.organizationId, tagId: args.tagId })
-    );
+    Policy.canPermission(args.organizationId, "tags.manage");
 
   return {
     canCreate,

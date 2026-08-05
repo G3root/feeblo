@@ -1,11 +1,5 @@
 import { Button } from "@feeblo/ui/button";
 import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
-import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -13,6 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import {
   Table,
@@ -22,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import { cn } from "@feeblo/ui/utils";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   Delete02Icon,
   Edit,
@@ -33,7 +30,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { cn } from "@feeblo/ui/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import {
   useTagCreateDialogContext,
@@ -72,12 +68,16 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   const tags = tagsQuery?.data;
   const handleCreate = () =>
     createDialogStore.send({ type: "toggle", data: { type } });
+  // Backend mirror: TagPolicy.canCreate requires tags.create (manager+).
+  const { allowed: canCreateTag } = usePolicy(
+    hasPermission(organizationId, "tags.create")
+  );
 
   if (tagsQuery.isLoading) {
     return (
       <SkeletonLoader isLoading>
         <section className="space-y-6">
-          <TagTableActions onCreate={handleCreate} />
+          <TagTableActions canCreate={canCreateTag} onCreate={handleCreate} />
           <TagTableShell>
             {loadingRowIds.map((id) => (
               <TagTableLoadingRow key={id} />
@@ -91,7 +91,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   if (tagsQuery.isError) {
     return (
       <section className="space-y-6">
-        <TagTableActions onCreate={handleCreate} />
+        <TagTableActions canCreate={canCreateTag} onCreate={handleCreate} />
         <TagTableErrorState />
       </section>
     );
@@ -100,7 +100,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   if (tags.length === 0) {
     return (
       <section className="space-y-6">
-        <TagTableActions onCreate={handleCreate} />
+        <TagTableActions canCreate={canCreateTag} onCreate={handleCreate} />
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -110,10 +110,12 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
             <EmptyDescription>{emptyDescription}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={handleCreate} type="button">
-              <HugeiconsIcon icon={Plus} />
-              <span>Create tag</span>
-            </Button>
+            {canCreateTag ? (
+              <Button onClick={handleCreate} type="button">
+                <HugeiconsIcon icon={Plus} />
+                <span>Create tag</span>
+              </Button>
+            ) : null}
           </EmptyContent>
         </Empty>
       </section>
@@ -122,7 +124,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
 
   return (
     <section className="space-y-6">
-      <TagTableActions onCreate={handleCreate} />
+      <TagTableActions canCreate={canCreateTag} onCreate={handleCreate} />
       <TagTableShell>
         {tags.map((tag) => (
           <TagTableRow
@@ -141,6 +143,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
                 data: { tagId: tag.id },
               })
             }
+            organizationId={organizationId}
             updatedAt={tag.updatedAt}
           />
         ))}
@@ -149,14 +152,22 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   );
 }
 
-function TagTableActions({ onCreate }: { onCreate: () => void }) {
+function TagTableActions({
+  canCreate,
+  onCreate,
+}: {
+  canCreate: boolean;
+  onCreate: () => void;
+}) {
   return (
     <div className="flex items-center justify-end">
       <SkeletonWrapper>
-        <Button onClick={onCreate} type="button">
-          <HugeiconsIcon icon={Plus} />
-          <span>New tag</span>
-        </Button>
+        {canCreate ? (
+          <Button onClick={onCreate} type="button">
+            <HugeiconsIcon icon={Plus} />
+            <span>New tag</span>
+          </Button>
+        ) : null}
       </SkeletonWrapper>
     </div>
   );
@@ -167,6 +178,7 @@ type TagTableRowProps = {
   name: string;
   onDelete: () => void;
   onEdit: () => void;
+  organizationId: string;
   updatedAt: Date;
 };
 
@@ -186,8 +198,24 @@ function TagTableRow({
   name,
   onDelete,
   onEdit,
+  organizationId,
   updatedAt,
 }: TagTableRowProps) {
+  const { allowed: canManageTag } = usePolicy(
+    hasPermission(organizationId, "tags.manage")
+  );
+
+  if (!canManageTag) {
+    return (
+      <TableRow>
+        <TableCell className="font-medium">{name}</TableCell>
+        <TableCell>{formatDate(createdAt)}</TableCell>
+        <TableCell>{formatDate(updatedAt)}</TableCell>
+        <TableCell className="text-right" />
+      </TableRow>
+    );
+  }
+
   return (
     <TableRow>
       <TableCell className="font-medium">{name}</TableCell>
