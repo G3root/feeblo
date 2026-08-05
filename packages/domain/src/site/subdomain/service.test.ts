@@ -81,6 +81,31 @@ describe("SubdomainValidationService", () => {
     expect(bundledError).toBeInstanceOf(ProfanityError);
   });
 
+  it("matches configured words as exact tokens", async () => {
+    // A configured word matches only as a whole slug token.
+    const error = await validateOrFail("snarf-app", {
+      extraWords: ["snarf"],
+    });
+    expect(error).toBeInstanceOf(ProfanityError);
+    expect(error.message).toContain("snarf");
+
+    // No substring matching: "art" doesn't flag "smart".
+    const substringResult = await Effect.runPromise(
+      validate("smart", { extraWords: ["art"] })
+    );
+    expect(substringResult.valid).toBe(true);
+
+    // Configured words are not tokenized, so a compound like "foo-bar" is
+    // matched as a single whole token, which slug tokenization never
+    // produces. Configure each part separately instead.
+    for (const slug of ["foo-bar", "prefix-foo-bar-suffix"]) {
+      const compoundResult = await Effect.runPromise(
+        validate(slug, { extraWords: ["foo-bar"] })
+      );
+      expect(compoundResult.valid, slug).toBe(true);
+    }
+  });
+
   it("rejects reserved subdomains case-insensitively", async () => {
     for (const slug of ["APP", "Dashboard", "Www"]) {
       const error = await validateOrFail(slug);

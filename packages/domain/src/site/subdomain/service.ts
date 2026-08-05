@@ -36,13 +36,8 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
       const { extraWords } = yield* ProfanityConfig;
       const reservedSubdomains = getReservedSubdomains();
 
-      // leo-profanity provides the default English dictionary; extra words
-      // (PROFANITY_EXTRA_WORDS) are appended to it.
-      const profanitySet = new Set([...leo.list(), ...extraWords]);
+      const extraTokenSet = new Set(extraWords);
 
-      // Tokens are matched whole-word after splitting on non-letter separators,
-      // so "my-fuck-app" -> ["my", "fuck", "app"] catches hyphenated slugs while
-      // "class" / "cocktail" stay valid.
       const validate = Effect.fn("SubdomainValidationService.validate")(
         (
           subdomain: string
@@ -57,10 +52,14 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
             return Effect.fail(reservedError(subdomain));
           }
 
-          const matches = normalized
-            .split(/[^a-z]+/)
-            .filter(Boolean)
-            .filter((token) => profanitySet.has(token));
+          const tokens = normalized.split(/[^a-z]+/).filter(Boolean);
+
+          const matches: string[] = [];
+          for (const token of tokens) {
+            if (leo.check(token) || extraTokenSet.has(token)) {
+              matches.push(token);
+            }
+          }
 
           if (matches.length > 0) {
             return Effect.fail(profanityError(matches));
@@ -77,5 +76,7 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
   static readonly layer = Layer.effect(this, this.make);
 
   /** Self-contained layer driven by environment variables. */
-  static readonly layerEnv = this.layer.pipe(Layer.provide(ProfanityConfig.layer));
+  static readonly layerEnv = this.layer.pipe(
+    Layer.provide(ProfanityConfig.layer)
+  );
 }
