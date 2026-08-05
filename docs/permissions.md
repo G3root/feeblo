@@ -34,7 +34,7 @@ Real-world feedback platforms (Featurebase, Canny) use a two-layer model:
 
 ### Layer 1 — Role hierarchy
 
-```
+```text
 owner > admin > manager > contributor
 ```
 
@@ -56,7 +56,7 @@ A strict ranking where higher roles inherit everything below them:
 Instead of scattering `role === "owner" || role === "admin"`, every gate is a
 **named permission**:
 
-```
+```text
 boards.manage        changelog.manage    posts.moderate
 members.invite       members.remove      members.roles.assign
 site.manage          roadmap.manage      billing.manage
@@ -115,7 +115,7 @@ use the shared vocabulary (`isPrivilegedRole`) for privileged-member limits.
 
 ## Package layout
 
-```
+```text
 packages/permissions/
   src/roles.ts            Role union, rank, hierarchy helpers
   src/permissions.ts      Permission union + catalog (labels/descriptions)
@@ -182,6 +182,17 @@ that updates `member` and `invitation` rows; the schema default now reads
    `posts.moderate`; delete still gated by `posts.manage`/author.
 4. `changelog-editor.tsx` — edit gate = `changelog.manage` **or** creator.
 5. Roadmap pages use `roadmap.manage` instead of the generic owner/admin gate.
+
+**Manager-only operations are enforced on the backend, not just in the UI.**
+The board/changelog/tag/contact/company create/update policies check
+`boards.create` / `changelog.create` / `tags.create` / `contacts.create` /
+`contacts.update` / `companies.create` / `companies.update` (all manager+)
+instead of bare `hasMembership`, so direct RPC calls from a contributor are
+rejected with `PolicyDenied`. Frontend mirrors gate the same actions
+(`CreateBoardButton`, changelog “New Entry”, tag/contact/company rows) so
+contributors never see actions that would 403. `TagList` now returns
+`creatorId` so the tag rename/delete menu keeps the creator fallback, matching
+`TagPolicy.canUpdate`/`canDelete`.
 
 ## Rules of thumb for new code
 

@@ -23,7 +23,7 @@ export type { InvitableRole, Role } from "./roles";
 export {
   compareRoles,
   INVITABLE_ROLES,
-  isInvitablerole,
+  isInvitableRole,
   isPrivilegedRole,
   isRole,
   PRIVILEGED_ROLES,

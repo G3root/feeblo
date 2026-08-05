@@ -46,7 +46,10 @@ import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 import { drizzleAdapter } from "./adapter/drizzzle-adapter";
 import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
-import { ORGANIZATION_ROLES } from "./organization-roles";
+import {
+  ORGANIZATION_ROLES,
+  organizationAccessControl,
+} from "./organization-roles";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
 import { AUTH_SESSION_DURATION_SECONDS } from "./session";
@@ -407,6 +410,7 @@ export const initAuthHandler = (
           // Roles mirror @feeblo/permissions. better-auth's own ACL only gates
           // org-plugin endpoints (invite/remove/update role/team); the Feeblo
           // permission table in packages/permissions gates everything else.
+          ac: organizationAccessControl,
           roles: ORGANIZATION_ROLES,
           organizationHooks: {
             async beforeCreateInvitation(data) {

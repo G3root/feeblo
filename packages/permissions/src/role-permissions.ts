@@ -1,5 +1,5 @@
 import type { Permission } from "./permissions";
-import type { Role } from "./roles";
+import { ROLE_RANK, type Role } from "./roles";
 
 /**
  * Base grants per role. Roles inherit every permission of lower-ranked roles
@@ -55,13 +55,6 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "companies.attributes.manage",
   ],
   owner: ["workspace.delete", "members.roles.owner"],
-};
-
-const ROLE_RANK: Record<Role, number> = {
-  contributor: 0,
-  manager: 1,
-  admin: 2,
-  owner: 3,
 };
 
 /** Every permission granted to `role`, including inherited ones. */

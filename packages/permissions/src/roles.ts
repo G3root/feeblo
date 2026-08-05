@@ -4,7 +4,7 @@
  * Both the backend (`packages/domain`) and the frontend (`packages/web-shared`,
  * `apps/web`) must reference this module instead of hardcoding role literals.
  *
- * Modeled after Featurebase/Canny: a strict role hierarchy where higher roles
+ * a strict role hierarchy where higher roles
  * inherit the permissions of every lower role:
  *
  *   owner > admin > manager > contributor
@@ -44,8 +44,7 @@ export const PRIVILEGED_ROLES = [
 
 /**
  * Roles that can be granted via an invitation. Owners are never invited — the
- * owner role is created when the workspace is created (Featurebase/Canny
- * behave the same way).
+ * owner role is created when the workspace is created.
  */
 export const INVITABLE_ROLES = [
   "admin",
@@ -63,7 +62,7 @@ export const isPrivilegedRole = (role: unknown): boolean =>
   role === "owner" || role === "admin";
 
 /** True when `role` is a role that can be granted through an invitation. */
-export const isInvitablerole = (role: unknown): boolean =>
+export const isInvitableRole = (role: unknown): boolean =>
   role === "admin" || role === "manager" || role === "contributor";
 
 /**
