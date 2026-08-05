@@ -4,11 +4,13 @@ import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -17,9 +19,14 @@ import { fetchRpc } from "~/lib/runtime";
 
 export const Route = createFileRoute("/$organizationId/settings/security")({
   component: RouteComponent,
-
-  beforeLoad: async () => {
-    await jwtSecretCollection.preload();
+  beforeLoad: async ({ params }) => {
+    const session = await getAuthSession();
+    if (
+      session !== null &&
+      hasPermission(params.organizationId, "workspace.update")(session)
+    ) {
+      await jwtSecretCollection.preload();
+    }
     return null;
   },
 });
@@ -38,7 +45,22 @@ function RouteComponent() {
     hasPermission(organizationId, "workspace.update")
   );
 
-  const { data: secrets } = useLiveQuery(
+  if (isPolicyPending) {
+    return null;
+  }
+  if (!canManageSecurity) {
+    return <SettingsAccessDenied />;
+  }
+
+  return <SecuritySettingsContent organizationId={organizationId} />;
+}
+
+function SecuritySettingsContent({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
+  const { data: secrets, isLoading } = useLiveQuery(
     (q) =>
       q
         .from({ secret: jwtSecretCollection })
@@ -61,7 +83,7 @@ function RouteComponent() {
     return latest;
   }, null);
 
-  if (isPolicyPending || !canManageSecurity) {
+  if (isLoading) {
     return null;
   }
 

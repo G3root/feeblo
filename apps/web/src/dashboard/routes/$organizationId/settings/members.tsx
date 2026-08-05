@@ -473,7 +473,7 @@ function MemberListItem({
       </div>
 
       <div className="flex items-center gap-2">
-        <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
+        <PolicyGuard policy={hasPermission(organizationId, "members.assign")}>
           <Select
             onValueChange={async (value) => {
               if (!value) {
@@ -505,7 +505,7 @@ function MemberListItem({
             }}
             value={role}
           >
-            <SelectTrigger className="w-28" disabled={isOwner}>
+            <SelectTrigger className="w-28" disabled={!canManageTarget}>
               <SelectValue />
             </SelectTrigger>
             <SelectPopup>

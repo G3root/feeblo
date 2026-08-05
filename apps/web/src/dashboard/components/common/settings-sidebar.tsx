@@ -51,11 +51,13 @@ const settingsItems = [
       {
         label: "Workspace",
         icon: Building03Icon,
+        permission: "workspace.update" as const,
         to: "/$organizationId/settings/workspace" as const,
       },
       {
         label: "Customize Public Site",
         icon: PaintBrush04Icon,
+        permission: "site.update" as const,
         to: "/$organizationId/settings/customize" as const,
       },
       {
@@ -66,11 +68,13 @@ const settingsItems = [
       {
         label: "Custom Attributes",
         icon: PropertyNewIcon,
+        permission: "contacts.*" as const,
         to: "/$organizationId/settings/custom-attributes" as const,
       },
       {
         label: "Billing",
         icon: CreditCardIcon,
+        permission: "billing.update" as const,
         to: "/$organizationId/settings/billing" as const,
       },
       {
@@ -151,35 +155,41 @@ export function SettingsSidebar({
               <SidebarMenu>
                 {group.subItems.map((item) => {
                   const menuItem = (
-                    <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton
-                      isActive={
-                        pathname ===
-                        `/${organizationId}/settings/${item.to.split("/").slice(3)}`
-                      }
-                      render={(renderProps) => (
-                        <Link
-                          {...renderProps}
-                          params={{ organizationId }}
-                          to={item.to}
-                        >
-                          <HugeiconsIcon icon={item.icon} />
-                          <span>{item.label}</span>
-                        </Link>
-                      )}
-                    />
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={
+                          pathname ===
+                          `/${organizationId}/settings/${item.to.split("/").slice(3)}`
+                        }
+                        render={(renderProps) => (
+                          <Link
+                            {...renderProps}
+                            params={{ organizationId }}
+                            to={item.to}
+                          >
+                            <HugeiconsIcon icon={item.icon} />
+                            <span>{item.label}</span>
+                          </Link>
+                        )}
+                      />
                     </SidebarMenuItem>
                   );
 
-                  return "permission" in item && item.permission ? (
-                    <PolicyGuard
-                      key={item.to}
-                      policy={hasPermission(organizationId, item.permission)}
-                    >
-                      {menuItem}
-                    </PolicyGuard>
-                  ) : (
-                    menuItem
+                  return (
+                    <Fragment key={item.to}>
+                      {"permission" in item && item.permission ? (
+                        <PolicyGuard
+                          policy={hasPermission(
+                            organizationId,
+                            item.permission
+                          )}
+                        >
+                          {menuItem}
+                        </PolicyGuard>
+                      ) : (
+                        menuItem
+                      )}
+                    </Fragment>
                   );
                 })}
               </SidebarMenu>

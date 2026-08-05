@@ -30,6 +30,7 @@ export interface SelectedTag {
 }
 
 interface TagSelectProps {
+  canCreate?: boolean;
   disabled?: boolean;
   onTagSelect: (
     option: TagSelectOption,
@@ -41,6 +42,7 @@ interface TagSelectProps {
 }
 
 export function TagSelect({
+  canCreate = true,
   disabled = false,
   onTagSelect,
   selectedTags,
@@ -103,17 +105,19 @@ export function TagSelect({
             </ComboboxPopup>
           </Combobox>
         </div>
-        <Button
-          aria-label="Create tag"
-          disabled={disabled}
-          onClick={() =>
-            createDialogStore.send({ type: "toggle", data: { type } })
-          }
-          size="icon-sm"
-          variant="outline"
-        >
-          <HugeiconsIcon icon={PlusSignIcon} />
-        </Button>
+        {canCreate ? (
+          <Button
+            aria-label="Create tag"
+            disabled={disabled}
+            onClick={() =>
+              createDialogStore.send({ type: "toggle", data: { type } })
+            }
+            size="icon-sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} />
+          </Button>
+        ) : null}
       </div>
 
       {selected.length > 0 ? (

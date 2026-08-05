@@ -1,6 +1,10 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { toastManager } from "@feeblo/ui/toast";
-import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  hasMembership,
+  hasPermission,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
@@ -15,6 +19,9 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 export function PostTagField() {
   const { post, organizationId, isLocked } = usePostCollectionData();
   const { allowed: canChangeTags } = usePolicy(hasMembership(organizationId));
+  const { allowed: canCreateTags } = usePolicy(
+    hasPermission(organizationId, "tags.create")
+  );
 
   const disabled = isLocked || !canChangeTags;
   const { postTagCollection } = useDashboardCollections();
@@ -101,15 +108,18 @@ export function PostTagField() {
   return (
     <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
       <TagSelect
+        canCreate={canCreateTags}
         disabled={disabled}
         onTagSelect={handleTagSelect}
         selectedTags={postTags ?? []}
         tags={tags}
         type="FEEDBACK"
       />
-      <TagCreateDialog
-        onCreated={(tag) => handleTagSelect(tag, false, false)}
-      />
+      {canCreateTags ? (
+        <TagCreateDialog
+          onCreated={(tag) => handleTagSelect(tag, false, false)}
+        />
+      ) : null}
     </TagCreateDialogProvider>
   );
 }
