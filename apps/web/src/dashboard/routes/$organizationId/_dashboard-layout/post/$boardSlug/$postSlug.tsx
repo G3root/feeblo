@@ -158,23 +158,20 @@ function RouteComponent() {
           </section>
         </div>
 
-        <aside className="hidden px-6 py-6 lg:block">
-          <div className="sticky top-0 space-y-4">
+        <aside className="px-6 py-6">
+          <div className="space-y-4 lg:sticky lg:top-0">
             <PostSidebarActions />
 
-            <PostPage.CanManage>
-              {(canManagePost) => (
-                <>
-                  <div>
-                    <PostStatusSelect disabled={!canManagePost} />
-                  </div>
+            {/* Each field self-gates with the permission the backend enforces
+                (PostPolicy.canUpdateProperties): status → posts.status,
+                board → posts.move, ETA → posts.status. */}
+            <div>
+              <PostStatusSelect />
+            </div>
 
-                  <PostBoardField disabled={!canManagePost} />
+            <PostBoardField />
 
-                  <PostEtaField disabled={!canManagePost} />
-                </>
-              )}
-            </PostPage.CanManage>
+            <PostEtaField />
 
             <div>
               <Separator />

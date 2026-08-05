@@ -197,6 +197,13 @@ const makePostPolicy = Effect.gen(function* () {
       )
     );
 
+  /** ETA is a post property reserved for managers and above (`posts.status`). */
+  const canUpdateEta = (organizationId: string) =>
+    Policy.all(
+      Policy.hasMembership(organizationId),
+      Policy.canPermission(organizationId, "posts.status")
+    );
+
   const canAdminUpdate = (organizationId: string) =>
     Policy.canPermission(organizationId, "posts.*");
 
@@ -209,6 +216,7 @@ const makePostPolicy = Effect.gen(function* () {
     canDelete,
     canUpdate,
     canUpdateProperties,
+    canUpdateEta,
     canAdminUpdate,
     canMerge,
   };

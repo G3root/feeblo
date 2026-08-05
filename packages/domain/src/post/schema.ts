@@ -74,10 +74,17 @@ export const PostUpdate = S.Struct({
   statusId: PostStatusId.schema,
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
-  etaQuarter: S.optional(S.NullOr(EtaQuarter)),
 });
 
 export type TPostUpdate = S.Schema.Type<typeof PostUpdate>;
+
+export const PostUpdateEta = S.Struct({
+  id: PostId.schema,
+  organizationId: WorkspaceId.schema,
+  etaQuarter: S.NullOr(EtaQuarter),
+});
+
+export type TPostUpdateEta = S.Schema.Type<typeof PostUpdateEta>;
 
 export const PostUpdateContent = S.Struct({
   assetIds: S.Array(S.String),

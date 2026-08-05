@@ -5,9 +5,12 @@ import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Calendar03Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { createOptimisticAction } from "@tanstack/react-db";
 import { useState } from "react";
+import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 const QUARTERS = [1, 2, 3, 4] as const;
@@ -42,12 +45,36 @@ function getQuarterValue(year: number, quarter: number) {
 }
 
 export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
-  const { post, isLocked, canManagePost } = usePostCollectionData();
+  const { post, isLocked, organizationId } = usePostCollectionData();
   const { postCollection } = useDashboardCollections();
+  // Backend mirror: PostPolicy.canUpdateEta lets `posts.status` holders
+  // (managers and above) set the ETA via PostUpdateEta.
+  const { allowed: canUpdateEta } = usePolicy(
+    hasPermission(organizationId, "posts.status")
+  );
   const selectedDate = getQuarterDate(post.etaQuarter);
   const [month, setMonth] = useState(selectedDate ?? new Date());
   const [open, setOpen] = useState(false);
-  const isDisabled = disabled || isLocked || !canManagePost;
+  const isDisabled = disabled || isLocked || !canUpdateEta;
+
+  const updatePostEta = createOptimisticAction<{ etaQuarter: string | null }>({
+    onMutate: ({ etaQuarter }) => {
+      postCollection.update(post.id, (draft) => {
+        draft.etaQuarter = etaQuarter;
+      });
+    },
+    mutationFn: async ({ etaQuarter }) => {
+      await fetchRpc((rpc) =>
+        rpc.PostUpdateEta({
+          id: post.id,
+          organizationId,
+          etaQuarter,
+        })
+      );
+
+      await postCollection.utils.refetch();
+    },
+  });
 
   const updateEta = async (etaQuarter: string | null) => {
     if (isDisabled || etaQuarter === post.etaQuarter) {
@@ -56,10 +83,8 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
     }
 
     try {
-      const tx = postCollection.update(post.id, (draft) => {
-        draft.etaQuarter = etaQuarter;
-      });
-      await tx.isPersisted.promise;
+      const transaction = updatePostEta({ etaQuarter });
+      await transaction.isPersisted.promise;
       trackEvent("post_updated", { field: "eta", success: true });
       toastManager.add({
         title: etaQuarter ? "ETA updated" : "ETA cleared",

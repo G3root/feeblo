@@ -106,7 +106,6 @@ export const postCollection = createCollection(
           statusId: updatedPost.statusId,
           boardId: updatedPost.boardId,
           organizationId: updatedPost.organizationId,
-          etaQuarter: updatedPost.etaQuarter,
         })
       );
 

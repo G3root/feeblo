@@ -507,6 +507,135 @@ describe("PostRpcHandlers", () => {
       );
     });
 
+    describe("PostUpdateEta", () => {
+      it.effect("lets a manager set the ETA", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostUpdateEta({
+              id: postId,
+              organizationId: fixture.organizationId,
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const [row] = yield* db
+            .select({ etaQuarter: schema.postTable.etaQuarter })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(row?.etaQuarter).toBe("2026-Q3");
+        })
+      );
+
+      it.effect("lets a manager clear the ETA", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Eta feedback"),
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostUpdateEta({
+              id: postId,
+              organizationId: fixture.organizationId,
+              etaQuarter: null,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const [row] = yield* db
+            .select({ etaQuarter: schema.postTable.etaQuarter })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(row?.etaQuarter).toBeNull();
+        })
+      );
+
+      it.effect("denies a contributor", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdateEta({
+                id: postId,
+                organizationId: fixture.organizationId,
+                etaQuarter: "2026-Q3",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "contributor")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("denies a non-member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdateEta({
+                id: postId,
+                organizationId: fixture.organizationId,
+                etaQuarter: "2026-Q3",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+    });
+
     describe("PostUpdatePublic", () => {
       it.effect("lets non-members update their own unlocked public posts", () =>
         Effect.gen(function* () {

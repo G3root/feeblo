@@ -484,6 +484,26 @@ const makePostRepository = Effect.gen(function* () {
         )
         .pipe(Effect.asVoid),
 
+    updateEta: ({
+      id,
+      organizationId,
+      etaQuarter,
+    }: {
+      id: string;
+      organizationId: string;
+      etaQuarter: string | null;
+    }) =>
+      db
+        .update(schema.postTable)
+        .set({ etaQuarter })
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
+
     updateEmbedding: ({
       embedding,
       expectedContent,
