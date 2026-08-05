@@ -7,6 +7,7 @@ type TPageType = "Dashboard" | "PublicPage";
 export interface PostCollectionState {
   board: TBoard;
   canManagePost: boolean;
+  canModeratePost: boolean;
   isArchived: boolean;
   isAuthenticated: boolean;
   isLocked: boolean;
@@ -58,6 +59,7 @@ export function PostCollectionStateProvider({
 export function createPostCollectionState({
   board,
   canManagePost,
+  canModeratePost,
   isAuthenticated,
   isMember,
   organizationId,
@@ -66,11 +68,12 @@ export function createPostCollectionState({
 }: PostCollectionDataProviderProps &
   Pick<
     PostCollectionState,
-    "canManagePost" | "isAuthenticated" | "isMember"
+    "canManagePost" | "canModeratePost" | "isAuthenticated" | "isMember"
   >): PostCollectionState {
   return {
     board,
     canManagePost,
+    canModeratePost,
     isArchived: post.archivedAt != null,
     isAuthenticated,
     isLocked: post.lockedAt != null,

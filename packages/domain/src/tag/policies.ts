@@ -40,7 +40,7 @@ const makeTagPolicy = Effect.gen(function* () {
 
   const isOwner = (args: TIsOwner) =>
     Policy.any(
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "tags.manage"),
       isCreator(args)
     );
 

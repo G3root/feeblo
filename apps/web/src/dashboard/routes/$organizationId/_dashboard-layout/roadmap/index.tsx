@@ -1,6 +1,6 @@
 import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
 import { Button } from "@feeblo/ui/button";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -182,7 +182,9 @@ function RouteComponent() {
 function RoadmapListHeader() {
   const organizationId = useOrganizationId();
   const createStore = useCreateRoadmapDialogContext();
-  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
+  const { allowed: canManage } = usePolicy(
+    hasPermission(organizationId, "roadmap.manage")
+  );
 
   return (
     <div className="flex items-center justify-between px-3">

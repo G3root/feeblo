@@ -8,7 +8,9 @@ import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import {
   allPolicy,
+  anyPolicy,
   hasMembership,
+  hasPermission,
   isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
@@ -190,8 +192,16 @@ export function ChangelogEditorProvider({
   const { changelogCollection } = useDashboardCollections();
   const editorScope = useRef(crypto.randomUUID()).current;
   const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
+  // Backend mirror: ChangelogPolicy.canUpdate = hasMembership AND
+  // (changelog.manage OR entry creator).
   const { allowed: isOwner } = usePolicy(
-    allPolicy(hasMembership(organizationId), isUser(changelog.creatorId ?? ""))
+    anyPolicy(
+      hasPermission(organizationId, "changelog.manage"),
+      allPolicy(
+        hasMembership(organizationId),
+        isUser(changelog.creatorId ?? "")
+      )
+    )
   );
   const form = useChangelogEditorForm({
     changelog,

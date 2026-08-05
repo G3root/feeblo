@@ -10,15 +10,7 @@ import { OrganizationRpcs } from "./rpcs";
 import type { TOrganizationUpdate } from "./schema";
 
 const canManageOrganization = (organizationId: string) =>
-  Policy.policy((session) =>
-    Effect.succeed(
-      session.memberships.some(
-        (membership) =>
-          membership.organizationId === organizationId &&
-          (membership.role === "owner" || membership.role === "admin")
-      )
-    )
-  );
+  Policy.canPermission(organizationId, "workspace.manage");
 
 export const OrganizationRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* OrganizationRepository;

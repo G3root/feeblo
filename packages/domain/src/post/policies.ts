@@ -67,15 +67,7 @@ const makePostPolicy = Effect.gen(function* () {
     );
 
   const isOrganizationOwnerOrAdmin = (organizationId: string) =>
-    Policy.policy((user) =>
-      Effect.succeed(
-        user.memberships.some(
-          (membership) =>
-            membership.organizationId === organizationId &&
-            (membership.role === "owner" || membership.role === "admin")
-        )
-      )
-    );
+    Policy.canPermission(organizationId, "workspace.manage");
 
   const isOwner = (args: TIsCreator) =>
     Policy.any(
@@ -153,7 +145,7 @@ const makePostPolicy = Effect.gen(function* () {
   };
 
   const canAdminUpdate = (organizationId: string) =>
-    isOrganizationOwnerOrAdmin(organizationId);
+    Policy.canPermission(organizationId, "posts.moderate");
 
   const canMerge = canAdminUpdate;
 

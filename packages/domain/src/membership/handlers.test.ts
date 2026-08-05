@@ -136,7 +136,7 @@ describe("MembershipRpcHandlers", () => {
 
         yield* policy.canInviteRoleWithinPlan({
           organizationId: fixture.organizationId,
-          role: "member",
+          role: "manager",
         });
       })
     );
@@ -213,7 +213,7 @@ describe("MembershipRpcHandlers", () => {
           id: targetMemberId,
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
-          role: "member",
+          role: "manager",
           createdAt: new Date(),
         });
         yield* db.insert(schema.userTable).values({
@@ -266,7 +266,7 @@ describe("MembershipRpcHandlers", () => {
           id: targetMemberId,
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
-          role: "member",
+          role: "manager",
           createdAt: new Date(),
         });
 
@@ -426,7 +426,7 @@ describe("MembershipRpcHandlers", () => {
           id: memberId,
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
-          role: "member",
+          role: "manager",
           createdAt: new Date(),
         });
         yield* db

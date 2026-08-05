@@ -21,7 +21,7 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
   const sitePolicy = yield* SitePolicy;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
   const manage = (organizationId: string) =>
-    Policy.hasOrganizationOwnerOrAdmin(organizationId);
+    Policy.canPermission(organizationId, "roadmap.manage");
   return {
     RoadmapColumnList: (args: TRoadmapColumnList) =>
       columns

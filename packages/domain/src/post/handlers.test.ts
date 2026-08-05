@@ -382,7 +382,7 @@ describe("PostRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member")
+                makeSession(fixture, "manager")
               )
             );
           yield* handlers
@@ -395,7 +395,7 @@ describe("PostRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member")
+                makeSession(fixture, "manager")
               )
             );
 
@@ -535,7 +535,7 @@ describe("PostRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, "member")
+                  makeSession(fixture, "manager")
                 )
               )
           );

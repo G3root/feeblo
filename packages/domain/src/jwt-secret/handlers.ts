@@ -11,17 +11,8 @@ import type {
   TJwtSecretRotate,
 } from "./schema";
 
-//TODO migrate to policy
 const canManageJwtSecret = (organizationId: string) =>
-  Policy.policy((session) =>
-    Effect.succeed(
-      session.memberships.some(
-        (membership) =>
-          membership.organizationId === organizationId &&
-          (membership.role === "owner" || membership.role === "admin")
-      )
-    )
-  );
+  Policy.canPermission(organizationId, "workspace.manage");
 
 export const JwtSecretRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* JwtSecretRepository;

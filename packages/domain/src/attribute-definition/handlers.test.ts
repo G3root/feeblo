@@ -167,7 +167,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
           ...session,
           memberships: session.memberships.map((membership) => ({
             ...membership,
-            role: "member",
+            role: "manager",
           })),
         };
         const provideMemberSession = Effect.provideService(

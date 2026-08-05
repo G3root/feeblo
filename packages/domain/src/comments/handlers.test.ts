@@ -648,7 +648,7 @@ describe("CommentRpcHandlers", () => {
             id: otherMembershipId,
             organizationId: fixture.organizationId,
             userId: otherUserId,
-            role: "member",
+            role: "manager",
             createdAt: new Date(),
           });
 
@@ -665,7 +665,7 @@ describe("CommentRpcHandlers", () => {
               {
                 membershipId: otherMembershipId,
                 organizationId: fixture.organizationId,
-                role: "member" as const,
+                role: "manager" as const,
               },
             ],
           };
@@ -872,7 +872,7 @@ describe("CommentRpcHandlers", () => {
             id: otherMembershipId,
             organizationId: fixture.organizationId,
             userId: otherUserId,
-            role: "member",
+            role: "manager",
             createdAt: new Date(),
           });
 
@@ -889,7 +889,7 @@ describe("CommentRpcHandlers", () => {
               {
                 membershipId: otherMembershipId,
                 organizationId: fixture.organizationId,
-                role: "member" as const,
+                role: "manager" as const,
               },
             ],
           };

@@ -84,6 +84,8 @@ function CreateBoardForm() {
           visibility: data.value.visibility,
           slug: slugify(data.value.name),
           organizationId,
+          // The server fills in the real creator id from the session.
+          creatorId: null,
         });
 
         await tx.isPersisted.promise;

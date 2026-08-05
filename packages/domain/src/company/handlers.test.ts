@@ -181,7 +181,7 @@ describe("CompanyRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member")
+                makeSession(fixture, "manager")
               )
             )
         );

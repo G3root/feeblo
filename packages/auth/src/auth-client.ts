@@ -8,6 +8,7 @@ import {
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import { z } from "zod";
 import { clientTimeZoneHeader } from "./client-time-zone";
+import { ORGANIZATION_ROLES } from "./organization-roles";
 import { jwtAutoLoginClient } from "./plugins/jwt-auto-login/client";
 import type {
   Auth,
@@ -23,7 +24,7 @@ export const createAuthClient = (
     plugins: [
       customSessionClient<Auth>(),
       emailOTPClient(),
-      organizationClient(),
+      organizationClient({ roles: ORGANIZATION_ROLES }),
       twoFactorClient(),
       adminClient(),
       jwtAutoLoginClient(),

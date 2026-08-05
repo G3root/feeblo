@@ -9,6 +9,12 @@ export const Board = S.Struct({
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
   organizationId: S.String,
+  /**
+   * User id of the board creator, exposed so the frontend can mirror the
+   * backend's "board creator may manage their board" resource check without
+   * an extra RPC.
+   */
+  creatorId: S.NullOr(S.String),
 });
 
 export type TBoard = S.Schema.Type<typeof Board>;

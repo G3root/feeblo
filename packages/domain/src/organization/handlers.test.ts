@@ -155,7 +155,7 @@ describe("OrganizationRpcHandlers", () => {
               id: `membership_${secondOrgId}`,
               organizationId: secondOrgId,
               userId: fixture.userId,
-              role: "member",
+              role: "manager",
               createdAt: now,
             });
 
@@ -181,7 +181,7 @@ describe("OrganizationRpcHandlers", () => {
                 {
                   membershipId: `membership_${secondOrgId}`,
                   organizationId: secondOrgId,
-                  role: "member",
+                  role: "manager",
                 },
               ],
             };
@@ -270,7 +270,7 @@ describe("OrganizationRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, "member")
+                  makeSession(fixture, "manager")
                 )
               )
           );

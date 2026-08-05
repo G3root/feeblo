@@ -1,6 +1,6 @@
 import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
 import { Button } from "@feeblo/ui/button";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Edit01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -173,7 +173,9 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
   const createStore = useCreateRoadmapDialogContext();
   const deleteStore = useDeleteRoadmapDialogContext();
   const editStore = useEditRoadmapDialogContext();
-  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
+  const { allowed: canManage } = usePolicy(
+    hasPermission(organizationId, "roadmap.manage")
+  );
 
   const handleDeleteClick = () => {
     deleteStore.send({ type: "toggle", data: { roadmapId } });

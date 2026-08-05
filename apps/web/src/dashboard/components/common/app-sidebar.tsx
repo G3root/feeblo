@@ -28,7 +28,12 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  anyPolicy,
+  hasPermission,
+  isUser,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import {
   ArrowRight01Icon,
   Building06Icon,
@@ -256,6 +261,7 @@ function BoardList() {
     <SkeletonLoader isLoading={false}>
       {boardQuery.data.map((board) => (
         <BoardItem
+          boardCreatorId={board.creatorId}
           boardPublicId={board.id}
           boardSlug={board.slug}
           key={board.id}
@@ -267,15 +273,16 @@ function BoardList() {
 }
 
 interface BoardItemProp {
+  boardCreatorId?: string | null;
   boardPublicId: string;
   boardSlug: string;
   name: string;
 }
 
 function BoardItem({
+  boardCreatorId,
   boardPublicId,
   name,
-
   boardSlug,
 }: BoardItemProp) {
   const organizationId = useOrganizationId();
@@ -299,20 +306,32 @@ function BoardItem({
             </Link>
           )}
         />
-        <BoardMenuWithPolicy boardPublicId={boardPublicId} />
+        <BoardMenuWithPolicy
+          boardCreatorId={boardCreatorId}
+          boardPublicId={boardPublicId}
+        />
       </SidebarMenuItem>
     </SkeletonWrapper>
   );
 }
 
 interface BoardMenuProps {
+  boardCreatorId?: string | null;
   boardPublicId: string;
 }
 
-function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
+function BoardMenuWithPolicy({
+  boardPublicId,
+  boardCreatorId,
+}: BoardMenuProps) {
   const organizationId = useOrganizationId();
+  // Backend mirror: BoardPolicy.canUpdate/canDelete = hasMembership AND
+  // (boards.manage OR board creator).
   const { allowed: canManageBoard } = usePolicy(
-    hasOwnerOrAdminRole(organizationId)
+    anyPolicy(
+      hasPermission(organizationId, "boards.manage"),
+      isUser(boardCreatorId ?? "")
+    )
   );
   if (!canManageBoard) {
     return null;
@@ -399,10 +418,7 @@ function RoadmapNav({ pathname }: { pathname: string }) {
   const roadmaps = roadmapsQuery.data ?? [];
 
   return (
-    <Collapsible
-      className="group/collapsible"
-      defaultOpen={isActive}
-    >
+    <Collapsible className="group/collapsible" defaultOpen={isActive}>
       <SidebarMenuItem>
         <CollapsibleTrigger
           render={(props) => (
@@ -427,8 +443,7 @@ function RoadmapNav({ pathname }: { pathname: string }) {
               <SidebarMenuSubItem key={roadmap.id}>
                 <SidebarMenuSubButton
                   isActive={
-                    pathname ===
-                    `/${organizationId}/roadmap/${roadmap.slug}`
+                    pathname === `/${organizationId}/roadmap/${roadmap.slug}`
                   }
                   render={(props) => (
                     <Link

@@ -104,6 +104,7 @@ const makeBoardRepository = Effect.gen(function* () {
             createdAt: schema.boardTable.createdAt,
             updatedAt: schema.boardTable.updatedAt,
             organizationId: schema.boardTable.organizationId,
+            creatorId: schema.boardTable.creatorId,
           })
           .from(schema.boardTable)
           .where(whereClause);

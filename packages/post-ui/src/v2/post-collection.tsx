@@ -1,7 +1,7 @@
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   anyPolicy,
-  hasOwnerOrAdminRole,
+  hasPermission,
   isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
@@ -19,9 +19,15 @@ export function PostCollectionDataProvider({
   pageType,
 }: PostCollectionDataProviderProps) {
   const { data: session } = useAuthState();
+  const { allowed: canModeratePost } = usePolicy(
+    hasPermission(organizationId, "posts.moderate")
+  );
+  // Backend mirror: PostPolicy.canUpdate/canDelete = hasMembership AND
+  // (posts.manage OR post creator). Posts.moderate (lock/archive/merge) is
+  // owner/admin only and intentionally NOT granted to authors.
   const { allowed: canManagePost } = usePolicy(
     anyPolicy(
-      hasOwnerOrAdminRole(organizationId),
+      hasPermission(organizationId, "posts.manage"),
       isUser(post?.creatorId ?? "")
     )
   );
@@ -34,6 +40,7 @@ export function PostCollectionDataProvider({
     board,
     post,
     canManagePost,
+    canModeratePost,
     organizationId,
     isMember,
     isAuthenticated: Boolean(session?.session),

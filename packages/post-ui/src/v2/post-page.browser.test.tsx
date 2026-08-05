@@ -13,7 +13,7 @@ vi.mock("@feeblo/web-shared/use-auth-state", () => ({
 }));
 vi.mock("@feeblo/web-shared/use-policy", () => ({
   anyPolicy: vi.fn(),
-  hasOwnerOrAdminRole: vi.fn(),
+  hasPermission: vi.fn(),
   isUser: vi.fn(),
   usePolicy: () => ({ allowed: false }),
 }));
@@ -45,6 +45,7 @@ const board = { visibility: "PUBLIC" } as TBoard;
 function state({
   authenticated = false,
   canManage = false,
+  canModerate = false,
   locked = false,
 } = {}) {
   const post = {
@@ -56,6 +57,7 @@ function state({
   return createPostCollectionState({
     board,
     canManagePost: canManage,
+    canModeratePost: canModerate,
     isAuthenticated: authenticated,
     isMember: authenticated,
     organizationId: "organization-id",
