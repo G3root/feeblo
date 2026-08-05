@@ -54,12 +54,19 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
             return Effect.fail(reservedError(subdomain));
           }
 
-          const tokens = normalized.split(TOKEN_REGEX).filter(Boolean);
-
           const matches: string[] = [];
-          for (const token of tokens) {
-            if (leo.check(token) || extraTokenSet.has(token)) {
-              matches.push(token);
+
+          // Configured compounds (e.g. "foo-bar") are stored intact, so match
+          // the whole slug before tokenizing — otherwise tokenization splits
+          // the slug into pieces that never equal the prohibited compound.
+          if (extraTokenSet.has(normalized)) {
+            matches.push(normalized);
+          } else {
+            const tokens = normalized.split(TOKEN_REGEX).filter(Boolean);
+            for (const token of tokens) {
+              if (leo.check(token) || extraTokenSet.has(token)) {
+                matches.push(token);
+              }
             }
           }
 

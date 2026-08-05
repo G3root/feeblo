@@ -94,16 +94,23 @@ describe("SubdomainValidationService", () => {
       validate("smart", { extraWords: ["art"] })
     );
     expect(substringResult.valid).toBe(true);
+  });
 
-    // Configured words are not tokenized, so a compound like "foo-bar" is
-    // matched as a single whole token, which slug tokenization never
-    // produces. Configure each part separately instead.
-    for (const slug of ["foo-bar", "prefix-foo-bar-suffix"]) {
-      const compoundResult = await Effect.runPromise(
-        validate(slug, { extraWords: ["foo-bar"] })
-      );
-      expect(compoundResult.valid, slug).toBe(true);
-    }
+  it("rejects explicitly configured compound words intact", async () => {
+    // A configured compound like "foo-bar" is stored intact and matched
+    // against the whole slug, so the prohibited compound is rejected.
+    const error = await validateOrFail("foo-bar", {
+      extraWords: ["foo-bar"],
+    });
+    expect(error).toBeInstanceOf(ProfanityError);
+    expect(error.message).toContain("foo-bar");
+
+    // Whole-slug matching is exact: a slug that merely contains the
+    // compound (but isn't equal to it) is not flagged by it.
+    const containedResult = await Effect.runPromise(
+      validate("prefix-foo-bar-suffix", { extraWords: ["foo-bar"] })
+    );
+    expect(containedResult.valid).toBe(true);
   });
 
   it("rejects reserved subdomains case-insensitively", async () => {
