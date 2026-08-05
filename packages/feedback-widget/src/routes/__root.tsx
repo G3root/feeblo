@@ -8,8 +8,8 @@ import {
   onMount,
   Show,
 } from "solid-js";
-import { ErrorFallback } from "../components/error-fallback";
 import { Button } from "../components/ui/button";
+import { ErrorFallback } from "../components/ui/error-fallback";
 import { Icon } from "../components/ui/icon";
 import { getWidgetConfig, moduleForPath } from "../lib/config";
 import { setWidgetContext } from "../lib/context";

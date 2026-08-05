@@ -733,6 +733,9 @@ importers:
 
   packages/feedback-widget:
     dependencies:
+      '@feeblo/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@feeblo/web-shared':
         specifier: workspace:*
         version: link:../web-shared
