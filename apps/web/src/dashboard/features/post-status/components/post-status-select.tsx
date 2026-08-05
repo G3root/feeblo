@@ -2,13 +2,16 @@ import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { StatusField } from "@feeblo/post-ui/post-properties";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
-  const { post, organizationId, isLocked, canManagePost } =
-    usePostCollectionData();
-  const isDisabled = disabled || isLocked || !canManagePost;
+  const { post, organizationId, isLocked } = usePostCollectionData();
+  const { allowed: canChangeStatus } = usePolicy(
+    hasPermission(organizationId, "posts.status")
+  );
+  const isDisabled = disabled || isLocked || !canChangeStatus;
   const { postCollection, postStatusCollection } = useDashboardCollections();
 
   const { data: postStatuses } = useLiveQuery(

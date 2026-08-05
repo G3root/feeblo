@@ -1,16 +1,12 @@
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
+import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import {
-  allPolicy,
-  hasMembership,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
   Delete02Icon,
@@ -18,7 +14,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { createContext, type ReactNode, use } from "react";
+import { createContext, type ReactNode, use, useRef } from "react";
 import { z } from "zod";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
@@ -31,6 +27,7 @@ import { ChangelogPublishDialog } from "./changelog-publish-dialog";
 import { ChangelogStatusBadge } from "./changelog-status";
 
 export type TChangelogEditorRecord = {
+  assetIds?: readonly string[];
   id: string;
   title: string;
   slug: string;
@@ -71,9 +68,11 @@ type ChangelogEditorProviderProps = {
 
 function useChangelogEditorForm({
   changelog,
+  editorScope,
   organizationId,
 }: {
   changelog: TChangelogEditorRecord;
+  editorScope: string;
   organizationId: string;
 }) {
   const { changelogCollection } = useDashboardCollections();
@@ -95,11 +94,18 @@ function useChangelogEditorForm({
       const submitMeta = meta as ChangelogSubmitMeta | undefined;
 
       try {
+        const finalized = await finalizeEditorContent(
+          value.content,
+          organizationId,
+          { assetIds: changelog.assetIds, scope: editorScope }
+        );
+        const { assetIds, content } = finalized;
         const payload = updatedChangelogSchema.parse({
           id: changelog.id,
           title: value.title.trim(),
           slug: submitMeta?.overrides?.slug ?? changelog.slug,
-          content: value.content,
+          content,
+          assetIds,
           status: submitMeta?.overrides?.status ?? changelog.status,
           scheduledAt:
             submitMeta?.overrides && "scheduledAt" in submitMeta.overrides
@@ -116,12 +122,14 @@ function useChangelogEditorForm({
           draft.title = payload.title;
           draft.slug = payload.slug;
           draft.content = payload.content;
+          draft.assetIds = payload.assetIds;
           draft.status = payload.status;
           draft.scheduledAt = payload.scheduledAt;
           draft.publishedAt = payload.publishedAt;
         });
 
         await tx.isPersisted.promise;
+        finalized.commit();
         trackEvent("changelog_saved", {
           status: payload.status,
           success: true,
@@ -157,6 +165,7 @@ type ChangelogEditorContextValue = {
   changelog: TChangelogEditorRecord;
   form: ReturnType<typeof useChangelogEditorForm>;
   formResetKey: string;
+  editorScope: string;
   handleDelete: () => Promise<void>;
   handleMoveToDraft: () => Promise<void>;
   isOwner: boolean;
@@ -174,11 +183,17 @@ export function ChangelogEditorProvider({
 }: ChangelogEditorProviderProps) {
   const navigate = useNavigate();
   const { changelogCollection } = useDashboardCollections();
+  const editorScope = useRef(crypto.randomUUID()).current;
   const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
+  // Backend mirror: ChangelogPolicy.canUpdate requires changelog.*.
   const { allowed: isOwner } = usePolicy(
-    allPolicy(hasMembership(organizationId), isUser(changelog.creatorId ?? ""))
+    hasPermission(organizationId, "changelog.*")
   );
-  const form = useChangelogEditorForm({ changelog, organizationId });
+  const form = useChangelogEditorForm({
+    changelog,
+    editorScope,
+    organizationId,
+  });
 
   async function handleMoveToDraft() {
     await form.handleSubmit({
@@ -219,6 +234,7 @@ export function ChangelogEditorProvider({
 
   const value: ChangelogEditorContextValue = {
     changelog,
+    editorScope,
     form,
     formResetKey,
     handleDelete,
@@ -370,15 +386,18 @@ export function ChangelogEditorSubmitAction() {
 }
 
 export function ChangelogEditorContentField() {
-  const { form, formResetKey, isOwner } = useChangelogEditor();
+  const { editorScope, form, formResetKey, isOwner, organizationId } =
+    useChangelogEditor();
 
   const isDisabled = !isOwner;
   return (
     <form.Field name="content">
       {(field) => (
         <PostContentEditor
+          editorScope={editorScope}
           key={formResetKey}
           onChange={field.handleChange}
+          organizationId={organizationId}
           readOnly={isDisabled}
           showBlockHandle={!isDisabled}
           value={field.state.value}

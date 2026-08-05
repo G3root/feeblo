@@ -1,6 +1,6 @@
-import { Column, Row, Section, Text } from "@react-email/components";
 import * as React from "react";
-import { Copy, EmailShell, Lead } from "./email-shell";
+import { Column, Row, Section, Text } from "react-email";
+import { EmailShell } from "./email-shell";
 
 type OrganizationInvitationEmailProps = {
   readonly inviteUrl: string;
@@ -17,34 +17,25 @@ export const OrganizationInvitationEmail = ({
 }: OrganizationInvitationEmailProps) => (
   <EmailShell
     cta={{ label: "Accept invitation", href: inviteUrl }}
-    eyebrow="Workspace Invitation"
-    footer="If this invitation was unexpected, you can ignore it without affecting your account."
-    preview={`You’ve been invited to join ${organizationName} on Feeblo`}
-    title={`Join ${organizationName}`}
+    footerBlurb="If this invitation was unexpected, you can ignore it without affecting your account."
+    homeUrl="https://feeblo.com"
+    preview={`You've been invited to join ${organizationName} on Feeblo`}
+    title="You're invited"
+    titleLead={`${inviterName ? `${inviterName} invited you` : "You've been invited"} to join ${organizationName} on Feeblo. Accept the invitation to get access to boards, feedback, and team settings for this workspace.`}
   >
-    <Lead>
-      {inviterName ? `${inviterName} invited you` : "You’ve been invited"} to
-      join <strong>{organizationName}</strong> on Feeblo.
-    </Lead>
-    <Copy>
-      Accept the invitation to get access to boards, feedback, and team settings
-      for this workspace.
-    </Copy>
-    <Section className="rounded bg-[#f1f3f5] px-4 py-3">
+    <Section className="border border-stroke bg-bg-2 px-5 py-4">
       <Row>
         <Column className="w-1/2 pr-2">
-          <Text className="m-0 font-medium text-[#7b8494] text-[11px] uppercase leading-[16px] tracking-[0.16em]">
+          <Text className="m-0 font-11 font-sans text-fg-3 uppercase">
             Role
           </Text>
-          <Text className="mt-[6px] mb-0 text-[#3c4149] text-[14px] leading-[20px]">
-            {role}
-          </Text>
+          <Text className="mt-2 mb-0 font-15 font-sans text-fg">{role}</Text>
         </Column>
         <Column className="w-1/2 pl-2">
-          <Text className="m-0 font-medium text-[#7b8494] text-[11px] uppercase leading-[16px] tracking-[0.16em]">
+          <Text className="m-0 font-11 font-sans text-fg-3 uppercase">
             Workspace
           </Text>
-          <Text className="mt-[6px] mb-0 text-[#3c4149] text-[14px] leading-[20px]">
+          <Text className="mt-2 mb-0 font-15 font-sans text-fg">
             {organizationName}
           </Text>
         </Column>

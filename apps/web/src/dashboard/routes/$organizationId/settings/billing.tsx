@@ -13,6 +13,8 @@ import {
 } from "@feeblo/ui/card";
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
+import { getAuthSession } from "@feeblo/web-shared/auth-session";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -31,6 +33,7 @@ import {
   type PlanType,
   type WorkspaceProduct,
 } from "~/features/billing/lib/plans";
+import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
@@ -47,17 +50,42 @@ export const Route = createFileRoute("/$organizationId/settings/billing")({
       })
       .parse(search),
   component: BillingSettingsPage,
-  beforeLoad: async () => {
-    await Promise.all([
-      workspaceProductCollection.preload(),
-      workspacePlanCollection.preload(),
-    ]);
+  beforeLoad: async ({ params }) => {
+    const session = await getAuthSession();
+    if (
+      session !== null &&
+      hasPermission(params.organizationId, "billing.update")(session)
+    ) {
+      await Promise.all([
+        workspaceProductCollection.preload(),
+        workspacePlanCollection.preload(),
+      ]);
+    }
     return null;
   },
 });
 
 function BillingSettingsPage() {
   const organizationId = useOrganizationId();
+  const { allowed: canManageBilling, isPending } = usePolicy(
+    hasPermission(organizationId, "billing.update")
+  );
+
+  if (isPending) {
+    return null;
+  }
+  if (!canManageBilling) {
+    return <SettingsAccessDenied />;
+  }
+
+  return <BillingSettingsContent organizationId={organizationId} />;
+}
+
+function BillingSettingsContent({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
   const search = Route.useSearch();
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");

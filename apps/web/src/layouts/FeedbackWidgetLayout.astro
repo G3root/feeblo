@@ -1,18 +1,27 @@
 ---
 import "@feeblo/feedback-widget/styles";
+
+import { getSecret } from "astro:env/server";
+import type { WidgetConfig } from "@feeblo/feedback-widget";
 import spriteSvgRaw from "@feeblo/feedback-widget/icons/sprite.svg?raw";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 
-import { getSecret } from "astro:env/server";
-
 interface Props {
+  locale?: string;
   organizationId: string;
   theme: string;
   title?: string;
+  widgetConfig: WidgetConfig;
 }
 
-const { title = "feeblo", organizationId, theme } = Astro.props;
+const {
+  title = "feeblo",
+  organizationId,
+  locale = "en",
+  theme,
+  widgetConfig,
+} = Astro.props;
 const noIndex = Boolean(getSecret("NO_INDEX"));
 
 const isDark = theme === "dark";
@@ -20,9 +29,9 @@ const spriteSvg = spriteSvgRaw.slice(spriteSvgRaw.indexOf("<svg"));
 ---
 
 <!doctype html>
-<html lang="en" data-theme={theme} class={isDark ? "dark" : ""}>
+<html lang={locale} data-theme={theme} class={isDark ? "dark" : ""}>
   <CommonHead title={title} noIndex={noIndex} />
-  <EnvScript organizationId={organizationId} />
+  <EnvScript organizationId={organizationId} widgetConfig={widgetConfig} />
   <style is:inline>
     html,
     body {

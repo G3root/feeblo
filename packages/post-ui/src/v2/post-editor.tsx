@@ -1,16 +1,25 @@
 import { Button } from "@feeblo/ui/button";
-import { Editor } from "@feeblo/ui/editor";
+import { Editor, finalizeEditorContent } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 import { toastManager } from "@feeblo/ui/toast";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
-import { createContext, type ReactNode, use, useRef, useState } from "react";
+import {
+  createContext,
+  memo,
+  type ReactNode,
+  use,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
 type PostEditorState = {
-  content: string;
   disabled: boolean;
+  editorScope: string;
+  organizationId?: string;
   placeholder: string;
   resetKey: number;
 };
@@ -32,6 +41,16 @@ type PostEditorContextValue = {
 
 const PostEditorContext = createContext<PostEditorContextValue | null>(null);
 
+type PostEditorInitialContent = {
+  value: string;
+};
+
+const PostEditorInitialContentContext =
+  createContext<PostEditorInitialContent | null>(null);
+
+const DEFAULT_PLACEHOLDER = "Type '/' for commands or start typing...";
+const noop = () => undefined;
+
 function usePostEditor() {
   const value = use(PostEditorContext);
 
@@ -42,10 +61,38 @@ function usePostEditor() {
   return value;
 }
 
+function usePostEditorInitialContent() {
+  const value = use(PostEditorInitialContentContext);
+
+  if (!value) {
+    throw new Error("PostEditor components must be used within Provider.");
+  }
+
+  return value.value;
+}
+
+function PostEditorInitialContentProvider({
+  children,
+  content,
+}: {
+  children?: ReactNode;
+  content: string;
+}) {
+  const initialContent = useRef({ value: content });
+
+  return (
+    <PostEditorInitialContentContext value={initialContent.current}>
+      {children}
+    </PostEditorInitialContentContext>
+  );
+}
+
 type PostEditorProviderProps = {
   children?: ReactNode;
   content?: string;
   disabled?: boolean;
+  editorScope?: string;
+  organizationId?: string;
   onContentChange?: (content: string) => void;
   onSubmit?: () => void | Promise<void>;
   placeholder?: string;
@@ -57,52 +104,80 @@ function PostEditorProvider({
   children,
   content = "",
   disabled = false,
+  editorScope: providedEditorScope,
+  organizationId,
   onContentChange,
-  onSubmit = () => {},
+  onSubmit = noop,
   placeholder,
   resetKey = 0,
   submitLabel = "Publish",
 }: PostEditorProviderProps) {
+  const onContentChangeRef = useRef(onContentChange);
+  const onSubmitRef = useRef(onSubmit);
+  const generatedEditorScope = useRef(crypto.randomUUID()).current;
+  const editorScope = providedEditorScope ?? generatedEditorScope;
+  onContentChangeRef.current = onContentChange;
+  onSubmitRef.current = onSubmit;
+
+  const actions = useMemo<PostEditorActions>(
+    () => ({
+      onContentChange: (nextContent) => {
+        onContentChangeRef.current?.(nextContent);
+      },
+      onSubmit: () => onSubmitRef.current(),
+    }),
+    []
+  );
+  const state = useMemo<PostEditorState>(
+    () => ({
+      disabled,
+      editorScope,
+      organizationId,
+      placeholder: placeholder ?? DEFAULT_PLACEHOLDER,
+      resetKey,
+    }),
+    [disabled, editorScope, organizationId, placeholder, resetKey]
+  );
+  const meta = useMemo<PostEditorMeta>(() => ({ submitLabel }), [submitLabel]);
+  const contextValue = useMemo<PostEditorContextValue>(
+    () => ({ actions, meta, state }),
+    [actions, meta, state]
+  );
+
   return (
-    <PostEditorContext
-      value={{
-        actions: {
-          onContentChange: onContentChange ?? (() => {}),
-          onSubmit,
-        },
-        meta: { submitLabel },
-        state: {
-          content,
-          disabled,
-          placeholder:
-            placeholder ?? "Type '/' for commands or start typing...",
-          resetKey,
-        },
-      }}
-    >
-      {children}
-    </PostEditorContext>
+    <PostEditorInitialContentProvider content={content} key={resetKey}>
+      <PostEditorContext value={contextValue}>{children}</PostEditorContext>
+    </PostEditorInitialContentProvider>
   );
 }
 
-function PostEditorEditor() {
+const PostEditorEditor = memo(function PostEditorEditor() {
   const { actions, state } = usePostEditor();
+  const initialContent = usePostEditorInitialContent();
 
   return (
     <EditorProvider
-      defaultValue={{ postContent: state.content }}
+      defaultValue={{
+        deferUploads: true,
+        editorScope: state.editorScope,
+        organizationId: state.organizationId,
+        postContent: initialContent,
+      }}
       key={state.resetKey}
     >
       <Editor
-        onChange={(doc) => actions.onContentChange(doc)}
+        deferUploads
+        editorScope={state.editorScope}
+        onChange={actions.onContentChange}
+        organizationId={state.organizationId}
         placeholder={state.placeholder}
         readOnly={state.disabled}
       />
     </EditorProvider>
   );
-}
+});
 
-function PostEditorSubmit() {
+const PostEditorSubmit = memo(function PostEditorSubmit() {
   const { actions, meta, state } = usePostEditor();
 
   return (
@@ -117,14 +192,20 @@ function PostEditorSubmit() {
       </Button>
     </div>
   );
-}
+});
 
 type PostEditorRootProps = {
   children?: ReactNode;
   content?: string;
   disabled?: boolean;
+  editorScope?: string;
+  existingAssetIds?: readonly string[];
+  organizationId?: string;
   onContentChange?: (content: string) => void;
-  onSubmit?: (value: { content: string }) => void | Promise<void>;
+  onSubmit?: (value: {
+    assetIds: string[];
+    content: string;
+  }) => void | Promise<void>;
   placeholder?: string;
   submitLabel?: string;
 };
@@ -133,14 +214,19 @@ function PostEditorComponent({
   children,
   content: externalContent,
   disabled,
+  editorScope: providedEditorScope,
+  existingAssetIds = [],
+  organizationId,
   onContentChange: externalOnContentChange,
-  onSubmit = () => {},
+  onSubmit = noop,
   placeholder,
   submitLabel,
 }: PostEditorRootProps) {
   const [internalContent, setInternalContent] = useState(externalContent ?? "");
   const [resetKey, setResetKey] = useState(0);
   const contentRef = useRef(externalContent ?? "");
+  const generatedEditorScope = useRef(crypto.randomUUID()).current;
+  const editorScope = providedEditorScope ?? generatedEditorScope;
 
   const isContentControlled = externalContent !== undefined;
 
@@ -159,7 +245,20 @@ function PostEditorComponent({
   };
 
   const handleSubmit = async () => {
-    await onSubmit({ content: contentRef.current });
+    const finalized = await finalizeEditorContent(
+      contentRef.current,
+      organizationId,
+      { assetIds: existingAssetIds, scope: editorScope }
+    );
+    try {
+      await onSubmit({
+        assetIds: finalized.assetIds,
+        content: finalized.content,
+      });
+    } catch {
+      return;
+    }
+    finalized.commit();
     setResetKey((k) => k + 1);
     if (!isContentControlled) {
       setInternalContent("");
@@ -171,8 +270,10 @@ function PostEditorComponent({
     <PostEditorProvider
       content={content}
       disabled={disabled}
+      editorScope={editorScope}
       onContentChange={handleContentChange}
       onSubmit={handleSubmit}
+      organizationId={organizationId}
       placeholder={placeholder}
       resetKey={resetKey}
       submitLabel={submitLabel}
@@ -200,13 +301,17 @@ export function PostContentUpdateInput() {
 
   const disabled = isLocked || !canManagePost;
 
-  const updatePostContent = createOptimisticAction<{ content: string }>({
-    onMutate: ({ content }) => {
+  const updatePostContent = createOptimisticAction<{
+    assetIds: string[];
+    content: string;
+  }>({
+    onMutate: ({ assetIds, content }) => {
       postCollection.update(post.id, (draft) => {
         draft.content = content;
+        draft.assetIds = assetIds;
       });
     },
-    mutationFn: async ({ content }) => {
+    mutationFn: async ({ assetIds, content }) => {
       await fetchRpc((rpc) =>
         pageType === "Dashboard"
           ? rpc.PostUpdateContent({
@@ -214,12 +319,14 @@ export function PostContentUpdateInput() {
               boardId: post.boardId,
               organizationId,
               content,
+              assetIds,
             })
           : rpc.PostUpdateContentPublic({
               id: post.id,
               boardId: post.boardId,
               organizationId,
               content,
+              assetIds,
             })
       );
       await postCollection.utils.refetch();
@@ -230,19 +337,23 @@ export function PostContentUpdateInput() {
     <PostEditor
       content={post.content}
       disabled={disabled}
-      onSubmit={async ({ content }) => {
-        if (content !== "") {
-          try {
-            const tx = updatePostContent({ content });
-            await tx.isPersisted.promise;
-          } catch {
-            toastManager.add({
-              title: "Failed to update content",
-              type: "error",
-            });
-          }
+      existingAssetIds={post.assetIds}
+      onSubmit={async ({ assetIds, content }) => {
+        try {
+          const tx = updatePostContent({
+            assetIds: content === "" ? [] : assetIds,
+            content,
+          });
+          await tx.isPersisted.promise;
+        } catch (error) {
+          toastManager.add({
+            title: "Failed to update content",
+            type: "error",
+          });
+          throw error;
         }
       }}
+      organizationId={organizationId}
       submitLabel="Update"
     >
       <PostEditor.Submit />

@@ -1,5 +1,13 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { toastManager } from "@feeblo/ui/toast";
+import {
+  allPolicy,
+  anyPolicy,
+  hasMembership,
+  hasPermission,
+  isUser,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
@@ -12,10 +20,22 @@ import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostTagField() {
-  const { post, organizationId, isLocked, canManagePost } =
-    usePostCollectionData();
+  const { post, organizationId, isLocked } = usePostCollectionData();
+  // Backend mirror: TagPolicy.canSetPostTags = membership AND
+  // (posts.* OR tags.* OR post creator). Contributors keep the tag field on
+  // their own posts; everyone else needs manager-level posts/tags grants.
+  const { allowed: canChangeTags } = usePolicy(
+    anyPolicy(
+      hasPermission(organizationId, "posts.*"),
+      hasPermission(organizationId, "tags.*"),
+      allPolicy(hasMembership(organizationId), isUser(post.creatorId ?? ""))
+    )
+  );
+  const { allowed: canCreateTags } = usePolicy(
+    hasPermission(organizationId, "tags.create")
+  );
 
-  const disabled = isLocked || !canManagePost;
+  const disabled = isLocked || !canChangeTags;
   const { postTagCollection } = useDashboardCollections();
 
   const { data: tags } = useLiveQuery(
@@ -100,12 +120,16 @@ export function PostTagField() {
   return (
     <TagCreateDialogProvider defaultValue={{ data: { type: "FEEDBACK" } }}>
       <TagSelect
+        canCreate={canCreateTags}
         disabled={disabled}
         onTagSelect={handleTagSelect}
         selectedTags={postTags ?? []}
         tags={tags}
         type="FEEDBACK"
       />
+      {/* Always mounted like the settings routes; the create button in
+          TagSelect is disabled without tags.create, so the dialog can never
+          open for users who lack the permission. */}
       <TagCreateDialog
         onCreated={(tag) => handleTagSelect(tag, false, false)}
       />

@@ -1,10 +1,18 @@
 import { transaction } from "@feeblo/db";
+import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-
+import {
+  cleanupOrphanedEditorAssets,
+  cleanupPreparedEditorAssets,
+  commitPreparedEditorAssets,
+  prepareEditorAssetContent,
+  rollbackPreparedEditorAssets,
+  syncPostAssetReferences,
+} from "../asset/service";
 import { BoardRepository } from "../board/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -21,7 +29,7 @@ import {
   postEmbeddingInput,
   schedulePostEmbeddingBestEffort,
 } from "./embedding-service";
-import { FailedToUpdatePostError } from "./errors";
+import { FailedToUpdatePostError, PostAlreadyExistsError } from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -137,11 +145,46 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const deletePostEffect = (args: TPostDelete) =>
-    repository.delete({
-      id: args.id,
-      organizationId: args.organizationId,
-      boardId: args.boardId,
-    });
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const canDeleteEngagedPost = Permissions.can(
+        session,
+        args.organizationId,
+        "posts.*"
+      );
+      const deleted = yield* transaction(
+        repository.delete({
+          id: args.id,
+          organizationId: args.organizationId,
+          boardId: args.boardId,
+          creatorId: session.session.userId,
+          onlyIfNew: !canDeleteEngagedPost,
+        })
+      );
+
+      if (!deleted && !canDeleteEngagedPost) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Posts with comments or other users' votes cannot be deleted",
+        });
+      }
+
+      return undefined;
+    }).pipe(
+      Effect.tap(() =>
+        cleanupOrphanedEditorAssets({
+          organizationId: args.organizationId,
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to clean up orphaned editor assets",
+              cause
+            ).pipe(
+              Effect.annotateLogs({ organizationId: args.organizationId })
+            )
+          )
+        )
+      )
+    );
 
   const updatePostEffect = (args: TPostUpdate) =>
     Effect.gen(function* () {
@@ -200,10 +243,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
   const updatePostContentEffect = (args: TPostUpdateContent) =>
     Effect.gen(function* () {
+      const session = yield* CurrentSession;
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
-      const session = yield* CurrentSession;
+      const prepared = yield* prepareEditorAssetContent({
+        organizationId: args.organizationId,
+        userId: session.session.userId,
+        content: sanitizedMarkdown,
+        assetIds: args.assetIds,
+      });
       const membership = Policy.getMembership(session, args.organizationId);
       let contentChanged = false;
       let title = "";
@@ -217,8 +266,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             return yield* new FailedToUpdatePostError();
           }
           title = previous.title;
-          contentChanged = previous.content !== sanitizedMarkdown;
+          contentChanged = previous.content !== prepared.content;
           if (!contentChanged) {
+            yield* commitPreparedEditorAssets(prepared.promotions);
+            yield* syncPostAssetReferences({
+              postId: args.id,
+              organizationId: args.organizationId,
+              userId: session.session.userId,
+              content: prepared.content,
+              assetIds: args.assetIds,
+            });
             return;
           }
           const actor = {
@@ -230,18 +287,31 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* repository.update({
             id: args.id,
             organizationId: args.organizationId,
-            content: sanitizedMarkdown,
+            content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
+          });
+          yield* commitPreparedEditorAssets(prepared.promotions);
+          yield* syncPostAssetReferences({
+            postId: args.id,
+            organizationId: args.organizationId,
+            userId: session.session.userId,
+            content: prepared.content,
+            assetIds: args.assetIds,
           });
           yield* activityRepository.create({
             ...actor,
             kind: "CONTENT_CHANGED",
           });
         })
+      ).pipe(
+        Effect.tapCause(() =>
+          rollbackPreparedEditorAssets(prepared.promotions)
+        ),
+        Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
       );
       if (contentChanged) {
         yield* scheduleEmbedding({
-          content: sanitizedMarkdown,
+          content: prepared.content,
           id: args.id,
           organizationId: args.organizationId,
           title,
@@ -326,16 +396,30 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
+      const prepared = yield* prepareEditorAssetContent({
+        organizationId: args.organizationId,
+        userId: session.session.userId,
+        content: sanitizedMarkdown,
+        assetIds: args.assetIds,
+      });
 
       yield* transaction(
         Effect.gen(function* () {
           yield* repository.create({
             ...args,
-            content: sanitizedMarkdown,
+            content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
             creatorId: session.session.userId,
             ...(opts.source ? { source: opts.source } : {}),
             ...(membership ? { creatorMemberId: membership.membershipId } : {}),
+          });
+          yield* commitPreparedEditorAssets(prepared.promotions);
+          yield* syncPostAssetReferences({
+            postId: args.id,
+            organizationId: args.organizationId,
+            userId: session.session.userId,
+            content: prepared.content,
+            assetIds: args.assetIds,
           });
 
           yield* activityRepository.create({
@@ -370,6 +454,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               }),
           });
         })
+      ).pipe(
+        Effect.tapCause(() =>
+          rollbackPreparedEditorAssets(prepared.promotions)
+        ),
+        Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
       );
 
       yield* repository
@@ -388,7 +477,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           )
         );
       yield* scheduleEmbedding({
-        content: sanitizedMarkdown,
+        content: prepared.content,
         id: args.id,
         organizationId: args.organizationId,
         title: args.title,
@@ -483,10 +572,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUpdate: (args: TPostUpdate) =>
       updatePostEffect(args).pipe(
         Policy.withPolicy(
-          postPolicy.canUpdate({
+          postPolicy.canUpdateProperties({
             organizationId: args.organizationId,
             postId: args.id,
             boardId: args.boardId,
+            statusId: args.statusId,
             source: "dashboard",
           })
         ),
@@ -578,7 +668,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             source: "dashboard",
           })
         ),
-        withRemapDbErrors("Post", "create")
+        withRemapDbErrors({
+          action: "create",
+          entity: "Post",
+          onUniqueViolation: () =>
+            new PostAlreadyExistsError({
+              message: "A post with this slug already exists",
+            }),
+        })
       ),
 
     PostCreatePublic: (args: TPostCreate) =>
@@ -593,7 +690,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             source: "public",
           })
         ),
-        withRemapDbErrors("Post", "create")
+        withRemapDbErrors({
+          action: "create",
+          entity: "Post",
+          onUniqueViolation: () =>
+            new PostAlreadyExistsError({
+              message: "A post with this slug already exists",
+            }),
+        })
       ),
 
     PostAdminUpdate: (args: TPostAdminUpdate) =>

@@ -1,3 +1,4 @@
+import { normalizeWidgetConfig, supportsBoardSelection } from "./config";
 import type { Logger } from "./debug";
 import type { EmbedOptions } from "./types";
 
@@ -20,16 +21,52 @@ export function createIframe(
   const iframe = document.createElement("iframe");
   const baseUrl = resolveBaseUrl(options);
   const params = new URLSearchParams();
+  const config = normalizeWidgetConfig(options);
+  params.set("mode", config.mode);
+  params.set("modules", config.modules.join(","));
   if (options.theme) {
     params.set("theme", options.theme);
+  }
+  if (options.locale) {
+    params.set("locale", options.locale);
+  }
+  if (options.defaultBoard && supportsBoardSelection(config)) {
+    params.set("board", options.defaultBoard);
+  }
+  // The widget targets its postMessages at the host origin. Passing it
+  // explicitly (rather than relying on document.referrer) keeps messaging
+  // working under Referrer-Policy: no-referrer hosts.
+  const hostOrigin = window.location.origin;
+  if (hostOrigin && hostOrigin !== "null") {
+    params.set("hostOrigin", hostOrigin);
   }
 
   const path = `${baseUrl}/feedback-widget/${organizationId}`;
   const query = params.toString();
-  iframe.src = query ? `${path}?${query}` : path;
+  const initialRoute = config.modules[0] === "updates" ? "#/updates" : "#/";
+  iframe.src = `${query ? `${path}?${query}` : path}${initialRoute}`;
   iframe.style.width = "100%";
   iframe.style.height = "100%";
   iframe.style.border = "none";
+  const titles: Record<string, Record<string, string>> = {
+    en: {
+      feedback: "Feeblo feedback widget",
+      updates: "Feeblo updates widget",
+      hub: "Feeblo Hub",
+    },
+  };
+  const language = options.locale?.split("-")[0]?.toLowerCase() ?? "en";
+  let defaultTitle = "Feeblo feedback widget";
+  if (config.mode === "hub") {
+    defaultTitle = "Feeblo Hub";
+  } else if (config.mode === "updates") {
+    defaultTitle = "Feeblo updates widget";
+  }
+  iframe.title = titles[language]?.[config.mode] ?? defaultTitle;
+  iframe.setAttribute(
+    "sandbox",
+    "allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"
+  );
   iframe.setAttribute("allow", "clipboard-write");
 
   if (logger?.enabled) {

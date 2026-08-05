@@ -34,6 +34,7 @@
     "@effect/sql-pglite": "catalog:",
     "@electric-sql/pglite": "^0.5.4",
     "@electric-sql/pglite-pgvector": "^0.0.5",
+    "@feeblo/permissions": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",

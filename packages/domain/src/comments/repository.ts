@@ -10,7 +10,6 @@ interface DeleteComment {
   id: string;
   organizationId: string;
   postId: string;
-  userId: string;
 }
 
 interface UpdateComment {
@@ -131,8 +130,7 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.id, args.id),
             eq(schema.commentTable.organizationId, args.organizationId),
-            eq(schema.commentTable.postId, args.postId),
-            eq(schema.commentTable.userId, args.userId)
+            eq(schema.commentTable.postId, args.postId)
           )
         )
         .returning({

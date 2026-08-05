@@ -17,6 +17,7 @@ import {
   SsoRepositoriesLive,
 } from "@feeblo/domain/widget/sso";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
+import type { Role } from "@feeblo/permissions";
 import { Mailer } from "@feeblo/transactional/mailer";
 import { polar, webhooks } from "@polar-sh/better-auth";
 import {
@@ -45,6 +46,10 @@ import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 import { drizzleAdapter } from "./adapter/drizzzle-adapter";
 import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
+import {
+  ORGANIZATION_ROLES,
+  organizationAccessControl,
+} from "./organization-roles";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
 import { AUTH_SESSION_DURATION_SECONDS } from "./session";
@@ -402,6 +407,11 @@ export const initAuthHandler = (
         }),
         organization({
           allowUserToCreateOrganization: false,
+          // Roles mirror @feeblo/permissions. better-auth's own ACL only gates
+          // org-plugin endpoints (invite/remove/update role/team); the Feeblo
+          // permission table in packages/permissions gates everything else.
+          ac: organizationAccessControl,
+          roles: ORGANIZATION_ROLES,
           organizationHooks: {
             async beforeCreateInvitation(data) {
               await runCallbackPolicy(
@@ -597,7 +607,7 @@ export const initAuthHandler = (
 export type AuthClientMembership = {
   membershipId: string;
   organizationId: string;
-  role: "owner" | "admin" | "member";
+  role: Role;
   userId: string;
 };
 

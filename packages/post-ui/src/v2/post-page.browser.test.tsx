@@ -6,14 +6,17 @@ import { PostPage } from "./post-page";
 import {
   createPostCollectionState,
   PostCollectionStateProvider,
+  usePostCollectionData,
 } from "./post-page-context";
 
 vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   useAuthState: () => ({ data: null }),
 }));
 vi.mock("@feeblo/web-shared/use-policy", () => ({
+  allPolicy: vi.fn(),
   anyPolicy: vi.fn(),
-  hasOwnerOrAdminRole: vi.fn(),
+  hasMembership: vi.fn(),
+  hasPermission: vi.fn(),
   isUser: vi.fn(),
   usePolicy: () => ({ allowed: false }),
 }));
@@ -44,7 +47,9 @@ const board = { visibility: "PUBLIC" } as TBoard;
 
 function state({
   authenticated = false,
+  canDelete = false,
   canManage = false,
+  canModerate = false,
   locked = false,
 } = {}) {
   const post = {
@@ -56,7 +61,9 @@ function state({
 
   return createPostCollectionState({
     board,
+    canDeletePost: canDelete,
     canManagePost: canManage,
+    canModeratePost: canModerate,
     isAuthenticated: authenticated,
     isMember: authenticated,
     organizationId: "organization-id",
@@ -75,7 +82,25 @@ function renderState(options?: Parameters<typeof state>[0]) {
       </PostPage.CanManage>
       <PostPage.Locked>locked</PostPage.Locked>
       <PostPage.Unlocked>unlocked</PostPage.Unlocked>
+      <AdminControls />
     </PostCollectionStateProvider>
+  );
+}
+
+/**
+ * Mirrors the capability gating in `post-sidebar-actions`: Lock/Unlock is
+ * driven by `canModeratePost`, Delete by `canDeletePost`. Rendered so the
+ * tests can verify the two capabilities compose independently.
+ */
+function AdminControls() {
+  const { canDeletePost, canModeratePost, isLocked } = usePostCollectionData();
+  return (
+    <>
+      {canModeratePost ? (
+        <span>{isLocked ? "Unlock post" : "Lock post"}</span>
+      ) : null}
+      {canDeletePost ? <span>Delete post</span> : null}
+    </>
   );
 }
 
@@ -104,6 +129,60 @@ describe("PostPage composition", () => {
 
     await expect.element(screen.getByText("locked")).toBeVisible();
     await expect.element(screen.getByText("unlocked")).not.toBeInTheDocument();
+  });
+
+  it("shows a moderator the unlock control without the delete control", async () => {
+    const screen = await renderState({
+      authenticated: true,
+      canManage: false,
+      canModerate: true,
+      locked: true,
+    });
+
+    await expect.element(screen.getByText("Unlock post")).toBeVisible();
+    await expect
+      .element(screen.getByText("Delete post"))
+      .not.toBeInTheDocument();
+  });
+
+  it("shows a moderator the lock control without the delete control", async () => {
+    const screen = await renderState({
+      authenticated: true,
+      canManage: false,
+      canModerate: true,
+    });
+
+    await expect.element(screen.getByText("Lock post")).toBeVisible();
+    await expect
+      .element(screen.getByText("Delete post"))
+      .not.toBeInTheDocument();
+  });
+
+  it("grants a manager the moderation control", async () => {
+    const screen = await renderState({
+      authenticated: true,
+      canDelete: true,
+      canManage: true,
+      canModerate: true,
+    });
+
+    await expect.element(screen.getByText("Delete post")).toBeVisible();
+    await expect.element(screen.getByText("Lock post")).toBeVisible();
+    await expect
+      .element(screen.getByText("Unlock post"))
+      .not.toBeInTheDocument();
+  });
+
+  it("hides deletion for an engaged post author", async () => {
+    const screen = await renderState({
+      authenticated: true,
+      canManage: true,
+      canDelete: false,
+    });
+
+    await expect
+      .element(screen.getByText("Delete post"))
+      .not.toBeInTheDocument();
   });
 
   it("composes the post editor, reactions, votes, and discussion", async () => {

@@ -13,6 +13,12 @@ export class FailedToCreatePostError extends Schema.TaggedErrorClass<FailedToCre
   { httpApiStatus: 500, identifier: "FailedToCreatePostError" }
 ) {}
 
+export class PostAlreadyExistsError extends Schema.TaggedErrorClass<PostAlreadyExistsError>()(
+  "PostAlreadyExistsError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 409, identifier: "PostAlreadyExistsError" }
+) {}
+
 export class FailedToDeletePostError extends Schema.TaggedErrorClass<FailedToDeletePostError>()(
   "FailedToDeletePostError",
   {},
@@ -35,6 +41,7 @@ export const PostServiceErrors = Schema.Union([
   BadRequestError,
   UnauthorizedError,
   InternalServerError,
+  PostAlreadyExistsError,
   PolicyDeniedError,
   FailedToCreatePostError,
   FailedToDeletePostError,

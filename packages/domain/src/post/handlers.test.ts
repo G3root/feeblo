@@ -2,9 +2,11 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   BoardId,
+  CommentId,
   type LegidOf,
   PostId,
   PostStatusId,
+  UpvoteId,
   WorkspaceId,
 } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
@@ -17,6 +19,7 @@ import { BoardRepository } from "../board/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
+import { S3Test } from "../services/s3-test";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -42,7 +45,7 @@ describe("PostRpcHandlers", () => {
 
   const makeSession = (
     fixture: Fixture,
-    role: Session["memberships"][number]["role"] | null = "owner",
+    role: Session["memberships"][number]["role"] | null = "owner"
   ): Session => ({
     user: {
       id: fixture.userId,
@@ -122,8 +125,9 @@ describe("PostRpcHandlers", () => {
     fixture: Fixture,
     id: LegidOf<"PostId">,
     title: string,
-    content = title,
+    content = title
   ) => ({
+    assetIds: [],
     id,
     organizationId: fixture.organizationId,
     boardId: fixture.boardId,
@@ -157,14 +161,18 @@ describe("PostRpcHandlers", () => {
     BoardRepository.layer,
     PostRepository.layer,
     PostActivityRepository.layer,
-    PostSubscriptionRepository.layer,
+    PostSubscriptionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = PostPolicy.layer.pipe(
-    Layer.provideMerge(RepositoriesTest),
+    Layer.provideMerge(RepositoriesTest)
   );
 
-  const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
+  const TestLayer = Layer.mergeAll(
+    HandlerTest,
+    Database.PgliteDatabaseLive,
+    S3Test
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("PostList", () => {
@@ -181,13 +189,13 @@ describe("PostRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
     });
 
@@ -206,14 +214,14 @@ describe("PostRpcHandlers", () => {
                   fixture,
                   postId,
                   "Public feedback",
-                  "A public idea",
-                ),
+                  "A public idea"
+                )
               )
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
+                  makeSession(fixture, null)
+                )
               );
 
             const posts = yield* handlers
@@ -222,7 +230,7 @@ describe("PostRpcHandlers", () => {
                 boardId: fixture.boardId,
               })
               .pipe(
-                Effect.provideService(OptionalCurrentSession, Option.none()),
+                Effect.provideService(OptionalCurrentSession, Option.none())
               );
 
             expect(posts).toHaveLength(1);
@@ -233,7 +241,7 @@ describe("PostRpcHandlers", () => {
               creatorMemberId: null,
             });
             expect(posts[0]?.content).toContain("A public idea");
-          }),
+          })
       );
 
       it.effect("rejects non-members on private boards", () =>
@@ -248,23 +256,40 @@ describe("PostRpcHandlers", () => {
                   fixture,
                   postId,
                   "Private feedback",
-                  "A private idea",
-                ),
+                  "A private idea"
+                )
               )
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
     });
 
     describe("PostCreate", () => {
+      it.effect("allows contributors to create posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Contributor feedback"))
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "contributor")
+              )
+            );
+        })
+      );
+
       it.effect("rejects non-members, including on public boards", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -273,18 +298,45 @@ describe("PostRpcHandlers", () => {
           const error = yield* Effect.flip(
             handlers
               .PostCreate(
-                postCreateInput(fixture, postId, "Member-only feedback"),
+                postCreateInput(fixture, postId, "Member-only feedback")
               )
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
+      );
+
+      it.effect("returns a meaningful error on a slug collision", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const firstPostId = yield* PostId.generate;
+          const secondPostId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(
+              postCreateInput(fixture, firstPostId, "Duplicate title")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostCreate(
+                postCreateInput(fixture, secondPostId, "Duplicate title")
+              )
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error._tag).toBe("PostAlreadyExistsError");
+          expect(error.message).toBe("A post with this slug already exists");
+          expect(error.cause).toBeUndefined();
+        })
       );
 
       it.effect("persists an etaQuarter when provided", () =>
@@ -322,7 +374,7 @@ describe("PostRpcHandlers", () => {
 
           yield* handlers
             .PostCreate(
-              postCreateInput(fixture, publicPostId, "Public feedback"),
+              postCreateInput(fixture, publicPostId, "Public feedback")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
@@ -340,11 +392,64 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(posts.map((post) => post.id)).toEqual([publicPostId]);
-        }),
+        })
       );
     });
 
     describe("PostUpdate", () => {
+      it.effect("lets contributors move posts but not change their status", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+          const destinationBoardId = yield* addBoard(fixture, "PUBLIC");
+          const otherStatusId = yield* PostStatusId.generate;
+
+          yield* db.insert(schema.postStatusTable).values({
+            id: otherStatusId,
+            type: "IN_PROGRESS",
+            orderIndex: 1,
+            organizationId: fixture.organizationId,
+          });
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostUpdate({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: destinationBoardId,
+              statusId: fixture.statusId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "contributor")
+              )
+            );
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdate({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: destinationBoardId,
+                statusId: otherStatusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "contributor")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
       it.effect("lets a post creator change the post", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -357,12 +462,13 @@ describe("PostRpcHandlers", () => {
                 fixture,
                 postId,
                 "Original feedback",
-                "Original content",
-              ),
+                "Original content"
+              )
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
             .PostUpdateContent({
+              assetIds: [],
               id: postId,
               organizationId: fixture.organizationId,
               boardId: fixture.boardId,
@@ -371,8 +477,8 @@ describe("PostRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member"),
-              ),
+                makeSession(fixture, "manager")
+              )
             );
           yield* handlers
             .PostUpdateTitle({
@@ -384,8 +490,8 @@ describe("PostRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member"),
-              ),
+                makeSession(fixture, "manager")
+              )
             );
 
           const [post] = yield* handlers
@@ -397,7 +503,7 @@ describe("PostRpcHandlers", () => {
 
           expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
           expect(post?.content).toContain("Updated content");
-        }),
+        })
       );
     });
 
@@ -411,7 +517,7 @@ describe("PostRpcHandlers", () => {
 
           yield* handlers
             .PostCreatePublic(
-              postCreateInput(fixture, postId, "Original feedback"),
+              postCreateInput(fixture, postId, "Original feedback")
             )
             .pipe(Effect.provideService(CurrentSession, session));
 
@@ -423,7 +529,7 @@ describe("PostRpcHandlers", () => {
                 boardId: fixture.boardId,
                 statusId: fixture.statusId,
               })
-              .pipe(Effect.provideService(CurrentSession, session)),
+              .pipe(Effect.provideService(CurrentSession, session))
           );
           expect(memberOnlyError._tag).toBe("PolicyDenied");
 
@@ -447,7 +553,7 @@ describe("PostRpcHandlers", () => {
             id: postId,
             title: "Original feedback",
           });
-        }),
+        })
       );
     });
 
@@ -461,7 +567,7 @@ describe("PostRpcHandlers", () => {
 
           yield* handlers
             .PostCreatePublic(
-              postCreateInput(fixture, postId, "Feedback to delete"),
+              postCreateInput(fixture, postId, "Feedback to delete")
             )
             .pipe(Effect.provideService(CurrentSession, session));
 
@@ -472,7 +578,7 @@ describe("PostRpcHandlers", () => {
                 organizationId: fixture.organizationId,
                 boardId: fixture.boardId,
               })
-              .pipe(Effect.provideService(CurrentSession, session)),
+              .pipe(Effect.provideService(CurrentSession, session))
           );
           expect(memberOnlyError._tag).toBe("PolicyDenied");
 
@@ -492,12 +598,97 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(posts).toHaveLength(0);
-        }),
+        })
+      );
+
+      it.effect("rejects creator deletion after another user votes", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const otherUserId = `other_${fixture.organizationId}`;
+          const db = yield* currentDb;
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Feedback with another vote")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* db.insert(schema.userTable).values({
+            id: otherUserId,
+            email: `${otherUserId}@example.com`,
+            name: "Other voter",
+          });
+          yield* db.insert(schema.upvoteTable).values({
+            id: yield* UpvoteId.generate,
+            postId,
+            userId: otherUserId,
+            organizationId: fixture.organizationId,
+            memberId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostDeletePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("rejects creator deletion after a comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const db = yield* currentDb;
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Feedback with a comment")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* db.insert(schema.commentTable).values({
+            id: yield* CommentId.generate,
+            content: "A comment",
+            organizationId: fixture.organizationId,
+            postId,
+            userId: fixture.userId,
+            memberId: null,
+            visibility: "PUBLIC",
+            parentCommentId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostDeletePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
       );
     });
 
     describe("PostAdminUpdate", () => {
-      it.effect("requires an organization owner or admin", () =>
+      it.effect("allows managers to moderate posts", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture();
@@ -509,26 +700,10 @@ describe("PostRpcHandlers", () => {
                 fixture,
                 postId,
                 "Moderated feedback",
-                "Content to moderate",
-              ),
+                "Content to moderate"
+              )
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-
-          const error = yield* Effect.flip(
-            handlers
-              .PostAdminUpdate({
-                id: postId,
-                organizationId: fixture.organizationId,
-                locked: true,
-              })
-              .pipe(
-                Effect.provideService(
-                  CurrentSession,
-                  makeSession(fixture, "member"),
-                ),
-              ),
-          );
-          expect(error._tag).toBe("PolicyDenied");
 
           yield* handlers
             .PostAdminUpdate({
@@ -536,7 +711,12 @@ describe("PostRpcHandlers", () => {
               organizationId: fixture.organizationId,
               locked: true,
             })
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
 
           const [post] = yield* handlers
             .PostListPublic({
@@ -546,7 +726,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(post?.lockedAt).toBeInstanceOf(Date);
-        }),
+        })
       );
     });
 
@@ -562,9 +742,9 @@ describe("PostRpcHandlers", () => {
                   embedCalls += 1;
                 }).pipe(
                   Effect.andThen(Deferred.await(releaseEmbedding)),
-                  Effect.as(Option.none()),
+                  Effect.as(Option.none())
                 ),
-            }),
+            })
           );
           const db = yield* currentDb;
           const fixture = yield* makeFixture();
@@ -589,7 +769,7 @@ describe("PostRpcHandlers", () => {
           expect(post?.embeddingModel).toBeNull();
           expect(post?.embeddedAt).toBeNull();
           yield* Deferred.succeed(releaseEmbedding, undefined);
-        }),
+        })
       );
 
       it.effect("does not store an embedding for an older post revision", () =>
@@ -601,7 +781,7 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
           const vector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
-            (_, index) => (index === 0 ? 1 : 0),
+            (_, index) => (index === 0 ? 1 : 0)
           );
 
           yield* handlers
@@ -612,8 +792,7 @@ describe("PostRpcHandlers", () => {
           });
           yield* repository.updateEmbedding({
             embedding: vector,
-            expectedContent:
-              sanitizeMarkdown("Old title").sanitizedMarkdown,
+            expectedContent: sanitizeMarkdown("Old title").sanitizedMarkdown,
             expectedTitle: "Old title",
             id: postId,
             model: DEFAULT_POST_EMBEDDING_MODEL,
@@ -626,7 +805,7 @@ describe("PostRpcHandlers", () => {
             .where(eq(schema.postTable.id, postId));
 
           expect(post?.embedding).toBeNull();
-        }),
+        })
       );
 
       it.effect("orders stored vectors by cosine distance", () =>
@@ -638,11 +817,11 @@ describe("PostRpcHandlers", () => {
           const farPostId = yield* PostId.generate;
           const queryVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
-            (_, index) => (index === 0 ? 1 : 0),
+            (_, index) => (index === 0 ? 1 : 0)
           );
           const farVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
-            (_, index) => (index < 2 ? 0.5 : 0),
+            (_, index) => (index < 2 ? 0.5 : 0)
           );
 
           for (const [id, title] of [
@@ -652,13 +831,12 @@ describe("PostRpcHandlers", () => {
             yield* handlers
               .PostCreate(postCreateInput(fixture, id, title))
               .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
           yield* repository.updateEmbedding({
             embedding: queryVector,
-            expectedContent:
-              sanitizeMarkdown("Near vector").sanitizedMarkdown,
+            expectedContent: sanitizeMarkdown("Near vector").sanitizedMarkdown,
             expectedTitle: "Near vector",
             id: nearPostId,
             model: DEFAULT_POST_EMBEDDING_MODEL,
@@ -666,8 +844,7 @@ describe("PostRpcHandlers", () => {
           });
           yield* repository.updateEmbedding({
             embedding: farVector,
-            expectedContent:
-              sanitizeMarkdown("Far vector").sanitizedMarkdown,
+            expectedContent: sanitizeMarkdown("Far vector").sanitizedMarkdown,
             expectedTitle: "Far vector",
             id: farPostId,
             model: DEFAULT_POST_EMBEDDING_MODEL,
@@ -681,9 +858,9 @@ describe("PostRpcHandlers", () => {
                   Option.some({
                     model: DEFAULT_POST_EMBEDDING_MODEL,
                     vector: queryVector,
-                  }),
+                  })
                 ),
-            }),
+            })
           );
           const suggestions = yield* semanticHandlers
             .PostSuggestions({
@@ -699,7 +876,7 @@ describe("PostRpcHandlers", () => {
             nearPostId,
             farPostId,
           ]);
-        }),
+        })
       );
 
       it.effect("filters out semantically unrelated posts", () =>
@@ -711,11 +888,11 @@ describe("PostRpcHandlers", () => {
           const unrelatedPostId = yield* PostId.generate;
           const queryVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
-            (_, index) => (index === 0 ? 1 : 0),
+            (_, index) => (index === 0 ? 1 : 0)
           );
           const unrelatedVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
-            (_, index) => (index === 1 ? 1 : 0),
+            (_, index) => (index === 1 ? 1 : 0)
           );
 
           for (const [id, title] of [
@@ -725,13 +902,12 @@ describe("PostRpcHandlers", () => {
             yield* handlers
               .PostCreate(postCreateInput(fixture, id, title))
               .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
           yield* repository.updateEmbedding({
             embedding: queryVector,
-            expectedContent:
-              sanitizeMarkdown("Near vector").sanitizedMarkdown,
+            expectedContent: sanitizeMarkdown("Near vector").sanitizedMarkdown,
             expectedTitle: "Near vector",
             id: nearPostId,
             model: DEFAULT_POST_EMBEDDING_MODEL,
@@ -754,9 +930,9 @@ describe("PostRpcHandlers", () => {
                   Option.some({
                     model: DEFAULT_POST_EMBEDDING_MODEL,
                     vector: queryVector,
-                  }),
+                  })
                 ),
-            }),
+            })
           );
           const suggestions = yield* semanticHandlers
             .PostSuggestions({
@@ -769,7 +945,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(suggestions.map((post) => post.id)).toEqual([nearPostId]);
-        }),
+        })
       );
 
       it.effect("ranks similar posts with the lexical fallback", () =>
@@ -785,8 +961,8 @@ describe("PostRpcHandlers", () => {
                 fixture,
                 billingPostId,
                 "Add yearly billing",
-                "Please support annual subscription invoices",
-              ),
+                "Please support annual subscription invoices"
+              )
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           yield* handlers
@@ -795,8 +971,8 @@ describe("PostRpcHandlers", () => {
                 fixture,
                 unrelatedPostId,
                 "Dark mode",
-                "Use a darker color theme",
-              ),
+                "Use a darker color theme"
+              )
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -810,7 +986,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(suggestions.map((post) => post.id)).toEqual([billingPostId]);
-        }),
+        })
       );
 
       it.effect(
@@ -829,11 +1005,11 @@ describe("PostRpcHandlers", () => {
                   fixture,
                   publicPostId,
                   "Export reports",
-                  "Export reports to CSV",
-                ),
+                  "Export reports to CSV"
+                )
               )
               .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(CurrentSession, makeSession(fixture))
               );
             yield* handlers
               .PostCreate({
@@ -841,12 +1017,12 @@ describe("PostRpcHandlers", () => {
                   fixture,
                   privatePostId,
                   "Private export reports",
-                  "Export private reports to CSV",
+                  "Export private reports to CSV"
                 ),
                 boardId: privateBoardId,
               })
               .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(CurrentSession, makeSession(fixture))
               );
 
             const suggestions = yield* handlers
@@ -856,11 +1032,11 @@ describe("PostRpcHandlers", () => {
                 content: "CSV reports",
               })
               .pipe(
-                Effect.provideService(OptionalCurrentSession, Option.none()),
+                Effect.provideService(OptionalCurrentSession, Option.none())
               );
 
             expect(suggestions.map((post) => post.id)).toEqual([publicPostId]);
-          }),
+          })
       );
     });
 
@@ -879,16 +1055,16 @@ describe("PostRpcHandlers", () => {
                   targetPostId: postId,
                 })
                 .pipe(
-                  Effect.provideService(CurrentSession, makeSession(fixture)),
-                ),
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                )
             );
 
             expect(error).toBeInstanceOf(BadRequestError);
             expect(error.message).toBe(
-              "Source and target posts must be different",
+              "Source and target posts must be different"
             );
-          }),
-        ),
+          })
+        )
       );
 
       it.effect("archives the source post and records its target", () =>
@@ -905,7 +1081,7 @@ describe("PostRpcHandlers", () => {
             yield* handlers
               .PostCreate(postCreateInput(fixture, id, title))
               .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
 
@@ -928,7 +1104,7 @@ describe("PostRpcHandlers", () => {
           expect(sourcePost).toMatchObject({ mergedIntoPostId: targetPostId });
           expect(sourcePost?.archivedAt).toBeInstanceOf(Date);
           expect(sourcePost?.mergedAt).toBeInstanceOf(Date);
-        }),
+        })
       );
     });
   });

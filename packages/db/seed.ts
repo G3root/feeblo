@@ -3,6 +3,8 @@ import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
 import {
   BoardId,
+  ChangelogId,
+  ChangelogTagId,
   CommentId,
   CommentReactionId,
   MemberId,
@@ -12,6 +14,8 @@ import {
   RoadmapColumnId,
   RoadmapId,
   SiteId,
+  SubscriptionId,
+  TagId,
   UpvoteId,
   WorkspaceId,
 } from "@feeblo/id";
@@ -26,6 +30,9 @@ import { Database } from "./src";
 import { nukeDatabase } from "./src/nuke";
 import {
   boardTable,
+  changelogPostTable,
+  changelogTable,
+  changelogTagTable,
   commentReactionTable,
   commentTable,
   DEFAULT_POST_STATUSES,
@@ -34,9 +41,12 @@ import {
   postReactionTable,
   postStatusTable,
   postTable,
+  productTable,
   roadmapColumnTable,
   roadmapTable,
   siteTable,
+  subscriptionTable,
+  tagTable,
   upvoteTable,
   userTable,
 } from "./src/schema";
@@ -48,11 +58,36 @@ const TEST_USER = {
 };
 
 const TEAM_USERS = [
-  { email: "alex@feeblo.dev", name: "Alex", joinMainOrg: true },
-  { email: "sam@feeblo.dev", name: "Sam", joinMainOrg: true },
-  { email: "jordan@feeblo.dev", name: "Jordan", joinMainOrg: true },
-  { email: "morgan@feeblo.dev", name: "Morgan", joinMainOrg: false },
-  { email: "taylor@feeblo.dev", name: "Taylor", joinMainOrg: false },
+  {
+    email: "alex@feeblo.dev",
+    name: "Alex",
+    joinMainOrg: true,
+    mainOrgRole: "manager",
+  },
+  {
+    email: "sam@feeblo.dev",
+    name: "Sam",
+    joinMainOrg: true,
+    mainOrgRole: "manager",
+  },
+  {
+    email: "jordan@feeblo.dev",
+    name: "Jordan",
+    joinMainOrg: true,
+    mainOrgRole: "contributor",
+  },
+  {
+    email: "morgan@feeblo.dev",
+    name: "Morgan",
+    joinMainOrg: false,
+    mainOrgRole: null,
+  },
+  {
+    email: "taylor@feeblo.dev",
+    name: "Taylor",
+    joinMainOrg: false,
+    mainOrgRole: null,
+  },
 ] as const;
 
 const MAIN_POST_COUNT = 40;
@@ -69,6 +104,269 @@ const REACTIONS = [
   "rocket",
 ] as const;
 
+type SeedPlan = "starter" | "professional";
+type SeedVariant = "monthly" | "yearly";
+
+/**
+ * A subscription lifecycle scenario for a seeded organization. Organizations
+ * without a scenario stay on the free plan (no subscription row).
+ */
+type SubscriptionScenario = {
+  productPlan: SeedPlan;
+  productVariant: SeedVariant;
+  status: NonNullable<typeof subscriptionTable.$inferInsert.status>;
+  /** Amount in cents, matching Polar payloads. */
+  amount: number;
+  interval: "month" | "year";
+  cancelAtPeriodEnd?: boolean;
+};
+
+const makeProductId = (plan: SeedPlan, variant: SeedVariant) =>
+  `prod_${plan}_${variant}`;
+
+const SEED_PRODUCTS = [
+  {
+    name: "Starter",
+    description: "For solo builders and small teams.",
+    plan: "starter",
+    variant: "monthly",
+    interval: "month",
+    amount: 1900,
+  },
+  {
+    name: "Starter (Yearly)",
+    description: "For solo builders and small teams, billed yearly.",
+    plan: "starter",
+    variant: "yearly",
+    interval: "year",
+    amount: 19_000,
+  },
+  {
+    name: "Professional",
+    description: "For teams running production workflows.",
+    plan: "professional",
+    variant: "monthly",
+    interval: "month",
+    amount: 4900,
+  },
+  {
+    name: "Professional (Yearly)",
+    description: "For teams running production workflows, billed yearly.",
+    plan: "professional",
+    variant: "yearly",
+    interval: "year",
+    amount: 49_000,
+  },
+] as const satisfies ReadonlyArray<{
+  name: string;
+  description: string;
+  plan: SeedPlan;
+  variant: SeedVariant;
+  interval: "month" | "year";
+  amount: number;
+}>;
+
+/**
+ * Which subscription lifecycle each seeded organization should demo,
+ * keyed by the owning user's email. Covers active, trialing, past_due,
+ * and canceled — orgs not listed here are free.
+ */
+const ORGANIZATION_PLANS: Record<string, SubscriptionScenario> = {
+  "test@feeblo.dev": {
+    productPlan: "professional",
+    productVariant: "yearly",
+    status: "active",
+    amount: 49_000,
+    interval: "year",
+  },
+  "morgan@feeblo.dev": {
+    productPlan: "starter",
+    productVariant: "monthly",
+    status: "trialing",
+    amount: 1900,
+    interval: "month",
+  },
+  "taylor@feeblo.dev": {
+    productPlan: "professional",
+    productVariant: "monthly",
+    status: "past_due",
+    amount: 4900,
+    interval: "month",
+  },
+  "jordan@feeblo.dev": {
+    productPlan: "starter",
+    productVariant: "yearly",
+    status: "canceled",
+    amount: 19_000,
+    interval: "year",
+    cancelAtPeriodEnd: true,
+  },
+};
+
+const CHANGELOG_TAG_NAMES = [
+  "New features",
+  "Improvements",
+  "Bug fixes",
+] as const;
+
+const CHANGELOG_SEEDS = [
+  {
+    title: "Introducing the unified inbox",
+    status: "published",
+    publishedDaysAgo: 30,
+    scheduledDaysAhead: null,
+    tags: ["New features"],
+    linkPostCount: 2,
+    content: `We've redesigned how feedback lands in your workspace. Every submission now arrives in a single, triage-ready inbox, so nothing gets lost between boards, sites, and the API.
+
+What's new
+- A unified view across all boards and entry points
+- Smarter duplicate detection with merge suggestions
+- Keyboard-first triage with bulk actions
+
+This is the first step toward a fully automated intake pipeline, and we'd love to hear how it feels for your team.`,
+  },
+  {
+    title: "Faster triage with AI-powered summaries",
+    status: "published",
+    publishedDaysAgo: 12,
+    scheduledDaysAhead: null,
+    tags: ["Improvements", "New features"],
+    linkPostCount: 2,
+    content: `Your daily digest just got smarter. We now summarize overnight feedback with AI, so you wake up to a shortlist of the most impactful requests instead of a wall of notifications.
+
+Highlights
+- Nightly summaries grouped by theme and board
+- Confidence scores on suggested status changes
+- One-click promotion of summary items to the roadmap
+
+Summaries respect your existing statuses and can be turned off per board in settings.`,
+  },
+  {
+    title: "New integrations: Slack and Linear",
+    status: "published",
+    publishedDaysAgo: 4,
+    scheduledDaysAhead: null,
+    tags: ["New features"],
+    linkPostCount: 1,
+    content: `Feeblo now pushes updates to Slack and Linear, so your team can act on feedback without leaving the tools they already live in.
+
+Set up in minutes
+- Connect Slack to post status changes to any channel
+- Mirror high-signal requests into Linear as issues
+- Choose which boards and statuses sync in both directions`,
+  },
+  {
+    title: "Webhooks are coming",
+    status: "scheduled",
+    publishedDaysAgo: null,
+    scheduledDaysAhead: 5,
+    tags: ["New features"],
+    linkPostCount: 0,
+    content: `Next week we're shipping outbound webhooks. Subscribe to post and comment events, receive them as signed JSON payloads, and build your own automations on top of Feeblo.
+
+Event types
+- post.created and post.status_changed
+- comment.created
+- Payloads signed with HMAC-SHA256
+
+Sign up in the integrations tab to get early access.`,
+  },
+  {
+    title: "Custom status workflows",
+    status: "draft",
+    publishedDaysAgo: null,
+    scheduledDaysAhead: null,
+    tags: ["Improvements"],
+    linkPostCount: 0,
+    content: `Explore a new way to model your pipeline. Custom statuses let you define exactly how feedback moves from submission to shipped, with rules for auto-advancing items and notifying the right people.
+
+Planned capabilities
+- Fully configurable status names and colors
+- Automation rules on status transitions
+- Per-board default entry status`,
+  },
+  {
+    title: "Roadmap gets drag-and-drop planning",
+    status: "published",
+    publishedDaysAgo: 45,
+    scheduledDaysAhead: null,
+    tags: ["Improvements"],
+    linkPostCount: 2,
+    content: `Planning a quarter used to mean copying rows between spreadsheets. The roadmap is now fully interactive: drag posts between columns, reorder them within a status, and watch the timeline update live.
+
+What changed
+- Drag-and-drop between any roadmap columns
+- Inline editing of titles and statuses
+- Saved views that sync across your team`,
+  },
+  {
+    title: "Faster boards: instant load times",
+    status: "published",
+    publishedDaysAgo: 60,
+    scheduledDaysAhead: null,
+    tags: ["Improvements"],
+    linkPostCount: 1,
+    content: `We've been hard at work on performance. Boards with thousands of posts now load in under a second, pagination is smoother, and the search index updates in real time.
+
+Measured improvements
+- 4x faster initial board load
+- 60% reduction in memory usage on large workspaces
+- Instant filtering, sorting, and search`,
+  },
+  {
+    title: "Bug fixes and stability pass",
+    status: "published",
+    publishedDaysAgo: 2,
+    scheduledDaysAhead: null,
+    tags: ["Bug fixes"],
+    linkPostCount: 1,
+    content: `A round of fixes focused on reliability and edge cases reported by the community.
+
+Fixed in this release
+- Emoji reactions no longer double-count when reconnecting
+- Comment notifications respect internal visibility settings
+- The widget no longer flashes a loading state on slow connections
+- Roadmap columns keep their order after a status rename`,
+  },
+  {
+    title: "Export feedback to CSV",
+    status: "scheduled",
+    publishedDaysAgo: null,
+    scheduledDaysAhead: 10,
+    tags: ["New features"],
+    linkPostCount: 0,
+    content: `Coming soon: export any board, filtered view, or the full workspace to CSV. Perfect for quarterly reviews, importing into your analytics stack, or sharing with stakeholders who live in spreadsheets.
+
+What you'll be able to do
+- Export posts, comments, and status history
+- Choose the columns that matter to you
+- Schedule recurring exports to email`,
+  },
+  {
+    title: "Team roles and permissions",
+    status: "draft",
+    publishedDaysAgo: null,
+    scheduledDaysAhead: null,
+    tags: ["New features", "Improvements"],
+    linkPostCount: 0,
+    content: `Draft: more granular roles are on the way. Beyond owners and members, we're introducing admins, moderators, and read-only analysts so every workspace can control who can edit, publish, and manage settings.
+
+Planned roles
+- Admin: full workspace control
+- Moderator: triage and respond to feedback
+- Analyst: read-only access with export permissions`,
+  },
+] as const satisfies ReadonlyArray<{
+  title: string;
+  status: "draft" | "scheduled" | "published";
+  publishedDaysAgo: number | null;
+  scheduledDaysAhead: number | null;
+  tags: readonly string[];
+  linkPostCount: number;
+  content: string;
+}>;
+
 class SeedDataError extends Data.TaggedError("SeedDataError")<{
   readonly message: string;
 }> {}
@@ -79,6 +377,15 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+
+const addDays = (date: Date, days: number) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+};
+
+const formatPlan = (scenario: SubscriptionScenario | undefined) =>
+  scenario ? `${scenario.productPlan} · ${scenario.status}` : "free";
 
 const ensureUser = ({
   email,
@@ -152,7 +459,7 @@ const ensureUser = ({
     return existingUser;
   });
 
-const ensureOrganization = (userId: string) =>
+const ensureOrganization = (userId: string, name = "Personal") =>
   Effect.gen(function* () {
     const db = yield* Database.Database;
 
@@ -172,7 +479,7 @@ const ensureOrganization = (userId: string) =>
         .insert(organizationTable)
         .values({
           id: orgId,
-          name: "Personal",
+          name,
           slug: userId,
           createdAt: new Date(),
         })
@@ -267,13 +574,13 @@ const ensureOrganization = (userId: string) =>
         roadmapStatuses.map((status) => [status.type, status.id])
       );
 
-      for (const [position, type] of ([
-        "PLANNED",
-        "IN_PROGRESS",
-        "COMPLETED",
-      ] as const).entries()) {
+      for (const [position, type] of (
+        ["PLANNED", "IN_PROGRESS", "COMPLETED"] as const
+      ).entries()) {
         const statusId = statusByType.get(type);
-        if (!statusId) continue;
+        if (!statusId) {
+          continue;
+        }
         const columnId = yield* RoadmapColumnId.generate;
         yield* db.insert(roadmapColumnTable).values({
           id: columnId,
@@ -411,6 +718,143 @@ const ensureBoards = ({
     }
 
     return boards;
+  });
+
+const ensureProducts = () =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+    const products: Array<{
+      id: string;
+      plan: SeedPlan;
+      variant: SeedVariant;
+    }> = [];
+
+    for (const definition of SEED_PRODUCTS) {
+      const id = makeProductId(definition.plan, definition.variant);
+
+      const [existing] = yield* db
+        .select({ id: productTable.id })
+        .from(productTable)
+        .where(eq(productTable.id, id))
+        .limit(1);
+
+      if (!existing) {
+        yield* db.insert(productTable).values({
+          id,
+          name: definition.name,
+          description: definition.description,
+          trialInterval: "month",
+          trialIntervalCount: 1,
+          recurringInterval: definition.interval,
+          recurringIntervalCount: 1,
+          isRecurring: true,
+          isArchived: false,
+          externalOrganizationId: "org_polar_seed",
+          visibility: "public",
+          prices: [{ priceAmount: definition.amount, priceCurrency: "usd" }],
+          metadata: {
+            plan: definition.plan,
+            variant: definition.variant,
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      products.push({ id, plan: definition.plan, variant: definition.variant });
+    }
+
+    return products;
+  });
+
+const ensureSubscription = ({
+  organizationId,
+  products,
+  scenario,
+}: {
+  organizationId: string;
+  products: Array<{ id: string; plan: SeedPlan; variant: SeedVariant }>;
+  scenario: SubscriptionScenario;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+
+    const [existing] = yield* db
+      .select({ id: subscriptionTable.id })
+      .from(subscriptionTable)
+      .where(eq(subscriptionTable.organizationId, organizationId))
+      .limit(1);
+
+    if (existing) {
+      return existing;
+    }
+
+    const product = products.find(
+      (item) =>
+        item.plan === scenario.productPlan &&
+        item.variant === scenario.productVariant
+    );
+
+    if (!product) {
+      return yield* new SeedDataError({
+        message: `No seeded product found for ${scenario.productPlan}/${scenario.productVariant}`,
+      });
+    }
+
+    const now = new Date();
+    const isTrialing = scenario.status === "trialing";
+    const isCanceled = scenario.status === "canceled";
+    const trialStart = isTrialing ? addDays(now, -9) : null;
+    const trialEnd = isTrialing ? addDays(now, 5) : null;
+    const currentPeriodStart = isTrialing
+      ? addDays(now, -9)
+      : addDays(now, -35);
+    // past_due keeps an open period so the plan still resolves while the
+    // dashboard shows the payment-failed state.
+    const currentPeriodEnd =
+      scenario.status === "past_due"
+        ? addDays(now, 5)
+        : addDays(now, isTrialing ? 21 : 330);
+
+    const subscriptionId = yield* SubscriptionId.generate;
+
+    const [created] = yield* db
+      .insert(subscriptionTable)
+      .values({
+        id: subscriptionId,
+        externalId: `sub_seed_${organizationId}`,
+        organizationId,
+        amount: scenario.amount,
+        cancelAtPeriodEnd: scenario.cancelAtPeriodEnd ?? false,
+        currency: "usd",
+        recurringInterval: scenario.interval,
+        recurringIntervalCount: 1,
+        status: scenario.status,
+        currentPeriodStart,
+        currentPeriodEnd,
+        trialStart,
+        trialEnd,
+        canceledAt: isCanceled ? addDays(now, -10) : null,
+        startedAt: currentPeriodStart,
+        endsAt: isCanceled ? addDays(now, 330) : null,
+        endedAt: null,
+        customerId: `cus_seed_${organizationId}`,
+        productId: product.id,
+        discountId: null,
+        checkoutId: `checkout_seed_${organizationId}`,
+        seats: scenario.productPlan === "professional" ? 10 : 3,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: subscriptionTable.id });
+
+    if (!created) {
+      return yield* new SeedDataError({
+        message: `Failed to create subscription for ${organizationId}`,
+      });
+    }
+
+    return created;
   });
 
 const ensurePosts = ({
@@ -674,11 +1118,128 @@ const seedEngagement = ({
     console.log(`   Created engagement for ${targetPosts.length} posts`);
   });
 
+const seedChangelogs = ({
+  organizationId,
+  creatorId,
+  creatorMemberId,
+  posts,
+}: {
+  organizationId: string;
+  creatorId: string;
+  creatorMemberId: string;
+  posts: Array<{ id: string; title: string }>;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+
+    const [existing] = yield* db
+      .select({ id: changelogTable.id })
+      .from(changelogTable)
+      .where(eq(changelogTable.organizationId, organizationId))
+      .limit(1);
+
+    if (existing) {
+      console.log("   Changelogs already exist, skipping");
+      return;
+    }
+
+    const now = new Date();
+    const tagIdsByName = new Map<string, string>();
+
+    for (const tagName of CHANGELOG_TAG_NAMES) {
+      const tagId = yield* TagId.generate;
+      yield* db.insert(tagTable).values({
+        id: tagId,
+        name: tagName,
+        slug: slugify(tagName),
+        type: "CHANGELOG",
+        organizationId,
+        creatorId,
+        creatorMemberId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      tagIdsByName.set(tagName, tagId);
+    }
+
+    let nextPostIndex = 0;
+
+    for (const definition of CHANGELOG_SEEDS) {
+      const changelogId = yield* ChangelogId.generate;
+      const publishedAt =
+        definition.publishedDaysAgo !== null
+          ? addDays(now, -definition.publishedDaysAgo)
+          : null;
+      const scheduledAt =
+        definition.scheduledDaysAhead !== null
+          ? addDays(now, definition.scheduledDaysAhead)
+          : null;
+
+      yield* db.insert(changelogTable).values({
+        id: changelogId,
+        title: definition.title,
+        slug: slugify(definition.title),
+        content: definition.content,
+        excerpt: htmlToExcerpt(definition.content),
+        status: definition.status,
+        scheduledAt,
+        publishedAt,
+        organizationId,
+        creatorId,
+        creatorMemberId,
+        createdAt: publishedAt ?? now,
+        updatedAt: now,
+      });
+
+      const linkedPosts = posts.slice(
+        nextPostIndex,
+        nextPostIndex + definition.linkPostCount
+      );
+      nextPostIndex += definition.linkPostCount;
+
+      for (const postItem of linkedPosts) {
+        yield* db.insert(changelogPostTable).values({
+          changelogId,
+          postId: postItem.id,
+          organizationId,
+          createdAt: new Date(),
+        });
+      }
+
+      for (const tagName of definition.tags) {
+        const tagId = tagIdsByName.get(tagName);
+        if (!tagId) {
+          continue;
+        }
+
+        const changelogTagId = yield* ChangelogTagId.generate;
+        yield* db.insert(changelogTagTable).values({
+          id: changelogTagId,
+          changelogId,
+          tagId,
+          organizationId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
+
+    console.log(
+      `   Seeded ${CHANGELOG_SEEDS.length} changelogs across ${CHANGELOG_TAG_NAMES.length} tags (published, scheduled, draft)`
+    );
+  });
+
 const seed = Effect.gen(function* () {
   console.log("Starting database seed...\n");
 
   yield* nukeDatabase();
   console.log("Database reset complete.\n");
+
+  console.log("0) Seeding billing products");
+  const products = yield* ensureProducts();
+  console.log(
+    `   Products: ${products.length} (starter/professional × monthly/yearly)`
+  );
 
   console.log("1) Creating test user and organization");
   const primaryUser = yield* ensureUser(TEST_USER);
@@ -688,6 +1249,21 @@ const seed = Effect.gen(function* () {
     userId: primaryUser.id,
     role: "owner",
   });
+
+  if (!primaryMember) {
+    return yield* new SeedDataError({
+      message: "Failed to ensure primary member",
+    });
+  }
+
+  const primaryScenario = ORGANIZATION_PLANS[TEST_USER.email];
+  if (primaryScenario) {
+    yield* ensureSubscription({
+      organizationId: primaryOrg.id,
+      products,
+      scenario: primaryScenario,
+    });
+  }
 
   const mainBoards = yield* ensureBoards({
     organizationId: primaryOrg.id,
@@ -709,6 +1285,7 @@ const seed = Effect.gen(function* () {
   });
 
   console.log(`   Main org: ${primaryOrg.name}`);
+  console.log(`   Plan: ${formatPlan(primaryScenario)}`);
   console.log(`   Site subdomain: ${primarySite.subdomain}`);
   console.log(`   Boards: ${mainBoards.map((item) => item.name).join(", ")}`);
   console.log(`   Posts: ${mainPosts.length}`);
@@ -735,10 +1312,20 @@ const seed = Effect.gen(function* () {
       yield* ensureMember({
         organizationId: primaryOrg.id,
         userId: userRecord.id,
-        role: "member",
+        role: candidate.mainOrgRole ?? "manager",
       });
 
       const personalOrg = yield* ensureOrganization(userRecord.id);
+
+      const planScenario = ORGANIZATION_PLANS[candidate.email];
+      if (planScenario) {
+        yield* ensureSubscription({
+          organizationId: personalOrg.id,
+          products,
+          scenario: planScenario,
+        });
+      }
+
       yield* ensureSite({
         organizationId: personalOrg.id,
         name: personalOrg.name,
@@ -759,12 +1346,25 @@ const seed = Effect.gen(function* () {
   const externalUsers = extraUsers.filter((item) => !item.joinMainOrg);
 
   for (const externalUser of externalUsers) {
-    const externalOrg = yield* ensureOrganization(externalUser.id);
+    const externalOrg = yield* ensureOrganization(
+      externalUser.id,
+      faker.company.name()
+    );
     const externalMember = yield* ensureMember({
       organizationId: externalOrg.id,
       userId: externalUser.id,
       role: "owner",
     });
+
+    const planScenario = ORGANIZATION_PLANS[externalUser.email];
+    if (planScenario) {
+      yield* ensureSubscription({
+        organizationId: externalOrg.id,
+        products,
+        scenario: planScenario,
+      });
+    }
+
     const externalBoards = yield* ensureBoards({
       organizationId: externalOrg.id,
       names: ["Roadmap", "Requests"],
@@ -785,7 +1385,7 @@ const seed = Effect.gen(function* () {
     });
 
     console.log(
-      `   Org for ${externalUser.email}: ${externalOrg.name} (${externalPosts.length} posts, subdomain: ${externalSite.subdomain})`
+      `   Org for ${externalUser.email}: ${externalOrg.name} (${externalPosts.length} posts, plan: ${formatPlan(planScenario)}, subdomain: ${externalSite.subdomain})`
     );
   }
 
@@ -803,6 +1403,15 @@ const seed = Effect.gen(function* () {
   yield* seedEngagement({
     organizationId: primaryOrg.id,
     actorIds,
+    posts: mainPosts,
+  });
+
+  console.log("5) Seeding changelogs in main org");
+
+  yield* seedChangelogs({
+    organizationId: primaryOrg.id,
+    creatorId: primaryUser.id,
+    creatorMemberId: primaryMember.id,
     posts: mainPosts,
   });
 

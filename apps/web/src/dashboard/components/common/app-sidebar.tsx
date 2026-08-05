@@ -28,7 +28,12 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  anyPolicy,
+  hasPermission,
+  PolicyGuard,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import {
   ArrowRight01Icon,
   Building06Icon,
@@ -205,7 +210,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 }
 
 function CreateBoardButton() {
+  const organizationId = useOrganizationId();
   const store = useCreateBoardDialogContext();
+  // Backend mirror: BoardPolicy.canCreate requires admin/owner boards.create.
+  const { allowed: canCreateBoard } = usePolicy(
+    hasPermission(organizationId, "boards.create")
+  );
+
+  if (!canCreateBoard) {
+    return null;
+  }
 
   return (
     <div>
@@ -272,12 +286,7 @@ interface BoardItemProp {
   name: string;
 }
 
-function BoardItem({
-  boardPublicId,
-  name,
-
-  boardSlug,
-}: BoardItemProp) {
+function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
   const organizationId = useOrganizationId();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -299,7 +308,7 @@ function BoardItem({
             </Link>
           )}
         />
-        <BoardMenuWithPolicy boardPublicId={boardPublicId} />
+        <BoardMenu boardPublicId={boardPublicId} />
       </SidebarMenuItem>
     </SkeletonWrapper>
   );
@@ -309,23 +318,20 @@ interface BoardMenuProps {
   boardPublicId: string;
 }
 
-function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
-  const organizationId = useOrganizationId();
-  const { allowed: canManageBoard } = usePolicy(
-    hasOwnerOrAdminRole(organizationId)
-  );
-  if (!canManageBoard) {
-    return null;
-  }
-  return <BoardMenu boardPublicId={boardPublicId} />;
-}
-
 function BoardMenu({ boardPublicId }: BoardMenuProps) {
   const { isMobile } = useSidebar();
+  const organizationId = useOrganizationId();
 
+  const { allowed: canManageBoard } = usePolicy(
+    anyPolicy(
+      hasPermission(organizationId, "boards.update"),
+      hasPermission(organizationId, "boards.delete")
+    )
+  );
   return (
     <Menu>
       <MenuTrigger
+        disabled={!canManageBoard}
         render={(props) => (
           <SidebarMenuAction {...props} className="mr-2" showOnHover>
             <HugeiconsIcon icon={Ellipsis} />
@@ -339,21 +345,42 @@ function BoardMenu({ boardPublicId }: BoardMenuProps) {
         className="w-48 rounded-lg"
         side={isMobile ? "bottom" : "right"}
       >
-        <RenameBoardButton boardPublicId={boardPublicId} />
+        <PolicyGuard policy={hasPermission(organizationId, "boards.update")}>
+          {({ allowed }) => (
+            <RenameBoardButton
+              boardPublicId={boardPublicId}
+              disabled={!allowed}
+            />
+          )}
+        </PolicyGuard>
 
         <MenuSeparator />
 
-        <DeleteBoardButton boardPublicId={boardPublicId} />
+        <PolicyGuard policy={hasPermission(organizationId, "boards.delete")}>
+          {({ allowed }) => (
+            <DeleteBoardButton
+              boardPublicId={boardPublicId}
+              disabled={!allowed}
+            />
+          )}
+        </PolicyGuard>
       </MenuPopup>
     </Menu>
   );
 }
 
-const DeleteBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
+const DeleteBoardButton = ({
+  boardPublicId,
+  disabled = false,
+}: {
+  boardPublicId: string;
+  disabled?: boolean;
+}) => {
   const store = useDeleteBoardDialogContext();
 
   return (
     <MenuItem
+      disabled={disabled}
       onClick={() =>
         store.send({ type: "toggle", data: { boardId: boardPublicId } })
       }
@@ -364,10 +391,17 @@ const DeleteBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
   );
 };
 
-const RenameBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
+const RenameBoardButton = ({
+  boardPublicId,
+  disabled = false,
+}: {
+  boardPublicId: string;
+  disabled?: boolean;
+}) => {
   const store = useRenameBoardDialogContext();
   return (
     <MenuItem
+      disabled={disabled}
       onClick={() =>
         store.send({ type: "toggle", data: { boardId: boardPublicId } })
       }
@@ -399,10 +433,7 @@ function RoadmapNav({ pathname }: { pathname: string }) {
   const roadmaps = roadmapsQuery.data ?? [];
 
   return (
-    <Collapsible
-      className="group/collapsible"
-      defaultOpen={isActive}
-    >
+    <Collapsible className="group/collapsible" defaultOpen={isActive}>
       <SidebarMenuItem>
         <CollapsibleTrigger
           render={(props) => (
@@ -427,8 +458,7 @@ function RoadmapNav({ pathname }: { pathname: string }) {
               <SidebarMenuSubItem key={roadmap.id}>
                 <SidebarMenuSubButton
                   isActive={
-                    pathname ===
-                    `/${organizationId}/roadmap/${roadmap.slug}`
+                    pathname === `/${organizationId}/roadmap/${roadmap.slug}`
                   }
                   render={(props) => (
                     <Link

@@ -12,13 +12,13 @@ import type {
   TCompanyAttributeDefinitionCreate,
   TCompanyAttributeDefinitionDelete,
   TCompanyAttributeDefinitionUpdate,
-  TCompanyAttributeValueUpsert,
   TCompanyAttributeValueUpdate,
+  TCompanyAttributeValueUpsert,
   TContactAttributeDefinitionCreate,
   TContactAttributeDefinitionDelete,
   TContactAttributeDefinitionUpdate,
-  TContactAttributeValueUpsert,
   TContactAttributeValueUpdate,
+  TContactAttributeValueUpsert,
 } from "./schema";
 
 type AttributeValue = Parameters<typeof buildAttributeValueColumns>[0];
@@ -142,6 +142,24 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0] !== undefined)),
 
+    findContactAttributeDefinitionById: (
+      args: TContactAttributeDefinitionDelete
+    ) =>
+      db
+        .select()
+        .from(schema.contactAttributeDefinitionTable)
+        .where(
+          and(
+            eq(schema.contactAttributeDefinitionTable.id, args.id),
+            eq(
+              schema.contactAttributeDefinitionTable.organizationId,
+              args.organizationId
+            )
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
+
     findCompanyAttributeDefinitions: (organizationId: string) =>
       db
         .select()
@@ -224,6 +242,24 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         )
         .limit(1)
         .pipe(Effect.map((rows) => rows[0] !== undefined)),
+
+    findCompanyAttributeDefinitionById: (
+      args: TCompanyAttributeDefinitionDelete
+    ) =>
+      db
+        .select()
+        .from(schema.companyAttributeDefinitionTable)
+        .where(
+          and(
+            eq(schema.companyAttributeDefinitionTable.id, args.id),
+            eq(
+              schema.companyAttributeDefinitionTable.organizationId,
+              args.organizationId
+            )
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
 
     findContactAttributeValues: (organizationId: string) =>
       db

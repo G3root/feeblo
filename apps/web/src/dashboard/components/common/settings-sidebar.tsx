@@ -9,6 +9,8 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@feeblo/ui/sidebar";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
   Building03Icon,
@@ -50,11 +52,13 @@ const settingsItems = [
       {
         label: "Workspace",
         icon: Building03Icon,
+        permission: "workspace.update" as const,
         to: "/$organizationId/settings/workspace" as const,
       },
       {
         label: "Customize Public Site",
         icon: PaintBrush04Icon,
+        permission: "site.update" as const,
         to: "/$organizationId/settings/customize" as const,
       },
       {
@@ -65,16 +69,19 @@ const settingsItems = [
       {
         label: "Custom Attributes",
         icon: PropertyNewIcon,
+        permission: "contacts.*" as const,
         to: "/$organizationId/settings/custom-attributes" as const,
       },
       {
         label: "Billing",
         icon: CreditCardIcon,
+        permission: "billing.update" as const,
         to: "/$organizationId/settings/billing" as const,
       },
       {
         label: "Security",
         icon: LockIcon,
+        permission: "workspace.update" as const,
         to: "/$organizationId/settings/security" as const,
       },
     ],
@@ -85,6 +92,7 @@ const settingsItems = [
       {
         label: "Roadmap",
         icon: LayoutThreeColumnIcon,
+        permission: "site.update" as const,
         to: "/$organizationId/settings/roadmap" as const,
       },
       {
@@ -100,6 +108,7 @@ const settingsItems = [
       {
         label: "Privacy",
         icon: Shield01Icon,
+        permission: "site.update" as const,
         to: "/$organizationId/settings/changelog-privacy" as const,
       },
       {
@@ -115,6 +124,7 @@ export function SettingsSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const organizationId = useOrganizationId();
+  const { data: session } = useAuthState();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -146,26 +156,46 @@ export function SettingsSidebar({
             <Fragment key={group.group}>
               <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
               <SidebarMenu>
-                {group.subItems.map((item) => (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton
-                      isActive={
-                        pathname ===
-                        `/${organizationId}/settings/${item.to.split("/").slice(3)}`
-                      }
-                      render={(renderProps) => (
-                        <Link
-                          {...renderProps}
-                          params={{ organizationId }}
-                          to={item.to}
-                        >
-                          <HugeiconsIcon icon={item.icon} />
-                          <span>{item.label}</span>
-                        </Link>
-                      )}
-                    />
-                  </SidebarMenuItem>
-                ))}
+                {group.subItems.map((item) => {
+                  const permission =
+                    "permission" in item ? item.permission : undefined;
+                  const canAccess =
+                    permission === undefined ||
+                    (session != null &&
+                      hasPermission(organizationId, permission)(session));
+
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton
+                        isActive={
+                          pathname ===
+                          `/${organizationId}/settings/${item.to.split("/").slice(3)}`
+                        }
+                        render={(renderProps) =>
+                          canAccess ? (
+                            <Link
+                              {...renderProps}
+                              params={{ organizationId }}
+                              to={item.to}
+                            >
+                              <HugeiconsIcon icon={item.icon} />
+                              <span>{item.label}</span>
+                            </Link>
+                          ) : (
+                            <span
+                              {...renderProps}
+                              aria-disabled="true"
+                              title="You don't have permission to access this setting."
+                            >
+                              <HugeiconsIcon icon={item.icon} />
+                              <span>{item.label}</span>
+                            </span>
+                          )
+                        }
+                      />
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </Fragment>
           ))}

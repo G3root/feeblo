@@ -365,6 +365,46 @@ describe("UpvoteRpcHandlers", () => {
           expect(upvotes[0]?.user.name).toBe("Test User");
         })
       );
+
+      it.effect("hides upvotes on private board posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* UpvoteRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const privateBoardId = yield* addBoard(fixture, "PRIVATE");
+          const postId = yield* PostId.generate;
+
+          const repository = yield* PostRepository;
+          yield* repository.create({
+            id: postId,
+            boardId: privateBoardId,
+            organizationId: fixture.organizationId,
+            statusId: fixture.statusId,
+            title: "Private post",
+            content: "Content",
+            creatorId: fixture.userId,
+            creatorMemberId: fixture.membershipId,
+          });
+
+          yield* handlers
+            .UpvoteToggle({
+              organizationId: fixture.organizationId,
+              postId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const upvotes = yield* handlers.UpvoteListPublic({
+            organizationId: fixture.organizationId,
+          });
+          expect(upvotes).toHaveLength(0);
+
+          const memberUpvotes = yield* handlers
+            .UpvoteList({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          expect(memberUpvotes).toHaveLength(1);
+        })
+      );
     });
 
     describe("UpvoteTogglePublic", () => {

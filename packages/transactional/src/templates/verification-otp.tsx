@@ -1,6 +1,6 @@
-import { Section, Text } from "@react-email/components";
 import * as React from "react";
-import { Copy, EmailShell, Lead } from "./email-shell";
+import { Section, Text } from "react-email";
+import { EmailShell } from "./email-shell";
 
 type VerificationOtpEmailProps = {
   readonly otp: string;
@@ -12,29 +12,17 @@ export const VerificationOtpEmail = ({
   otp,
 }: VerificationOtpEmailProps) => (
   <EmailShell
-    eyebrow="Verification Code"
-    footer="For security, never share this code with anyone."
+    footerBlurb="For security, never share this code with anyone."
+    homeUrl="https://feeblo.com"
     preview={`Your ${flowLabel.toLowerCase()} code is ${otp}`}
-    title={`${flowLabel} code`}
+    title="Almost there"
+    titleLead={`Use this one-time code to finish your ${flowLabel.toLowerCase()} on Feeblo. This code will only be valid for the next few minutes.`}
   >
-    <Lead>
-      Use this one-time code to finish your Feeblo {flowLabel.toLowerCase()}.
-    </Lead>
-    <Copy>
-      This code will only be valid for the next few minutes. If you didn’t
-      request it, you can ignore this email.
-    </Copy>
-    <Section>
-      <Text className="m-0 font-medium text-[#7b8494] text-[11px] uppercase leading-[16px] tracking-[0.16em]">
-        One-time password
+    <Section className="border border-stroke bg-bg-2 px-5 py-5 text-center">
+      <Text className="m-0 font-11 font-sans text-fg-3 uppercase">
+        One-time code
       </Text>
-      <Text
-        className="mt-[10px] inline-block rounded bg-[#dfe1e4] px-1 py-px font-bold font-mono text-[#3c4149] text-[21px] leading-[1.4] tracking-[-0.3px]"
-        style={{
-          fontFamily:
-            "'SFMono-Regular', 'SF Mono', 'Roboto Mono', 'Menlo', monospace",
-        }}
-      >
+      <Text className="m-0 mt-3 font-24 font-mono text-fg tracking-[0.24em]">
         {otp}
       </Text>
     </Section>

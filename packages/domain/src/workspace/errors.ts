@@ -9,7 +9,7 @@ import {
 import {
   ProfanityError,
   ReservedSubdomainError,
-} from "../site/services/profanity-check-schema";
+} from "../site/subdomain/errors";
 
 export class FailedToCreateWorkspaceError extends Schema.TaggedErrorClass<FailedToCreateWorkspaceError>()(
   "FailedToCreateWorkspaceError",

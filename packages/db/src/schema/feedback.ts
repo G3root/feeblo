@@ -504,6 +504,10 @@ export const postTable = pgTable(
       onDelete: "set null",
     }),
     source: postSourceEnum("source").default("DASHBOARD").notNull(),
+    metadata: jsonb("metadata")
+      .$type<Record<string, string>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     mergedIntoPostId: text("merged_into_post_id"),
@@ -786,8 +790,10 @@ export const changelogTable = pgTable(
   {
     id: text("id").primaryKey(),
     title: text("title").notNull(),
+    coverImage: text("cover_image"),
     slug: text("slug").notNull(),
     content: text("content").notNull(),
+    excerpt: text("excerpt").notNull().default(""),
     status: changelogStatusEnum("status").notNull().default("draft"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     publishedAt: timestamp("published_at", { withTimezone: true }),

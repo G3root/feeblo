@@ -6,8 +6,8 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
-import { ReservedSubdomainError } from "../site/services/profanity-check-schema";
-import { SubdomainValidationService } from "../site/services/profanity-check-service";
+import { ReservedSubdomainError } from "../site/subdomain/errors";
+import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspaceRepository } from "./repository";
 

@@ -25,7 +25,7 @@ describe("NotificationRpcHandlers", () => {
       const now = new Date();
       yield* db.insert(schema.organizationTable).values({ id: organizationId, name: "Test organization", slug: organizationId, createdAt: now });
       yield* db.insert(schema.userTable).values({ id: userId, email: `${organizationId}@example.com`, name: "Test user" });
-      yield* db.insert(schema.memberTable).values({ id: memberId, organizationId, userId, role: "member", createdAt: now });
+      yield* db.insert(schema.memberTable).values({ id: memberId, organizationId, userId, role: "manager", createdAt: now });
       return { memberId, organizationId, userId } satisfies Fixture;
     });
 
@@ -33,7 +33,7 @@ describe("NotificationRpcHandlers", () => {
     user: { id: fixture.userId, email: "user@example.com", name: "Test user", restrictedToOrganizationId: null },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
-    memberships: member ? [{ membershipId: fixture.memberId, organizationId: fixture.organizationId, role: "member" }] : [],
+    memberships: member ? [{ membershipId: fixture.memberId, organizationId: fixture.organizationId, role: "manager" }] : [],
   });
 
   const insertNotification = (
@@ -69,7 +69,7 @@ describe("NotificationRpcHandlers", () => {
       const userId = `user_second_${fixture.organizationId}`;
       const memberId = `member_second_${fixture.organizationId}`;
       yield* db.insert(schema.userTable).values({ id: userId, email: `${userId}@example.com`, name: "Second user" });
-      yield* db.insert(schema.memberTable).values({ id: memberId, organizationId: fixture.organizationId, userId, role: "member", createdAt: new Date() });
+      yield* db.insert(schema.memberTable).values({ id: memberId, organizationId: fixture.organizationId, userId, role: "manager", createdAt: new Date() });
       return { ...fixture, memberId, userId } satisfies Fixture;
     });
 

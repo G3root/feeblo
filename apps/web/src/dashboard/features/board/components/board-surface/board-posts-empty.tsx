@@ -37,20 +37,23 @@ export function BoardPostsEmpty({
       {hasFilters ? null : (
         <EmptyContent>
           <PolicyGuard policy={hasMembership(organizationId)}>
-            <Button
-              onClick={() =>
-                store.send({
-                  type: "toggle",
-                  data: {
-                    boardId,
-                    source: "board_empty_state",
-                    status: "PLANNED",
-                  },
-                })
-              }
-            >
-              Create post
-            </Button>
+            {({ allowed }) => (
+              <Button
+                disabled={!allowed}
+                onClick={() =>
+                  store.send({
+                    type: "toggle",
+                    data: {
+                      boardId,
+                      source: "board_empty_state",
+                      status: "PLANNED",
+                    },
+                  })
+                }
+              >
+                Create post
+              </Button>
+            )}
           </PolicyGuard>
         </EmptyContent>
       )}

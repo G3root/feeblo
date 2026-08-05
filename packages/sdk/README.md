@@ -29,6 +29,33 @@ const widget = Feeblo.init("org_123");
 widget.identify(user).setBoard("roadmap").open();
 ```
 
+### Widget modes
+
+Focused feedback remains the default. Use `updates` for a card-based product
+updates panel, or combine an ordered subset of modules in Feeblo Hub:
+
+```ts
+Feeblo.init("org_123", { mode: "feedback" });
+
+Feeblo.init("org_123", {
+  mode: "updates",
+  placement: "bottom-left",
+});
+
+const hub = Feeblo.init("org_123", {
+  mode: "hub",
+  modules: ["updates", "feedback"],
+  placement: "bottom-right",
+});
+
+hub.openModule("feedback");
+```
+
+`placement` renders Feeblo's launcher in the selected bottom corner. Omit it
+to keep programmatic and `data-feeblo-feedback` triggers as the only ways to
+open the widget. Hub requires at least one unique module and initially shows
+the first module in the array.
+
 ### Config-object form
 
 Prefer a single object? `init` accepts a config object too:
@@ -218,6 +245,9 @@ console.log(Feeblo.version);
 | ---------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `baseUrl`        | `string`                                    | Override the widget host. Defaults to `https://app.feeblo.com` (or `localhost:3001` in dev). |
 | `theme`          | `string`                                    | Widget theme, forwarded as a query param.                                                    |
+| `mode`           | `"feedback" \| "updates" \| "hub"`       | Widget experience. Defaults to `feedback`.                                                   |
+| `modules`        | `Array<"feedback" \| "updates">`           | Ordered Hub modules. Defaults to feedback then updates.                                      |
+| `placement`      | `"bottom-left" \| "bottom-right"`           | Render a launcher in the selected bottom corner.                                             |
 | `user`           | `UserIdentity`                              | Identify the current user on init.                                                           |
 | `debug`          | `boolean`                                   | Enable diagnostic logging.                                                                   |
 | `root`           | `HTMLElement`                               | Where to mount the widget container. Defaults to `document.body`.                            |
@@ -260,6 +290,7 @@ Or via a global config placed before the script:
 | `init(id, opts?)` | Initialise the widget. Returns a chainable `FeebloWidget`.             |
 | `identify(user)`  | Identify or update the current user. Chainable.                        |
 | `open()`          | Open the widget. Chainable.                                            |
+| `openModule(name)`| Open an enabled module. Chainable.                                     |
 | `close()`         | Close the widget. Chainable.                                           |
 | `setBoard(board)` | Switch the active board. Chainable.                                    |
 | `destroy()`       | Tear down the widget and release listeners.                            |

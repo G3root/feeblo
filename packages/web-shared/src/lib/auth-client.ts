@@ -12,11 +12,17 @@ export const organizationLogoUploadEndpoint = `${baseUrl}api/organization/logo`;
 export const editorMediaUploadEndpoint = `${baseUrl}api/media/upload`;
 
 export const uploadedEditorMediaSchema = z.object({
+  assetId: z.string(),
   bucket: z.string(),
   key: z.string(),
-  kind: z.enum(["image", "video"]),
+  kind: z.literal("image"),
   url: z.url(),
 });
+
+export type EditorMediaUploadOptions = {
+  readonly organizationId?: string;
+  readonly timeoutMs?: number;
+};
 
 export const authClient = createAuthClient(baseUrl, {
   getTimeZone: getClientTimeZone,

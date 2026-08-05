@@ -1,4 +1,4 @@
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "./empty";
 
 export function ErrorFallback(props: { error: unknown }) {
   const message =
