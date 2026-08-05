@@ -7,7 +7,7 @@ import * as Option from "effect/Option";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
-import { SubdomainValidationService } from "../site/services/profanity-check-service";
+import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRepository } from "./repository";
 import { WorkspaceRpcs } from "./rpcs";
 import type {
@@ -107,5 +107,5 @@ export const WorkspaceRpcHandlers = WorkspaceRpcs.toLayer(
   WorkspaceRpcHandlersEffect
 ).pipe(
   Layer.provide(WorkspaceRepository.layer),
-  Layer.provide(SubdomainValidationService.liveLayer)
+  Layer.provide(SubdomainValidationService.layerEnv)
 );
