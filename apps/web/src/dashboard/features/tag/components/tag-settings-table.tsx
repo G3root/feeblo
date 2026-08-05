@@ -1,11 +1,5 @@
 import { Button } from "@feeblo/ui/button";
 import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
-import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -13,6 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import {
   Table,
@@ -22,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import { cn } from "@feeblo/ui/utils";
+import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
   Delete02Icon,
   Edit,
@@ -33,7 +30,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { cn } from "@feeblo/ui/utils";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import {
   useTagCreateDialogContext,
@@ -77,7 +73,10 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
     return (
       <SkeletonLoader isLoading>
         <section className="space-y-6">
-          <TagTableActions onCreate={handleCreate} />
+          <TagTableActions
+            onCreate={handleCreate}
+            organizationId={organizationId}
+          />
           <TagTableShell>
             {loadingRowIds.map((id) => (
               <TagTableLoadingRow key={id} />
@@ -91,7 +90,10 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   if (tagsQuery.isError) {
     return (
       <section className="space-y-6">
-        <TagTableActions onCreate={handleCreate} />
+        <TagTableActions
+          onCreate={handleCreate}
+          organizationId={organizationId}
+        />
         <TagTableErrorState />
       </section>
     );
@@ -100,7 +102,10 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   if (tags.length === 0) {
     return (
       <section className="space-y-6">
-        <TagTableActions onCreate={handleCreate} />
+        <TagTableActions
+          onCreate={handleCreate}
+          organizationId={organizationId}
+        />
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -110,10 +115,18 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
             <EmptyDescription>{emptyDescription}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={handleCreate} type="button">
-              <HugeiconsIcon icon={Plus} />
-              <span>Create tag</span>
-            </Button>
+            <PolicyGuard policy={hasPermission(organizationId, "tags.create")}>
+              {({ allowed }) => (
+                <Button
+                  disabled={!allowed}
+                  onClick={handleCreate}
+                  type="button"
+                >
+                  <HugeiconsIcon icon={Plus} />
+                  <span>Create tag</span>
+                </Button>
+              )}
+            </PolicyGuard>
           </EmptyContent>
         </Empty>
       </section>
@@ -122,7 +135,10 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
 
   return (
     <section className="space-y-6">
-      <TagTableActions onCreate={handleCreate} />
+      <TagTableActions
+        onCreate={handleCreate}
+        organizationId={organizationId}
+      />
       <TagTableShell>
         {tags.map((tag) => (
           <TagTableRow
@@ -141,6 +157,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
                 data: { tagId: tag.id },
               })
             }
+            organizationId={organizationId}
             updatedAt={tag.updatedAt}
           />
         ))}
@@ -149,14 +166,24 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   );
 }
 
-function TagTableActions({ onCreate }: { onCreate: () => void }) {
+function TagTableActions({
+  onCreate,
+  organizationId,
+}: {
+  onCreate: () => void;
+  organizationId: string;
+}) {
   return (
     <div className="flex items-center justify-end">
       <SkeletonWrapper>
-        <Button onClick={onCreate} type="button">
-          <HugeiconsIcon icon={Plus} />
-          <span>New tag</span>
-        </Button>
+        <PolicyGuard policy={hasPermission(organizationId, "tags.create")}>
+          {({ allowed }) => (
+            <Button disabled={!allowed} onClick={onCreate} type="button">
+              <HugeiconsIcon icon={Plus} />
+              <span>New tag</span>
+            </Button>
+          )}
+        </PolicyGuard>
       </SkeletonWrapper>
     </div>
   );
@@ -167,6 +194,7 @@ type TagTableRowProps = {
   name: string;
   onDelete: () => void;
   onEdit: () => void;
+  organizationId: string;
   updatedAt: Date;
 };
 
@@ -186,6 +214,7 @@ function TagTableRow({
   name,
   onDelete,
   onEdit,
+  organizationId,
   updatedAt,
 }: TagTableRowProps) {
   return (
@@ -194,31 +223,42 @@ function TagTableRow({
       <TableCell>{formatDate(createdAt)}</TableCell>
       <TableCell>{formatDate(updatedAt)}</TableCell>
       <TableCell className="text-right">
-        <Menu>
-          <MenuTrigger
-            render={(triggerProps) => (
-              <Button
-                {...triggerProps}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <HugeiconsIcon icon={Ellipsis} />
-                <span className="sr-only">Open actions for {name}</span>
-              </Button>
-            )}
-          />
-          <MenuPopup align="end" className="w-40">
-            <MenuItem onClick={onEdit}>
-              <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
-              <span>Rename</span>
-            </MenuItem>
-            <MenuItem onClick={onDelete} variant="destructive">
-              <HugeiconsIcon icon={Delete02Icon} />
-              <span>Delete</span>
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
+        <PolicyGuard policy={hasPermission(organizationId, "tags.*")}>
+          {({ allowed }) => (
+            <Menu>
+              <MenuTrigger
+                render={(triggerProps) => (
+                  <Button
+                    {...triggerProps}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <HugeiconsIcon icon={Ellipsis} />
+                    <span className="sr-only">Open actions for {name}</span>
+                  </Button>
+                )}
+              />
+              <MenuPopup align="end" className="w-40">
+                <MenuItem disabled={!allowed} onClick={onEdit}>
+                  <HugeiconsIcon
+                    className="text-muted-foreground"
+                    icon={Edit}
+                  />
+                  <span>Rename</span>
+                </MenuItem>
+                <MenuItem
+                  disabled={!allowed}
+                  onClick={onDelete}
+                  variant="destructive"
+                >
+                  <HugeiconsIcon icon={Delete02Icon} />
+                  <span>Delete</span>
+                </MenuItem>
+              </MenuPopup>
+            </Menu>
+          )}
+        </PolicyGuard>
       </TableCell>
     </TableRow>
   );

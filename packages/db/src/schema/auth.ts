@@ -1,3 +1,4 @@
+import type { Role } from "@feeblo/permissions";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -156,10 +157,7 @@ export const memberTable = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => userTable.id, { onDelete: "cascade" }),
-    role: text("role")
-      .default("member")
-      .$type<"member" | "owner" | "admin">()
-      .notNull(),
+    role: text("role").default("manager").$type<Role>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (table) => [
@@ -180,7 +178,7 @@ export const invitationTable = pgTable(
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
-    role: text("role"),
+    role: text("role").$type<Role | null>(),
     status: text("status").default("pending").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

@@ -58,11 +58,36 @@ const TEST_USER = {
 };
 
 const TEAM_USERS = [
-  { email: "alex@feeblo.dev", name: "Alex", joinMainOrg: true },
-  { email: "sam@feeblo.dev", name: "Sam", joinMainOrg: true },
-  { email: "jordan@feeblo.dev", name: "Jordan", joinMainOrg: true },
-  { email: "morgan@feeblo.dev", name: "Morgan", joinMainOrg: false },
-  { email: "taylor@feeblo.dev", name: "Taylor", joinMainOrg: false },
+  {
+    email: "alex@feeblo.dev",
+    name: "Alex",
+    joinMainOrg: true,
+    mainOrgRole: "manager",
+  },
+  {
+    email: "sam@feeblo.dev",
+    name: "Sam",
+    joinMainOrg: true,
+    mainOrgRole: "manager",
+  },
+  {
+    email: "jordan@feeblo.dev",
+    name: "Jordan",
+    joinMainOrg: true,
+    mainOrgRole: "contributor",
+  },
+  {
+    email: "morgan@feeblo.dev",
+    name: "Morgan",
+    joinMainOrg: false,
+    mainOrgRole: null,
+  },
+  {
+    email: "taylor@feeblo.dev",
+    name: "Taylor",
+    joinMainOrg: false,
+    mainOrgRole: null,
+  },
 ] as const;
 
 const MAIN_POST_COUNT = 40;
@@ -1287,7 +1312,7 @@ const seed = Effect.gen(function* () {
       yield* ensureMember({
         organizationId: primaryOrg.id,
         userId: userRecord.id,
-        role: "member",
+        role: candidate.mainOrgRole ?? "manager",
       });
 
       const personalOrg = yield* ensureOrganization(userRecord.id);

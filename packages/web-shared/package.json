@@ -105,6 +105,7 @@
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
+    "@feeblo/permissions": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@tanstack/query-db-collection": "catalog:",

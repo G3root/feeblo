@@ -2,9 +2,11 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   BoardId,
+  CommentId,
   type LegidOf,
   PostId,
   PostStatusId,
+  UpvoteId,
   WorkspaceId,
 } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
@@ -271,6 +273,23 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostCreate", () => {
+      it.effect("allows contributors to create posts", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Contributor feedback"))
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "contributor")
+              )
+            );
+        })
+      );
+
       it.effect("rejects non-members, including on public boards", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -355,6 +374,59 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostUpdate", () => {
+      it.effect("lets contributors move posts but not change their status", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+          const destinationBoardId = yield* addBoard(fixture, "PUBLIC");
+          const otherStatusId = yield* PostStatusId.generate;
+
+          yield* db.insert(schema.postStatusTable).values({
+            id: otherStatusId,
+            type: "IN_PROGRESS",
+            orderIndex: 1,
+            organizationId: fixture.organizationId,
+          });
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostUpdate({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: destinationBoardId,
+              statusId: fixture.statusId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "contributor")
+              )
+            );
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdate({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: destinationBoardId,
+                statusId: otherStatusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "contributor")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
       it.effect("lets a post creator change the post", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -382,7 +454,7 @@ describe("PostRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member")
+                makeSession(fixture, "manager")
               )
             );
           yield* handlers
@@ -395,7 +467,7 @@ describe("PostRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member")
+                makeSession(fixture, "manager")
               )
             );
 
@@ -505,10 +577,95 @@ describe("PostRpcHandlers", () => {
           expect(posts).toHaveLength(0);
         })
       );
+
+      it.effect("rejects creator deletion after another user votes", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const otherUserId = `other_${fixture.organizationId}`;
+          const db = yield* currentDb;
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Feedback with another vote")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* db.insert(schema.userTable).values({
+            id: otherUserId,
+            email: `${otherUserId}@example.com`,
+            name: "Other voter",
+          });
+          yield* db.insert(schema.upvoteTable).values({
+            id: yield* UpvoteId.generate,
+            postId,
+            userId: otherUserId,
+            organizationId: fixture.organizationId,
+            memberId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostDeletePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("rejects creator deletion after a comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          const session = makeSession(fixture, null);
+          const db = yield* currentDb;
+
+          yield* handlers
+            .PostCreatePublic(
+              postCreateInput(fixture, postId, "Feedback with a comment")
+            )
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* db.insert(schema.commentTable).values({
+            id: yield* CommentId.generate,
+            content: "A comment",
+            organizationId: fixture.organizationId,
+            postId,
+            userId: fixture.userId,
+            memberId: null,
+            visibility: "PUBLIC",
+            parentCommentId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostDeletePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
     });
 
     describe("PostAdminUpdate", () => {
-      it.effect("requires an organization owner or admin", () =>
+      it.effect("allows managers to moderate posts", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture();
@@ -525,29 +682,18 @@ describe("PostRpcHandlers", () => {
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          const error = yield* Effect.flip(
-            handlers
-              .PostAdminUpdate({
-                id: postId,
-                organizationId: fixture.organizationId,
-                locked: true,
-              })
-              .pipe(
-                Effect.provideService(
-                  CurrentSession,
-                  makeSession(fixture, "member")
-                )
-              )
-          );
-          expect(error._tag).toBe("PolicyDenied");
-
           yield* handlers
             .PostAdminUpdate({
               id: postId,
               organizationId: fixture.organizationId,
               locked: true,
             })
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
 
           const [post] = yield* handlers
             .PostListPublic({

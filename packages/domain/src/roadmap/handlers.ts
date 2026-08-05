@@ -20,7 +20,7 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* RoadmapRepository;
   const sitePolicy = yield* SitePolicy;
   const manage = (organizationId: string) =>
-    Policy.hasOrganizationOwnerOrAdmin(organizationId);
+    Policy.canPermission(organizationId, "roadmap.*");
   return {
     RoadmapList: (args: TRoadmapList) =>
       repository

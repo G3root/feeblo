@@ -1,11 +1,10 @@
 import { currentDb, schema } from "@feeblo/db";
+import { PRIVILEGED_ROLES, type Role } from "@feeblo/permissions";
 import { and, eq, inArray } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
-import { PRIVILEGED_MEMBER_ROLES } from "../plan-entitlements";
 
 interface TFindMembershipsByUserId {
   userId: string;
@@ -41,7 +40,7 @@ interface TDeleteMember {
 interface TUpdateMemberRole {
   memberId: string;
   organizationId: string;
-  role: "owner" | "admin" | "member";
+  role: Role;
 }
 
 interface TCreateInvitation {
@@ -50,7 +49,7 @@ interface TCreateInvitation {
   id: string;
   inviterId: string;
   organizationId: string;
-  role: string;
+  role: Role | null;
 }
 
 interface TCancelInvitation {
@@ -247,7 +246,7 @@ const makeMembershipRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.memberTable.organizationId, organizationId),
-              inArray(schema.memberTable.role, [...PRIVILEGED_MEMBER_ROLES])
+              inArray(schema.memberTable.role, [...PRIVILEGED_ROLES])
             )
           );
 
@@ -264,7 +263,7 @@ const makeMembershipRepository = Effect.gen(function* () {
             and(
               eq(schema.invitationTable.organizationId, organizationId),
               eq(schema.invitationTable.status, "pending"),
-              inArray(schema.invitationTable.role, [...PRIVILEGED_MEMBER_ROLES])
+              inArray(schema.invitationTable.role, [...PRIVILEGED_ROLES])
             )
           );
 

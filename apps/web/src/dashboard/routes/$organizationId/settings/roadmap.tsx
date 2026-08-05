@@ -1,9 +1,11 @@
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTransition } from "react";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useSite } from "~/hooks/use-site";
 import { siteCollection } from "~/lib/collections";
 
@@ -16,11 +18,15 @@ export const Route = createFileRoute("/$organizationId/settings/roadmap")({
 });
 
 function RouteComponent() {
+  const organizationId = useOrganizationId();
+  const { allowed: canManageRoadmap, isPending: isPolicyPending } = usePolicy(
+    hasPermission(organizationId, "site.update")
+  );
   const site = useSite();
   const [isPending, startTransition] = useTransition();
 
   const handleCheckedChange = (checked: boolean) => {
-    if (!site) {
+    if (!(site && canManageRoadmap)) {
       return;
     }
 
@@ -71,7 +77,11 @@ function RouteComponent() {
                     <SettingsItem.ItemActions>
                       <Switch
                         checked={site?.roadmapVisibility === "PUBLIC"}
-                        disabled={!site || isPending}
+                        disabled={
+                          !(site && canManageRoadmap) ||
+                          isPending ||
+                          isPolicyPending
+                        }
                         onCheckedChange={handleCheckedChange}
                       />
                     </SettingsItem.ItemActions>

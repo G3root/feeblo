@@ -21,22 +21,22 @@ const makeAttributeDefinitionPolicy = Effect.gen(function* () {
   ) => Policy.policy(() => repository.companyAttributeDefinitionExists(args));
 
   const canCreateContact = (organizationId: string) =>
-    Policy.hasOrganizationOwnerOrAdmin(organizationId);
+    Policy.canPermission(organizationId, "contacts.*");
 
   const canUpdateContact = (args: TContactAttributeDefinitionDelete) =>
     Policy.all(
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "contacts.*"),
       contactBelongsToOrganization(args)
     );
 
   const canDeleteContact = canUpdateContact;
 
   const canCreateCompany = (organizationId: string) =>
-    Policy.hasOrganizationOwnerOrAdmin(organizationId);
+    Policy.canPermission(organizationId, "companies.*");
 
   const canUpdateCompany = (args: TCompanyAttributeDefinitionDelete) =>
     Policy.all(
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "companies.*"),
       companyBelongsToOrganization(args)
     );
 

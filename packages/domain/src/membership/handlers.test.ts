@@ -136,7 +136,7 @@ describe("MembershipRpcHandlers", () => {
 
         yield* policy.canInviteRoleWithinPlan({
           organizationId: fixture.organizationId,
-          role: "member",
+          role: "manager",
         });
       })
     );
@@ -213,7 +213,7 @@ describe("MembershipRpcHandlers", () => {
           id: targetMemberId,
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
-          role: "member",
+          role: "manager",
           createdAt: new Date(),
         });
         yield* db.insert(schema.userTable).values({
@@ -266,7 +266,7 @@ describe("MembershipRpcHandlers", () => {
           id: targetMemberId,
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
-          role: "member",
+          role: "manager",
           createdAt: new Date(),
         });
 
@@ -426,7 +426,7 @@ describe("MembershipRpcHandlers", () => {
           id: memberId,
           organizationId: fixture.organizationId,
           userId: `member_${fixture.organizationId}`,
-          role: "member",
+          role: "manager",
           createdAt: new Date(),
         });
         yield* db
@@ -441,6 +441,43 @@ describe("MembershipRpcHandlers", () => {
           })
           .pipe(
             Effect.provideService(CurrentSession, makeSession(fixture, "admin"))
+          );
+
+        const remaining = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.id, memberId));
+        expect(remaining).toHaveLength(0);
+      })
+    );
+    it.effect("allows a manager to remove a contributor", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const memberId = yield* MemberId.generate;
+        const targetUserId = `contributor_${fixture.organizationId}`;
+
+        yield* db.insert(schema.userTable).values({
+          id: targetUserId,
+          email: `${targetUserId}@example.com`,
+          name: "Contributor",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: memberId,
+          organizationId: fixture.organizationId,
+          userId: targetUserId,
+          role: "contributor",
+          createdAt: new Date(),
+        });
+
+        yield* handlers
+          .OrganizationRemoveMember({
+            organizationId: fixture.organizationId,
+            memberId,
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "manager"))
           );
 
         const remaining = yield* db

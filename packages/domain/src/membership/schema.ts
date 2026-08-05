@@ -1,7 +1,8 @@
 import { MemberId, WorkspaceId } from "@feeblo/id";
+import { ROLES } from "@feeblo/permissions";
 import * as S from "effect/Schema";
 
-const ROLE_LITERAL = S.Literals(["owner", "admin", "member"]);
+const ROLE_LITERAL = S.Literals([...ROLES]);
 
 export const Membership = S.Struct({
   id: S.String,
@@ -33,7 +34,7 @@ export const OrganizationInvitation = S.Struct({
   id: S.String,
   organizationId: S.String,
   email: S.String,
-  role: S.NullOr(S.String),
+  role: S.NullOr(ROLE_LITERAL),
   status: S.String,
   expiresAt: S.DateFromString,
   inviterId: S.String,

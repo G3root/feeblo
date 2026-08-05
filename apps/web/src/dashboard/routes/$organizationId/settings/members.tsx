@@ -1,3 +1,9 @@
+import {
+  compareRoles,
+  INVITABLE_ROLES,
+  type InvitableRole,
+  type Role,
+} from "@feeblo/permissions";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -27,6 +33,7 @@ import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   hasOwnerOrAdminRole,
+  hasPermission,
   PolicyGuard,
 } from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Plus, Search01Icon } from "@hugeicons/core-free-icons";
@@ -224,10 +231,7 @@ function MembersSection() {
       {noFilter || isEmpty ? null : (
         <MembersSettingsLayout.List>
           {members.map((member) => {
-            const role = member.role.split(",")[0] as
-              | "owner"
-              | "admin"
-              | "member";
+            const role = member.role.split(",")[0] as Role;
             const isOwner = member.role.split(",").includes("owner");
             const isCurrentUser = member.userId === session?.user?.id;
 
@@ -372,7 +376,7 @@ function InvitationsSection() {
               id={invitation.id}
               key={invitation.id}
               organizationId={organizationId}
-              role={invitation.role || "member"}
+              role={invitation.role || "manager"}
             />
           ))}
         </MembersSettingsLayout.List>
@@ -448,9 +452,15 @@ function MemberListItem({
   isOwner: boolean;
   name: string;
   organizationId: string;
-  role: "owner" | "admin" | "member";
+  role: Role;
 }) {
   const { membersCollection } = useDashboardCollections();
+  const { data: session } = useAuthState();
+  const actorRole = session?.memberships.find(
+    (membership) => membership.organizationId === organizationId
+  )?.role;
+  const canManageTarget =
+    actorRole !== undefined && compareRoles(role, actorRole) === -1;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
@@ -463,78 +473,99 @@ function MemberListItem({
       </div>
 
       <div className="flex items-center gap-2">
-        <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
-          <Select
-            onValueChange={async (value) => {
-              if (!value) {
-                throw new Error("value not found");
-              }
-              const tx = membersCollection.update(id, (draft) => {
-                draft.role = value as "owner" | "admin" | "member";
-              });
-              try {
-                await tx.isPersisted.promise;
-                trackEvent("org_member_role_changed", {
-                  role: value,
-                  success: true,
+        <PolicyGuard policy={hasPermission(organizationId, "members.assign")}>
+          {({ allowed }) => (
+            <Select
+              onValueChange={async (value) => {
+                if (!value) {
+                  throw new Error("value not found");
+                }
+                const tx = membersCollection.update(id, (draft) => {
+                  draft.role = value as Role;
                 });
-                toastManager.add({
-                  title: "Member role updated",
-                  type: "success",
-                });
-              } catch (_error) {
-                trackEvent("org_member_role_changed", {
-                  role: value,
-                  success: false,
-                });
-                toastManager.add({
-                  title: "Failed to update role",
-                  type: "error",
-                });
-              }
-            }}
-            value={role}
-          >
-            <SelectTrigger className="w-28" disabled={isOwner}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup>
-              {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem
-                disabled={atPrivilegedLimit && role !== "admin"}
-                value="admin"
+                try {
+                  await tx.isPersisted.promise;
+                  trackEvent("org_member_role_changed", {
+                    role: value,
+                    success: true,
+                  });
+                  toastManager.add({
+                    title: "Member role updated",
+                    type: "success",
+                  });
+                } catch (_error) {
+                  trackEvent("org_member_role_changed", {
+                    role: value,
+                    success: false,
+                  });
+                  toastManager.add({
+                    title: "Failed to update role",
+                    type: "error",
+                  });
+                }
+              }}
+              value={role}
+            >
+              <SelectTrigger
+                className="w-28"
+                disabled={!(allowed && canManageTarget)}
+                title={
+                  allowed
+                    ? undefined
+                    : "You don't have permission to change roles"
+                }
               >
-                Admin
-              </SelectItem>
-            </SelectPopup>
-          </Select>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectPopup>
+                {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="contributor">Contributor</SelectItem>
+                <SelectItem
+                  disabled={atPrivilegedLimit && role !== "admin"}
+                  value="admin"
+                >
+                  Admin
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          )}
+        </PolicyGuard>
 
-          <Button
-            disabled={isOwner}
-            onClick={async () => {
-              const tx = membersCollection.delete(id);
-              try {
-                await tx.isPersisted.promise;
-                trackEvent("org_member_removed", { success: true });
-                toastManager.add({
-                  title: "Member removed",
-                  type: "success",
-                });
-              } catch (_error) {
-                trackEvent("org_member_removed", { success: false });
-                toastManager.add({
-                  title: "Failed to remove member",
-                  type: "error",
-                });
+        <PolicyGuard policy={hasPermission(organizationId, "members.remove")}>
+          {({ allowed }) => (
+            <Button
+              aria-label={`Remove ${name}`}
+              disabled={!(allowed && canManageTarget) || isCurrentUser}
+              onClick={async () => {
+                const tx = membersCollection.delete(id);
+                try {
+                  await tx.isPersisted.promise;
+                  trackEvent("org_member_removed", { success: true });
+                  toastManager.add({
+                    title: "Member removed",
+                    type: "success",
+                  });
+                } catch (_error) {
+                  trackEvent("org_member_removed", { success: false });
+                  toastManager.add({
+                    title: "Failed to remove member",
+                    type: "error",
+                  });
+                }
+              }}
+              size="icon-sm"
+              title={
+                allowed
+                  ? undefined
+                  : "You don't have permission to remove members"
               }
-            }}
-            size="icon-sm"
-            type="button"
-            variant="destructive"
-          >
-            <HugeiconsIcon icon={Delete02Icon} />
-          </Button>
+              type="button"
+              variant="destructive"
+            >
+              <HugeiconsIcon icon={Delete02Icon} />
+            </Button>
+          )}
         </PolicyGuard>
       </div>
     </div>
@@ -595,30 +626,33 @@ function InvitationListItem({
       </div>
 
       <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
-        <Button
-          onClick={async () => {
-            const tx = invitationsCollection.delete(id);
-            try {
-              await tx.isPersisted.promise;
-              trackEvent("org_invitation_revoked", { success: true });
-              toastManager.add({
-                title: "Invitation revoked",
-                type: "success",
-              });
-            } catch (_error) {
-              trackEvent("org_invitation_revoked", { success: false });
-              toastManager.add({
-                title: "Failed to revoke invitation",
-                type: "error",
-              });
-            }
-          }}
-          size="icon-sm"
-          type="button"
-          variant="destructive"
-        >
-          <HugeiconsIcon icon={Delete02Icon} />
-        </Button>
+        {({ allowed }) => (
+          <Button
+            disabled={!allowed}
+            onClick={async () => {
+              const tx = invitationsCollection.delete(id);
+              try {
+                await tx.isPersisted.promise;
+                trackEvent("org_invitation_revoked", { success: true });
+                toastManager.add({
+                  title: "Invitation revoked",
+                  type: "success",
+                });
+              } catch (_error) {
+                trackEvent("org_invitation_revoked", { success: false });
+                toastManager.add({
+                  title: "Failed to revoke invitation",
+                  type: "error",
+                });
+              }
+            }}
+            size="icon-sm"
+            type="button"
+            variant="destructive"
+          >
+            <HugeiconsIcon icon={Delete02Icon} />
+          </Button>
+        )}
       </PolicyGuard>
     </div>
   );
@@ -632,7 +666,7 @@ function InvitationListItemLoading() {
           <p className="font-medium text-sm">invite@example.com</p>
         </SkeletonWrapper>
         <SkeletonWrapper>
-          <p className="text-muted-foreground text-xs">Invited as member</p>
+          <p className="text-muted-foreground text-xs">Invited as manager</p>
         </SkeletonWrapper>
         <SkeletonWrapper>
           <p className="text-muted-foreground text-xs">Expires soon</p>
@@ -653,7 +687,7 @@ const invitationLoadingIds = ["invitation-loading-1", "invitation-loading-2"];
 
 const InviteMemberFormSchema = z.object({
   email: z.email("Enter a valid email"),
-  role: z.enum(["member", "admin"]),
+  role: z.enum([...INVITABLE_ROLES]),
 });
 
 function InviteMemberForm() {
@@ -663,7 +697,7 @@ function InviteMemberForm() {
   const form = useAppForm({
     defaultValues: {
       email: "",
-      role: "member" as "member" | "admin",
+      role: "manager" as InvitableRole,
     },
     validators: {
       onSubmit: InviteMemberFormSchema,
@@ -728,7 +762,7 @@ function InviteMemberForm() {
           children={(field) => (
             <Select
               onValueChange={(value) =>
-                field.handleChange(value as "member" | "admin")
+                field.handleChange(value as InvitableRole)
               }
               value={field.state.value}
             >
@@ -738,7 +772,8 @@ function InviteMemberForm() {
                 </SelectTrigger>
               </SkeletonWrapper>
               <SelectPopup>
-                <SelectItem value="member">Member</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="contributor">Contributor</SelectItem>
                 <SelectItem disabled={atLimit} value="admin">
                   Admin
                 </SelectItem>

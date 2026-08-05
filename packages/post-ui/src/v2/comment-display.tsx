@@ -311,10 +311,10 @@ function ToggleVisibilityButton() {
 }
 
 function CommentDisplayDropdown() {
-  const { canManagePost } = usePostCollectionData();
+  const { canModeratePost } = usePostCollectionData();
   const { state } = useCommentDisplay();
 
-  if (!(canManagePost || state.isAuthor)) {
+  if (!(canModeratePost || state.isAuthor)) {
     return null;
   }
 
@@ -328,8 +328,8 @@ function CommentDisplayDropdown() {
         }
       />
       <MenuPopup>
-        <EditButton />
-        <ToggleVisibilityButton />
+        {state.isAuthor ? <EditButton /> : null}
+        {state.isAuthor ? <ToggleVisibilityButton /> : null}
         <DeleteButton />
       </MenuPopup>
     </Menu>

@@ -1,13 +1,13 @@
 import { currentDb, schema } from "@feeblo/db";
+import { can } from "@feeblo/permissions";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-
-import { replaceSingletonAsset } from "../asset/service";
 import { AssetRepository } from "../asset/repository";
+import { replaceSingletonAsset } from "../asset/service";
 import { Api } from "../http/api";
 import {
   BadRequestError,
@@ -38,13 +38,14 @@ export const OrganizationApiLive = HttpApiBuilder.group(
       ({ payload: { file, organizationId } }) => {
         return Effect.gen(function* () {
           const session = yield* currentHttpApiSession;
-          const repository = yield* OrganizationRepository;
-          const membership = yield* repository.findMemberRole({
+          // Explicit permission gate (same `can()` as Policy.canPermission):
+          // workspace management is the `workspace.update` grant, which is
+          // exactly the roles `isPrivilegedRole` used to hardcode.
+          const canManageOrganization = can(
+            session,
             organizationId,
-            userId: session.session.userId,
-          });
-          const canManageOrganization =
-            membership?.role === "owner" || membership?.role === "admin";
+            "workspace.update"
+          );
 
           if (!canManageOrganization) {
             return yield* new UnauthorizedError({

@@ -12,6 +12,7 @@ const makeContactPolicy = Effect.gen(function* () {
   const belongsToOrganization = (args: TContactDelete) =>
     Policy.policy(() => repository.exists(args));
 
+  //TODO REVISIT LATER
   const userIsOrgMember = (args: {
     organizationId: string;
     userId: string | null | undefined;
@@ -27,7 +28,7 @@ const makeContactPolicy = Effect.gen(function* () {
 
   const canCreate = (args: TContactCreate) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
+      Policy.canPermission(args.organizationId, "contacts.create"),
       userIsOrgMember({
         organizationId: args.organizationId,
         userId: args.userId,
@@ -36,7 +37,7 @@ const makeContactPolicy = Effect.gen(function* () {
 
   const canUpdate = (args: TContactUpdate) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
+      Policy.canPermission(args.organizationId, "contacts.update"),
       belongsToOrganization(args),
       userIsOrgMember({
         organizationId: args.organizationId,
@@ -46,7 +47,7 @@ const makeContactPolicy = Effect.gen(function* () {
 
   const canDelete = (args: TContactDelete) =>
     Policy.all(
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "contacts.*"),
       belongsToOrganization(args)
     );
 

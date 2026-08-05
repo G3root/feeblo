@@ -150,6 +150,30 @@ describe("ContactRpcHandlers", () => {
       })
     );
 
+    it.effect("rejects contributors (contacts.create is manager+)", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+
+        const error = yield* Effect.flip(
+          handlers
+            .ContactCreate({
+              organizationId: fixture.organizationId,
+              name: "Ada",
+              email: "ada@example.com",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "contributor")
+              )
+            )
+        );
+
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
     it.effect("rejects a contact missing a required attribute", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
@@ -295,7 +319,7 @@ describe("ContactRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member")
+                makeSession(fixture, "manager")
               )
             )
         );

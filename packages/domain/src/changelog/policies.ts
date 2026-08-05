@@ -1,15 +1,9 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
 import { ChangelogRepository } from "./repository";
-
-type TIsCreator = {
-  organizationId: string;
-  changelogId: string;
-};
 
 type TCanDelete = {
   organizationId: string;
@@ -22,56 +16,17 @@ type TCanUpdate = {
 };
 
 const makeChangelogPolicy = Effect.gen(function* () {
-  const repository = yield* ChangelogRepository;
+  yield* ChangelogRepository;
 
-  const isCreator = (args: TIsCreator) =>
-    Policy.policy((user) =>
-      Option.fromNullishOr(
-        user.memberships.find(
-          (membership) => membership.organizationId === args.organizationId
-        )
-      ).pipe(
-        Option.match({
-          onNone: () => Effect.succeed(false),
-          onSome: (membership) =>
-            repository
-              .findByCreatorId({
-                id: args.changelogId,
-                organizationId: args.organizationId,
-                memberId: membership.membershipId,
-              })
-              .pipe(Effect.map(Option.isSome)),
-        })
-      )
-    );
-
-  const isOwner = (args: TIsCreator) =>
-    Policy.any(
-      Policy.hasOrganizationRole(args.organizationId, "owner"),
-      Policy.hasOrganizationRole(args.organizationId, "admin"),
-      isCreator(args)
-    );
-
+  //TODO CHECK ORGANIZATION OWNED
   const canCreate = (organizationId: string) =>
-    Policy.hasMembership(organizationId);
+    Policy.canPermission(organizationId, "changelog.create");
 
   const canDelete = (args: TCanDelete) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({
-        organizationId: args.organizationId,
-        changelogId: args.changelogId,
-      })
-    );
+    Policy.canPermission(args.organizationId, "changelog.*");
 
   const canUpdate = (args: TCanUpdate) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({
-        organizationId: args.organizationId,
-        changelogId: args.changelogId,
-      })
-    );
+    Policy.canPermission(args.organizationId, "changelog.*");
 
   return { canCreate, canDelete, canUpdate };
 });

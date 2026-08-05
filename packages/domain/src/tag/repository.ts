@@ -398,6 +398,25 @@ const makeTagRepository = Effect.gen(function* () {
         return rows.length > 0;
       }),
 
+    hasPostCreator: ({
+      postId,
+      organizationId,
+      userId,
+    }: THasPost & { userId: string }) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.creatorId, userId)
+            )
+          );
+        return rows.length > 0;
+      }),
+
     findById: ({ id, organizationId }: TFindTagById) =>
       db
         .select({

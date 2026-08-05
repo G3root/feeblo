@@ -6,12 +6,7 @@ import { useAppForm } from "@feeblo/ui/hooks/form";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import {
-  allPolicy,
-  hasMembership,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
   Delete02Icon,
@@ -190,8 +185,9 @@ export function ChangelogEditorProvider({
   const { changelogCollection } = useDashboardCollections();
   const editorScope = useRef(crypto.randomUUID()).current;
   const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
+  // Backend mirror: ChangelogPolicy.canUpdate requires changelog.*.
   const { allowed: isOwner } = usePolicy(
-    allPolicy(hasMembership(organizationId), isUser(changelog.creatorId ?? ""))
+    hasPermission(organizationId, "changelog.*")
   );
   const form = useChangelogEditorForm({
     changelog,

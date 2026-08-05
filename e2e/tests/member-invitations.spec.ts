@@ -1,3 +1,4 @@
+import type { InvitableRole } from "@feeblo/permissions";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import {
   createAuthenticatedWorkspace,
@@ -11,9 +12,8 @@ import {
 import { createTestUser, type TestUser } from "../helpers/test-users";
 
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
-const appOrigin = new URL(
-  process.env.E2E_BASE_URL ?? "http://localhost:3101"
-).origin;
+const appOrigin = new URL(process.env.E2E_BASE_URL ?? "http://localhost:3101")
+  .origin;
 
 const invitationEndpoint = (action: "accept" | "reject") =>
   `${apiURL}/api/auth/organization/${action}-invitation`;
@@ -25,7 +25,7 @@ function membersUrl(organizationUrl: string): string {
 async function inviteMember(
   page: Page,
   email: string,
-  role: "admin" | "member" = "member",
+  role: InvitableRole = "manager",
   expectSuccess = true
 ) {
   const form = page.locator("form").filter({
@@ -33,9 +33,9 @@ async function inviteMember(
   });
 
   await form.getByRole("textbox", { name: "Invite email" }).fill(email);
-  if (role !== "member") {
+  if (role !== "manager") {
     await form.getByRole("combobox").click();
-    await page.getByRole("option", { name: "Admin" }).click();
+    await page.getByRole("option", { name: role }).click();
   }
   await form.getByRole("button", { name: "Invite" }).click();
   if (expectSuccess) {
@@ -87,7 +87,7 @@ test.describe("member invitations", () => {
     expect(email.subject).toBe(`Join ${owner.workspaceName} on Feeblo`);
     expect(email.text).toContain(owner.workspaceName);
     expect(email.text).toContain("Role");
-    expect(email.text).toContain("member");
+    expect(email.text).toContain("manager");
     expect(email.html).toContain(
       `${new URL(owner.organizationUrl).origin}/invitation/`
     );
@@ -116,7 +116,7 @@ test.describe("member invitations", () => {
     const invalidEmail = "not-an-email";
 
     await page.goto(membersUrl(owner.organizationUrl));
-    await inviteMember(page, invalidEmail, "member", false);
+    await inviteMember(page, invalidEmail, "manager", false);
 
     expect(
       await page
@@ -144,7 +144,7 @@ test.describe("member invitations", () => {
     await expect(
       page.getByRole("textbox", { name: "Invite email" })
     ).toBeEmpty();
-    await inviteMember(page, invitee.email, "member", false);
+    await inviteMember(page, invitee.email, "manager", false);
 
     await expect(
       page.getByText("Failed to invite member", { exact: true })
@@ -280,10 +280,7 @@ test.describe("member invitations", () => {
     }
   });
 
-  test("a member cannot invite teammates", async ({
-    browser,
-    page,
-  }) => {
+  test("a member cannot invite teammates", async ({ browser, page }) => {
     const owner = await createAuthenticatedWorkspace(page);
     const member = createTestUser();
     const memberContext = await browser.newContext();
@@ -376,7 +373,7 @@ test.describe("member invitations", () => {
       ).toBeTruthy();
 
       await page.reload();
-      await inviteMember(page, invitee.email, "member", false);
+      await inviteMember(page, invitee.email, "manager", false);
       await expect(
         page.getByText("Failed to invite member", { exact: true })
       ).toBeVisible();

@@ -648,7 +648,7 @@ describe("CommentRpcHandlers", () => {
             id: otherMembershipId,
             organizationId: fixture.organizationId,
             userId: otherUserId,
-            role: "member",
+            role: "manager",
             createdAt: new Date(),
           });
 
@@ -665,7 +665,7 @@ describe("CommentRpcHandlers", () => {
               {
                 membershipId: otherMembershipId,
                 organizationId: fixture.organizationId,
-                role: "member" as const,
+                role: "manager" as const,
               },
             ],
           };
@@ -850,7 +850,7 @@ describe("CommentRpcHandlers", () => {
         })
       );
 
-      it.effect("rejects non-owner deleting a comment", () =>
+      it.effect("allows a manager to delete another user's comment", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture();
@@ -872,7 +872,7 @@ describe("CommentRpcHandlers", () => {
             id: otherMembershipId,
             organizationId: fixture.organizationId,
             userId: otherUserId,
-            role: "member",
+            role: "manager",
             createdAt: new Date(),
           });
 
@@ -889,7 +889,63 @@ describe("CommentRpcHandlers", () => {
               {
                 membershipId: otherMembershipId,
                 organizationId: fixture.organizationId,
-                role: "member" as const,
+                role: "manager" as const,
+              },
+            ],
+          };
+
+          const result = yield* handlers
+            .CommentDelete({
+              id: commentId,
+              organizationId: fixture.organizationId,
+              postId: fixture.postId,
+            })
+            .pipe(Effect.provideService(CurrentSession, otherSession));
+
+          expect(result.message).toBe("Comment deleted successfully");
+        })
+      );
+
+      it.effect("rejects a contributor deleting another user's comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const commentId = yield* CommentId.generate;
+
+          yield* handlers
+            .CommentCreate(commentCreateInput(fixture, commentId, "My comment"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const otherUserId = `other_contributor_${fixture.organizationId}`;
+          const otherMembershipId = `other_contributor_membership_${fixture.organizationId}`;
+          const db = yield* currentDb;
+          yield* db.insert(schema.userTable).values({
+            id: otherUserId,
+            email: `${otherUserId}@example.com`,
+            name: "Other Contributor",
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: otherMembershipId,
+            organizationId: fixture.organizationId,
+            userId: otherUserId,
+            role: "contributor",
+            createdAt: new Date(),
+          });
+
+          const otherSession: Session = {
+            user: {
+              id: otherUserId,
+              email: `${otherUserId}@example.com`,
+              name: "Other Contributor",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId: otherUserId, token: "other-test-token" },
+            organizations: [{ id: fixture.organizationId }],
+            memberships: [
+              {
+                membershipId: otherMembershipId,
+                organizationId: fixture.organizationId,
+                role: "contributor",
               },
             ],
           };
