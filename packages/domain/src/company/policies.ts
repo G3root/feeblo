@@ -13,11 +13,11 @@ const makeCompanyPolicy = Effect.gen(function* () {
     Policy.policy(() => repository.exists(args));
 
   const canCreate = (organizationId: string) =>
-    Policy.hasMembership(organizationId);
+    Policy.canPermission(organizationId, "companies.create");
 
   const canUpdate = (args: TCompanyDelete) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
+      Policy.canPermission(args.organizationId, "companies.update"),
       belongsToOrganization(args)
     );
 

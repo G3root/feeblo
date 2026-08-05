@@ -1,7 +1,6 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
 import { ChangelogRepository } from "./repository";
@@ -24,53 +23,15 @@ type TCanUpdate = {
 const makeChangelogPolicy = Effect.gen(function* () {
   const repository = yield* ChangelogRepository;
 
-  const isCreator = (args: TIsCreator) =>
-    Policy.policy((user) =>
-      Option.fromNullishOr(
-        user.memberships.find(
-          (membership) => membership.organizationId === args.organizationId
-        )
-      ).pipe(
-        Option.match({
-          onNone: () => Effect.succeed(false),
-          onSome: (membership) =>
-            repository
-              .findByCreatorId({
-                id: args.changelogId,
-                organizationId: args.organizationId,
-                memberId: membership.membershipId,
-              })
-              .pipe(Effect.map(Option.isSome)),
-        })
-      )
-    );
-
-  const isOwner = (args: TIsCreator) =>
-    Policy.any(
-      Policy.canPermission(args.organizationId, "changelog.manage"),
-      isCreator(args)
-    );
-
+  //TODO CHECK ORGANIZATION OWNED
   const canCreate = (organizationId: string) =>
-    Policy.hasMembership(organizationId);
+    Policy.canPermission(organizationId, "changelog.create");
 
   const canDelete = (args: TCanDelete) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({
-        organizationId: args.organizationId,
-        changelogId: args.changelogId,
-      })
-    );
+    Policy.canPermission(args.organizationId, "changelog.manage");
 
   const canUpdate = (args: TCanUpdate) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({
-        organizationId: args.organizationId,
-        changelogId: args.changelogId,
-      })
-    );
+    Policy.canPermission(args.organizationId, "changelog.manage");
 
   return { canCreate, canDelete, canUpdate };
 });
