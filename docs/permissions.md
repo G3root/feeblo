@@ -28,9 +28,9 @@ Because the two copies were independent, they drifted:
 
 The shared system fixes all of these by construction.
 
-## Model (Featurebase / Canny style)
+## Model
 
-Real-world feedback platforms (Featurebase, Canny) use a two-layer model:
+Real-world feedback platforms use a two-layer model:
 
 ### Layer 1 — Role hierarchy
 
@@ -235,4 +235,3 @@ each step follows the same pattern:
 
 Because everything else imports `Role`/`ROLES`/`can()` from the shared
 package, no other consumer needs to change.
-
