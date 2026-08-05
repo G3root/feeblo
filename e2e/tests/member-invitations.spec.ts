@@ -80,7 +80,7 @@ test.describe("member invitations", () => {
     ).toBeVisible();
     await expect(page.getByText(invitee.email, { exact: true })).toBeVisible();
     await expect(
-      page.getByText("Invited as member", { exact: true })
+      page.getByText("Invited as manager", { exact: true })
     ).toBeVisible();
 
     const email = await waitForTestEmail(page.context().request, invitee.email);
