@@ -8,6 +8,7 @@ type MarkdownContentProps = Omit<
   content: string;
 };
 
+//TODO: refactor the component to another later. this name is misleading and content is always html
 export function MarkdownContent({
   className,
   content,
@@ -16,7 +17,7 @@ export function MarkdownContent({
   return (
     <div
       className={cn("typeset", className)}
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized Markdown rendered to HTML
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: already sanitized in the server
       dangerouslySetInnerHTML={{ __html: content }}
       {...props}
     />
