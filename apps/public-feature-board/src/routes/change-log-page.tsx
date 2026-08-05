@@ -1,13 +1,22 @@
+import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupText,
+} from "@feeblo/ui/input-group";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Separator } from "@feeblo/ui/separator";
-import { eq, useLiveQuery } from "@tanstack/react-db";
+import { Search01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, ilike, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   ChangelogPageLayout,
   ChangelogTimeline,
@@ -26,6 +35,8 @@ export const Route = createLazyRoute("/changelog")({
 export function ChangelogPage() {
   const site = useSite();
   const { publicChangelogCollection } = usePublicCollections();
+  const [search, setSearch] = useState("");
+  const normalizedSearch = search.trim();
   const {
     data: changelogs = [],
     isLoading,
@@ -34,11 +45,20 @@ export function ChangelogPage() {
     (q) =>
       q
         .from({ changelog: publicChangelogCollection })
-        .where(({ changelog }) =>
-          eq(changelog.organizationId, site.organizationId)
-        )
+        .where(({ changelog }) => {
+          let condition = eq(changelog.organizationId, site.organizationId);
+
+          if (normalizedSearch) {
+            condition = and(
+              condition,
+              ilike(changelog.title, `%${normalizedSearch}%`)
+            );
+          }
+
+          return condition;
+        })
         .orderBy(({ changelog }) => changelog.publishedAt, "desc"),
-    [site.organizationId]
+    [site.organizationId, normalizedSearch]
   );
 
   if (isLoading) {
@@ -62,16 +82,36 @@ export function ChangelogPage() {
 
   return (
     <ChangelogPageLayout>
-      <h2 className="pb-3 font-semibold text-base tracking-tight">
-        Changelogs
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="font-semibold text-base tracking-tight">Changelogs</h2>
+        <div className="w-full sm:w-72">
+          <InputGroup>
+            <InputGroupAddon>
+              <InputGroupText>
+                <HugeiconsIcon icon={Search01Icon} />
+              </InputGroupText>
+            </InputGroupAddon>
+            <DebouncedInputGroupInput
+              aria-label="Search changelog titles"
+              onChange={setSearch}
+              placeholder="Search changelog titles"
+              value={search}
+            />
+          </InputGroup>
+        </div>
+      </div>
       {changelogs.length === 0 ? (
         <Empty className="border">
           <EmptyHeader>
-            <EmptyTitle>No published changelogs yet</EmptyTitle>
+            <EmptyTitle>
+              {normalizedSearch
+                ? "No changelogs match your search"
+                : "No published changelogs yet"}
+            </EmptyTitle>
             <EmptyDescription>
-              Published changelog updates will appear here once they are
-              released.
+              {normalizedSearch
+                ? "Try a different title search."
+                : "Published changelog updates will appear here once they are released."}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
