@@ -7,7 +7,6 @@ import { ProfanityError, ReservedSubdomainError } from "./errors";
 import { SubdomainValidationService } from "./service";
 
 type ConfigOverrides = {
-  readonly customWords?: string[];
   readonly extraWords?: string[];
 };
 
@@ -17,7 +16,6 @@ const testLayer = (overrides: ConfigOverrides = {}) =>
       Layer.effect(
         ProfanityConfig,
         Effect.succeed({
-          customWords: overrides.customWords ?? [],
           extraWords: overrides.extraWords ?? [],
         })
       )
@@ -69,20 +67,6 @@ describe("SubdomainValidationService", () => {
     expect(error.message).toContain("fuck");
   });
 
-  it("uses custom words instead of the bundled dictionary", async () => {
-    const error = await validateOrFail("zorp", {
-      customWords: ["zorp", "wibble"],
-    });
-    expect(error).toBeInstanceOf(ProfanityError);
-    expect(error.message).toContain("zorp");
-
-    // The bundled dictionary is replaced, so "fuck" is no longer flagged.
-    const result = await Effect.runPromise(
-      validate("fuck", { customWords: ["zorp", "wibble"] })
-    );
-    expect(result.valid).toBe(true);
-  });
-
   it("appends extra words to the bundled dictionary", async () => {
     const error = await validateOrFail("snarf-app", {
       extraWords: ["snarf"],
@@ -95,5 +79,13 @@ describe("SubdomainValidationService", () => {
       extraWords: ["snarf"],
     });
     expect(bundledError).toBeInstanceOf(ProfanityError);
+  });
+
+  it("rejects reserved subdomains case-insensitively", async () => {
+    for (const slug of ["APP", "Dashboard", "Www"]) {
+      const error = await validateOrFail(slug);
+      expect(error, slug).toBeInstanceOf(ReservedSubdomainError);
+      expect(error.message, slug).toContain("reserved");
+    }
   });
 });

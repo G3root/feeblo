@@ -33,17 +33,12 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
   "SubdomainValidationService",
   {
     make: Effect.gen(function* () {
-      const { customWords, extraWords } = yield* ProfanityConfig;
+      const { extraWords } = yield* ProfanityConfig;
       const reservedSubdomains = getReservedSubdomains();
 
-      // leo-profanity provides the default English dictionary. A custom list
-      // (PROFANITY_WORDS) replaces it entirely; extra words
+      // leo-profanity provides the default English dictionary; extra words
       // (PROFANITY_EXTRA_WORDS) are appended to it.
-      const words =
-        customWords.length > 0
-          ? customWords
-          : [...leo.list(), ...extraWords];
-      const profanitySet = new Set(words);
+      const profanitySet = new Set([...leo.list(), ...extraWords]);
 
       // Tokens are matched whole-word after splitting on non-letter separators,
       // so "my-fuck-app" -> ["my", "fuck", "app"] catches hyphenated slugs while
@@ -56,12 +51,13 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
           SubdomainValidationError,
           never
         > => {
-          if (reservedSubdomains.includes(subdomain)) {
+          const normalized = subdomain.toLowerCase();
+
+          if (reservedSubdomains.includes(normalized)) {
             return Effect.fail(reservedError(subdomain));
           }
 
-          const matches = subdomain
-            .toLowerCase()
+          const matches = normalized
             .split(/[^a-z]+/)
             .filter(Boolean)
             .filter((token) => profanitySet.has(token));
