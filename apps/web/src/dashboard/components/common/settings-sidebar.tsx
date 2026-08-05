@@ -92,6 +92,7 @@ const settingsItems = [
       {
         label: "Roadmap",
         icon: LayoutThreeColumnIcon,
+        permission: "site.update" as const,
         to: "/$organizationId/settings/roadmap" as const,
       },
       {
