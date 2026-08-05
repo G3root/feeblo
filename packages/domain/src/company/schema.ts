@@ -1,3 +1,4 @@
+import { EntitySource } from "@feeblo/db/validation-schema/entity-source";
 import {
   CompanyAttributeDefinitionId,
   CompanyAttributeValueId,
@@ -71,7 +72,7 @@ export const Company = S.Struct({
   name: S.String,
   avatar: S.NullOr(S.String),
   externalCreatedAt: S.NullOr(S.DateFromString),
-  source: S.Literals(["DASHBOARD", "WIDGET", "API", "IMPORT"]),
+  source: EntitySource,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

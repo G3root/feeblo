@@ -73,7 +73,7 @@ export interface AnalyticsEvents {
   post_deleted: { mode: "single" | "bulk"; success: boolean };
   post_lock_changed: { locked: boolean; success: boolean };
   post_updated: {
-    field: "board" | "content" | "status" | "title";
+    field: "board" | "content" | "eta" | "status" | "title";
     success: boolean;
   };
 

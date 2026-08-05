@@ -29,6 +29,7 @@ import { scheduleSubmissionNotificationBatch } from "./workflow";
 interface TPostUpdateInput {
   boardId?: string;
   content?: string;
+  etaQuarter?: string | null | undefined;
   excerpt?: string;
   id: string;
   organizationId: string;
@@ -56,6 +57,7 @@ interface TPostCreate {
   content: string;
   creatorId?: string | null;
   creatorMemberId?: string | null;
+  etaQuarter?: string | null | undefined;
   excerpt?: string;
   id: string;
   metadata?: Record<string, string>;
@@ -119,6 +121,7 @@ const selectPostFields = (userId?: string | null) => ({
   content: schema.postTable.content,
   excerpt: schema.postTable.excerpt,
   statusId: schema.postTable.statusId,
+  etaQuarter: schema.postTable.etaQuarter,
   createdAt: schema.postTable.createdAt,
   updatedAt: schema.postTable.updatedAt,
   organizationId: schema.postTable.organizationId,
@@ -161,6 +164,7 @@ const makePostRepository = Effect.gen(function* () {
           archivedAt: schema.postTable.archivedAt,
           boardId: schema.postTable.boardId,
           content: schema.postTable.content,
+          etaQuarter: schema.postTable.etaQuarter,
           lockedAt: schema.postTable.lockedAt,
           statusId: schema.postTable.statusId,
           title: schema.postTable.title,
@@ -458,6 +462,7 @@ const makePostRepository = Effect.gen(function* () {
       title,
       content,
       excerpt,
+      etaQuarter,
     }: TPostUpdateInput) =>
       db
         .update(schema.postTable)
@@ -470,7 +475,28 @@ const makePostRepository = Effect.gen(function* () {
             content !== undefined
               ? (excerpt ?? htmlToExcerpt(content))
               : excerpt,
+          etaQuarter,
         })
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.asVoid),
+
+    updateEta: ({
+      id,
+      organizationId,
+      etaQuarter,
+    }: {
+      id: string;
+      organizationId: string;
+      etaQuarter: string | null;
+    }) =>
+      db
+        .update(schema.postTable)
+        .set({ etaQuarter })
         .where(
           and(
             eq(schema.postTable.id, id),
@@ -609,6 +635,7 @@ const makePostRepository = Effect.gen(function* () {
       metadata,
       source,
       excerpt: inputExcerpt,
+      etaQuarter,
     }: TPostCreate) =>
       Effect.gen(function* () {
         const excerpt = inputExcerpt ?? htmlToExcerpt(content);
@@ -631,6 +658,7 @@ const makePostRepository = Effect.gen(function* () {
             createdAt: new Date(),
             slug: slugify(title),
             updatedAt: new Date(),
+            etaQuarter: etaQuarter ?? null,
           })
           .pipe(Effect.asVoid);
       }),

@@ -1,15 +1,6 @@
+import { NotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
-
-export const NotificationEventType = S.Literals([
-  "feedback.submitted",
-  "feedback.commented",
-  "feedback.status_changed",
-]);
-
-export type TNotificationEventType = S.Schema.Type<
-  typeof NotificationEventType
->;
 
 export const Notification = S.Struct({
   id: S.String,

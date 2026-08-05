@@ -1,11 +1,11 @@
 import { currentDb, schema } from "@feeblo/db";
-import type { assetKindEnum } from "@feeblo/db/schema";
+import type { TAssetKind } from "@feeblo/db/validation-schema/asset-kind";
 import { and, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-export type AssetKind = (typeof assetKindEnum.enumValues)[number];
+export type AssetKind = TAssetKind;
 
 export type AssetOwner =
   | { readonly type: "organization"; readonly id: string }

@@ -1,13 +1,8 @@
-import {
-  RoadmapId,
-  WorkspaceId,
-} from "@feeblo/id";
+import { RoadmapMode } from "@feeblo/db/validation-schema/roadmap-mode";
+import { RoadmapId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 /** A roadmap filter with no conditions intentionally matches every workspace post. */
-export const RoadmapMode = S.Literals(["status", "filtered"]);
-export type TRoadmapMode = S.Schema.Type<typeof RoadmapMode>;
-
 export const RoadmapVisibility = S.Literals(["public", "private"]);
 export type TRoadmapVisibility = S.Schema.Type<typeof RoadmapVisibility>;
 
@@ -34,7 +29,7 @@ export const TagRoadmapFilterCondition = S.Struct({
 export const SimpleRoadmapFilterCondition = S.Union([
   BoardRoadmapFilterCondition,
   StatusRoadmapFilterCondition,
-  TagRoadmapFilterCondition
+  TagRoadmapFilterCondition,
 ]);
 export type TSimpleRoadmapFilterCondition = S.Schema.Type<
   typeof SimpleRoadmapFilterCondition
@@ -67,17 +62,27 @@ const RoadmapCreateFields = {
   organizationId: WorkspaceId.schema,
   name: S.String.check(S.isLengthBetween(1, 120)),
   slug: S.String.check(S.isLengthBetween(1, 120)),
-  description: S.optional(S.NullOr(S.String.check(S.isMaxLength(2_000)))),
+  description: S.optional(S.NullOr(S.String.check(S.isMaxLength(2000)))),
   isPrimary: S.optional(S.Boolean),
   visibility: RoadmapVisibility,
   filter: SimpleRoadmapFilter,
 };
 
-export const RoadmapCreate = S.Struct({ ...RoadmapCreateFields, mode: RoadmapMode });
+export const RoadmapCreate = S.Struct({
+  ...RoadmapCreateFields,
+  mode: RoadmapMode,
+});
 export type TRoadmapCreate = S.Schema.Type<typeof RoadmapCreate>;
 
-const RoadmapUpdateFields = { ...RoadmapCreateFields, description: S.NullOr(S.String.check(S.isMaxLength(2_000))), isPrimary: S.Boolean };
-export const RoadmapUpdate = S.Struct({ ...RoadmapUpdateFields, mode: RoadmapMode });
+const RoadmapUpdateFields = {
+  ...RoadmapCreateFields,
+  description: S.NullOr(S.String.check(S.isMaxLength(2000))),
+  isPrimary: S.Boolean,
+};
+export const RoadmapUpdate = S.Struct({
+  ...RoadmapUpdateFields,
+  mode: RoadmapMode,
+});
 export type TRoadmapUpdate = S.Schema.Type<typeof RoadmapUpdate>;
 
 export const RoadmapList = S.Struct({ organizationId: WorkspaceId.schema });

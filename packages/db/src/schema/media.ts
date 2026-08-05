@@ -2,22 +2,15 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
-  pgEnum,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { TAssetKind } from "../validation-schema/asset-kind";
 import { organizationTable, userTable } from "./auth";
 import { changelogTable, postTable } from "./feedback";
-
-export const assetKindEnum = pgEnum("asset_kind", [
-  "profile_image",
-  "organization_logo",
-  "editor_image",
-  "editor_video",
-]);
 
 export const assetTable = pgTable(
   "asset",
@@ -26,7 +19,7 @@ export const assetTable = pgTable(
     bucket: text("bucket").notNull(),
     key: text("key").notNull(),
     url: text("url").notNull(),
-    kind: assetKindEnum("kind").notNull(),
+    kind: text("kind").$type<TAssetKind>().notNull(),
     userId: text("user_id").references(() => userTable.id, {
       onDelete: "cascade",
     }),

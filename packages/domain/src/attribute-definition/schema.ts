@@ -1,3 +1,4 @@
+import { AttributeType } from "@feeblo/db/validation-schema/attribute-type";
 import {
   CompanyAttributeDefinitionId,
   CompanyAttributeValueId,
@@ -6,14 +7,6 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import * as S from "effect/Schema";
-
-export const AttributeType = S.Literals([
-  "TEXT",
-  "INTEGER",
-  "DECIMAL",
-  "BOOLEAN",
-  "DATE",
-]);
 
 export const AttributeConfig = S.Struct({
   min: S.optional(S.Number),

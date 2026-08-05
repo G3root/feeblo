@@ -1,6 +1,10 @@
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+export const EtaQuarter = S.String.pipe(
+  S.check(S.isPattern(/^[0-9]{4}-Q[1-4]$/))
+);
+
 export const Post = S.Struct({
   assetIds: S.optional(S.Array(S.String)),
   id: S.String,
@@ -10,6 +14,7 @@ export const Post = S.Struct({
   content: S.String,
   excerpt: S.String,
   statusId: S.String,
+  etaQuarter: S.NullOr(EtaQuarter),
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
   organizationId: S.String,
@@ -73,6 +78,14 @@ export const PostUpdate = S.Struct({
 
 export type TPostUpdate = S.Schema.Type<typeof PostUpdate>;
 
+export const PostUpdateEta = S.Struct({
+  id: PostId.schema,
+  organizationId: WorkspaceId.schema,
+  etaQuarter: S.NullOr(EtaQuarter),
+});
+
+export type TPostUpdateEta = S.Schema.Type<typeof PostUpdateEta>;
+
 export const PostUpdateContent = S.Struct({
   assetIds: S.Array(S.String),
   id: PostId.schema,
@@ -122,6 +135,7 @@ export const PostCreate = S.Struct({
   content: S.String,
   statusId: PostStatusId.schema,
   organizationId: WorkspaceId.schema,
+  etaQuarter: S.optional(S.NullOr(EtaQuarter)),
 });
 
 export type TPostCreate = S.Schema.Type<typeof PostCreate>;

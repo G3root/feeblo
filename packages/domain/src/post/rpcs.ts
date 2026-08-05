@@ -16,6 +16,7 @@ import {
   PostSuggestions,
   PostUpdate,
   PostUpdateContent,
+  PostUpdateEta,
   PostUpdateTitle,
 } from "./schema";
 
@@ -79,6 +80,12 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostUpdate", {
     success: Schema.Void,
     payload: PostUpdate,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostUpdateEta", {
+    success: Schema.Void,
+    payload: PostUpdateEta,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
