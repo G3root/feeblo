@@ -21,6 +21,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@feeblo/utils": "workspace:*",
     "@feeblo/web-shared": "workspace:*",
     "@solidjs/router": "catalog:",
     "class-variance-authority": "catalog:",

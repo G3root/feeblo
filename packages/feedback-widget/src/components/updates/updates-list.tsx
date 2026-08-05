@@ -1,8 +1,8 @@
 import { A, createAsync } from "@solidjs/router";
 import { ErrorBoundary, For, Show } from "solid-js";
 import { fetchUpdates } from "../../lib/api";
-import { PoweredByBadge } from "../board-list/powered-by-badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
+import { PoweredByBadge } from "../ui/powered-by-badge";
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
@@ -85,9 +85,7 @@ export function UpdatesList() {
                           {update.title}
                         </h2>
                         <Show when={update.excerpt}>
-                          <p class="mt-1.5 line-clamp-2 text-muted-foreground text-sm leading-relaxed">
-                            {update.excerpt}
-                          </p>
+                          <p class="">{update.excerpt}</p>
                         </Show>
                       </article>
                     </A>

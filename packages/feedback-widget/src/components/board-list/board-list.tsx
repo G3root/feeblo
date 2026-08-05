@@ -1,8 +1,7 @@
-/** biome-ignore-all lint/style/noExportedImports: <explanation> */
 import { For } from "solid-js";
 import type { Board } from "../../lib/boards";
+import { PoweredByBadge } from "../ui/powered-by-badge";
 import { BoardCard } from "./board-card";
-import { PoweredByBadge } from "./powered-by-badge";
 
 export function BoardList(props: { boards: Board[] }) {
   return (
@@ -20,5 +19,3 @@ export function BoardList(props: { boards: Board[] }) {
     </div>
   );
 }
-
-export { BoardCard, PoweredByBadge };
