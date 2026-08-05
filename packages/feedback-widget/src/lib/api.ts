@@ -1,4 +1,5 @@
 import { action, query, type RoutePreloadFuncArgs } from "@solidjs/router";
+import { getWidgetContext } from "./context";
 import { getWidgetToken } from "./identity";
 import { sendToParent } from "./messages";
 
@@ -12,6 +13,22 @@ export interface WidgetBoard {
 }
 
 export type FeedbackResult = { ok: true } | { ok: false; message: string };
+export interface WidgetSuggestion {
+  excerpt: string;
+  id: string;
+  slug: string;
+  title: string;
+}
+
+export interface WidgetUpdate {
+  content: string;
+  excerpt: string;
+  id: string;
+  imageUrl: string | null;
+  publishedAt: string;
+  slug: string;
+  title: string;
+}
 
 interface FeedbackFormData extends FormData {
   get(name: "content" | "title" | "boardName" | "boardId"): string;
@@ -38,8 +55,34 @@ export const fetchBoards = query(async (): Promise<WidgetBoard[]> => {
   return res.json();
 }, "boards");
 
+export const fetchUpdates = query(async (): Promise<WidgetUpdate[]> => {
+  const organizationId = getOrganizationId();
+  const url = `${getApiBaseUrl()}/updates?organizationId=${encodeURIComponent(organizationId)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch updates: ${res.status}`);
+  }
+  return res.json();
+}, "updates");
+
 export function preloadBoards(_args: RoutePreloadFuncArgs) {
   return fetchBoards();
+}
+
+export async function fetchSuggestions(
+  input: { boardId: string; content: string; title: string },
+  signal: AbortSignal
+): Promise<WidgetSuggestion[]> {
+  const response = await fetch(`${getApiBaseUrl()}/suggestions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, organizationId: getOrganizationId() }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch suggestions: ${response.status}`);
+  }
+  return response.json();
 }
 
 export const createFeedBackAction = action(
@@ -52,14 +95,23 @@ export const createFeedBackAction = action(
     const organizationId = getOrganizationId();
 
     const token = getWidgetToken();
+    const metadata = getWidgetContext();
 
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/feedback`;
-    const body: Record<string, string> = {
+    const body: {
+      boardId: string;
+      content: string;
+      metadata: Record<string, string>;
+      organizationId: string;
+      title: string;
+      token?: string;
+    } = {
       boardId,
       content,
       title,
       organizationId,
+      metadata,
     };
     if (token) {
       body.token = token;
@@ -80,7 +132,9 @@ export const createFeedBackAction = action(
 
     sendToParent({
       event: "FEEDBACK_SUBMITTED",
-      data: { post: { boardId, boardName, title } },
+      data: {
+        post: { boardId, boardName, title, metadata },
+      },
     });
 
     return { ok: true };

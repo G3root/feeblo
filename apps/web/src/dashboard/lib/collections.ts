@@ -104,8 +104,6 @@ export const postCollection = createCollection(
         rpc.PostUpdate({
           id: updatedPost.id,
           statusId: updatedPost.statusId,
-          content: updatedPost.content,
-          title: updatedPost.title,
           boardId: updatedPost.boardId,
           organizationId: updatedPost.organizationId,
         })
@@ -136,6 +134,7 @@ export const postCollection = createCollection(
           organizationId: newPost.organizationId,
           title: newPost.title,
           content: newPost.content,
+          assetIds: newPost.assetIds ?? [],
           statusId: newPost.statusId,
         })
       );
@@ -206,6 +205,7 @@ export const changelogCollection = createCollection(
           title: updatedChangelog.title,
           slug: updatedChangelog.slug,
           content: updatedChangelog.content,
+          assetIds: updatedChangelog.assetIds ?? [],
           status: updatedChangelog.status,
           scheduledAt: updatedChangelog.scheduledAt,
           publishedAt: updatedChangelog.publishedAt,
@@ -234,6 +234,7 @@ export const changelogCollection = createCollection(
           title: newChangelog.title,
           slug: newChangelog.slug,
           content: newChangelog.content,
+          assetIds: newChangelog.assetIds ?? [],
           status: newChangelog.status,
           scheduledAt: newChangelog.scheduledAt,
           publishedAt: newChangelog.publishedAt,
@@ -632,6 +633,7 @@ export const commentCollection = createCollection(
       );
 
       await postActivityCollection.utils.refetch();
+      await postCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -648,6 +650,7 @@ export const commentCollection = createCollection(
       );
 
       await postActivityCollection.utils.refetch();
+      await postCollection.utils.refetch();
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -810,6 +813,7 @@ export const upvoteCollection = createCollection(
           postId: newUpvote.postId,
         })
       );
+      await postCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -821,6 +825,7 @@ export const upvoteCollection = createCollection(
           postId: deletedUpvote.postId,
         })
       );
+      await postCollection.utils.refetch();
     },
   })
 );

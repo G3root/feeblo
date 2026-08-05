@@ -60,6 +60,7 @@ describe("init", () => {
     expect(typeof widget.close).toBe("function");
     expect(typeof widget.identify).toBe("function");
     expect(typeof widget.setBoard).toBe("function");
+    expect(typeof widget.openModule).toBe("function");
     expect(typeof widget.destroy).toBe("function");
   });
 
@@ -101,6 +102,15 @@ describe("init", () => {
     expect(w2).toBeDefined();
     expect(embedBefore).not.toBeNull();
     expect(embedAfter).toBe(embedBefore);
+  });
+
+  it("replaces the embed when the mode changes for the same organization", () => {
+    init("org_mode", { mode: "feedback" });
+    const feedbackEmbed = getCurrentEmbed();
+
+    init("org_mode", { mode: "updates" });
+
+    expect(getCurrentEmbed()).not.toBe(feedbackEmbed);
   });
 
   it("identifies user when passed in options", () => {
@@ -165,6 +175,21 @@ describe("FeebloWidget methods", () => {
     expect(boardMsg?.[0].data.board).toBe("roadmap");
   });
 
+  it("setBoard is ignored when feedback is not the landing module", () => {
+    Feeblo.destroy();
+    widget = init("org_updates_board", { mode: "updates" });
+    postWidgetMessage({ event: "READY" });
+    widget.open();
+    fakePostMessage.mockClear();
+
+    widget.setBoard("roadmap");
+
+    expect(fakePostMessage).not.toHaveBeenCalledWith(
+      { event: "SET_BOARD", data: { board: "roadmap" } },
+      MOCK_ORIGIN
+    );
+  });
+
   it("identify sends IDENTIFY message when loaded", () => {
     postWidgetMessage({ event: "READY" });
     fakePostMessage.mockClear();
@@ -177,10 +202,76 @@ describe("FeebloWidget methods", () => {
     expect(identifyMsg).toBeDefined();
   });
 
+  it("sends context metadata to the iframe", () => {
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    widget.metadata({ page: "/pricing", source: "nav" });
+
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      {
+        event: "SET_CONTEXT",
+        data: { page: "/pricing", source: "nav" },
+      },
+      MOCK_ORIGIN
+    );
+  });
+
   it("methods return the widget for chaining", () => {
     expect(widget.open()).toBe(widget);
     expect(widget.close()).toBe(widget);
     expect(widget.setBoard("b")).toBe(widget);
+    expect(widget.openModule("feedback")).toBe(widget);
+  });
+
+  it("renders and toggles a placed launcher", () => {
+    Feeblo.destroy();
+    widget = init("org_launcher", { placement: "bottom-right" });
+    const launcher = document.getElementById("feeblo-widget-launcher");
+
+    expect(launcher).not.toBeNull();
+    launcher?.click();
+    expect(widget.isOpen()).toBe(true);
+    expect(launcher?.getAttribute("aria-expanded")).toBe("true");
+    launcher?.click();
+    expect(widget.isOpen()).toBe(false);
+    expect(launcher?.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("opens enabled Hub modules and ignores disabled modules", () => {
+    Feeblo.destroy();
+    widget = init("org_hub", { mode: "hub", modules: ["updates"] });
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    widget.openModule("feedback");
+    expect(widget.isOpen()).toBe(false);
+
+    widget.openModule("updates");
+    expect(widget.isOpen()).toBe(true);
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      { event: "SET_MODULE", data: { module: "updates" } },
+      MOCK_ORIGIN
+    );
+  });
+
+  it("feedback triggers select the Feedback module in Hub", () => {
+    Feeblo.destroy();
+    widget = init("org_trigger_hub", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+    });
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+    const trigger = document.createElement("button");
+    trigger.setAttribute("data-feeblo-feedback", "");
+
+    widget.open(trigger);
+
+    expect(fakePostMessage).toHaveBeenCalledWith(
+      { event: "SET_MODULE", data: { module: "feedback" } },
+      MOCK_ORIGIN
+    );
   });
 
   it("destroy removes the container from DOM", () => {
@@ -289,6 +380,315 @@ describe("Embed postMessage callbacks", () => {
   });
 });
 
+describe("defaultBoard handling", () => {
+  afterEach(() => {
+    Feeblo.destroy();
+    fakePostMessage.mockClear();
+  });
+
+  it("defers SET_BOARD for defaultBoard until READY", () => {
+    init("org_db", { defaultBoard: "roadmap" });
+
+    const boardBeforeReady = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardBeforeReady).toBeUndefined();
+
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeDefined();
+    expect(boardMsg?.[0].data.board).toBe("roadmap");
+  });
+
+  it("sends defaultBoard for hub whose first module is feedback", () => {
+    init("org_db_hub", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeDefined();
+    expect(boardMsg?.[0].data.board).toBe("roadmap");
+  });
+
+  it("sends a queued feedback module before its queued board", () => {
+    const widget = init("org_db_module_order", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    widget.openModule("feedback");
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    const navigationEvents = fakePostMessage.mock.calls
+      .map(([message]: [any]) => message?.event)
+      .filter((event) => event === "SET_MODULE" || event === "SET_BOARD");
+    expect(navigationEvents).toEqual(["SET_MODULE", "SET_BOARD"]);
+  });
+
+  it("ignores defaultBoard in updates mode", () => {
+    init("org_db_updates", {
+      mode: "updates",
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeUndefined();
+  });
+
+  it("ignores defaultBoard for hub whose first module is updates", () => {
+    init("org_db_hub_updates_first", {
+      mode: "hub",
+      modules: ["updates", "feedback"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+
+    const boardMsg = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    expect(boardMsg).toBeUndefined();
+  });
+});
+
+describe("navigation sync ordering", () => {
+  afterEach(() => {
+    Feeblo.destroy();
+    fakePostMessage.mockClear();
+  });
+
+  function navigationAndShowEvents(): string[] {
+    return fakePostMessage.mock.calls
+      .map(([message]: [any]) => message?.event)
+      .filter(
+        (event) =>
+          event === "SET_MODULE" || event === "SET_BOARD" || event === "SHOW"
+      );
+  }
+
+  function boardMessage(): { board: string } | undefined {
+    const call = fakePostMessage.mock.calls.find(
+      ([msg]: [any]) => msg?.event === "SET_BOARD"
+    );
+    return call?.[0].data;
+  }
+
+  it("re-asserts the configured board when openModule('feedback') reopens a ready, closed widget", () => {
+    const widget = init("org_sync_reopen", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+    widget.open();
+    widget.close();
+    fakePostMessage.mockClear();
+
+    widget.openModule("feedback");
+
+    expect(navigationAndShowEvents()).toEqual([
+      "SET_MODULE",
+      "SET_BOARD",
+      "SHOW",
+    ]);
+    expect(boardMessage()?.board).toBe("roadmap");
+  });
+
+  it("re-asserts the board when openModule('feedback') is called while already open", () => {
+    const widget = init("org_sync_open", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+    widget.open();
+    fakePostMessage.mockClear();
+
+    widget.openModule("feedback");
+
+    expect(navigationAndShowEvents()).toEqual(["SET_MODULE", "SET_BOARD"]);
+  });
+
+  it("re-asserts the board after the feedback module when opening via trigger", () => {
+    const widget = init("org_sync_trigger", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+    widget.open();
+    widget.close();
+    fakePostMessage.mockClear();
+
+    const trigger = document.createElement("button");
+    trigger.setAttribute("data-feeblo-feedback", "");
+    widget.open(trigger);
+
+    expect(navigationAndShowEvents()).toEqual([
+      "SET_MODULE",
+      "SET_BOARD",
+      "SHOW",
+    ]);
+    expect(boardMessage()?.board).toBe("roadmap");
+  });
+
+  it("applies setBoard immediately when loaded, even while closed", () => {
+    const widget = init("org_sync_setboard", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+    });
+    postWidgetMessage({ event: "READY" });
+    widget.close();
+    fakePostMessage.mockClear();
+
+    widget.setBoard("changelog");
+
+    expect(navigationAndShowEvents()).toEqual(["SET_MODULE", "SET_BOARD"]);
+    expect(boardMessage()?.board).toBe("changelog");
+
+    fakePostMessage.mockClear();
+    widget.open();
+    expect(navigationAndShowEvents()).toEqual(["SHOW"]);
+  });
+
+  it("plain open() does not re-send navigation when the state is unchanged", () => {
+    const widget = init("org_sync_plain", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+    widget.close();
+    fakePostMessage.mockClear();
+
+    widget.open();
+
+    expect(navigationAndShowEvents()).toEqual(["SHOW"]);
+  });
+
+  it("does not send SET_BOARD when navigating to the updates module", () => {
+    const widget = init("org_sync_updates", {
+      mode: "hub",
+      modules: ["feedback", "updates"],
+      defaultBoard: "roadmap",
+    });
+    postWidgetMessage({ event: "READY" });
+    fakePostMessage.mockClear();
+
+    widget.openModule("updates");
+
+    const events = fakePostMessage.mock.calls.map(([msg]: [any]) => msg?.event);
+    expect(events).toContain("SET_MODULE");
+    expect(events).not.toContain("SET_BOARD");
+    expect(events).toContain("SHOW");
+  });
+});
+
+describe("ready handshake", () => {
+  afterEach(() => {
+    Feeblo.destroy();
+    fakePostMessage.mockClear();
+  });
+
+  function showMessages(): number {
+    return fakePostMessage.mock.calls.filter(
+      ([message]: [any]) => message?.event === "SHOW"
+    ).length;
+  }
+
+  it("re-posts SHOW when the widget becomes ready while the host is already open", () => {
+    const widget = init("org_handshake_open", {});
+    widget.open();
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    expect(showMessages()).toBe(1);
+  });
+
+  it("does not re-post SHOW on READY when the widget acknowledged the open", () => {
+    const widget = init("org_handshake_ack", {});
+    widget.open();
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+    fakePostMessage.mockClear();
+
+    postWidgetMessage({ event: "READY" });
+
+    expect(showMessages()).toBe(0);
+  });
+
+  it("emits widgetOpened when a pre-ready open is acknowledged after READY", () => {
+    const widget = init("org_handshake_event", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    widget.open();
+    postWidgetMessage({ event: "READY" });
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    const detail = (listener.mock.calls[0]?.[0] as CustomEvent).detail;
+    expect(detail.data).toEqual({ module: "feedback" });
+    window.removeEventListener("widgetOpened", listener);
+  });
+
+  it("emits widgetOpened at most once when READY races an acknowledged open", () => {
+    const widget = init("org_handshake_once", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    // The widget subscribed early: open()'s SHOW was received and acknowledged
+    // before the host processed the queued READY message.
+    widget.open();
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+    fakePostMessage.mockClear();
+    postWidgetMessage({ event: "READY" });
+
+    expect(showMessages()).toBe(0);
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("widgetOpened", listener);
+  });
+
+  it("emits widgetOpened once when both SHOW messages are acknowledged", () => {
+    const widget = init("org_handshake_duplicate", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    widget.open();
+    postWidgetMessage({ event: "READY" });
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener("widgetOpened", listener);
+  });
+
+  it("ignores a delayed open acknowledgement after the widget closes", () => {
+    const widget = init("org_handshake_closed", {});
+    const listener = vi.fn();
+    window.addEventListener("widgetOpened", listener);
+
+    widget.open();
+    widget.close();
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
+
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener("widgetOpened", listener);
+  });
+});
+
 describe("Widget events via postMessage", () => {
   afterEach(() => {
     Feeblo.destroy();
@@ -310,11 +710,30 @@ describe("Widget events via postMessage", () => {
     const handler = vi.fn();
     window.addEventListener("widgetOpened", handler);
 
-    init("org_widget_open");
-    postWidgetMessage({ event: "WIDGET_OPENED", data: { some: "data" } });
+    const widget = init("org_widget_open");
+    widget.open();
+    postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
 
     expect(handler).toHaveBeenCalledTimes(1);
     window.removeEventListener("widgetOpened", handler);
+  });
+
+  it("does not expose identity tokens through identityChanged events", () => {
+    const handler = vi.fn();
+    window.addEventListener("identityChanged", handler);
+
+    init("org_identity_changed");
+    postWidgetMessage({
+      event: "IDENTITY_CHANGED",
+      data: { id: "user_1", email: "person@example.com", token: "secret" },
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler.mock.calls[0]?.[0].detail.data).toEqual({
+      id: "user_1",
+      email: "person@example.com",
+    });
+    window.removeEventListener("identityChanged", handler);
   });
 
   it("emits feedbackSubmitted event when FEEDBACK_SUBMITTED message is received", () => {
@@ -333,7 +752,7 @@ describe("Widget events via postMessage", () => {
     window.removeEventListener("feedbackSubmitted", handler);
   });
 
-  it("only emits feedbackSubmitted once per embed", () => {
+  it("emits feedbackSubmitted for every submission", () => {
     const handler = vi.fn();
     window.addEventListener("feedbackSubmitted", handler);
 
@@ -351,7 +770,7 @@ describe("Widget events via postMessage", () => {
       },
     });
 
-    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledTimes(2);
     window.removeEventListener("feedbackSubmitted", handler);
   });
 });

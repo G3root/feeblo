@@ -126,3 +126,7 @@ export const CompanyAttributeValueId = makeId(
     approximateLength,
   }
 );
+
+export const AssetId = makeId("asset", "ast", {
+  approximateLength,
+});

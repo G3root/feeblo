@@ -1,7 +1,7 @@
 import "./auto-init";
 import { subscribe, unsubscribe } from "./events";
 import { destroyInstance, getCurrentEmbed, init } from "./instance";
-import type { UserIdentity } from "./types";
+import type { UserIdentity, WidgetModule } from "./types";
 import { organizationId } from "./types";
 import { VERSION } from "./version";
 
@@ -23,9 +23,13 @@ export type {
   FeebloWidget,
   InitConfig,
   OrganizationId,
+  PublicUserIdentity,
   SubmittedFeedback,
   UserIdentity,
   WidgetCompany,
+  WidgetMode,
+  WidgetModule,
+  WidgetPlacement,
 } from "./types";
 export { organizationId } from "./types";
 export { VERSION } from "./version";
@@ -39,9 +43,12 @@ export interface Feeblo {
   destroy(): void;
   identify(user: UserIdentity): Feeblo;
   init: typeof init;
+  isOpen(): boolean;
+  metadata(patch: Record<string, string | null>): Feeblo;
   off: typeof unsubscribe;
   on: typeof subscribe;
   open(): Feeblo;
+  openModule(module: WidgetModule): Feeblo;
   organizationId: typeof organizationId;
   setBoard(board: string): Feeblo;
   readonly version: string;
@@ -59,9 +66,20 @@ export const Feeblo = {
     getCurrentEmbed()?.open();
     return Feeblo;
   },
+  openModule(module: WidgetModule): Feeblo {
+    getCurrentEmbed()?.openModule(module);
+    return Feeblo;
+  },
   close(): Feeblo {
     getCurrentEmbed()?.close();
     return Feeblo;
+  },
+  metadata(patch: Record<string, string | null>): Feeblo {
+    getCurrentEmbed()?.metadata(patch);
+    return Feeblo;
+  },
+  isOpen(): boolean {
+    return getCurrentEmbed()?.isOpenState() ?? false;
   },
   setBoard(board: string): Feeblo {
     getCurrentEmbed()?.setBoard(board);

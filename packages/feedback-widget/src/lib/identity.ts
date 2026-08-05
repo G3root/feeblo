@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 
-export interface WidgetIdentity {
+export interface WidgetUserIdentity {
   avatar?: string | undefined;
   companies?:
     | Array<{
@@ -14,8 +14,10 @@ export interface WidgetIdentity {
   email?: string | undefined;
   id: string;
   name?: string | undefined;
-  token: string;
+  token?: string | undefined;
 }
+
+export type WidgetIdentity = WidgetUserIdentity;
 
 const [identity, setIdentity] = createSignal<WidgetIdentity | null>(null);
 
@@ -24,7 +26,8 @@ export function getWidgetIdentity(): WidgetIdentity | null {
 }
 
 export function getWidgetToken(): string | null {
-  return identity()?.token ?? null;
+  const current = identity();
+  return current?.token ?? null;
 }
 
 export function setWidgetIdentity(data: WidgetIdentity): void {

@@ -1,11 +1,5 @@
 import { Button } from "@feeblo/ui/button";
 import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
-import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -13,6 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import {
   Table,
   TableBody,
@@ -21,6 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import {
+  anyPolicy,
+  type ClientPolicy,
+  hasPermission,
+  PolicyGuard,
+} from "@feeblo/web-shared/use-policy";
 import {
   ArrowUpRight01Icon,
   Delete02Icon,
@@ -145,10 +146,20 @@ function ContactPage() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={openCreateDialog} type="button">
-              <HugeiconsIcon icon={UserAdd01Icon} />
-              Create contact
-            </Button>
+            <PolicyGuard
+              policy={hasPermission(organizationId, "contacts.create")}
+            >
+              {({ allowed }) => (
+                <Button
+                  disabled={!allowed}
+                  onClick={openCreateDialog}
+                  type="button"
+                >
+                  <HugeiconsIcon icon={UserAdd01Icon} />
+                  Create contact
+                </Button>
+              )}
+            </PolicyGuard>
           </EmptyContent>
         </Empty>
       </div>
@@ -158,10 +169,18 @@ function ContactPage() {
   return (
     <div className="p-3">
       <div className="mb-3 flex justify-end">
-        <Button onClick={openCreateDialog} type="button">
-          <HugeiconsIcon icon={UserAdd01Icon} />
-          Create contact
-        </Button>
+        <PolicyGuard policy={hasPermission(organizationId, "contacts.create")}>
+          {({ allowed }) => (
+            <Button
+              disabled={!allowed}
+              onClick={openCreateDialog}
+              type="button"
+            >
+              <HugeiconsIcon icon={UserAdd01Icon} />
+              Create contact
+            </Button>
+          )}
+        </PolicyGuard>
       </div>
       <Table>
         <TableHeader>
@@ -192,6 +211,7 @@ function ContactPage() {
               contact={contact}
               definitions={definitions}
               key={contact.id}
+              managePolicy={hasPermission(organizationId, "contacts.*")}
               onCompanyClick={(companyId) =>
                 companyEditDialogStore.send({
                   type: "toggle",
@@ -210,6 +230,7 @@ function ContactPage() {
                   data: { contactId: contact.id },
                 })
               }
+              updatePolicy={hasPermission(organizationId, "contacts.update")}
             />
           ))}
         </TableBody>
@@ -222,9 +243,11 @@ function ContactTableRow({
   company,
   contact,
   definitions,
+  managePolicy,
   onCompanyClick,
   onDelete,
   onEdit,
+  updatePolicy,
 }: {
   company?: { id: string; name: string };
   contact: {
@@ -238,9 +261,11 @@ function ContactTableRow({
     updatedAt: Date;
   };
   definitions: readonly CustomAttributeDefinition[];
+  managePolicy: ClientPolicy;
   onCompanyClick: (companyId: string) => void;
   onDelete: () => void;
   onEdit: () => void;
+  updatePolicy: ClientPolicy;
 }) {
   const { contactAttributeValueCollection } = useDashboardCollections();
   const { data: values = [] } = useLiveQuery(
@@ -283,33 +308,54 @@ function ContactTableRow({
       ))}
       <TableCell>{formatDate(contact.updatedAt)}</TableCell>
       <TableCell className="text-right">
-        <Menu>
-          <MenuTrigger
-            render={(triggerProps) => (
-              <Button
-                {...triggerProps}
-                size="icon-sm"
-                type="button"
-                variant="ghost"
-              >
-                <HugeiconsIcon icon={Ellipsis} />
-                <span className="sr-only">
-                  Open actions for {contact.name ?? "contact"}
-                </span>
-              </Button>
-            )}
-          />
-          <MenuPopup align="end" className="w-40">
-            <MenuItem onClick={onEdit}>
-              <HugeiconsIcon className="text-muted-foreground" icon={Edit} />
-              <span>Edit</span>
-            </MenuItem>
-            <MenuItem onClick={onDelete} variant="destructive">
-              <HugeiconsIcon icon={Delete02Icon} />
-              <span>Delete</span>
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
+        <PolicyGuard policy={anyPolicy(updatePolicy, managePolicy)}>
+          {({ allowed: canUseAnyAction }) =>
+            canUseAnyAction ? (
+              <Menu>
+                <MenuTrigger
+                  render={(triggerProps) => (
+                    <Button
+                      {...triggerProps}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <HugeiconsIcon icon={Ellipsis} />
+                      <span className="sr-only">
+                        Open actions for {contact.name ?? "contact"}
+                      </span>
+                    </Button>
+                  )}
+                />
+                <MenuPopup align="end" className="w-40">
+                  <PolicyGuard policy={updatePolicy}>
+                    {({ allowed }) => (
+                      <MenuItem disabled={!allowed} onClick={onEdit}>
+                        <HugeiconsIcon
+                          className="text-muted-foreground"
+                          icon={Edit}
+                        />
+                        <span>Edit</span>
+                      </MenuItem>
+                    )}
+                  </PolicyGuard>
+                  <PolicyGuard policy={managePolicy}>
+                    {({ allowed }) => (
+                      <MenuItem
+                        disabled={!allowed}
+                        onClick={onDelete}
+                        variant="destructive"
+                      >
+                        <HugeiconsIcon icon={Delete02Icon} />
+                        <span>Delete</span>
+                      </MenuItem>
+                    )}
+                  </PolicyGuard>
+                </MenuPopup>
+              </Menu>
+            ) : null
+          }
+        </PolicyGuard>
       </TableCell>
     </TableRow>
   );

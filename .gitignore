@@ -62,3 +62,6 @@ packages/feedback-widget/src/icons/sprite.svg
 test-results/
 playwright-report/
 .last-run.json
+
+
+.vitest-attachments

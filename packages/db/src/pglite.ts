@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 
@@ -25,7 +26,7 @@ export const migratePglite = async (databaseUrl: string): Promise<void> => {
   const dataDir = dataDirectory(databaseUrl);
   await mkdir(dataDir, { recursive: true });
 
-  const pglite = new PGlite(dataDir);
+  const pglite = new PGlite(dataDir, { extensions: { vector } });
   const db = drizzle({ client: pglite });
 
   try {

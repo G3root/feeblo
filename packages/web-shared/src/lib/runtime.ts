@@ -1,14 +1,15 @@
 import { createRuntime, type RpcClientType, withRpc } from "@feeblo/rpc-client";
-import * as Cause from "effect/Cause";
 import type * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 
+import { RpcError } from "./rpc-error";
 import { getRuntimePublicEnv } from "./runtime-public-env";
 
 const runtime = createRuntime(getRuntimePublicEnv().apiUrl);
+
 /**
  * Runs an Effect with the default runtime and optional AbortSignal.
- * Resolves with the value on success, throws the cause on failure.
+ * Resolves with the value on success, throws a structured RpcError on failure.
  */
 export async function runEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -19,16 +20,17 @@ export async function runEffect<A, E, R>(
     { signal: options?.signal }
   );
   if (Exit.isFailure(result)) {
-    const cause = result.cause;
-
-    throw new Error(Cause.pretty(cause));
+    throw new RpcError(result.cause);
   }
   return result.value;
 }
 
 /**
  * Fetches via RPC: runs the given RPC effect with the default runtime.
- * Resolves with the value on success, throws the cause on failure.
+ *
+ * Handle declared domain failures inside `cb` with `Effect.catchTag` or
+ * `Effect.catchTags`; JavaScript promises cannot retain a typed rejection
+ * channel. Any failure left unhandled is thrown as `RpcError` for fallback UI.
  */
 export function fetchRpc<A, E, R>(
   cb: (rpc: RpcClientType) => Effect.Effect<A, E, R>,

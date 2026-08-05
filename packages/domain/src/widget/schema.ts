@@ -23,6 +23,12 @@ export const WidgetFeedbackCreate = S.Struct({
   organizationId: WorkspaceId.schema,
   title: S.String,
   content: S.String,
+  metadata: S.optional(
+    S.Record(
+      S.String.pipe(S.check(S.isMaxLength(64))),
+      S.String.check(S.isMaxLength(500))
+    ).check(S.isMaxProperties(20))
+  ),
   token: S.optional(S.String),
 });
 
@@ -40,3 +46,29 @@ export const WidgetFeedbackResponse = S.Struct({
 export type TWidgetFeedbackResponse = S.Schema.Type<
   typeof WidgetFeedbackResponse
 >;
+
+export const WidgetSuggestionRequest = S.Struct({
+  boardId: BoardId.schema,
+  organizationId: WorkspaceId.schema,
+  title: S.String.check(S.isMaxLength(200)),
+  content: S.String.check(S.isMaxLength(20_000)),
+});
+
+export const WidgetSuggestion = S.Struct({
+  id: S.String,
+  title: S.String,
+  excerpt: S.String,
+  slug: S.String,
+});
+
+export const WidgetUpdate = S.Struct({
+  id: S.String,
+  title: S.String,
+  slug: S.String,
+  content: S.String,
+  excerpt: S.String,
+  imageUrl: S.NullOr(S.String),
+  publishedAt: S.DateFromString,
+});
+
+export type TWidgetUpdate = S.Schema.Type<typeof WidgetUpdate>;

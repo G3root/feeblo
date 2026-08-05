@@ -7,6 +7,12 @@
     "./src/*": {
       "default": "./src/*"
     },
+    "./asset/repository": {
+      "default": "./src/asset/repository.ts"
+    },
+    "./asset/service": {
+      "default": "./src/asset/service.ts"
+    },
     "./rpc-group": {
       "default": "./src/rpc-group.ts"
     },
@@ -254,14 +260,16 @@
       "default": "./src/attribute-definition/validation.ts"
     },
     "./site/subdomain-validation-service": {
-      "default": "./src/site/services/profanity-check-service.ts"
+      "default": "./src/site/subdomain/service.ts"
     }
   },
   "dependencies": {
     "@effect-aws/client-s3": "catalog:",
     "@effect-aws/s3": "catalog:",
+    "@effect/ai-openai": "4.0.0-beta.66",
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
+    "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@polar-sh/sdk": "catalog:",
@@ -270,6 +278,7 @@
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
     "jose": "catalog:",
+    "leo-profanity": "^1.9.0",
     "react": "catalog:",
     "takumi-js": "^2.4.0"
   },

@@ -3,6 +3,8 @@
 /** biome-ignore-all lint/complexity/noBannedTypes: <explanation> */
 // credits: https://github.com/CapSoftware/Cap/blob/main/packages/web-domain/src/Policy.ts
 
+import type { Permission, Role } from "@feeblo/permissions";
+import * as Permissions from "@feeblo/permissions";
 import type { NonEmptyReadonlyArray } from "effect/Array";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -109,6 +111,21 @@ export const hasMembership = (organizationId: string): Policy =>
   policy((user) => Effect.succeed(isMember(user, organizationId)));
 
 /**
+ * Role/scope gate built on the shared permission table
+ * (`packages/permissions`). This is the function every backend policy should
+ * use for role-based gates so backend enforcement and frontend UI gating can
+ * never drift — the frontend `hasPermission` in `@feeblo/web-shared/use-policy`
+ * calls the same `can()`.
+ */
+export const canPermission = (
+  organizationId: string,
+  permission: Permission
+): Policy =>
+  policy((user) =>
+    Effect.succeed(Permissions.can(user, organizationId, permission))
+  );
+
+/**
  * Allows guests and regular users, but confines organization-SSO users to the
  * organization encoded in their authenticated session.
  */
@@ -125,10 +142,7 @@ export const hasRestrictedOrganizationScope = (
 export const isMember = (
   session: CurrentSession["Service"],
   organizationId: string
-) =>
-  session.memberships.some(
-    (membership) => membership.organizationId === organizationId
-  );
+): boolean => Permissions.isMember(session, organizationId);
 
 export const getMembership = (
   session: CurrentSession["Service"],
@@ -140,25 +154,11 @@ export const getMembership = (
 
 export const hasOrganizationRole = (
   organizationId: string,
-  role: "owner" | "admin" | "member"
+  role: Role
 ): Policy =>
   policy((user) =>
-    Effect.succeed(
-      user.memberships.some(
-        (membership) =>
-          membership.organizationId === organizationId &&
-          membership.role === role
-      )
-    )
+    Effect.succeed(Permissions.roleIn(user, organizationId) === role)
   );
 
-export const hasOrganizationOwnerOrAdmin = (organizationId: string) =>
-  policy((user) =>
-    Effect.succeed(
-      user.memberships.some(
-        (membership) =>
-          membership.organizationId === organizationId &&
-          (membership.role === "owner" || membership.role === "admin")
-      )
-    )
-  );
+export const hasOrganizationOwnerOrAdmin = (organizationId: string): Policy =>
+  canPermission(organizationId, "workspace.update");

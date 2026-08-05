@@ -1,9 +1,11 @@
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTransition } from "react";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useSite } from "~/hooks/use-site";
 import { siteCollection } from "~/lib/collections";
 
@@ -18,11 +20,15 @@ export const Route = createFileRoute(
 });
 
 function ChangelogPrivacySettingsPage() {
+  const organizationId = useOrganizationId();
+  const { allowed: canManagePrivacy, isPending: isPolicyPending } = usePolicy(
+    hasPermission(organizationId, "site.update")
+  );
   const site = useSite();
   const [isPending, startTransition] = useTransition();
 
   const handleCheckedChange = (checked: boolean) => {
-    if (!site) {
+    if (!(site && canManagePrivacy)) {
       return;
     }
 
@@ -74,7 +80,12 @@ function ChangelogPrivacySettingsPage() {
                     <SettingsItem.ItemActions>
                       <Switch
                         checked={site?.changelogVisibility === "PUBLIC"}
-                        disabled={!site || isPending}
+                        disabled={
+                          !site ||
+                          !canManagePrivacy ||
+                          isPending ||
+                          isPolicyPending
+                        }
                         onCheckedChange={handleCheckedChange}
                       />
                     </SettingsItem.ItemActions>

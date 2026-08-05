@@ -1,19 +1,23 @@
 ---
+import type { WidgetConfig } from "@feeblo/feedback-widget";
+
 interface Props {
   organizationId?: string;
+  widgetConfig?: WidgetConfig;
 }
 
-const { organizationId } = Astro.props;
+const { organizationId, widgetConfig } = Astro.props;
 
 import { getPublicEnvServer } from "../dashboard/lib/server-runtime-public-env";
 
 const publicEnv = getPublicEnvServer();
 ---
 
-<script is:inline define:vars={{ publicEnv, organizationId }}>
+<script is:inline define:vars={{ publicEnv, organizationId, widgetConfig }}>
   window.global = window.global || {};
   window.global.__ENV = {
     ...publicEnv,
     ...(organizationId ? { organizationId } : {}),
+    ...(widgetConfig ? { widgetConfig } : {}),
   };
 </script>

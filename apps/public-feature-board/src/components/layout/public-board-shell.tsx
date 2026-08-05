@@ -4,8 +4,12 @@ import {
   useAuthDialogContext,
 } from "@feeblo/post-ui/dialog-stores";
 import type { PostCollections } from "@feeblo/post-ui/post-collections-provider";
-import { PostCollectionsProvider } from "@feeblo/post-ui/post-collections-provider";
+import {
+  PostCollectionsProvider,
+  type PostCollectionsValue,
+} from "@feeblo/post-ui/post-collections-provider";
 import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
 import type { ReactNode } from "react";
 import { useCallback } from "react";
 import {
@@ -33,6 +37,26 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
     });
   }, [authDialogStore]);
 
+  const getPostHref = useCallback<
+    NonNullable<PostCollectionsValue["getPostHref"]>
+  >((post) => `/p/${post.slug}`, []);
+
+  const suggestPosts = useCallback<
+    NonNullable<PostCollectionsValue["suggestPosts"]>
+  >(
+    ({ signal, ...input }) =>
+      fetchRpc(
+        (rpc) =>
+          rpc.PostSuggestionsPublic({
+            ...input,
+            limit: 5,
+            organizationId: site.organizationId,
+          }),
+        { signal }
+      ),
+    [site.organizationId]
+  );
+
   const collections: PostCollections = {
     boardCollection: publicBoardCollection,
     postCollection: publicPostCollection,
@@ -47,8 +71,10 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
   return (
     <PostCollectionsProvider
       collections={collections}
+      getPostHref={getPostHref}
       onAuthRequired={handleAuthRequired}
       organizationId={site.organizationId}
+      suggestPosts={suggestPosts}
     >
       <PostCreateDialogProvider>
         <div className="flex min-h-dvh flex-col bg-background text-foreground">

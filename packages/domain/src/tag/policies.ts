@@ -1,15 +1,9 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 
 import * as Policy from "../policy";
 import { TagRepository } from "./repository";
-
-type TIsOwner = {
-  organizationId: string;
-  tagId: string;
-};
 
 type TCanDelete = {
   organizationId: string;
@@ -21,48 +15,75 @@ type TCanUpdate = {
   tagId: string;
 };
 
+type TCanSetPostTags = {
+  organizationId: string;
+  postId: string;
+};
+
+type TCanSetChangelogTags = {
+  organizationId: string;
+  changelogId: string;
+};
 const makeTagPolicy = Effect.gen(function* () {
   const repository = yield* TagRepository;
 
-  const isCreator = (args: TIsOwner) =>
-    Policy.policy((user) =>
-      repository
-        .findById({ id: args.tagId, organizationId: args.organizationId })
-        .pipe(
-          Effect.map((tag) => {
-            if (Option.isSome(tag)) {
-              return tag.value.creatorId === user.session.userId;
-            }
-            return false;
-          })
-        )
-    );
-
-  const isOwner = (args: TIsOwner) =>
-    Policy.any(
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
-      isCreator(args)
-    );
-
+  // TODO ADD ORG OWNERSHIP CHECK
   const canCreate = (organizationId: string) =>
-    Policy.hasMembership(organizationId);
+    Policy.canPermission(organizationId, "tags.create");
 
   const canDelete = (args: TCanDelete) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({ organizationId: args.organizationId, tagId: args.tagId })
-    );
+    Policy.canPermission(args.organizationId, "tags.*");
 
   const canUpdate = (args: TCanUpdate) =>
+    Policy.canPermission(args.organizationId, "tags.*");
+
+  const isPostCreator = (args: TCanSetPostTags) =>
+    Policy.policy((user) =>
+      repository.hasPostCreator({
+        postId: args.postId,
+        organizationId: args.organizationId,
+        userId: user.session.userId,
+      })
+    );
+
+  /**
+   * Post tag assignments are manager-scoped (tags.* / posts.*), but
+   * contributors may tag posts they created. Mirrors PostPolicy.canUpdate
+   * (posts.* OR creator) with tags.* added, since assignment is also a tag
+   * management action.
+   */
+  const canSetPostTags = (args: TCanSetPostTags) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
-      isOwner({ organizationId: args.organizationId, tagId: args.tagId })
+      Policy.any(
+        Policy.canPermission(args.organizationId, "posts.*"),
+        Policy.canPermission(args.organizationId, "tags.*"),
+        isPostCreator(args)
+      )
+    );
+
+  /**
+   * Strictly manager-scoped: contributors can never set changelog tags. No
+   * creator branch — unlike posts, changelog creation itself is manager-only
+   * (changelog.create), so a contributor can never legitimately be a
+   * changelog creator, and a demoted creator shouldn't retain tag rights
+   * they no longer hold for editing.
+   */
+  const canSetChangelogTags = (args: TCanSetChangelogTags) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.any(
+        Policy.canPermission(args.organizationId, "changelog.*"),
+        Policy.canPermission(args.organizationId, "tags.*")
+      )
     );
 
   return {
     canCreate,
     canDelete,
     canUpdate,
+    canSetPostTags,
+    canSetChangelogTags,
   };
 });
 

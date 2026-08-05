@@ -6,14 +6,17 @@ import {
 } from "@feeblo/ui/accordion";
 import { Button } from "@feeblo/ui/button";
 import {
+  type BoardPostStatus,
+  getBoardStatusLabel,
+} from "@feeblo/web-shared/board/constants";
+import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
+import {
   Add01Icon,
   ArrowDown01Icon,
   ArrowUp01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
-import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
-import { type BoardPostStatus, getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
 import type { BoardPostLane } from "./types";
@@ -60,11 +63,14 @@ export function BoardListView({
               </AccordionTrigger>
 
               <PolicyGuard policy={hasMembership(organizationId)}>
-                <AddPostButton
-                  boardId={boardId}
-                  status={lane.status}
-                  statusId={lane.statusId}
-                />
+                {({ allowed }) => (
+                  <AddPostButton
+                    boardId={boardId}
+                    disabled={!allowed}
+                    status={lane.status}
+                    statusId={lane.statusId}
+                  />
+                )}
               </PolicyGuard>
             </div>
             <AccordionPanel className="h-auto px-0 pb-0">
@@ -85,10 +91,12 @@ export function BoardListView({
 
 function AddPostButton({
   boardId,
+  disabled = false,
   status,
   statusId,
 }: {
   boardId?: string;
+  disabled?: boolean;
   status: BoardPostStatus;
   statusId: string;
 }) {
@@ -98,6 +106,7 @@ function AddPostButton({
     <Button
       aria-label={`Add post to ${getBoardStatusLabel(status)}`}
       className="absolute top-1/2 right-6 -translate-y-1/2"
+      disabled={disabled}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();

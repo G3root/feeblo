@@ -16,7 +16,10 @@ function normalizeCompany(
       result[key] = company[key];
     }
   }
-  return result as Pick<WidgetCompany, "id" | "name" | "avatar" | "customFields">;
+  return result as Pick<
+    WidgetCompany,
+    "id" | "name" | "avatar" | "customFields"
+  >;
 }
 
 export function normalizeUserIdentity(

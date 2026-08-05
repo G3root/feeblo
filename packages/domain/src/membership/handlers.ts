@@ -60,6 +60,12 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
             role,
           });
 
+          yield* membershipPolicy.canManageRole({
+            organizationId,
+            memberId,
+            role,
+          });
+
           yield* repository.updateMemberRole({
             organizationId,
             memberId,
@@ -68,22 +74,33 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         })
       ).pipe(
         Policy.withPolicy(
-          membershipPolicy.canUpdateMemberRole({ organizationId, memberId })
+          membershipPolicy.canUpdateMemberRole({
+            organizationId,
+            memberId,
+            role,
+          })
         ),
         withRemapDbErrors("Membership", "update")
       ),
     OrganizationRemoveMember: ({ organizationId, memberId }: TRemoveMember) =>
-      repository
-        .deleteMember({
-          organizationId,
-          memberId,
+      transaction(
+        Effect.gen(function* () {
+          yield* membershipPolicy.canManageTarget({
+            organizationId,
+            memberId,
+          });
+
+          yield* repository.deleteMember({
+            organizationId,
+            memberId,
+          });
         })
-        .pipe(
-          Policy.withPolicy(
-            membershipPolicy.canRemoveMember({ organizationId, memberId })
-          ),
-          withRemapDbErrors("Membership", "delete")
+      ).pipe(
+        Policy.withPolicy(
+          membershipPolicy.canRemoveMember({ organizationId, memberId })
         ),
+        withRemapDbErrors("Membership", "delete")
+      ),
     OrganizationCancelInvitation: ({
       organizationId,
       invitationId,

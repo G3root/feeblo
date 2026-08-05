@@ -9,7 +9,8 @@ import * as Option from "effect/Option";
 
 interface TUpvoteList {
   organizationId: string;
-  visibility?: "PUBLIC" | "PRIVATE";
+  /** Restricts the list to upvotes on public boards (used by public endpoints). */
+  publicOnly?: boolean;
 }
 
 interface TUpvoteToggle {
@@ -23,7 +24,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    list: ({ organizationId }: TUpvoteList) =>
+    list: ({ organizationId, publicOnly = false }: TUpvoteList) =>
       db
         .select({
           id: schema.upvoteTable.id,
@@ -43,7 +44,20 @@ const makeUpvoteRepository = Effect.gen(function* () {
           schema.userTable,
           eq(schema.userTable.id, schema.upvoteTable.userId)
         )
-        .where(and(eq(schema.upvoteTable.organizationId, organizationId))),
+        .innerJoin(
+          schema.postTable,
+          eq(schema.postTable.id, schema.upvoteTable.postId)
+        )
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .where(
+          and(
+            eq(schema.upvoteTable.organizationId, organizationId),
+            ...(publicOnly ? [eq(schema.boardTable.visibility, "PUBLIC")] : [])
+          )
+        ),
 
     toggle: ({ organizationId, postId, userId, visibility }: TUpvoteToggle) =>
       Effect.gen(function* () {

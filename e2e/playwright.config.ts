@@ -66,7 +66,7 @@ export default defineConfig({
         : "pnpm run dev:server:e2e",
       env: e2eEnv,
       reuseExistingServer: false,
-      timeout: 120_000,
+      timeout: 240_000,
       url: `${apiURL}/health`,
     },
     {
@@ -75,7 +75,7 @@ export default defineConfig({
         : "pnpm run dev:web:e2e",
       env: e2eEnv,
       reuseExistingServer: false,
-      timeout: 120_000,
+      timeout: 240_000,
       url: baseURL,
     },
   ],

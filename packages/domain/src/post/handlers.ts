@@ -1,10 +1,18 @@
 import { transaction } from "@feeblo/db";
+import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-
+import {
+  cleanupOrphanedEditorAssets,
+  cleanupPreparedEditorAssets,
+  commitPreparedEditorAssets,
+  prepareEditorAssetContent,
+  rollbackPreparedEditorAssets,
+  syncPostAssetReferences,
+} from "../asset/service";
 import { BoardRepository } from "../board/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -16,7 +24,12 @@ import { PostSubscriptionRepository } from "../post-subscription/repository";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
-import { FailedToUpdatePostError } from "./errors";
+import {
+  PostEmbeddingService,
+  postEmbeddingInput,
+  schedulePostEmbeddingBestEffort,
+} from "./embedding-service";
+import { FailedToUpdatePostError, PostAlreadyExistsError } from "./errors";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -26,8 +39,12 @@ import type {
   TPostDelete,
   TPostList,
   TPostMerge,
+  TPostSuggestions,
   TPostUpdate,
+  TPostUpdateContent,
+  TPostUpdateTitle,
 } from "./schema";
+import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
@@ -35,20 +52,142 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
   const notifications = yield* Effect.serviceOption(NotificationService);
+  const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
 
   // -- Shared effect helpers (no policy applied) --
 
-  const deletePostEffect = (args: TPostDelete) =>
-    repository.delete({
-      id: args.id,
-      organizationId: args.organizationId,
-      boardId: args.boardId,
+  const scheduleEmbedding = ({
+    content,
+    id,
+    organizationId,
+    title,
+  }: {
+    content: string;
+    id: string;
+    organizationId: string;
+    title: string;
+  }) =>
+    Option.match(embeddingService, {
+      onNone: () => Effect.void,
+      onSome: (service) =>
+        schedulePostEmbeddingBestEffort({
+          content,
+          embeddingService: service,
+          postId: id,
+          organizationId,
+          title,
+        }),
     });
 
-  const updatePostEffect = (args: TPostUpdate) => {
-    const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(args.content);
-    return Effect.gen(function* () {
+  const suggestionsEffect = (args: TPostSuggestions, publicOnly: boolean) =>
+    Effect.gen(function* () {
+      const input = postEmbeddingInput(args);
+      const resultLimit = args.limit ?? 5;
+      const queryEmbedding = Option.isSome(embeddingService)
+        ? yield* embeddingService.value
+            .embed(input)
+            .pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning(
+                  "Failed to generate suggestion query embedding",
+                  cause
+                ).pipe(Effect.as(Option.none()))
+              )
+            )
+        : Option.none();
+      const candidates = yield* repository.findSuggestionCandidates({
+        organizationId: args.organizationId,
+        ...(args.boardId ? { boardId: args.boardId } : {}),
+        ...(Option.isSome(queryEmbedding)
+          ? {
+              embedding: queryEmbedding.value.vector,
+              embeddingModel: queryEmbedding.value.model,
+            }
+          : {}),
+        limit: Option.isSome(queryEmbedding)
+          ? resultLimit
+          : Math.max(25, resultLimit * 5),
+        publicOnly,
+      });
+
+      if (Option.isSome(queryEmbedding)) {
+        const matches = candidates
+          .filter(
+            (candidate) =>
+              candidate.distance !== null &&
+              candidate.distance <= SUGGESTION_MAX_DISTANCE
+          )
+          .map(({ distance: _distance, ...post }) => post);
+        if (matches.length > 0) {
+          return matches;
+        }
+      }
+
+      const lexicalCandidates = Option.isSome(queryEmbedding)
+        ? yield* repository.findSuggestionCandidates({
+            organizationId: args.organizationId,
+            ...(args.boardId ? { boardId: args.boardId } : {}),
+            limit: Math.max(25, resultLimit * 5),
+            publicOnly,
+          })
+        : candidates;
+
+      return lexicalCandidates
+        .map((post) => ({
+          post,
+          score: postLexicalSimilarity(input, post),
+        }))
+        .filter(({ score }) => score > 0)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, resultLimit)
+        .map(({ post }) => post);
+    });
+
+  const deletePostEffect = (args: TPostDelete) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const canDeleteEngagedPost = Permissions.can(
+        session,
+        args.organizationId,
+        "posts.*"
+      );
+      const deleted = yield* transaction(
+        repository.delete({
+          id: args.id,
+          organizationId: args.organizationId,
+          boardId: args.boardId,
+          creatorId: session.session.userId,
+          onlyIfNew: !canDeleteEngagedPost,
+        })
+      );
+
+      if (!deleted && !canDeleteEngagedPost) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Posts with comments or other users' votes cannot be deleted",
+        });
+      }
+
+      return undefined;
+    }).pipe(
+      Effect.tap(() =>
+        cleanupOrphanedEditorAssets({
+          organizationId: args.organizationId,
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to clean up orphaned editor assets",
+              cause
+            ).pipe(
+              Effect.annotateLogs({ organizationId: args.organizationId })
+            )
+          )
+        )
+      )
+    );
+
+  const updatePostEffect = (args: TPostUpdate) =>
+    Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
       yield* transaction(
@@ -67,17 +206,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             postId: args.id,
           };
           const activities: CreatePostActivity[] = [];
-          if (previous.title !== args.title) {
-            activities.push({
-              ...actor,
-              kind: "TITLE_CHANGED",
-              previousValue: previous.title,
-              nextValue: args.title,
-            });
-          }
-          if (previous.content !== sanitizedMarkdown) {
-            activities.push({ ...actor, kind: "CONTENT_CHANGED" });
-          }
           if (previous.statusId !== args.statusId) {
             activities.push({
               ...actor,
@@ -94,11 +222,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               nextValue: args.boardId,
             });
           }
-          yield* repository.update({
-            ...args,
-            content: sanitizedMarkdown,
-            excerpt: htmlToExcerpt(sanitizedHtml),
-          });
+          yield* repository.update(args);
           yield* activityRepository.createMany(activities);
           if (previous.statusId !== args.statusId) {
             yield* Option.match(notifications, {
@@ -116,7 +240,133 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         })
       );
     });
-  };
+
+  const updatePostContentEffect = (args: TPostUpdateContent) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
+        args.content
+      );
+      const prepared = yield* prepareEditorAssetContent({
+        organizationId: args.organizationId,
+        userId: session.session.userId,
+        content: sanitizedMarkdown,
+        assetIds: args.assetIds,
+      });
+      const membership = Policy.getMembership(session, args.organizationId);
+      let contentChanged = false;
+      let title = "";
+      yield* transaction(
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          title = previous.title;
+          contentChanged = previous.content !== prepared.content;
+          if (!contentChanged) {
+            yield* commitPreparedEditorAssets(prepared.promotions);
+            yield* syncPostAssetReferences({
+              postId: args.id,
+              organizationId: args.organizationId,
+              userId: session.session.userId,
+              content: prepared.content,
+              assetIds: args.assetIds,
+            });
+            return;
+          }
+          const actor = {
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+          };
+          yield* repository.update({
+            id: args.id,
+            organizationId: args.organizationId,
+            content: prepared.content,
+            excerpt: htmlToExcerpt(sanitizedHtml),
+          });
+          yield* commitPreparedEditorAssets(prepared.promotions);
+          yield* syncPostAssetReferences({
+            postId: args.id,
+            organizationId: args.organizationId,
+            userId: session.session.userId,
+            content: prepared.content,
+            assetIds: args.assetIds,
+          });
+          yield* activityRepository.create({
+            ...actor,
+            kind: "CONTENT_CHANGED",
+          });
+        })
+      ).pipe(
+        Effect.tapCause(() =>
+          rollbackPreparedEditorAssets(prepared.promotions)
+        ),
+        Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+      );
+      if (contentChanged) {
+        yield* scheduleEmbedding({
+          content: prepared.content,
+          id: args.id,
+          organizationId: args.organizationId,
+          title,
+        });
+      }
+    });
+
+  const updatePostTitleEffect = (args: TPostUpdateTitle) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+      let titleChanged = false;
+      let content = "";
+      yield* transaction(
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          content = previous.content;
+          titleChanged = previous.title !== args.title;
+          if (!titleChanged) {
+            return;
+          }
+          const actor = {
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+          };
+          yield* repository.update({
+            id: args.id,
+            organizationId: args.organizationId,
+            title: args.title,
+          });
+          yield* activityRepository.create({
+            ...actor,
+            kind: "TITLE_CHANGED",
+            previousValue: previous.title,
+            nextValue: args.title,
+          });
+        })
+      );
+      if (titleChanged) {
+        yield* scheduleEmbedding({
+          content,
+          id: args.id,
+          organizationId: args.organizationId,
+          title: args.title,
+        });
+      }
+    });
 
   const createPostEffect = (
     args: TPostCreate,
@@ -146,16 +396,30 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
+      const prepared = yield* prepareEditorAssetContent({
+        organizationId: args.organizationId,
+        userId: session.session.userId,
+        content: sanitizedMarkdown,
+        assetIds: args.assetIds,
+      });
 
       yield* transaction(
         Effect.gen(function* () {
           yield* repository.create({
             ...args,
-            content: sanitizedMarkdown,
+            content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
             creatorId: session.session.userId,
             ...(opts.source ? { source: opts.source } : {}),
             ...(membership ? { creatorMemberId: membership.membershipId } : {}),
+          });
+          yield* commitPreparedEditorAssets(prepared.promotions);
+          yield* syncPostAssetReferences({
+            postId: args.id,
+            organizationId: args.organizationId,
+            userId: session.session.userId,
+            content: prepared.content,
+            assetIds: args.assetIds,
           });
 
           yield* activityRepository.create({
@@ -178,7 +442,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             postId: args.id,
             organizationId: args.organizationId,
           });
-
           yield* Option.match(notifications, {
             onNone: () => Effect.void,
             onSome: (service) =>
@@ -191,6 +454,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               }),
           });
         })
+      ).pipe(
+        Effect.tapCause(() =>
+          rollbackPreparedEditorAssets(prepared.promotions)
+        ),
+        Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
       );
 
       yield* repository
@@ -208,6 +476,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             )
           )
         );
+      yield* scheduleEmbedding({
+        content: prepared.content,
+        id: args.id,
+        organizationId: args.organizationId,
+        title: args.title,
+      });
     });
 
   // -- RPC handlers --
@@ -250,6 +524,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       );
     },
 
+    PostSuggestions: (args: TPostSuggestions) =>
+      suggestionsEffect(args, false).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Post", "select")
+      ),
+
+    PostSuggestionsPublic: (args: TPostSuggestions) =>
+      suggestionsEffect(args, true).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostSuggestionsPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Post", "select")
+      ),
+
     PostDelete: (args: TPostDelete) =>
       deletePostEffect(args).pipe(
         Policy.withPolicy(
@@ -283,10 +572,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUpdate: (args: TPostUpdate) =>
       updatePostEffect(args).pipe(
         Policy.withPolicy(
-          postPolicy.canUpdate({
+          postPolicy.canUpdateProperties({
             organizationId: args.organizationId,
             postId: args.id,
             boardId: args.boardId,
+            statusId: args.statusId,
             source: "dashboard",
           })
         ),
@@ -310,6 +600,66 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
+    PostUpdateContent: (args: TPostUpdateContent) =>
+      updatePostContentEffect(args).pipe(
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "dashboard",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateTitle: (args: TPostUpdateTitle) =>
+      updatePostTitleEffect(args).pipe(
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "dashboard",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateContentPublic: (args: TPostUpdateContent) =>
+      updatePostContentEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostUpdateContentPublic",
+          level: "expensive",
+        }),
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "public",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    PostUpdateTitlePublic: (args: TPostUpdateTitle) =>
+      updatePostTitleEffect(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostUpdateTitlePublic",
+          level: "expensive",
+        }),
+        Policy.withPolicy(
+          postPolicy.canUpdate({
+            organizationId: args.organizationId,
+            postId: args.id,
+            boardId: args.boardId,
+            source: "public",
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
     PostCreate: (args: TPostCreate) =>
       createPostEffect(args).pipe(
         Policy.withPolicy(
@@ -318,7 +668,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             source: "dashboard",
           })
         ),
-        withRemapDbErrors("Post", "create")
+        withRemapDbErrors({
+          action: "create",
+          entity: "Post",
+          onUniqueViolation: () =>
+            new PostAlreadyExistsError({
+              message: "A post with this slug already exists",
+            }),
+        })
       ),
 
     PostCreatePublic: (args: TPostCreate) =>
@@ -333,7 +690,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             source: "public",
           })
         ),
-        withRemapDbErrors("Post", "create")
+        withRemapDbErrors({
+          action: "create",
+          entity: "Post",
+          onUniqueViolation: () =>
+            new PostAlreadyExistsError({
+              message: "A post with this slug already exists",
+            }),
+        })
       ),
 
     PostAdminUpdate: (args: TPostAdminUpdate) =>
@@ -405,5 +769,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostRepository.layer),
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
+  Layer.provide(PostEmbeddingService.layer),
   Layer.provide(NotificationService.layer)
 );

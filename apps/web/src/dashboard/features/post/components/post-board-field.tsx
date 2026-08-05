@@ -2,14 +2,18 @@ import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { PostBoardSelect } from "@feeblo/post-ui/post-properties";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
-  const { post, board, organizationId, canManagePost, isLocked } =
+  const { post, board, organizationId, isLocked } =
     usePostCollectionData();
-  const isDisabled = disabled || isLocked || !canManagePost;
+  const { allowed: canMovePost } = usePolicy(
+    hasPermission(organizationId, "posts.move")
+  );
+  const isDisabled = disabled || isLocked || !canMovePost;
   const navigate = useNavigate();
   const { boardCollection, postCollection } = useDashboardCollections();
 

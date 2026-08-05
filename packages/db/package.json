@@ -25,6 +25,7 @@
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
+    "db:configure-embeddings": "dotenvx run -f ../../.env -- tsx configure-embeddings.ts",
     "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -32,6 +33,8 @@
     "@effect/sql-pg": "catalog:",
     "@effect/sql-pglite": "catalog:",
     "@electric-sql/pglite": "^0.5.4",
+    "@electric-sql/pglite-pgvector": "^0.0.5",
+    "@feeblo/permissions": "workspace:*",
     "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",

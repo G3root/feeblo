@@ -30,6 +30,7 @@ export interface SelectedTag {
 }
 
 interface TagSelectProps {
+  canCreate?: boolean;
   disabled?: boolean;
   onTagSelect: (
     option: TagSelectOption,
@@ -41,6 +42,7 @@ interface TagSelectProps {
 }
 
 export function TagSelect({
+  canCreate = true,
   disabled = false,
   onTagSelect,
   selectedTags,
@@ -84,9 +86,7 @@ export function TagSelect({
               aria-label="Add tags"
               placeholder="Add tags..."
               size="sm"
-              startAddon={
-                <HugeiconsIcon icon={Search01Icon} strokeWidth={2} />
-              }
+              startAddon={<HugeiconsIcon icon={Search01Icon} strokeWidth={2} />}
             />
             <ComboboxPopup aria-label="Select tags">
               <ComboboxEmpty>No tags found.</ComboboxEmpty>
@@ -105,11 +105,14 @@ export function TagSelect({
         </div>
         <Button
           aria-label="Create tag"
-          disabled={disabled}
+          disabled={disabled || !canCreate}
           onClick={() =>
             createDialogStore.send({ type: "toggle", data: { type } })
           }
           size="icon-sm"
+          title={
+            canCreate ? undefined : "You don't have permission to create tags"
+          }
           variant="outline"
         >
           <HugeiconsIcon icon={PlusSignIcon} />

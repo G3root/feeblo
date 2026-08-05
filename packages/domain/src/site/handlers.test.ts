@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { SiteId, WorkspaceId } from "@feeblo/id";
+import type { Role } from "@feeblo/permissions";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -91,10 +92,7 @@ describe("SiteRpcHandlers", () => {
       } satisfies Fixture;
     });
 
-  const addMember = (
-    fixture: Fixture,
-    role: "owner" | "admin" | "member" = "member"
-  ) =>
+  const addMember = (fixture: Fixture, role: Role = "manager") =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const memberId = `member2_${fixture.organizationId}`;
@@ -240,7 +238,7 @@ describe("SiteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
-          yield* addMember(fixture, "member");
+          yield* addMember(fixture, "manager");
 
           const error = yield* Effect.flip(
             handlers
@@ -255,7 +253,7 @@ describe("SiteRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, "member")
+                  makeSession(fixture, "manager")
                 )
               )
           );
@@ -358,7 +356,7 @@ describe("SiteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
-          yield* addMember(fixture, "member");
+          yield* addMember(fixture, "manager");
 
           const error = yield* Effect.flip(
             handlers
@@ -370,7 +368,7 @@ describe("SiteRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, "member")
+                  makeSession(fixture, "manager")
                 )
               )
           );

@@ -161,10 +161,3 @@ export const getPlanFeatureRows = (
 
   return rows;
 };
-
-export const PRIVILEGED_MEMBER_ROLES = ["owner", "admin"] as const;
-
-export const isPrivilegedMemberRole = (role: string) =>
-  PRIVILEGED_MEMBER_ROLES.includes(
-    role as (typeof PRIVILEGED_MEMBER_ROLES)[number]
-  );

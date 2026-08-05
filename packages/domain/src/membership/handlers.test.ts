@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { WorkspaceId } from "@feeblo/id";
+import { MemberId, WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -16,7 +17,10 @@ describe("MembershipRpcHandlers", () => {
     organizationId: string;
     userId: string;
   };
-  const makeSession = (fixture: Fixture, isMember = true): Session => ({
+  const makeSession = (
+    fixture: Fixture,
+    role: Session["memberships"][number]["role"] | null = "owner"
+  ): Session => ({
     user: {
       id: fixture.userId,
       email: "user@example.com",
@@ -25,12 +29,12 @@ describe("MembershipRpcHandlers", () => {
     },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
-    memberships: isMember
+    memberships: role
       ? [
           {
             membershipId: fixture.membershipId,
             organizationId: fixture.organizationId,
-            role: "owner",
+            role,
           },
         ]
       : [],
@@ -40,7 +44,7 @@ describe("MembershipRpcHandlers", () => {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
       const userId = `user_${organizationId}`;
-      const membershipId = `membership_${organizationId}`;
+      const membershipId = yield* MemberId.generate;
       const now = new Date();
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -118,7 +122,7 @@ describe("MembershipRpcHandlers", () => {
           handlers
             .OrganizationMembersList({ organizationId: fixture.organizationId })
             .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture, false))
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
             )
         );
         expect(error._tag).toBe("PolicyDenied");
@@ -132,7 +136,7 @@ describe("MembershipRpcHandlers", () => {
 
         yield* policy.canInviteRoleWithinPlan({
           organizationId: fixture.organizationId,
-          role: "member",
+          role: "manager",
         });
       })
     );
@@ -150,6 +154,337 @@ describe("MembershipRpcHandlers", () => {
         );
 
         expect(error).toMatchObject({ _tag: "PolicyDenied" });
+      })
+    );
+    it.effect("prevents an admin from promoting themselves to owner", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const otherOwnerMemberId = yield* MemberId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: `owner_${fixture.organizationId}`,
+          email: `owner_${fixture.organizationId}@example.com`,
+          name: "Other Owner",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: otherOwnerMemberId,
+          organizationId: fixture.organizationId,
+          userId: `owner_${fixture.organizationId}`,
+          role: "owner",
+          createdAt: new Date(),
+        });
+        yield* db
+          .update(schema.memberTable)
+          .set({ role: "admin" })
+          .where(eq(schema.memberTable.id, fixture.membershipId));
+
+        const error = yield* Effect.flip(
+          handlers
+            .OrganizationUpdateMemberRole({
+              organizationId: fixture.organizationId,
+              memberId: fixture.membershipId,
+              role: "owner",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "admin")
+              )
+            )
+        );
+
+        expect(error).toMatchObject({ _tag: "PolicyDenied" });
+      })
+    );
+    it.effect("prevents an admin from assigning the owner role", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const targetMemberId = yield* MemberId.generate;
+        const otherOwnerMemberId = yield* MemberId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: `member_${fixture.organizationId}`,
+          email: `member_${fixture.organizationId}@example.com`,
+          name: "Regular Member",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: targetMemberId,
+          organizationId: fixture.organizationId,
+          userId: `member_${fixture.organizationId}`,
+          role: "manager",
+          createdAt: new Date(),
+        });
+        yield* db.insert(schema.userTable).values({
+          id: `owner_${fixture.organizationId}`,
+          email: `owner_${fixture.organizationId}@example.com`,
+          name: "Other Owner",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: otherOwnerMemberId,
+          organizationId: fixture.organizationId,
+          userId: `owner_${fixture.organizationId}`,
+          role: "owner",
+          createdAt: new Date(),
+        });
+        yield* db
+          .update(schema.memberTable)
+          .set({ role: "admin" })
+          .where(eq(schema.memberTable.id, fixture.membershipId));
+
+        const error = yield* Effect.flip(
+          handlers
+            .OrganizationUpdateMemberRole({
+              organizationId: fixture.organizationId,
+              memberId: targetMemberId,
+              role: "owner",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "admin")
+              )
+            )
+        );
+
+        expect(error).toMatchObject({ _tag: "PolicyDenied" });
+      })
+    );
+    it.effect("allows an owner to assign the owner role", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const targetMemberId = yield* MemberId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: `member_${fixture.organizationId}`,
+          email: `member_${fixture.organizationId}@example.com`,
+          name: "Regular Member",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: targetMemberId,
+          organizationId: fixture.organizationId,
+          userId: `member_${fixture.organizationId}`,
+          role: "manager",
+          createdAt: new Date(),
+        });
+
+        yield* handlers
+          .OrganizationUpdateMemberRole({
+            organizationId: fixture.organizationId,
+            memberId: targetMemberId,
+            role: "owner",
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+      })
+    );
+    it.effect("prevents an owner from removing or demoting another owner", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const otherOwnerMemberId = yield* MemberId.generate;
+        const otherOwnerUserId = `other_owner_${fixture.organizationId}`;
+
+        yield* db.insert(schema.userTable).values({
+          id: otherOwnerUserId,
+          email: `${otherOwnerUserId}@example.com`,
+          name: "Other Owner",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: otherOwnerMemberId,
+          organizationId: fixture.organizationId,
+          userId: otherOwnerUserId,
+          role: "owner",
+          createdAt: new Date(),
+        });
+
+        const removeError = yield* Effect.flip(
+          handlers
+            .OrganizationRemoveMember({
+              organizationId: fixture.organizationId,
+              memberId: otherOwnerMemberId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(removeError._tag).toBe("PolicyDenied");
+
+        const demoteError = yield* Effect.flip(
+          handlers
+            .OrganizationUpdateMemberRole({
+              organizationId: fixture.organizationId,
+              memberId: otherOwnerMemberId,
+              role: "admin",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(demoteError._tag).toBe("PolicyDenied");
+
+        const [otherOwner] = yield* db
+          .select({ role: schema.memberTable.role })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.id, otherOwnerMemberId));
+        expect(otherOwner?.role).toBe("owner");
+      })
+    );
+    it.effect("prevents an admin from removing an owner", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* addAdmin(fixture.organizationId);
+        const ownerMemberId = yield* MemberId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: `owner_${fixture.organizationId}`,
+          email: `owner_${fixture.organizationId}@example.com`,
+          name: "Other Owner",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: ownerMemberId,
+          organizationId: fixture.organizationId,
+          userId: `owner_${fixture.organizationId}`,
+          role: "owner",
+          createdAt: new Date(),
+        });
+        yield* db
+          .update(schema.memberTable)
+          .set({ role: "admin" })
+          .where(eq(schema.memberTable.id, fixture.membershipId));
+
+        const error = yield* Effect.flip(
+          handlers
+            .OrganizationRemoveMember({
+              organizationId: fixture.organizationId,
+              memberId: ownerMemberId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "admin")
+              )
+            )
+        );
+
+        expect(error).toMatchObject({ _tag: "PolicyDenied" });
+      })
+    );
+    it.effect("prevents an admin from removing another admin", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* addAdmin(fixture.organizationId);
+        const admin2MemberId = yield* MemberId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: `admin2_${fixture.organizationId}`,
+          email: `admin2_${fixture.organizationId}@example.com`,
+          name: "Admin 2",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: admin2MemberId,
+          organizationId: fixture.organizationId,
+          userId: `admin2_${fixture.organizationId}`,
+          role: "admin",
+          createdAt: new Date(),
+        });
+        yield* db
+          .update(schema.memberTable)
+          .set({ role: "admin" })
+          .where(eq(schema.memberTable.id, fixture.membershipId));
+
+        const error = yield* Effect.flip(
+          handlers
+            .OrganizationRemoveMember({
+              organizationId: fixture.organizationId,
+              memberId: admin2MemberId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "admin")
+              )
+            )
+        );
+
+        expect(error).toMatchObject({ _tag: "PolicyDenied" });
+      })
+    );
+    it.effect("allows an admin to remove a regular member", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* addAdmin(fixture.organizationId);
+        const memberId = yield* MemberId.generate;
+        yield* db.insert(schema.userTable).values({
+          id: `member_${fixture.organizationId}`,
+          email: `member_${fixture.organizationId}@example.com`,
+          name: "Regular Member",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: memberId,
+          organizationId: fixture.organizationId,
+          userId: `member_${fixture.organizationId}`,
+          role: "manager",
+          createdAt: new Date(),
+        });
+        yield* db
+          .update(schema.memberTable)
+          .set({ role: "admin" })
+          .where(eq(schema.memberTable.id, fixture.membershipId));
+
+        yield* handlers
+          .OrganizationRemoveMember({
+            organizationId: fixture.organizationId,
+            memberId,
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "admin"))
+          );
+
+        const remaining = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.id, memberId));
+        expect(remaining).toHaveLength(0);
+      })
+    );
+    it.effect("allows a manager to remove a contributor", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const memberId = yield* MemberId.generate;
+        const targetUserId = `contributor_${fixture.organizationId}`;
+
+        yield* db.insert(schema.userTable).values({
+          id: targetUserId,
+          email: `${targetUserId}@example.com`,
+          name: "Contributor",
+        });
+        yield* db.insert(schema.memberTable).values({
+          id: memberId,
+          organizationId: fixture.organizationId,
+          userId: targetUserId,
+          role: "contributor",
+          createdAt: new Date(),
+        });
+
+        yield* handlers
+          .OrganizationRemoveMember({
+            organizationId: fixture.organizationId,
+            memberId,
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "manager"))
+          );
+
+        const remaining = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.id, memberId));
+        expect(remaining).toHaveLength(0);
       })
     );
   });

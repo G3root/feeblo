@@ -91,11 +91,14 @@ const makeCommentPolicy = Effect.gen(function* () {
             organizationId: args.organizationId,
           })
         ),
-        isOwner({
-          organizationId: args.organizationId,
-          commentId: args.commentId,
-          postId: args.postId,
-        })
+        Policy.any(
+          isOwner({
+            organizationId: args.organizationId,
+            commentId: args.commentId,
+            postId: args.postId,
+          }),
+          Policy.canPermission(args.organizationId, "comments.*")
+        )
       );
     }
 
@@ -107,11 +110,14 @@ const makeCommentPolicy = Effect.gen(function* () {
           organizationId: args.organizationId,
         })
       ),
-      isOwner({
-        organizationId: args.organizationId,
-        commentId: args.commentId,
-        postId: args.postId,
-      })
+      Policy.any(
+        isOwner({
+          organizationId: args.organizationId,
+          commentId: args.commentId,
+          postId: args.postId,
+        }),
+        Policy.canPermission(args.organizationId, "comments.*")
+      )
     );
   };
 

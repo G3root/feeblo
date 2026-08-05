@@ -1,4 +1,6 @@
-import { Copy, EmailShell, Lead } from "./email-shell";
+import * as React from "react";
+import { Link, Section, Text } from "react-email";
+import { EmailShell } from "./email-shell";
 
 export type EmailPost = { readonly label: string; readonly url: string };
 
@@ -10,18 +12,21 @@ export const EmailPostList = ({
   readonly posts: readonly EmailPost[];
 }) => {
   return (
-    <div style={{ marginTop: "24px" }}>
-      <Copy>
-        <strong>{heading}</strong>
-      </Copy>
-      <ul>
-        {posts.map((item) => (
-          <li key={item.url}>
-            <a href={item.url}>{item.label}</a>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Section>
+      <Text className="m-0 font-20 font-condensed text-fg uppercase">
+        {heading}
+      </Text>
+      {posts.map((item) => (
+        <Section className="border-stroke border-t" key={item.url}>
+          <Link
+            className="inline-block w-full py-4 font-14 font-sans text-fg-2"
+            href={item.url}
+          >
+            {item.label}
+          </Link>
+        </Section>
+      ))}
+    </Section>
   );
 };
 
@@ -35,24 +40,19 @@ type WeeklyDigestEmailProps = {
 export const WeeklyDigestEmail = (props: WeeklyDigestEmailProps) => (
   <EmailShell
     cta={{ label: "Open workspace", href: props.dashboardUrl }}
-    eyebrow={props.organizationName}
-    footer={
-      <>
-        You receive this because you follow feedback in this workspace.{" "}
-        <a href={props.unsubscribeUrl}>Unsubscribe from this weekly digest</a>.
-      </>
-    }
+    homeUrl="https://feeblo.com"
     preview={`Your weekly ${props.organizationName} digest`}
     title="Your weekly digest"
+    titleLead={`Here is what happened in the ${props.organizationName} workspace last week.`}
+    unsubscribeUrl={props.unsubscribeUrl}
   >
-    <Lead>Here is what happened in the workspace last week.</Lead>
     <EmailPostList heading="Latest feedback" posts={props.posts} />
   </EmailShell>
 );
 
 export const createWeeklyDigestEmail = (props: WeeklyDigestEmailProps) => ({
   subject: `${props.organizationName}: weekly digest`,
-  react: <WeeklyDigestEmail {...props} />,
+  react: React.createElement(WeeklyDigestEmail, props),
 });
 
 WeeklyDigestEmail.PreviewProps = {
