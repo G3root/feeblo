@@ -73,9 +73,9 @@ export const isMember = (
 /**
  * True when the context holds a privileged role (owner/admin) in the org.
  * Semantic replacement for the old `role === "owner" || role === "admin"`
- * checks; equivalent to `can(context, orgId, "workspace.manage")`.
+ * checks; equivalent to `can(context, orgId, "workspace.update")`.
  */
 export const isOwnerOrAdmin = (
   context: PermissionContext | null | undefined,
   organizationId: string
-): boolean => can(context, organizationId, "workspace.manage");
+): boolean => can(context, organizationId, "workspace.update");

@@ -633,6 +633,7 @@ export const commentCollection = createCollection(
       );
 
       await postActivityCollection.utils.refetch();
+      await postCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -649,6 +650,7 @@ export const commentCollection = createCollection(
       );
 
       await postActivityCollection.utils.refetch();
+      await postCollection.utils.refetch();
     },
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -811,6 +813,7 @@ export const upvoteCollection = createCollection(
           postId: newUpvote.postId,
         })
       );
+      await postCollection.utils.refetch();
     },
     onDelete: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -822,6 +825,7 @@ export const upvoteCollection = createCollection(
           postId: deletedUpvote.postId,
         })
       );
+      await postCollection.utils.refetch();
     },
   })
 );

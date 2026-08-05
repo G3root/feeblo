@@ -16,17 +16,17 @@ type TCanUpdate = {
 };
 
 const makeTagPolicy = Effect.gen(function* () {
-  const repository = yield* TagRepository;
+  yield* TagRepository;
 
   // TODO ADD ORG OWNERSHIP CHECK
   const canCreate = (organizationId: string) =>
     Policy.canPermission(organizationId, "tags.create");
 
   const canDelete = (args: TCanDelete) =>
-    Policy.canPermission(args.organizationId, "tags.manage");
+    Policy.canPermission(args.organizationId, "tags.*");
 
   const canUpdate = (args: TCanUpdate) =>
-    Policy.canPermission(args.organizationId, "tags.manage");
+    Policy.canPermission(args.organizationId, "tags.*");
 
   return {
     canCreate,

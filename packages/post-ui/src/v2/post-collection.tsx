@@ -1,6 +1,8 @@
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
+  allPolicy,
   anyPolicy,
+  hasMembership,
   hasPermission,
   isUser,
   usePolicy,
@@ -19,18 +21,28 @@ export function PostCollectionDataProvider({
   pageType,
 }: PostCollectionDataProviderProps) {
   const { data: session } = useAuthState();
-  const { allowed: canModeratePost } = usePolicy(
-    hasPermission(organizationId, "posts.moderate")
+  const { allowed: canManageAllPosts } = usePolicy(
+    hasPermission(organizationId, "posts.*")
   );
-  // Backend mirror: PostPolicy.canUpdate/canDelete = hasMembership AND
-  // (posts.manage OR post creator). Posts.moderate (lock/archive/merge) is
-  // owner/admin only and intentionally NOT granted to authors.
-  const { allowed: canManagePost } = usePolicy(
-    anyPolicy(
-      hasPermission(organizationId, "posts.manage"),
+  const { allowed: isPostCreator } = usePolicy(
+    allPolicy(
+      hasMembership(organizationId),
       isUser(post?.creatorId ?? "")
     )
   );
+  // Backend mirror: PostPolicy.canUpdate = hasMembership AND
+  // (posts.* OR post creator). PostPolicy.canDelete additionally requires
+  // an untouched post for contributors. Posts.* (lock/archive/merge) is manager+
+  // and intentionally NOT granted to contributors merely because
+  // they authored the post.
+  const { allowed: canManagePost } = usePolicy(
+    anyPolicy(
+      hasPermission(organizationId, "posts.*"),
+      allPolicy(hasMembership(organizationId), isUser(post?.creatorId ?? ""))
+    )
+  );
+  const canDeletePost =
+    canManageAllPosts || (isPostCreator && post?.canDeleteAsCreator === true);
 
   const isMember =
     session?.memberships?.some((m) => m.organizationId === organizationId) ??
@@ -38,9 +50,10 @@ export function PostCollectionDataProvider({
 
   const state = buildPostCollectionState({
     board,
+    canDeletePost,
     post,
     canManagePost,
-    canModeratePost,
+    canModeratePost: canManageAllPosts,
     organizationId,
     isMember,
     isAuthenticated: Boolean(session?.session),

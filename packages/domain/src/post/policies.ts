@@ -66,13 +66,39 @@ const makePostPolicy = Effect.gen(function* () {
       )
     );
 
-  const isOrganizationOwnerOrAdmin = (organizationId: string) =>
-    Policy.canPermission(organizationId, "workspace.manage");
-
   const isOwner = (args: TIsCreator) =>
     Policy.any(
-      isOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "posts.*"),
       isCreator(args)
+    );
+
+  const isNewPostOwner = (args: TIsCreator) =>
+    Policy.policy((user) =>
+      pipe(args.postId, (postId) =>
+        Schema.is(PostIds)(postId)
+          ? repository
+              .findNewByCreatorIds({
+                ids: postId,
+                organizationId: args.organizationId,
+                userId: user.session.userId,
+                boardId: args.boardId,
+              })
+              .pipe(Effect.map((posts) => posts.length === postId.length))
+          : repository
+              .findNewByCreatorId({
+                id: postId,
+                organizationId: args.organizationId,
+                userId: user.session.userId,
+                boardId: args.boardId,
+              })
+              .pipe(Effect.map((post) => post._tag === "Some"))
+      )
+    );
+
+  const isNewPostOwnerOrPrivileged = (args: TIsCreator) =>
+    Policy.any(
+      Policy.canPermission(args.organizationId, "posts.*"),
+      isNewPostOwner(args)
     );
 
   const isUnlocked = (args: TIsUnlocked) =>
@@ -102,7 +128,7 @@ const makePostPolicy = Effect.gen(function* () {
     if (args.source === "public") {
       return Policy.all(
         Policy.hasRestrictedOrganizationScope(args.organizationId),
-        isOwner({
+        isNewPostOwnerOrPrivileged({
           organizationId: args.organizationId,
           postId: args.postId,
           boardId: args.boardId,
@@ -111,7 +137,7 @@ const makePostPolicy = Effect.gen(function* () {
     }
     return Policy.all(
       Policy.hasMembership(args.organizationId),
-      isOwner({
+      isNewPostOwnerOrPrivileged({
         organizationId: args.organizationId,
         postId: args.postId,
         boardId: args.boardId,
@@ -145,7 +171,7 @@ const makePostPolicy = Effect.gen(function* () {
   };
 
   const canAdminUpdate = (organizationId: string) =>
-    Policy.canPermission(organizationId, "posts.moderate");
+    Policy.canPermission(organizationId, "posts.*");
 
   const canMerge = canAdminUpdate;
 

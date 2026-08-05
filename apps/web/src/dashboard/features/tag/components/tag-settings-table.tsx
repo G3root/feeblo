@@ -202,7 +202,7 @@ function TagTableRow({
   updatedAt,
 }: TagTableRowProps) {
   const { allowed: canManageTag } = usePolicy(
-    hasPermission(organizationId, "tags.manage")
+    hasPermission(organizationId, "tags.*")
   );
 
   if (!canManageTag) {

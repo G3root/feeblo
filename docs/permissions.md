@@ -22,7 +22,7 @@ Because the two copies were independent, they drifted:
 | --- | --- | --- | --- | --- |
 | 1 | `hasRole(role)` had **no org scope** | "user is admin anywhere → show admin UI" | roles are always org-scoped | An admin of org A saw admin UI inside org B |
 | 2 | Board menu gated by `hasOwnerOrAdminRole` | board creator (member) sees no menu | `BoardPolicy.canUpdate/canDelete` = manage **OR board creator** | UI hid actions the backend allows |
-| 3 | Post lock/archive/merge gated by `canManagePost` (manage **or** author) | post author sees lock/merge | `PostAdminUpdate`/`PostMerge` = `posts.moderate` (owner/admin only) | UI showed actions the backend rejects (403) |
+| 3 | Post lock/archive/merge gated by `canManagePost` (manage **or** author) | post author sees lock/merge | `PostAdminUpdate`/`PostMerge` = `posts.*` (manager+) | UI showed actions the backend rejects (403) |
 | 4 | Changelog editor gated by creator-only | owner/admin sees read-only editor for others' entries | `ChangelogPolicy.canUpdate` = manage **or** creator | UI blocked actions the backend allows |
 | 5 | Role literal duplicated | `"owner" \| "admin" \| "member"` typed by hand in ~6 places | same literal, hand-typed | Adding a role meant touching every site |
 
@@ -40,10 +40,12 @@ owner > admin > manager > contributor
 
 A strict ranking where higher roles inherit everything below them:
 
-- **owner** — full workspace control; created with the workspace, never invited.
-- **admin** — privileged: members, billing, site, roadmap, content moderation.
-- **manager** — content manager: creates boards, changelogs, tags, CRM records
-  (formerly the "member" role).
+- **owner** — workspace owner; created with the workspace, never invited. Its
+  only additional named permission is organization deletion.
+- **admin** — privileged workspace administrator with the same named
+  permissions as owner except organization deletion.
+- **manager** — content manager: handles posts, changelogs, tags, roadmaps,
+  and lower-ranked user cleanup (formerly the "member" role).
 - **contributor** — contributes feedback: creates/votes/comments on posts.
 
 `packages/permissions/src/roles.ts` is its single definition (`ROLES`,
@@ -57,15 +59,18 @@ Instead of scattering `role === "owner" || role === "admin"`, every gate is a
 **named permission**:
 
 ```text
-boards.manage        changelog.manage    posts.moderate
-members.invite       members.remove      members.roles.assign
-site.manage          roadmap.manage      billing.manage
-contacts.manage      companies.manage    …
+boards.*             changelog.*         posts.*
+comments.*           members.invite      members.remove
+members.assign       site.*              roadmap.*
+billing.*            contacts.*          companies.*
 ```
 
 `packages/permissions/src/permissions.ts` is the catalog (id + label +
-description, anchored to the backend policy it maps to) and
-`src/role-permissions.ts` is the role → permission table. Roles inherit
+description, anchored to the backend policy it maps to). Its
+`createPermissions(resource, actions)` utility creates the action permissions
+and the matching `{resource}.*` wildcard. `roleGrants` resolves a wildcard
+grant for action checks. `src/role-permissions.ts` is the role → permission
+table. Roles inherit
 permissions from lower ranks automatically (`permissionsForRole`).
 
 ### The `can()` API
@@ -80,9 +85,9 @@ can(context, organizationId, permission) => boolean
 `context` only needs `memberships: [{ organizationId, role }]` — both the
 backend `Session` and the frontend `AuthClientSession` satisfy it structurally.
 
-- **Backend:** `Policy.canPermission(organizationId, "posts.moderate")`
+- **Backend:** `Policy.canPermission(organizationId, "posts.*")`
   wraps `can()` in the Effect policy machinery.
-- **Frontend:** `hasPermission(organizationId, "posts.moderate")` is a
+- **Frontend:** `hasPermission(organizationId, "posts.*")` is a
   `ClientPolicy` over the same `can()`.
 
 ### Resource checks stay on the backend
@@ -97,16 +102,10 @@ Two complementary rules:
 
    ```ts
    // backend  ChangelogPolicy.canUpdate
-   Policy.all(
-     Policy.hasMembership(orgId),
-     Policy.any(Policy.canPermission(orgId, "changelog.manage"), isCreator(args)),
-   )
+   Policy.canPermission(orgId, "changelog.*")
 
-   // frontend changelog-editor.tsx (same shape, same permission id)
-   anyPolicy(
-     hasPermission(orgId, "changelog.manage"),
-     allPolicy(hasMembership(orgId), isUser(changelog.creatorId)),
-   )
+   // frontend changelog-editor.tsx (same permission id)
+   hasPermission(orgId, "changelog.*")
    ```
 
 Plan entitlements (limits/capabilities) remain a separate, orthogonal layer —
@@ -132,11 +131,11 @@ The former `member` role was renamed to `manager` (same permissions) and a new
 lowest tier `contributor` was added:
 
 | Role | Grants (beyond inheritance) |
-| --- | --- |
-| `contributor` | `posts.create`, `posts.vote`, `posts.comment`, `members.view`, `notifications.manage` |
-| `manager` | + `boards.create`, `changelog.create`, `tags.create`, `contacts.create/update`, `companies.create/update` |
-| `admin` | + `workspace.manage`, member/billing/site/roadmap management, `posts.moderate`, … |
-| `owner` | + `workspace.delete`, `members.roles.owner` |
+ | --- | --- |
+| `contributor` | No named permissions; membership-scoped content policies apply directly |
+| `manager` | + `members.remove`, `posts.*`, `changelog.*`, `tags.*`, `roadmap.*`, `comments.*`, CRM create/update |
+| `admin` | + `workspace.update`, `members.*`, `billing.*`, `site.*`, `boards.*`, `contacts.*`, `companies.*` |
+| `owner` | + `workspace.delete` |
 
 The DB `member.role` column is `text` (not an enum), so the rename is a data
 migration (`packages/db/src/migrations/20260805000000_rename_member_role_to_manager`)
@@ -152,7 +151,7 @@ that updates `member` and `invitation` rows; the schema default now reads
   `hasOrganizationOwnerOrAdmin`/`isMember` now delegate to
   `@feeblo/permissions`; new `canPermission(organizationId, permission)` for
   role gates. `hasOrganizationOwnerOrAdmin` is kept as an alias of
-  `canPermission(orgId, "workspace.manage")`.
+  `canPermission(orgId, "workspace.update")`.
 - Module policies (`board`, `post`, `changelog`, `tag`, `site`, `contact`,
   `company`, `attribute-definition`, `membership`, `billing`, `roadmap`,
   `roadmap-column`) use `canPermission` with named permissions instead of
@@ -176,18 +175,19 @@ that updates `member` and `invitation` rows; the schema default now reads
 **Mismatch fixes applied:**
 
 1. `hasRole` is org-scoped (bug class removed).
-2. `app-sidebar.tsx` board menu = `boards.manage` **or** board creator
-   (`BoardList` now returns `creatorId`).
-3. `post-sidebar-actions.tsx` — lock/archive (`PostAdminUpdate`) gated by
-   `posts.moderate`; delete still gated by `posts.manage`/author.
-4. `changelog-editor.tsx` — edit gate = `changelog.manage` **or** creator.
-5. Roadmap pages use `roadmap.manage` instead of the generic owner/admin gate.
+2. Board lifecycle and privacy are available to admins and owners through
+   `boards.create` and `boards.*`.
+3. `post-sidebar-actions.tsx` — manager+ users can manage/moderate posts;
+   contributors retain author-level post editing, with own-post deletion
+   restricted to posts without comments or other votes.
+4. `changelog-editor.tsx` — edit/delete/publish requires `changelog.*`.
+5. Roadmap pages use `roadmap.*` instead of the generic owner/admin gate.
+6. Managers can delete other users' comments through `comments.*`.
 
 **Manager-only operations are enforced on the backend, not just in the UI.**
-The board/changelog/tag/contact/company create/update policies check
-`boards.create` / `changelog.create` / `tags.create` / `contacts.create` /
-`contacts.update` / `companies.create` / `companies.update` (all manager+)
-instead of bare `hasMembership`, so direct RPC calls from a contributor are
+The board/changelog/tag/contact/company create/update policies check named
+permissions instead of bare `hasMembership`, so direct RPC calls from a
+contributor are
 rejected with `PolicyDenied`. Frontend mirrors gate the same actions
 (`CreateBoardButton`, changelog “New Entry”, tag/contact/company rows) so
 contributors never see actions that would 403. `TagList` now returns
@@ -210,9 +210,9 @@ contributors never see actions that would 403. `TagList` now returns
 ## Migration checklist (remaining call sites)
 
 - `apps/web/src/dashboard/routes/$organizationId/settings/*` still use the
-  `hasOwnerOrAdminRole` convenience alias (works, maps to `workspace.manage`).
-  Prefer explicit permissions (`site.manage`, `site.customize`,
-  `members.invite`/`members.remove`) when next touched.
+  `hasOwnerOrAdminRole` convenience alias (works, maps to `workspace.update`).
+  Prefer explicit permissions (`site.*`, `members.invite`/`members.remove`)
+  when next touched.
 - `members.tsx` parses `member.role.split(",")` from the DB — replace with a
   `Role`-typed mapper when the member collection schema is tightened.
 - `packages/domain/src/policy.ts#hasOrganizationRole` remains exported for

@@ -53,7 +53,7 @@ function PostAdminActionButtons() {
   const {
     post,
     board,
-    canManagePost,
+    canDeletePost,
     canModeratePost,
     isLocked,
     organizationId,
@@ -146,7 +146,7 @@ function PostAdminActionButtons() {
         </Tooltip>
       ) : null}
 
-      {canManagePost ? (
+      {canDeletePost ? (
         <Tooltip>
           <TooltipTrigger
             render={(props) => (

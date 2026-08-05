@@ -174,11 +174,13 @@ describe("TagRpcHandlers", () => {
                 .pipe(Effect.provideService(CurrentSession, session(f, false)))
             );
             expect(error._tag).toBe("PolicyDenied");
-            expect(
-              yield* handlers.TagListPublic({
-                organizationId: f.organizationId,
-              })
-            ).toMatchObject([{ id: tagId, name: "Feature", type: "FEEDBACK" }]);
+            const publicTags = yield* handlers.TagListPublic({
+              organizationId: f.organizationId,
+            });
+            expect(publicTags).toMatchObject([
+              { id: tagId, name: "Feature", type: "FEEDBACK" },
+            ]);
+            expect(publicTags[0]).not.toHaveProperty("creatorId");
           })
       );
       it.effect("allows tag creators to update their tags", () =>

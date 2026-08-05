@@ -161,4 +161,4 @@ export const hasOrganizationRole = (
   );
 
 export const hasOrganizationOwnerOrAdmin = (organizationId: string): Policy =>
-  canPermission(organizationId, "workspace.manage");
+  canPermission(organizationId, "workspace.update");

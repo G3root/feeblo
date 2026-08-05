@@ -5,6 +5,7 @@ import {
   canAll,
   canAny,
   compareRoles,
+  createPermissions,
   isInvitableRole,
   isMember,
   isOwnerOrAdmin,
@@ -12,6 +13,7 @@ import {
   isRole,
   type PermissionContext,
   permissionsForRole,
+  PERMISSIONS,
   type Role,
   roleAtLeast,
   roleGrants,
@@ -65,76 +67,83 @@ describe("roles", () => {
 });
 
 describe("role permissions", () => {
-  it("grants contribution permissions to every role (inheritance)", () => {
-    for (const role of ["contributor", "manager", "admin", "owner"] as const) {
-      expect(roleGrants(role, "posts.create")).toBe(true);
-      expect(roleGrants(role, "posts.vote")).toBe(true);
-      expect(roleGrants(role, "posts.comment")).toBe(true);
-      expect(roleGrants(role, "notifications.manage")).toBe(true);
+  it("creates action permissions and one resource wildcard", () => {
+    expect(createPermissions("posts", ["create", "delete"] as const)).toEqual([
+      "posts.create",
+      "posts.delete",
+      "posts.*",
+    ]);
+
+    const resources = new Set(PERMISSIONS.map((permission) => permission.split(".")[0]));
+    for (const resource of resources) {
+      expect(PERMISSIONS).toContain(`${resource}.*`);
     }
+    expect(PERMISSIONS.every((permission) => permission.split(".").length === 2)).toBe(
+      true
+    );
   });
 
-  it("grants content-management permissions to manager and above", () => {
+  it("does not add named permissions to contributors", () => {
+    expect(permissionsForRole("contributor")).toHaveLength(0);
+  });
+
+  it("grants resource wildcards to managers and above", () => {
     for (const role of ["manager", "admin", "owner"] as const) {
-      expect(roleGrants(role, "boards.create")).toBe(true);
+      expect(roleGrants(role, "posts.*")).toBe(true);
+      expect(roleGrants(role, "posts.lock")).toBe(true);
+      expect(roleGrants(role, "changelog.*")).toBe(true);
+      expect(roleGrants(role, "tags.*")).toBe(true);
+      expect(roleGrants(role, "roadmap.*")).toBe(true);
+      expect(roleGrants(role, "comments.*")).toBe(true);
+      expect(roleGrants(role, "members.remove")).toBe(true);
       expect(roleGrants(role, "changelog.create")).toBe(true);
       expect(roleGrants(role, "tags.create")).toBe(true);
       expect(roleGrants(role, "contacts.create")).toBe(true);
       expect(roleGrants(role, "companies.update")).toBe(true);
     }
+    expect(roleGrants("owner", "boards.create")).toBe(true);
+    expect(roleGrants("owner", "boards.*")).toBe(true);
+    expect(roleGrants("admin", "boards.create")).toBe(true);
+    expect(roleGrants("admin", "boards.*")).toBe(true);
+    expect(roleGrants("manager", "boards.create")).toBe(false);
     expect(roleGrants("contributor", "boards.create")).toBe(false);
     expect(roleGrants("contributor", "changelog.create")).toBe(false);
     expect(roleGrants("contributor", "tags.create")).toBe(false);
     expect(roleGrants("contributor", "contacts.create")).toBe(false);
   });
 
-  it("grants workspace.manage only to privileged roles", () => {
-    expect(roleGrants("owner", "workspace.manage")).toBe(true);
-    expect(roleGrants("admin", "workspace.manage")).toBe(true);
-    expect(roleGrants("manager", "workspace.manage")).toBe(false);
-    expect(roleGrants("contributor", "workspace.manage")).toBe(false);
+  it("grants workspace updates only to privileged roles", () => {
+    expect(roleGrants("owner", "workspace.update")).toBe(true);
+    expect(roleGrants("admin", "workspace.update")).toBe(true);
+    expect(roleGrants("manager", "workspace.update")).toBe(false);
+    expect(roleGrants("contributor", "workspace.update")).toBe(false);
   });
 
-  it("grants posts.moderate only to privileged roles (no author exception)", () => {
-    expect(roleGrants("owner", "posts.moderate")).toBe(true);
-    expect(roleGrants("admin", "posts.moderate")).toBe(true);
-    expect(roleGrants("manager", "posts.moderate")).toBe(false);
-    expect(roleGrants("contributor", "posts.moderate")).toBe(false);
-  });
-
-  it("grants owner-only permissions only to owner", () => {
+  it("grants organization deletion only to owner", () => {
     expect(roleGrants("owner", "workspace.delete")).toBe(true);
     expect(roleGrants("admin", "workspace.delete")).toBe(false);
-    expect(roleGrants("owner", "members.roles.owner")).toBe(true);
-    expect(roleGrants("admin", "members.roles.owner")).toBe(false);
   });
 
-  it("computes the full effective set per role", () => {
+  it("gives admin and owner the same permissions except deletion", () => {
     const admin = permissionsForRole("admin");
-    expect(admin.has("posts.create")).toBe(true);
-    expect(admin.has("boards.create")).toBe(true);
-    expect(admin.has("posts.moderate")).toBe(true);
-    expect(admin.has("billing.manage")).toBe(true);
+    expect(admin.has("posts.*")).toBe(true);
+    expect(admin.has("comments.*")).toBe(true);
+    expect(roleGrants("admin", "comments.delete")).toBe(true);
+    expect(admin.has("billing.*")).toBe(true);
 
     const owner = permissionsForRole("owner");
-    for (const permission of admin) {
-      expect(owner.has(permission)).toBe(true);
-    }
+    expect([...owner].filter((permission) => permission !== "workspace.delete"))
+      .toEqual([...admin]);
     expect(owner.has("workspace.delete")).toBe(true);
-
-    const manager = permissionsForRole("manager");
-    expect(manager.has("posts.create")).toBe(true);
-    expect(manager.has("boards.create")).toBe(true);
-    expect(manager.has("posts.moderate")).toBe(false);
   });
 });
 
 describe("can()", () => {
   it("denies when the context is missing or the user is not a member", () => {
-    expect(can(null, org, "posts.create")).toBe(false);
-    expect(can(undefined, org, "posts.create")).toBe(false);
-    expect(can(ctx([]), org, "posts.create")).toBe(false);
-    expect(can(ctx([["org_other", "admin"]]), org, "posts.create")).toBe(false);
+    expect(can(null, org, "posts.*")).toBe(false);
+    expect(can(undefined, org, "posts.*")).toBe(false);
+    expect(can(ctx([]), org, "posts.*")).toBe(false);
+    expect(can(ctx([["org_other", "admin"]]), org, "posts.*")).toBe(false);
   });
 
   it("checks the org-scoped membership only", () => {
@@ -143,56 +152,54 @@ describe("can()", () => {
       ["org_a", "manager"],
       ["org_b", "admin"],
     ]);
-    expect(can(session, "org_a", "posts.moderate")).toBe(false);
-    expect(can(session, "org_a", "posts.create")).toBe(true);
-    expect(can(session, "org_a", "boards.create")).toBe(true);
-    expect(can(session, "org_b", "posts.moderate")).toBe(true);
+    expect(can(session, "org_a", "posts.lock")).toBe(true);
+    expect(can(session, "org_a", "boards.create")).toBe(false);
+    expect(can(session, "org_b", "posts.lock")).toBe(true);
+    expect(can(session, "org_b", "boards.create")).toBe(true);
   });
 
   it("denies can() for a contributor on content-management and privileged permissions", () => {
     const session = ctx([[org, "contributor"]]);
     for (const permission of [
-      "workspace.manage",
+      "workspace.update",
       "boards.create",
-      "boards.manage",
+      "boards.*",
       "changelog.create",
       "tags.create",
-      "posts.manage",
-      "posts.moderate",
+      "posts.*",
+      "comments.*",
       "members.invite",
       "members.remove",
-      "members.roles.assign",
-      "billing.manage",
-      "site.manage",
-      "roadmap.manage",
+      "members.assign",
+      "billing.*",
+      "site.*",
+      "roadmap.*",
       "contacts.create",
-      "contacts.manage",
+      "contacts.*",
       "companies.create",
-      "companies.manage",
+      "companies.*",
     ] as const) {
       expect(can(session, org, permission), permission).toBe(false);
     }
   });
 
-  it("allows contributors to create/vote/comment on posts", () => {
+  it("recognizes contributors as members without named permissions", () => {
     const session = ctx([[org, "contributor"]]);
-    for (const permission of [
-      "posts.create",
-      "posts.vote",
-      "posts.comment",
-      "members.view",
-      "notifications.manage",
-    ] as const) {
-      expect(can(session, org, permission), permission).toBe(true);
-    }
+    expect(isMember(session, org)).toBe(true);
+    expect(permissionsForRole("contributor")).toHaveLength(0);
   });
 
   it("allows managers to run content operations contributors cannot", () => {
     const session = ctx([[org, "manager"]]);
     for (const permission of [
-      "boards.create",
+      "members.remove",
+      "posts.*",
       "changelog.create",
+      "changelog.*",
       "tags.create",
+      "tags.*",
+      "roadmap.*",
+      "comments.*",
       "contacts.create",
       "contacts.update",
       "companies.create",
@@ -200,19 +207,19 @@ describe("can()", () => {
     ] as const) {
       expect(can(session, org, permission), permission).toBe(true);
     }
-    expect(can(session, org, "posts.moderate")).toBe(false);
-    expect(can(session, org, "members.remove")).toBe(false);
+    expect(can(session, org, "boards.create")).toBe(false);
+    expect(can(session, org, "boards.*")).toBe(false);
   });
 
   it("canAny/canAll compose correctly", () => {
     const session = ctx([[org, "admin"]]);
-    expect(canAny(session, org, ["posts.moderate", "workspace.delete"])).toBe(
+    expect(canAny(session, org, ["posts.*", "workspace.delete"])).toBe(
       true
     );
-    expect(canAll(session, org, ["posts.moderate", "billing.manage"])).toBe(
+    expect(canAll(session, org, ["posts.*", "billing.*"])).toBe(
       true
     );
-    expect(canAll(session, org, ["posts.moderate", "workspace.delete"])).toBe(
+    expect(canAll(session, org, ["posts.*", "workspace.delete"])).toBe(
       false
     );
   });

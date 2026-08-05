@@ -12,49 +12,37 @@ import { ROLE_RANK, type Role } from "./roles";
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   /**
-   * Contributors feed the funnel: they submit, vote on, and discuss feedback.
-   * They cannot create boards, changelogs, tags, or CRM records.
+   * Contributors are governed by membership-scoped content policies. They
+   * have no additional named permissions.
    */
-  contributor: [
-    "members.view",
-    "posts.create",
-    "posts.vote",
-    "posts.comment",
-    "notifications.manage",
-  ],
+  contributor: [],
   /**
-   * Managers (formerly "member") run day-to-day content operations: boards,
-   * changelogs, tags, and non-destructive CRM work.
+   * Managers (formerly "member") run day-to-day feedback operations:
+   * moderation, changelogs, tags, roadmaps, and user cleanup. CRM
+   * creation/update stays manager-scoped.
    */
   manager: [
-    "boards.create",
-    "changelog.create",
-    "tags.create",
+    "members.remove",
+    "posts.*",
+    "changelog.*",
+    "tags.*",
+    "roadmap.*",
+    "comments.*",
     "contacts.create",
     "contacts.update",
     "companies.create",
     "companies.update",
   ],
   admin: [
-    "workspace.manage",
-    "members.invite",
-    "members.remove",
-    "members.roles.assign",
-    "billing.manage",
-    "site.manage",
-    "site.customize",
-    "boards.manage",
-    "posts.manage",
-    "posts.moderate",
-    "changelog.manage",
-    "roadmap.manage",
-    "tags.manage",
-    "contacts.manage",
-    "contacts.attributes.manage",
-    "companies.manage",
-    "companies.attributes.manage",
+    "workspace.update",
+    "members.*",
+    "billing.*",
+    "site.*",
+    "boards.*",
+    "contacts.*",
+    "companies.*",
   ],
-  owner: ["workspace.delete", "members.roles.owner"],
+  owner: ["workspace.delete"],
 };
 
 /** Every permission granted to `role`, including inherited ones. */
@@ -73,6 +61,17 @@ export const permissionsForRole = (role: Role): ReadonlySet<Permission> => {
   return permissions;
 };
 
-/** True when `role` grants `permission` (directly or through inheritance). */
-export const roleGrants = (role: Role, permission: Permission): boolean =>
-  permissionsForRole(role).has(permission);
+/** True when `role` grants `permission` directly or through a resource wildcard. */
+export const roleGrants = (role: Role, permission: Permission): boolean => {
+  const grants = permissionsForRole(role);
+  if (grants.has(permission)) {
+    return true;
+  }
+
+  const separator = permission.indexOf(".");
+  if (separator === -1 || permission.endsWith(".*")) {
+    return false;
+  }
+
+  return grants.has(`${permission.slice(0, separator)}.*` as Permission);
+};

@@ -229,6 +229,39 @@ describe("BoardRpcHandlers", () => {
         })
       );
 
+      it.effect("rejects managers (board lifecycle is owner-only)", () =>
+        Effect.gen(function* () {
+          const handlers = yield* BoardRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const boardId = yield* BoardId.generate;
+          const memberUser = yield* addMemberUser(fixture, "manager");
+          const memberSession: Session = {
+            user: {
+              id: memberUser.userId,
+              email: `${memberUser.userId}@example.com`,
+              name: "Test manager",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId: memberUser.userId, token: "test-token" },
+            organizations: [{ id: fixture.organizationId }],
+            memberships: [
+              {
+                membershipId: memberUser.membershipId,
+                organizationId: fixture.organizationId,
+                role: "manager",
+              },
+            ],
+          };
+          const error = yield* Effect.flip(
+            handlers
+              .BoardCreate(boardCreateInput(fixture, boardId, "New board"))
+              .pipe(Effect.provideService(CurrentSession, memberSession))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
       it.effect("allows members to create a public board on free plan", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;

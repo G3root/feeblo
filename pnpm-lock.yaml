@@ -512,6 +512,9 @@ importers:
       '@feeblo/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@feeblo/permissions':
+        specifier: workspace:*
+        version: link:../packages/permissions
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1

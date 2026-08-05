@@ -10,6 +10,7 @@ export {
 } from "./can";
 export type { Permission, PermissionDefinition } from "./permissions";
 export {
+  createPermissions,
   PERMISSION_CATALOG,
   PERMISSIONS,
 } from "./permissions";

@@ -17,7 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 
 export function PostPageActions() {
-  const { canManagePost, post } = usePostCollectionData();
+  const { canDeletePost, post } = usePostCollectionData();
   const postId = post.id;
 
   const store = usePostDeleteDialogContext();
@@ -37,7 +37,7 @@ export function PostPageActions() {
         <HugeiconsIcon icon={ArrowLeft01Icon} />
       </Link>
 
-      {canManagePost ? (
+      {canDeletePost ? (
         <Menu>
           <MenuTrigger
             render={(props) => (

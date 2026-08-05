@@ -191,7 +191,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
   const canUpdateMemberRole = (args: TCanUpdateMemberRole) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
-      Policy.canPermission(args.organizationId, "members.roles.assign"),
+      Policy.canPermission(args.organizationId, "members.assign"),
       isMemberAlready(args),
       hasOtherOwners(args)
     );

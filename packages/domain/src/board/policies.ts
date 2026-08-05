@@ -39,11 +39,11 @@ const makeBoardPolicy = Effect.gen(function* () {
     );
 
   const canDelete = (args: TCanDelete) =>
-    Policy.canPermission(args.organizationId, "boards.manage");
+    Policy.canPermission(args.organizationId, "boards.*");
 
   const canUpdate = (args: TCanUpdate) =>
     Policy.all(
-      Policy.canPermission(args.organizationId, "boards.manage"),
+      Policy.canPermission(args.organizationId, "boards.*"),
       Effect.gen(function* () {
         if (args.visibility !== "PRIVATE") {
           return;

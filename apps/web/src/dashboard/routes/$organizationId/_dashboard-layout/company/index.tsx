@@ -99,7 +99,7 @@ function CompanyPage() {
 
   const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
   // Backend mirrors: CompanyPolicy.canCreate requires companies.create,
-  // canUpdate requires companies.update, canDelete requires companies.manage.
+  // canUpdate requires companies.update, canDelete requires companies.*.
   const { allowed: canCreate } = usePolicy(
     hasPermission(organizationId, "companies.create")
   );
@@ -107,7 +107,7 @@ function CompanyPage() {
     hasPermission(organizationId, "companies.update")
   );
   const { allowed: canManage } = usePolicy(
-    hasPermission(organizationId, "companies.manage")
+    hasPermission(organizationId, "companies.*")
   );
 
   if (!companiesQuery.isLoading && companies.length === 0) {

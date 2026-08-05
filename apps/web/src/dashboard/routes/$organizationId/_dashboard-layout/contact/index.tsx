@@ -127,7 +127,7 @@ function ContactPage() {
 
   const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
   // Backend mirrors: ContactPolicy.canCreate requires contacts.create,
-  // canUpdate requires contacts.update, canDelete requires contacts.manage.
+  // canUpdate requires contacts.update, canDelete requires contacts.*.
   const { allowed: canCreate } = usePolicy(
     hasPermission(organizationId, "contacts.create")
   );
@@ -135,7 +135,7 @@ function ContactPage() {
     hasPermission(organizationId, "contacts.update")
   );
   const { allowed: canManage } = usePolicy(
-    hasPermission(organizationId, "contacts.manage")
+    hasPermission(organizationId, "contacts.*")
   );
 
   if (!contactsQuery.isLoading && contacts.length === 0) {

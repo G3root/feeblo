@@ -174,7 +174,7 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
   const deleteStore = useDeleteRoadmapDialogContext();
   const editStore = useEditRoadmapDialogContext();
   const { allowed: canManage } = usePolicy(
-    hasPermission(organizationId, "roadmap.manage")
+    hasPermission(organizationId, "roadmap.*")
   );
 
   const handleDeleteClick = () => {

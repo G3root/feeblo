@@ -68,10 +68,10 @@ export const anyPolicy = (
 
 /**
  * Client policy: current user is organization owner or admin.
- * Delegates to the shared `workspace.manage` permission.
+ * Delegates to the shared `workspace.update` permission.
  */
 export const hasOwnerOrAdminRole = (organizationId: string): ClientPolicy =>
-  hasPermission(organizationId, "workspace.manage");
+  hasPermission(organizationId, "workspace.update");
 
 /**
  * Conditionally renders children based on a policy evaluation.

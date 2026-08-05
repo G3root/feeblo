@@ -9,11 +9,12 @@
  *
  *   owner > admin > manager > contributor
  *
- * - `owner`       — full workspace control, created with the workspace.
- * - `admin`       — privileged: manages members, billing, site, roadmap,
- *                   content moderation, and everything below.
- * - `manager`     — content manager: creates boards, changelogs, tags, and
- *                   CRM records (formerly the "member" role).
+ * - `owner`       — workspace owner, created with the workspace. Its only
+ *                   additional named permission is organization deletion.
+ * - `admin`       — privileged workspace administrator with the same named
+ *                   permissions as owner except organization deletion.
+ * - `manager`     — content manager: handles posts, changelogs, tags,
+ *                   roadmaps, and lower-ranked user cleanup.
  * - `contributor` — contributes feedback: creates/votes/comments on posts.
  */
 export const ROLES = ["owner", "admin", "manager", "contributor"] as const;

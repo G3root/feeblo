@@ -48,7 +48,7 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(organizationId),
-            Policy.canPermission(organizationId, "billing.manage")
+            Policy.canPermission(organizationId, "billing.*")
           )
         ),
         withRemapDbErrors("Billing", "select")
@@ -74,7 +74,7 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(organizationId),
-            Policy.canPermission(organizationId, "billing.manage")
+            Policy.canPermission(organizationId, "billing.*")
           )
         ),
         withRemapDbErrors("Billing", "select")

@@ -12,7 +12,7 @@ import type {
 } from "./schema";
 
 const canManageJwtSecret = (organizationId: string) =>
-  Policy.canPermission(organizationId, "workspace.manage");
+  Policy.canPermission(organizationId, "workspace.update");
 
 export const JwtSecretRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* JwtSecretRepository;

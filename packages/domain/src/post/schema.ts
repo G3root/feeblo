@@ -15,6 +15,8 @@ export const Post = S.Struct({
   organizationId: S.String,
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
+  /** UI hint; the backend remains authoritative for deletion. */
+  canDeleteAsCreator: S.optional(S.Boolean),
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),

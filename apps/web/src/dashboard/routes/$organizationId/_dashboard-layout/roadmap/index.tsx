@@ -183,7 +183,7 @@ function RoadmapListHeader() {
   const organizationId = useOrganizationId();
   const createStore = useCreateRoadmapDialogContext();
   const { allowed: canManage } = usePolicy(
-    hasPermission(organizationId, "roadmap.manage")
+    hasPermission(organizationId, "roadmap.*")
   );
 
   return (

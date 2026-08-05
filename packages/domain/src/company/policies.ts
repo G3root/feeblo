@@ -23,7 +23,7 @@ const makeCompanyPolicy = Effect.gen(function* () {
 
   const canDelete = (args: TCompanyDelete) =>
     Policy.all(
-      Policy.canPermission(args.organizationId, "companies.manage"),
+      Policy.canPermission(args.organizationId, "companies.*"),
       belongsToOrganization(args)
     );
 

@@ -1,4 +1,5 @@
 import { transaction } from "@feeblo/db";
+import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
@@ -144,28 +145,46 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     });
 
   const deletePostEffect = (args: TPostDelete) =>
-    repository
-      .delete({
-        id: args.id,
-        organizationId: args.organizationId,
-        boardId: args.boardId,
-      })
-      .pipe(
-        Effect.tap(() =>
-          cleanupOrphanedEditorAssets({
-            organizationId: args.organizationId,
-          }).pipe(
-            Effect.catchCause((cause) =>
-              Effect.logWarning(
-                "Failed to clean up orphaned editor assets",
-                cause
-              ).pipe(
-                Effect.annotateLogs({ organizationId: args.organizationId })
-              )
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const canDeleteEngagedPost = Permissions.can(
+        session,
+        args.organizationId,
+        "posts.*"
+      );
+      const deleted = yield* transaction(
+        repository.delete({
+          id: args.id,
+          organizationId: args.organizationId,
+          boardId: args.boardId,
+          creatorId: session.session.userId,
+          onlyIfNew: !canDeleteEngagedPost,
+        })
+      );
+
+      if (!deleted && !canDeleteEngagedPost) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Posts with comments or other users' votes cannot be deleted",
+        });
+      }
+
+      return undefined;
+    }).pipe(
+      Effect.tap(() =>
+        cleanupOrphanedEditorAssets({
+          organizationId: args.organizationId,
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to clean up orphaned editor assets",
+              cause
+            ).pipe(
+              Effect.annotateLogs({ organizationId: args.organizationId })
             )
           )
         )
-      );
+      )
+    );
 
   const updatePostEffect = (args: TPostUpdate) =>
     Effect.gen(function* () {

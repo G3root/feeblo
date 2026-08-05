@@ -207,7 +207,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 function CreateBoardButton() {
   const organizationId = useOrganizationId();
   const store = useCreateBoardDialogContext();
-  // Backend mirror: BoardPolicy.canCreate requires boards.create (manager+).
+  // Backend mirror: BoardPolicy.canCreate requires admin/owner boards.create.
   const { allowed: canCreateBoard } = usePolicy(
     hasPermission(organizationId, "boards.create")
   );
@@ -317,7 +317,7 @@ function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
   const organizationId = useOrganizationId();
 
   const { allowed: canManageBoard } = usePolicy(
-    hasPermission(organizationId, "boards.manage")
+    hasPermission(organizationId, "boards.*")
   );
   if (!canManageBoard) {
     return null;
