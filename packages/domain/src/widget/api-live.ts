@@ -5,6 +5,7 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import type {
@@ -13,6 +14,7 @@ import type {
 } from "../attribute-definition/schema";
 import { BoardRepository } from "../board/repository";
 import { ChangelogRepository } from "../changelog/repository";
+import { getClientIpFromRequest } from "../client-ip";
 import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
@@ -31,6 +33,8 @@ import {
   SUGGESTION_MAX_DISTANCE,
 } from "../post/suggestions";
 import { PostStatusRepository } from "../post-status/repository";
+import * as RateLimit from "../rate-limit";
+import { RateLimitService } from "../rate-limit/service";
 import {
   InternalServerError,
   NotFoundError,
@@ -38,6 +42,23 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { upsertContactFromParsed } from "./sso";
+
+const withWidgetRateLimit =
+  (options: RateLimit.PublicRpcRateLimitOptions) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const rateLimitService = yield* RateLimitService;
+
+      return yield* Effect.provideService(
+        effect.pipe(RateLimit.withPublicRpcRateLimit(options)),
+        RateLimit.PublicRpcRateLimiter,
+        RateLimit.makePublicRpcRateLimiter({
+          clientIp: getClientIpFromRequest(request),
+          rateLimitService,
+        })
+      );
+    });
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   organizationId,
@@ -69,6 +90,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
     handlers
       .handle("listUpdates", ({ payload }) =>
         listWidgetUpdates(payload).pipe(
+          withWidgetRateLimit({
+            name: "WidgetListUpdates",
+            level: "read",
+          }),
           Effect.provide(ChangelogRepository.layer),
           withRemapDbErrors("Changelog", "select")
         )
@@ -142,6 +167,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
               slug,
             }));
         }).pipe(
+          withWidgetRateLimit({
+            name: "WidgetSuggestPosts",
+            level: "expensive",
+          }),
           Effect.provide([PostEmbeddingService.layer, PostRepository.layer]),
           Effect.mapError(
             () =>
@@ -163,6 +192,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
 
           return boards.map(({ visibility: _visibility, ...board }) => board);
         }).pipe(
+          withWidgetRateLimit({
+            name: "WidgetListBoards",
+            level: "read",
+          }),
           Effect.provide(BoardRepository.layer),
           withRemapDbErrors("Boards", "select")
         )
@@ -306,6 +339,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
             createdAt: now,
           };
         }).pipe(
+          withWidgetRateLimit({
+            name: "WidgetCreateFeedback",
+            level: "write",
+          }),
           Effect.provide([
             AttributeDefinitionRepository.layer,
             BoardRepository.layer,
