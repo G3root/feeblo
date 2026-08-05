@@ -1,13 +1,5 @@
+import { PostStatusType } from "@feeblo/db/validation-schema/post-status-type";
 import * as S from "effect/Schema";
-
-export const PostStatusType = S.Literals([
-  "PENDING",
-  "REVIEW",
-  "PLANNED",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "CLOSED",
-]);
 
 export const PostStatus = S.Struct({
   id: S.String,

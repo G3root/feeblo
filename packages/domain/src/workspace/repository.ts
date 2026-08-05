@@ -6,6 +6,7 @@ import {
   RoadmapColumnId,
   RoadmapId,
   SiteId,
+  TagId,
   WorkspaceId,
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
@@ -89,6 +90,21 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             createdAt: new Date(),
             userId: args.userId,
           });
+
+          for (const name of ["High Priority", "Low Priority"]) {
+            const tagId = yield* TagId.generate;
+            yield* tx.insert(schema.tagTable).values({
+              id: tagId,
+              name,
+              slug: slugify(name),
+              type: "FEEDBACK",
+              organizationId,
+              creatorId: args.userId,
+              creatorMemberId: memberId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          }
 
           const statusIdByType = new Map<
             (typeof schema.DEFAULT_POST_STATUSES)[number]["type"],

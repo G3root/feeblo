@@ -1,11 +1,10 @@
 import { currentDb, schema } from "@feeblo/db";
+import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
 import { PostActivityId } from "@feeblo/id";
 import { and, asc, eq, gte } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
-import type { TPostActivityKind } from "./schema";
 
 export interface CreatePostActivity {
   actorId: string | null;

@@ -42,6 +42,7 @@ import type {
   TPostSuggestions,
   TPostUpdate,
   TPostUpdateContent,
+  TPostUpdateEta,
   TPostUpdateTitle,
 } from "./schema";
 import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
@@ -237,6 +238,40 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 }),
             });
           }
+        })
+      );
+    });
+
+  const updatePostEtaEffect = (args: TPostUpdateEta) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const membership = Policy.getMembership(session, args.organizationId);
+      yield* transaction(
+        Effect.gen(function* () {
+          const previous = yield* repository.findActivityState({
+            id: args.id,
+            organizationId: args.organizationId,
+          });
+          if (!previous) {
+            return yield* new FailedToUpdatePostError();
+          }
+          if (previous.etaQuarter === args.etaQuarter) {
+            return;
+          }
+          yield* repository.updateEta({
+            id: args.id,
+            organizationId: args.organizationId,
+            etaQuarter: args.etaQuarter,
+          });
+          yield* activityRepository.create({
+            actorId: session.session.userId,
+            actorMemberId: membership?.membershipId ?? null,
+            organizationId: args.organizationId,
+            postId: args.id,
+            kind: "ETA_CHANGED",
+            previousValue: previous.etaQuarter,
+            nextValue: args.etaQuarter,
+          });
         })
       );
     });
@@ -698,6 +733,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               message: "A post with this slug already exists",
             }),
         })
+      ),
+
+    PostUpdateEta: (args: TPostUpdateEta) =>
+      updatePostEtaEffect(args).pipe(
+        Policy.withPolicy(postPolicy.canUpdateEta(args.organizationId)),
+        withRemapDbErrors("Post", "update")
       ),
 
     PostAdminUpdate: (args: TPostAdminUpdate) =>

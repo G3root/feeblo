@@ -10,7 +10,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -338,6 +338,29 @@ describe("PostRpcHandlers", () => {
           expect(error.cause).toBeUndefined();
         })
       );
+
+      it.effect("persists an etaQuarter when provided", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Eta post"),
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [row] = yield* db
+            .select({ etaQuarter: schema.postTable.etaQuarter })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(row?.etaQuarter).toBe("2026-Q3");
+        }),
+      );
     });
 
     describe("PostListPublic", () => {
@@ -480,6 +503,175 @@ describe("PostRpcHandlers", () => {
 
           expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
           expect(post?.content).toContain("Updated content");
+        })
+      );
+    });
+
+    describe("PostUpdateEta", () => {
+      it.effect("lets a manager set the ETA", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostUpdateEta({
+              id: postId,
+              organizationId: fixture.organizationId,
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const [row] = yield* db
+            .select({ etaQuarter: schema.postTable.etaQuarter })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(row?.etaQuarter).toBe("2026-Q3");
+
+          const [activity] = yield* db
+            .select({
+              kind: schema.postActivityTable.kind,
+              previousValue: schema.postActivityTable.previousValue,
+              nextValue: schema.postActivityTable.nextValue,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, postId),
+                eq(schema.postActivityTable.kind, "ETA_CHANGED")
+              )
+            );
+
+          expect(activity).toMatchObject({
+            kind: "ETA_CHANGED",
+            previousValue: null,
+            nextValue: "2026-Q3",
+          });
+        })
+      );
+
+      it.effect("lets a manager clear the ETA", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate({
+              ...postCreateInput(fixture, postId, "Eta feedback"),
+              etaQuarter: "2026-Q3",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostUpdateEta({
+              id: postId,
+              organizationId: fixture.organizationId,
+              etaQuarter: null,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const [row] = yield* db
+            .select({ etaQuarter: schema.postTable.etaQuarter })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+
+          expect(row?.etaQuarter).toBeNull();
+
+          const [activity] = yield* db
+            .select({
+              kind: schema.postActivityTable.kind,
+              previousValue: schema.postActivityTable.previousValue,
+              nextValue: schema.postActivityTable.nextValue,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, postId),
+                eq(schema.postActivityTable.kind, "ETA_CHANGED")
+              )
+            );
+
+          expect(activity).toMatchObject({
+            kind: "ETA_CHANGED",
+            previousValue: "2026-Q3",
+            nextValue: null,
+          });
+        })
+      );
+
+      it.effect("denies a contributor", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdateEta({
+                id: postId,
+                organizationId: fixture.organizationId,
+                etaQuarter: "2026-Q3",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "contributor")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("denies a non-member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Eta feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdateEta({
+                id: postId,
+                organizationId: fixture.organizationId,
+                etaQuarter: "2026-Q3",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
         })
       );
     });

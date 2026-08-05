@@ -1,22 +1,11 @@
+import { PostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
 import { PostId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
-export const PostActivityKind = S.Literals([
-  "POST_CREATED",
-  "TITLE_CHANGED",
-  "CONTENT_CHANGED",
-  "STATUS_CHANGED",
-  "BOARD_CHANGED",
-  "POST_LOCKED",
-  "POST_UNLOCKED",
-  "POST_ARCHIVED",
-  "POST_UNARCHIVED",
-  "COMMENT_CREATED",
-  "COMMENT_UPDATED",
-  "COMMENT_DELETED",
-]);
-
-export type TPostActivityKind = S.Schema.Type<typeof PostActivityKind>;
+/**
+ * `PostActivityKind` comes from `@feeblo/db/validation-schema/activity-kind` — the canonical
+ * vocabulary the `post_activity.kind` column type is derived from.
+ */
 
 export const PostActivity = S.Struct({
   id: S.String,
