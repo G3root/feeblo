@@ -1,3 +1,4 @@
+import type { InvitableRole } from "@feeblo/permissions";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import {
   createAuthenticatedWorkspace,
@@ -24,7 +25,7 @@ function membersUrl(organizationUrl: string): string {
 async function inviteMember(
   page: Page,
   email: string,
-  role: "admin" | "manager" | "contributor" = "manager",
+  role: InvitableRole = "manager",
   expectSuccess = true
 ) {
   const form = page.locator("form").filter({
