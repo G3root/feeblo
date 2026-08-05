@@ -13,7 +13,7 @@
     "dev": "dotenvx run -f ../../.env -- astro dev --port 3001",
     "dev:bare": "astro dev",
     "generate-types": "wrangler types",
-    "check-types": "astro check",
+    "check-types": "pnpm build:paraglide && pnpm astro check",
     "machine-translate": "inlang machine translate --project project.inlang"
   },
   "dependencies": {
