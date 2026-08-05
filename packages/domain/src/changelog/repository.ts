@@ -98,6 +98,7 @@ const makeChangelogRepository = Effect.gen(function* () {
           publishedAt: schema.changelogTable.publishedAt,
           organizationId: schema.changelogTable.organizationId,
           creatorMemberId: schema.changelogTable.creatorMemberId,
+          coverImage: schema.changelogTable.coverImage,
           creatorId: schema.changelogTable.creatorId,
           createdAt: schema.changelogTable.createdAt,
           updatedAt: schema.changelogTable.updatedAt,

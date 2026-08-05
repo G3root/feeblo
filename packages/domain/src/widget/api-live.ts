@@ -39,8 +39,6 @@ import {
 } from "../rpc-errors";
 import { upsertContactFromParsed } from "./sso";
 
-const UPDATE_IMAGE_SOURCE = /<img[^>]+src=["']([^"']+)["']/i;
-
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   organizationId,
 }: {
@@ -51,15 +49,14 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
 
   return entries.map((entry) => {
     const { sanitizedHtml } = sanitizeMarkdown(entry.content);
-    const imageMatch = sanitizedHtml.match(UPDATE_IMAGE_SOURCE);
-    //TODO IMAGE
+
     return {
       id: entry.id,
       title: entry.title,
       slug: entry.slug,
       content: sanitizedHtml,
-      excerpt: htmlToExcerpt(sanitizedHtml),
-      imageUrl: imageMatch?.[1] ?? null,
+      excerpt: entry.excerpt,
+      imageUrl: entry.coverImage,
       publishedAt: entry.publishedAt ?? entry.createdAt,
     };
   });
