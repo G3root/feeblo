@@ -7,11 +7,6 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { BoardRepository } from "./repository";
 
-type TIsCreator = {
-  organizationId: string;
-  boardId: string;
-};
-
 type TCanCreate = {
   organizationId: string;
   visibility: "PUBLIC" | "PRIVATE";
@@ -32,34 +27,9 @@ const makeBoardPolicy = Effect.gen(function* () {
   const repository = yield* BoardRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
 
-  const isCreator = (args: TIsCreator) =>
-    Policy.policy((user) =>
-      Option.fromNullishOr(
-        user.memberships.find((m) => m.organizationId === args.organizationId)
-      ).pipe(
-        Option.match({
-          onNone: () => Effect.succeed(false),
-          onSome: (membership) =>
-            repository
-              .findById({
-                id: args.boardId,
-                organizationId: args.organizationId,
-                memberId: membership.membershipId,
-              })
-              .pipe(Effect.map(Option.isSome)),
-        })
-      )
-    );
-
-  const isOwner = (args: TIsCreator) =>
-    Policy.any(
-      Policy.canPermission(args.organizationId, "boards.manage"),
-      isCreator(args)
-    );
-
   const canCreate = (args: TCanCreate) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
+      Policy.canPermission(args.organizationId, "boards.create"),
       entitlementPolicy.canCreateBoard({
         ...args,
         boardCount: repository.countByOrganizationId({
@@ -69,15 +39,11 @@ const makeBoardPolicy = Effect.gen(function* () {
     );
 
   const canDelete = (args: TCanDelete) =>
-    Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({ organizationId: args.organizationId, boardId: args.boardId })
-    );
+    Policy.canPermission(args.organizationId, "boards.manage");
 
   const canUpdate = (args: TCanUpdate) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
-      isOwner({ organizationId: args.organizationId, boardId: args.boardId }),
+      Policy.canPermission(args.organizationId, "boards.manage"),
       Effect.gen(function* () {
         if (args.visibility !== "PRIVATE") {
           return;

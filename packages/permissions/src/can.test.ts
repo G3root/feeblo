@@ -5,7 +5,7 @@ import {
   canAll,
   canAny,
   compareRoles,
-  isInvitablerole,
+  isInvitableRole,
   isMember,
   isOwnerOrAdmin,
   isPrivilegedRole,
@@ -50,10 +50,10 @@ describe("roles", () => {
   });
 
   it("only allows inviting admin/manager/contributor", () => {
-    expect(isInvitablerole("admin")).toBe(true);
-    expect(isInvitablerole("manager")).toBe(true);
-    expect(isInvitablerole("contributor")).toBe(true);
-    expect(isInvitablerole("owner")).toBe(false);
+    expect(isInvitableRole("admin")).toBe(true);
+    expect(isInvitableRole("manager")).toBe(true);
+    expect(isInvitableRole("contributor")).toBe(true);
+    expect(isInvitableRole("owner")).toBe(false);
   });
 
   it("guards the role literal", () => {

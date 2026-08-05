@@ -111,6 +111,7 @@ const makeBoardRepository = Effect.gen(function* () {
 
         return boards;
       }),
+
     countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
       db
         .select({ id: schema.boardTable.id })

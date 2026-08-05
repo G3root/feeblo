@@ -28,12 +28,7 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-import {
-  anyPolicy,
-  hasPermission,
-  isUser,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   ArrowRight01Icon,
   Building06Icon,
@@ -210,7 +205,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 }
 
 function CreateBoardButton() {
+  const organizationId = useOrganizationId();
   const store = useCreateBoardDialogContext();
+  // Backend mirror: BoardPolicy.canCreate requires boards.create (manager+).
+  const { allowed: canCreateBoard } = usePolicy(
+    hasPermission(organizationId, "boards.create")
+  );
+
+  if (!canCreateBoard) {
+    return null;
+  }
 
   return (
     <div>
@@ -261,7 +265,6 @@ function BoardList() {
     <SkeletonLoader isLoading={false}>
       {boardQuery.data.map((board) => (
         <BoardItem
-          boardCreatorId={board.creatorId}
           boardPublicId={board.id}
           boardSlug={board.slug}
           key={board.id}
@@ -273,18 +276,12 @@ function BoardList() {
 }
 
 interface BoardItemProp {
-  boardCreatorId?: string | null;
   boardPublicId: string;
   boardSlug: string;
   name: string;
 }
 
-function BoardItem({
-  boardCreatorId,
-  boardPublicId,
-  name,
-  boardSlug,
-}: BoardItemProp) {
+function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
   const organizationId = useOrganizationId();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -306,32 +303,21 @@ function BoardItem({
             </Link>
           )}
         />
-        <BoardMenuWithPolicy
-          boardCreatorId={boardCreatorId}
-          boardPublicId={boardPublicId}
-        />
+        <BoardMenuWithPolicy boardPublicId={boardPublicId} />
       </SidebarMenuItem>
     </SkeletonWrapper>
   );
 }
 
 interface BoardMenuProps {
-  boardCreatorId?: string | null;
   boardPublicId: string;
 }
 
-function BoardMenuWithPolicy({
-  boardPublicId,
-  boardCreatorId,
-}: BoardMenuProps) {
+function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
   const organizationId = useOrganizationId();
-  // Backend mirror: BoardPolicy.canUpdate/canDelete = hasMembership AND
-  // (boards.manage OR board creator).
+
   const { allowed: canManageBoard } = usePolicy(
-    anyPolicy(
-      hasPermission(organizationId, "boards.manage"),
-      isUser(boardCreatorId ?? "")
-    )
+    hasPermission(organizationId, "boards.manage")
   );
   if (!canManageBoard) {
     return null;

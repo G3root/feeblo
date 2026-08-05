@@ -3,7 +3,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, queryOnce } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -15,7 +15,9 @@ export const useChangelogAction = () => {
   const organizationId = useOrganizationId();
   const { changelogCollection, membersCollection } = useDashboardCollections();
   const { data: session } = useAuthState();
-  const { allowed: canCreate } = usePolicy(hasMembership(organizationId));
+  const { allowed: canCreate } = usePolicy(
+    hasPermission(organizationId, "changelog.create")
+  );
 
   const createChangeLog = async () => {
     if (!canCreate) {
