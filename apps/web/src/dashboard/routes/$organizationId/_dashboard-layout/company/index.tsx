@@ -7,7 +7,11 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  anyPolicy,
+  hasPermission,
+  PolicyGuard,
+} from "@feeblo/web-shared/use-policy";
 import {
   Building02Icon,
   Delete02Icon,
@@ -98,17 +102,6 @@ function CompanyPage() {
   const definitions = definitionsQuery.data ?? [];
 
   const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
-  // Backend mirrors: CompanyPolicy.canCreate requires companies.create,
-  // canUpdate requires companies.update, canDelete requires companies.*.
-  const { allowed: canCreate } = usePolicy(
-    hasPermission(organizationId, "companies.create")
-  );
-  const { allowed: canUpdate } = usePolicy(
-    hasPermission(organizationId, "companies.update")
-  );
-  const { allowed: canManage } = usePolicy(
-    hasPermission(organizationId, "companies.*")
-  );
 
   if (!companiesQuery.isLoading && companies.length === 0) {
     return (
@@ -124,12 +117,20 @@ function CompanyPage() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            {canCreate ? (
-              <Button onClick={openCreateDialog} type="button">
-                <HugeiconsIcon icon={Building02Icon} />
-                Create company
-              </Button>
-            ) : null}
+            <PolicyGuard
+              policy={hasPermission(organizationId, "companies.create")}
+            >
+              {({ allowed }) => (
+                <Button
+                  disabled={!allowed}
+                  onClick={openCreateDialog}
+                  type="button"
+                >
+                  <HugeiconsIcon icon={Building02Icon} />
+                  Create company
+                </Button>
+              )}
+            </PolicyGuard>
           </EmptyContent>
         </Empty>
       </div>
@@ -139,12 +140,18 @@ function CompanyPage() {
   return (
     <div className="p-3">
       <div className="mb-3 flex justify-end">
-        {canCreate ? (
-          <Button onClick={openCreateDialog} type="button">
-            <HugeiconsIcon icon={Building02Icon} />
-            Create company
-          </Button>
-        ) : null}
+        <PolicyGuard policy={hasPermission(organizationId, "companies.create")}>
+          {({ allowed }) => (
+            <Button
+              disabled={!allowed}
+              onClick={openCreateDialog}
+              type="button"
+            >
+              <HugeiconsIcon icon={Building02Icon} />
+              Create company
+            </Button>
+          )}
+        </PolicyGuard>
       </div>
       <Table>
         <TableHeader>
@@ -174,58 +181,83 @@ function CompanyPage() {
                 companyId={company.id}
                 definitions={definitions}
               />
-              <TableCell>
-                {canUpdate || canManage ? (
-                  <Menu>
-                    <MenuTrigger
-                      render={(triggerProps) => (
-                        <Button
-                          {...triggerProps}
-                          size="icon-sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <HugeiconsIcon icon={Ellipsis} />
-                          <span className="sr-only">
-                            Open actions for {company.name}
-                          </span>
-                        </Button>
-                      )}
-                    />
-                    <MenuPopup align="end" className="w-40">
-                      {canUpdate ? (
-                        <MenuItem
-                          onClick={() =>
-                            editDialogStore.send({
-                              type: "toggle",
-                              data: { companyId: company.id },
-                            })
-                          }
-                        >
-                          <HugeiconsIcon
-                            className="text-muted-foreground"
-                            icon={Edit}
-                          />
-                          <span>Edit</span>
-                        </MenuItem>
-                      ) : null}
-                      {canManage ? (
-                        <MenuItem
-                          onClick={() =>
-                            deleteDialogStore.send({
-                              type: "toggle",
-                              data: { companyId: company.id },
-                            })
-                          }
-                          variant="destructive"
-                        >
-                          <HugeiconsIcon icon={Delete02Icon} />
-                          <span>Delete</span>
-                        </MenuItem>
-                      ) : null}
-                    </MenuPopup>
-                  </Menu>
-                ) : null}
+              <TableCell className="text-right">
+                <PolicyGuard
+                  policy={anyPolicy(
+                    hasPermission(organizationId, "companies.update"),
+                    hasPermission(organizationId, "companies.*")
+                  )}
+                >
+                  {({ allowed: canUseAnyAction }) =>
+                    canUseAnyAction ? (
+                      <Menu>
+                        <MenuTrigger
+                          render={(triggerProps) => (
+                            <Button
+                              {...triggerProps}
+                              size="icon-sm"
+                              type="button"
+                              variant="ghost"
+                            >
+                              <HugeiconsIcon icon={Ellipsis} />
+                              <span className="sr-only">
+                                Open actions for {company.name}
+                              </span>
+                            </Button>
+                          )}
+                        />
+                        <MenuPopup align="end" className="w-40">
+                          <PolicyGuard
+                            policy={hasPermission(
+                              organizationId,
+                              "companies.update"
+                            )}
+                          >
+                            {({ allowed }) => (
+                              <MenuItem
+                                disabled={!allowed}
+                                onClick={() =>
+                                  editDialogStore.send({
+                                    type: "toggle",
+                                    data: { companyId: company.id },
+                                  })
+                                }
+                              >
+                                <HugeiconsIcon
+                                  className="text-muted-foreground"
+                                  icon={Edit}
+                                />
+                                <span>Edit</span>
+                              </MenuItem>
+                            )}
+                          </PolicyGuard>
+                          <PolicyGuard
+                            policy={hasPermission(
+                              organizationId,
+                              "companies.*"
+                            )}
+                          >
+                            {({ allowed }) => (
+                              <MenuItem
+                                disabled={!allowed}
+                                onClick={() =>
+                                  deleteDialogStore.send({
+                                    type: "toggle",
+                                    data: { companyId: company.id },
+                                  })
+                                }
+                                variant="destructive"
+                              >
+                                <HugeiconsIcon icon={Delete02Icon} />
+                                <span>Delete</span>
+                              </MenuItem>
+                            )}
+                          </PolicyGuard>
+                        </MenuPopup>
+                      </Menu>
+                    ) : null
+                  }
+                </PolicyGuard>
               </TableCell>
             </TableRow>
           ))}

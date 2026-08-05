@@ -308,7 +308,7 @@ function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
             </Link>
           )}
         />
-        <BoardMenuWithPolicy boardPublicId={boardPublicId} />
+        <BoardMenu boardPublicId={boardPublicId} />
       </SidebarMenuItem>
     </SkeletonWrapper>
   );
@@ -318,31 +318,20 @@ interface BoardMenuProps {
   boardPublicId: string;
 }
 
-function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
+function BoardMenu({ boardPublicId }: BoardMenuProps) {
+  const { isMobile } = useSidebar();
   const organizationId = useOrganizationId();
 
-  // Backend mirror: BoardPolicy.canUpdate requires boards.update,
-  // BoardPolicy.canDelete requires boards.delete. The menu (rename/delete)
-  // needs either one, so gate on the explicit actions instead of boards.*.
   const { allowed: canManageBoard } = usePolicy(
     anyPolicy(
       hasPermission(organizationId, "boards.update"),
       hasPermission(organizationId, "boards.delete")
     )
   );
-  if (!canManageBoard) {
-    return null;
-  }
-  return <BoardMenu boardPublicId={boardPublicId} />;
-}
-
-function BoardMenu({ boardPublicId }: BoardMenuProps) {
-  const { isMobile } = useSidebar();
-  const organizationId = useOrganizationId();
-
   return (
     <Menu>
       <MenuTrigger
+        disabled={!canManageBoard}
         render={(props) => (
           <SidebarMenuAction {...props} className="mr-2" showOnHover>
             <HugeiconsIcon icon={Ellipsis} />
@@ -357,24 +346,41 @@ function BoardMenu({ boardPublicId }: BoardMenuProps) {
         side={isMobile ? "bottom" : "right"}
       >
         <PolicyGuard policy={hasPermission(organizationId, "boards.update")}>
-          <RenameBoardButton boardPublicId={boardPublicId} />
+          {({ allowed }) => (
+            <RenameBoardButton
+              boardPublicId={boardPublicId}
+              disabled={!allowed}
+            />
+          )}
         </PolicyGuard>
 
         <MenuSeparator />
 
         <PolicyGuard policy={hasPermission(organizationId, "boards.delete")}>
-          <DeleteBoardButton boardPublicId={boardPublicId} />
+          {({ allowed }) => (
+            <DeleteBoardButton
+              boardPublicId={boardPublicId}
+              disabled={!allowed}
+            />
+          )}
         </PolicyGuard>
       </MenuPopup>
     </Menu>
   );
 }
 
-const DeleteBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
+const DeleteBoardButton = ({
+  boardPublicId,
+  disabled = false,
+}: {
+  boardPublicId: string;
+  disabled?: boolean;
+}) => {
   const store = useDeleteBoardDialogContext();
 
   return (
     <MenuItem
+      disabled={disabled}
       onClick={() =>
         store.send({ type: "toggle", data: { boardId: boardPublicId } })
       }
@@ -385,10 +391,17 @@ const DeleteBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
   );
 };
 
-const RenameBoardButton = ({ boardPublicId }: { boardPublicId: string }) => {
+const RenameBoardButton = ({
+  boardPublicId,
+  disabled = false,
+}: {
+  boardPublicId: string;
+  disabled?: boolean;
+}) => {
   const store = useRenameBoardDialogContext();
   return (
     <MenuItem
+      disabled={disabled}
       onClick={() =>
         store.send({ type: "toggle", data: { boardId: boardPublicId } })
       }

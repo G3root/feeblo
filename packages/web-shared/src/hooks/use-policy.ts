@@ -76,6 +76,17 @@ export const hasOwnerOrAdminRole = (organizationId: string): ClientPolicy =>
 /**
  * Conditionally renders children based on a policy evaluation.
  * Frontend mirror of `withPolicy` from `packages/domain/src/policy.ts`.
+ *
+ * Pass a render prop to render an action in a disabled state instead of
+ * hiding it (delete buttons, action menu items, etc.):
+ *
+ * ```tsx
+ * <PolicyGuard policy={hasPermission(organizationId, "boards.delete")}>
+ *   {({ allowed }) => (
+ *     <MenuItem disabled={!allowed} onClick={handleDelete}>Delete</MenuItem>
+ *   )}
+ * </PolicyGuard>
+ * ```
  */
 export function PolicyGuard({
   policy,
@@ -86,9 +97,16 @@ export function PolicyGuard({
   policy: ClientPolicy;
   fallback?: ReactNode;
   pending?: ReactNode;
-  children: ReactNode;
+  children: ReactNode | ((result: { allowed: boolean }) => ReactNode);
 }): ReactNode {
   const { allowed, isPending } = usePolicy(policy);
+
+  if (typeof children === "function") {
+    if (isPending) {
+      return children({ allowed: false });
+    }
+    return children({ allowed });
+  }
 
   if (isPending) {
     return pending;

@@ -9,7 +9,8 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@feeblo/ui/sidebar";
-import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
   Building03Icon,
@@ -122,6 +123,7 @@ export function SettingsSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const organizationId = useOrganizationId();
+  const { data: session } = useAuthState();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -154,42 +156,43 @@ export function SettingsSidebar({
               <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
               <SidebarMenu>
                 {group.subItems.map((item) => {
-                  const menuItem = (
-                    <SidebarMenuItem>
+                  const permission =
+                    "permission" in item ? item.permission : undefined;
+                  const canAccess =
+                    permission === undefined ||
+                    (session != null &&
+                      hasPermission(organizationId, permission)(session));
+
+                  return (
+                    <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton
                         isActive={
                           pathname ===
                           `/${organizationId}/settings/${item.to.split("/").slice(3)}`
                         }
-                        render={(renderProps) => (
-                          <Link
-                            {...renderProps}
-                            params={{ organizationId }}
-                            to={item.to}
-                          >
-                            <HugeiconsIcon icon={item.icon} />
-                            <span>{item.label}</span>
-                          </Link>
-                        )}
+                        render={(renderProps) =>
+                          canAccess ? (
+                            <Link
+                              {...renderProps}
+                              params={{ organizationId }}
+                              to={item.to}
+                            >
+                              <HugeiconsIcon icon={item.icon} />
+                              <span>{item.label}</span>
+                            </Link>
+                          ) : (
+                            <span
+                              {...renderProps}
+                              aria-disabled="true"
+                              title="You don't have permission to access this setting."
+                            >
+                              <HugeiconsIcon icon={item.icon} />
+                              <span>{item.label}</span>
+                            </span>
+                          )
+                        }
                       />
                     </SidebarMenuItem>
-                  );
-
-                  return (
-                    <Fragment key={item.to}>
-                      {"permission" in item && item.permission ? (
-                        <PolicyGuard
-                          policy={hasPermission(
-                            organizationId,
-                            item.permission
-                          )}
-                        >
-                          {menuItem}
-                        </PolicyGuard>
-                      ) : (
-                        menuItem
-                      )}
-                    </Fragment>
                   );
                 })}
               </SidebarMenu>

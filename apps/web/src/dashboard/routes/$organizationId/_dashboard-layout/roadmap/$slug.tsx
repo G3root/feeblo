@@ -1,6 +1,6 @@
 import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
 import { Button } from "@feeblo/ui/button";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Edit01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -173,9 +173,6 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
   const createStore = useCreateRoadmapDialogContext();
   const deleteStore = useDeleteRoadmapDialogContext();
   const editStore = useEditRoadmapDialogContext();
-  const { allowed: canManage } = usePolicy(
-    hasPermission(organizationId, "roadmap.*")
-  );
 
   const handleDeleteClick = () => {
     deleteStore.send({ type: "toggle", data: { roadmapId } });
@@ -185,37 +182,40 @@ function RoadmapDetailActions({ roadmapId }: { roadmapId: string }) {
     editStore.send({ type: "toggle", data: { roadmapId } });
   };
 
-  if (!canManage) {
-    return null;
-  }
-
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      <Button
-        onClick={() => createStore.send({ type: "toggle" })}
-        size="sm"
-        variant="default"
-      >
-        <HugeiconsIcon icon={Plus} />
-        New Roadmap
-      </Button>
-      <Button
-        aria-label="Edit roadmap"
-        onClick={handleEditClick}
-        size="icon-sm"
-        variant="outline"
-      >
-        <HugeiconsIcon icon={Edit01Icon} />
-      </Button>
-      <Button
-        aria-label="Delete roadmap"
-        onClick={handleDeleteClick}
-        size="icon-sm"
-        variant="destructive-outline"
-      >
-        <HugeiconsIcon icon={Delete02Icon} />
-      </Button>
-    </div>
+    <PolicyGuard policy={hasPermission(organizationId, "roadmap.*")}>
+      {({ allowed }) => (
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            disabled={!allowed}
+            onClick={() => createStore.send({ type: "toggle" })}
+            size="sm"
+            variant="default"
+          >
+            <HugeiconsIcon icon={Plus} />
+            New Roadmap
+          </Button>
+          <Button
+            aria-label="Edit roadmap"
+            disabled={!allowed}
+            onClick={handleEditClick}
+            size="icon-sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Edit01Icon} />
+          </Button>
+          <Button
+            aria-label="Delete roadmap"
+            disabled={!allowed}
+            onClick={handleDeleteClick}
+            size="icon-sm"
+            variant="destructive-outline"
+          >
+            <HugeiconsIcon icon={Delete02Icon} />
+          </Button>
+        </div>
+      )}
+    </PolicyGuard>
   );
 }
 

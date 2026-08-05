@@ -32,8 +32,8 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
-  hasPermission,
   hasOwnerOrAdminRole,
+  hasPermission,
   PolicyGuard,
 } from "@feeblo/web-shared/use-policy";
 import { Delete02Icon, Plus, Search01Icon } from "@hugeicons/core-free-icons";
@@ -474,80 +474,98 @@ function MemberListItem({
 
       <div className="flex items-center gap-2">
         <PolicyGuard policy={hasPermission(organizationId, "members.assign")}>
-          <Select
-            onValueChange={async (value) => {
-              if (!value) {
-                throw new Error("value not found");
-              }
-              const tx = membersCollection.update(id, (draft) => {
-                draft.role = value as Role;
-              });
-              try {
-                await tx.isPersisted.promise;
-                trackEvent("org_member_role_changed", {
-                  role: value,
-                  success: true,
+          {({ allowed }) => (
+            <Select
+              onValueChange={async (value) => {
+                if (!value) {
+                  throw new Error("value not found");
+                }
+                const tx = membersCollection.update(id, (draft) => {
+                  draft.role = value as Role;
                 });
-                toastManager.add({
-                  title: "Member role updated",
-                  type: "success",
-                });
-              } catch (_error) {
-                trackEvent("org_member_role_changed", {
-                  role: value,
-                  success: false,
-                });
-                toastManager.add({
-                  title: "Failed to update role",
-                  type: "error",
-                });
-              }
-            }}
-            value={role}
-          >
-            <SelectTrigger className="w-28" disabled={!canManageTarget}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectPopup>
-              {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
-              <SelectItem value="manager">Manager</SelectItem>
-              <SelectItem value="contributor">Contributor</SelectItem>
-              <SelectItem
-                disabled={atPrivilegedLimit && role !== "admin"}
-                value="admin"
+                try {
+                  await tx.isPersisted.promise;
+                  trackEvent("org_member_role_changed", {
+                    role: value,
+                    success: true,
+                  });
+                  toastManager.add({
+                    title: "Member role updated",
+                    type: "success",
+                  });
+                } catch (_error) {
+                  trackEvent("org_member_role_changed", {
+                    role: value,
+                    success: false,
+                  });
+                  toastManager.add({
+                    title: "Failed to update role",
+                    type: "error",
+                  });
+                }
+              }}
+              value={role}
+            >
+              <SelectTrigger
+                className="w-28"
+                disabled={!(allowed && canManageTarget)}
+                title={
+                  allowed
+                    ? undefined
+                    : "You don't have permission to change roles"
+                }
               >
-                Admin
-              </SelectItem>
-            </SelectPopup>
-          </Select>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectPopup>
+                {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="contributor">Contributor</SelectItem>
+                <SelectItem
+                  disabled={atPrivilegedLimit && role !== "admin"}
+                  value="admin"
+                >
+                  Admin
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          )}
         </PolicyGuard>
 
         <PolicyGuard policy={hasPermission(organizationId, "members.remove")}>
-          <Button
-            disabled={!canManageTarget || isCurrentUser}
-            onClick={async () => {
-              const tx = membersCollection.delete(id);
-              try {
-                await tx.isPersisted.promise;
-                trackEvent("org_member_removed", { success: true });
-                toastManager.add({
-                  title: "Member removed",
-                  type: "success",
-                });
-              } catch (_error) {
-                trackEvent("org_member_removed", { success: false });
-                toastManager.add({
-                  title: "Failed to remove member",
-                  type: "error",
-                });
+          {({ allowed }) => (
+            <Button
+              aria-label={`Remove ${name}`}
+              disabled={!(allowed && canManageTarget) || isCurrentUser}
+              onClick={async () => {
+                const tx = membersCollection.delete(id);
+                try {
+                  await tx.isPersisted.promise;
+                  trackEvent("org_member_removed", { success: true });
+                  toastManager.add({
+                    title: "Member removed",
+                    type: "success",
+                  });
+                } catch (_error) {
+                  trackEvent("org_member_removed", { success: false });
+                  toastManager.add({
+                    title: "Failed to remove member",
+                    type: "error",
+                  });
+                }
+              }}
+              size="icon-sm"
+              title={
+                allowed
+                  ? undefined
+                  : "You don't have permission to remove members"
               }
-            }}
-            size="icon-sm"
-            type="button"
-            variant="destructive"
-          >
-            <HugeiconsIcon icon={Delete02Icon} />
-          </Button>
+              type="button"
+              variant="destructive"
+            >
+              <HugeiconsIcon icon={Delete02Icon} />
+            </Button>
+          )}
         </PolicyGuard>
       </div>
     </div>
@@ -608,30 +626,33 @@ function InvitationListItem({
       </div>
 
       <PolicyGuard policy={hasOwnerOrAdminRole(organizationId)}>
-        <Button
-          onClick={async () => {
-            const tx = invitationsCollection.delete(id);
-            try {
-              await tx.isPersisted.promise;
-              trackEvent("org_invitation_revoked", { success: true });
-              toastManager.add({
-                title: "Invitation revoked",
-                type: "success",
-              });
-            } catch (_error) {
-              trackEvent("org_invitation_revoked", { success: false });
-              toastManager.add({
-                title: "Failed to revoke invitation",
-                type: "error",
-              });
-            }
-          }}
-          size="icon-sm"
-          type="button"
-          variant="destructive"
-        >
-          <HugeiconsIcon icon={Delete02Icon} />
-        </Button>
+        {({ allowed }) => (
+          <Button
+            disabled={!allowed}
+            onClick={async () => {
+              const tx = invitationsCollection.delete(id);
+              try {
+                await tx.isPersisted.promise;
+                trackEvent("org_invitation_revoked", { success: true });
+                toastManager.add({
+                  title: "Invitation revoked",
+                  type: "success",
+                });
+              } catch (_error) {
+                trackEvent("org_invitation_revoked", { success: false });
+                toastManager.add({
+                  title: "Failed to revoke invitation",
+                  type: "error",
+                });
+              }
+            }}
+            size="icon-sm"
+            type="button"
+            variant="destructive"
+          >
+            <HugeiconsIcon icon={Delete02Icon} />
+          </Button>
+        )}
       </PolicyGuard>
     </div>
   );

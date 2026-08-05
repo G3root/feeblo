@@ -1,12 +1,7 @@
 import { usePostDeleteDialogContext } from "@feeblo/post-ui/dialog-stores";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { Button, buttonVariants } from "@feeblo/ui/button";
-import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { cn } from "@feeblo/ui/utils";
 import {
   ArrowLeft01Icon,
@@ -37,36 +32,35 @@ export function PostPageActions() {
         <HugeiconsIcon icon={ArrowLeft01Icon} />
       </Link>
 
-      {canDeletePost ? (
-        <Menu>
-          <MenuTrigger
-            render={(props) => (
-              <Button
-                {...props}
-                aria-label="More actions"
-                size="icon-sm"
-                variant="outline"
-              >
-                <HugeiconsIcon icon={Ellipsis} />
-              </Button>
-            )}
-          />
-          <MenuPopup align="start" className="w-40">
-            <MenuItem
-              onClick={() =>
-                store.send({
-                  type: "toggle",
-                  data: { postId, redirectOptions: { to: "/" } },
-                })
-              }
-              variant="destructive"
+      <Menu>
+        <MenuTrigger
+          render={(props) => (
+            <Button
+              {...props}
+              aria-label="More actions"
+              size="icon-sm"
+              variant="outline"
             >
-              <HugeiconsIcon icon={Delete02Icon} />
-              <span>Delete</span>
-            </MenuItem>
-          </MenuPopup>
-        </Menu>
-      ) : null}
+              <HugeiconsIcon icon={Ellipsis} />
+            </Button>
+          )}
+        />
+        <MenuPopup align="start" className="w-40">
+          <MenuItem
+            disabled={!canDeletePost}
+            onClick={() =>
+              store.send({
+                type: "toggle",
+                data: { postId, redirectOptions: { to: "/" } },
+              })
+            }
+            variant="destructive"
+          >
+            <HugeiconsIcon icon={Delete02Icon} />
+            <span>Delete</span>
+          </MenuItem>
+        </MenuPopup>
+      </Menu>
     </div>
   );
 }

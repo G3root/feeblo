@@ -86,9 +86,7 @@ export function TagSelect({
               aria-label="Add tags"
               placeholder="Add tags..."
               size="sm"
-              startAddon={
-                <HugeiconsIcon icon={Search01Icon} strokeWidth={2} />
-              }
+              startAddon={<HugeiconsIcon icon={Search01Icon} strokeWidth={2} />}
             />
             <ComboboxPopup aria-label="Select tags">
               <ComboboxEmpty>No tags found.</ComboboxEmpty>
@@ -105,19 +103,20 @@ export function TagSelect({
             </ComboboxPopup>
           </Combobox>
         </div>
-        {canCreate ? (
-          <Button
-            aria-label="Create tag"
-            disabled={disabled}
-            onClick={() =>
-              createDialogStore.send({ type: "toggle", data: { type } })
-            }
-            size="icon-sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={PlusSignIcon} />
-          </Button>
-        ) : null}
+        <Button
+          aria-label="Create tag"
+          disabled={disabled || !canCreate}
+          onClick={() =>
+            createDialogStore.send({ type: "toggle", data: { type } })
+          }
+          size="icon-sm"
+          title={
+            canCreate ? undefined : "You don't have permission to create tags"
+          }
+          variant="outline"
+        >
+          <HugeiconsIcon icon={PlusSignIcon} />
+        </Button>
       </div>
 
       {selected.length > 0 ? (

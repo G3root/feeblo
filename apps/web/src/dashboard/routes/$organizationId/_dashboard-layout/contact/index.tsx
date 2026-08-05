@@ -16,7 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  anyPolicy,
+  type ClientPolicy,
+  hasPermission,
+  PolicyGuard,
+} from "@feeblo/web-shared/use-policy";
 import {
   ArrowUpRight01Icon,
   Delete02Icon,
@@ -126,17 +131,6 @@ function ContactPage() {
   const companiesById = new Map(companies.map((c) => [c.id, c]));
 
   const openCreateDialog = () => createDialogStore.send({ type: "toggle" });
-  // Backend mirrors: ContactPolicy.canCreate requires contacts.create,
-  // canUpdate requires contacts.update, canDelete requires contacts.*.
-  const { allowed: canCreate } = usePolicy(
-    hasPermission(organizationId, "contacts.create")
-  );
-  const { allowed: canUpdate } = usePolicy(
-    hasPermission(organizationId, "contacts.update")
-  );
-  const { allowed: canManage } = usePolicy(
-    hasPermission(organizationId, "contacts.*")
-  );
 
   if (!contactsQuery.isLoading && contacts.length === 0) {
     return (
@@ -152,12 +146,20 @@ function ContactPage() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            {canCreate ? (
-              <Button onClick={openCreateDialog} type="button">
-                <HugeiconsIcon icon={UserAdd01Icon} />
-                Create contact
-              </Button>
-            ) : null}
+            <PolicyGuard
+              policy={hasPermission(organizationId, "contacts.create")}
+            >
+              {({ allowed }) => (
+                <Button
+                  disabled={!allowed}
+                  onClick={openCreateDialog}
+                  type="button"
+                >
+                  <HugeiconsIcon icon={UserAdd01Icon} />
+                  Create contact
+                </Button>
+              )}
+            </PolicyGuard>
           </EmptyContent>
         </Empty>
       </div>
@@ -167,12 +169,18 @@ function ContactPage() {
   return (
     <div className="p-3">
       <div className="mb-3 flex justify-end">
-        {canCreate ? (
-          <Button onClick={openCreateDialog} type="button">
-            <HugeiconsIcon icon={UserAdd01Icon} />
-            Create contact
-          </Button>
-        ) : null}
+        <PolicyGuard policy={hasPermission(organizationId, "contacts.create")}>
+          {({ allowed }) => (
+            <Button
+              disabled={!allowed}
+              onClick={openCreateDialog}
+              type="button"
+            >
+              <HugeiconsIcon icon={UserAdd01Icon} />
+              Create contact
+            </Button>
+          )}
+        </PolicyGuard>
       </div>
       <Table>
         <TableHeader>
@@ -195,8 +203,6 @@ function ContactPage() {
         <TableBody>
           {contacts.map((contact) => (
             <ContactTableRow
-              canManage={canManage}
-              canUpdate={canUpdate}
               company={
                 contact.companyId
                   ? companiesById.get(contact.companyId)
@@ -205,6 +211,7 @@ function ContactPage() {
               contact={contact}
               definitions={definitions}
               key={contact.id}
+              managePolicy={hasPermission(organizationId, "contacts.*")}
               onCompanyClick={(companyId) =>
                 companyEditDialogStore.send({
                   type: "toggle",
@@ -223,6 +230,7 @@ function ContactPage() {
                   data: { contactId: contact.id },
                 })
               }
+              updatePolicy={hasPermission(organizationId, "contacts.update")}
             />
           ))}
         </TableBody>
@@ -232,17 +240,15 @@ function ContactPage() {
 }
 
 function ContactTableRow({
-  canManage,
-  canUpdate,
   company,
   contact,
   definitions,
+  managePolicy,
   onCompanyClick,
   onDelete,
   onEdit,
+  updatePolicy,
 }: {
-  canManage: boolean;
-  canUpdate: boolean;
   company?: { id: string; name: string };
   contact: {
     companyId: string | null;
@@ -255,9 +261,11 @@ function ContactTableRow({
     updatedAt: Date;
   };
   definitions: readonly CustomAttributeDefinition[];
+  managePolicy: ClientPolicy;
   onCompanyClick: (companyId: string) => void;
   onDelete: () => void;
   onEdit: () => void;
+  updatePolicy: ClientPolicy;
 }) {
   const { contactAttributeValueCollection } = useDashboardCollections();
   const { data: values = [] } = useLiveQuery(
@@ -300,42 +308,54 @@ function ContactTableRow({
       ))}
       <TableCell>{formatDate(contact.updatedAt)}</TableCell>
       <TableCell className="text-right">
-        {canUpdate || canManage ? (
-          <Menu>
-            <MenuTrigger
-              render={(triggerProps) => (
-                <Button
-                  {...triggerProps}
-                  size="icon-sm"
-                  type="button"
-                  variant="ghost"
-                >
-                  <HugeiconsIcon icon={Ellipsis} />
-                  <span className="sr-only">
-                    Open actions for {contact.name ?? "contact"}
-                  </span>
-                </Button>
-              )}
-            />
-            <MenuPopup align="end" className="w-40">
-              {canUpdate ? (
-                <MenuItem onClick={onEdit}>
-                  <HugeiconsIcon
-                    className="text-muted-foreground"
-                    icon={Edit}
-                  />
-                  <span>Edit</span>
-                </MenuItem>
-              ) : null}
-              {canManage ? (
-                <MenuItem onClick={onDelete} variant="destructive">
-                  <HugeiconsIcon icon={Delete02Icon} />
-                  <span>Delete</span>
-                </MenuItem>
-              ) : null}
-            </MenuPopup>
-          </Menu>
-        ) : null}
+        <PolicyGuard policy={anyPolicy(updatePolicy, managePolicy)}>
+          {({ allowed: canUseAnyAction }) =>
+            canUseAnyAction ? (
+              <Menu>
+                <MenuTrigger
+                  render={(triggerProps) => (
+                    <Button
+                      {...triggerProps}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <HugeiconsIcon icon={Ellipsis} />
+                      <span className="sr-only">
+                        Open actions for {contact.name ?? "contact"}
+                      </span>
+                    </Button>
+                  )}
+                />
+                <MenuPopup align="end" className="w-40">
+                  <PolicyGuard policy={updatePolicy}>
+                    {({ allowed }) => (
+                      <MenuItem disabled={!allowed} onClick={onEdit}>
+                        <HugeiconsIcon
+                          className="text-muted-foreground"
+                          icon={Edit}
+                        />
+                        <span>Edit</span>
+                      </MenuItem>
+                    )}
+                  </PolicyGuard>
+                  <PolicyGuard policy={managePolicy}>
+                    {({ allowed }) => (
+                      <MenuItem
+                        disabled={!allowed}
+                        onClick={onDelete}
+                        variant="destructive"
+                      >
+                        <HugeiconsIcon icon={Delete02Icon} />
+                        <span>Delete</span>
+                      </MenuItem>
+                    )}
+                  </PolicyGuard>
+                </MenuPopup>
+              </Menu>
+            ) : null
+          }
+        </PolicyGuard>
       </TableCell>
     </TableRow>
   );
