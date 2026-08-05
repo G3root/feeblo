@@ -1,5 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
-import { isPrivilegedRole } from "@feeblo/permissions";
+import { can } from "@feeblo/permissions";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -38,12 +38,14 @@ export const OrganizationApiLive = HttpApiBuilder.group(
       ({ payload: { file, organizationId } }) => {
         return Effect.gen(function* () {
           const session = yield* currentHttpApiSession;
-          const repository = yield* OrganizationRepository;
-          const membership = yield* repository.findMemberRole({
+          // Explicit permission gate (same `can()` as Policy.canPermission):
+          // workspace management is the `workspace.update` grant, which is
+          // exactly the roles `isPrivilegedRole` used to hardcode.
+          const canManageOrganization = can(
+            session,
             organizationId,
-            userId: session.session.userId,
-          });
-          const canManageOrganization = isPrivilegedRole(membership?.role);
+            "workspace.update"
+          );
 
           if (!canManageOrganization) {
             return yield* new UnauthorizedError({

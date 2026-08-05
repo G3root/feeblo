@@ -18,6 +18,7 @@ import {
   roleAtLeast,
   roleGrants,
   roleIn,
+  ROLES,
 } from "./index";
 
 const ctx = (
@@ -49,6 +50,14 @@ describe("roles", () => {
     expect(isPrivilegedRole("manager")).toBe(false);
     expect(isPrivilegedRole("contributor")).toBe(false);
     expect(isPrivilegedRole("moderator")).toBe(false);
+
+    // Privilege is derived from the workspace.update grant, not a hardcoded
+    // role list — this invariant pins that equivalence for every role.
+    for (const role of ROLES) {
+      expect(isPrivilegedRole(role)).toBe(
+        roleGrants(role, "workspace.update")
+      );
+    }
   });
 
   it("only allows inviting admin/manager/contributor", () => {
@@ -83,8 +92,10 @@ describe("role permissions", () => {
     );
   });
 
-  it("does not add named permissions to contributors", () => {
-    expect(permissionsForRole("contributor")).toHaveLength(0);
+  it("only grants contributors the cross-post move permission", () => {
+    expect([...permissionsForRole("contributor")]).toEqual(["posts.move"]);
+    expect(roleGrants("contributor", "posts.move")).toBe(true);
+    expect(roleGrants("contributor", "posts.status")).toBe(false);
   });
 
   it("grants resource wildcards to managers and above", () => {
@@ -101,12 +112,14 @@ describe("role permissions", () => {
       expect(roleGrants(role, "contacts.create")).toBe(true);
       expect(roleGrants(role, "companies.update")).toBe(true);
     }
-    expect(roleGrants("owner", "boards.create")).toBe(true);
     expect(roleGrants("owner", "boards.*")).toBe(true);
-    expect(roleGrants("admin", "boards.create")).toBe(true);
     expect(roleGrants("admin", "boards.*")).toBe(true);
-    expect(roleGrants("manager", "boards.create")).toBe(false);
-    expect(roleGrants("contributor", "boards.create")).toBe(false);
+    for (const action of ["create", "update", "delete"] as const) {
+      expect(roleGrants("owner", `boards.${action}`)).toBe(true);
+      expect(roleGrants("admin", `boards.${action}`)).toBe(true);
+      expect(roleGrants("manager", `boards.${action}`)).toBe(false);
+      expect(roleGrants("contributor", `boards.${action}`)).toBe(false);
+    }
     expect(roleGrants("contributor", "changelog.create")).toBe(false);
     expect(roleGrants("contributor", "tags.create")).toBe(false);
     expect(roleGrants("contributor", "contacts.create")).toBe(false);
@@ -119,12 +132,12 @@ describe("role permissions", () => {
     expect(roleGrants("contributor", "workspace.update")).toBe(false);
   });
 
-  it("grants organization deletion only to owner", () => {
+  it("grants organization deletion to admin and owner", () => {
     expect(roleGrants("owner", "workspace.delete")).toBe(true);
-    expect(roleGrants("admin", "workspace.delete")).toBe(false);
+    expect(roleGrants("admin", "workspace.delete")).toBe(true);
   });
 
-  it("gives admin and owner the same permissions except deletion", () => {
+  it("gives admin and owner identical effective permissions", () => {
     const admin = permissionsForRole("admin");
     expect(admin.has("posts.*")).toBe(true);
     expect(admin.has("comments.*")).toBe(true);
@@ -132,8 +145,7 @@ describe("role permissions", () => {
     expect(admin.has("billing.*")).toBe(true);
 
     const owner = permissionsForRole("owner");
-    expect([...owner].filter((permission) => permission !== "workspace.delete"))
-      .toEqual([...admin]);
+    expect([...owner]).toEqual([...admin]);
     expect(owner.has("workspace.delete")).toBe(true);
   });
 });
@@ -183,10 +195,10 @@ describe("can()", () => {
     }
   });
 
-  it("recognizes contributors as members without named permissions", () => {
+  it("recognizes contributors as members with their limited move permission", () => {
     const session = ctx([[org, "contributor"]]);
     expect(isMember(session, org)).toBe(true);
-    expect(permissionsForRole("contributor")).toHaveLength(0);
+    expect([...permissionsForRole("contributor")]).toEqual(["posts.move"]);
   });
 
   it("allows managers to run content operations contributors cannot", () => {
@@ -220,7 +232,7 @@ describe("can()", () => {
       true
     );
     expect(canAll(session, org, ["posts.*", "workspace.delete"])).toBe(
-      false
+      true
     );
   });
 

@@ -26,7 +26,7 @@ export const ORGANIZATION_ROLES = {
     ac: ["create", "read", "update", "delete"],
   }),
   admin: organizationAccessControl.newRole({
-    organization: ["update"],
+    organization: ["update", "delete"],
     member: ["create", "update", "delete"],
     invitation: ["create", "cancel"],
     team: ["create", "update", "delete"],

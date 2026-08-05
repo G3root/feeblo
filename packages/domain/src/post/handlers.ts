@@ -572,10 +572,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     PostUpdate: (args: TPostUpdate) =>
       updatePostEffect(args).pipe(
         Policy.withPolicy(
-          postPolicy.canUpdate({
+          postPolicy.canUpdateProperties({
             organizationId: args.organizationId,
             postId: args.id,
             boardId: args.boardId,
+            statusId: args.statusId,
             source: "dashboard",
           })
         ),

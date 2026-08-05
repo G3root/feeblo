@@ -28,7 +28,12 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  anyPolicy,
+  hasPermission,
+  PolicyGuard,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import {
   ArrowRight01Icon,
   Building06Icon,
@@ -316,8 +321,14 @@ interface BoardMenuProps {
 function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
   const organizationId = useOrganizationId();
 
+  // Backend mirror: BoardPolicy.canUpdate requires boards.update,
+  // BoardPolicy.canDelete requires boards.delete. The menu (rename/delete)
+  // needs either one, so gate on the explicit actions instead of boards.*.
   const { allowed: canManageBoard } = usePolicy(
-    hasPermission(organizationId, "boards.*")
+    anyPolicy(
+      hasPermission(organizationId, "boards.update"),
+      hasPermission(organizationId, "boards.delete")
+    )
   );
   if (!canManageBoard) {
     return null;
@@ -327,6 +338,7 @@ function BoardMenuWithPolicy({ boardPublicId }: BoardMenuProps) {
 
 function BoardMenu({ boardPublicId }: BoardMenuProps) {
   const { isMobile } = useSidebar();
+  const organizationId = useOrganizationId();
 
   return (
     <Menu>
@@ -344,11 +356,15 @@ function BoardMenu({ boardPublicId }: BoardMenuProps) {
         className="w-48 rounded-lg"
         side={isMobile ? "bottom" : "right"}
       >
-        <RenameBoardButton boardPublicId={boardPublicId} />
+        <PolicyGuard policy={hasPermission(organizationId, "boards.update")}>
+          <RenameBoardButton boardPublicId={boardPublicId} />
+        </PolicyGuard>
 
         <MenuSeparator />
 
-        <DeleteBoardButton boardPublicId={boardPublicId} />
+        <PolicyGuard policy={hasPermission(organizationId, "boards.delete")}>
+          <DeleteBoardButton boardPublicId={boardPublicId} />
+        </PolicyGuard>
       </MenuPopup>
     </Menu>
   );

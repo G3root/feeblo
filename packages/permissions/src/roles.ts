@@ -9,10 +9,9 @@
  *
  *   owner > admin > manager > contributor
  *
- * - `owner`       — workspace owner, created with the workspace. Its only
- *                   additional named permission is organization deletion.
- * - `admin`       — privileged workspace administrator with the same named
- *                   permissions as owner except organization deletion.
+ * - `owner`       — legacy workspace-owner designation. It has the same
+ *                   effective permissions as admin.
+ * - `admin`       — unrestricted workspace administrator.
  * - `manager`     — content manager: handles posts, changelogs, tags,
  *                   roadmaps, and lower-ranked user cleanup.
  * - `contributor` — contributes feedback: creates/votes/comments on posts.
@@ -34,16 +33,6 @@ export const ROLE_RANK: Record<Role, number> = {
 };
 
 /**
- * Privileged roles — the roles that can manage a workspace. Equivalent to the
- * ad-hoc `role === "owner" || role === "admin"` checks that used to be
- * scattered across the codebase.
- */
-export const PRIVILEGED_ROLES = [
-  "owner",
-  "admin",
-] as const satisfies readonly Role[];
-
-/**
  * Roles that can be granted via an invitation. Owners are never invited — the
  * owner role is created when the workspace is created.
  */
@@ -57,10 +46,6 @@ export type InvitableRole = (typeof INVITABLE_ROLES)[number];
 
 export const isRole = (value: unknown): value is Role =>
   typeof value === "string" && (ROLES as readonly string[]).includes(value);
-
-/** True when `role` is "owner" or "admin". */
-export const isPrivilegedRole = (role: unknown): boolean =>
-  role === "owner" || role === "admin";
 
 /** True when `role` is a role that can be granted through an invitation. */
 export const isInvitableRole = (role: unknown): boolean =>

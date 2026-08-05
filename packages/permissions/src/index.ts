@@ -16,7 +16,9 @@ export {
 } from "./permissions";
 
 export {
+  isPrivilegedRole,
   permissionsForRole,
+  PRIVILEGED_ROLES,
   ROLE_PERMISSIONS,
   roleGrants,
 } from "./role-permissions";
@@ -25,9 +27,7 @@ export {
   compareRoles,
   INVITABLE_ROLES,
   isInvitableRole,
-  isPrivilegedRole,
   isRole,
-  PRIVILEGED_ROLES,
   ROLE_RANK,
   ROLES,
   roleAtLeast,

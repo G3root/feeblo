@@ -35,6 +35,10 @@ type TCanUpdate = {
   source: TSource;
 };
 
+type TCanUpdateProperties = TCanUpdate & {
+  statusId: string;
+};
+
 type TIsUnlocked = {
   organizationId: string;
   postId: string;
@@ -170,6 +174,29 @@ const makePostPolicy = Effect.gen(function* () {
     );
   };
 
+  const canUpdateProperties = (args: TCanUpdateProperties) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.any(
+        Policy.canPermission(args.organizationId, "posts.status"),
+        Policy.all(
+          Policy.canPermission(args.organizationId, "posts.move"),
+          Policy.policy(() =>
+            repository
+              .findStatusId({
+                id: args.postId,
+                organizationId: args.organizationId,
+              })
+              .pipe(
+                Effect.map(
+                  (currentStatusId) => currentStatusId === args.statusId
+                )
+              )
+          )
+        )
+      )
+    );
+
   const canAdminUpdate = (organizationId: string) =>
     Policy.canPermission(organizationId, "posts.*");
 
@@ -181,6 +208,7 @@ const makePostPolicy = Effect.gen(function* () {
     canCreate,
     canDelete,
     canUpdate,
+    canUpdateProperties,
     canAdminUpdate,
     canMerge,
   };

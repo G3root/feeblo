@@ -9,6 +9,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@feeblo/ui/sidebar";
+import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
   Building03Icon,
@@ -75,6 +76,7 @@ const settingsItems = [
       {
         label: "Security",
         icon: LockIcon,
+        permission: "workspace.update" as const,
         to: "/$organizationId/settings/security" as const,
       },
     ],
@@ -100,6 +102,7 @@ const settingsItems = [
       {
         label: "Privacy",
         icon: Shield01Icon,
+        permission: "site.update" as const,
         to: "/$organizationId/settings/changelog-privacy" as const,
       },
       {
@@ -146,8 +149,9 @@ export function SettingsSidebar({
             <Fragment key={group.group}>
               <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
               <SidebarMenu>
-                {group.subItems.map((item) => (
-                  <SidebarMenuItem key={item.to}>
+                {group.subItems.map((item) => {
+                  const menuItem = (
+                    <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       isActive={
                         pathname ===
@@ -164,8 +168,20 @@ export function SettingsSidebar({
                         </Link>
                       )}
                     />
-                  </SidebarMenuItem>
-                ))}
+                    </SidebarMenuItem>
+                  );
+
+                  return "permission" in item && item.permission ? (
+                    <PolicyGuard
+                      key={item.to}
+                      policy={hasPermission(organizationId, item.permission)}
+                    >
+                      {menuItem}
+                    </PolicyGuard>
+                  ) : (
+                    menuItem
+                  );
+                })}
               </SidebarMenu>
             </Fragment>
           ))}

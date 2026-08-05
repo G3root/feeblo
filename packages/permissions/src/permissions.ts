@@ -26,7 +26,7 @@ const PERMISSION_ACTIONS = {
   billing: ["update"],
   site: ["update"],
   boards: ["create", "update", "delete"],
-  posts: ["update", "delete", "lock", "archive", "status", "merge"],
+  posts: ["update", "delete", "move", "lock", "archive", "status", "merge"],
   comments: ["delete"],
   changelog: ["create", "update", "publish", "delete"],
   roadmap: ["create", "update", "delete"],

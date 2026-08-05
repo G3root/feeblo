@@ -38,20 +38,68 @@ Real-world feedback platforms use a two-layer model:
 owner > admin > manager > contributor
 ```
 
-A strict ranking where higher roles inherit everything below them:
+An administrative precedence order where higher roles inherit everything
+below them. Owner retains the highest legacy rank for ownership-transfer and
+invitation rules, while its effective capability set is identical to admin:
 
-- **owner** — workspace owner; created with the workspace, never invited. Its
-  only additional named permission is organization deletion.
-- **admin** — privileged workspace administrator with the same named
-  permissions as owner except organization deletion.
+- **owner** — legacy workspace-owner designation; created with the workspace
+  and never invited. It has the same effective permissions as admin.
+- **admin** — unrestricted workspace administrator.
 - **manager** — content manager: handles posts, changelogs, tags, roadmaps,
   and lower-ranked user cleanup (formerly the "member" role).
 - **contributor** — contributes feedback: creates/votes/comments on posts.
 
 `packages/permissions/src/roles.ts` is its single definition (`ROLES`,
 `ROLE_RANK`, `roleAtLeast`, `compareRoles`). Owner and admin are "privileged"
-(`PRIVILEGED_ROLES`); admin/manager/contributor can be invited
+— `PRIVILEGED_ROLES`/`isPrivilegedRole` are **derived** from the permission
+table via the `workspace.update` grant (admin directly, owner by inheritance),
+not a hardcoded role list; admin/manager/contributor can be invited
 (`INVITABLE_ROLES`).
+
+### Predefined role matrix
+
+Admin and owner are intentionally equivalent for authorization. `owner` is
+kept only for legacy workspace records. "Own" post/comment actions still
+require the resource-level authorship checks described below.
+
+| Area | Capability | Contributor | Manager | Admin / Owner |
+| --- | --- | :---: | :---: | :---: |
+| Boards | Import posts | No | Yes | Yes |
+| Boards | Export data to CSV | No | Yes | Yes |
+| Boards | Customize the create-post form | No | Yes | Yes |
+| Boards | Create or delete boards | No | No | Yes |
+| Boards | Manage board privacy | No | No | Yes |
+| Posts | Create a post | Yes | Yes | Yes |
+| Posts | Delete a newly-created own post | Yes | Yes | Yes |
+| Posts | Change post tags | Yes | Yes | Yes |
+| Posts | Move posts between boards | Yes | Yes | Yes |
+| Posts | Manage tags | No | Yes | Yes |
+| Posts | Change ETA, owner, or status | No | Yes | Yes |
+| Posts | Manage categories | No | Yes | Yes |
+| Posts | Merge or unmerge posts | No | Yes | Yes |
+| Posts | Delete another user's post | No | Yes | Yes |
+| Posts | Manage post fields | No | Yes | Yes |
+| Votes | Vote for self or on behalf of another user | Yes | Yes | Yes |
+| Comments | Create public or internal comments | Yes | Yes | Yes |
+| Comments | Delete own comments | Yes | Yes | Yes |
+| Comments | Delete another user's comments | No | Yes | Yes |
+| Users | Delete users | No | Yes | Yes |
+| Users | View user details | Yes | Yes | Yes |
+| Roadmaps | Prioritize the roadmap | No | Yes | Yes |
+| Changelog | Manage the changelog | No | Yes | Yes |
+| Changelog | Manage changelog privacy | No | No | Yes |
+| Developer | Manage API/SSO keys or webhooks | No | No | Yes |
+| Settings | Manage post statuses | No | Yes | Yes |
+| Settings | Manage authentication, billing, company profile, custom domains, email, or integrations | No | No | Yes |
+| Settings | Manage teammates | No | No | Yes |
+| Settings | Delete the workspace | No | No | Yes |
+
+The matrix is the authorization contract, including capabilities planned for
+future product surfaces. Board import, CSV export, create-post-form
+customization, outbound webhook management, and configurable post fields or
+statuses are not currently shipped. They must receive distinct named
+permissions and matching backend/frontend gates when implemented; no existing
+generic permission should be reused for them.
 
 ### Layer 2 — Named permissions
 
@@ -110,7 +158,8 @@ Two complementary rules:
 
 Plan entitlements (limits/capabilities) remain a separate, orthogonal layer —
 they gate *how much* (board count, admin count), not *who may*. They already
-use the shared vocabulary (`isPrivilegedRole`) for privileged-member limits.
+use the shared vocabulary (`isPrivilegedRole`, now permission-derived) for
+privileged-member limits.
 
 ## Package layout
 
@@ -132,10 +181,10 @@ lowest tier `contributor` was added:
 
 | Role | Grants (beyond inheritance) |
  | --- | --- |
-| `contributor` | No named permissions; membership-scoped content policies apply directly |
+| `contributor` | + `posts.move`; other contribution actions use membership/resource policies |
 | `manager` | + `members.remove`, `posts.*`, `changelog.*`, `tags.*`, `roadmap.*`, `comments.*`, CRM create/update |
-| `admin` | + `workspace.update`, `members.*`, `billing.*`, `site.*`, `boards.*`, `contacts.*`, `companies.*` |
-| `owner` | + `workspace.delete` |
+| `admin` | + `workspace.*`, `members.*`, `billing.*`, `site.*`, `boards.*`, `contacts.*`, `companies.*` |
+| `owner` | No additional grants; retained as a legacy alias of admin |
 
 The DB `member.role` column is `text` (not an enum), so the rename is a data
 migration (`packages/db/src/migrations/20260805000000_rename_member_role_to_manager`)
@@ -159,7 +208,9 @@ that updates `member` and `invitation` rows; the schema default now reads
 - `membership/schema.ts` builds `ROLE_LITERAL` from `ROLES`.
 - `plan-entitlements.ts` uses `PRIVILEGED_ROLES`/`isPrivilegedRole` from
   `@feeblo/permissions` directly (the old `PRIVILEGED_MEMBER_ROLES` /
-  `isPrivilegedMemberRole` aliases were removed).
+  `isPrivilegedMemberRole` aliases were removed). `isPrivilegedRole` is
+  derived from the permission table (`roleGrants(role, "workspace.update")`)
+  rather than a hardcoded role list.
 - The `member.role` / `invitation.role` columns in `packages/db` are typed
   `.$type<Role>()` / `.$type<Role | null>()`, so repository results stay
   assignable to the Effect schemas.

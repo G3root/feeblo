@@ -1,5 +1,6 @@
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { toastManager } from "@feeblo/ui/toast";
+import { hasMembership, usePolicy } from "@feeblo/web-shared/use-policy";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { TagCreateDialog } from "~/features/tag/components/tag-create-dialog";
 import {
@@ -12,10 +13,10 @@ import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export function PostTagField() {
-  const { post, organizationId, isLocked, canManagePost } =
-    usePostCollectionData();
+  const { post, organizationId, isLocked } = usePostCollectionData();
+  const { allowed: canChangeTags } = usePolicy(hasMembership(organizationId));
 
-  const disabled = isLocked || !canManagePost;
+  const disabled = isLocked || !canChangeTags;
   const { postTagCollection } = useDashboardCollections();
 
   const { data: tags } = useLiveQuery(

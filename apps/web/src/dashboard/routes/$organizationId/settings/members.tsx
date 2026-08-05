@@ -1,4 +1,5 @@
 import {
+  compareRoles,
   INVITABLE_ROLES,
   type InvitableRole,
   type Role,
@@ -31,6 +32,7 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
+  hasPermission,
   hasOwnerOrAdminRole,
   PolicyGuard,
 } from "@feeblo/web-shared/use-policy";
@@ -453,6 +455,12 @@ function MemberListItem({
   role: Role;
 }) {
   const { membersCollection } = useDashboardCollections();
+  const { data: session } = useAuthState();
+  const actorRole = session?.memberships.find(
+    (membership) => membership.organizationId === organizationId
+  )?.role;
+  const canManageTarget =
+    actorRole !== undefined && compareRoles(role, actorRole) === -1;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
@@ -512,9 +520,11 @@ function MemberListItem({
               </SelectItem>
             </SelectPopup>
           </Select>
+        </PolicyGuard>
 
+        <PolicyGuard policy={hasPermission(organizationId, "members.remove")}>
           <Button
-            disabled={isOwner}
+            disabled={!canManageTarget || isCurrentUser}
             onClick={async () => {
               const tx = membersCollection.delete(id);
               try {

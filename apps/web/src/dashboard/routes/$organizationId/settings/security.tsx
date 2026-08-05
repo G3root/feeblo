@@ -4,6 +4,7 @@ import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -33,6 +34,9 @@ function formatDate(date: Date): string {
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
+  const { allowed: canManageSecurity, isPending: isPolicyPending } = usePolicy(
+    hasPermission(organizationId, "workspace.update")
+  );
 
   const { data: secrets } = useLiveQuery(
     (q) =>
@@ -56,6 +60,10 @@ function RouteComponent() {
     }
     return latest;
   }, null);
+
+  if (isPolicyPending || !canManageSecurity) {
+    return null;
+  }
 
   if (!activeSecret) {
     throw new Error("secret not found");

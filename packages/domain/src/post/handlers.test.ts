@@ -374,6 +374,59 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostUpdate", () => {
+      it.effect("lets contributors move posts but not change their status", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+          const destinationBoardId = yield* addBoard(fixture, "PUBLIC");
+          const otherStatusId = yield* PostStatusId.generate;
+
+          yield* db.insert(schema.postStatusTable).values({
+            id: otherStatusId,
+            type: "IN_PROGRESS",
+            orderIndex: 1,
+            organizationId: fixture.organizationId,
+          });
+          yield* handlers
+            .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .PostUpdate({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: destinationBoardId,
+              statusId: fixture.statusId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "contributor")
+              )
+            );
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostUpdate({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: destinationBoardId,
+                statusId: otherStatusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "contributor")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
       it.effect("lets a post creator change the post", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
