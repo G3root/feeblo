@@ -1,4 +1,4 @@
-import { isPrivilegedMemberRole } from "@feeblo/domain/plan-entitlements";
+import { isPrivilegedRole } from "@feeblo/permissions";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { invitationsCollection, membersCollection } from "~/lib/collections";
 import { useEntitlements } from "./use-entitlements";
@@ -30,14 +30,12 @@ export const usePrivilegedMemberLimit = () => {
   );
 
   const privilegedMemberCount = (membersQuery.data ?? []).filter((member) =>
-    isPrivilegedMemberRole(member.role.split(",")[0] ?? "")
+    isPrivilegedRole(member.role.split(",")[0] ?? "")
   ).length;
 
   const pendingPrivilegedInvitationsCount = (
     invitationsQuery.data ?? []
-  ).filter((invitation) =>
-    isPrivilegedMemberRole(invitation.role ?? "")
-  ).length;
+  ).filter((invitation) => isPrivilegedRole(invitation.role ?? "")).length;
 
   const limit = entitlements.limits.privilegedMembers;
   const atLimit =

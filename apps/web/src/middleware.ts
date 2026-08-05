@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: Redirect suffixes mirror the route decision tree. */
-import { sequence } from "astro:middleware";
+/** biome-ignore-all lint/suspicious/useAwait: <explanation> */
+import { defineMiddleware, sequence } from "astro:middleware";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";
 import type { AuthHint } from "@feeblo/web-shared/auth-hint";
@@ -7,6 +8,17 @@ import type { APIContext, MiddlewareNext } from "astro";
 import { fetchRpcServer } from "~/lib/runtime-server";
 import { authClient } from "~/lib/server-auth-client";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
+
+import { paraglideMiddleware } from "./paraglide/server";
+
+export const localeMiddleware = defineMiddleware(async (context, next) => {
+  // Avoid consuming bodies for non-GET/HEAD requests
+  // https://github.com/opral/paraglide-js/issues/564
+  if (context.request.method !== "GET" && context.request.method !== "HEAD") {
+    return next(context.request);
+  }
+  return paraglideMiddleware(context.request, ({ request }) => next(request));
+});
 
 const AUTH_SIGN_IN_PATH = "/sign-in";
 const AUTH_SIGN_UP_PATH = "/sign-up";
@@ -296,6 +308,7 @@ function redirectMiddleware(context: APIContext, next: MiddlewareNext) {
 }
 
 export const onRequest = sequence(
+  localeMiddleware,
   documentCacheMiddleware,
   subdomainMiddleware,
   siteMiddleware,

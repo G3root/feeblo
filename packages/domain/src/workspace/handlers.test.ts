@@ -6,8 +6,8 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
-import { ReservedSubdomainError } from "../site/services/profanity-check-schema";
-import { SubdomainValidationService } from "../site/services/profanity-check-service";
+import { ReservedSubdomainError } from "../site/subdomain/errors";
+import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspaceRepository } from "./repository";
 
@@ -120,7 +120,7 @@ describe("WorkspaceRpcHandlers", () => {
 
   layer(TestLayer)("handlers", (it) => {
     describe("WorkspaceCreate", () => {
-      it.effect("creates a workspace with default boards and statuses", () =>
+      it.effect("creates a workspace with default boards, statuses, and tags", () =>
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const db = yield* currentDb;
@@ -188,6 +188,21 @@ describe("WorkspaceRpcHandlers", () => {
               eq(schema.postStatusTable.organizationId, result.organizationId)
             );
           expect(statuses).toHaveLength(6);
+
+          // Verify default post tags were created
+          const tags = yield* db
+            .select()
+            .from(schema.tagTable)
+            .where(eq(schema.tagTable.organizationId, result.organizationId));
+          expect(tags).toHaveLength(2);
+          expect(
+            tags.map((tag) => ({ name: tag.name, type: tag.type }))
+          ).toEqual(
+            expect.arrayContaining([
+              { name: "High Priority", type: "FEEDBACK" },
+              { name: "Low Priority", type: "FEEDBACK" },
+            ])
+          );
 
           // Verify the primary status roadmap and its ordered columns were created
           const roadmaps = yield* db

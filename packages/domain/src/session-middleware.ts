@@ -1,13 +1,12 @@
+import type { Role } from "@feeblo/permissions";
 import { parseCookie } from "cookie-es";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
-
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
 import * as HttpApiSecurity from "effect/unstable/httpapi/HttpApiSecurity";
-
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
 import { UnauthorizedError } from "./rpc-errors";
@@ -33,7 +32,7 @@ export type Session = {
   readonly memberships: ReadonlyArray<{
     readonly membershipId: string;
     readonly organizationId: string;
-    readonly role: "owner" | "admin" | "member";
+    readonly role: Role;
   }>;
 };
 

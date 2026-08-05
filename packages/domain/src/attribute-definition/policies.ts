@@ -14,31 +14,29 @@ const makeAttributeDefinitionPolicy = Effect.gen(function* () {
 
   const contactBelongsToOrganization = (
     args: TContactAttributeDefinitionDelete
-  ) =>
-    Policy.policy(() => repository.contactAttributeDefinitionExists(args));
+  ) => Policy.policy(() => repository.contactAttributeDefinitionExists(args));
 
   const companyBelongsToOrganization = (
     args: TCompanyAttributeDefinitionDelete
-  ) =>
-    Policy.policy(() => repository.companyAttributeDefinitionExists(args));
+  ) => Policy.policy(() => repository.companyAttributeDefinitionExists(args));
 
   const canCreateContact = (organizationId: string) =>
-    Policy.hasMembership(organizationId);
+    Policy.canPermission(organizationId, "contacts.*");
 
   const canUpdateContact = (args: TContactAttributeDefinitionDelete) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
+      Policy.canPermission(args.organizationId, "contacts.*"),
       contactBelongsToOrganization(args)
     );
 
   const canDeleteContact = canUpdateContact;
 
   const canCreateCompany = (organizationId: string) =>
-    Policy.hasMembership(organizationId);
+    Policy.canPermission(organizationId, "companies.*");
 
   const canUpdateCompany = (args: TCompanyAttributeDefinitionDelete) =>
     Policy.all(
-      Policy.hasMembership(args.organizationId),
+      Policy.canPermission(args.organizationId, "companies.*"),
       companyBelongsToOrganization(args)
     );
 

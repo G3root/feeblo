@@ -1,12 +1,13 @@
 import type { TComment } from "@feeblo/domain/src/comments/schema.js";
-import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { Button } from "@feeblo/ui/button";
+import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import {
   Menu,
-  MenuPopup,
   MenuItem,
+  MenuPopup,
   MenuTrigger,
 } from "@feeblo/ui/menu";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   Delete02Icon,
@@ -209,13 +210,7 @@ function CommentDisplayHeader() {
 function CommentDisplayBody() {
   const { state } = useCommentDisplay();
 
-  return (
-    <div
-      className="mt-1 text-sm [&_p]:my-0.5"
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitized HTML content
-      dangerouslySetInnerHTML={{ __html: state.content }}
-    />
-  );
+  return <MarkdownContent className="mt-1 text-sm" content={state.content} />;
 }
 
 function CommentDisplayActions() {
@@ -316,10 +311,10 @@ function ToggleVisibilityButton() {
 }
 
 function CommentDisplayDropdown() {
-  const { canManagePost } = usePostCollectionData();
+  const { canModeratePost } = usePostCollectionData();
   const { state } = useCommentDisplay();
 
-  if (!(canManagePost || state.isAuthor)) {
+  if (!(canModeratePost || state.isAuthor)) {
     return null;
   }
 
@@ -333,8 +328,8 @@ function CommentDisplayDropdown() {
         }
       />
       <MenuPopup>
-        <EditButton />
-        <ToggleVisibilityButton />
+        {state.isAuthor ? <EditButton /> : null}
+        {state.isAuthor ? <ToggleVisibilityButton /> : null}
         <DeleteButton />
       </MenuPopup>
     </Menu>

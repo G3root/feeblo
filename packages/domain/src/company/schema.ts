@@ -1,3 +1,4 @@
+import { EntitySource } from "@feeblo/db/validation-schema/entity-source";
 import {
   CompanyAttributeDefinitionId,
   CompanyAttributeValueId,
@@ -5,6 +6,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import * as S from "effect/Schema";
+import { noDuplicateAttributeIds } from "../attribute-definition/validation";
 
 export const CommonCompanyFields = S.Struct({
   id: S.String,
@@ -41,7 +43,7 @@ export const CompanyCreate = S.Struct({
           S.Union([S.String, S.Number, S.Boolean, S.DateFromString])
         ),
       })
-    )
+    ).check(noDuplicateAttributeIds)
   ),
 });
 
@@ -70,7 +72,7 @@ export const Company = S.Struct({
   name: S.String,
   avatar: S.NullOr(S.String),
   externalCreatedAt: S.NullOr(S.DateFromString),
-  source: S.Literals(["DASHBOARD", "WIDGET", "API", "IMPORT"]),
+  source: EntitySource,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

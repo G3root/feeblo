@@ -1,7 +1,5 @@
-import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -9,7 +7,6 @@ import { withRemapDbErrors } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
-import { RoadmapPolicy } from "./policies";
 import { RoadmapRepository } from "./repository";
 import { RoadmapRpcs } from "./rpcs";
 import type {
@@ -22,7 +19,8 @@ import type {
 export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* RoadmapRepository;
   const sitePolicy = yield* SitePolicy;
-  const roadmapPolicy = yield* RoadmapPolicy;
+  const manage = (organizationId: string) =>
+    Policy.canPermission(organizationId, "roadmap.*");
   return {
     RoadmapList: (args: TRoadmapList) =>
       repository
@@ -45,58 +43,26 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Roadmap", "select")
         ),
     RoadmapCreate: (args: TRoadmapCreate) =>
-      transaction(
-        Effect.gen(function* () {
-          const roadmapCount = yield* repository.countByOrganizationId({
-            organizationId: args.organizationId,
-          });
-
-          yield* repository.create({
-            ...args,
-            isPrimary: roadmapCount === 0,
-          });
-        })
-      ).pipe(
-        Policy.withPolicy(roadmapPolicy.canCreate(args)),
-        withRemapDbErrors("Roadmap", "create")
-      ),
-    RoadmapUpdate: (args: TRoadmapUpdate) => {
-      const { isPrimary: _isPrimary, ...updateArgs } = args;
-
-      return transaction(repository.update(updateArgs)).pipe(
-        Policy.withPolicy(
-          roadmapPolicy.canUpdate({
-            organizationId: args.organizationId,
-            roadmapId: args.id,
-            visibility: args.visibility,
-          })
+      repository
+        .create(args)
+        .pipe(
+          Policy.withPolicy(manage(args.organizationId)),
+          withRemapDbErrors("Roadmap", "create")
         ),
-        withRemapDbErrors("Roadmap", "update")
-      );
-    },
+    RoadmapUpdate: (args: TRoadmapUpdate) =>
+      repository
+        .update(args)
+        .pipe(
+          Policy.withPolicy(manage(args.organizationId)),
+          withRemapDbErrors("Roadmap", "update")
+        ),
     RoadmapDelete: (args: TRoadmapDelete) =>
-      transaction(
-        Effect.gen(function* () {
-          const roadmap = yield* repository.getById({
-            id: args.id,
-            organizationId: args.organizationId,
-          });
-
-          yield* repository.delete(args);
-
-          if (Option.isSome(roadmap) && roadmap.value.isPrimary) {
-            yield* repository.delegatePrimary({
-              organizationId: args.organizationId,
-              exceptRoadmapId: args.id,
-            });
-          }
-        })
-      ).pipe(
-        Policy.withPolicy(
-          roadmapPolicy.canDelete({ organizationId: args.organizationId })
+      repository
+        .delete(args)
+        .pipe(
+          Policy.withPolicy(manage(args.organizationId)),
+          withRemapDbErrors("Roadmap", "delete")
         ),
-        withRemapDbErrors("Roadmap", "delete")
-      ),
   };
 });
 
@@ -107,6 +73,5 @@ export const RoadmapRpcHandlers = RoadmapRpcs.toLayer(
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
-  Layer.provide(RoadmapPolicy.layer),
   Layer.provide(RoadmapRepository.layer)
 );

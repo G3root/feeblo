@@ -1,3 +1,4 @@
+import { normalizeWidgetConfig, widgetConfigKey } from "./config";
 import { banner } from "./debug";
 import { Embed } from "./embed";
 import { EmbedError } from "./errors";
@@ -37,7 +38,10 @@ function setupGlobalListeners(): void {
       if (msg.data.setBoard) {
         currentEmbed.setBoard(msg.data.setBoard);
       }
-      currentEmbed.open();
+      currentEmbed.openModule("feedback");
+      if (!currentEmbed.isOpenState()) {
+        currentEmbed.open();
+      }
     }
   };
 
@@ -70,16 +74,25 @@ export function destroyInstance(embed: Embed | null): void {
 
 function createWidgetProxy(embed: Embed): FeebloWidget {
   const widget: FeebloWidget = {
-    identify: (user) => {
-      embed.identify(user);
+    identify: (identity) => {
+      embed.identify(identity);
       return widget;
     },
     setBoard: (board) => {
       embed.setBoard(board);
       return widget;
     },
+    metadata: (patch) => {
+      embed.metadata(patch);
+      return widget;
+    },
+    isOpen: () => embed.isOpenState(),
     open: (trigger, metadata) => {
       embed.open(trigger, metadata);
+      return widget;
+    },
+    openModule: (module) => {
+      embed.openModule(module);
       return widget;
     },
     close: () => {
@@ -97,9 +110,12 @@ function noopWidget(): FeebloWidget {
   const self: FeebloWidget = {
     identify: () => self,
     setBoard: () => self,
+    metadata: () => self,
     open: () => self,
+    openModule: () => self,
     close: () => self,
     destroy: () => undefined,
+    isOpen: () => false,
   };
   return self;
 }
@@ -144,7 +160,13 @@ export function init(
     return noopWidget();
   }
 
-  if (currentEmbed && currentOrgId === organizationId) {
+  const normalizedConfig = normalizeWidgetConfig(resolvedOptions);
+  const nextConfigKey = widgetConfigKey(normalizedConfig);
+  if (
+    currentEmbed &&
+    currentOrgId === organizationId &&
+    currentEmbed.getConfigKey() === nextConfigKey
+  ) {
     if (resolvedOptions.user) {
       currentEmbed.identify(resolvedOptions.user);
     }
@@ -155,7 +177,7 @@ export function init(
     destroyInstance(currentEmbed);
   }
 
-  const embed = new Embed(organizationId, resolvedOptions);
+  const embed = new Embed(organizationId, resolvedOptions, normalizedConfig);
   currentEmbed = embed;
   currentOrgId = organizationId;
 

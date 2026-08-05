@@ -1,11 +1,10 @@
 import { currentDb, schema } from "@feeblo/db";
+import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
 import { and, count, desc, eq, isNull, lt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
-import type { TNotificationEventType } from "./schema";
 
 type NotificationInput = {
   actorMemberId?: string | null;

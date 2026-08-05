@@ -1,4 +1,5 @@
 export const CONTAINER_ID = "feeblo-embed-container";
+export const LAUNCHER_ID = "feeblo-widget-launcher";
 export const FEEDBACK_ATTRIBUTE = "data-feeblo-feedback";
 export const SCAN_INTERVAL_MS = 1000;
 export const FADE_DURATION_MS = 150;
@@ -27,5 +28,7 @@ export const CONTAINER_STYLES: Partial<CSSStyleDeclaration> = {
 export const EVENT_NAMES = [
   "widgetReady",
   "widgetOpened",
+  "widgetClosed",
+  "identityChanged",
   "feedbackSubmitted",
 ] as const;

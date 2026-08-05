@@ -1,0 +1,17 @@
+{
+  "Rules": [
+    {
+      "ID": "delete-temporary-editor-media",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "tmp/editor-media/"
+      },
+      "Expiration": {
+        "Days": 7
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    }
+  ]
+}

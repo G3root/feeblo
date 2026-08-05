@@ -1,3 +1,4 @@
+import { EntitySource } from "@feeblo/db/validation-schema/entity-source";
 import {
   ContactAttributeDefinitionId,
   ContactAttributeValueId,
@@ -5,6 +6,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import * as S from "effect/Schema";
+import { noDuplicateAttributeIds } from "../attribute-definition/validation";
 
 export const CommonContactFields = S.Struct({
   userId: S.String,
@@ -47,7 +49,7 @@ export const ContactCreate = S.Struct({
           S.Union([S.String, S.Number, S.Boolean, S.DateFromString])
         ),
       })
-    )
+    ).check(noDuplicateAttributeIds)
   ),
 });
 
@@ -81,7 +83,7 @@ export const Contact = S.Struct({
   phone: S.NullOr(S.String),
   avatar: S.NullOr(S.String),
   companyId: S.NullOr(S.String),
-  source: S.Literals(["DASHBOARD", "WIDGET", "API", "IMPORT"]),
+  source: EntitySource,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });

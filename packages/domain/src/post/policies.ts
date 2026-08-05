@@ -35,6 +35,10 @@ type TCanUpdate = {
   source: TSource;
 };
 
+type TCanUpdateProperties = TCanUpdate & {
+  statusId: string;
+};
+
 type TIsUnlocked = {
   organizationId: string;
   postId: string;
@@ -66,21 +70,39 @@ const makePostPolicy = Effect.gen(function* () {
       )
     );
 
-  const isOrganizationOwnerOrAdmin = (organizationId: string) =>
+  const isOwner = (args: TIsCreator) =>
+    Policy.any(
+      Policy.canPermission(args.organizationId, "posts.*"),
+      isCreator(args)
+    );
+
+  const isNewPostOwner = (args: TIsCreator) =>
     Policy.policy((user) =>
-      Effect.succeed(
-        user.memberships.some(
-          (membership) =>
-            membership.organizationId === organizationId &&
-            (membership.role === "owner" || membership.role === "admin")
-        )
+      pipe(args.postId, (postId) =>
+        Schema.is(PostIds)(postId)
+          ? repository
+              .findNewByCreatorIds({
+                ids: postId,
+                organizationId: args.organizationId,
+                userId: user.session.userId,
+                boardId: args.boardId,
+              })
+              .pipe(Effect.map((posts) => posts.length === postId.length))
+          : repository
+              .findNewByCreatorId({
+                id: postId,
+                organizationId: args.organizationId,
+                userId: user.session.userId,
+                boardId: args.boardId,
+              })
+              .pipe(Effect.map((post) => post._tag === "Some"))
       )
     );
 
-  const isOwner = (args: TIsCreator) =>
+  const isNewPostOwnerOrPrivileged = (args: TIsCreator) =>
     Policy.any(
-      isOrganizationOwnerOrAdmin(args.organizationId),
-      isCreator(args)
+      Policy.canPermission(args.organizationId, "posts.*"),
+      isNewPostOwner(args)
     );
 
   const isUnlocked = (args: TIsUnlocked) =>
@@ -110,7 +132,7 @@ const makePostPolicy = Effect.gen(function* () {
     if (args.source === "public") {
       return Policy.all(
         Policy.hasRestrictedOrganizationScope(args.organizationId),
-        isOwner({
+        isNewPostOwnerOrPrivileged({
           organizationId: args.organizationId,
           postId: args.postId,
           boardId: args.boardId,
@@ -119,7 +141,7 @@ const makePostPolicy = Effect.gen(function* () {
     }
     return Policy.all(
       Policy.hasMembership(args.organizationId),
-      isOwner({
+      isNewPostOwnerOrPrivileged({
         organizationId: args.organizationId,
         postId: args.postId,
         boardId: args.boardId,
@@ -152,8 +174,38 @@ const makePostPolicy = Effect.gen(function* () {
     );
   };
 
+  const canUpdateProperties = (args: TCanUpdateProperties) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.any(
+        Policy.canPermission(args.organizationId, "posts.status"),
+        Policy.all(
+          Policy.canPermission(args.organizationId, "posts.move"),
+          Policy.policy(() =>
+            repository
+              .findStatusId({
+                id: args.postId,
+                organizationId: args.organizationId,
+              })
+              .pipe(
+                Effect.map(
+                  (currentStatusId) => currentStatusId === args.statusId
+                )
+              )
+          )
+        )
+      )
+    );
+
+  /** ETA is a post property reserved for managers and above (`posts.status`). */
+  const canUpdateEta = (organizationId: string) =>
+    Policy.all(
+      Policy.hasMembership(organizationId),
+      Policy.canPermission(organizationId, "posts.status")
+    );
+
   const canAdminUpdate = (organizationId: string) =>
-    isOrganizationOwnerOrAdmin(organizationId);
+    Policy.canPermission(organizationId, "posts.*");
 
   const canMerge = canAdminUpdate;
 
@@ -163,6 +215,8 @@ const makePostPolicy = Effect.gen(function* () {
     canCreate,
     canDelete,
     canUpdate,
+    canUpdateProperties,
+    canUpdateEta,
     canAdminUpdate,
     canMerge,
   };

@@ -1,3 +1,5 @@
+import { getAuthSession } from "@feeblo/web-shared/auth-session";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 import { CustomAttributeCreateDialog } from "~/features/custom-attribute/components/custom-attribute-create-dialog";
 import { CustomAttributeDeleteDialog } from "~/features/custom-attribute/components/custom-attribute-delete-dialog";
@@ -8,7 +10,9 @@ import {
   CustomAttributeDeleteDialogProvider,
   CustomAttributeEditDialogProvider,
 } from "~/features/custom-attribute/dialog-stores";
+import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import {
   companyAttributeDefinitionCollection,
   contactAttributeDefinitionCollection,
@@ -18,16 +22,34 @@ export const Route = createFileRoute(
   "/$organizationId/settings/custom-attributes"
 )({
   component: RouteComponent,
-  beforeLoad: async () => {
-    await Promise.all([
-      contactAttributeDefinitionCollection.preload(),
-      companyAttributeDefinitionCollection.preload(),
-    ]);
+  beforeLoad: async ({ params }) => {
+    const session = await getAuthSession();
+    if (
+      session !== null &&
+      hasPermission(params.organizationId, "contacts.*")(session)
+    ) {
+      await Promise.all([
+        contactAttributeDefinitionCollection.preload(),
+        companyAttributeDefinitionCollection.preload(),
+      ]);
+    }
     return null;
   },
 });
 
 function RouteComponent() {
+  const organizationId = useOrganizationId();
+  const { allowed: canManageAttributes, isPending } = usePolicy(
+    hasPermission(organizationId, "contacts.*")
+  );
+
+  if (isPending) {
+    return null;
+  }
+  if (!canManageAttributes) {
+    return <SettingsAccessDenied />;
+  }
+
   return (
     <CustomAttributeCreateDialogProvider
       defaultValue={{ data: { entityType: "contact" } }}

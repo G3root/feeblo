@@ -11,15 +11,27 @@ export function PostContentEditor({
   onChange,
   value,
   readOnly,
+  organizationId,
+  editorScope,
   ...rest
 }: PostContentEditorProps) {
   return (
     <div className="space-y-3">
-      <EditorProvider defaultValue={{ postContent: value }}>
+      <EditorProvider
+        defaultValue={{
+          deferUploads: true,
+          organizationId,
+          editorScope,
+          postContent: value,
+        }}
+      >
         <Editor
+          deferUploads
+          editorScope={editorScope}
           onChange={(doc) => {
             onChange(doc);
           }}
+          organizationId={organizationId}
           placeholder="Add description..."
           readOnly={readOnly}
           {...rest}

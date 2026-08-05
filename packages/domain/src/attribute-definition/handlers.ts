@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
-import { withRemapDbErrors } from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { AttributeDefinitionPolicy } from "./policies";
 import { AttributeDefinitionRepository } from "./repository";
 import { AttributeDefinitionRpcs } from "./rpcs";
@@ -20,6 +20,7 @@ import type {
   TContactAttributeValueList,
   TContactAttributeValueUpdate,
 } from "./schema";
+import { validateAttributeValueEffect } from "./validation";
 
 //TODO FIX later
 export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
@@ -107,7 +108,18 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("ContactAttributeValue", "select")
         ),
     ContactAttributeValueUpdate: (args: TContactAttributeValueUpdate) =>
-      repository.updateContactAttributeValue(args).pipe(
+      Effect.gen(function* () {
+        const definition = yield* repository.findContactAttributeDefinitionById(
+          contactAttributeDefinitionReference(args)
+        );
+        if (definition === undefined) {
+          return yield* new BadRequestError({
+            message: "Attribute definition not found",
+          });
+        }
+        yield* validateAttributeValueEffect(definition, args.value);
+        return yield* repository.updateContactAttributeValue(args);
+      }).pipe(
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),
@@ -131,7 +143,18 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("CompanyAttributeValue", "select")
         ),
     CompanyAttributeValueUpdate: (args: TCompanyAttributeValueUpdate) =>
-      repository.updateCompanyAttributeValue(args).pipe(
+      Effect.gen(function* () {
+        const definition = yield* repository.findCompanyAttributeDefinitionById(
+          companyAttributeDefinitionReference(args)
+        );
+        if (definition === undefined) {
+          return yield* new BadRequestError({
+            message: "Attribute definition not found",
+          });
+        }
+        yield* validateAttributeValueEffect(definition, args.value);
+        return yield* repository.updateCompanyAttributeValue(args);
+      }).pipe(
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),

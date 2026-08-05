@@ -101,7 +101,6 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             id: args.id,
             organizationId: args.organizationId,
             postId: args.postId,
-            userId: session.session.userId,
           });
           if (deleted) {
             yield* activityRepository.create({

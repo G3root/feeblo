@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./styles.css": "./src/styles/theme.css",
+    "./typeset.css": "./src/styles/typeset.css",
     "./runtime": {
       "types": "./src/lib/runtime.ts",
       "default": "./src/lib/runtime.ts"
@@ -103,6 +105,7 @@
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain": "workspace:*",
+    "@feeblo/permissions": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@tanstack/query-db-collection": "catalog:",
@@ -113,6 +116,7 @@
     "effect": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "tw-animate-css": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

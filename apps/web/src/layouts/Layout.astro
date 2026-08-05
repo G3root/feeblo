@@ -7,20 +7,24 @@ interface Props {
 
 const { title = "feeblo" } = Astro.props;
 
+import { getSecret } from "astro:env/server";
 import { getClientHintCheckScript } from "@feeblo/web-shared/client-hints";
+import { getLocale, getTextDirection } from "../paraglide/runtime";
 import CommonHead from "./CommonHead.astro";
 import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
-
-import { getSecret } from "astro:env/server";
 
 const clientHintCheckScript = getClientHintCheckScript();
 const noIndex = Boolean(getSecret("NO_INDEX"));
 ---
 
 <!doctype html>
-<html lang="en">
-  <CommonHead clientHintCheckScript={clientHintCheckScript} title={title} noIndex={noIndex} />
+<html lang={getLocale()} dir={getTextDirection()}>
+  <CommonHead
+    clientHintCheckScript={clientHintCheckScript}
+    title={title}
+    noIndex={noIndex}
+  />
 
   <style is:global>
     .pending-shell {

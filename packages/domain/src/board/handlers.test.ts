@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, type LegidOf, WorkspaceId } from "@feeblo/id";
+import type { Role } from "@feeblo/permissions";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { BoardPolicy } from "../board/policies";
@@ -20,7 +21,7 @@ describe("BoardRpcHandlers", () => {
 
   const makeSession = (
     fixture: Fixture,
-    role: Session["memberships"][number]["role"] | null = "owner",
+    role: Session["memberships"][number]["role"] | null = "owner"
   ): Session => ({
     user: {
       id: fixture.userId,
@@ -41,10 +42,7 @@ describe("BoardRpcHandlers", () => {
       : [],
   });
 
-  const addMemberUser = (
-    fixture: Fixture,
-    role: "owner" | "admin" | "member" = "member",
-  ) =>
+  const addMemberUser = (fixture: Fixture, role: Role = "manager") =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const userId = `user_${fixture.organizationId}_${role}`;
@@ -116,7 +114,7 @@ describe("BoardRpcHandlers", () => {
     fixture: Fixture,
     id: LegidOf<"BoardId">,
     name: string,
-    visibility: "PUBLIC" | "PRIVATE" = "PUBLIC",
+    visibility: "PUBLIC" | "PRIVATE" = "PUBLIC"
   ) => ({
     id,
     organizationId: fixture.organizationId,
@@ -126,12 +124,12 @@ describe("BoardRpcHandlers", () => {
 
   const RepositoriesTest = Layer.mergeAll(
     BoardRepository.layer,
-    WorkspaceRepository.layer,
+    WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = BoardPolicy.layer.pipe(
     Layer.provide(EntitlementPolicy.layer),
-    Layer.provideMerge(RepositoriesTest),
+    Layer.provideMerge(RepositoriesTest)
   );
 
   const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
@@ -150,13 +148,13 @@ describe("BoardRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("returns boards for members", () =>
@@ -168,16 +166,14 @@ describe("BoardRpcHandlers", () => {
             .BoardList({
               organizationId: fixture.organizationId,
             })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(boards).toHaveLength(1);
           expect(boards[0]).toMatchObject({
             id: fixture.boardId,
             name: "Test board",
           });
-        }),
+        })
       );
     });
 
@@ -208,7 +204,7 @@ describe("BoardRpcHandlers", () => {
 
           expect(boards.map((b) => b.id)).toEqual([fixture.boardId]);
           expect(boards[0]?.visibility).toBe("PUBLIC");
-        }),
+        })
       );
     });
 
@@ -220,19 +216,50 @@ describe("BoardRpcHandlers", () => {
           const boardId = yield* BoardId.generate;
           const error = yield* Effect.flip(
             handlers
-              .BoardCreate(
-                boardCreateInput(fixture, boardId, "New board"),
-              )
+              .BoardCreate(boardCreateInput(fixture, boardId, "New board"))
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
+      );
+
+      it.effect("rejects managers (board lifecycle is owner-only)", () =>
+        Effect.gen(function* () {
+          const handlers = yield* BoardRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const boardId = yield* BoardId.generate;
+          const memberUser = yield* addMemberUser(fixture, "manager");
+          const memberSession: Session = {
+            user: {
+              id: memberUser.userId,
+              email: `${memberUser.userId}@example.com`,
+              name: "Test manager",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId: memberUser.userId, token: "test-token" },
+            organizations: [{ id: fixture.organizationId }],
+            memberships: [
+              {
+                membershipId: memberUser.membershipId,
+                organizationId: fixture.organizationId,
+                role: "manager",
+              },
+            ],
+          };
+          const error = yield* Effect.flip(
+            handlers
+              .BoardCreate(boardCreateInput(fixture, boardId, "New board"))
+              .pipe(Effect.provideService(CurrentSession, memberSession))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
       );
 
       it.effect("allows members to create a public board on free plan", () =>
@@ -243,11 +270,9 @@ describe("BoardRpcHandlers", () => {
 
           yield* handlers
             .BoardCreate(
-              boardCreateInput(fixture, boardId, "My public board", "PUBLIC"),
+              boardCreateInput(fixture, boardId, "My public board", "PUBLIC")
             )
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const boards = yield* handlers.BoardListPublic({
             organizationId: fixture.organizationId,
@@ -258,7 +283,7 @@ describe("BoardRpcHandlers", () => {
             name: "My public board",
             visibility: "PUBLIC",
           });
-        }),
+        })
       );
 
       it.effect("rejects private boards on free plan", () =>
@@ -269,20 +294,13 @@ describe("BoardRpcHandlers", () => {
           const error = yield* Effect.flip(
             handlers
               .BoardCreate(
-                boardCreateInput(
-                  fixture,
-                  boardId,
-                  "Private board",
-                  "PRIVATE",
-                ),
+                boardCreateInput(fixture, boardId, "Private board", "PRIVATE")
               )
-              .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
-              ),
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("respects the board limit on free plan", () =>
@@ -295,26 +313,22 @@ describe("BoardRpcHandlers", () => {
           const secondBoardId = yield* BoardId.generate;
           yield* handlers
             .BoardCreate(
-              boardCreateInput(fixture, secondBoardId, "Second board"),
+              boardCreateInput(fixture, secondBoardId, "Second board")
             )
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           // Third board should be rejected.
           const thirdBoardId = yield* BoardId.generate;
           const error = yield* Effect.flip(
             handlers
               .BoardCreate(
-                boardCreateInput(fixture, thirdBoardId, "Third board"),
+                boardCreateInput(fixture, thirdBoardId, "Third board")
               )
-              .pipe(
-                Effect.provideService(CurrentSession, makeSession(fixture)),
-              ),
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
     });
 
@@ -334,20 +348,20 @@ describe("BoardRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("rejects a non-owner member from updating", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;
           const fixture = yield* makeFixture();
-          const memberUser = yield* addMemberUser(fixture, "member");
+          const memberUser = yield* addMemberUser(fixture, "manager");
           const memberSession: Session = {
             user: {
               id: memberUser.userId,
@@ -361,7 +375,7 @@ describe("BoardRpcHandlers", () => {
               {
                 membershipId: memberUser.membershipId,
                 organizationId: fixture.organizationId,
-                role: "member",
+                role: "manager",
               },
             ],
           };
@@ -373,13 +387,11 @@ describe("BoardRpcHandlers", () => {
                 name: "Updated board",
                 visibility: "PUBLIC",
               })
-              .pipe(
-                Effect.provideService(CurrentSession, memberSession),
-              ),
+              .pipe(Effect.provideService(CurrentSession, memberSession))
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("lets the owner update the board", () =>
@@ -394,9 +406,7 @@ describe("BoardRpcHandlers", () => {
               name: "Updated board",
               visibility: "PUBLIC",
             })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const boards = yield* handlers.BoardListPublic({
             organizationId: fixture.organizationId,
@@ -406,7 +416,7 @@ describe("BoardRpcHandlers", () => {
             id: fixture.boardId,
             name: "Updated board",
           });
-        }),
+        })
       );
     });
 
@@ -424,20 +434,20 @@ describe("BoardRpcHandlers", () => {
               .pipe(
                 Effect.provideService(
                   CurrentSession,
-                  makeSession(fixture, null),
-                ),
-              ),
+                  makeSession(fixture, null)
+                )
+              )
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("rejects a non-owner member from deleting", () =>
         Effect.gen(function* () {
           const handlers = yield* BoardRpcHandlersEffect;
           const fixture = yield* makeFixture();
-          const memberUser = yield* addMemberUser(fixture, "member");
+          const memberUser = yield* addMemberUser(fixture, "manager");
           const memberSession: Session = {
             user: {
               id: memberUser.userId,
@@ -451,7 +461,7 @@ describe("BoardRpcHandlers", () => {
               {
                 membershipId: memberUser.membershipId,
                 organizationId: fixture.organizationId,
-                role: "member",
+                role: "manager",
               },
             ],
           };
@@ -461,13 +471,11 @@ describe("BoardRpcHandlers", () => {
                 id: fixture.boardId,
                 organizationId: fixture.organizationId,
               })
-              .pipe(
-                Effect.provideService(CurrentSession, memberSession),
-              ),
+              .pipe(Effect.provideService(CurrentSession, memberSession))
           );
 
           expect(error._tag).toBe("PolicyDenied");
-        }),
+        })
       );
 
       it.effect("lets the owner delete the board", () =>
@@ -480,16 +488,14 @@ describe("BoardRpcHandlers", () => {
               id: fixture.boardId,
               organizationId: fixture.organizationId,
             })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-            );
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const boards = yield* handlers.BoardListPublic({
             organizationId: fixture.organizationId,
           });
 
           expect(boards).toHaveLength(0);
-        }),
+        })
       );
     });
   });

@@ -1,7 +1,6 @@
+import { PostStatusType } from "@feeblo/db/validation-schema/post-status-type";
 import { SiteId } from "@feeblo/id";
 import * as Schema from "effect/Schema";
-
-import { PostStatusType } from "../post-status/schema";
 
 const ValidSiteId = SiteId.schema.check(
   Schema.makeFilter(SiteId.is, { message: "Must be a valid site ID" })

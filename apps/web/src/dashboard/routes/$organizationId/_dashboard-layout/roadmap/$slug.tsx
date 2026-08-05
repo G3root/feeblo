@@ -1,6 +1,6 @@
 import { useRoadmapData } from "@feeblo/post-ui/roadmap/use-roadmap-data";
 import { Button } from "@feeblo/ui/button";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
   CircleLockIcon,
   CircleUnlockIcon,
@@ -112,7 +112,6 @@ function RoadmapDetailActions({
   const deleteStore = useDeleteRoadmapDialogContext();
   const editStore = useEditRoadmapDialogContext();
   const visibilityStore = useToggleRoadmapVisibilityDialogContext();
-  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
 
   const isPrivate = visibility === "private";
 
@@ -131,46 +130,54 @@ function RoadmapDetailActions({
     });
   };
 
-  if (!canManage) {
-    return null;
-  }
-
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      <Button
-        onClick={() => createStore.send({ type: "toggle" })}
-        size="sm"
-        variant="default"
-      >
-        <HugeiconsIcon icon={Plus} />
-        New Roadmap
-      </Button>
-      <Button
-        aria-label={isPrivate ? "Make roadmap public" : "Make roadmap private"}
-        onClick={handleVisibilityClick}
-        size="sm"
-        variant="outline"
-      >
-        <HugeiconsIcon icon={isPrivate ? CircleUnlockIcon : CircleLockIcon} />
-        {isPrivate ? "Private" : "Public"}
-      </Button>
-      <Button
-        aria-label="Edit roadmap"
-        onClick={handleEditClick}
-        size="icon-sm"
-        variant="outline"
-      >
-        <HugeiconsIcon icon={Edit01Icon} />
-      </Button>
-      <Button
-        aria-label="Delete roadmap"
-        onClick={handleDeleteClick}
-        size="icon-sm"
-        variant="destructive-outline"
-      >
-        <HugeiconsIcon icon={Delete02Icon} />
-      </Button>
-    </div>
+    <PolicyGuard policy={hasPermission(organizationId, "roadmap.*")}>
+      {({ allowed }) => (
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            disabled={!allowed}
+            onClick={() => createStore.send({ type: "toggle" })}
+            size="sm"
+            variant="default"
+          >
+            <HugeiconsIcon icon={Plus} />
+            New Roadmap
+          </Button>
+          <Button
+            aria-label={
+              isPrivate ? "Make roadmap public" : "Make roadmap private"
+            }
+            disabled={!allowed}
+            onClick={handleVisibilityClick}
+            size="sm"
+            variant="outline"
+          >
+            <HugeiconsIcon
+              icon={isPrivate ? CircleUnlockIcon : CircleLockIcon}
+            />
+            {isPrivate ? "Private" : "Public"}
+          </Button>
+          <Button
+            aria-label="Edit roadmap"
+            disabled={!allowed}
+            onClick={handleEditClick}
+            size="icon-sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Edit01Icon} />
+          </Button>
+          <Button
+            aria-label="Delete roadmap"
+            disabled={!allowed}
+            onClick={handleDeleteClick}
+            size="icon-sm"
+            variant="destructive-outline"
+          >
+            <HugeiconsIcon icon={Delete02Icon} />
+          </Button>
+        </div>
+      )}
+    </PolicyGuard>
   );
 }
 

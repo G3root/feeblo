@@ -50,8 +50,14 @@ const PostPublicActionButtons = memo(function PostPublicActionButtons() {
 });
 
 function PostAdminActionButtons() {
-  const { post, board, canManagePost, isLocked, organizationId } =
-    usePostCollectionData();
+  const {
+    post,
+    board,
+    canDeletePost,
+    canModeratePost,
+    isLocked,
+    organizationId,
+  } = usePostCollectionData();
   const { postActivityCollection, postCollection } = useDashboardCollections();
   const postDialogStore = usePostDeleteDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
@@ -118,61 +124,59 @@ function PostAdminActionButtons() {
 
   return (
     <>
-      {canManagePost ? (
-        <>
-          <Tooltip>
-            <TooltipTrigger
-              render={(props) => (
-                <Button
-                  {...props}
-                  aria-label={lockLabel}
-                  className="rounded-full"
-                  onClick={() => setDialogAction("lock")}
-                  size="icon-sm"
-                  variant="outline"
-                >
-                  <HugeiconsIcon
-                    icon={isLocked ? CircleUnlockIcon : CircleLockIcon}
-                  />
-                </Button>
-              )}
-            />
-            <TooltipPopup>{lockLabel}</TooltipPopup>
-          </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={(props) => (
+            <Button
+              {...props}
+              aria-label={lockLabel}
+              className="rounded-full"
+              disabled={!canModeratePost}
+              onClick={() => setDialogAction("lock")}
+              size="icon-sm"
+              variant="outline"
+            >
+              <HugeiconsIcon
+                icon={isLocked ? CircleUnlockIcon : CircleLockIcon}
+              />
+            </Button>
+          )}
+        />
+        <TooltipPopup>{lockLabel}</TooltipPopup>
+      </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger
-              render={(props) => (
-                <Button
-                  {...props}
-                  aria-label="Delete post"
-                  className="rounded-full"
-                  onClick={() =>
-                    postDialogStore.send({
-                      type: "toggle",
-                      data: {
-                        postId: post.id,
-                        redirectOptions: {
-                          to: "/$organizationId/board/$boardSlug",
-                          params: {
-                            organizationId,
-                            boardSlug: board.slug,
-                          },
-                        },
+      <Tooltip>
+        <TooltipTrigger
+          render={(props) => (
+            <Button
+              {...props}
+              aria-label="Delete post"
+              className="rounded-full"
+              disabled={!canDeletePost}
+              onClick={() =>
+                postDialogStore.send({
+                  type: "toggle",
+                  data: {
+                    postId: post.id,
+                    redirectOptions: {
+                      to: "/$organizationId/board/$boardSlug",
+                      params: {
+                        organizationId,
+                        boardSlug: board.slug,
                       },
-                    })
-                  }
-                  size="icon-sm"
-                  variant="outline"
-                >
-                  <HugeiconsIcon icon={Trash2} />
-                </Button>
-              )}
-            />
-            <TooltipPopup>Delete post</TooltipPopup>
-          </Tooltip>
-        </>
-      ) : null}
+                    },
+                  },
+                })
+              }
+              size="icon-sm"
+              variant="outline"
+            >
+              <HugeiconsIcon icon={Trash2} />
+            </Button>
+          )}
+        />
+        <TooltipPopup>Delete post</TooltipPopup>
+      </Tooltip>
 
       <ConfirmActionDialog
         description={

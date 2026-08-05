@@ -7,7 +7,8 @@ import {
   AutocompleteRoot,
 } from "prosekit/react/autocomplete";
 import { type ChangeEvent, useRef } from "react";
-import { editorUploader } from "../../uploader";
+import { useEditorContext } from "../../editor-store";
+import { createEditorUploader } from "../../uploader";
 import SlashMenuEmpty from "./slash-menu-empty";
 import SlashMenuItem from "./slash-menu-item";
 
@@ -16,6 +17,7 @@ const regex = canUseRegexLookbehind() ? /(?<!\S)\/(\S.*)?$/u : /\/(\S.*)?$/u;
 
 export default function SlashMenu() {
   const editor = useEditor<BasicExtension>();
+  const editorStore = useEditorContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageSelect = () => {
@@ -28,7 +30,23 @@ export default function SlashMenu() {
       return;
     }
 
-    editor.commands.uploadImage({ file, uploader: editorUploader });
+    const organizationId = editorStore.get().context.organizationId;
+    const scope = editorStore.get().context.editorScope;
+    editor.commands.uploadImage({
+      file,
+      uploader: createEditorUploader(
+        organizationId
+          ? {
+              deferUploads: Boolean(editorStore.get().context.deferUploads),
+              organizationId,
+              ...(scope ? { scope } : {}),
+            }
+          : {
+              deferUploads: Boolean(editorStore.get().context.deferUploads),
+              ...(scope ? { scope } : {}),
+            }
+      ),
+    });
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";

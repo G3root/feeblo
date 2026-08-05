@@ -1,7 +1,11 @@
 import * as Schema from "effect/Schema";
 
 import { PolicyDeniedError } from "../policy";
-import { InternalServerError, UnauthorizedError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../rpc-errors";
 
 export class CompanyNotFoundError extends Schema.TaggedErrorClass<CompanyNotFoundError>()(
   "CompanyNotFoundError",
@@ -37,6 +41,7 @@ export const CompanyServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  BadRequestError,
   CompanyAlreadyExistsError,
   CompanyNotFoundError,
   FailedToCreateCompanyError,

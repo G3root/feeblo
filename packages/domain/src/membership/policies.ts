@@ -1,3 +1,4 @@
+import * as Permissions from "@feeblo/permissions";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -5,7 +6,6 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EntitlementPolicy } from "../entitlement/policies";
-import { isPrivilegedMemberRole } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { MembershipRepository } from "./repository";
 
@@ -22,7 +22,7 @@ type TIsMember = {
 type TCanAssignRoleWithinPlan = {
   organizationId: string;
   memberId: string;
-  role: "owner" | "admin" | "member";
+  role: Permissions.Role;
 };
 
 type TCanInviteRoleWithinPlan = {
@@ -48,14 +48,17 @@ type TCanRemoveMember = {
 type TCanUpdateMemberRole = {
   organizationId: string;
   memberId: string;
-  role: "owner" | "admin" | "member";
+  role: Permissions.Role;
 };
 
-const ROLE_RANK: Record<"member" | "admin" | "owner", number> = {
-  member: 0,
-  admin: 1,
-  owner: 2,
-};
+/**
+ * An actor may only manage a target ranked strictly below them. Rank comes
+ * from the shared role hierarchy (`@feeblo/permissions`).
+ */
+const canManageMember = (
+  actorRole: Permissions.Role,
+  targetRole: Permissions.Role
+): boolean => Permissions.compareRoles(targetRole, actorRole) === -1;
 
 const makeMembershipPolicy = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
@@ -96,13 +99,13 @@ const makeMembershipPolicy = Effect.gen(function* () {
     });
 
   const canInviteRoleWithinPlan = (args: TCanInviteRoleWithinPlan) =>
-    isPrivilegedMemberRole(args.role)
+    Permissions.isPrivilegedRole(args.role)
       ? canAddPrivilegedRole(args.organizationId)
       : Effect.void;
 
   const canChangeRoleWithinPlan = (args: TCanChangeRoleWithinPlan) =>
-    isPrivilegedMemberRole(args.newRole) &&
-    !isPrivilegedMemberRole(args.currentRole)
+    Permissions.isPrivilegedRole(args.newRole) &&
+    !Permissions.isPrivilegedRole(args.currentRole)
       ? canAddPrivilegedRole(args.organizationId)
       : Effect.void;
 
@@ -129,13 +132,33 @@ const makeMembershipPolicy = Effect.gen(function* () {
   const canCancelInvitation = (args: TCanCancelInvitation) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId)
+      Policy.canPermission(args.organizationId, "members.invite")
+    );
+
+  const canManageTarget = (args: TCanRemoveMember) =>
+    Policy.policy((session) =>
+      Effect.gen(function* () {
+        const actor = Policy.getMembership(session, args.organizationId);
+        if (!actor) {
+          return false;
+        }
+
+        const target = yield* repository.findMemberById({
+          memberId: args.memberId,
+          organizationId: args.organizationId,
+        });
+        if (Option.isNone(target)) {
+          return false;
+        }
+
+        return canManageMember(actor.role, target.value.role);
+      })
     );
 
   const canRemoveMember = (args: TCanRemoveMember) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "members.remove"),
       isMemberAlready(args),
       hasOtherOwners(args)
     );
@@ -156,25 +179,21 @@ const makeMembershipPolicy = Effect.gen(function* () {
           return false;
         }
 
-        const actorRank = ROLE_RANK[actor.role];
-        const targetRank = ROLE_RANK[target.value.role];
-        const newRank = ROLE_RANK[args.role];
+        const newRank = Permissions.ROLE_RANK[args.role];
 
-        const canManageTarget =
-          actorRank === ROLE_RANK.owner || targetRank < actorRank;
-        const canAssignRole = newRank <= actorRank;
-
-        return canManageTarget && canAssignRole;
+        return (
+          canManageMember(actor.role, target.value.role) &&
+          newRank <= Permissions.ROLE_RANK[actor.role]
+        );
       })
     );
 
   const canUpdateMemberRole = (args: TCanUpdateMemberRole) =>
     Policy.all(
       Policy.hasMembership(args.organizationId),
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "members.assign"),
       isMemberAlready(args),
-      hasOtherOwners(args),
-      canManageRole(args)
+      hasOtherOwners(args)
     );
 
   return {
@@ -184,6 +203,8 @@ const makeMembershipPolicy = Effect.gen(function* () {
     canRemoveMember,
     canUpdateMemberRole,
     canChangeRoleWithinPlan,
+    canManageTarget,
+    canManageRole,
   };
 });
 

@@ -1,7 +1,5 @@
-import type {
-  TPostActivity,
-  TPostActivityKind,
-} from "@feeblo/domain/post-activity/schema";
+import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
+import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import {
   Timeline,
   TimelineContent,
@@ -15,6 +13,7 @@ import {
 import {
   Archive01Icon,
   ArchiveRestoreIcon,
+  Calendar03Icon,
   CommentAdd01Icon,
   CommentRemove01Icon,
   Edit01Icon,
@@ -60,6 +59,7 @@ const activityIconMap: Record<TPostActivityKind, typeof FileAddIcon> = {
   CONTENT_CHANGED: NoteEditIcon,
   STATUS_CHANGED: StatusIcon,
   BOARD_CHANGED: MoveIcon,
+  ETA_CHANGED: Calendar03Icon,
   POST_LOCKED: SquareLock02Icon,
   POST_UNLOCKED: SquareUnlock02Icon,
   POST_ARCHIVED: Archive01Icon,
@@ -68,6 +68,16 @@ const activityIconMap: Record<TPostActivityKind, typeof FileAddIcon> = {
   COMMENT_UPDATED: MessageEdit01Icon,
   COMMENT_DELETED: CommentRemove01Icon,
 };
+
+const ETA_PATTERN = /^(\d{4})-Q([1-4])$/;
+
+function formatEta(value: string | null) {
+  const match = value?.match(ETA_PATTERN);
+  if (!match) {
+    return null;
+  }
+  return `Q${match[2]} ${match[1]}`;
+}
 
 function getActivityDescription({
   activity,
@@ -84,6 +94,10 @@ function getActivityDescription({
     CONTENT_CHANGED: "updated the post content",
     STATUS_CHANGED: `changed the status from ${statusNames.get(activity.previousValue ?? "") ?? "Unknown"} to ${statusNames.get(activity.nextValue ?? "") ?? "Unknown"}`,
     BOARD_CHANGED: `moved the post from ${boardNames.get(activity.previousValue ?? "") ?? "Unknown"} to ${boardNames.get(activity.nextValue ?? "") ?? "Unknown"}`,
+    ETA_CHANGED:
+      activity.nextValue == null
+        ? "cleared the ETA"
+        : `set the ETA to ${formatEta(activity.nextValue) ?? activity.nextValue}`,
     POST_LOCKED: "locked the post",
     POST_UNLOCKED: "unlocked the post",
     POST_ARCHIVED: "archived the post",

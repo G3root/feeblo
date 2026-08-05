@@ -5,6 +5,7 @@ import cloudflare from "@astrojs/cloudflare";
 import node from "@astrojs/node";
 import react from "@astrojs/react";
 import solidJs from "@astrojs/solid-js";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 // import alchemy from "alchemy/cloudflare/astro";
@@ -59,6 +60,12 @@ export default defineConfig({
 
   vite: {
     plugins: [
+      paraglideVitePlugin({
+        project: "./project.inlang",
+        outdir: "./src/paraglide",
+        emitTsDeclarations: true,
+        strategy: ["cookie", "baseLocale"],
+      }),
       iconsSpritesheet({
         inputDir: widgetIconsSource,
         outputDir: widgetIconsDir,

@@ -8,7 +8,12 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  hasOwnerOrAdminRole,
+  hasPermission,
+  PolicyGuard,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import { LayoutThreeColumnIcon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -106,17 +111,24 @@ function RoadmapListHeader({
 }) {
   const organizationId = useOrganizationId();
   const createStore = useCreateRoadmapDialogContext();
-  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
 
   return (
     <div className="flex items-center justify-between px-3">
       <h1 className="font-semibold text-xl">Roadmaps</h1>
-      {canManage && showCreateAction && (
-        <Button onClick={() => createStore.send({ type: "toggle" })} size="sm">
-          <HugeiconsIcon icon={Plus} />
-          New Roadmap
-        </Button>
-      )}
+      {showCreateAction ? (
+        <PolicyGuard policy={hasPermission(organizationId, "roadmap.*")}>
+          {({ allowed }) => (
+            <Button
+              disabled={!allowed}
+              onClick={() => createStore.send({ type: "toggle" })}
+              size="sm"
+            >
+              <HugeiconsIcon icon={Plus} />
+              New Roadmap
+            </Button>
+          )}
+        </PolicyGuard>
+      ) : null}
     </div>
   );
 }
