@@ -1,6 +1,7 @@
 import { useNavigate } from "@solidjs/router";
 import type { WidgetUpdate } from "../../lib/api";
 import { Button } from "../ui/button";
+import { Icon } from "../ui/icon";
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   day: "numeric",
@@ -14,7 +15,7 @@ export function UpdateDetail(props: { update: WidgetUpdate }) {
   return (
     <article class="typeset typeset-sm p-6">
       <Button onClick={() => navigate("/updates")} size="sm" variant="outline">
-        <span aria-hidden="true">←</span>
+        <Icon name="ArrowLeft01Icon" />
         All updates
       </Button>
       <header class="mt-8 pr-10">
