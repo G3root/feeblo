@@ -32,6 +32,11 @@ export const Route = createLazyRoute("/changelog")({
   component: ChangelogPage,
 });
 
+/**
+ * Displays published changelog entries with title search and RSS subscription access.
+ *
+ * @returns The changelog page content.
+ */
 export function ChangelogPage() {
   const site = useSite();
   const { publicChangelogCollection } = usePublicCollections();
