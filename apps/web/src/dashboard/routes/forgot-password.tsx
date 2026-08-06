@@ -39,64 +39,77 @@ function RouteComponent() {
         onSubmit: undefined,
       });
 
-      const isResetReady = await initializePasswordReset(value.email);
-      if (!isResetReady) {
-        await clearVerificationOtp(value.email, "reset-password");
-        return;
-      }
-
-      const response = await authClient.emailOtp.requestPasswordReset({
-        email: value.email,
-      });
-
-      if (response.error) {
-        // The verification-otp cookie was set above; clear it so a later
-        // visit to /reset-password doesn't surface a stale OTP screen.
-        await clearVerificationOtp(value.email, "reset-password");
-
-        switch (response.error.code) {
-          case "EMAIL_BLOCKED": {
-            form.setErrorMap({
-              onSubmit: {
-                fields: {
-                  email: {
-                    message: "Email is blocked.",
-                  },
-                },
-              },
-            });
-            return;
-          }
-          case "TEMPORARY_EMAIL_NOT_ALLOWED": {
-            form.setErrorMap({
-              onSubmit: {
-                fields: {
-                  email: {
-                    message: "Temporary email addresses are not allowed.",
-                  },
-                },
-              },
-            });
-            return;
-          }
-          default: {
-            break;
-          }
+      try {
+        const isResetReady = await initializePasswordReset(value.email);
+        if (!isResetReady) {
+          await clearVerificationOtp(value.email, "reset-password");
+          return;
         }
 
-        const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
-        if (rateLimitError.success) {
-          const minutes = Math.max(
-            1,
-            Math.ceil(rateLimitError.data.retryAfterSeconds / 60)
-          );
+        const response = await authClient.emailOtp.requestPasswordReset({
+          email: value.email,
+        });
+
+        if (response.error) {
+          // The verification-otp cookie was set above; clear it so a later
+          // visit to /reset-password doesn't surface a stale OTP screen.
+          await clearVerificationOtp(value.email, "reset-password");
+
+          switch (response.error.code) {
+            case "EMAIL_BLOCKED": {
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: "Email is blocked.",
+                    },
+                  },
+                },
+              });
+              return;
+            }
+            case "TEMPORARY_EMAIL_NOT_ALLOWED": {
+              form.setErrorMap({
+                onSubmit: {
+                  fields: {
+                    email: {
+                      message: "Temporary email addresses are not allowed.",
+                    },
+                  },
+                },
+              });
+              return;
+            }
+            default: {
+              break;
+            }
+          }
+
+          const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
+          if (rateLimitError.success) {
+            const minutes = Math.max(
+              1,
+              Math.ceil(rateLimitError.data.retryAfterSeconds / 60)
+            );
+            form.setErrorMap({
+              onSubmit: {
+                fields: {
+                  email: {
+                    message: `Too many reset requests. Please try again in ${minutes} ${
+                      minutes === 1 ? "minute" : "minutes"
+                    }.`,
+                  },
+                },
+              },
+            });
+            return;
+          }
+
           form.setErrorMap({
             onSubmit: {
               fields: {
                 email: {
-                  message: `Too many reset requests. Please try again in ${minutes} ${
-                    minutes === 1 ? "minute" : "minutes"
-                  }.`,
+                  message: response.error.message,
                 },
               },
             },
@@ -104,22 +117,27 @@ function RouteComponent() {
           return;
         }
 
+        await navigate({
+          to: "/reset-password",
+          search: { redirectTo: search.redirectTo },
+        });
+      } catch (error) {
+        // The verification-otp cookie may have been set above; clear it so a
+        // later visit to /reset-password doesn't surface a stale OTP screen.
+        await clearVerificationOtp(value.email, "reset-password");
         form.setErrorMap({
           onSubmit: {
             fields: {
               email: {
-                message: response.error.message,
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Something went wrong",
               },
             },
           },
         });
-        return;
       }
-
-      await navigate({
-        to: "/reset-password",
-        search: { redirectTo: search.redirectTo },
-      });
     },
   });
 

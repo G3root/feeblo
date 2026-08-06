@@ -36,15 +36,20 @@ export async function clearVerificationOtp(
   email: string,
   type: "email-verification" | "reset-password"
 ) {
-  await fetch(verificationOtpEndpoint, {
-    method: "DELETE",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      email,
-      type,
-    }),
-  });
+  try {
+    await fetch(verificationOtpEndpoint, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email,
+        type,
+      }),
+    });
+  } catch {
+    // Best-effort cleanup: a failed DELETE must not block the caller's
+    // success toast or redirect.
+  }
 }
 
 export type ResendResult =
@@ -85,24 +90,36 @@ export function useOtpResend({
 
   const resend = useCallback(async () => {
     setIsResending(true);
-    const result = await onResend().finally(() => setIsResending(false));
+    try {
+      const result = await onResend();
 
-    if (result.success) {
-      setCooldown(RESEND_COOLDOWN_SECONDS);
+      if (result.success) {
+        setCooldown(RESEND_COOLDOWN_SECONDS);
+        toastManager.add({
+          title: successMessage,
+          type: "success",
+        });
+        return;
+      }
+
+      if (result.retryAfterSeconds !== undefined) {
+        setCooldown(result.retryAfterSeconds);
+      }
       toastManager.add({
-        title: successMessage,
-        type: "success",
+        title: result.message ?? "Failed to send verification code",
+        type: "error",
       });
-      return;
+    } catch {
+      // A network/unknown failure sent nothing; leave the cooldown untouched
+      // so the user can retry, but surface the error and resolve so click
+      // handlers don't produce unhandled rejections.
+      toastManager.add({
+        title: "Failed to send verification code",
+        type: "error",
+      });
+    } finally {
+      setIsResending(false);
     }
-
-    if (result.retryAfterSeconds !== undefined) {
-      setCooldown(result.retryAfterSeconds);
-    }
-    toastManager.add({
-      title: result.message ?? "Failed to send verification code",
-      type: "error",
-    });
   }, [onResend, successMessage]);
 
   return { cooldown, isResending, resend };

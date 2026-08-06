@@ -24,7 +24,7 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { AuthShell } from "~/features/auth/components/auth-shell";
 import {
@@ -77,6 +77,13 @@ function RouteComponent() {
   const { email } = Route.useLoaderData();
   const [step, setStep] = useState<"otp" | "password">("otp");
   const [otp, setOtp] = useState("");
+  const passwordHeadingRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (step === "password") {
+      passwordHeadingRef.current?.focus();
+    }
+  }, [step]);
 
   const {
     cooldown: resendCooldown,
@@ -177,11 +184,30 @@ function RouteComponent() {
         onSubmit: undefined,
       });
 
-      const response = await authClient.emailOtp.resetPassword({
-        email,
-        otp,
-        password: value.password,
-      });
+      let response: Awaited<
+        ReturnType<typeof authClient.emailOtp.resetPassword>
+      >;
+      try {
+        response = await authClient.emailOtp.resetPassword({
+          email,
+          otp,
+          password: value.password,
+        });
+      } catch (error) {
+        passwordForm.setErrorMap({
+          onSubmit: {
+            fields: {
+              password: {
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : "Something went wrong",
+              },
+            },
+          },
+        });
+        return;
+      }
 
       if (response.error) {
         if (
@@ -215,6 +241,16 @@ function RouteComponent() {
         title: "Password reset. Please sign in with your new password.",
         type: "success",
       });
+
+      // Password resets don't revoke existing sessions server-side, so sign
+      // out to clear the stale session cookie; otherwise the authenticated
+      // middleware redirect would bounce the user away from /sign-in.
+      try {
+        await authClient.signOut();
+      } catch {
+        // Best-effort: proceed to /sign-in even if revocation fails.
+      }
+
       await navigate({
         to: "/sign-in",
         search: { redirectTo: search.redirectTo },
@@ -235,6 +271,7 @@ function RouteComponent() {
           </div>
         }
         title="Reset your password"
+        titleRef={passwordHeadingRef}
       >
         <form
           onSubmit={(e) => {
