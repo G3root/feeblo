@@ -16,6 +16,11 @@ type TCanUpdate = {
   categoryId: string;
 };
 
+type TCanSetChangelogCategories = {
+  changelogId: string;
+  organizationId: string;
+};
+
 const makeChangelogCategoryPolicy = Effect.gen(function* () {
   const repository = yield* ChangelogCategoryRepository;
   const entitlementPolicy = yield* EntitlementPolicy;
@@ -35,7 +40,22 @@ const makeChangelogCategoryPolicy = Effect.gen(function* () {
   const canUpdate = (args: TCanUpdate) =>
     Policy.canPermission(args.organizationId, "changelog-categories.*");
 
-  return { canCreate, canDelete, canUpdate };
+  /**
+   * Category assignments on changelogs are manager-scoped: changelog.* or
+   * changelog-categories.*. Contributors can never set changelog categories
+   * — changelog creation itself is manager-only, so a contributor can never
+   * legitimately be a changelog creator.
+   */
+  const canSetChangelogCategories = (args: TCanSetChangelogCategories) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      Policy.any(
+        Policy.canPermission(args.organizationId, "changelog.*"),
+        Policy.canPermission(args.organizationId, "changelog-categories.*")
+      )
+    );
+
+  return { canCreate, canDelete, canUpdate, canSetChangelogCategories };
 });
 
 export class ChangelogCategoryPolicy extends Context.Service<ChangelogCategoryPolicy>()(

@@ -21,7 +21,6 @@ type TChangelogListItem = {
   status: ChangelogStatus;
   scheduledAt: Date | null;
   publishedAt: Date | null;
-  categoryId: string | null;
   updatedAt: Date;
   user: {
     name: string | null;
@@ -44,7 +43,8 @@ export function ChangelogListView({
   changelogs: TChangelogListItem[];
   organizationId: string;
 }) {
-  const { changelogCategoryCollection } = useDashboardCollections();
+  const { changelogCategoryCollection, changelogCategoryLinkCollection } =
+    useDashboardCollections();
   const categoriesQuery = useLiveQuery(
     (q) =>
       q
@@ -56,6 +56,21 @@ export function ChangelogListView({
   const categoryById = new Map(
     categories.map((category) => [category.id, category])
   );
+
+  const linksQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ link: changelogCategoryLinkCollection })
+        .where(({ link }) => eq(link.organizationId, organizationId)),
+    [organizationId]
+  );
+  const links = linksQuery.data ?? [];
+  const categoryIdsByChangelog = new Map<string, string[]>();
+  for (const link of links) {
+    const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
+    ids.push(link.categoryId);
+    categoryIdsByChangelog.set(link.changelogId, ids);
+  }
 
   return (
     <div className="p-3">
@@ -71,9 +86,14 @@ export function ChangelogListView({
         </TableHeader>
         <TableBody>
           {changelogs.map((changelog) => {
-            const category = changelog.categoryId
-              ? categoryById.get(changelog.categoryId)
-              : undefined;
+            const changelogCategories = (
+              categoryIdsByChangelog.get(changelog.id) ?? []
+            )
+              .map((categoryId) => categoryById.get(categoryId))
+              .filter(
+                (category): category is NonNullable<typeof category> =>
+                  category !== undefined
+              );
 
             return (
               <TableRow key={changelog.id}>
@@ -86,14 +106,25 @@ export function ChangelogListView({
                   </Link>
                 </TableCell>
                 <TableCell>
-                  {category ? (
-                    <span className="inline-flex items-center gap-2 text-sm">
-                      <span
-                        aria-hidden="true"
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: category.icon }}
-                      />
-                      <span>{category.name}</span>
+                  {changelogCategories.length > 0 ? (
+                    <span className="flex flex-wrap gap-1.5">
+                      {changelogCategories.map((category) => (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium text-xs"
+                          key={category.id}
+                          style={{
+                            backgroundColor: `${category.icon}1f`,
+                            color: category.icon,
+                          }}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="size-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: category.icon }}
+                          />
+                          {category.name}
+                        </span>
+                      ))}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">—</span>

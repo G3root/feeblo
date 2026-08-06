@@ -10,6 +10,7 @@ import {
   getCurrentOrganizationId,
   publicBoardCollection,
   publicChangelogCategoryCollection,
+  publicChangelogCategoryLinkCollection,
   publicChangelogCollection,
   publicPostCollection,
   publicPostStatusCollection,
@@ -161,6 +162,7 @@ const changelogRoute = createRoute({
     await Promise.all([
       publicChangelogCollection.preload(),
       publicChangelogCategoryCollection.preload(),
+      publicChangelogCategoryLinkCollection.preload(),
     ]);
     return null;
   },
@@ -173,6 +175,7 @@ const changelogDetailRoute = createRoute({
     await Promise.all([
       publicChangelogCollection.preload(),
       publicChangelogCategoryCollection.preload(),
+      publicChangelogCategoryLinkCollection.preload(),
     ]);
     return null;
   },

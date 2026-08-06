@@ -16,7 +16,6 @@ export const Changelog = S.Struct({
   status: ChangelogStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),
-  categoryId: S.NullOr(S.String),
   organizationId: S.String,
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
@@ -47,7 +46,6 @@ export const ChangelogCreate = S.Struct({
   status: ChangelogStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),
-  categoryId: S.NullOr(S.String),
   organizationId: WorkspaceId.schema,
 });
 
@@ -64,7 +62,6 @@ export const ChangelogUpdate = S.Struct({
   status: ChangelogStatus,
   scheduledAt: S.NullOr(S.DateFromString),
   publishedAt: S.NullOr(S.DateFromString),
-  categoryId: S.NullOr(S.String),
   organizationId: WorkspaceId.schema,
 });
 

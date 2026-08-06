@@ -3,6 +3,7 @@ import { DashboardLayout } from "~/layouts/dashboard-layout.tsx";
 import {
   boardCollection,
   changelogCategoryCollection,
+  changelogCategoryLinkCollection,
   organizationCollection,
   postCollection,
   postStatusCollection,
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/$organizationId/_dashboard-layout")({
       tagCollection.preload(),
       postTagCollection.preload(),
       changelogCategoryCollection.preload(),
+      changelogCategoryLinkCollection.preload(),
     ]);
     return null;
   },

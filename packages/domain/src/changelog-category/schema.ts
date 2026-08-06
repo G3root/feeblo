@@ -2,7 +2,7 @@ import {
   ChangelogCategoryColorIcon,
   ChangelogCategoryIconType,
 } from "@feeblo/db/validation-schema/changelog-category-icon-type";
-import { ChangelogCategoryId, WorkspaceId } from "@feeblo/id";
+import { ChangelogCategoryId, ChangelogId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const ChangelogCategory = S.Struct({
@@ -56,4 +56,25 @@ export const ChangelogCategoryDelete = S.Struct({
 
 export type TChangelogCategoryDelete = S.Schema.Type<
   typeof ChangelogCategoryDelete
+>;
+
+export const ChangelogCategorySet = S.Struct({
+  changelogId: ChangelogId.schema,
+  organizationId: WorkspaceId.schema,
+  categoryIds: S.Array(ChangelogCategoryId.schema),
+});
+
+export type TChangelogCategorySet = S.Schema.Type<typeof ChangelogCategorySet>;
+
+export const ChangelogCategoryLink = S.Struct({
+  id: S.String,
+  changelogId: S.String,
+  categoryId: S.String,
+  organizationId: S.String,
+  createdAt: S.DateFromString,
+  updatedAt: S.DateFromString,
+});
+
+export type TChangelogCategoryLink = S.Schema.Type<
+  typeof ChangelogCategoryLink
 >;

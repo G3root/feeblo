@@ -15,6 +15,7 @@ import type {
   TChangelogCategoryCreate,
   TChangelogCategoryDelete,
   TChangelogCategoryList,
+  TChangelogCategorySet,
   TChangelogCategoryUpdate,
 } from "./schema";
 
@@ -36,6 +37,26 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
       repository.findMany(args).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "ChangelogCategoryListPublic",
+          level: "read",
+        }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewChangelog(args.organizationId)
+        ),
+        withRemapDbErrors("ChangelogCategory", "select")
+      ),
+
+    ChangelogCategoryListLinks: (args: TChangelogCategoryList) =>
+      repository
+        .findLinks(args)
+        .pipe(
+          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+          withRemapDbErrors("ChangelogCategory", "select")
+        ),
+
+    ChangelogCategoryListLinksPublic: (args: TChangelogCategoryList) =>
+      repository.findLinksPublished(args).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ChangelogCategoryListLinksPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(
@@ -73,8 +94,73 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         ),
         withRemapDbErrors("ChangelogCategory", "delete")
       ),
+
+    ChangelogCategorySet: (args: TChangelogCategorySet) =>
+      Effect.gen(function* () {
+        const categoryIds = [...new Set(args.categoryIds)];
+        yield* validateChangelog({
+          changelogId: args.changelogId,
+          organizationId: args.organizationId,
+        });
+        yield* validateCategoryIds({
+          organizationId: args.organizationId,
+          categoryIds,
+        });
+
+        yield* repository.setChangelogCategories({ ...args, categoryIds });
+      }).pipe(
+        Policy.withPolicy(
+          categoryPolicy.canSetChangelogCategories({
+            changelogId: args.changelogId,
+            organizationId: args.organizationId,
+          })
+        ),
+        withRemapDbErrors("ChangelogCategory", "update")
+      ),
   };
 });
+
+const validateChangelog = ({
+  changelogId,
+  organizationId,
+}: {
+  changelogId: string;
+  organizationId: string;
+}) =>
+  Effect.gen(function* () {
+    const repository = yield* ChangelogCategoryRepository;
+    const exists = yield* repository.hasChangelog({
+      changelogId,
+      organizationId,
+    });
+
+    if (!exists) {
+      return yield* new Policy.PolicyDeniedError({
+        reason: "Changelog does not belong to this organization",
+      });
+    }
+  });
+
+const validateCategoryIds = ({
+  organizationId,
+  categoryIds,
+}: {
+  organizationId: string;
+  categoryIds: readonly string[];
+}) =>
+  Effect.gen(function* () {
+    const repository = yield* ChangelogCategoryRepository;
+    const count = yield* repository.countExistingCategories({
+      organizationId,
+      categoryIds,
+    });
+
+    if (count !== categoryIds.length) {
+      return yield* new Policy.PolicyDeniedError({
+        reason: "One or more categories do not belong to this organization",
+      });
+    }
+  });
 
 export const ChangelogCategoryRpcHandlers = ChangelogCategoryRpcs.toLayer(
   ChangelogCategoryRpcHandlersEffect

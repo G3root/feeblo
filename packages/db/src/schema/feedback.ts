@@ -798,12 +798,6 @@ export const changelogTable = pgTable(
     status: changelogStatusEnum("status").notNull().default("draft"),
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
-    categoryId: text("category_id").references(
-      () => changelogCategoryTable.id,
-      {
-        onDelete: "set null",
-      }
-    ),
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
@@ -828,6 +822,37 @@ export const changelogTable = pgTable(
     uniqueIndex("changelog_organizationId_slug_uidx").on(
       table.organizationId,
       table.slug
+    ),
+  ]
+);
+
+export const changelogCategoryLinkTable = pgTable(
+  "changelog_category_link",
+  {
+    id: text("id").primaryKey(),
+    changelogId: text("changelog_id")
+      .notNull()
+      .references(() => changelogTable.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => changelogCategoryTable.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("changelog_category_link_changelogId_idx").on(table.changelogId),
+    index("changelog_category_link_categoryId_idx").on(table.categoryId),
+    uniqueIndex("changelog_category_link_changelogId_categoryId_uidx").on(
+      table.changelogId,
+      table.categoryId
     ),
   ]
 );

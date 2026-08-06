@@ -17,7 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, ilike, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChangelogCategoryBadge } from "../components/changelog/changelog-category-badge";
+import { ChangelogCategoryBadges } from "../components/changelog/changelog-category-badge";
 import {
   ChangelogPageLayout,
   ChangelogTimeline,
@@ -61,6 +61,21 @@ export function ChangelogPage() {
         .orderBy(({ changelog }) => changelog.publishedAt, "desc"),
     [site.organizationId, normalizedSearch]
   );
+
+  const { publicChangelogCategoryLinkCollection } = usePublicCollections();
+  const { data: categoryLinks = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ link: publicChangelogCategoryLinkCollection })
+        .where(({ link }) => eq(link.organizationId, site.organizationId)),
+    [site.organizationId]
+  );
+  const categoryIdsByChangelog = new Map<string, string[]>();
+  for (const link of categoryLinks) {
+    const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
+    ids.push(link.categoryId);
+    categoryIdsByChangelog.set(link.changelogId, ids);
+  }
 
   if (isLoading) {
     return <ChangelogPageLayout>Loading changelog...</ChangelogPageLayout>;
@@ -143,7 +158,9 @@ export function ChangelogPage() {
 
                 <ChangelogTimelineBody className="space-y-6 p-0 sm:p-0">
                   <header className="space-y-3">
-                    <ChangelogCategoryBadge categoryId={item.categoryId} />
+                    <ChangelogCategoryBadges
+                      categoryIds={categoryIdsByChangelog.get(item.id) ?? []}
+                    />
                     <Link
                       className="block w-fit transition-opacity hover:opacity-80"
                       params={{ changelogSlug: item.slug }}

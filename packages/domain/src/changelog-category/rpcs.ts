@@ -9,7 +9,9 @@ import {
   ChangelogCategory,
   ChangelogCategoryCreate,
   ChangelogCategoryDelete,
+  ChangelogCategoryLink,
   ChangelogCategoryList,
+  ChangelogCategorySet,
   ChangelogCategoryUpdate,
 } from "./schema";
 
@@ -43,6 +45,26 @@ export class ChangelogCategoryRpcs extends RpcGroup.make(
   Rpc.make("ChangelogCategoryDelete", {
     success: Schema.Void,
     payload: ChangelogCategoryDelete,
+    error: ChangelogCategoryServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("ChangelogCategoryListLinks", {
+    payload: ChangelogCategoryList,
+    success: Schema.Array(ChangelogCategoryLink),
+    error: ChangelogCategoryServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("ChangelogCategoryListLinksPublic", {
+    payload: ChangelogCategoryList,
+    success: Schema.Array(ChangelogCategoryLink),
+    error: Schema.Union([ChangelogCategoryServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  Rpc.make("ChangelogCategorySet", {
+    success: Schema.Void,
+    payload: ChangelogCategorySet,
     error: ChangelogCategoryServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

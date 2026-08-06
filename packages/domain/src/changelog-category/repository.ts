@@ -1,10 +1,11 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, asc, eq } from "drizzle-orm";
+import { ChangelogCategoryLinkId } from "@feeblo/id";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import type { TChangelogCategory } from "./schema";
+import type { TChangelogCategory, TChangelogCategorySet } from "./schema";
 
 interface TFindMany {
   organizationId: string;
@@ -35,10 +36,63 @@ interface TDelete {
   organizationId: string;
 }
 
+interface TCountExistingCategories {
+  categoryIds: readonly string[];
+  organizationId: string;
+}
+
+interface THasChangelog {
+  changelogId: string;
+  organizationId: string;
+}
+
 const makeChangelogCategoryRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
+  const findLinks = ({ organizationId }: { organizationId: string }) =>
+    db
+      .select({
+        id: schema.changelogCategoryLinkTable.id,
+        changelogId: schema.changelogCategoryLinkTable.changelogId,
+        categoryId: schema.changelogCategoryLinkTable.categoryId,
+        organizationId: schema.changelogCategoryLinkTable.organizationId,
+        createdAt: schema.changelogCategoryLinkTable.createdAt,
+        updatedAt: schema.changelogCategoryLinkTable.updatedAt,
+      })
+      .from(schema.changelogCategoryLinkTable)
+      .where(
+        eq(schema.changelogCategoryLinkTable.organizationId, organizationId)
+      );
+
+  const findLinksPublished = ({ organizationId }: { organizationId: string }) =>
+    db
+      .select({
+        id: schema.changelogCategoryLinkTable.id,
+        changelogId: schema.changelogCategoryLinkTable.changelogId,
+        categoryId: schema.changelogCategoryLinkTable.categoryId,
+        organizationId: schema.changelogCategoryLinkTable.organizationId,
+        createdAt: schema.changelogCategoryLinkTable.createdAt,
+        updatedAt: schema.changelogCategoryLinkTable.updatedAt,
+      })
+      .from(schema.changelogCategoryLinkTable)
+      .innerJoin(
+        schema.changelogTable,
+        eq(
+          schema.changelogCategoryLinkTable.changelogId,
+          schema.changelogTable.id
+        )
+      )
+      .where(
+        and(
+          eq(schema.changelogCategoryLinkTable.organizationId, organizationId),
+          eq(schema.changelogTable.status, "published")
+        )
+      );
+
   return {
+    findLinks,
+    findLinksPublished,
+
     findMany: ({ organizationId }: TFindMany) =>
       db
         .select({
@@ -104,6 +158,82 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
             eq(schema.changelogCategoryTable.id, id),
             eq(schema.changelogCategoryTable.organizationId, organizationId)
           )
+        )
+        .pipe(Effect.asVoid),
+
+    hasChangelog: ({ changelogId, organizationId }: THasChangelog) =>
+      db
+        .select({ id: schema.changelogTable.id })
+        .from(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, changelogId),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows.length === 1)),
+
+    countExistingCategories: ({
+      categoryIds,
+      organizationId,
+    }: TCountExistingCategories) =>
+      db
+        .select({ id: schema.changelogCategoryTable.id })
+        .from(schema.changelogCategoryTable)
+        .where(
+          and(
+            eq(schema.changelogCategoryTable.organizationId, organizationId),
+            inArray(schema.changelogCategoryTable.id, categoryIds)
+          )
+        )
+        .pipe(Effect.map((rows) => rows.length)),
+
+    setChangelogCategories: ({
+      changelogId,
+      organizationId,
+      categoryIds,
+    }: TChangelogCategorySet) =>
+      db
+        .transaction((tx) =>
+          Effect.gen(function* () {
+            yield* tx
+              .delete(schema.changelogCategoryLinkTable)
+              .where(
+                and(
+                  eq(
+                    schema.changelogCategoryLinkTable.changelogId,
+                    changelogId
+                  ),
+                  eq(
+                    schema.changelogCategoryLinkTable.organizationId,
+                    organizationId
+                  )
+                )
+              );
+
+            if (categoryIds.length === 0) {
+              return;
+            }
+
+            const rows = yield* Effect.forEach(categoryIds, (categoryId) =>
+              ChangelogCategoryLinkId.generate.pipe(
+                Effect.map((id) => ({
+                  id,
+                  changelogId,
+                  categoryId,
+                  organizationId,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                }))
+              )
+            );
+
+            yield* tx
+              .insert(schema.changelogCategoryLinkTable)
+              .values(rows)
+              .onConflictDoNothing();
+          })
         )
         .pipe(Effect.asVoid),
   };

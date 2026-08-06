@@ -12,7 +12,6 @@ export const updatedChangelogSchema = z.object({
   status: changelogStatusSchema,
   scheduledAt: z.date().nullable(),
   publishedAt: z.date().nullable(),
-  categoryId: z.string().nullable(),
   organizationId: z.string(),
 });
 

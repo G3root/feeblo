@@ -1,23 +1,33 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { usePublicCollections } from "../../providers/public-collections-provider";
 
-export function ChangelogCategoryBadge({
-  categoryId,
+export function ChangelogCategoryBadges({
+  categoryIds,
 }: {
-  categoryId: string | null;
+  categoryIds: readonly string[];
 }) {
+  if (categoryIds.length === 0) {
+    return null;
+  }
+
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {categoryIds.map((categoryId) => (
+        <ChangelogCategoryBadge categoryId={categoryId} key={categoryId} />
+      ))}
+    </span>
+  );
+}
+
+export function ChangelogCategoryBadge({ categoryId }: { categoryId: string }) {
   const { publicChangelogCategoryCollection } = usePublicCollections();
 
   const categoryQuery = useLiveQuery(
-    (q) => {
-      if (!categoryId) {
-        return undefined;
-      }
-      return q
+    (q) =>
+      q
         .from({ category: publicChangelogCategoryCollection })
         .where(({ category }) => eq(category.id, categoryId))
-        .findOne();
-    },
+        .findOne(),
     [categoryId]
   );
 

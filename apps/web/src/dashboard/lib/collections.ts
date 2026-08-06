@@ -209,7 +209,6 @@ export const changelogCollection = createCollection(
           status: updatedChangelog.status,
           scheduledAt: updatedChangelog.scheduledAt,
           publishedAt: updatedChangelog.publishedAt,
-          categoryId: updatedChangelog.categoryId,
           organizationId: updatedChangelog.organizationId,
         })
       );
@@ -239,11 +238,34 @@ export const changelogCollection = createCollection(
           status: newChangelog.status,
           scheduledAt: newChangelog.scheduledAt,
           publishedAt: newChangelog.publishedAt,
-          categoryId: newChangelog.categoryId,
           organizationId: newChangelog.organizationId,
         })
       );
     },
+  })
+);
+
+export const changelogCategoryLinkCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("changelog-category-link"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogCategoryListLinks({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
   })
 );
 
@@ -1562,6 +1584,7 @@ export const roadmapColumnCollection = createCollection(
 export const dashboardCollections = {
   boardCollection,
   changelogCategoryCollection,
+  changelogCategoryLinkCollection,
   changelogCollection,
   changelogPostCollection,
   changelogTagCollection,

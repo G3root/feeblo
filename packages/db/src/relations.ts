@@ -4,6 +4,7 @@ import {
   assetTable,
   boardTable,
   changelogAssetTable,
+  changelogCategoryLinkTable,
   changelogCategoryTable,
   changelogPostTable,
   changelogTable,
@@ -70,6 +71,7 @@ export const relations = defineRelations(
     commentTable,
     commentReactionTable,
     siteTable,
+    changelogCategoryLinkTable,
     changelogCategoryTable,
     changelogTable,
     changelogPostTable,
@@ -639,9 +641,9 @@ export const relations = defineRelations(
         from: r.changelogCategoryTable.organizationId,
         to: r.organizationTable.id,
       }),
-      changelogs: r.many.changelogTable({
+      changelogLinks: r.many.changelogCategoryLinkTable({
         from: r.changelogCategoryTable.id,
-        to: r.changelogTable.categoryId,
+        to: r.changelogCategoryLinkTable.categoryId,
       }),
     },
     changelogTable: {
@@ -657,9 +659,9 @@ export const relations = defineRelations(
         from: r.changelogTable.creatorMemberId,
         to: r.memberTable.id,
       }),
-      category: r.one.changelogCategoryTable({
-        from: r.changelogTable.categoryId,
-        to: r.changelogCategoryTable.id,
+      changelogCategories: r.many.changelogCategoryLinkTable({
+        from: r.changelogTable.id,
+        to: r.changelogCategoryLinkTable.changelogId,
       }),
       changelogTags: r.many.changelogTagTable({
         from: r.changelogTable.id,
@@ -672,6 +674,20 @@ export const relations = defineRelations(
       assets: r.many.changelogAssetTable({
         from: r.changelogTable.id,
         to: r.changelogAssetTable.changelogId,
+      }),
+    },
+    changelogCategoryLinkTable: {
+      changelog: r.one.changelogTable({
+        from: r.changelogCategoryLinkTable.changelogId,
+        to: r.changelogTable.id,
+      }),
+      category: r.one.changelogCategoryTable({
+        from: r.changelogCategoryLinkTable.categoryId,
+        to: r.changelogCategoryTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.changelogCategoryLinkTable.organizationId,
+        to: r.organizationTable.id,
       }),
     },
     changelogPostTable: {

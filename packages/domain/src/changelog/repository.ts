@@ -65,7 +65,6 @@ const makeChangelogRepository = Effect.gen(function* () {
           status: schema.changelogTable.status,
           scheduledAt: schema.changelogTable.scheduledAt,
           publishedAt: schema.changelogTable.publishedAt,
-          categoryId: schema.changelogTable.categoryId,
           organizationId: schema.changelogTable.organizationId,
           creatorMemberId: schema.changelogTable.creatorMemberId,
           creatorId: schema.changelogTable.creatorId,
@@ -97,7 +96,6 @@ const makeChangelogRepository = Effect.gen(function* () {
           status: schema.changelogTable.status,
           scheduledAt: schema.changelogTable.scheduledAt,
           publishedAt: schema.changelogTable.publishedAt,
-          categoryId: schema.changelogTable.categoryId,
           organizationId: schema.changelogTable.organizationId,
           creatorMemberId: schema.changelogTable.creatorMemberId,
           coverImage: schema.changelogTable.coverImage,
@@ -132,7 +130,6 @@ const makeChangelogRepository = Effect.gen(function* () {
       status,
       scheduledAt,
       publishedAt,
-      categoryId,
       organizationId,
       creatorId,
       creatorMemberId,
@@ -148,7 +145,6 @@ const makeChangelogRepository = Effect.gen(function* () {
           status,
           scheduledAt,
           publishedAt,
-          categoryId,
           organizationId,
           creatorId,
           ...(creatorMemberId ? { creatorMemberId } : {}),
@@ -166,7 +162,6 @@ const makeChangelogRepository = Effect.gen(function* () {
       status,
       scheduledAt,
       publishedAt,
-      categoryId,
       organizationId,
     }: TChangelogUpdateInternal) =>
       db
@@ -179,7 +174,6 @@ const makeChangelogRepository = Effect.gen(function* () {
           status,
           scheduledAt,
           publishedAt,
-          categoryId,
           updatedAt: new Date(),
         })
         .where(

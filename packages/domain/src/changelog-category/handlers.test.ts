@@ -1,6 +1,11 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { ChangelogCategoryId, SiteId, WorkspaceId } from "@feeblo/id";
+import {
+  ChangelogCategoryId,
+  ChangelogId,
+  SiteId,
+  WorkspaceId,
+} from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -101,6 +106,25 @@ describe("ChangelogCategoryRpcHandlers", () => {
         icon: overrides?.icon ?? "#22c55e",
         createdAt: new Date(),
         updatedAt: new Date(),
+      });
+      return id;
+    });
+  const insertChangelog = (fixture: Fixture) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const id = yield* ChangelogId.generate;
+      const now = new Date();
+      yield* db.insert(schema.changelogTable).values({
+        id,
+        title: "Release",
+        slug: `release-${id}`,
+        content: "Release notes",
+        excerpt: "Release notes",
+        status: "draft",
+        organizationId: fixture.organizationId,
+        creatorId: fixture.userId,
+        createdAt: now,
+        updatedAt: now,
       });
       return id;
     });
@@ -295,6 +319,184 @@ describe("ChangelogCategoryRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
         expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("sets multiple categories on a changelog", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const changelogId = yield* insertChangelog(fixture);
+        const firstCategoryId = yield* insertCategory(fixture, {
+          name: "New",
+        });
+        const secondCategoryId = yield* insertCategory(fixture, {
+          name: "Improved",
+          icon: "#3b82f6",
+        });
+
+        yield* handlers
+          .ChangelogCategorySet({
+            changelogId,
+            organizationId: fixture.organizationId,
+            categoryIds: [firstCategoryId, secondCategoryId],
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        const links = yield* handlers
+          .ChangelogCategoryListLinks({
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(links).toMatchObject([
+          { changelogId, categoryId: firstCategoryId },
+          { changelogId, categoryId: secondCategoryId },
+        ]);
+      })
+    );
+
+    it.effect("replaces the category set when re-setting", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const changelogId = yield* insertChangelog(fixture);
+        const firstCategoryId = yield* insertCategory(fixture, {
+          name: "New",
+        });
+        const secondCategoryId = yield* insertCategory(fixture, {
+          name: "Improved",
+          icon: "#3b82f6",
+        });
+
+        yield* handlers
+          .ChangelogCategorySet({
+            changelogId,
+            organizationId: fixture.organizationId,
+            categoryIds: [firstCategoryId, secondCategoryId],
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        yield* handlers
+          .ChangelogCategorySet({
+            changelogId,
+            organizationId: fixture.organizationId,
+            categoryIds: [firstCategoryId],
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        const links = yield* handlers
+          .ChangelogCategoryListLinks({
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(links.map((link) => link.categoryId)).toEqual([firstCategoryId]);
+      })
+    );
+
+    it.effect("rejects setting categories from another organization", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const changelogId = yield* insertChangelog(fixture);
+        const otherOrganizationId = yield* WorkspaceId.generate;
+        const otherCategoryId = yield* ChangelogCategoryId.generate;
+        const db = yield* currentDb;
+        const now = new Date();
+        yield* db.insert(schema.organizationTable).values({
+          id: otherOrganizationId,
+          name: "Other organization",
+          slug: otherOrganizationId,
+          createdAt: now,
+        });
+        yield* db.insert(schema.changelogCategoryTable).values({
+          id: otherCategoryId,
+          organizationId: otherOrganizationId,
+          name: "Foreign",
+          iconType: "color",
+          icon: "#22c55e",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .ChangelogCategorySet({
+              changelogId,
+              organizationId: fixture.organizationId,
+              categoryIds: [otherCategoryId],
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("rejects contributors from setting changelog categories", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const changelogId = yield* insertChangelog(fixture);
+        const categoryId = yield* insertCategory(fixture);
+
+        const error = yield* Effect.flip(
+          handlers
+            .ChangelogCategorySet({
+              changelogId,
+              organizationId: fixture.organizationId,
+              categoryIds: [categoryId],
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, { role: "contributor" })
+              )
+            )
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("lists only links to published changelogs publicly", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* makeSite(fixture, "PUBLIC");
+        const draftChangelogId = yield* insertChangelog(fixture);
+        const publishedChangelogId = yield* Effect.gen(function* () {
+          const db = yield* currentDb;
+          const id = yield* ChangelogId.generate;
+          const now = new Date();
+          yield* db.insert(schema.changelogTable).values({
+            id,
+            title: "Published",
+            slug: `published-${id}`,
+            content: "Notes",
+            excerpt: "Notes",
+            status: "published",
+            organizationId: fixture.organizationId,
+            creatorId: fixture.userId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          return id;
+        });
+        const categoryId = yield* insertCategory(fixture);
+
+        for (const changelogId of [draftChangelogId, publishedChangelogId]) {
+          yield* handlers
+            .ChangelogCategorySet({
+              changelogId,
+              organizationId: fixture.organizationId,
+              categoryIds: [categoryId],
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        }
+
+        const links = yield* handlers.ChangelogCategoryListLinksPublic({
+          organizationId: fixture.organizationId,
+        });
+        expect(links.map((link) => link.changelogId)).toEqual([
+          publishedChangelogId,
+        ]);
       })
     );
   });

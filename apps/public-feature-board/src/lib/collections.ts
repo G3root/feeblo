@@ -278,6 +278,30 @@ export const publicChangelogCategoryCollection = createCollection(
   })
 );
 
+export const publicChangelogCategoryLinkCollection = createCollection(
+  queryCollectionOptions({
+    staleTime: Duration.toMillis(Duration.minutes(5)),
+    queryKey: () =>
+      getOrganizationScopedQueryKey("public-changelog-category-link"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogCategoryListLinksPublic({ organizationId }),
+        { signal: ctx.signal }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
 export const getPublicChangelogPostKey = ({
   changelogId,
   postId,
@@ -733,6 +757,7 @@ export const publicPostSubscriptionCollection = createCollection(
 export const publicCollections = {
   publicBoardCollection,
   publicChangelogCategoryCollection,
+  publicChangelogCategoryLinkCollection,
   publicChangelogCollection,
   publicChangelogPostCollection,
   publicChangelogTagCollection,
