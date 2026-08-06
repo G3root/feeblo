@@ -62,10 +62,19 @@ test.describe("changelog RSS feed", () => {
     expect(response.status()).toBe(200);
     expect(response.headers()["content-type"]).toContain("application/rss+xml");
     const body = await response.text();
+    expect(body).toContain('<?xml version="1.0" encoding="UTF-8"?>');
     expect(body).toContain('<rss version="2.0"');
+    expect(body).toContain(`<title>${user.workspaceName}</title>`);
+    expect(body).toContain(`<link>${boardUrl}/changelog</link>`);
     expect(body).toContain(`<title>${title}</title>`);
     expect(body).toContain(`<link>${boardUrl}/changelog/${slug}</link>`);
-    expect(body).toContain("Published from an RSS e2e test.");
+    expect(body).toContain(
+      "<![CDATA[<p>Published from an RSS e2e test.</p>]]>"
+    );
+    expect(body).toContain('<guid isPermaLink="false">');
+    expect(body).toContain(`<source url="${boardUrl}/changelog/rss.xml">`);
+    expect(body).toContain("<generator>Feeblo</generator>");
+    expect(body).toContain("<ttl>60</ttl>");
 
     // A hidden changelog must not be served through RSS.
     await page.goto(`${workspace.organizationUrl}/settings/changelog-privacy`);
