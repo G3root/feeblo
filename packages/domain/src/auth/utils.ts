@@ -19,21 +19,21 @@ const VerificationOTPStateFromJson = Schema.fromJsonString(
 class VerificationOTPEncryptionError extends Schema.TaggedErrorClass<VerificationOTPEncryptionError>()(
   "VerificationOTPEncryptionError",
   {
-    cause: Schema.Defect,
+    cause: Schema.Defect(),
   }
 ) {}
 
 class VerificationOTPDecryptionError extends Schema.TaggedErrorClass<VerificationOTPDecryptionError>()(
   "VerificationOTPDecryptionError",
   {
-    cause: Schema.Defect,
+    cause: Schema.Defect(),
   }
 ) {}
 
 class InvalidVerificationOTPStateError extends Schema.TaggedErrorClass<InvalidVerificationOTPStateError>()(
   "InvalidVerificationOTPStateError",
   {
-    cause: Schema.optional(Schema.Defect),
+    cause: Schema.optional(Schema.Defect()),
   }
 ) {}
 

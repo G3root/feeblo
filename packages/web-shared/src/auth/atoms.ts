@@ -21,7 +21,7 @@ import { authClient } from "../lib/auth-client";
 
 export class AuthSessionRequestError extends Schema.TaggedErrorClass<AuthSessionRequestError>()(
   "AuthSessionRequestError",
-  { cause: Schema.Defect }
+  { cause: Schema.Defect() }
 ) {}
 
 export const meAtom = Atom.make(

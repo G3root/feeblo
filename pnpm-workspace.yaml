@@ -63,7 +63,4 @@ catalog:
 nodeLinker: hoisted
 overrides:
   prosemirror-model: ^1.25.9
-  # picomatch is CJS; the nested copy under @astrojs/react (from
-  # tinyglobby 0.2.17 -> fdir -> picomatch 4.0.5) is served raw to the
-  # workerd dev runner, which crashes with "require is not defined".
-  # picomatch: 4.0.5
+

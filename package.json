@@ -45,7 +45,6 @@
     "@feeblo/config": "workspace:*",
     "@types/node": "catalog:",
     "dotenv": "catalog:",
-    "effect-solutions": "^0.5.2",
     "turbo": "^2.10.8",
     "typescript": "catalog:",
     "ultracite": "7.2.3",
