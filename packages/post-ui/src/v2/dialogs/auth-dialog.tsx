@@ -28,6 +28,7 @@ import {
   verificationOtpEndpoint,
 } from "@feeblo/web-shared/auth-client";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
+import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import {
   EmailSchema,
   NameSchema,
@@ -384,6 +385,16 @@ function SignInForm({
         )}
         name="password"
       />
+      <div className="flex justify-end">
+        <a
+          className="text-muted-foreground text-sm underline underline-offset-4"
+          href={`${getRuntimePublicEnv().appUrl ?? ""}/forgot-password`}
+          rel="noreferrer"
+          target="_blank"
+        >
+          Forgot password?
+        </a>
+      </div>
       <form.AppForm>
         <form.SubscribeButton
           className="w-full"

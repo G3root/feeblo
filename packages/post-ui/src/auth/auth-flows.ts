@@ -45,6 +45,41 @@ export async function initializeEmailVerification(email: string) {
   return false;
 }
 
+export async function initializePasswordReset(email: string) {
+  const response = await fetch(verificationOtpEndpoint, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      type: "reset-password",
+    }),
+  });
+
+  if (response.ok) {
+    return true;
+  }
+
+  const serverMessage = await response
+    .json()
+    .then((body: unknown) => {
+      if (typeof body === "object" && body !== null) {
+        const record = body as { error?: { message?: string } };
+        return record.error?.message;
+      }
+      return undefined;
+    })
+    .catch(() => undefined);
+
+  toastManager.add({
+    title: serverMessage ?? "Failed to initialize password reset",
+    type: "error",
+  });
+  return false;
+}
+
 export async function signInWithSocialProvider({
   provider,
   redirectTo,

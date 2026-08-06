@@ -18,10 +18,13 @@ import {
   verificationOtpEndpoint,
 } from "@feeblo/web-shared/auth-client";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { z } from "zod";
-
-const RESEND_COOLDOWN_SECONDS = 60;
+import {
+  clearVerificationOtp,
+  getResendLabel,
+  RateLimitErrorSchema,
+  useOtpResend,
+} from "~/features/auth/lib/otp-resend";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
@@ -30,33 +33,6 @@ const SearchSchema = z.object({
 const FormSchema = z.object({
   otp: z.string().length(6, { message: "Verification code must be 6 digits" }),
 });
-
-const RateLimitErrorSchema = z.object({
-  code: z.literal("VERIFICATION_OTP_RATE_LIMITED"),
-  retryAfterSeconds: z.number().int().positive(),
-});
-
-function formatCountdown(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function getResendLabel({
-  cooldown,
-  isResending,
-}: {
-  cooldown: number;
-  isResending: boolean;
-}) {
-  if (isResending) {
-    return "Sending…";
-  }
-  if (cooldown > 0) {
-    return `Resend in ${formatCountdown(cooldown)}`;
-  }
-  return "Resend code";
-}
 
 export const Route = createFileRoute("/email-verify")({
   validateSearch: (search) => SearchSchema.parse(search),
@@ -76,8 +52,12 @@ export const Route = createFileRoute("/email-verify")({
       })
       .safeParse(await response.json());
 
-    if (!parsed.success || parsed.data.type !== "email-verification") {
+    if (!parsed.success) {
       throw redirect({ to: "/sign-up" });
+    }
+
+    if (parsed.data.type === "reset-password") {
+      throw redirect({ to: "/reset-password" });
     }
 
     return parsed.data;
@@ -88,20 +68,33 @@ export const Route = createFileRoute("/email-verify")({
 function RouteComponent() {
   const search = Route.useSearch();
   const verificationState = Route.useLoaderData();
-  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
-  const [isResending, setIsResending] = useState(false);
 
-  useEffect(() => {
-    if (resendCooldown <= 0) {
-      return;
-    }
+  const {
+    cooldown: resendCooldown,
+    isResending,
+    resend,
+  } = useOtpResend({
+    successMessage: "Verification code sent",
+    onResend: async () => {
+      const response = await authClient.emailOtp.sendVerificationOtp({
+        email: verificationState.email,
+        type: "email-verification",
+      });
 
-    const timer = window.setTimeout(() => {
-      setResendCooldown((current) => Math.max(0, current - 1));
-    }, 1000);
+      if (response.error) {
+        const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
+        return {
+          success: false as const,
+          retryAfterSeconds: rateLimitError.success
+            ? rateLimitError.data.retryAfterSeconds
+            : undefined,
+          message: response.error.message,
+        };
+      }
 
-    return () => window.clearTimeout(timer);
-  }, [resendCooldown]);
+      return { success: true as const };
+    },
+  });
 
   const form = useAppForm({
     defaultValues: {
@@ -132,15 +125,7 @@ function RouteComponent() {
         type: "success",
       });
 
-      await fetch(verificationOtpEndpoint, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: verificationState.email,
-          type: "email-verification",
-        }),
-      });
+      await clearVerificationOtp(verificationState.email, "email-verification");
 
       const redirectTo = search.redirectTo?.startsWith("/")
         ? search.redirectTo
@@ -212,38 +197,10 @@ function RouteComponent() {
                         Didn&apos;t receive the code?
                         <Button
                           disabled={resendCooldown > 0 || isResending}
-                          onClick={async (e) => {
+                          onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setIsResending(true);
-                            const response = await authClient.emailOtp
-                              .sendVerificationOtp({
-                                email: verificationState.email,
-                                type: "email-verification",
-                              })
-                              .finally(() => setIsResending(false));
-
-                            if (!response.error) {
-                              setResendCooldown(RESEND_COOLDOWN_SECONDS);
-                              toastManager.add({
-                                title: "Verification code sent",
-                                type: "success",
-                              });
-                              return;
-                            }
-
-                            const rateLimitError =
-                              RateLimitErrorSchema.safeParse(response.error);
-                            if (rateLimitError.success) {
-                              setResendCooldown(
-                                rateLimitError.data.retryAfterSeconds
-                              );
-                            }
-
-                            toastManager.add({
-                              title: response.error.message,
-                              type: "error",
-                            });
+                            resend();
                           }}
                           type="button"
                           variant="link"

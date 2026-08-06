@@ -157,6 +157,16 @@ function RouteComponent() {
             name="password"
           />
 
+          <div className="flex justify-end">
+            <Link
+              className="text-muted-foreground text-sm underline underline-offset-4"
+              search={{ redirectTo: search.redirectTo }}
+              to="/forgot-password"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
           <form.AppForm>
             <form.SubscribeButton
               className="w-full"
