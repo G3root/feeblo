@@ -9,8 +9,7 @@ import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 import * as W from "effect/unstable/workflow";
 
-export const WelcomeUserWorkflow = W.Workflow.make({
-  name: "WelcomeUserWorkflow",
+export const WelcomeUserWorkflow = W.Workflow.make("WelcomeUserWorkflow", {
   payload: {
     userId: S.String,
     email: S.String,

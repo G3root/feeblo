@@ -35,6 +35,10 @@ import {
   organization,
   testUtils,
 } from "better-auth/plugins";
+import {
+  type GenericOAuthUserInfo,
+  genericOAuth,
+} from "better-auth/plugins/generic-oauth";
 import { eq } from "drizzle-orm";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -82,6 +86,8 @@ export const initAuthHandler = (
       githubClientSecret,
       googleClientId,
       googleClientSecret,
+      githubEmulatorUrl,
+      googleEmulatorUrl,
       secret,
       signUpEnabled,
       turnstileKey,
@@ -211,6 +217,88 @@ export const initAuthHandler = (
       }
     };
 
+    // Local OAuth emulator (vercel-labs/emulate) support.
+    //
+    // better-auth's built-in GitHub/Google providers hardcode the token and
+    // userinfo endpoints to the real providers, so the emulator is wired up
+    // through the genericOAuth plugin instead, which supports per-provider
+    // authorizationUrl / tokenUrl / userInfoUrl overrides. The emulators serve
+    // the same paths as the real providers:
+    //   github: /login/oauth/authorize, /login/oauth/access_token, /user
+    //   google: /o/oauth2/v2/auth, /oauth2/token, /oauth2/v2/userinfo (+ OIDC discovery)
+    //
+    // Env contract (values must match emulate.config.yaml):
+    //   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET + GITHUB_EMULATOR_URL
+    //   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET + GOOGLE_EMULATOR_URL
+    //
+    // Providers managed by the emulator are excluded from the built-in
+    // socialProviders block below so their IDs are not registered twice.
+    // Emulator GitHub profiles are api.github.com shaped (login/avatar_url),
+    // which the generic provider doesn't map by itself.
+    type GitHubEmulatorProfile = GenericOAuthUserInfo & {
+      readonly login?: string;
+      readonly avatar_url?: string;
+    };
+
+    const githubEmulator =
+      Option.isSome(githubEmulatorUrl) &&
+      Option.isSome(githubClientId) &&
+      Option.isSome(githubClientSecret)
+        ? {
+            providerId: "github" as const,
+            name: "GitHub",
+            clientId: githubClientId.value,
+            clientSecret: githubClientSecret.value,
+            authorizationUrl: `${githubEmulatorUrl.value}/login/oauth/authorize`,
+            tokenUrl: `${githubEmulatorUrl.value}/login/oauth/access_token`,
+            userInfoUrl: `${githubEmulatorUrl.value}/user`,
+            scopes: ["read:user", "user:email"],
+            // The emulator rejects basic-auth client credentials; secrets go
+            // in the request body.
+            tokenEndpointAuth: { method: "client_secret_post" } as const,
+            disableSignUp: !signUpEnabled,
+            disableImplicitSignUp: !signUpEnabled,
+            mapProfileToUser: (profile: GitHubEmulatorProfile) => {
+              const name = profile.name ?? profile.login;
+              return {
+                name: name ?? "",
+                ...(profile.avatar_url ? { image: profile.avatar_url } : {}),
+                // The emulator always issues emails for verified users.
+                emailVerified: profile.emailVerified ?? Boolean(profile.email),
+              };
+            },
+          }
+        : null;
+
+    const googleEmulator =
+      Option.isSome(googleEmulatorUrl) &&
+      Option.isSome(googleClientId) &&
+      Option.isSome(googleClientSecret)
+        ? {
+            providerId: "google" as const,
+            name: "Google",
+            clientId: googleClientId.value,
+            clientSecret: googleClientSecret.value,
+            // The emulate Google server signs id_tokens with HS256 and serves
+            // an empty JWKS, so OIDC discovery (which enables mandatory id_token
+            // verification against the discovered JWKS) cannot work here. Use
+            // explicit endpoints instead so better-auth skips id_token
+            // verification and resolves the user from the userinfo endpoint.
+            authorizationUrl: `${googleEmulatorUrl.value}/o/oauth2/v2/auth`,
+            tokenUrl: `${googleEmulatorUrl.value}/oauth2/token`,
+            userInfoUrl: `${googleEmulatorUrl.value}/oauth2/v2/userinfo`,
+            scopes: ["openid", "email", "profile"],
+            prompt: "select_account" as const,
+            tokenEndpointAuth: { method: "client_secret_post" } as const,
+            disableSignUp: !signUpEnabled,
+            disableImplicitSignUp: !signUpEnabled,
+          }
+        : null;
+
+    const emulatorProviders = [githubEmulator, googleEmulator].filter(
+      (provider): provider is NonNullable<typeof provider> => provider !== null
+    );
+
     const baseConfig = {
       plugins: [jwtAutoLogin(ssoOptions)],
     } satisfies BetterAuthOptions;
@@ -236,13 +324,17 @@ export const initAuthHandler = (
       session: {
         expiresIn: AUTH_SESSION_DURATION_SECONDS,
       },
-      ...((githubClientId._tag === "Some" &&
-        githubClientSecret._tag === "Some") ||
-      (googleClientId._tag === "Some" && googleClientSecret._tag === "Some")
+      ...((Option.isSome(githubClientId) &&
+        Option.isSome(githubClientSecret) &&
+        Option.isNone(githubEmulatorUrl)) ||
+      (Option.isSome(googleClientId) &&
+        Option.isSome(googleClientSecret) &&
+        Option.isNone(googleEmulatorUrl))
         ? {
             socialProviders: {
-              ...(githubClientId._tag === "Some" &&
-              githubClientSecret._tag === "Some"
+              ...(Option.isSome(githubClientId) &&
+              Option.isSome(githubClientSecret) &&
+              Option.isNone(githubEmulatorUrl)
                 ? {
                     github: {
                       clientId: githubClientId.value,
@@ -252,8 +344,9 @@ export const initAuthHandler = (
                     },
                   }
                 : {}),
-              ...(googleClientId._tag === "Some" &&
-              googleClientSecret._tag === "Some"
+              ...(Option.isSome(googleClientId) &&
+              Option.isSome(googleClientSecret) &&
+              Option.isNone(googleEmulatorUrl)
                 ? {
                     google: {
                       prompt: "select_account",
@@ -312,7 +405,10 @@ export const initAuthHandler = (
       },
       plugins: [
         ...baseConfig.plugins,
-        ...(polarService.client && polarService.webhookSecret._tag === "Some"
+        ...(emulatorProviders.length > 0
+          ? [genericOAuth({ config: emulatorProviders })]
+          : []),
+        ...(polarService.client && Option.isSome(polarService.webhookSecret)
           ? [
               polar({
                 client: polarService.client,
@@ -366,7 +462,7 @@ export const initAuthHandler = (
             ]
           : []),
 
-        ...(turnstileKey._tag === "Some"
+        ...(Option.isSome(turnstileKey)
           ? [
               captcha({
                 provider: "cloudflare-turnstile",

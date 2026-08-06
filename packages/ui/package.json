@@ -11,9 +11,9 @@
     "./*": "./src/*.tsx"
   },
   "dependencies": {
-    "@feeblo/web-shared": "workspace:*",
-    "@feeblo/utils": "workspace:*",
     "@base-ui/react": "catalog:",
+    "@feeblo/utils": "workspace:*",
+    "@feeblo/web-shared": "workspace:*",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
     "@tanstack/react-form": "catalog:",
@@ -23,8 +23,10 @@
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "katex": "^0.17.0",
+    "lucide-react": "^1.28.0",
     "prosekit": "^0.21.4",
     "react": "catalog:",
+    "react-day-picker": "^10.0.1",
     "react-dom": "catalog:",
     "tailwind-merge": "catalog:",
     "zod": "catalog:"

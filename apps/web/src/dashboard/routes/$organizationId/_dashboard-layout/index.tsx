@@ -2,6 +2,14 @@ import { useDashboardHomeStats } from "@feeblo/post-ui/dashboard/use-dashboard-h
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@feeblo/ui/empty";
+import {
   Item,
   ItemActions,
   ItemContent,
@@ -12,7 +20,7 @@ import {
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { Plus } from "@hugeicons/core-free-icons";
+import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -127,6 +135,47 @@ function RouteComponent() {
             );
           })}
         </ItemGroup>
+      </section>
+    );
+  } else {
+    const hasBoards = boards.length > 0;
+    const emptyDescription = hasBoards
+      ? "Create your first post to start collecting and organizing feedback from your users."
+      : "Create your first board to start collecting posts and feedback.";
+    const emptyCta = hasBoards ? (
+      <Button
+        onClick={() =>
+          createPostStore.send({
+            type: "toggle",
+            data: { source: "dashboard", status: "PENDING" },
+          })
+        }
+      >
+        <HugeiconsIcon icon={Plus} />
+        Create your first post
+      </Button>
+    ) : (
+      <Button onClick={() => createBoardStore.send({ type: "toggle" })}>
+        <HugeiconsIcon icon={Plus} />
+        Create your first board
+      </Button>
+    );
+
+    recentPostsSection = (
+      <section>
+        <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+          Recent posts
+        </h2>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={MessageMultiple01Icon} />
+            </EmptyMedia>
+            <EmptyTitle>No posts yet</EmptyTitle>
+            <EmptyDescription>{emptyDescription}</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>{emptyCta}</EmptyContent>
+        </Empty>
       </section>
     );
   }

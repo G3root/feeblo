@@ -67,10 +67,10 @@ const testConnection = (db: PgDrizzle.EffectPgDatabase) =>
   db.execute(sql`SELECT 1`).pipe(
     Effect.retry(
       Schedule.jittered(Schedule.spaced("1.25 seconds")).pipe(
-        Schedule.both(Schedule.recurs(10)),
-        Schedule.tapOutput(([output]) =>
+        Schedule.upTo({ times: 10 }),
+        Schedule.tap(({ attempt }) =>
           Effect.logWarning(
-            `[Database client]: Connection to the database failed. Retrying (attempt ${output}).`
+            `[Database client]: Connection to the database failed. Retrying (attempt ${attempt}).`
           )
         )
       )

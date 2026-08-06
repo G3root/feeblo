@@ -149,6 +149,22 @@ export interface DrizzleAdapterConfig {
    */
   schema?: Record<string, any> | undefined;
   /**
+   * Database schema namespace, used during the Better Auth CLI to generate the schema.
+   *
+   * Only applies to PostgreSQL. It will generate something like this:
+   *
+   * ```ts
+   * const authSchema = pgSchema("auth");
+   *
+   * export const user = authSchema.table("user", {...});
+   * export const session = authSchema.table("session", {...});
+   * ```
+   *
+   * @example "auth"
+   * @default undefined
+   */
+  schemaName?: string | undefined;
+  /**
    * Whether to execute multiple operations in a transaction.
    *
    * If the database doesn't support transactions,
@@ -205,6 +221,10 @@ export const drizzleAdapter = (
       }
 
       function getSchema(model: string) {
+        // Note: the reference adapter falls back to `db._.fullSchema`, but
+        // EffectPgDatabase (drizzle-orm 1.x rc) only exposes `{ relations,
+        // session }` on `db._` — the raw schema is never retained. Requiring
+        // `config.schema` keeps the failure mode explicit.
         const schema = config.schema;
         if (!schema) {
           throw new BetterAuthError(
@@ -752,15 +772,17 @@ export const drizzleAdapter = (
        *
        * When `usePlural` is false (default), Better Auth uses singular model
        * names like "user", but Drizzle's db.query is keyed by the schema
-       * export names (often plural like "users" or suffixed like "userTable").
-       * This function:
+       * export names (often plural like "users"). This function:
        *
-       * 1. Tries the model name directly
+       * 1. Tries the model name directly (works when schema keys match)
        * 2. If usePlural is set, tries appending "s"
-       * 3. Tries the drizzle table naming convention: {model}Table
-       * 4. Falls back to scanning config.schema for matching table objects
+       * 3. Falls back to scanning config.schema to find which db.query key
+       *    corresponds to the same table object
        */
       function getQueryModel(model: string): string | null {
+        if (!dbt.query) {
+          return null;
+        }
         if (dbt.query[model]) {
           return model;
         }
@@ -772,22 +794,15 @@ export const drizzleAdapter = (
           }
         }
 
-        // Try the drizzle table naming convention (e.g., "user" → "userTable")
-        const tableName = `${model}Table`;
-        if (dbt.query[tableName]) {
-          return tableName;
-        }
-
         if (config.schema) {
           const targetTable = config.schema[model];
           if (targetTable) {
-            // Scan existing query keys for naming conventions
+            // EffectPgDatabase does not expose the raw schema on `db._` (the
+            // reference adapter scans `db._.fullSchema` there). Each relational
+            // query builder retains its table object instead, so compare
+            // identity directly.
             for (const key of Object.keys(dbt.query)) {
-              if (
-                key === model ||
-                key === `${model}s` ||
-                key === `${model}Table`
-              ) {
+              if (dbt.query[key]?.table === targetTable) {
                 return key;
               }
             }
@@ -809,7 +824,7 @@ export const drizzleAdapter = (
           const schemaModel = getSchema(model);
           const clause = convertWhereClause(where, model);
 
-          if (options.experimental?.joins) {
+          if (join) {
             const queryModel = getQueryModel(model);
             if (dbt.query && queryModel) {
               let includes:
@@ -817,22 +832,20 @@ export const drizzleAdapter = (
                 | undefined;
 
               const pluralJoinResults: string[] = [];
-              if (join) {
-                includes = {};
-                const joinEntries = Object.entries(join);
-                for (const [model, joinAttr] of joinEntries) {
-                  const limit =
-                    joinAttr.limit ??
-                    options.advanced?.database?.defaultFindManyLimit ??
-                    100;
-                  const isUnique = joinAttr.relation === "one-to-one";
-                  const pluralSuffix = isUnique || config.usePlural ? "" : "s";
-                  includes[`${model}${pluralSuffix}`] = isUnique
-                    ? true
-                    : { limit };
-                  if (!isUnique) {
-                    pluralJoinResults.push(`${model}${pluralSuffix}`);
-                  }
+              includes = {};
+              const joinEntries = Object.entries(join);
+              for (const [model, joinAttr] of joinEntries) {
+                const limit =
+                  joinAttr.limit ??
+                  options.advanced?.database?.defaultFindManyLimit ??
+                  100;
+                const isUnique = joinAttr.relation === "one-to-one";
+                const pluralSuffix = isUnique || config.usePlural ? "" : "s";
+                includes[`${model}${pluralSuffix}`] = isUnique
+                  ? true
+                  : { limit };
+                if (!isUnique) {
+                  pluralJoinResults.push(`${model}${pluralSuffix}`);
                 }
               }
               const query = dbt.query[queryModel].findFirst({
@@ -900,30 +913,28 @@ export const drizzleAdapter = (
           const clause = where ? convertWhereClause(where, model) : [];
           const sortFn = sortBy?.direction === "desc" ? desc : asc;
 
-          if (options.experimental?.joins) {
+          if (join) {
             const queryModel = getQueryModel(model);
-            if (queryModel) {
+            if (dbt.query && queryModel) {
               let includes:
                 | Record<string, { limit: number } | boolean>
                 | undefined;
 
               const pluralJoinResults: string[] = [];
-              if (join) {
-                includes = {};
-                const joinEntries = Object.entries(join);
-                for (const [model, joinAttr] of joinEntries) {
-                  const isUnique = joinAttr.relation === "one-to-one";
-                  const limit =
-                    joinAttr.limit ??
-                    options.advanced?.database?.defaultFindManyLimit ??
-                    100;
-                  const pluralSuffix = isUnique || config.usePlural ? "" : "s";
-                  includes[`${model}${pluralSuffix}`] = isUnique
-                    ? true
-                    : { limit };
-                  if (!isUnique) {
-                    pluralJoinResults.push(`${model}${pluralSuffix}`);
-                  }
+              includes = {};
+              const joinEntries = Object.entries(join);
+              for (const [model, joinAttr] of joinEntries) {
+                const isUnique = joinAttr.relation === "one-to-one";
+                const limit =
+                  joinAttr.limit ??
+                  options.advanced?.database?.defaultFindManyLimit ??
+                  100;
+                const pluralSuffix = isUnique || config.usePlural ? "" : "s";
+                includes[`${model}${pluralSuffix}`] = isUnique
+                  ? true
+                  : { limit };
+                if (!isUnique) {
+                  pluralJoinResults.push(`${model}${pluralSuffix}`);
                 }
               }
               let orderBy: SQL<unknown>[] | undefined;
@@ -1224,9 +1235,12 @@ export const drizzleAdapter = (
       adapterName: "Drizzle Adapter",
       usePlural: config.usePlural ?? false,
       debugLogs: config.debugLogs ?? false,
-      supportsUUIDs: true,
-      supportsJSON: true,
-      supportsArrays: true,
+      supportsUUIDs: config.provider === "pg" ? true : false,
+      supportsJSON:
+        config.provider === "pg" // even though mysql also supports it, mysql requires to pass stringified json anyway.
+          ? true
+          : false,
+      supportsArrays: config.provider === "pg" ? true : false,
       customTransformOutput: ({ data, fieldAttributes }) => {
         // not all providers support dates
         // one such example case is https://github.com/better-auth/better-auth/issues/7819
