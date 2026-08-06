@@ -1,7 +1,7 @@
 import type {
+  RoadmapColumnDefinition,
   RoadmapLane,
   RoadmapPost,
-  RoadmapStatusDefinition,
 } from "./types";
 
 export function formatRoadmapPostDate(value: Date | string) {
@@ -19,16 +19,16 @@ export function formatRoadmapPostDate(value: Date | string) {
 
 export function groupRoadmapPostsByStatus<TPost extends RoadmapPost>(
   posts: readonly TPost[],
-  orderedStatuses: readonly RoadmapStatusDefinition[]
+  orderedColumns: readonly RoadmapColumnDefinition[]
 ) {
   const map = new Map<string, RoadmapLane<TPost>>(
-    orderedStatuses.map((status) => [
-      status.id,
+    orderedColumns.map((column) => [
+      column.statusId,
       {
-        name: status.name,
+        name: column.name,
         posts: [],
-        status: status.type,
-        statusId: status.id,
+        status: column.type,
+        statusId: column.statusId,
       },
     ])
   );

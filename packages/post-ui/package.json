@@ -115,6 +115,14 @@
     "./roadmap/utils": {
       "types": "./src/roadmap/utils.ts",
       "default": "./src/roadmap/utils.ts"
+    },
+    "./roadmap/use-roadmap-data": {
+      "types": "./src/roadmap/use-roadmap-data.ts",
+      "default": "./src/roadmap/use-roadmap-data.ts"
+    },
+    "./dashboard/use-dashboard-home-stats": {
+      "types": "./src/dashboard/use-dashboard-home-stats.ts",
+      "default": "./src/dashboard/use-dashboard-home-stats.ts"
     }
   },
   "scripts": {

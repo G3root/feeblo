@@ -15,6 +15,10 @@ describe("plan feature catalog", () => {
       label: "Private Boards",
     });
     expect(rows).not.toContainEqual({
+      key: "privateRoadmaps",
+      label: "Private Roadmaps",
+    });
+    expect(rows).not.toContainEqual({
       key: "removeBranding",
       label: "Remove Feeblo Branding",
     });
@@ -29,6 +33,7 @@ describe("plan feature catalog", () => {
       capabilities: {
         changelog: true,
         privateBoards: true,
+        privateRoadmaps: true,
         removeBranding: true,
         roadmap: true,
         unlimitedEndUsers: true,
@@ -44,6 +49,7 @@ describe("plan feature catalog", () => {
       { key: "unlimitedEndUsers", label: "Unlimited End Users" },
       { key: "unlimitedPosts", label: "Unlimited Posts" },
       { key: "privateBoards", label: "Private Boards" },
+      { key: "privateRoadmaps", label: "Private Roadmaps" },
       { key: "removeBranding", label: "Remove Feeblo Branding" },
     ]);
   });

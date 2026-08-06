@@ -1,9 +1,21 @@
-import { groupRoadmapPostsByStatus } from "@feeblo/post-ui/roadmap/utils";
+import { useRoadmapData } from "@feeblo/post-ui/roadmap/use-roadmap-data";
 import { Button } from "@feeblo/ui/button";
-import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
-import { Plus } from "@hugeicons/core-free-icons";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@feeblo/ui/empty";
+import {
+  hasOwnerOrAdminRole,
+  hasPermission,
+  PolicyGuard,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
+import { LayoutThreeColumnIcon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
 import { useCreateRoadmapDialogContext } from "~/features/roadmap/dialog-stores";
@@ -35,124 +47,37 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId } = Route.useParams();
 
-  const roadmapsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ roadmap: roadmapCollection })
-        .where(({ roadmap }) =>
-          and(
-            eq(roadmap.organizationId, organizationId),
-            eq(roadmap.mode, "status")
-          )
-        )
-        .select(({ roadmap }) => ({
-          description: roadmap.description,
-          id: roadmap.id,
-          name: roadmap.name,
-        }))
-        .orderBy(({ roadmap }) => roadmap.createdAt, "asc"),
-    [organizationId]
-  );
+  const { isError, isLoading, lanesFor, roadmaps } = useRoadmapData({
+    boardCollection,
+    postCollection,
+    postStatusCollection,
+    roadmapCollection,
+    roadmapColumnCollection,
+    organizationId,
+  });
 
-  const columnsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ column: roadmapColumnCollection })
-        .join(
-          { postStatus: postStatusCollection },
-          ({ column, postStatus }) => eq(column.statusId, postStatus.id),
-          "inner"
-        )
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        )
-        .select(({ column, postStatus }) => ({
-          id: postStatus.id,
-          name: column.name,
-          roadmapId: column.roadmapId,
-          type: postStatus.type,
-        }))
-        .orderBy(({ column }) => column.position, "asc"),
-    [organizationId]
-  );
-
-  const postsQuery = useLiveQuery(
-    (q) =>
-      q
-        .from({ post: postCollection })
-        .join(
-          { postStatus: postStatusCollection },
-          ({ post, postStatus }) => eq(post.statusId, postStatus.id),
-          "inner"
-        )
-        .join(
-          { board: boardCollection },
-          ({ post, board }) => eq(post.boardId, board.id),
-          "inner"
-        )
-        .where(({ board, post, postStatus }) =>
-          and(
-            eq(post.organizationId, organizationId),
-            eq(postStatus.organizationId, organizationId),
-            eq(board.organizationId, organizationId)
-          )
-        )
-        .select(({ board, post, postStatus }) => ({
-          boardName: board.name,
-          boardSlug: board.slug,
-          id: post.id,
-          slug: post.slug,
-          status: postStatus.type,
-          statusId: post.statusId,
-          summary: post.excerpt,
-          title: post.title,
-          updatedAt: post.updatedAt,
-        }))
-        .orderBy(({ post }) => post.createdAt, "desc"),
-    [organizationId]
-  );
-
-  if (roadmapsQuery.isError || columnsQuery.isError || postsQuery.isError) {
+  if (isError) {
     throw new Error("Failed to load roadmap");
   }
 
-  if (
-    roadmapsQuery.isLoading ||
-    columnsQuery.isLoading ||
-    postsQuery.isLoading
-  ) {
+  if (isLoading) {
     return <RoadmapLoadingState />;
   }
 
-  const roadmaps = roadmapsQuery.data ?? [];
-
   if (roadmaps.length === 0) {
     return (
-      <RoadmapEmptyState message="This workspace does not have a roadmap yet." />
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
+        <RoadmapListHeader showCreateAction={false} />
+        <RoadmapEmptyState />
+      </div>
     );
-  }
-
-  const columns = columnsQuery.data ?? [];
-  const posts = postsQuery.data ?? [];
-
-  const columnsByRoadmapId = new Map<string, typeof columns>();
-  for (const column of columns) {
-    const grouped = columnsByRoadmapId.get(column.roadmapId);
-    if (grouped) {
-      grouped.push(column);
-    } else {
-      columnsByRoadmapId.set(column.roadmapId, [column]);
-    }
   }
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-4 overflow-y-auto p-4 md:p-6">
       <RoadmapListHeader />
       {roadmaps.map((roadmap) => {
-        const lanes = groupRoadmapPostsByStatus(
-          posts,
-          columnsByRoadmapId.get(roadmap.id) ?? []
-        );
+        const lanes = lanesFor(roadmap.id);
 
         return (
           <section
@@ -170,7 +95,7 @@ function RouteComponent() {
             {lanes.length > 0 ? (
               <RoadmapBoard lanes={lanes} organizationId={organizationId} />
             ) : (
-              <RoadmapEmptyState message="This roadmap has no columns configured." />
+              <RoadmapEmptyMessage message="This roadmap has no columns configured." />
             )}
           </section>
         );
@@ -179,25 +104,31 @@ function RouteComponent() {
   );
 }
 
-function RoadmapListHeader() {
+function RoadmapListHeader({
+  showCreateAction = true,
+}: {
+  showCreateAction?: boolean;
+}) {
   const organizationId = useOrganizationId();
   const createStore = useCreateRoadmapDialogContext();
 
   return (
     <div className="flex items-center justify-between px-3">
       <h1 className="font-semibold text-xl">Roadmaps</h1>
-      <PolicyGuard policy={hasPermission(organizationId, "roadmap.*")}>
-        {({ allowed }) => (
-          <Button
-            disabled={!allowed}
-            onClick={() => createStore.send({ type: "toggle" })}
-            size="sm"
-          >
-            <HugeiconsIcon icon={Plus} />
-            New Roadmap
-          </Button>
-        )}
-      </PolicyGuard>
+      {showCreateAction ? (
+        <PolicyGuard policy={hasPermission(organizationId, "roadmap.*")}>
+          {({ allowed }) => (
+            <Button
+              disabled={!allowed}
+              onClick={() => createStore.send({ type: "toggle" })}
+              size="sm"
+            >
+              <HugeiconsIcon icon={Plus} />
+              New Roadmap
+            </Button>
+          )}
+        </PolicyGuard>
+      ) : null}
     </div>
   );
 }
@@ -214,10 +145,41 @@ function RoadmapLoadingState() {
   );
 }
 
-function RoadmapEmptyState({ message }: { message: string }) {
+function RoadmapEmptyState() {
+  const organizationId = useOrganizationId();
+  const createStore = useCreateRoadmapDialogContext();
+  const { allowed: canManage } = usePolicy(hasOwnerOrAdminRole(organizationId));
+
   return (
-    <div className="flex min-h-64 flex-1 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
-      {message}
-    </div>
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HugeiconsIcon icon={LayoutThreeColumnIcon} />
+        </EmptyMedia>
+        <EmptyTitle>No roadmaps yet</EmptyTitle>
+        <EmptyDescription>
+          Create a roadmap to visualize how feedback moves from idea to shipped.
+        </EmptyDescription>
+      </EmptyHeader>
+      {canManage ? (
+        <EmptyContent>
+          <Button onClick={() => createStore.send({ type: "toggle" })}>
+            <HugeiconsIcon icon={Plus} />
+            Create roadmap
+          </Button>
+        </EmptyContent>
+      ) : null}
+    </Empty>
+  );
+}
+
+function RoadmapEmptyMessage({ message }: { message: string }) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyTitle>Nothing here yet</EmptyTitle>
+        <EmptyDescription>{message}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

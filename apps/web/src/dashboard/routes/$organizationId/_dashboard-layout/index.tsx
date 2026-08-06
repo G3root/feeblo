@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
+import { useDashboardHomeStats } from "@feeblo/post-ui/dashboard/use-dashboard-home-stats";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -14,8 +14,8 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { count, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
@@ -34,6 +34,7 @@ export const Route = createFileRoute("/$organizationId/_dashboard-layout/")({
       boardCollection.preload(),
       postCollection.preload(),
       postStatusCollection.preload(),
+      upvoteCollection.preload(),
     ]);
 
     return null;
@@ -46,58 +47,89 @@ function RouteComponent() {
   const createPostStore = usePostCreateDialogContext();
   const createBoardStore = useCreateBoardDialogContext();
 
-  const { data: boards } = useLiveQuery(
-    (q) =>
-      q
-        .from({ board: boardCollection })
-        .where(({ board }) => eq(board.organizationId, organizationId)),
-    [organizationId]
-  );
+  const { boards, isError, isLoading, recentPosts, statuses, upvoteCounts } =
+    useDashboardHomeStats({
+      boardCollection,
+      postCollection,
+      postStatusCollection,
+      upvoteCollection,
+      organizationId,
+    });
 
-  const { data: statuses } = useLiveQuery(
-    (q) =>
-      q
-        .from({ postStatus: postStatusCollection })
-        .where(({ postStatus }) =>
-          eq(postStatus.organizationId, organizationId)
-        ),
-    [organizationId]
-  );
-
-  const {
-    data: recentPosts,
-    isError: recentPostsError,
-    isLoading: recentPostsLoading,
-  } = useLiveQuery(
-    (q) =>
-      q
-        .from({ post: postCollection })
-        .where(({ post }) => eq(post.organizationId, organizationId))
-        .orderBy(({ post }) => post.createdAt, "desc")
-        .limit(5),
-    [organizationId]
-  );
-
-  const { data: upvoteCounts } = useLiveQuery(
-    (q) =>
-      q
-        .from({ upvote: upvoteCollection })
-        .where(({ upvote }) => eq(upvote.organizationId, organizationId))
-        .groupBy(({ upvote }) => upvote.postId)
-        .select(({ upvote }) => ({
-          count: count(upvote.id),
-          postId: upvote.postId,
-        })),
-    [organizationId]
-  );
-
-  const boardMap = new Map((boards ?? []).map((b) => [b.id, b]));
+  const boardMap = new Map(boards.map((b) => [b.id, b]));
   const upvoteCountByPostId = new Map(
-    (upvoteCounts ?? []).map((entry) => [entry.postId, entry.count])
+    upvoteCounts.map((entry) => [entry.postId, entry.count])
   );
 
   const userName =
     sessionData?.user?.name ?? sessionData?.user?.email ?? "there";
+
+  let recentPostsSection: ReactNode;
+
+  if (isLoading) {
+    recentPostsSection = <RecentPostsSkeleton />;
+  } else if (isError) {
+    recentPostsSection = (
+      <section>
+        <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+          Recent posts
+        </h2>
+        <div className="flex min-h-32 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
+          There was a problem loading your recent posts.
+        </div>
+      </section>
+    );
+  } else if (recentPosts.length > 0) {
+    recentPostsSection = (
+      <section>
+        <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+          Recent posts
+        </h2>
+        <ItemGroup>
+          {recentPosts.map((post) => {
+            const board = boardMap.get(post.boardId);
+            const status = statuses.find((s) => s.id === post.statusId);
+            return (
+              <Link
+                className="block transition-transform duration-100 active:scale-[0.99]"
+                key={post.id}
+                params={{
+                  organizationId,
+                  boardSlug: board?.slug ?? "",
+                  postSlug: post.slug,
+                }}
+                to="/$organizationId/post/$boardSlug/$postSlug"
+              >
+                <Item size="sm" variant="outline">
+                  <ItemContent>
+                    <ItemTitle>{post.title}</ItemTitle>
+                    <ItemDescription>
+                      {board?.name}
+                      {board?.name && " · "}
+                      {formatPostDate(post.createdAt)}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemActions>
+                    {status && (
+                      <Badge className="text-xs" variant="secondary">
+                        {status.type
+                          .toLowerCase()
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </Badge>
+                    )}
+                    <span className="text-muted-foreground text-sm tabular-nums">
+                      {upvoteCountByPostId.get(post.id) ?? 0}
+                    </span>
+                  </ItemActions>
+                </Item>
+              </Link>
+            );
+          })}
+        </ItemGroup>
+      </section>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
@@ -130,75 +162,7 @@ function RouteComponent() {
         </div>
       </div>
 
-      {recentPostsError ? (
-        <section>
-          <h2 className="mb-3 font-medium text-muted-foreground text-sm">
-            Recent posts
-          </h2>
-          <div className="flex min-h-24 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
-            There was a problem loading recent posts.
-          </div>
-        </section>
-      ) : recentPostsLoading ? (
-        <section>
-          <h2 className="mb-3 font-medium text-muted-foreground text-sm">
-            Recent posts
-          </h2>
-          <div className="space-y-2">
-            {[1, 2, 3].map((skeleton) => (
-              <Skeleton className="h-12 w-full" key={skeleton} />
-            ))}
-          </div>
-        </section>
-      ) : recentPosts && recentPosts.length > 0 ? (
-        <section>
-          <h2 className="mb-3 font-medium text-muted-foreground text-sm">
-            Recent posts
-          </h2>
-          <ItemGroup>
-            {recentPosts.map((post) => {
-              const board = boardMap.get(post.boardId);
-              const status = statuses?.find((s) => s.id === post.statusId);
-              return (
-                <Link
-                  className="block transition-transform duration-100 active:scale-[0.99]"
-                  key={post.id}
-                  params={{
-                    organizationId,
-                    boardSlug: board?.slug ?? "",
-                    postSlug: post.slug,
-                  }}
-                  to="/$organizationId/post/$boardSlug/$postSlug"
-                >
-                  <Item size="sm" variant="outline">
-                    <ItemContent>
-                      <ItemTitle>{post.title}</ItemTitle>
-                      <ItemDescription>
-                        {board?.name}
-                        {board?.name && " · "}
-                        {formatPostDate(post.createdAt)}
-                      </ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                      {status && (
-                        <Badge className="text-xs" variant="secondary">
-                          {status.type
-                            .toLowerCase()
-                            .replace(/_/g, " ")
-                            .replace(/\b\w/g, (c) => c.toUpperCase())}
-                        </Badge>
-                      )}
-                      <span className="text-muted-foreground text-sm tabular-nums">
-                        {upvoteCountByPostId.get(post.id) ?? 0}
-                      </span>
-                    </ItemActions>
-                  </Item>
-                </Link>
-              );
-            })}
-          </ItemGroup>
-        </section>
-      ) : null}
+      {recentPostsSection}
 
       <Separator />
 
@@ -218,3 +182,33 @@ function RouteComponent() {
     </div>
   );
 }
+
+function RecentPostsSkeleton() {
+  return (
+    <section>
+      <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+        Recent posts
+      </h2>
+      <ItemGroup>
+        {RECENT_POST_SKELETON_KEYS.map((key) => (
+          <Item key={key} size="sm" variant="outline">
+            <ItemContent>
+              <ItemTitle>
+                <Skeleton className="h-4 w-2/5" />
+              </ItemTitle>
+              <ItemDescription>
+                <Skeleton className="h-3 w-1/3" />
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-4 w-6" />
+            </ItemActions>
+          </Item>
+        ))}
+      </ItemGroup>
+    </section>
+  );
+}
+
+const RECENT_POST_SKELETON_KEYS = ["a", "b", "c", "d", "e"];

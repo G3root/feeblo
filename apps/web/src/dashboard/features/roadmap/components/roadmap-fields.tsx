@@ -24,6 +24,7 @@ import { useState } from "react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { postStatusCollection } from "~/lib/collections";
 import { roadmapFormOpts } from "../shared-form";
+import { RoadmapVisibilityField } from "./roadmap-visibility-field";
 
 export const RoadmapFields = withForm({
   ...roadmapFormOpts,
@@ -38,6 +39,7 @@ export const RoadmapFields = withForm({
           children={(field) => <field.TextareaField label="Description" />}
           name="description"
         />
+        <RoadmapVisibilityField form={form} />
         <RoadmapColumnsField form={form} />
       </>
     );

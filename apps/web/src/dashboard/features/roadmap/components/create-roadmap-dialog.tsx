@@ -11,6 +11,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { roadmapCollection, roadmapColumnCollection } from "~/lib/collections";
@@ -46,6 +47,18 @@ export function CreateRoadmapDialog() {
 function CreateRoadmapForm() {
   const organizationId = useOrganizationId();
   const store = useCreateRoadmapDialogContext();
+
+  const { data: roadmaps, isLoading } = useLiveQuery(
+    (q) =>
+      q
+        .from({ roadmap: roadmapCollection })
+        .where(({ roadmap }) => eq(roadmap.organizationId, organizationId)),
+    [organizationId]
+  );
+
+  const isFirstRoadmap =
+    !isLoading && roadmaps !== undefined && roadmaps.length === 0;
+
   const form = useAppForm({
     ...roadmapFormOpts,
     onSubmit: async ({ value }) => {
@@ -59,7 +72,7 @@ function CreateRoadmapForm() {
           name: value.name,
           slug: slugify(value.name),
           description: value.description ?? null,
-          isPrimary: false,
+          isPrimary: isFirstRoadmap,
           mode: "status",
           visibility: value.visibility,
           filter: emptyFilter,
