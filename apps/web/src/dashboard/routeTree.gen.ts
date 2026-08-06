@@ -9,18 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
-<<<<<<< HEAD
-import { Route as SignUpRouteImport } from "./routes/sign-up"
-import { Route as SignInRouteImport } from "./routes/sign-in"
-import { Route as ResetPasswordRouteImport } from "./routes/reset-password"
-import { Route as RegisterRouteImport } from "./routes/register"
-import { Route as ForgotPasswordRouteImport } from "./routes/forgot-password"
-import { Route as EmailVerifyRouteImport } from "./routes/email-verify"
-=======
->>>>>>> main
 import { Route as OrganizationIdRouteImport } from "./routes/$organizationId"
 import { Route as EmailVerifyRouteImport } from "./routes/email-verify"
+import { Route as ForgotPasswordRouteImport } from "./routes/forgot-password"
 import { Route as RegisterRouteImport } from "./routes/register"
+import { Route as ResetPasswordRouteImport } from "./routes/reset-password"
 import { Route as SignInRouteImport } from "./routes/sign-in"
 import { Route as SignUpRouteImport } from "./routes/sign-up"
 import { Route as OrganizationIdDashboardLayoutRouteImport } from "./routes/$organizationId/_dashboard-layout"
@@ -55,35 +48,9 @@ import { Route as OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport 
 import { Route as OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 import { Route as OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 
-<<<<<<< HEAD
-const SignUpRoute = SignUpRouteImport.update({
-  id: "/sign-up",
-  path: "/sign-up",
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignInRoute = SignInRouteImport.update({
-  id: "/sign-in",
-  path: "/sign-in",
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: "/reset-password",
-  path: "/reset-password",
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RegisterRoute = RegisterRouteImport.update({
-  id: "/register",
-  path: "/register",
-=======
 const OrganizationIdRoute = OrganizationIdRouteImport.update({
   id: "/$organizationId",
   path: "/$organizationId",
->>>>>>> main
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
-  id: "/forgot-password",
-  path: "/forgot-password",
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmailVerifyRoute = EmailVerifyRouteImport.update({
@@ -91,9 +58,19 @@ const EmailVerifyRoute = EmailVerifyRouteImport.update({
   path: "/email-verify",
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: "/forgot-password",
+  path: "/forgot-password",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: "/register",
   path: "/register",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: "/reset-password",
+  path: "/reset-password",
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -539,47 +516,11 @@ export interface RootRouteChildren {
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-<<<<<<< HEAD
-    "/sign-up": {
-      id: "/sign-up"
-      path: "/sign-up"
-      fullPath: "/sign-up"
-      preLoaderRoute: typeof SignUpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    "/sign-in": {
-      id: "/sign-in"
-      path: "/sign-in"
-      fullPath: "/sign-in"
-      preLoaderRoute: typeof SignInRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    "/reset-password": {
-      id: "/reset-password"
-      path: "/reset-password"
-      fullPath: "/reset-password"
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    "/register": {
-      id: "/register"
-      path: "/register"
-      fullPath: "/register"
-      preLoaderRoute: typeof RegisterRouteImport
-=======
     "/$organizationId": {
       id: "/$organizationId"
       path: "/$organizationId"
       fullPath: "/$organizationId"
       preLoaderRoute: typeof OrganizationIdRouteImport
->>>>>>> main
-      parentRoute: typeof rootRouteImport
-    }
-    "/forgot-password": {
-      id: "/forgot-password"
-      path: "/forgot-password"
-      fullPath: "/forgot-password"
-      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/email-verify": {
@@ -589,11 +530,25 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof EmailVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/forgot-password": {
+      id: "/forgot-password"
+      path: "/forgot-password"
+      fullPath: "/forgot-password"
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/register": {
       id: "/register"
       path: "/register"
       fullPath: "/register"
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/reset-password": {
+      id: "/reset-password"
+      path: "/reset-password"
+      fullPath: "/reset-password"
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/sign-in": {
