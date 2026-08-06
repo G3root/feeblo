@@ -22,7 +22,7 @@ export class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplat
   "MailTemplateRenderError",
   {
     subject: Schema.String,
-    cause: Schema.Defect,
+    cause: Schema.Defect(),
   }
 ) {}
 
@@ -30,7 +30,7 @@ export class MailDeliveryError extends Schema.TaggedErrorClass<MailDeliveryError
   "MailDeliveryError",
   {
     subject: Schema.String,
-    cause: Schema.Defect,
+    cause: Schema.Defect(),
   }
 ) {}
 

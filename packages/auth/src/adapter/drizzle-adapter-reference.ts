@@ -151,6 +151,22 @@ export interface DrizzleAdapterConfig {
    */
   schema?: Record<string, any> | undefined;
   /**
+   * Database schema namespace, used during the Better Auth CLI to generate the schema.
+   *
+   * Only applies to PostgreSQL. It will generate something like this:
+   *
+   * ```ts
+   * const authSchema = pgSchema("auth");
+   *
+   * export const user = authSchema.table("user", {...});
+   * export const session = authSchema.table("session", {...});
+   * ```
+   *
+   * @example "auth"
+   * @default undefined
+   */
+  schemaName?: string | undefined;
+  /**
    * Whether to execute multiple operations in a transaction.
    *
    * If the database doesn't support transactions,
@@ -173,7 +189,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
     (db: DB, inTransaction = false): AdapterFactoryCustomizeAdapterCreator =>
     ({
       getFieldName,
-      getDefaultFieldName: _getDefaultFieldName,
+      getDefaultFieldName,
       getDefaultModelName,
       options,
       schema: baSchema,
@@ -737,6 +753,9 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
        *    corresponds to the same table object
        */
       function getQueryModel(model: string): string | null {
+        if (!db.query) {
+          return null;
+        }
         if (db.query[model]) {
           return model;
         }
@@ -777,7 +796,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
           const schemaModel = getSchema(model);
           const clause = convertWhereClause(where, model);
 
-          if (options.experimental?.joins) {
+          if (join) {
             const queryModel = getQueryModel(model);
             if (db.query && queryModel) {
               let includes:
@@ -785,22 +804,20 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                 | undefined;
 
               const pluralJoinResults: string[] = [];
-              if (join) {
-                includes = {};
-                const joinEntries = Object.entries(join);
-                for (const [model, joinAttr] of joinEntries) {
-                  const limit =
-                    joinAttr.limit ??
-                    options.advanced?.database?.defaultFindManyLimit ??
-                    100;
-                  const isUnique = joinAttr.relation === "one-to-one";
-                  const pluralSuffix = isUnique || config.usePlural ? "" : "s";
-                  includes[`${model}${pluralSuffix}`] = isUnique
-                    ? true
-                    : { limit };
-                  if (!isUnique) {
-                    pluralJoinResults.push(`${model}${pluralSuffix}`);
-                  }
+              includes = {};
+              const joinEntries = Object.entries(join);
+              for (const [model, joinAttr] of joinEntries) {
+                const limit =
+                  joinAttr.limit ??
+                  options.advanced?.database?.defaultFindManyLimit ??
+                  100;
+                const isUnique = joinAttr.relation === "one-to-one";
+                const pluralSuffix = isUnique || config.usePlural ? "" : "s";
+                includes[`${model}${pluralSuffix}`] = isUnique
+                  ? true
+                  : { limit };
+                if (!isUnique) {
+                  pluralJoinResults.push(`${model}${pluralSuffix}`);
                 }
               }
               const query = db.query[queryModel].findFirst({
@@ -865,30 +882,28 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
           const clause = where ? convertWhereClause(where, model) : [];
           const sortFn = sortBy?.direction === "desc" ? desc : asc;
 
-          if (options.experimental?.joins) {
+          if (join) {
             const queryModel = getQueryModel(model);
-            if (queryModel) {
+            if (db.query && queryModel) {
               let includes:
                 | Record<string, { limit: number } | boolean>
                 | undefined;
 
               const pluralJoinResults: string[] = [];
-              if (join) {
-                includes = {};
-                const joinEntries = Object.entries(join);
-                for (const [model, joinAttr] of joinEntries) {
-                  const isUnique = joinAttr.relation === "one-to-one";
-                  const limit =
-                    joinAttr.limit ??
-                    options.advanced?.database?.defaultFindManyLimit ??
-                    100;
-                  const pluralSuffix = isUnique || config.usePlural ? "" : "s";
-                  includes[`${model}${pluralSuffix}`] = isUnique
-                    ? true
-                    : { limit };
-                  if (!isUnique) {
-                    pluralJoinResults.push(`${model}${pluralSuffix}`);
-                  }
+              includes = {};
+              const joinEntries = Object.entries(join);
+              for (const [model, joinAttr] of joinEntries) {
+                const isUnique = joinAttr.relation === "one-to-one";
+                const limit =
+                  joinAttr.limit ??
+                  options.advanced?.database?.defaultFindManyLimit ??
+                  100;
+                const pluralSuffix = isUnique || config.usePlural ? "" : "s";
+                includes[`${model}${pluralSuffix}`] = isUnique
+                  ? true
+                  : { limit };
+                if (!isUnique) {
+                  pluralJoinResults.push(`${model}${pluralSuffix}`);
                 }
               }
               let orderBy: SQL<unknown>[] | undefined;

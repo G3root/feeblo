@@ -14,7 +14,7 @@ class SubmissionNotificationDataError extends S.TaggedErrorClass<SubmissionNotif
   "SubmissionNotificationDataError",
   {
     operation: S.String,
-    cause: S.Defect,
+    cause: S.Defect(),
   }
 ) {}
 
@@ -24,15 +24,17 @@ const WorkflowError = S.Union([
   SubmissionNotificationDataError,
 ]);
 
-export const SubmissionEmailNotificationWorkflow = W.Workflow.make({
-  name: "SubmissionEmailNotificationWorkflow",
-  payload: {
-    batchId: S.String,
-    organizationId: S.String,
-  },
-  error: WorkflowError,
-  idempotencyKey: ({ batchId }) => batchId,
-});
+export const SubmissionEmailNotificationWorkflow = W.Workflow.make(
+  "SubmissionEmailNotificationWorkflow",
+  {
+    payload: {
+      batchId: S.String,
+      organizationId: S.String,
+    },
+    error: WorkflowError,
+    idempotencyKey: ({ batchId }) => batchId,
+  }
+);
 
 const releaseBatch = ({
   batchId,

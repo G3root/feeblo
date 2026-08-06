@@ -9,45 +9,53 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
+<<<<<<< HEAD
 import { Route as SignUpRouteImport } from "./routes/sign-up"
 import { Route as SignInRouteImport } from "./routes/sign-in"
 import { Route as ResetPasswordRouteImport } from "./routes/reset-password"
 import { Route as RegisterRouteImport } from "./routes/register"
 import { Route as ForgotPasswordRouteImport } from "./routes/forgot-password"
 import { Route as EmailVerifyRouteImport } from "./routes/email-verify"
+=======
+>>>>>>> main
 import { Route as OrganizationIdRouteImport } from "./routes/$organizationId"
-import { Route as OrganizationIdSettingsRouteImport } from "./routes/$organizationId/settings"
+import { Route as EmailVerifyRouteImport } from "./routes/email-verify"
+import { Route as RegisterRouteImport } from "./routes/register"
+import { Route as SignInRouteImport } from "./routes/sign-in"
+import { Route as SignUpRouteImport } from "./routes/sign-up"
 import { Route as OrganizationIdDashboardLayoutRouteImport } from "./routes/$organizationId/_dashboard-layout"
-import { Route as OrganizationIdSettingsIndexRouteImport } from "./routes/$organizationId/settings/index"
+import { Route as OrganizationIdSettingsRouteImport } from "./routes/$organizationId/settings"
 import { Route as OrganizationIdDashboardLayoutIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/index"
-import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$organizationId/settings/workspace"
-import { Route as OrganizationIdSettingsSecurityRouteImport } from "./routes/$organizationId/settings/security"
-import { Route as OrganizationIdSettingsRoadmapRouteImport } from "./routes/$organizationId/settings/roadmap"
-import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
-import { Route as OrganizationIdSettingsPreferencesRouteImport } from "./routes/$organizationId/settings/preferences"
-import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
-import { Route as OrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/$organizationId/settings/feedback-tags"
-import { Route as OrganizationIdSettingsCustomizeRouteImport } from "./routes/$organizationId/settings/customize"
-import { Route as OrganizationIdSettingsCustomAttributesRouteImport } from "./routes/$organizationId/settings/custom-attributes"
-import { Route as OrganizationIdSettingsChangelogTagsRouteImport } from "./routes/$organizationId/settings/changelog-tags"
-import { Route as OrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/$organizationId/settings/changelog-privacy"
+import { Route as OrganizationIdSettingsIndexRouteImport } from "./routes/$organizationId/settings/index"
 import { Route as OrganizationIdSettingsBillingRouteImport } from "./routes/$organizationId/settings/billing"
-import { Route as OrganizationIdDashboardLayoutRoadmapIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/index"
-import { Route as OrganizationIdDashboardLayoutFeedbackIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/index"
-import { Route as OrganizationIdDashboardLayoutContactIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/contact/index"
-import { Route as OrganizationIdDashboardLayoutCompanyIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/company/index"
+import { Route as OrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/$organizationId/settings/changelog-privacy"
+import { Route as OrganizationIdSettingsChangelogTagsRouteImport } from "./routes/$organizationId/settings/changelog-tags"
+import { Route as OrganizationIdSettingsCustomAttributesRouteImport } from "./routes/$organizationId/settings/custom-attributes"
+import { Route as OrganizationIdSettingsCustomizeRouteImport } from "./routes/$organizationId/settings/customize"
+import { Route as OrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/$organizationId/settings/feedback-tags"
+import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
+import { Route as OrganizationIdSettingsPreferencesRouteImport } from "./routes/$organizationId/settings/preferences"
+import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
+import { Route as OrganizationIdSettingsRoadmapRouteImport } from "./routes/$organizationId/settings/roadmap"
+import { Route as OrganizationIdSettingsSecurityRouteImport } from "./routes/$organizationId/settings/security"
+import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$organizationId/settings/workspace"
 import { Route as OrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/index"
-import { Route as OrganizationIdDashboardLayoutRoadmapSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/$slug"
-import { Route as OrganizationIdDashboardLayoutFeedbackBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/backlog"
-import { Route as OrganizationIdDashboardLayoutFeedbackActiveRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/active"
-import { Route as OrganizationIdDashboardLayoutChangelogPublishedRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/published"
 import { Route as OrganizationIdDashboardLayoutChangelogDraftRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/draft"
+import { Route as OrganizationIdDashboardLayoutChangelogPublishedRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/published"
+import { Route as OrganizationIdDashboardLayoutCompanyIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/company/index"
+import { Route as OrganizationIdDashboardLayoutContactIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/contact/index"
+import { Route as OrganizationIdDashboardLayoutFeedbackIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/index"
+import { Route as OrganizationIdDashboardLayoutFeedbackActiveRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/active"
+import { Route as OrganizationIdDashboardLayoutFeedbackBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/backlog"
+import { Route as OrganizationIdDashboardLayoutRoadmapIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/index"
+import { Route as OrganizationIdDashboardLayoutRoadmapSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/$slug"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
-import { Route as OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
-import { Route as OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
-import { Route as OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/active"
+import { Route as OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
+import { Route as OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
+import { Route as OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 
+<<<<<<< HEAD
 const SignUpRoute = SignUpRouteImport.update({
   id: "/sign-up",
   path: "/sign-up",
@@ -66,6 +74,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: "/register",
   path: "/register",
+=======
+const OrganizationIdRoute = OrganizationIdRouteImport.update({
+  id: "/$organizationId",
+  path: "/$organizationId",
+>>>>>>> main
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -78,97 +91,41 @@ const EmailVerifyRoute = EmailVerifyRouteImport.update({
   path: "/email-verify",
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrganizationIdRoute = OrganizationIdRouteImport.update({
-  id: "/$organizationId",
-  path: "/$organizationId",
+const RegisterRoute = RegisterRouteImport.update({
+  id: "/register",
+  path: "/register",
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrganizationIdSettingsRoute = OrganizationIdSettingsRouteImport.update({
-  id: "/settings",
-  path: "/settings",
-  getParentRoute: () => OrganizationIdRoute,
+const SignInRoute = SignInRouteImport.update({
+  id: "/sign-in",
+  path: "/sign-in",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignUpRoute = SignUpRouteImport.update({
+  id: "/sign-up",
+  path: "/sign-up",
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizationIdDashboardLayoutRoute =
   OrganizationIdDashboardLayoutRouteImport.update({
     id: "/_dashboard-layout",
     getParentRoute: () => OrganizationIdRoute,
   } as any)
-const OrganizationIdSettingsIndexRoute =
-  OrganizationIdSettingsIndexRouteImport.update({
-    id: "/",
-    path: "/",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
+const OrganizationIdSettingsRoute = OrganizationIdSettingsRouteImport.update({
+  id: "/settings",
+  path: "/settings",
+  getParentRoute: () => OrganizationIdRoute,
+} as any)
 const OrganizationIdDashboardLayoutIndexRoute =
   OrganizationIdDashboardLayoutIndexRouteImport.update({
     id: "/",
     path: "/",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
-const OrganizationIdSettingsWorkspaceRoute =
-  OrganizationIdSettingsWorkspaceRouteImport.update({
-    id: "/workspace",
-    path: "/workspace",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsSecurityRoute =
-  OrganizationIdSettingsSecurityRouteImport.update({
-    id: "/security",
-    path: "/security",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsRoadmapRoute =
-  OrganizationIdSettingsRoadmapRouteImport.update({
-    id: "/roadmap",
-    path: "/roadmap",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsProfileRoute =
-  OrganizationIdSettingsProfileRouteImport.update({
-    id: "/profile",
-    path: "/profile",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsPreferencesRoute =
-  OrganizationIdSettingsPreferencesRouteImport.update({
-    id: "/preferences",
-    path: "/preferences",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsMembersRoute =
-  OrganizationIdSettingsMembersRouteImport.update({
-    id: "/members",
-    path: "/members",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsFeedbackTagsRoute =
-  OrganizationIdSettingsFeedbackTagsRouteImport.update({
-    id: "/feedback-tags",
-    path: "/feedback-tags",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsCustomizeRoute =
-  OrganizationIdSettingsCustomizeRouteImport.update({
-    id: "/customize",
-    path: "/customize",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsCustomAttributesRoute =
-  OrganizationIdSettingsCustomAttributesRouteImport.update({
-    id: "/custom-attributes",
-    path: "/custom-attributes",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsChangelogTagsRoute =
-  OrganizationIdSettingsChangelogTagsRouteImport.update({
-    id: "/changelog-tags",
-    path: "/changelog-tags",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
-const OrganizationIdSettingsChangelogPrivacyRoute =
-  OrganizationIdSettingsChangelogPrivacyRouteImport.update({
-    id: "/changelog-privacy",
-    path: "/changelog-privacy",
+const OrganizationIdSettingsIndexRoute =
+  OrganizationIdSettingsIndexRouteImport.update({
+    id: "/",
+    path: "/",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdSettingsBillingRoute =
@@ -177,58 +134,76 @@ const OrganizationIdSettingsBillingRoute =
     path: "/billing",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdDashboardLayoutRoadmapIndexRoute =
-  OrganizationIdDashboardLayoutRoadmapIndexRouteImport.update({
-    id: "/roadmap/",
-    path: "/roadmap/",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+const OrganizationIdSettingsChangelogPrivacyRoute =
+  OrganizationIdSettingsChangelogPrivacyRouteImport.update({
+    id: "/changelog-privacy",
+    path: "/changelog-privacy",
+    getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdDashboardLayoutFeedbackIndexRoute =
-  OrganizationIdDashboardLayoutFeedbackIndexRouteImport.update({
-    id: "/feedback/",
-    path: "/feedback/",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+const OrganizationIdSettingsChangelogTagsRoute =
+  OrganizationIdSettingsChangelogTagsRouteImport.update({
+    id: "/changelog-tags",
+    path: "/changelog-tags",
+    getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdDashboardLayoutContactIndexRoute =
-  OrganizationIdDashboardLayoutContactIndexRouteImport.update({
-    id: "/contact/",
-    path: "/contact/",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+const OrganizationIdSettingsCustomAttributesRoute =
+  OrganizationIdSettingsCustomAttributesRouteImport.update({
+    id: "/custom-attributes",
+    path: "/custom-attributes",
+    getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdDashboardLayoutCompanyIndexRoute =
-  OrganizationIdDashboardLayoutCompanyIndexRouteImport.update({
-    id: "/company/",
-    path: "/company/",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+const OrganizationIdSettingsCustomizeRoute =
+  OrganizationIdSettingsCustomizeRouteImport.update({
+    id: "/customize",
+    path: "/customize",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsFeedbackTagsRoute =
+  OrganizationIdSettingsFeedbackTagsRouteImport.update({
+    id: "/feedback-tags",
+    path: "/feedback-tags",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsMembersRoute =
+  OrganizationIdSettingsMembersRouteImport.update({
+    id: "/members",
+    path: "/members",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsPreferencesRoute =
+  OrganizationIdSettingsPreferencesRouteImport.update({
+    id: "/preferences",
+    path: "/preferences",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsProfileRoute =
+  OrganizationIdSettingsProfileRouteImport.update({
+    id: "/profile",
+    path: "/profile",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsRoadmapRoute =
+  OrganizationIdSettingsRoadmapRouteImport.update({
+    id: "/roadmap",
+    path: "/roadmap",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsSecurityRoute =
+  OrganizationIdSettingsSecurityRouteImport.update({
+    id: "/security",
+    path: "/security",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsWorkspaceRoute =
+  OrganizationIdSettingsWorkspaceRouteImport.update({
+    id: "/workspace",
+    path: "/workspace",
+    getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdDashboardLayoutChangelogIndexRoute =
   OrganizationIdDashboardLayoutChangelogIndexRouteImport.update({
     id: "/changelog/",
     path: "/changelog/",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
-  } as any)
-const OrganizationIdDashboardLayoutRoadmapSlugRoute =
-  OrganizationIdDashboardLayoutRoadmapSlugRouteImport.update({
-    id: "/roadmap/$slug",
-    path: "/roadmap/$slug",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
-  } as any)
-const OrganizationIdDashboardLayoutFeedbackBacklogRoute =
-  OrganizationIdDashboardLayoutFeedbackBacklogRouteImport.update({
-    id: "/feedback/backlog",
-    path: "/feedback/backlog",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
-  } as any)
-const OrganizationIdDashboardLayoutFeedbackActiveRoute =
-  OrganizationIdDashboardLayoutFeedbackActiveRouteImport.update({
-    id: "/feedback/active",
-    path: "/feedback/active",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
-  } as any)
-const OrganizationIdDashboardLayoutChangelogPublishedRoute =
-  OrganizationIdDashboardLayoutChangelogPublishedRouteImport.update({
-    id: "/changelog/published",
-    path: "/changelog/published",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
 const OrganizationIdDashboardLayoutChangelogDraftRoute =
@@ -237,22 +212,64 @@ const OrganizationIdDashboardLayoutChangelogDraftRoute =
     path: "/changelog/draft",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
+const OrganizationIdDashboardLayoutChangelogPublishedRoute =
+  OrganizationIdDashboardLayoutChangelogPublishedRouteImport.update({
+    id: "/changelog/published",
+    path: "/changelog/published",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutCompanyIndexRoute =
+  OrganizationIdDashboardLayoutCompanyIndexRouteImport.update({
+    id: "/company/",
+    path: "/company/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutContactIndexRoute =
+  OrganizationIdDashboardLayoutContactIndexRouteImport.update({
+    id: "/contact/",
+    path: "/contact/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutFeedbackIndexRoute =
+  OrganizationIdDashboardLayoutFeedbackIndexRouteImport.update({
+    id: "/feedback/",
+    path: "/feedback/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutFeedbackActiveRoute =
+  OrganizationIdDashboardLayoutFeedbackActiveRouteImport.update({
+    id: "/feedback/active",
+    path: "/feedback/active",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutFeedbackBacklogRoute =
+  OrganizationIdDashboardLayoutFeedbackBacklogRouteImport.update({
+    id: "/feedback/backlog",
+    path: "/feedback/backlog",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutRoadmapIndexRoute =
+  OrganizationIdDashboardLayoutRoadmapIndexRouteImport.update({
+    id: "/roadmap/",
+    path: "/roadmap/",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutRoadmapSlugRoute =
+  OrganizationIdDashboardLayoutRoadmapSlugRouteImport.update({
+    id: "/roadmap/$slug",
+    path: "/roadmap/$slug",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
 const OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute =
   OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport.update({
     id: "/board/$boardSlug/",
     path: "/board/$boardSlug/",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
-const OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute =
-  OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport.update({
-    id: "/post/$boardSlug/$postSlug",
-    path: "/post/$boardSlug/$postSlug",
-    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
-  } as any)
-const OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute =
-  OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport.update({
-    id: "/changelog/edit/$changelogSlug",
-    path: "/changelog/edit/$changelogSlug",
+const OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute =
+  OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport.update({
+    id: "/board/$boardSlug/active",
+    path: "/board/$boardSlug/active",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
 const OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute =
@@ -261,10 +278,16 @@ const OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute =
     path: "/board/$boardSlug/backlog",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
-const OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute =
-  OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport.update({
-    id: "/board/$boardSlug/active",
-    path: "/board/$boardSlug/active",
+const OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute =
+  OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport.update({
+    id: "/changelog/edit/$changelogSlug",
+    path: "/changelog/edit/$changelogSlug",
+    getParentRoute: () => OrganizationIdDashboardLayoutRoute,
+  } as any)
+const OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute =
+  OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport.update({
+    id: "/post/$boardSlug/$postSlug",
+    path: "/post/$boardSlug/$postSlug",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
 
@@ -516,6 +539,7 @@ export interface RootRouteChildren {
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+<<<<<<< HEAD
     "/sign-up": {
       id: "/sign-up"
       path: "/sign-up"
@@ -542,6 +566,13 @@ declare module "@tanstack/react-router" {
       path: "/register"
       fullPath: "/register"
       preLoaderRoute: typeof RegisterRouteImport
+=======
+    "/$organizationId": {
+      id: "/$organizationId"
+      path: "/$organizationId"
+      fullPath: "/$organizationId"
+      preLoaderRoute: typeof OrganizationIdRouteImport
+>>>>>>> main
       parentRoute: typeof rootRouteImport
     }
     "/forgot-password": {
@@ -558,19 +589,26 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof EmailVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    "/$organizationId": {
-      id: "/$organizationId"
-      path: "/$organizationId"
-      fullPath: "/$organizationId"
-      preLoaderRoute: typeof OrganizationIdRouteImport
+    "/register": {
+      id: "/register"
+      path: "/register"
+      fullPath: "/register"
+      preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
-    "/$organizationId/settings": {
-      id: "/$organizationId/settings"
-      path: "/settings"
-      fullPath: "/$organizationId/settings"
-      preLoaderRoute: typeof OrganizationIdSettingsRouteImport
-      parentRoute: typeof OrganizationIdRoute
+    "/sign-in": {
+      id: "/sign-in"
+      path: "/sign-in"
+      fullPath: "/sign-in"
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/sign-up": {
+      id: "/sign-up"
+      path: "/sign-up"
+      fullPath: "/sign-up"
+      preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
     }
     "/$organizationId/_dashboard-layout": {
       id: "/$organizationId/_dashboard-layout"
@@ -579,12 +617,12 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutRouteImport
       parentRoute: typeof OrganizationIdRoute
     }
-    "/$organizationId/settings/": {
-      id: "/$organizationId/settings/"
-      path: "/"
-      fullPath: "/$organizationId/settings/"
-      preLoaderRoute: typeof OrganizationIdSettingsIndexRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
+    "/$organizationId/settings": {
+      id: "/$organizationId/settings"
+      path: "/settings"
+      fullPath: "/$organizationId/settings"
+      preLoaderRoute: typeof OrganizationIdSettingsRouteImport
+      parentRoute: typeof OrganizationIdRoute
     }
     "/$organizationId/_dashboard-layout/": {
       id: "/$organizationId/_dashboard-layout/"
@@ -593,81 +631,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutIndexRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
-    "/$organizationId/settings/workspace": {
-      id: "/$organizationId/settings/workspace"
-      path: "/workspace"
-      fullPath: "/$organizationId/settings/workspace"
-      preLoaderRoute: typeof OrganizationIdSettingsWorkspaceRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/security": {
-      id: "/$organizationId/settings/security"
-      path: "/security"
-      fullPath: "/$organizationId/settings/security"
-      preLoaderRoute: typeof OrganizationIdSettingsSecurityRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/roadmap": {
-      id: "/$organizationId/settings/roadmap"
-      path: "/roadmap"
-      fullPath: "/$organizationId/settings/roadmap"
-      preLoaderRoute: typeof OrganizationIdSettingsRoadmapRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/profile": {
-      id: "/$organizationId/settings/profile"
-      path: "/profile"
-      fullPath: "/$organizationId/settings/profile"
-      preLoaderRoute: typeof OrganizationIdSettingsProfileRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/preferences": {
-      id: "/$organizationId/settings/preferences"
-      path: "/preferences"
-      fullPath: "/$organizationId/settings/preferences"
-      preLoaderRoute: typeof OrganizationIdSettingsPreferencesRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/members": {
-      id: "/$organizationId/settings/members"
-      path: "/members"
-      fullPath: "/$organizationId/settings/members"
-      preLoaderRoute: typeof OrganizationIdSettingsMembersRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/feedback-tags": {
-      id: "/$organizationId/settings/feedback-tags"
-      path: "/feedback-tags"
-      fullPath: "/$organizationId/settings/feedback-tags"
-      preLoaderRoute: typeof OrganizationIdSettingsFeedbackTagsRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/customize": {
-      id: "/$organizationId/settings/customize"
-      path: "/customize"
-      fullPath: "/$organizationId/settings/customize"
-      preLoaderRoute: typeof OrganizationIdSettingsCustomizeRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/custom-attributes": {
-      id: "/$organizationId/settings/custom-attributes"
-      path: "/custom-attributes"
-      fullPath: "/$organizationId/settings/custom-attributes"
-      preLoaderRoute: typeof OrganizationIdSettingsCustomAttributesRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/changelog-tags": {
-      id: "/$organizationId/settings/changelog-tags"
-      path: "/changelog-tags"
-      fullPath: "/$organizationId/settings/changelog-tags"
-      preLoaderRoute: typeof OrganizationIdSettingsChangelogTagsRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
-    "/$organizationId/settings/changelog-privacy": {
-      id: "/$organizationId/settings/changelog-privacy"
-      path: "/changelog-privacy"
-      fullPath: "/$organizationId/settings/changelog-privacy"
-      preLoaderRoute: typeof OrganizationIdSettingsChangelogPrivacyRouteImport
+    "/$organizationId/settings/": {
+      id: "/$organizationId/settings/"
+      path: "/"
+      fullPath: "/$organizationId/settings/"
+      preLoaderRoute: typeof OrganizationIdSettingsIndexRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/settings/billing": {
@@ -677,67 +645,88 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsBillingRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
-    "/$organizationId/_dashboard-layout/roadmap/": {
-      id: "/$organizationId/_dashboard-layout/roadmap/"
+    "/$organizationId/settings/changelog-privacy": {
+      id: "/$organizationId/settings/changelog-privacy"
+      path: "/changelog-privacy"
+      fullPath: "/$organizationId/settings/changelog-privacy"
+      preLoaderRoute: typeof OrganizationIdSettingsChangelogPrivacyRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/changelog-tags": {
+      id: "/$organizationId/settings/changelog-tags"
+      path: "/changelog-tags"
+      fullPath: "/$organizationId/settings/changelog-tags"
+      preLoaderRoute: typeof OrganizationIdSettingsChangelogTagsRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/custom-attributes": {
+      id: "/$organizationId/settings/custom-attributes"
+      path: "/custom-attributes"
+      fullPath: "/$organizationId/settings/custom-attributes"
+      preLoaderRoute: typeof OrganizationIdSettingsCustomAttributesRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/customize": {
+      id: "/$organizationId/settings/customize"
+      path: "/customize"
+      fullPath: "/$organizationId/settings/customize"
+      preLoaderRoute: typeof OrganizationIdSettingsCustomizeRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/feedback-tags": {
+      id: "/$organizationId/settings/feedback-tags"
+      path: "/feedback-tags"
+      fullPath: "/$organizationId/settings/feedback-tags"
+      preLoaderRoute: typeof OrganizationIdSettingsFeedbackTagsRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/members": {
+      id: "/$organizationId/settings/members"
+      path: "/members"
+      fullPath: "/$organizationId/settings/members"
+      preLoaderRoute: typeof OrganizationIdSettingsMembersRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/preferences": {
+      id: "/$organizationId/settings/preferences"
+      path: "/preferences"
+      fullPath: "/$organizationId/settings/preferences"
+      preLoaderRoute: typeof OrganizationIdSettingsPreferencesRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/profile": {
+      id: "/$organizationId/settings/profile"
+      path: "/profile"
+      fullPath: "/$organizationId/settings/profile"
+      preLoaderRoute: typeof OrganizationIdSettingsProfileRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/roadmap": {
+      id: "/$organizationId/settings/roadmap"
       path: "/roadmap"
-      fullPath: "/$organizationId/roadmap/"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapIndexRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+      fullPath: "/$organizationId/settings/roadmap"
+      preLoaderRoute: typeof OrganizationIdSettingsRoadmapRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
     }
-    "/$organizationId/_dashboard-layout/feedback/": {
-      id: "/$organizationId/_dashboard-layout/feedback/"
-      path: "/feedback"
-      fullPath: "/$organizationId/feedback/"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutFeedbackIndexRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    "/$organizationId/settings/security": {
+      id: "/$organizationId/settings/security"
+      path: "/security"
+      fullPath: "/$organizationId/settings/security"
+      preLoaderRoute: typeof OrganizationIdSettingsSecurityRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
     }
-    "/$organizationId/_dashboard-layout/contact/": {
-      id: "/$organizationId/_dashboard-layout/contact/"
-      path: "/contact"
-      fullPath: "/$organizationId/contact/"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutContactIndexRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
-    }
-    "/$organizationId/_dashboard-layout/company/": {
-      id: "/$organizationId/_dashboard-layout/company/"
-      path: "/company"
-      fullPath: "/$organizationId/company/"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutCompanyIndexRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    "/$organizationId/settings/workspace": {
+      id: "/$organizationId/settings/workspace"
+      path: "/workspace"
+      fullPath: "/$organizationId/settings/workspace"
+      preLoaderRoute: typeof OrganizationIdSettingsWorkspaceRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/_dashboard-layout/changelog/": {
       id: "/$organizationId/_dashboard-layout/changelog/"
       path: "/changelog"
       fullPath: "/$organizationId/changelog/"
       preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogIndexRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
-    }
-    "/$organizationId/_dashboard-layout/roadmap/$slug": {
-      id: "/$organizationId/_dashboard-layout/roadmap/$slug"
-      path: "/roadmap/$slug"
-      fullPath: "/$organizationId/roadmap/$slug"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapSlugRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
-    }
-    "/$organizationId/_dashboard-layout/feedback/backlog": {
-      id: "/$organizationId/_dashboard-layout/feedback/backlog"
-      path: "/feedback/backlog"
-      fullPath: "/$organizationId/feedback/backlog"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutFeedbackBacklogRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
-    }
-    "/$organizationId/_dashboard-layout/feedback/active": {
-      id: "/$organizationId/_dashboard-layout/feedback/active"
-      path: "/feedback/active"
-      fullPath: "/$organizationId/feedback/active"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutFeedbackActiveRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
-    }
-    "/$organizationId/_dashboard-layout/changelog/published": {
-      id: "/$organizationId/_dashboard-layout/changelog/published"
-      path: "/changelog/published"
-      fullPath: "/$organizationId/changelog/published"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogPublishedRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
     "/$organizationId/_dashboard-layout/changelog/draft": {
@@ -747,6 +736,62 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogDraftRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
+    "/$organizationId/_dashboard-layout/changelog/published": {
+      id: "/$organizationId/_dashboard-layout/changelog/published"
+      path: "/changelog/published"
+      fullPath: "/$organizationId/changelog/published"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogPublishedRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/company/": {
+      id: "/$organizationId/_dashboard-layout/company/"
+      path: "/company"
+      fullPath: "/$organizationId/company/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutCompanyIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/contact/": {
+      id: "/$organizationId/_dashboard-layout/contact/"
+      path: "/contact"
+      fullPath: "/$organizationId/contact/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutContactIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/feedback/": {
+      id: "/$organizationId/_dashboard-layout/feedback/"
+      path: "/feedback"
+      fullPath: "/$organizationId/feedback/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutFeedbackIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/feedback/active": {
+      id: "/$organizationId/_dashboard-layout/feedback/active"
+      path: "/feedback/active"
+      fullPath: "/$organizationId/feedback/active"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutFeedbackActiveRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/feedback/backlog": {
+      id: "/$organizationId/_dashboard-layout/feedback/backlog"
+      path: "/feedback/backlog"
+      fullPath: "/$organizationId/feedback/backlog"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutFeedbackBacklogRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/roadmap/": {
+      id: "/$organizationId/_dashboard-layout/roadmap/"
+      path: "/roadmap"
+      fullPath: "/$organizationId/roadmap/"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapIndexRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/roadmap/$slug": {
+      id: "/$organizationId/_dashboard-layout/roadmap/$slug"
+      path: "/roadmap/$slug"
+      fullPath: "/$organizationId/roadmap/$slug"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapSlugRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
     "/$organizationId/_dashboard-layout/board/$boardSlug/": {
       id: "/$organizationId/_dashboard-layout/board/$boardSlug/"
       path: "/board/$boardSlug"
@@ -754,18 +799,11 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
-    "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": {
-      id: "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
-      path: "/post/$boardSlug/$postSlug"
-      fullPath: "/$organizationId/post/$boardSlug/$postSlug"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport
-      parentRoute: typeof OrganizationIdDashboardLayoutRoute
-    }
-    "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug": {
-      id: "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
-      path: "/changelog/edit/$changelogSlug"
-      fullPath: "/$organizationId/changelog/edit/$changelogSlug"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport
+    "/$organizationId/_dashboard-layout/board/$boardSlug/active": {
+      id: "/$organizationId/_dashboard-layout/board/$boardSlug/active"
+      path: "/board/$boardSlug/active"
+      fullPath: "/$organizationId/board/$boardSlug/active"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
     "/$organizationId/_dashboard-layout/board/$boardSlug/backlog": {
@@ -775,11 +813,18 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
-    "/$organizationId/_dashboard-layout/board/$boardSlug/active": {
-      id: "/$organizationId/_dashboard-layout/board/$boardSlug/active"
-      path: "/board/$boardSlug/active"
-      fullPath: "/$organizationId/board/$boardSlug/active"
-      preLoaderRoute: typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport
+    "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug": {
+      id: "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
+      path: "/changelog/edit/$changelogSlug"
+      fullPath: "/$organizationId/changelog/edit/$changelogSlug"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport
+      parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": {
+      id: "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
+      path: "/post/$boardSlug/$postSlug"
+      fullPath: "/$organizationId/post/$boardSlug/$postSlug"
+      preLoaderRoute: typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
   }

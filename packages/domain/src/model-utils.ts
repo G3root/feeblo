@@ -222,7 +222,7 @@ export const Date: Date = Schema.String.pipe(
         return Effect.succeed(DateTime.removeTime(opt.value));
       }
       return Effect.fail(
-        new SchemaIssue.InvalidValue(Option.some(s), {
+        new SchemaIssue.InvalidValue({
           message: "Invalid date format",
         })
       );
