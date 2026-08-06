@@ -52,7 +52,7 @@
   "dependencies": {},
   "devDependencies": {
     "@feeblo/config": "workspace:*",
-    "@floating-ui/dom": "^1.7.4",
+    "@floating-ui/dom": "catalog:",
     "happy-dom": "^20.10.6",
     "typescript": "catalog:",
     "vite": "catalog:",

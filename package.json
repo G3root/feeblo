@@ -38,18 +38,18 @@
     "fix": "ultracite fix"
   },
   "devDependencies": {
-    "dotenv": "catalog:",
-    "zod": "catalog:",
-    "@dotenvx/dotenvx": "catalog:",
     "@biomejs/biome": "2.4.0",
     "@cloudflare/workers-types": "catalog:",
+    "@dotenvx/dotenvx": "catalog:",
     "@effect/language-service": "^0.85.1",
     "@feeblo/config": "workspace:*",
     "@types/node": "catalog:",
+    "dotenv": "catalog:",
     "effect-solutions": "^0.5.2",
-    "turbo": "^2.9.9",
+    "turbo": "^2.10.8",
     "typescript": "catalog:",
-    "ultracite": "7.2.3"
+    "ultracite": "7.2.3",
+    "zod": "catalog:"
   },
   "packageManager": "pnpm@11.0.3",
   "engines": {

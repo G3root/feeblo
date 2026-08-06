@@ -143,7 +143,7 @@
     "@hugeicons/react": "^1.1.6",
     "@number-flow/react": "^0.6.1",
     "@tanstack/react-db": "catalog:",
-    "@tanstack/react-form": "^1.28.6",
+    "@tanstack/react-form": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:"
