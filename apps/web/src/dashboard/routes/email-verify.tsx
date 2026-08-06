@@ -76,8 +76,12 @@ export const Route = createFileRoute("/email-verify")({
       })
       .safeParse(await response.json());
 
-    if (!parsed.success || parsed.data.type !== "email-verification") {
+    if (!parsed.success) {
       throw redirect({ to: "/sign-up" });
+    }
+
+    if (parsed.data.type === "reset-password") {
+      throw redirect({ to: "/reset-password" });
     }
 
     return parsed.data;

@@ -45,6 +45,30 @@ export async function initializeEmailVerification(email: string) {
   return false;
 }
 
+export async function initializePasswordReset(email: string) {
+  const response = await fetch(verificationOtpEndpoint, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      type: "reset-password",
+    }),
+  });
+
+  if (response.ok) {
+    return true;
+  }
+
+  toastManager.add({
+    title: "Failed to initialize password reset",
+    type: "error",
+  });
+  return false;
+}
+
 export async function signInWithSocialProvider({
   provider,
   redirectTo,

@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as SignUpRouteImport } from "./routes/sign-up"
 import { Route as SignInRouteImport } from "./routes/sign-in"
+import { Route as ResetPasswordRouteImport } from "./routes/reset-password"
 import { Route as RegisterRouteImport } from "./routes/register"
+import { Route as ForgotPasswordRouteImport } from "./routes/forgot-password"
 import { Route as EmailVerifyRouteImport } from "./routes/email-verify"
 import { Route as OrganizationIdRouteImport } from "./routes/$organizationId"
 import { Route as OrganizationIdSettingsRouteImport } from "./routes/$organizationId/settings"
@@ -56,9 +58,19 @@ const SignInRoute = SignInRouteImport.update({
   path: "/sign-in",
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: "/reset-password",
+  path: "/reset-password",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: "/register",
   path: "/register",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: "/forgot-password",
+  path: "/forgot-password",
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmailVerifyRoute = EmailVerifyRouteImport.update({
@@ -259,7 +271,9 @@ const OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute =
 export interface FileRoutesByFullPath {
   "/$organizationId": typeof OrganizationIdRouteWithChildren
   "/email-verify": typeof EmailVerifyRoute
+  "/forgot-password": typeof ForgotPasswordRoute
   "/register": typeof RegisterRoute
+  "/reset-password": typeof ResetPasswordRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/settings": typeof OrganizationIdSettingsRouteWithChildren
@@ -296,7 +310,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/$organizationId": typeof OrganizationIdDashboardLayoutIndexRoute
   "/email-verify": typeof EmailVerifyRoute
+  "/forgot-password": typeof ForgotPasswordRoute
   "/register": typeof RegisterRoute
+  "/reset-password": typeof ResetPasswordRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/settings/billing": typeof OrganizationIdSettingsBillingRoute
@@ -332,7 +348,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/$organizationId": typeof OrganizationIdRouteWithChildren
   "/email-verify": typeof EmailVerifyRoute
+  "/forgot-password": typeof ForgotPasswordRoute
   "/register": typeof RegisterRoute
+  "/reset-password": typeof ResetPasswordRoute
   "/sign-in": typeof SignInRoute
   "/sign-up": typeof SignUpRoute
   "/$organizationId/_dashboard-layout": typeof OrganizationIdDashboardLayoutRouteWithChildren
@@ -372,7 +390,9 @@ export interface FileRouteTypes {
   fullPaths:
     | "/$organizationId"
     | "/email-verify"
+    | "/forgot-password"
     | "/register"
+    | "/reset-password"
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/settings"
@@ -409,7 +429,9 @@ export interface FileRouteTypes {
   to:
     | "/$organizationId"
     | "/email-verify"
+    | "/forgot-password"
     | "/register"
+    | "/reset-password"
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/settings/billing"
@@ -444,7 +466,9 @@ export interface FileRouteTypes {
     | "__root__"
     | "/$organizationId"
     | "/email-verify"
+    | "/forgot-password"
     | "/register"
+    | "/reset-password"
     | "/sign-in"
     | "/sign-up"
     | "/$organizationId/_dashboard-layout"
@@ -483,7 +507,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   OrganizationIdRoute: typeof OrganizationIdRouteWithChildren
   EmailVerifyRoute: typeof EmailVerifyRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   RegisterRoute: typeof RegisterRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
 }
@@ -504,11 +530,25 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/reset-password": {
+      id: "/reset-password"
+      path: "/reset-password"
+      fullPath: "/reset-password"
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/register": {
       id: "/register"
       path: "/register"
       fullPath: "/register"
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/forgot-password": {
+      id: "/forgot-password"
+      path: "/forgot-password"
+      fullPath: "/forgot-password"
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/email-verify": {
@@ -866,7 +906,9 @@ const OrganizationIdRouteWithChildren = OrganizationIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   OrganizationIdRoute: OrganizationIdRouteWithChildren,
   EmailVerifyRoute: EmailVerifyRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   RegisterRoute: RegisterRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
 }

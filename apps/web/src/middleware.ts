@@ -23,6 +23,8 @@ export const localeMiddleware = defineMiddleware(async (context, next) => {
 const AUTH_SIGN_IN_PATH = "/sign-in";
 const AUTH_SIGN_UP_PATH = "/sign-up";
 const AUTH_EMAIL_VERIFY_PATH = "/email-verify";
+const AUTH_FORGOT_PASSWORD_PATH = "/forgot-password";
+const AUTH_RESET_PASSWORD_PATH = "/reset-password";
 const REGISTER_PATH = "/register";
 const DASHBOARD_PATH = "/";
 const PUBLIC_BOARD_PATH = "/s";
@@ -32,6 +34,8 @@ const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_SIGN_IN_PATH,
   AUTH_SIGN_UP_PATH,
   AUTH_EMAIL_VERIFY_PATH,
+  AUTH_FORGOT_PASSWORD_PATH,
+  AUTH_RESET_PASSWORD_PATH,
 ]);
 const DASHBOARD_NON_ORG_PATHS = new Set([
   ...DASHBOARD_AUTH_PATHS,
