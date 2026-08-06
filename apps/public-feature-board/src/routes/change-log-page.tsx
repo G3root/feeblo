@@ -12,7 +12,7 @@ import {
 } from "@feeblo/ui/input-group";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Separator } from "@feeblo/ui/separator";
-import { Search01Icon } from "@hugeicons/core-free-icons";
+import { RssIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, ilike, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link } from "@tanstack/react-router";
@@ -83,7 +83,17 @@ export function ChangelogPage() {
   return (
     <ChangelogPageLayout>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="font-semibold text-base tracking-tight">Changelogs</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold text-base tracking-tight">Changelogs</h2>
+          <a
+            aria-label="Subscribe to the changelog RSS feed"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            href="/changelog/rss.xml"
+            title="RSS feed"
+          >
+            <HugeiconsIcon icon={RssIcon} />
+          </a>
+        </div>
         <div className="w-full sm:w-72">
           <InputGroup>
             <InputGroupAddon>
