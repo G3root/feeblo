@@ -8,6 +8,7 @@ import EnvScript from "./EnvScript.astro";
 import ThemeScript from "./ThemeScript.astro";
 
 interface Props {
+  changelogVisibility?: "PUBLIC" | "HIDDEN";
   description?: string;
   noIndex?: boolean;
   organizationId: string;
@@ -17,6 +18,7 @@ interface Props {
 }
 
 const {
+  changelogVisibility,
   description,
   title = "feeblo",
   organizationId,
@@ -39,6 +41,16 @@ ogImageUrl.searchParams.set("site", subdomain);
     noIndex={noIndex}
     ogImageUrl={ogImageUrl.toString()}
   />
+  {
+    changelogVisibility === "PUBLIC" && (
+      <link
+        href="/changelog/rss.xml"
+        rel="alternate"
+        title={`${siteName} changelog`}
+        type="application/rss+xml"
+      />
+    )
+  }
   <EnvScript organizationId={organizationId} />
   <ThemeScript />
   <body>

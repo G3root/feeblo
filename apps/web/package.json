@@ -19,6 +19,7 @@
   "dependencies": {
     "@astrojs/node": "11.0.0",
     "@astrojs/react": "^6.0.2",
+    "@astrojs/rss": "^4.0.19",
     "@astrojs/solid-js": "^7.0.1",
     "@base-ui/react": "catalog:",
     "@dnd-kit/abstract": "^0.3.2",
