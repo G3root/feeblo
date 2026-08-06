@@ -74,6 +74,10 @@ export const accountTable = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
+    // better-auth >= 1.7 identifies OAuth identities by issuer (RFC 9207).
+    // Synthetic issuers: "local:credential" (email/password),
+    // "local:oauth:<providerId>" (social).
+    issuer: text("issuer").notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -97,7 +101,10 @@ export const accountTable = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("account_userId_idx").on(table.userId)]
+  (table) => [
+    index("account_userId_idx").on(table.userId),
+    index("account_issuer_accountId_idx").on(table.issuer, table.accountId),
+  ]
 );
 
 export const verificationTable = pgTable(

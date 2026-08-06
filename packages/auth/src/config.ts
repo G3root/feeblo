@@ -14,6 +14,10 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const githubClientSecret = yield* optionalString("GITHUB_CLIENT_SECRET");
     const googleClientId = yield* optionalString("GOOGLE_CLIENT_ID");
     const googleClientSecret = yield* optionalString("GOOGLE_CLIENT_SECRET");
+    // When set, the corresponding social provider is pointed at the local
+    // OAuth emulator (vercel-labs/emulate) instead of the real provider.
+    const githubEmulatorUrl = yield* optionalString("GITHUB_EMULATOR_URL");
+    const googleEmulatorUrl = yield* optionalString("GOOGLE_EMULATOR_URL");
     const trustedOrigins = yield* optionalString("AUTH_TRUSTED_ORIGINS");
     const turnstileKey = yield* optionalString("TURNSTILE_SECRET_KEY");
     const allowedEmails = yield* optionalString("ALLOWED_EMAILS");
@@ -37,6 +41,8 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
       githubClientSecret,
       googleClientId,
       googleClientSecret,
+      githubEmulatorUrl,
+      googleEmulatorUrl,
       secret,
       signUpEnabled,
       emailVerificationRequired,
