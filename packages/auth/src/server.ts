@@ -303,6 +303,102 @@ export const initAuthHandler = (
       plugins: [jwtAutoLogin(ssoOptions)],
     } satisfies BetterAuthOptions;
 
+    type VerificationOtpFlow =
+      | "email-verification"
+      | "password-reset"
+      | "sign-in";
+    const verificationOtpRateLimitedPaths = new Set([
+      "/email-otp/request-password-reset",
+      "/forget-password/email-otp",
+      "/email-otp/request-email-change",
+      "/email-otp/send-verification-otp",
+    ]);
+
+    const consumeVerificationOtpRateLimitForFlow = async (
+      flow: VerificationOtpFlow,
+      email: string
+    ) => {
+      await callbackRuntime.runPromise(
+        RateLimitService.use((rateLimiter) =>
+          flow === "password-reset"
+            ? rateLimiter.consumePasswordResetOtp(email)
+            : flow === "sign-in"
+              ? rateLimiter.consumeSignInOtp(email)
+              : rateLimiter.consumeEmailVerificationOtp(email)
+        ).pipe(
+          Effect.catchTag("RateLimiterError", (error) =>
+            Effect.fail(
+              new APIError(
+                error.reason._tag === "RateLimitExceeded"
+                  ? "TOO_MANY_REQUESTS"
+                  : "INTERNAL_SERVER_ERROR",
+                {
+                  code:
+                    error.reason._tag === "RateLimitExceeded"
+                      ? "VERIFICATION_OTP_RATE_LIMITED"
+                      : "VERIFICATION_OTP_RATE_LIMIT_UNAVAILABLE",
+                  message:
+                    error.reason._tag === "RateLimitExceeded"
+                      ? "Too many verification codes requested. Please try again later."
+                      : "Unable to send a verification code. Please try again.",
+                  ...(error.reason._tag === "RateLimitExceeded"
+                    ? {
+                        retryAfterSeconds: Math.ceil(
+                          Duration.toSeconds(error.reason.retryAfter)
+                        ),
+                      }
+                    : {}),
+                },
+                error.reason._tag === "RateLimitExceeded"
+                  ? {
+                      "Retry-After": String(
+                        Math.ceil(
+                          Duration.toSeconds(error.reason.retryAfter)
+                        )
+                      ),
+                    }
+                  : undefined
+              )
+            )
+          )
+        )
+      );
+    };
+
+    const consumeVerificationOtpRateLimit = async (ctx: {
+      path: string;
+      body?: Record<string, unknown>;
+    }) => {
+      const flow =
+        ctx.path === "/email-otp/request-password-reset" ||
+        ctx.path === "/forget-password/email-otp"
+          ? ("password-reset" as const)
+          : ctx.path === "/email-otp/request-email-change"
+            ? ("email-verification" as const)
+            : ctx.path === "/email-otp/send-verification-otp"
+              ? ctx.body?.type === "sign-in"
+                ? ("sign-in" as const)
+                : ctx.body?.type === "forget-password"
+                  ? ("password-reset" as const)
+                  : ("email-verification" as const)
+              : null;
+
+      if (!flow) {
+        return;
+      }
+
+      const email =
+        ctx.path === "/email-otp/request-email-change"
+          ? ctx.body?.newEmail
+          : ctx.body?.email;
+
+      if (typeof email !== "string" || !email) {
+        return;
+      }
+
+      await consumeVerificationOtpRateLimitForFlow(flow, email);
+    };
+
     const config = {
       ...baseConfig,
       database: drizzleAdapter(db, {
@@ -555,52 +651,21 @@ export const initAuthHandler = (
           expiresIn: 8 * 60, // 8 minutes
           overrideDefaultEmailVerification: true,
 
-          async sendVerificationOTP({ email, otp, type }) {
-            await callbackRuntime.runPromise(
-              RateLimitService.use((rateLimiter) =>
+          async sendVerificationOTP({ email, otp, type }, ctx) {
+            // Some Better Auth flows invoke this callback directly instead of
+            // dispatching the email-OTP endpoint, so hooks.before does not run.
+            // Keep those sends rate limited, while avoiding a second consume
+            // for paths already handled by the request hook.
+            if (!ctx || !verificationOtpRateLimitedPaths.has(ctx.path)) {
+              await consumeVerificationOtpRateLimitForFlow(
                 type === "forget-password"
-                  ? rateLimiter.consumePasswordResetOtp(email)
+                  ? "password-reset"
                   : type === "sign-in"
-                    ? rateLimiter.consumeSignInOtp(email)
-                    : rateLimiter.consumeEmailVerificationOtp(email)
-              ).pipe(
-                Effect.catchTag("RateLimiterError", (error) =>
-                  Effect.fail(
-                    new APIError(
-                      error.reason._tag === "RateLimitExceeded"
-                        ? "TOO_MANY_REQUESTS"
-                        : "INTERNAL_SERVER_ERROR",
-                      {
-                        code:
-                          error.reason._tag === "RateLimitExceeded"
-                            ? "VERIFICATION_OTP_RATE_LIMITED"
-                            : "VERIFICATION_OTP_RATE_LIMIT_UNAVAILABLE",
-                        message:
-                          error.reason._tag === "RateLimitExceeded"
-                            ? "Too many verification codes requested. Please try again later."
-                            : "Unable to send a verification code. Please try again.",
-                        ...(error.reason._tag === "RateLimitExceeded"
-                          ? {
-                              retryAfterSeconds: Math.ceil(
-                                Duration.toSeconds(error.reason.retryAfter)
-                              ),
-                            }
-                          : {}),
-                      },
-                      error.reason._tag === "RateLimitExceeded"
-                        ? {
-                            "Retry-After": String(
-                              Math.ceil(
-                                Duration.toSeconds(error.reason.retryAfter)
-                              )
-                            ),
-                          }
-                        : undefined
-                    )
-                  )
-                )
-              )
-            );
+                    ? "sign-in"
+                    : "email-verification",
+                email
+              );
+            }
             const flowLabel =
               type === "forget-password"
                 ? "password reset"
@@ -657,6 +722,8 @@ export const initAuthHandler = (
               });
             }
           }
+
+          await consumeVerificationOtpRateLimit(ctx);
         }),
       },
       databaseHooks: {

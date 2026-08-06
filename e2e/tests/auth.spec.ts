@@ -60,6 +60,21 @@ test.describe("authentication", () => {
   );
 
   test(
+    "signed-in user can open the forgot password page",
+    { tag: "@critical" },
+    async ({ page }) => {
+      const user = createTestUser();
+      await createAuthenticatedWorkspace(page, user);
+
+      await page.goto("/forgot-password");
+
+      await expect(
+        page.getByRole("button", { name: "Send reset code", exact: true })
+      ).toBeVisible();
+    }
+  );
+
+  test(
     "user can reset their password through the forgot password flow",
     { tag: "@critical" },
     async ({ page }) => {

@@ -62,8 +62,19 @@ export async function initializePasswordReset(email: string) {
     return true;
   }
 
+  const serverMessage = await response
+    .json()
+    .then((body: unknown) => {
+      if (typeof body === "object" && body !== null) {
+        const record = body as { error?: { message?: string } };
+        return record.error?.message;
+      }
+      return undefined;
+    })
+    .catch(() => undefined);
+
   toastManager.add({
-    title: "Failed to initialize password reset",
+    title: serverMessage ?? "Failed to initialize password reset",
     type: "error",
   });
   return false;

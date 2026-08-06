@@ -160,6 +160,7 @@ function RouteComponent() {
           <div className="flex justify-end">
             <Link
               className="text-muted-foreground text-sm underline underline-offset-4"
+              search={{ redirectTo: search.redirectTo }}
               to="/forgot-password"
             >
               Forgot password?

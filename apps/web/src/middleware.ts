@@ -37,6 +37,13 @@ const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_FORGOT_PASSWORD_PATH,
   AUTH_RESET_PASSWORD_PATH,
 ]);
+// Unlike sign-in/sign-up, password recovery cannot create a session, so it is
+// safe (and necessary) for a signed-in user — e.g. on a shared device — to
+// reach these pages without being bounced back to the dashboard.
+const PASSWORD_RESET_PATHS = new Set([
+  AUTH_FORGOT_PASSWORD_PATH,
+  AUTH_RESET_PASSWORD_PATH,
+]);
 const DASHBOARD_NON_ORG_PATHS = new Set([
   ...DASHBOARD_AUTH_PATHS,
   REGISTER_PATH,
@@ -263,7 +270,7 @@ function dashboardAuthRedirectMiddleware(
     return context.redirect(redirectURL.toString());
   }
 
-  if (isAuthed && isAuthPath) {
+  if (isAuthed && isAuthPath && !PASSWORD_RESET_PATHS.has(pathname)) {
     if (!hasOrgs) {
       return context.redirect(REGISTER_PATH);
     }

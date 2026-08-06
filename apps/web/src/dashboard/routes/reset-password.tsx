@@ -24,13 +24,19 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 import { AuthShell } from "~/features/auth/components/auth-shell";
 import {
+  clearVerificationOtp,
   getResendLabel,
-  RESEND_COOLDOWN_SECONDS,
-} from "~/features/auth/lib/resend-countdown";
+  RateLimitErrorSchema,
+  useOtpResend,
+} from "~/features/auth/lib/otp-resend";
+
+const SearchSchema = z.object({
+  redirectTo: z.string().optional(),
+});
 
 const OtpFormSchema = z.object({
   otp: z.string().length(6, { message: "Verification code must be 6 digits" }),
@@ -38,12 +44,8 @@ const OtpFormSchema = z.object({
 
 const PasswordFormSchema = PasswordAndConfirmPasswordSchema;
 
-const RateLimitErrorSchema = z.object({
-  code: z.literal("VERIFICATION_OTP_RATE_LIMITED"),
-  retryAfterSeconds: z.number().int().positive(),
-});
-
 export const Route = createFileRoute("/reset-password")({
+  validateSearch: (search) => SearchSchema.parse(search),
   loader: async () => {
     const response = await fetch(verificationOtpEndpoint, {
       credentials: "include",
@@ -71,49 +73,36 @@ export const Route = createFileRoute("/reset-password")({
 
 function RouteComponent() {
   const navigate = useNavigate({ from: "/reset-password" });
+  const search = Route.useSearch();
   const { email } = Route.useLoaderData();
   const [step, setStep] = useState<"otp" | "password">("otp");
   const [otp, setOtp] = useState("");
-  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
-  const [isResending, setIsResending] = useState(false);
 
-  useEffect(() => {
-    if (resendCooldown <= 0) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setResendCooldown((current) => Math.max(0, current - 1));
-    }, 1000);
-
-    return () => window.clearTimeout(timer);
-  }, [resendCooldown]);
-
-  const resendResetCode = async () => {
-    setIsResending(true);
-    const response = await authClient.emailOtp
-      .requestPasswordReset({ email })
-      .finally(() => setIsResending(false));
-
-    if (!response.error) {
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-      toastManager.add({
-        title: "Reset code sent",
-        type: "success",
+  const {
+    cooldown: resendCooldown,
+    isResending,
+    resend: resendResetCode,
+  } = useOtpResend({
+    successMessage: "Reset code sent",
+    onResend: async () => {
+      const response = await authClient.emailOtp.requestPasswordReset({
+        email,
       });
-      return;
-    }
 
-    const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
-    if (rateLimitError.success) {
-      setResendCooldown(rateLimitError.data.retryAfterSeconds);
-    }
+      if (response.error) {
+        const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
+        return {
+          success: false as const,
+          retryAfterSeconds: rateLimitError.success
+            ? rateLimitError.data.retryAfterSeconds
+            : undefined,
+          message: response.error.message,
+        };
+      }
 
-    toastManager.add({
-      title: response.error.message,
-      type: "error",
-    });
-  };
+      return { success: true as const };
+    },
+  });
 
   const otpForm = useAppForm({
     defaultValues: {
@@ -154,7 +143,7 @@ function RouteComponent() {
           }
           case "USER_NOT_FOUND": {
             toastManager.add({
-              title: "No reset request found for this account.",
+              title: "This account is no longer available. Please try again.",
               type: "error",
             });
             await navigate({ to: "/forgot-password" });
@@ -220,21 +209,16 @@ function RouteComponent() {
         return;
       }
 
-      await fetch(verificationOtpEndpoint, {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email,
-          type: "reset-password",
-        }),
-      });
+      await clearVerificationOtp(email, "reset-password");
 
       toastManager.add({
         title: "Password reset. Please sign in with your new password.",
         type: "success",
       });
-      await navigate({ to: "/sign-in" });
+      await navigate({
+        to: "/sign-in",
+        search: { redirectTo: search.redirectTo },
+      });
     },
   });
 

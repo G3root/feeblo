@@ -5,8 +5,17 @@ import { EmailSchema } from "@feeblo/web-shared/user-validation";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { AuthShell } from "~/features/auth/components/auth-shell";
+import {
+  clearVerificationOtp,
+  RateLimitErrorSchema,
+} from "~/features/auth/lib/otp-resend";
+
+const SearchSchema = z.object({
+  redirectTo: z.string().optional(),
+});
 
 export const Route = createFileRoute("/forgot-password")({
+  validateSearch: (search) => SearchSchema.parse(search),
   component: RouteComponent,
 });
 
@@ -14,13 +23,9 @@ const FormSchema = z.object({
   email: EmailSchema,
 });
 
-const RateLimitErrorSchema = z.object({
-  code: z.literal("VERIFICATION_OTP_RATE_LIMITED"),
-  retryAfterSeconds: z.number().int().positive(),
-});
-
 function RouteComponent() {
   const navigate = useNavigate({ from: "/forgot-password" });
+  const search = Route.useSearch();
 
   const form = useAppForm({
     defaultValues: {
@@ -36,6 +41,7 @@ function RouteComponent() {
 
       const isResetReady = await initializePasswordReset(value.email);
       if (!isResetReady) {
+        await clearVerificationOtp(value.email, "reset-password");
         return;
       }
 
@@ -44,6 +50,10 @@ function RouteComponent() {
       });
 
       if (response.error) {
+        // The verification-otp cookie was set above; clear it so a later
+        // visit to /reset-password doesn't surface a stale OTP screen.
+        await clearVerificationOtp(value.email, "reset-password");
+
         switch (response.error.code) {
           case "EMAIL_BLOCKED": {
             form.setErrorMap({
@@ -106,7 +116,10 @@ function RouteComponent() {
         return;
       }
 
-      await navigate({ to: "/reset-password" });
+      await navigate({
+        to: "/reset-password",
+        search: { redirectTo: search.redirectTo },
+      });
     },
   });
 
