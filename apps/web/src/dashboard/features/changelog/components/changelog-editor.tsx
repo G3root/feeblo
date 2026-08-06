@@ -4,6 +4,13 @@ import { Button } from "@feeblo/ui/button";
 import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@feeblo/ui/select";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
@@ -13,6 +20,7 @@ import {
   Ellipsis,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, use, useRef } from "react";
 import { z } from "zod";
@@ -35,6 +43,7 @@ export type TChangelogEditorRecord = {
   status: ChangelogStatus;
   scheduledAt: Date | null;
   publishedAt: Date | null;
+  categoryId: string | null;
   organizationId: string;
   creatorId: string | null;
   createdAt: Date;
@@ -115,6 +124,7 @@ function useChangelogEditorForm({
             submitMeta?.overrides && "publishedAt" in submitMeta.overrides
               ? (submitMeta.overrides.publishedAt ?? null)
               : changelog.publishedAt,
+          categoryId: changelog.categoryId,
           organizationId,
         });
 
@@ -126,6 +136,7 @@ function useChangelogEditorForm({
           draft.status = payload.status;
           draft.scheduledAt = payload.scheduledAt;
           draft.publishedAt = payload.publishedAt;
+          draft.categoryId = payload.categoryId;
         });
 
         await tx.isPersisted.promise;
@@ -423,6 +434,7 @@ export function ChangelogEditorMetadata() {
         label="Author"
         value={changelog.user.name ?? "Unknown author"}
       />
+      <MetadataRow label="Category" value={<ChangelogEditorCategoryField />} />
       <MetadataRow
         label="Publish At"
         value={formatDateTime(changelog.publishedAt, changelog.scheduledAt)}
@@ -436,6 +448,59 @@ export function ChangelogEditorMetadata() {
         value={changelog.updatedAt.toLocaleDateString()}
       />
     </>
+  );
+}
+
+export function ChangelogEditorCategoryField() {
+  const { changelog, isOwner, organizationId } = useChangelogEditor();
+  const { changelogCategoryCollection, changelogCollection } =
+    useDashboardCollections();
+
+  const categoriesQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ category: changelogCategoryCollection })
+        .where(({ category }) => eq(category.organizationId, organizationId))
+        .orderBy(({ category }) => category.createdAt, "asc"),
+    [organizationId]
+  );
+  const categories = categoriesQuery.data ?? [];
+  const value = changelog.categoryId ?? "";
+
+  return (
+    <Select
+      disabled={!isOwner}
+      onValueChange={async (nextValue) => {
+        const categoryId = nextValue === "" ? null : nextValue;
+        if (categoryId === changelog.categoryId) {
+          return;
+        }
+        const tx = changelogCollection.update(changelog.id, (draft) => {
+          draft.categoryId = categoryId;
+        });
+        await tx.isPersisted.promise.catch(() => undefined);
+      }}
+      value={value}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="No category" />
+      </SelectTrigger>
+      <SelectPopup align="start">
+        <SelectItem value="">No category</SelectItem>
+        {categories.map((category) => (
+          <SelectItem key={category.id} value={category.id}>
+            <span className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: category.icon }}
+              />
+              <span>{category.name}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
   );
 }
 

@@ -29,6 +29,7 @@ describe("plan feature catalog", () => {
       limits: {
         feedbackBoards: 5,
         privilegedMembers: 5,
+        changelogCategories: null,
       },
       capabilities: {
         changelog: true,
@@ -44,6 +45,7 @@ describe("plan feature catalog", () => {
     expect(getPlanFeatureRows("starter")).toEqual([
       { key: "feedbackBoards", label: "5 Feedback Boards" },
       { key: "privilegedMembers", label: "5 Admin Roles" },
+      { key: "changelogCategories", label: "Unlimited Changelog Categories" },
       { key: "roadmap", label: "Roadmap" },
       { key: "changelog", label: "Changelog" },
       { key: "unlimitedEndUsers", label: "Unlimited End Users" },

@@ -15,6 +15,7 @@ import {
   ArrowLeft01Icon,
   Building03Icon,
   CreditCardIcon,
+  Folder01Icon,
   LayoutThreeColumnIcon,
   LockIcon,
   PaintBrush04Icon,
@@ -110,6 +111,12 @@ const settingsItems = [
         icon: Shield01Icon,
         permission: "site.update" as const,
         to: "/$organizationId/settings/changelog-privacy" as const,
+      },
+      {
+        label: "Categories",
+        icon: Folder01Icon,
+        permission: "changelog-categories.*" as const,
+        to: "/$organizationId/settings/changelog-categories" as const,
       },
       {
         label: "Tags",

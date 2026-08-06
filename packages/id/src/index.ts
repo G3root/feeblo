@@ -67,6 +67,10 @@ export const ChangelogId = makeId("changelog", "chg", {
   approximateLength,
 });
 
+export const ChangelogCategoryId = makeId("changelog_category", "chc", {
+  approximateLength,
+});
+
 export const RoadmapId = makeId("roadmap", "rmp", {
   approximateLength,
 });

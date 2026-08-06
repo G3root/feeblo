@@ -9,6 +9,7 @@ import { PublicBoardShell } from "../components/layout/public-board-shell";
 import {
   getCurrentOrganizationId,
   publicBoardCollection,
+  publicChangelogCategoryCollection,
   publicChangelogCollection,
   publicPostCollection,
   publicPostStatusCollection,
@@ -157,7 +158,10 @@ const changelogRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/changelog",
   beforeLoad: async () => {
-    await Promise.all([publicChangelogCollection.preload()]);
+    await Promise.all([
+      publicChangelogCollection.preload(),
+      publicChangelogCategoryCollection.preload(),
+    ]);
     return null;
   },
 }).lazy(() => import("../routes/change-log-page").then((d) => d.Route));
@@ -166,7 +170,10 @@ const changelogDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/changelog/$changelogSlug",
   beforeLoad: async () => {
-    await Promise.all([publicChangelogCollection.preload()]);
+    await Promise.all([
+      publicChangelogCollection.preload(),
+      publicChangelogCategoryCollection.preload(),
+    ]);
     return null;
   },
 }).lazy(() => import("../routes/change-log-detail-page").then((d) => d.Route));

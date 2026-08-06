@@ -1,6 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import {
   BoardId,
+  ChangelogCategoryId,
   MemberId,
   PostStatusId,
   RoadmapColumnId,
@@ -122,6 +123,19 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               updatedAt: new Date(),
             });
             statusIdByType.set(postStatus.type, postStatusId);
+          }
+
+          for (const category of schema.DEFAULT_CHANGELOG_CATEGORIES) {
+            const categoryId = yield* ChangelogCategoryId.generate;
+            yield* tx.insert(schema.changelogCategoryTable).values({
+              id: categoryId,
+              organizationId,
+              name: category.name,
+              iconType: category.iconType,
+              icon: category.icon,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
           }
 
           const roadmapId = yield* RoadmapId.generate;

@@ -17,6 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, ilike, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { ChangelogCategoryBadge } from "../components/changelog/changelog-category-badge";
 import {
   ChangelogPageLayout,
   ChangelogTimeline,
@@ -141,7 +142,8 @@ export function ChangelogPage() {
                 </ChangelogTimelineDate>
 
                 <ChangelogTimelineBody className="space-y-6 p-0 sm:p-0">
-                  <header>
+                  <header className="space-y-3">
+                    <ChangelogCategoryBadge categoryId={item.categoryId} />
                     <Link
                       className="block w-fit transition-opacity hover:opacity-80"
                       params={{ changelogSlug: item.slug }}

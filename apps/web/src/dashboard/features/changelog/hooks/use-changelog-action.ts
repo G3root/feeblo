@@ -56,6 +56,7 @@ export const useChangelogAction = () => {
         status: "draft" as ChangelogStatus,
         scheduledAt: null,
         publishedAt: null,
+        categoryId: null,
         organizationId,
         creatorId: session?.user?.id ?? null,
         creatorMemberId: member?.id ?? null,

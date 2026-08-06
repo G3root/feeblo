@@ -105,6 +105,7 @@ describe("ChangelogRpcHandlers", () => {
             status: "draft",
             scheduledAt: null,
             publishedAt: null,
+            categoryId: null,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         const entries = yield* handlers
@@ -154,6 +155,7 @@ describe("ChangelogRpcHandlers", () => {
               status: "draft",
               scheduledAt: null,
               publishedAt: null,
+              categoryId: null,
             })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture)),
@@ -232,6 +234,7 @@ describe("ChangelogRpcHandlers", () => {
               status: "draft",
               scheduledAt: null,
               publishedAt: null,
+              categoryId: null,
             })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture)),

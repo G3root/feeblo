@@ -4,6 +4,7 @@ import {
   assetTable,
   boardTable,
   changelogAssetTable,
+  changelogCategoryTable,
   changelogPostTable,
   changelogTable,
   changelogTagTable,
@@ -69,6 +70,7 @@ export const relations = defineRelations(
     commentTable,
     commentReactionTable,
     siteTable,
+    changelogCategoryTable,
     changelogTable,
     changelogPostTable,
     changelogTagTable,
@@ -246,6 +248,10 @@ export const relations = defineRelations(
       changelogs: r.many.changelogTable({
         from: r.organizationTable.id,
         to: r.changelogTable.organizationId,
+      }),
+      changelogCategories: r.many.changelogCategoryTable({
+        from: r.organizationTable.id,
+        to: r.changelogCategoryTable.organizationId,
       }),
       changelogTags: r.many.changelogTagTable({
         from: r.organizationTable.id,
@@ -628,6 +634,16 @@ export const relations = defineRelations(
         to: r.roadmapTable.id,
       }),
     },
+    changelogCategoryTable: {
+      organization: r.one.organizationTable({
+        from: r.changelogCategoryTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      changelogs: r.many.changelogTable({
+        from: r.changelogCategoryTable.id,
+        to: r.changelogTable.categoryId,
+      }),
+    },
     changelogTable: {
       organization: r.one.organizationTable({
         from: r.changelogTable.organizationId,
@@ -640,6 +656,10 @@ export const relations = defineRelations(
       creatorMember: r.one.memberTable({
         from: r.changelogTable.creatorMemberId,
         to: r.memberTable.id,
+      }),
+      category: r.one.changelogCategoryTable({
+        from: r.changelogTable.categoryId,
+        to: r.changelogCategoryTable.id,
       }),
       changelogTags: r.many.changelogTagTable({
         from: r.changelogTable.id,

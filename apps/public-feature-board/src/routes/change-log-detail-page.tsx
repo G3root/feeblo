@@ -12,6 +12,7 @@ import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
+import { ChangelogCategoryBadge } from "../components/changelog/changelog-category-badge";
 import {
   ChangelogPageLayout,
   ChangelogStickyRail,
@@ -142,6 +143,7 @@ export function ChangeLogDetailPage() {
               )}
             </p>
             <div className="space-y-3">
+              <ChangelogCategoryBadge categoryId={changelog.categoryId} />
               <h1 className="max-w-3xl font-semibold text-4xl tracking-tight sm:text-5xl">
                 {changelog.title}
               </h1>

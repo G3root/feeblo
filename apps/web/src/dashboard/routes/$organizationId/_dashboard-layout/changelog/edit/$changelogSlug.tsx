@@ -14,6 +14,7 @@ import {
   ChangelogEditorBackLink,
   ChangelogEditorContentField,
   ChangelogEditorForm,
+  ChangelogEditorMetadata,
   ChangelogEditorMoreActions,
   ChangelogEditorProvider,
   ChangelogEditorStatus,
@@ -30,6 +31,7 @@ import {
   ChangelogMoveToDraftDialogProvider,
 } from "~/features/changelog/dialog-stores";
 import {
+  changelogCategoryCollection,
   changelogCollection,
   changelogPostCollection,
   postCollection,
@@ -46,6 +48,7 @@ export const Route = createFileRoute(
       changelogPostCollection.preload(),
       postCollection.preload(),
       postStatusCollection.preload(),
+      changelogCategoryCollection.preload(),
     ]);
   },
   component: RouteComponent,
@@ -139,6 +142,11 @@ function RouteComponent() {
                   <ChangelogEditorSubmitAction />
                 </div>
               </ChangelogEditor.Main>
+              <ChangelogEditor.Sidebar>
+                <ChangelogEditor.MetadataList>
+                  <ChangelogEditorMetadata />
+                </ChangelogEditor.MetadataList>
+              </ChangelogEditor.Sidebar>
             </ChangelogEditor>
           </ChangelogEditorForm>
           <ChangelogMoveToDraftDialog />

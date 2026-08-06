@@ -209,6 +209,7 @@ export const changelogCollection = createCollection(
           status: updatedChangelog.status,
           scheduledAt: updatedChangelog.scheduledAt,
           publishedAt: updatedChangelog.publishedAt,
+          categoryId: updatedChangelog.categoryId,
           organizationId: updatedChangelog.organizationId,
         })
       );
@@ -238,7 +239,71 @@ export const changelogCollection = createCollection(
           status: newChangelog.status,
           scheduledAt: newChangelog.scheduledAt,
           publishedAt: newChangelog.publishedAt,
+          categoryId: newChangelog.categoryId,
           organizationId: newChangelog.organizationId,
+        })
+      );
+    },
+  })
+);
+
+export const changelogCategoryCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("changelog-category"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogCategoryList({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newCategory } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCategoryCreate({
+          id: newCategory.id,
+          name: newCategory.name,
+          iconType: newCategory.iconType,
+          icon: newCategory.icon,
+          organizationId: newCategory.organizationId,
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedCategory } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCategoryUpdate({
+          id: updatedCategory.id,
+          name: updatedCategory.name,
+          iconType: updatedCategory.iconType,
+          icon: updatedCategory.icon,
+          organizationId: updatedCategory.organizationId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedCategory } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCategoryDelete({
+          id: deletedCategory.id,
+          organizationId: deletedCategory.organizationId,
         })
       );
     },
@@ -1496,6 +1561,7 @@ export const roadmapColumnCollection = createCollection(
 
 export const dashboardCollections = {
   boardCollection,
+  changelogCategoryCollection,
   changelogCollection,
   changelogPostCollection,
   changelogTagCollection,

@@ -29,6 +29,10 @@ type TCanCreateRoadmap = {
   visibility: "public" | "private";
 };
 
+type TCanCreateChangelogCategory = {
+  organizationId: string;
+};
+
 type TCanUpdateRoadmapVisibility = {
   organizationId: string;
 };
@@ -154,6 +158,29 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
+  const canCreateChangelogCategory = <E, R>(
+    args: TCanCreateChangelogCategory & {
+      categoryCount: Effect.Effect<number, E, R>;
+    }
+  ) =>
+    Effect.gen(function* () {
+      const { entitlements, plan } = yield* findEntitlements(
+        args.organizationId
+      );
+
+      if (entitlements.limits.changelogCategories === null) {
+        return;
+      }
+
+      if (
+        (yield* args.categoryCount) >= entitlements.limits.changelogCategories
+      ) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: `The ${plan} plan allows up to ${entitlements.limits.changelogCategories} changelog categories.`,
+        });
+      }
+    });
+
   return {
     canCreateBoard,
     canUpdateBoardVisibility,
@@ -161,6 +188,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canAssignPrivilegedRole,
     canCreateRoadmap,
     canUpdateRoadmapVisibility,
+    canCreateChangelogCategory,
   };
 });
 

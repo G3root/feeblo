@@ -3,6 +3,7 @@ import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
 import {
   BoardId,
+  ChangelogCategoryId,
   ChangelogId,
   ChangelogTagId,
   CommentId,
@@ -30,11 +31,13 @@ import { Database } from "./src";
 import { nukeDatabase } from "./src/nuke";
 import {
   boardTable,
+  changelogCategoryTable,
   changelogPostTable,
   changelogTable,
   changelogTagTable,
   commentReactionTable,
   commentTable,
+  DEFAULT_CHANGELOG_CATEGORIES,
   DEFAULT_POST_STATUSES,
   memberTable,
   organizationTable,
@@ -532,6 +535,27 @@ const ensureOrganization = (userId: string, name = "Personal") =>
           organizationId: org.id,
           type: postStatusDefinition.type,
           orderIndex: postStatusDefinition.orderIndex,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
+
+    const existingChangelogCategories = yield* db
+      .select({ id: changelogCategoryTable.id })
+      .from(changelogCategoryTable)
+      .where(eq(changelogCategoryTable.organizationId, org.id))
+      .limit(1);
+
+    if (existingChangelogCategories.length === 0) {
+      for (const category of DEFAULT_CHANGELOG_CATEGORIES) {
+        const categoryId = yield* ChangelogCategoryId.generate;
+        yield* db.insert(changelogCategoryTable).values({
+          id: categoryId,
+          organizationId: org.id,
+          name: category.name,
+          iconType: category.iconType,
+          icon: category.icon,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
