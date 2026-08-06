@@ -100,7 +100,7 @@ export function ChangelogCategorySettingsTable() {
       <section className="space-y-6">
         <CategoryTableActions
           disabled={false}
-          onSelectCategory={() => undefined}
+          onSelectCategory={handleCreate}
         />
         <Empty>
           <EmptyHeader>

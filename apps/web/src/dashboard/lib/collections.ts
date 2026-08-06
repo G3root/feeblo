@@ -276,7 +276,7 @@ export const changelogCategoryCollection = createCollection(
         rpc.ChangelogCategoryCreate({
           id: newCategory.id,
           name: newCategory.name,
-          iconType: newCategory.iconType,
+          iconType: newCategory.iconType as "color",
           icon: newCategory.icon,
           organizationId: newCategory.organizationId,
         })
@@ -290,7 +290,7 @@ export const changelogCategoryCollection = createCollection(
         rpc.ChangelogCategoryUpdate({
           id: updatedCategory.id,
           name: updatedCategory.name,
-          iconType: updatedCategory.iconType,
+          iconType: updatedCategory.iconType as "color",
           icon: updatedCategory.icon,
           organizationId: updatedCategory.organizationId,
         })

@@ -64,6 +64,7 @@ function ChangelogCategoryRenameForm() {
             eq(category.organizationId, organizationId)
           )
         )
+        .orderBy(({ category }) => category.createdAt, "desc")
         .limit(1),
     [organizationId, categoryId]
   );
