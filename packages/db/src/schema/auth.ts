@@ -103,7 +103,10 @@ export const accountTable = pgTable(
   },
   (table) => [
     index("account_userId_idx").on(table.userId),
-    index("account_issuer_accountId_idx").on(table.issuer, table.accountId),
+    uniqueIndex("account_issuer_account_id_uidx").on(
+      table.issuer,
+      table.accountId
+    ),
   ]
 );
 

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "f5a084ba-a395-4aa0-b64a-7574edb486ef",
+  "id": "f8aa6bec-72b6-4392-9373-c0f802951de5",
   "prevIds": [
     "ef1e3fd7-7494-4720-af1e-ed6fa7f65b1b"
   ],
@@ -5059,12 +5059,12 @@
           "opclass": null
         }
       ],
-      "isUnique": false,
+      "isUnique": true,
       "where": null,
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "account_issuer_accountId_idx",
+      "name": "account_issuer_account_id_uidx",
       "entityType": "indexes",
       "schema": "public",
       "table": "account"

@@ -378,7 +378,7 @@ importers:
         version: 1.2.121
       '@marsidev/react-turnstile':
         specifier: ^1.5.4
-        version: 1.5.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 1.5.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@posthog/react':
         specifier: ^1.10.3
         version: 1.10.3(@types/react@19.2.18)(posthog-js@1.411.0)(react@19.2.8)
@@ -3157,8 +3157,8 @@ packages:
   '@lix-js/server-protocol-schema@0.1.1':
     resolution: {integrity: sha512-jBeALB6prAbtr5q4vTuxnRZZv1M2rKe8iNqRQhFJ4Tv7150unEa0vKyz0hs8Gl3fUGsWaNJBh3J8++fpbrpRBQ==}
 
-  '@marsidev/react-turnstile@1.5.4':
-    resolution: {integrity: sha512-2+ulBzQPYcC5jZ4Pghlcc6a6+CQ6L0cgTxtbavZbcHcG5/wSQsTAM+vDudF94L9AUPG4uSNQF1kotmvx0Ns/QA==}
+  '@marsidev/react-turnstile@1.5.5':
+    resolution: {integrity: sha512-+EtXbmsJwlRuIUruLb3UBAakpW0wFGeA17QQp0uG8Mv+Zh8MXktZT68P5HS2g1ssfeRd2+BZGupOE/F4KGajFQ==}
     peerDependencies:
       react: ^17.0.2 || ^18.0.0 || ^19.0
       react-dom: ^17.0.2 || ^18.0.0 || ^19.0
@@ -11367,7 +11367,7 @@ snapshots:
 
   '@lix-js/server-protocol-schema@0.1.1': {}
 
-  '@marsidev/react-turnstile@1.5.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@marsidev/react-turnstile@1.5.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
