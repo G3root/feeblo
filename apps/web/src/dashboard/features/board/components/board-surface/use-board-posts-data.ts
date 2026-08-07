@@ -61,6 +61,7 @@ export function useBoardPostsData({
     postCollection,
     postStatusCollection,
     postTagCollection,
+    upvoteCollection,
   } = useDashboardCollections();
   const normalizedSearch = search.trim();
   const statusesKey = statuses.join(",");
@@ -165,6 +166,7 @@ export function useBoardPostsData({
           summary: post.excerpt,
           title: post.title,
           updatedAt: post.updatedAt,
+          user: post.user,
         }))
         .where(({ post, postStatus }) => {
           let condition = eq(post.organizationId, organizationId);
@@ -230,14 +232,39 @@ export function useBoardPostsData({
     ]
   );
 
+  const upvotesQuery = useLiveQuery(
+    (q) => {
+      if (!organizationId) {
+        return undefined;
+      }
+
+      return q
+        .from({ upvote: upvoteCollection })
+        .where(({ upvote }) => eq(upvote.organizationId, organizationId))
+        .select(({ upvote }) => ({ postId: upvote.postId }));
+    },
+    [organizationId]
+  );
+
   const boardById = new Map(
     (boardsQuery.data ?? []).map((board) => [board.id, board])
   );
+
+  const upvoteCountByPostId = new Map<string, number>();
+
+  for (const upvote of upvotesQuery.data ?? []) {
+    upvoteCountByPostId.set(
+      upvote.postId,
+      (upvoteCountByPostId.get(upvote.postId) ?? 0) + 1
+    );
+  }
 
   const posts: BoardPostRow[] = (postsQuery.data ?? []).map((post) => ({
     ...post,
     boardName: boardById.get(post.boardId)?.name ?? "",
     boardSlug: boardById.get(post.boardId)?.slug ?? "",
+    upvoteCount: upvoteCountByPostId.get(post.id) ?? 0,
+    user: post.user,
   }));
 
   return {
@@ -245,11 +272,13 @@ export function useBoardPostsData({
       postStatusesQuery.isError ||
       boardsQuery.isError ||
       matchingTagPostsQuery.isError ||
-      postsQuery.isError,
+      postsQuery.isError ||
+      upvotesQuery.isError,
     isLoading:
       postStatusesQuery.isLoading ||
       boardsQuery.isLoading ||
       postsQuery.isLoading ||
+      upvotesQuery.isLoading ||
       (tagIds.length > 0 && matchingTagPostsQuery.isLoading),
     postStatuses: filterPostStatusesByPreset(
       postStatusesQuery.data ?? [],

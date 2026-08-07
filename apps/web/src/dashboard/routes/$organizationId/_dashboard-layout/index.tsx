@@ -15,10 +15,12 @@ import {
   ItemContent,
   ItemDescription,
   ItemGroup,
+  ItemMedia,
   ItemTitle,
 } from "@feeblo/ui/item";
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -109,6 +111,13 @@ function RouteComponent() {
                 to="/$organizationId/post/$boardSlug/$postSlug"
               >
                 <Item size="sm" variant="outline">
+                  <ItemMedia>
+                    <UserAvatar
+                      image={post.user?.image}
+                      name={post.user?.name}
+                      size="sm"
+                    />
+                  </ItemMedia>
                   <ItemContent>
                     <ItemTitle>{post.title}</ItemTitle>
                     <ItemDescription>
@@ -241,6 +250,9 @@ function RecentPostsSkeleton() {
       <ItemGroup>
         {RECENT_POST_SKELETON_KEYS.map((key) => (
           <Item key={key} size="sm" variant="outline">
+            <ItemMedia>
+              <Skeleton className="size-6 rounded-full" />
+            </ItemMedia>
             <ItemContent>
               <ItemTitle>
                 <Skeleton className="h-4 w-2/5" />

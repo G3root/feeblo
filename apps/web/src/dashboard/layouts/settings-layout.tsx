@@ -36,7 +36,7 @@ export function SettingsLayout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </header>
-        <ScrollArea className="min-h-0 flex-1 overflow-hidden">
+        <ScrollArea className="min-h-0 flex-1 overflow-hidden" fill>
           {children}
         </ScrollArea>
       </SidebarInset>
