@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { lazy, type ReactNode, Suspense } from "react";
 import { PostCommentComposer } from "../post/post-comment-composer";
 import { CommentsList } from "./comment-display";
 import {
@@ -12,7 +13,6 @@ import {
   PostDeleteDialog,
 } from "./dialogs";
 import { PostCollectionDataProvider } from "./post-collection";
-import { PostContentUpdateInput } from "./post-editor";
 import {
   type PostCollectionDataProviderProps,
   usePostCollectionData,
@@ -20,6 +20,21 @@ import {
 import { PostTitleUpdateInput } from "./post-title-input";
 import { PostReactionPicker } from "./reaction-picker";
 import { UpvoteButton } from "./upvote-toggle";
+
+// Post content is rendered as sanitized Markdown in display mode and as the
+// rich-text editor in edit mode. Both views are lazy-loaded so the default
+// display mode stays lightweight and never pulls in the editor bundle.
+const MarkdownContent = lazy(() =>
+  import("@feeblo/ui/markdown-content").then((mod) => ({
+    default: mod.MarkdownContent,
+  }))
+);
+
+const PostContentUpdateInput = lazy(() =>
+  import("./post-editor").then((mod) => ({
+    default: mod.PostContentUpdateInput,
+  }))
+);
 
 function Root({ children, ...post }: PostCollectionDataProviderProps) {
   return (
@@ -67,7 +82,33 @@ function Title() {
 }
 
 function Content() {
-  return <PostContentUpdateInput />;
+  const { canManagePost, isLocked, post } = usePostCollectionData();
+
+  // Post authors get the rich-text editor; everyone else (readers, locked
+  // posts) sees the rendered Markdown.
+  if (canManagePost && !isLocked) {
+    return (
+      <Suspense fallback={<ContentSkeleton />}>
+        <PostContentUpdateInput />
+      </Suspense>
+    );
+  }
+
+  return (
+    <Suspense fallback={<ContentSkeleton />}>
+      <MarkdownContent content={post.content} />
+    </Suspense>
+  );
+}
+
+function ContentSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-11/12" />
+      <Skeleton className="h-4 w-3/4" />
+    </div>
+  );
 }
 
 function Reactions() {
