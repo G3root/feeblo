@@ -166,4 +166,30 @@ test.describe("feedback workflow", () => {
       page.getByRole("checkbox", { name: completedTitle })
     ).toHaveCount(0);
   });
+
+  test("post creator can toggle their subscription", async ({ page }) => {
+    const title = `Subscription post ${randomUUID().slice(0, 8)}`;
+
+    await createWorkspace(page);
+    await createPost(page, title, "I want to follow this post.");
+    await openPost(page, title);
+
+    // The post creator is automatically subscribed.
+    const unsubscribeButton = page.getByRole("button", {
+      name: "Unsubscribe",
+      exact: true,
+    });
+    await expect(unsubscribeButton).toBeVisible();
+
+    // Unsubscribe, then re-subscribe.
+    await unsubscribeButton.click();
+    const subscribeButton = page.getByRole("button", {
+      name: "Subscribe",
+      exact: true,
+    });
+    await expect(subscribeButton).toBeVisible();
+
+    await subscribeButton.click();
+    await expect(unsubscribeButton).toBeVisible();
+  });
 });

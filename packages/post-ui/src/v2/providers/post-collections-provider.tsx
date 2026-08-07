@@ -5,6 +5,7 @@ import type { TOrganizationMember } from "@feeblo/domain/membership/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TPostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import type { TPostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import type { Collection } from "@tanstack/react-db";
 import { createContext, useContext } from "react";
@@ -17,6 +18,7 @@ export interface PostCollections {
   postCollection: Collection<TPost, string, any, any>;
   postReactionCollection: Collection<TPostReaction, string, any, any>;
   postStatusCollection: Collection<TPostStatus, string, any, any>;
+  postSubscriptionCollection: Collection<TPostSubscription, string, any, any>;
   upvoteCollection: Collection<TUpvote, string, any, any>;
 }
 

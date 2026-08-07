@@ -1,5 +1,6 @@
 import { usePostDeleteDialogContext } from "@feeblo/post-ui/dialog-stores";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { SubscribeButton } from "@feeblo/post-ui/subscribe-toggle";
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { cn } from "@feeblo/ui/utils";
@@ -32,35 +33,39 @@ export function PostPageActions() {
         <HugeiconsIcon icon={ArrowLeft01Icon} />
       </Link>
 
-      <Menu>
-        <MenuTrigger
-          render={(props) => (
-            <Button
-              {...props}
-              aria-label="More actions"
-              size="icon-sm"
-              variant="outline"
+      <div className="ml-auto flex items-center gap-2">
+        <SubscribeButton />
+
+        <Menu>
+          <MenuTrigger
+            render={(props) => (
+              <Button
+                {...props}
+                aria-label="More actions"
+                size="icon-sm"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={Ellipsis} />
+              </Button>
+            )}
+          />
+          <MenuPopup align="start" className="w-40">
+            <MenuItem
+              disabled={!canDeletePost}
+              onClick={() =>
+                store.send({
+                  type: "toggle",
+                  data: { postId, redirectOptions: { to: "/" } },
+                })
+              }
+              variant="destructive"
             >
-              <HugeiconsIcon icon={Ellipsis} />
-            </Button>
-          )}
-        />
-        <MenuPopup align="start" className="w-40">
-          <MenuItem
-            disabled={!canDeletePost}
-            onClick={() =>
-              store.send({
-                type: "toggle",
-                data: { postId, redirectOptions: { to: "/" } },
-              })
-            }
-            variant="destructive"
-          >
-            <HugeiconsIcon icon={Delete02Icon} />
-            <span>Delete</span>
-          </MenuItem>
-        </MenuPopup>
-      </Menu>
+              <HugeiconsIcon icon={Delete02Icon} />
+              <span>Delete</span>
+            </MenuItem>
+          </MenuPopup>
+        </Menu>
+      </div>
     </div>
   );
 }
