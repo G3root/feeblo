@@ -128,7 +128,7 @@ function RouteComponent() {
         <ChangelogDeleteDialogProvider>
           <ChangelogEditorForm>
             <ChangelogEditor>
-              <ChangelogEditor.Main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 md:px-6 md:py-8">
+              <ChangelogEditor.Main>
                 <ChangelogEditor.Header className="items-center gap-3">
                   <ChangelogEditorBackLink />
                 </ChangelogEditor.Header>
@@ -160,7 +160,7 @@ function ChangelogEditorLoadingState() {
   return (
     <SkeletonLoader isLoading>
       <ChangelogEditor>
-        <ChangelogEditor.Main className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 md:px-6 md:py-8">
+        <ChangelogEditor.Main>
           <ChangelogEditor.Header className="items-center gap-3">
             <SkeletonWrapper>
               <div className="size-8 rounded-full border bg-background" />

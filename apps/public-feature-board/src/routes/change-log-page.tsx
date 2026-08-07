@@ -35,7 +35,10 @@ export const Route = createLazyRoute("/changelog")({
 
 export function ChangelogPage() {
   const site = useSite();
-  const { publicChangelogCollection } = usePublicCollections();
+  const {
+    publicChangelogCategoryLinkCollection,
+    publicChangelogCollection,
+  } = usePublicCollections();
   const [search, setSearch] = useState("");
   const normalizedSearch = search.trim();
   const {
@@ -62,7 +65,6 @@ export function ChangelogPage() {
     [site.organizationId, normalizedSearch]
   );
 
-  const { publicChangelogCategoryLinkCollection } = usePublicCollections();
   const { data: categoryLinks = [] } = useLiveQuery(
     (q) =>
       q

@@ -32,6 +32,7 @@ export function ChangeLogDetailPage() {
   const site = useSite();
   const { changelogSlug } = useParams({ from: "/changelog/$changelogSlug" });
   const {
+    publicChangelogCategoryLinkCollection,
     publicChangelogCollection,
     publicChangelogPostCollection,
     publicPostCollection,
@@ -55,7 +56,6 @@ export function ChangeLogDetailPage() {
     [site.organizationId, changelogSlug]
   );
 
-  const { publicChangelogCategoryLinkCollection } = usePublicCollections();
   const { data: categoryLinks = [] } = useLiveQuery(
     (q) => {
       if (!changelog) {

@@ -6,16 +6,6 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { ChangelogCategoryRepository } from "./repository";
 
-type TCanDelete = {
-  organizationId: string;
-  categoryId: string;
-};
-
-type TCanUpdate = {
-  organizationId: string;
-  categoryId: string;
-};
-
 type TCanSetChangelogCategories = {
   changelogId: string;
   organizationId: string;
@@ -34,11 +24,11 @@ const makeChangelogCategoryPolicy = Effect.gen(function* () {
       })
     );
 
-  const canDelete = (args: TCanDelete) =>
-    Policy.canPermission(args.organizationId, "changelog-categories.*");
+  const canDelete = (organizationId: string) =>
+    Policy.canPermission(organizationId, "changelog-categories.*");
 
-  const canUpdate = (args: TCanUpdate) =>
-    Policy.canPermission(args.organizationId, "changelog-categories.*");
+  const canUpdate = (organizationId: string) =>
+    Policy.canPermission(organizationId, "changelog-categories.*");
 
   /**
    * Category assignments on changelogs are manager-scoped: changelog.* or

@@ -293,12 +293,19 @@ export const changelogCategoryCollection = createCollection(
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: newCategory } = mutation;
+      const iconType = newCategory.iconType;
+
+      if (iconType !== "color") {
+        throw new Error(
+          "Unsupported changelog category icon type; only color is supported"
+        );
+      }
 
       await fetchRpc((rpc) =>
         rpc.ChangelogCategoryCreate({
           id: newCategory.id,
           name: newCategory.name,
-          iconType: newCategory.iconType as "color",
+          iconType,
           icon: newCategory.icon,
           organizationId: newCategory.organizationId,
         })
@@ -307,12 +314,19 @@ export const changelogCategoryCollection = createCollection(
     onUpdate: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
       const { modified: updatedCategory } = mutation;
+      const iconType = updatedCategory.iconType;
+
+      if (iconType !== "color") {
+        throw new Error(
+          "Unsupported changelog category icon type; only color is supported"
+        );
+      }
 
       await fetchRpc((rpc) =>
         rpc.ChangelogCategoryUpdate({
           id: updatedCategory.id,
           name: updatedCategory.name,
-          iconType: updatedCategory.iconType as "color",
+          iconType,
           icon: updatedCategory.icon,
           organizationId: updatedCategory.organizationId,
         })

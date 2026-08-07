@@ -778,7 +778,6 @@ export const changelogCategoryTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("changelog_category_organizationId_idx").on(table.organizationId),
     uniqueIndex("changelog_category_organizationId_name_uidx").on(
       table.organizationId,
       table.name

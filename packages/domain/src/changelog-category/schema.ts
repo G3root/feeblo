@@ -5,6 +5,11 @@ import {
 import { ChangelogCategoryId, ChangelogId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+const ChangelogCategoryName = S.Trim.pipe(
+  S.check(S.isMinLength(1)),
+  S.check(S.isMaxLength(100))
+);
+
 export const ChangelogCategory = S.Struct({
   id: S.String,
   name: S.String,
@@ -27,7 +32,7 @@ export type TChangelogCategoryList = S.Schema.Type<
 
 export const ChangelogCategoryCreate = S.Struct({
   id: ChangelogCategoryId.schema,
-  name: S.String,
+  name: ChangelogCategoryName,
   iconType: ChangelogCategoryColorIcon.iconType,
   icon: ChangelogCategoryColorIcon.schema,
   organizationId: WorkspaceId.schema,
@@ -39,7 +44,7 @@ export type TChangelogCategoryCreate = S.Schema.Type<
 
 export const ChangelogCategoryUpdate = S.Struct({
   id: ChangelogCategoryId.schema,
-  name: S.String,
+  name: ChangelogCategoryName,
   iconType: ChangelogCategoryColorIcon.iconType,
   icon: ChangelogCategoryColorIcon.schema,
   organizationId: WorkspaceId.schema,

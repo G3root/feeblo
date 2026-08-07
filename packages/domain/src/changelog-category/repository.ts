@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { ChangelogCategoryLinkId } from "@feeblo/id";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -62,7 +62,8 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
       .from(schema.changelogCategoryLinkTable)
       .where(
         eq(schema.changelogCategoryLinkTable.organizationId, organizationId)
-      );
+      )
+      .orderBy(asc(schema.changelogCategoryLinkTable.createdAt));
 
   const findLinksPublished = ({ organizationId }: { organizationId: string }) =>
     db
@@ -87,7 +88,8 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
           eq(schema.changelogCategoryLinkTable.organizationId, organizationId),
           eq(schema.changelogTable.status, "published")
         )
-      );
+      )
+      .orderBy(asc(schema.changelogCategoryLinkTable.createdAt));
 
   return {
     findLinks,
@@ -109,15 +111,11 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
         .orderBy(asc(schema.changelogCategoryTable.createdAt)),
 
     countByOrganizationId: ({ organizationId }: TCountByOrganizationId) =>
-      Effect.gen(function* () {
-        const rows = yield* db
-          .select({ id: schema.changelogCategoryTable.id })
-          .from(schema.changelogCategoryTable)
-          .where(
-            eq(schema.changelogCategoryTable.organizationId, organizationId)
-          );
-        return rows.length;
-      }),
+      db
+        .select({ count: count() })
+        .from(schema.changelogCategoryTable)
+        .where(eq(schema.changelogCategoryTable.organizationId, organizationId))
+        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
 
     create: ({ id, name, iconType, icon, organizationId }: TCreate) =>
       db

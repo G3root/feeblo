@@ -1,3 +1,4 @@
+import { PLAN_ENTITLEMENTS } from "@feeblo/domain/plan-entitlements";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -38,8 +39,6 @@ import {
   useChangelogCategoryEditDialogContext,
 } from "../dialog-stores";
 
-const FREE_PLAN_CATEGORY_LIMIT = 3;
-
 export function ChangelogCategorySettingsTable() {
   const organizationId = useOrganizationId();
   const { changelogCategoryCollection } = useDashboardCollections();
@@ -57,11 +56,13 @@ export function ChangelogCategorySettingsTable() {
     [organizationId]
   );
 
-  const categories = categoriesQuery?.data;
+  const categories = categoriesQuery?.data ?? [];
   const plan = planQuery.data?.plan;
   const categoryLimit =
-    plan === "free" ? FREE_PLAN_CATEGORY_LIMIT : Number.POSITIVE_INFINITY;
-  const hasReachedLimit = (categories?.length ?? 0) >= categoryLimit;
+    plan === "free"
+      ? PLAN_ENTITLEMENTS.free.limits.changelogCategories
+      : Number.POSITIVE_INFINITY;
+  const hasReachedLimit = categories.length >= categoryLimit;
   const handleCreate = () =>
     createDialogStore.send({ type: "toggle", data: {} });
 
@@ -190,7 +191,8 @@ function CategoryTableActions({
     <div className="flex items-center justify-end gap-3">
       {plan === "free" ? (
         <p className="text-muted-foreground text-sm">
-          {total} of {FREE_PLAN_CATEGORY_LIMIT} categories used
+          {total} of {PLAN_ENTITLEMENTS.free.limits.changelogCategories}{" "}
+          categories used
         </p>
       ) : null}
       <SkeletonWrapper>
@@ -274,9 +276,7 @@ function CategoryTableRow({
                     variant="ghost"
                   >
                     <HugeiconsIcon icon={Ellipsis} />
-                    <span className="sr-only">
-                      Open actions for {categoryId}
-                    </span>
+                    <span className="sr-only">Open actions for {name}</span>
                   </Button>
                 )}
               />
