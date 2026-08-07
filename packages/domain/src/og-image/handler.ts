@@ -5,6 +5,9 @@ import * as Schema from "effect/Schema";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
+import { getClientIpFromRequest } from "../client-ip";
+import * as RateLimit from "../rate-limit";
+import { RateLimitService } from "../rate-limit/service";
 import {
   type OgImagePostNotFoundError,
   type OgImageRenderError,
@@ -73,22 +76,57 @@ export const handleOgImage = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  OgImageService
+  OgImageService | RateLimitService
 > =>
-  handleOgImageEffect(request).pipe(
-    Effect.catchTag("OgImagePostNotFoundError", () =>
-      Effect.succeed(HttpServerResponse.text("Post not found", { status: 404 }))
-    ),
-    Effect.catchTag("OgImageRenderError", () =>
-      Effect.succeed(
-        HttpServerResponse.text("Unable to render OG image", { status: 500 })
-      )
-    ),
-    Effect.catchTag("OgImageRequestValidationError", (error) =>
-      Effect.succeed(HttpServerResponse.text(error.message, { status: 400 }))
-    ),
-    Effect.catchTag("OgImageSiteNotFoundError", () =>
-      Effect.succeed(HttpServerResponse.text("Site not found", { status: 404 }))
-    ),
-    Effect.orDie
-  );
+  Effect.gen(function* () {
+    const rateLimitService = yield* RateLimitService;
+    // The render is CPU-bound and this route is unauthenticated; an attacker
+    // can bypass the browser/CDN cache headers by varying query parameters, so
+    // consume a per-IP quota before touching the database or the renderer.
+    return yield* Effect.provideService(
+      handleOgImageEffect(request).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "OgImage",
+          level: "expensive",
+        }),
+        Effect.catchTag("RateLimitExceededError", () =>
+          Effect.succeed(
+            HttpServerResponse.text("Too many requests", { status: 429 })
+          )
+        ),
+        Effect.catchTag("RateLimitUnavailableError", () =>
+          Effect.succeed(
+            HttpServerResponse.text("Rate limiter unavailable", { status: 503 })
+          )
+        ),
+        Effect.catchTag("OgImagePostNotFoundError", () =>
+          Effect.succeed(
+            HttpServerResponse.text("Post not found", { status: 404 })
+          )
+        ),
+        Effect.catchTag("OgImageRenderError", () =>
+          Effect.succeed(
+            HttpServerResponse.text("Unable to render OG image", {
+              status: 500,
+            })
+          )
+        ),
+        Effect.catchTag("OgImageRequestValidationError", (error) =>
+          Effect.succeed(
+            HttpServerResponse.text(error.message, { status: 400 })
+          )
+        ),
+        Effect.catchTag("OgImageSiteNotFoundError", () =>
+          Effect.succeed(
+            HttpServerResponse.text("Site not found", { status: 404 })
+          )
+        ),
+        Effect.orDie
+      ),
+      RateLimit.PublicRpcRateLimiter,
+      RateLimit.makePublicRpcRateLimiter({
+        clientIp: getClientIpFromRequest(request),
+        rateLimitService,
+      })
+    );
+  });

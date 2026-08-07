@@ -1,6 +1,5 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -76,27 +75,18 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Roadmap", "update")
       ),
     RoadmapDelete: (args: TRoadmapDelete) =>
-      Effect.gen(function* () {
-        const roadmap = yield* repository.getById({
-          id: args.id,
-          organizationId: args.organizationId,
-        });
-
-        yield* repository.delete(args);
-
-        // Keep exactly one primary: hand it off when the primary is deleted.
-        if (Option.isSome(roadmap) && roadmap.value.isPrimary) {
-          yield* repository.delegatePrimary({
-            organizationId: args.organizationId,
-            exceptRoadmapId: args.id,
-          });
-        }
-      }).pipe(
-        Policy.withPolicy(
-          roadmapPolicy.canDelete({ organizationId: args.organizationId })
+      // Deletion and primary handoff run in one organization-scoped
+      // transaction (see RoadmapRepository.deleteWithPrimaryHandoff), so a
+      // concurrent create/delete cannot leave the organization with zero or
+      // multiple primary roadmaps.
+      repository
+        .deleteWithPrimaryHandoff(args)
+        .pipe(
+          Policy.withPolicy(
+            roadmapPolicy.canDelete({ organizationId: args.organizationId })
+          ),
+          withRemapDbErrors("Roadmap", "delete")
         ),
-        withRemapDbErrors("Roadmap", "delete")
-      ),
   };
 });
 

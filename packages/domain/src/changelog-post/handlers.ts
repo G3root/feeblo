@@ -52,6 +52,9 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
               "Post is not an unannounced completed post in this organization",
           });
         }
+        // changelogPolicy.canUpdate additionally requires the changelog to
+        // belong to this organization, so a manager cannot link this
+        // organization's post to another organization's changelog.
         yield* repository.create(args);
       }).pipe(
         Policy.withPolicy(

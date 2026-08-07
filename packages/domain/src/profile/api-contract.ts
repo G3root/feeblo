@@ -5,7 +5,7 @@ import * as Multipart from "effect/unstable/http/Multipart";
 import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
-
+import { UploadLimitsMiddleware } from "../http/upload-limits";
 import {
   BadRequestError,
   InternalServerError,
@@ -33,4 +33,5 @@ export class ProfileApiGroup extends HttpApiGroup.make("ProfileApiGroup")
       }).pipe(HttpApiSchema.asMultipart()),
     })
   )
-  .middleware(HttpApiAuthMiddleware) {}
+  .middleware(HttpApiAuthMiddleware)
+  .middleware(UploadLimitsMiddleware) {}

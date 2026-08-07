@@ -9,6 +9,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { AssetRepository } from "../asset/repository";
 import { replaceSingletonAsset } from "../asset/service";
 import { Api } from "../http/api";
+import { UploadLimitsMiddlewareLive } from "../http/upload-limits";
 import {
   BadRequestError,
   InternalServerError,
@@ -67,6 +68,24 @@ export const OrganizationApiLive = HttpApiBuilder.group(
           }
 
           const fs = yield* FileSystem.FileSystem;
+
+          // Check the on-disk size before reading the file into memory so an
+          // oversized upload cannot exhaust server memory.
+          const fileInfo = yield* fs
+            .stat(file.path)
+            .pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({ message: "Failed to read file" })
+              )
+            );
+          const maxSize = FileSystem.Size(MAX_ORGANIZATION_LOGO_BYTES);
+          if (fileInfo.size === FileSystem.Size(0) || fileInfo.size > maxSize) {
+            return yield* new BadRequestError({
+              message: "Workspace logo must be between 1B and 5MB",
+            });
+          }
+
           const bytes = yield* fs
             .readFile(file.path)
             .pipe(
@@ -129,7 +148,10 @@ export const OrganizationApiLive = HttpApiBuilder.group(
         );
       }
     )
-).pipe(Layer.provide(HttpApiAuthMiddlewareLive));
+).pipe(
+  Layer.provide(HttpApiAuthMiddlewareLive),
+  Layer.provide(UploadLimitsMiddlewareLive)
+);
 
 function getFileExtension(contentType: string): string | null {
   switch (contentType) {

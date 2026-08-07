@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
+import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { WorkspaceRepository } from "../workspace/repository";
 import { SitePolicy } from "./policies";
@@ -36,7 +37,13 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
           subdomain: args.subdomain,
           limit: 1,
         })
-        .pipe(withRemapDbErrors("Site", "select")),
+        .pipe(
+          RateLimit.withPublicRpcRateLimit({
+            name: "SiteListBySubdomain",
+            level: "read",
+          }),
+          withRemapDbErrors("Site", "select")
+        ),
     SiteUpdate: (args: TSiteUpdate) =>
       repository
         .update(args)

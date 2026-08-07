@@ -54,6 +54,33 @@ const makeChangelogRepository = Effect.gen(function* () {
         )
         .pipe(Effect.map(EffectArray.get(0))),
 
+    /**
+     * A changelog is scoped to its organization. Policies gate cross-tenant
+     * operations on this instead of trusting a caller-supplied changelog id:
+     * without it, a manager could link this organization's post to another
+     * organization's changelog (ids are enumerable via public listings),
+     * creating a cross-tenant link row that surfaces foreign changelog content
+     * in this organization's public feed.
+     */
+    existsInOrganization: ({
+      id,
+      organizationId,
+    }: {
+      id: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: schema.changelogTable.id })
+        .from(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, id),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows.length > 0)),
+
     findMany: ({ organizationId, limit }: TFindMany) => {
       const query = db
         .select({

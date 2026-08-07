@@ -586,5 +586,130 @@ describe("RoadmapRpcHandlers", () => {
           });
         })
     );
+    it.effect(
+      "keeps exactly one primary when the primary and a non-primary roadmap are deleted concurrently",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* RoadmapRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const db = yield* currentDb;
+          const secondId = yield* RoadmapId.generate;
+          const thirdId = yield* RoadmapId.generate;
+          const now = new Date();
+
+          yield* db.insert(schema.roadmapTable).values([
+            {
+              id: secondId,
+              organizationId: fixture.organizationId,
+              name: "Second roadmap",
+              slug: secondId,
+              description: null,
+              isPrimary: false,
+              mode: "status",
+              visibility: "public",
+              filter: { version: 1, operator: "and", conditions: [] },
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: thirdId,
+              organizationId: fixture.organizationId,
+              name: "Third roadmap",
+              slug: thirdId,
+              description: null,
+              isPrimary: false,
+              mode: "status",
+              visibility: "public",
+              filter: { version: 1, operator: "and", conditions: [] },
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+
+          // Deleting the primary and a non-primary roadmap at the same time
+          // must not lose track of the primary: whichever delete runs second
+          // observes the handoff and either skips promotion or promotes the
+          // remaining roadmap.
+          yield* Effect.all(
+            [
+              handlers
+                .RoadmapDelete({
+                  id: fixture.roadmapId,
+                  organizationId: fixture.organizationId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                ),
+              handlers
+                .RoadmapDelete({
+                  id: secondId,
+                  organizationId: fixture.organizationId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                ),
+            ],
+            { concurrency: 2 }
+          );
+
+          const roadmaps = yield* handlers
+            .RoadmapList({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(roadmaps).toHaveLength(1);
+          expect(roadmaps.filter((roadmap) => roadmap.isPrimary)).toHaveLength(
+            1
+          );
+        })
+    );
+    it.effect(
+      "keeps exactly one primary when a primary delete races a create",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* RoadmapRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const createdId = yield* RoadmapId.generate;
+
+          // Deleting the only (primary) roadmap while a new roadmap is being
+          // created must end with exactly one primary: either the create wins
+          // the primary claim after the delete commits, or the delete's handoff
+          // promotes the just-created roadmap.
+          yield* Effect.all(
+            [
+              handlers
+                .RoadmapDelete({
+                  id: fixture.roadmapId,
+                  organizationId: fixture.organizationId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                ),
+              handlers
+                .RoadmapCreate(
+                  roadmapCreateInput(fixture, createdId, "Racing roadmap")
+                )
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                ),
+            ],
+            { concurrency: 2 }
+          );
+
+          const roadmaps = yield* handlers
+            .RoadmapList({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(roadmaps).toHaveLength(1);
+          expect(
+            roadmaps.find((roadmap) => roadmap.id === createdId)
+          ).toMatchObject({
+            isPrimary: true,
+          });
+        })
+    );
   });
 });
