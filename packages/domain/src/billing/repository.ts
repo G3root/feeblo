@@ -246,6 +246,7 @@ const makeBillingRepository = Effect.gen(function* () {
       db
         .select({
           id: schema.subscriptionTable.id,
+          externalId: schema.subscriptionTable.externalId,
           customerId: schema.subscriptionTable.customerId,
           organizationId: schema.subscriptionTable.organizationId,
         })

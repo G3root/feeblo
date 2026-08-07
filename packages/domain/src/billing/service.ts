@@ -9,6 +9,7 @@ import { PolarConfig } from "./config";
 import {
   FailedToCreateCheckoutError,
   FailedToCreatePortalError,
+  FailedToRevokeSubscriptionError,
 } from "./errors";
 
 const URLRegex = /\/$/;
@@ -101,6 +102,33 @@ const makePolarService = Effect.gen(function* () {
         url: portalSession.customerPortalUrl,
       };
     }),
+    /**
+     * Immediately cancels a subscription. Used when an organization is deleted
+     * so billing does not continue for a tenant that no longer exists.
+     */
+    revokeSubscription: Effect.fn("PolarService.revokeSubscription")(
+      function* ({ id }: { id: string }) {
+        if (!client) {
+          return;
+        }
+
+        yield* Effect.tryPromise({
+          try: () => client.subscriptions.revoke({ id }),
+          catch: (cause) =>
+            new FailedToRevokeSubscriptionError({
+              message: "Failed to revoke Polar subscription",
+              ...(cause instanceof Error ? { cause } : {}),
+            }),
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.logWarning("Failed to revoke Polar subscription", {
+              subscriptionId: id,
+              error,
+            })
+          )
+        );
+      }
+    ),
   };
 });
 
