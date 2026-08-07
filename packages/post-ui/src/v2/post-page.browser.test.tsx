@@ -54,6 +54,7 @@ function state({
 } = {}) {
   const post = {
     archivedAt: null,
+    content: "Plain post content",
     lockedAt: locked ? new Date() : null,
     mergedIntoPostId: null,
     etaQuarter: null,
@@ -185,9 +186,11 @@ describe("PostPage composition", () => {
       .not.toBeInTheDocument();
   });
 
-  it("composes the post editor, reactions, votes, and discussion", async () => {
+  it("composes the post content, reactions, votes, and discussion", async () => {
     const screen = await render(
-      <PostCollectionStateProvider value={state()}>
+      <PostCollectionStateProvider
+        value={state({ authenticated: true, canManage: true })}
+      >
         <PostPage.Title />
         <PostPage.Content />
         <PostPage.Reactions />
@@ -200,12 +203,40 @@ describe("PostPage composition", () => {
     await expect
       .element(screen.getByRole("heading", { name: "post title" }))
       .toBeVisible();
+
+    // A post author sees the editor directly, without an edit toggle.
     await expect.element(screen.getByText("post content")).toBeVisible();
+    await expect
+      .element(screen.getByText("Plain post content"))
+      .not.toBeInTheDocument();
+
     await expect.element(screen.getByText("reaction picker")).toBeVisible();
     await expect
       .element(screen.getByRole("button", { name: "compact vote" }))
       .toBeVisible();
     await expect.element(screen.getByText("comment composer")).toBeVisible();
     await expect.element(screen.getByText("comments list")).toBeVisible();
+  });
+
+  it("shows the rendered Markdown to readers who cannot edit the post", async () => {
+    const screen = await render(
+      <PostCollectionStateProvider value={state()}>
+        <PostPage.Content />
+      </PostCollectionStateProvider>
+    );
+
+    await expect.element(screen.getByText("Plain post content")).toBeVisible();
+  });
+
+  it("shows the rendered Markdown when the post is locked", async () => {
+    const screen = await render(
+      <PostCollectionStateProvider
+        value={state({ authenticated: true, canManage: true, locked: true })}
+      >
+        <PostPage.Content />
+      </PostCollectionStateProvider>
+    );
+
+    await expect.element(screen.getByText("Plain post content")).toBeVisible();
   });
 });

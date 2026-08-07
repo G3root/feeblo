@@ -1,4 +1,6 @@
-import type { ComponentProps } from "react";
+// import "@feeblo/web-shared/typeset.css";
+import { markdownToHtml } from "@feeblo/utils/markdown";
+import { type ComponentProps, useMemo } from "react";
 import { cn } from "./utils";
 
 type MarkdownContentProps = Omit<
@@ -8,17 +10,18 @@ type MarkdownContentProps = Omit<
   content: string;
 };
 
-//TODO: refactor the component to another later. this name is misleading and content is always html
 export function MarkdownContent({
   className,
   content,
   ...props
 }: MarkdownContentProps) {
+  const html = useMemo(() => markdownToHtml(content), [content]);
+
   return (
     <div
       className={cn("typeset", className)}
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: already sanitized in the server
-      dangerouslySetInnerHTML={{ __html: content }}
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized Markdown rendered to HTML
+      dangerouslySetInnerHTML={{ __html: html }}
       {...props}
     />
   );
