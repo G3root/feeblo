@@ -49,7 +49,7 @@ const getDatabaseErrorCode = (cause: unknown): string | undefined =>
     onSome: ({ code }) => code,
   });
 
-const isUniqueViolation = (error: unknown): boolean =>
+export const isUniqueViolation = (error: unknown): boolean =>
   error instanceof EffectDrizzleQueryError &&
   getDatabaseErrorCode(error.cause) === "23505";
 
@@ -204,7 +204,12 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
           return toInternalError("There was a database error when");
         }
       )
-    );
+      // Every RemappedDbError variant above is caught and remapped to
+      // InternalServerError/UniqueViolationError, so the resulting error set
+      // is exactly Exclude<E, RemappedDbError> | InternalServerError |
+      // UniqueViolationError. The cast bridges Effect.catchIf's `unassigned`
+      // sentinel noise in its generic inference.
+    ) as RemappedDbEffect<R, E, A, UniqueViolationError>;
   };
 }
 

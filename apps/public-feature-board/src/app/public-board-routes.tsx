@@ -12,7 +12,10 @@ import {
   publicChangelogCategoryCollection,
   publicChangelogCategoryLinkCollection,
   publicChangelogCollection,
+  publicCommentCollection,
+  publicCommentReactionCollection,
   publicPostCollection,
+  publicPostReactionCollection,
   publicPostStatusCollection,
   publicPostTagCollection,
   publicRoadmapCollection,
@@ -149,6 +152,9 @@ const postRoute = createRoute({
       publicPostStatusCollection.preload(),
       publicPostTagCollection.preload(),
       publicTagCollection.preload(),
+      publicCommentCollection.preload(),
+      publicCommentReactionCollection.preload(),
+      publicPostReactionCollection.preload(),
     ]);
 
     return null;

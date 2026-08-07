@@ -2,7 +2,6 @@ import { transaction } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
@@ -243,9 +242,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const id = yield* PostId.generate;
           const now = new Date();
           const excerpt = htmlToExcerpt(sanitizedHtml);
-          const slug = slugify(title);
 
           let contactId: string | undefined;
+          let slug: string | undefined;
 
           if (token) {
             const secrets = yield* jwtSecretRepository.getSecretsForOrg({
@@ -292,7 +291,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   )
                 );
 
-                yield* postRepository.create({
+                slug = yield* postRepository.create({
                   id,
                   boardId,
                   organizationId,
@@ -307,7 +306,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               })
             );
           } else {
-            yield* transaction(
+            slug = yield* transaction(
               postRepository.create({
                 id,
                 boardId,
@@ -329,6 +328,12 @@ export const WidgetApiLive = HttpApiBuilder.group(
             organizationId,
             title,
           });
+
+          if (!slug) {
+            return yield* new InternalServerError({
+              message: "Failed to create feedback",
+            });
+          }
 
           return {
             id,
@@ -352,6 +357,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
             PostRepository.layer,
             PostStatusRepository.layer,
           ]),
+          Effect.catchTag("PostAlreadyExistsError", () =>
+            Effect.fail(
+              new InternalServerError({
+                message: "Failed to create feedback",
+              })
+            )
+          ),
           withRemapDbErrors("Feedback", "create")
         )
       )

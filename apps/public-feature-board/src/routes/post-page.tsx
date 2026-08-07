@@ -10,8 +10,8 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import { cn } from "@feeblo/ui/utils";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { cn } from "@feeblo/ui/utils";
 import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";

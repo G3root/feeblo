@@ -40,6 +40,29 @@ function getCurrentOrganizationId() {
   return organizationId ? decodeURIComponent(organizationId) : undefined;
 }
 
+/**
+ * Post detail pages live at `/:organizationId/.../post/:boardSlug/:postSlug`;
+ * parse the post slug from the current URL so the comment/reaction collections
+ * can be keyed and fetched when the query is created without an explicit
+ * filter (e.g. from a route loader).
+ */
+function getCurrentPostSlug() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  const segments = window.location.pathname
+    .split("/")
+    .filter((segment) => segment.length > 0);
+  const postIndex = segments.indexOf("post");
+
+  if (postIndex === -1 || !segments[postIndex + 2]) {
+    return undefined;
+  }
+
+  return decodeURIComponent(segments[postIndex + 2]);
+}
+
 function getOrganizationScopedQueryKey(
   scope: string,
   ...parts: ReadonlyArray<string | undefined>
@@ -688,17 +711,20 @@ export const commentCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const slug = getEqFilterValue(parsed.filters, "postSlug");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
       return slug
         ? getOrganizationScopedQueryKey("comment", "postSlug", slug)
         : getOrganizationScopedQueryKey("comment");
     },
     syncMode: "on-demand",
+
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug = getEqFilterValue(parsed.filters, "postSlug");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
       if (!(organizationId && slug)) {
         return [];
@@ -830,17 +856,20 @@ export const commentReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const slug = getEqFilterValue(parsed.filters, "postSlug");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
       return slug
         ? getOrganizationScopedQueryKey("comment-reaction", "postSlug", slug)
         : getOrganizationScopedQueryKey("comment-reaction");
     },
     syncMode: "on-demand",
+
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug = getEqFilterValue(parsed.filters, "postSlug");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
       if (!(organizationId && slug)) {
         return [];
@@ -935,17 +964,20 @@ export const postReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const slug = getEqFilterValue(parsed.filters, "postSlug");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
       return slug
         ? getOrganizationScopedQueryKey("post-reaction", "postSlug", slug)
         : getOrganizationScopedQueryKey("post-reaction");
     },
     syncMode: "on-demand",
+
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const slug = getEqFilterValue(parsed.filters, "postSlug");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
       if (!(organizationId && slug)) {
         return [];
