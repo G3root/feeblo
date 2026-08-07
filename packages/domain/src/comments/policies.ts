@@ -20,6 +20,7 @@ type TCanCreate = {
   visibility: "PUBLIC" | "INTERNAL";
   postId: string;
   source: TSource;
+  parentCommentId?: string | null;
 };
 
 type TCanDelete = {
@@ -40,6 +41,39 @@ const makeCommentPolicy = Effect.gen(function* () {
   const repository = yield* CommentRepository;
   const postRepository = yield* PostRepository;
 
+  /**
+   * Guards against cross-tenant/cross-post parent references: a reply must
+   * point at a comment on the same organization + post. On the public path
+   * the parent must additionally be a PUBLIC comment, so anonymous users
+   * cannot anchor a reply under an INTERNAL (member-only) comment.
+   */
+  const canReplyToParent = (args: {
+    organizationId: string;
+    postId: string;
+    parentCommentId?: string | null;
+    publicOnly: boolean;
+  }) =>
+    Policy.policy(() => {
+      if (!args.parentCommentId) {
+        return Effect.succeed(true);
+      }
+      return repository
+        .findById({
+          id: args.parentCommentId,
+          organizationId: args.organizationId,
+          postId: args.postId,
+        })
+        .pipe(
+          Effect.map((parent) =>
+            Option.match(parent, {
+              onNone: () => false,
+              onSome: (comment) =>
+                args.publicOnly ? comment.visibility === "PUBLIC" : true,
+            })
+          )
+        );
+    });
+
   const canCreate = (args: TCanCreate) => {
     if (args.source === "public") {
       return Policy.all(
@@ -54,7 +88,8 @@ const makeCommentPolicy = Effect.gen(function* () {
           // member can create internal and public comments
           Policy.hasMembership(args.organizationId),
           Policy.policy(() => Effect.succeed(args.visibility === "PUBLIC"))
-        )
+        ),
+        canReplyToParent({ ...args, publicOnly: true })
       );
     }
 
@@ -65,7 +100,8 @@ const makeCommentPolicy = Effect.gen(function* () {
           id: args.postId,
           organizationId: args.organizationId,
         })
-      )
+      ),
+      canReplyToParent({ ...args, publicOnly: false })
     );
   };
 

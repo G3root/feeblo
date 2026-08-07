@@ -46,6 +46,7 @@ export const useCommentForm = ({
 }: useCommentFormProps) => {
   const { post, organizationId } = usePostCollectionData();
   const postId = post.id;
+  const postSlug = post.slug;
   const {
     collections: { commentCollection },
     onAuthRequired,
@@ -82,6 +83,7 @@ export const useCommentForm = ({
         organizationId,
         memberId: membership?.membershipId ?? null,
         postId,
+        postSlug,
         userId: session.user.id,
         user: {
           name: session.user.name,

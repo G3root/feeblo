@@ -688,25 +688,25 @@ export const commentCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug = getEqFilterValue(parsed.filters, "postSlug");
 
-      return postId
-        ? getOrganizationScopedQueryKey("comment", "postId", postId)
+      return slug
+        ? getOrganizationScopedQueryKey("comment", "postSlug", slug)
         : getOrganizationScopedQueryKey("comment");
     },
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug = getEqFilterValue(parsed.filters, "postSlug");
 
-      if (!(organizationId && postId)) {
+      if (!(organizationId && slug)) {
         return [];
       }
 
       try {
         const data = await fetchRpc(
-          (rpc) => rpc.CommentList({ organizationId, postId }),
+          (rpc) => rpc.CommentList({ organizationId, slug }),
           { signal: ctx.signal }
         );
         return [...data];
@@ -830,24 +830,24 @@ export const commentReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug = getEqFilterValue(parsed.filters, "postSlug");
 
-      return postId
-        ? getOrganizationScopedQueryKey("comment-reaction", "postId", postId)
+      return slug
+        ? getOrganizationScopedQueryKey("comment-reaction", "postSlug", slug)
         : getOrganizationScopedQueryKey("comment-reaction");
     },
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug = getEqFilterValue(parsed.filters, "postSlug");
 
-      if (!(organizationId && postId)) {
+      if (!(organizationId && slug)) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.CommentReactionList({ organizationId, postId }),
+        (rpc) => rpc.CommentReactionList({ organizationId, slug }),
         {
           signal: ctx.signal,
         }
@@ -935,24 +935,24 @@ export const postReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug = getEqFilterValue(parsed.filters, "postSlug");
 
-      return postId
-        ? getOrganizationScopedQueryKey("post-reaction", "postId", postId)
+      return slug
+        ? getOrganizationScopedQueryKey("post-reaction", "postSlug", slug)
         : getOrganizationScopedQueryKey("post-reaction");
     },
     syncMode: "on-demand",
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug = getEqFilterValue(parsed.filters, "postSlug");
 
-      if (!(organizationId && postId)) {
+      if (!(organizationId && slug)) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.PostReactionList({ organizationId, postId }),
+        (rpc) => rpc.PostReactionList({ organizationId, slug }),
         {
           signal: ctx.signal,
         }

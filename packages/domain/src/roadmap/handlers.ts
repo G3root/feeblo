@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -7,6 +8,7 @@ import { withRemapDbErrors } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
+import { RoadmapPolicy } from "./policies";
 import { RoadmapRepository } from "./repository";
 import { RoadmapRpcs } from "./rpcs";
 import type {
@@ -19,8 +21,8 @@ import type {
 export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* RoadmapRepository;
   const sitePolicy = yield* SitePolicy;
-  const manage = (organizationId: string) =>
-    Policy.canPermission(organizationId, "roadmap.*");
+  const roadmapPolicy = yield* RoadmapPolicy;
+
   return {
     RoadmapList: (args: TRoadmapList) =>
       repository
@@ -43,26 +45,57 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Roadmap", "select")
         ),
     RoadmapCreate: (args: TRoadmapCreate) =>
-      repository
-        .create(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("Roadmap", "create")
+      Effect.gen(function* () {
+        // The first roadmap in an organization becomes the primary one.
+        const count = yield* repository.countByOrganizationId({
+          organizationId: args.organizationId,
+        });
+        yield* repository.create({
+          ...args,
+          isPrimary: count === 0,
+        });
+      }).pipe(
+        Policy.withPolicy(
+          roadmapPolicy.canCreate({
+            organizationId: args.organizationId,
+            visibility: args.visibility,
+          })
         ),
+        withRemapDbErrors("Roadmap", "create")
+      ),
     RoadmapUpdate: (args: TRoadmapUpdate) =>
-      repository
-        .update(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("Roadmap", "update")
+      repository.update(args).pipe(
+        Policy.withPolicy(
+          roadmapPolicy.canUpdate({
+            organizationId: args.organizationId,
+            roadmapId: args.id,
+            visibility: args.visibility,
+          })
         ),
+        withRemapDbErrors("Roadmap", "update")
+      ),
     RoadmapDelete: (args: TRoadmapDelete) =>
-      repository
-        .delete(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("Roadmap", "delete")
+      Effect.gen(function* () {
+        const roadmap = yield* repository.getById({
+          id: args.id,
+          organizationId: args.organizationId,
+        });
+
+        yield* repository.delete(args);
+
+        // Keep exactly one primary: hand it off when the primary is deleted.
+        if (Option.isSome(roadmap) && roadmap.value.isPrimary) {
+          yield* repository.delegatePrimary({
+            organizationId: args.organizationId,
+            exceptRoadmapId: args.id,
+          });
+        }
+      }).pipe(
+        Policy.withPolicy(
+          roadmapPolicy.canDelete({ organizationId: args.organizationId })
         ),
+        withRemapDbErrors("Roadmap", "delete")
+      ),
   };
 });
 
@@ -70,6 +103,7 @@ export const RoadmapRpcHandlers = RoadmapRpcs.toLayer(
   RoadmapRpcHandlersEffect
 ).pipe(
   Layer.provide(SitePolicy.layer),
+  Layer.provide(RoadmapPolicy.layer),
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),

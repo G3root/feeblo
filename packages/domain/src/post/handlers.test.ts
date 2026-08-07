@@ -10,7 +10,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -280,7 +280,9 @@ describe("PostRpcHandlers", () => {
           const postId = yield* PostId.generate;
 
           yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Contributor feedback"))
+            .PostCreate(
+              postCreateInput(fixture, postId, "Contributor feedback")
+            )
             .pipe(
               Effect.provideService(
                 CurrentSession,
@@ -312,7 +314,7 @@ describe("PostRpcHandlers", () => {
         })
       );
 
-      it.effect("returns a meaningful error on a slug collision", () =>
+      it.effect("deduplicates slug collisions across the organization", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture();
@@ -324,19 +326,69 @@ describe("PostRpcHandlers", () => {
               postCreateInput(fixture, firstPostId, "Duplicate title")
             )
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* handlers
+            .PostCreate(
+              postCreateInput(fixture, secondPostId, "Duplicate title")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          const error = yield* Effect.flip(
-            handlers
-              .PostCreate(
-                postCreateInput(fixture, secondPostId, "Duplicate title")
-              )
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
-          );
+          const db = yield* currentDb;
+          const rows = yield* db
+            .select({ id: schema.postTable.id, slug: schema.postTable.slug })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, fixture.organizationId))
+            .orderBy(schema.postTable.createdAt);
 
-          expect(error._tag).toBe("PostAlreadyExistsError");
-          expect(error.message).toBe("A post with this slug already exists");
-          expect(error.cause).toBeUndefined();
+          expect(rows).toHaveLength(2);
+          expect(rows[0]).toMatchObject({
+            id: firstPostId,
+            slug: "duplicate-title",
+          });
+          expect(rows[1]).toMatchObject({
+            id: secondPostId,
+            slug: "duplicate-title-2",
+          });
         })
+      );
+
+      it.effect(
+        "keeps the same slug for identical titles in other organizations",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const firstFixture = yield* makeFixture();
+            const secondFixture = yield* makeFixture();
+            const firstPostId = yield* PostId.generate;
+            const secondPostId = yield* PostId.generate;
+
+            yield* handlers
+              .PostCreate(
+                postCreateInput(firstFixture, firstPostId, "Shared title")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(firstFixture))
+              );
+            yield* handlers
+              .PostCreate(
+                postCreateInput(secondFixture, secondPostId, "Shared title")
+              )
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(secondFixture)
+                )
+              );
+
+            const db = yield* currentDb;
+            const rows = yield* db
+              .select({ id: schema.postTable.id, slug: schema.postTable.slug })
+              .from(schema.postTable)
+              .where(inArray(schema.postTable.id, [firstPostId, secondPostId]));
+
+            expect(rows).toHaveLength(2);
+            expect(rows[0]).toMatchObject({ slug: "shared-title" });
+            expect(rows[1]).toMatchObject({ slug: "shared-title" });
+          })
       );
 
       it.effect("persists an etaQuarter when provided", () =>
@@ -359,7 +411,7 @@ describe("PostRpcHandlers", () => {
             .where(eq(schema.postTable.id, postId));
 
           expect(row?.etaQuarter).toBe("2026-Q3");
-        }),
+        })
       );
     });
 
@@ -397,57 +449,61 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostUpdate", () => {
-      it.effect("lets contributors move posts but not change their status", () =>
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const handlers = yield* PostRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-          const postId = yield* PostId.generate;
-          const destinationBoardId = yield* addBoard(fixture, "PUBLIC");
-          const otherStatusId = yield* PostStatusId.generate;
+      it.effect(
+        "lets contributors move posts but not change their status",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const destinationBoardId = yield* addBoard(fixture, "PUBLIC");
+            const otherStatusId = yield* PostStatusId.generate;
 
-          yield* db.insert(schema.postStatusTable).values({
-            id: otherStatusId,
-            type: "IN_PROGRESS",
-            orderIndex: 1,
-            organizationId: fixture.organizationId,
-          });
-          yield* handlers
-            .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-
-          yield* handlers
-            .PostUpdate({
-              id: postId,
+            yield* db.insert(schema.postStatusTable).values({
+              id: otherStatusId,
+              type: "IN_PROGRESS",
+              orderIndex: 1,
               organizationId: fixture.organizationId,
-              boardId: destinationBoardId,
-              statusId: fixture.statusId,
-            })
-            .pipe(
-              Effect.provideService(
-                CurrentSession,
-                makeSession(fixture, "contributor")
-              )
-            );
+            });
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
 
-          const error = yield* Effect.flip(
-            handlers
+            yield* handlers
               .PostUpdate({
                 id: postId,
                 organizationId: fixture.organizationId,
                 boardId: destinationBoardId,
-                statusId: otherStatusId,
+                statusId: fixture.statusId,
               })
               .pipe(
                 Effect.provideService(
                   CurrentSession,
                   makeSession(fixture, "contributor")
                 )
-              )
-          );
+              );
 
-          expect(error._tag).toBe("PolicyDenied");
-        })
+            const error = yield* Effect.flip(
+              handlers
+                .PostUpdate({
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: destinationBoardId,
+                  statusId: otherStatusId,
+                })
+                .pipe(
+                  Effect.provideService(
+                    CurrentSession,
+                    makeSession(fixture, "contributor")
+                  )
+                )
+            );
+
+            expect(error._tag).toBe("PolicyDenied");
+          })
       );
 
       it.effect("lets a post creator change the post", () =>

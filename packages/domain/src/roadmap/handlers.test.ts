@@ -217,7 +217,7 @@ describe("RoadmapRpcHandlers", () => {
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                makeSession(fixture, "member")
+                makeSession(fixture, "contributor")
               )
             )
         );

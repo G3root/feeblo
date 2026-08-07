@@ -28,16 +28,16 @@ const makeRoadmapPolicy = Effect.gen(function* () {
 
   const canCreate = (args: TCanCreate) =>
     Policy.all(
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "roadmap.*"),
       entitlementPolicy.canCreateRoadmap(args)
     );
 
   const canDelete = (args: TCanDelete) =>
-    Policy.hasOrganizationOwnerOrAdmin(args.organizationId);
+    Policy.canPermission(args.organizationId, "roadmap.*");
 
   const canUpdate = (args: TCanUpdate) =>
     Policy.all(
-      Policy.hasOrganizationOwnerOrAdmin(args.organizationId),
+      Policy.canPermission(args.organizationId, "roadmap.*"),
       Effect.gen(function* () {
         if (args.visibility !== "private") {
           return;

@@ -9,9 +9,14 @@ import {
 } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
-import { CurrentSession, type Session } from "../session-middleware";
+import {
+  CurrentSession,
+  OptionalCurrentSession,
+  type Session,
+} from "../session-middleware";
 import { UpvoteRpcHandlersEffect } from "./handlers";
 import { UpvotePolicy } from "./policies";
 import { UpvoteRepository } from "./repository";
@@ -353,17 +358,132 @@ describe("UpvoteRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           // List publicly without auth
-          const upvotes = yield* handlers.UpvoteListPublic({
-            organizationId: fixture.organizationId,
-          });
+          const upvotes = yield* handlers
+            .UpvoteListPublic({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(upvotes).toHaveLength(1);
+          // Internal voter identifiers are redacted for anonymous callers.
           expect(upvotes[0]).toMatchObject({
             postId,
-            userId: fixture.userId,
+            userId: null,
+            memberId: null,
           });
+          // Display fields stay public (voter dialog).
           expect(upvotes[0]?.user.name).toBe("Test User");
         })
+      );
+
+      it.effect("honors the postId filter", () =>
+        Effect.gen(function* () {
+          const handlers = yield* UpvoteRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postA = yield* PostId.generate;
+          const postB = yield* PostId.generate;
+
+          yield* createPost(fixture, postA, "Post A");
+          yield* createPost(fixture, postB, "Post B");
+
+          yield* handlers
+            .UpvoteToggle({
+              organizationId: fixture.organizationId,
+              postId: postA,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* handlers
+            .UpvoteToggle({
+              organizationId: fixture.organizationId,
+              postId: postB,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const upvotes = yield* handlers
+            .UpvoteListPublic({
+              organizationId: fixture.organizationId,
+              postId: postA,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+          expect(upvotes).toHaveLength(1);
+          expect(upvotes[0]).toMatchObject({ postId: postA, userId: null });
+        })
+      );
+
+      it.effect(
+        "keeps the session user's identity but redacts other voters",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* UpvoteRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+            const db = yield* currentDb;
+
+            yield* createPost(fixture, postId, "Test post");
+
+            // A second, non-member voter.
+            const otherUserId = `other_user_${fixture.organizationId}`;
+            yield* db.insert(schema.userTable).values({
+              id: otherUserId,
+              email: `${otherUserId}@example.com`,
+              name: "Other User",
+            });
+            const otherSession: Session = {
+              user: {
+                id: otherUserId,
+                email: `${otherUserId}@example.com`,
+                name: "Other User",
+                restrictedToOrganizationId: null,
+              },
+              session: { userId: otherUserId, token: "other-token" },
+              organizations: [],
+              memberships: [],
+            };
+
+            yield* handlers
+              .UpvoteToggle({
+                organizationId: fixture.organizationId,
+                postId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .UpvoteTogglePublic({
+                organizationId: fixture.organizationId,
+                postId,
+              })
+              .pipe(Effect.provideService(CurrentSession, otherSession));
+
+            const upvotes = yield* handlers
+              .UpvoteListPublic({
+                organizationId: fixture.organizationId,
+              })
+              .pipe(
+                Effect.provideService(
+                  OptionalCurrentSession,
+                  Option.some(makeSession(fixture))
+                )
+              );
+
+            expect(upvotes).toHaveLength(2);
+
+            const mine = upvotes.find((u) => u.userId === fixture.userId);
+            const other = upvotes.find((u) => u.userId !== fixture.userId);
+
+            expect(mine).toMatchObject({
+              postId,
+              userId: fixture.userId,
+              memberId: fixture.membershipId,
+            });
+            expect(other).toMatchObject({
+              postId,
+              userId: null,
+              memberId: null,
+            });
+            expect(other?.user.name).toBe("Other User");
+          })
       );
 
       it.effect("hides upvotes on private board posts", () =>
@@ -392,9 +512,11 @@ describe("UpvoteRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          const upvotes = yield* handlers.UpvoteListPublic({
-            organizationId: fixture.organizationId,
-          });
+          const upvotes = yield* handlers
+            .UpvoteListPublic({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
           expect(upvotes).toHaveLength(0);
 
           const memberUpvotes = yield* handlers
@@ -427,13 +549,15 @@ describe("UpvoteRpcHandlers", () => {
 
           expect(result.upvoted).toBe(true);
 
-          // Verify the upvote is visible publicly
-          const upvotes = yield* handlers.UpvoteListPublic({
-            organizationId: fixture.organizationId,
-          });
+          // Verify the upvote is visible publicly (identity redacted)
+          const upvotes = yield* handlers
+            .UpvoteListPublic({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(upvotes).toHaveLength(1);
-          expect(upvotes[0]).toMatchObject({ postId, userId: fixture.userId });
+          expect(upvotes[0]).toMatchObject({ postId, userId: null });
         })
       );
 
@@ -532,9 +656,11 @@ describe("UpvoteRpcHandlers", () => {
           expect(second.upvoted).toBe(false);
 
           // Verify upvote is removed
-          const upvotes = yield* handlers.UpvoteListPublic({
-            organizationId: fixture.organizationId,
-          });
+          const upvotes = yield* handlers
+            .UpvoteListPublic({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
           expect(upvotes).toHaveLength(0);
         })
       );

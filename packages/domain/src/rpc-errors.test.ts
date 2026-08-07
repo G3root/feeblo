@@ -15,7 +15,7 @@ describe("withRemapDbErrors", () => {
             params: ["secret-param"],
             cause: {
               code: "23505",
-              constraint: "post_organizationId_boardId_slug_uidx",
+              constraint: "post_organizationId_slug_uidx",
             },
           })
         ).pipe(

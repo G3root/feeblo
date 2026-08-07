@@ -10,7 +10,7 @@ import * as Option from "effect/Option";
 
 interface TPostReactionList {
   organizationId: string;
-  postId: string;
+  slug: string;
 }
 
 interface TPostReactionToggle {
@@ -24,14 +24,14 @@ const makePostReactionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    list: ({ postId, organizationId }: TPostReactionList) =>
+    list: ({ slug, organizationId }: TPostReactionList) =>
       Effect.gen(function* () {
         const post = yield* db
           .select({ id: schema.postTable.id })
           .from(schema.postTable)
           .where(
             and(
-              eq(schema.postTable.id, postId),
+              eq(schema.postTable.slug, slug),
               eq(schema.postTable.organizationId, organizationId)
             )
           )
@@ -46,6 +46,7 @@ const makePostReactionRepository = Effect.gen(function* () {
           .select({
             id: schema.postReactionTable.id,
             postId: schema.postReactionTable.postId,
+            postSlug: schema.postTable.slug,
             organizationId: schema.postTable.organizationId,
             userId: schema.postReactionTable.userId,
             memberId: schema.postReactionTable.memberId,
@@ -61,7 +62,7 @@ const makePostReactionRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.postTable.organizationId, organizationId),
-              eq(schema.postReactionTable.postId, postId)
+              eq(schema.postReactionTable.postId, post.value.id)
             )
           );
 
@@ -71,7 +72,7 @@ const makePostReactionRepository = Effect.gen(function* () {
         }));
       }),
 
-    listPublic: ({ postId, organizationId }: TPostReactionList) =>
+    listPublic: ({ slug, organizationId }: TPostReactionList) =>
       Effect.gen(function* () {
         const post = yield* db
           .select({ id: schema.postTable.id })
@@ -82,7 +83,7 @@ const makePostReactionRepository = Effect.gen(function* () {
           )
           .where(
             and(
-              eq(schema.postTable.id, postId),
+              eq(schema.postTable.slug, slug),
               eq(schema.postTable.organizationId, organizationId),
               eq(schema.boardTable.visibility, "PUBLIC")
             )
@@ -98,6 +99,7 @@ const makePostReactionRepository = Effect.gen(function* () {
           .select({
             id: schema.postReactionTable.id,
             postId: schema.postReactionTable.postId,
+            postSlug: schema.postTable.slug,
             organizationId: schema.postTable.organizationId,
             userId: schema.postReactionTable.userId,
             memberId: schema.postReactionTable.memberId,
@@ -113,7 +115,7 @@ const makePostReactionRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.postTable.organizationId, organizationId),
-              eq(schema.postReactionTable.postId, postId)
+              eq(schema.postReactionTable.postId, post.value.id)
             )
           );
 

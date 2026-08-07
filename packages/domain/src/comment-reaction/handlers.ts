@@ -4,9 +4,10 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
+import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
-import { CurrentSession } from "../session-middleware";
+import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
 import type { TCommentReactionList, TCommentReactionToggle } from "./schema";
@@ -21,7 +22,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
       repository
         .list({
           organizationId: args.organizationId,
-          postId: args.postId,
+          slug: args.slug,
         })
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -52,18 +53,27 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("CommentReaction", "update")
       ),
     CommentReactionListPublic: (args: TCommentReactionList) =>
-      repository
-        .listPublic({
+      Effect.gen(function* () {
+        const sessionOption = yield* OptionalCurrentSession;
+        const sessionUserId =
+          sessionOption._tag === "Some"
+            ? sessionOption.value.session.userId
+            : undefined;
+
+        const reactions = yield* repository.listPublic({
           organizationId: args.organizationId,
-          postId: args.postId,
-        })
-        .pipe(
-          RateLimit.withPublicRpcRateLimit({
-            name: "CommentReactionListPublic",
-            level: "read",
-          }),
-          withRemapDbErrors("CommentReaction", "select")
-        ),
+          slug: args.slug,
+        });
+
+        // Never leak internal reactor identifiers to public callers.
+        return redactActorIdentities(reactions, sessionUserId);
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "CommentReactionListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("CommentReaction", "select")
+      ),
     CommentReactionTogglePublic: (args: TCommentReactionToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;

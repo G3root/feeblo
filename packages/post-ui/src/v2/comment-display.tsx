@@ -1,12 +1,7 @@
 import type { TComment } from "@feeblo/domain/src/comments/schema.js";
 import { Button } from "@feeblo/ui/button";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
-import {
-  Menu,
-  MenuItem,
-  MenuPopup,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
@@ -59,6 +54,7 @@ type CommentDisplayState = {
   authorName: string;
   commentId: string;
   postId: string;
+  postSlug: string;
   content: string;
   createdAt: Date;
   disabled: boolean;
@@ -109,6 +105,7 @@ type CommentDisplayProviderProps = {
   authorName: string;
   commentId: string;
   postId: string;
+  postSlug: string;
   content: string;
   createdAt: Date;
   deleteLabel?: string;
@@ -133,6 +130,7 @@ function CommentDisplayProvider({
   authorName,
   commentId,
   postId,
+  postSlug,
   content,
   createdAt,
   deleteLabel = "Delete",
@@ -173,6 +171,7 @@ function CommentDisplayProvider({
           isAuthor,
           isInternal,
           postId,
+          postSlug,
         },
       }}
     >
@@ -184,9 +183,7 @@ function CommentDisplayProvider({
 function CommentDisplayAvatar() {
   const { state } = useCommentDisplay();
 
-  return (
-    <UserAvatar name={state.authorName} size="sm" />
-  );
+  return <UserAvatar name={state.authorName} size="sm" />;
 }
 
 function CommentDisplayHeader() {
@@ -234,6 +231,7 @@ function CommentDisplayActions() {
           commentId={state.commentId}
           disabled={state.disabled}
           postId={state.postId}
+          postSlug={state.postSlug}
         />
       </div>
 
@@ -381,7 +379,7 @@ export function CommentsList() {
   const {
     collections: { commentCollection },
   } = usePostCollections();
-  const postId = post.id;
+  const postSlug = post.slug;
 
   const { data: comments, isLoading: isCommentsLoading } = useLiveQuery(
     (q) =>
@@ -390,11 +388,11 @@ export function CommentsList() {
         .where(({ comment }) =>
           and(
             eq(comment.organizationId, organizationId),
-            eq(comment.postId, postId)
+            eq(comment.postSlug, postSlug)
           )
         )
         .orderBy((comment) => comment.comment.createdAt, "desc"),
-    [organizationId, postId]
+    [organizationId, postSlug]
   );
 
   if (isCommentsLoading) {
@@ -427,6 +425,7 @@ function CommentDisplayitem({ data, currentUserId }: CommentDisplayItemProps) {
       onDelete={() => {}}
       onReply={() => {}}
       postId={data.postId}
+      postSlug={data.postSlug}
     />
   );
 }

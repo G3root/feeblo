@@ -30,19 +30,19 @@ interface FindByIdComment {
 
 interface FindManyComments {
   organizationId: string;
-  postId: string;
+  slug: string;
   visibility?: "PUBLIC" | "INTERNAL";
 }
 
 interface FindManyPublicComments {
   organizationId: string;
-  postId: string;
+  slug: string;
 }
 const makeCommentRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    findMany: ({ organizationId, postId, visibility }: FindManyComments) =>
+    findMany: ({ organizationId, slug, visibility }: FindManyComments) =>
       Effect.gen(function* () {
         const where: SQL[] = [];
         if (visibility) {
@@ -50,7 +50,7 @@ const makeCommentRepository = Effect.gen(function* () {
         }
 
         where.push(eq(schema.commentTable.organizationId, organizationId));
-        where.push(eq(schema.commentTable.postId, postId));
+        where.push(eq(schema.postTable.slug, slug));
 
         return yield* db
           .select({
@@ -60,6 +60,7 @@ const makeCommentRepository = Effect.gen(function* () {
             updatedAt: schema.commentTable.updatedAt,
             organizationId: schema.commentTable.organizationId,
             postId: schema.commentTable.postId,
+            postSlug: schema.postTable.slug,
             userId: schema.commentTable.userId,
             visibility: schema.commentTable.visibility,
             parentCommentId: schema.commentTable.parentCommentId,
@@ -73,9 +74,13 @@ const makeCommentRepository = Effect.gen(function* () {
             schema.userTable,
             eq(schema.commentTable.userId, schema.userTable.id)
           )
+          .innerJoin(
+            schema.postTable,
+            eq(schema.commentTable.postId, schema.postTable.id)
+          )
           .where(and(...where));
       }),
-    findManyPublic: ({ organizationId, postId }: FindManyPublicComments) =>
+    findManyPublic: ({ organizationId, slug }: FindManyPublicComments) =>
       db
         .select({
           id: schema.commentTable.id,
@@ -84,6 +89,7 @@ const makeCommentRepository = Effect.gen(function* () {
           updatedAt: schema.commentTable.updatedAt,
           organizationId: schema.commentTable.organizationId,
           postId: schema.commentTable.postId,
+          postSlug: schema.postTable.slug,
           userId: schema.commentTable.userId,
           visibility: schema.commentTable.visibility,
           parentCommentId: schema.commentTable.parentCommentId,
@@ -108,7 +114,7 @@ const makeCommentRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.commentTable.organizationId, organizationId),
-            eq(schema.commentTable.postId, postId),
+            eq(schema.postTable.slug, slug),
             eq(schema.commentTable.visibility, "PUBLIC"),
             eq(schema.boardTable.visibility, "PUBLIC")
           )

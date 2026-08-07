@@ -190,6 +190,7 @@ export function PostReactionPicker() {
 
   const disabled = isLocked;
   const postId = post.id;
+  const postSlug = post.slug;
   const {
     collections: { postReactionCollection },
     onAuthRequired,
@@ -199,7 +200,7 @@ export function PostReactionPicker() {
   const { data: reactionCounts, isLoading: isReactionCountsLoading } =
     useLiveQuery(
       (q) => {
-        if (!postId) {
+        if (!postSlug) {
           return undefined;
         }
         return q
@@ -207,7 +208,7 @@ export function PostReactionPicker() {
           .where(({ postReaction }) =>
             and(
               eq(postReaction.organizationId, organizationId),
-              eq(postReaction.postId, postId)
+              eq(postReaction.postSlug, postSlug)
             )
           )
           .groupBy(({ postReaction }) => postReaction.emoji)
@@ -217,13 +218,13 @@ export function PostReactionPicker() {
           }))
           .orderBy(({ postReaction }) => postReaction.emoji, "asc");
       },
-      [organizationId, postId]
+      [organizationId, postSlug]
     );
 
   const { data: userReactions, isLoading: isUserReactionsLoading } =
     useLiveQuery(
       (q) => {
-        if (!(postId && session?.user?.id)) {
+        if (!(postSlug && session?.user?.id)) {
           return undefined;
         }
         return q
@@ -231,7 +232,7 @@ export function PostReactionPicker() {
           .where(({ postReaction }) =>
             and(
               eq(postReaction.organizationId, organizationId),
-              eq(postReaction.postId, postId),
+              eq(postReaction.postSlug, postSlug),
               eq(postReaction.userId, session.user.id)
             )
           )
@@ -240,7 +241,7 @@ export function PostReactionPicker() {
           }))
           .distinct();
       },
-      [organizationId, postId, session?.user?.id]
+      [organizationId, postSlug, session?.user?.id]
     );
 
   const handleToggleReaction = async (emoji: ReactionEmoji) => {
@@ -272,7 +273,7 @@ export function PostReactionPicker() {
           and(
             eq(post.emoji, emoji),
             eq(post.organizationId, organizationId),
-            eq(post.postId, postId),
+            eq(post.postSlug, postSlug),
             eq(post.userId, currentUserId)
           )
         )
@@ -296,6 +297,7 @@ export function PostReactionPicker() {
       updatedAt: new Date(),
       organizationId,
       postId,
+      postSlug,
       userId: currentUserId,
       memberId: membership?.membershipId ?? null,
       emoji,
@@ -340,12 +342,14 @@ interface CommentReactionPickerProps {
   commentId: string;
   disabled?: boolean;
   postId: string;
+  postSlug: string;
 }
 
 export function CommentReactionPicker({
   commentId,
   disabled,
   postId,
+  postSlug,
 }: CommentReactionPickerProps) {
   const {
     collections: { commentReactionCollection },
@@ -357,7 +361,7 @@ export function CommentReactionPicker({
   const { data: reactionCounts, isLoading: isReactionCountsLoading } =
     useLiveQuery(
       (q) => {
-        if (!postId) {
+        if (!postSlug) {
           return undefined;
         }
         return q
@@ -365,7 +369,7 @@ export function CommentReactionPicker({
           .where(({ commentReaction }) =>
             and(
               eq(commentReaction.commentId, commentId),
-              eq(commentReaction.postId, postId)
+              eq(commentReaction.postSlug, postSlug)
             )
           )
           .groupBy(({ commentReaction }) => commentReaction.emoji)
@@ -375,13 +379,13 @@ export function CommentReactionPicker({
           }))
           .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
       },
-      [organizationId, postId]
+      [organizationId, postSlug]
     );
 
   const { data: userReactions, isLoading: isUserReactionsLoading } =
     useLiveQuery(
       (q) => {
-        if (!(postId && session?.user?.id)) {
+        if (!(postSlug && session?.user?.id)) {
           return undefined;
         }
         return q
@@ -390,7 +394,7 @@ export function CommentReactionPicker({
             and(
               eq(commentReaction.commentId, commentId),
               eq(commentReaction.userId, session.user.id),
-              eq(commentReaction.postId, postId)
+              eq(commentReaction.postSlug, postSlug)
             )
           )
           .select(({ commentReaction }) => ({
@@ -398,7 +402,7 @@ export function CommentReactionPicker({
           }))
           .distinct();
       },
-      [organizationId, postId, session?.user?.id]
+      [organizationId, postSlug, session?.user?.id]
     );
 
   const handleToggleReaction = async (emoji: ReactionEmoji) => {
@@ -454,6 +458,7 @@ export function CommentReactionPicker({
       updatedAt: new Date(),
       organizationId,
       postId,
+      postSlug,
       userId: currentUserId,
       memberId: membership?.membershipId ?? null,
       emoji,

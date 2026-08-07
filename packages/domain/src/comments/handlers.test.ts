@@ -197,7 +197,7 @@ describe("CommentRpcHandlers", () => {
             handlers
               .CommentList({
                 organizationId: fixture.organizationId,
-                postId: fixture.postId,
+                slug: fixture.postId,
               })
               .pipe(
                 Effect.provideService(
@@ -226,7 +226,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -267,7 +267,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
@@ -294,7 +294,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
@@ -372,7 +372,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -408,6 +408,100 @@ describe("CommentRpcHandlers", () => {
           expect(error._tag).toBe("PolicyDenied");
         })
       );
+
+      it.effect("allows replying to a comment on the same post", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const parentCommentId = yield* CommentId.generate;
+          const childCommentId = yield* CommentId.generate;
+
+          yield* handlers
+            .CommentCreate(
+              commentCreateInput(fixture, parentCommentId, "Parent")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const result = yield* handlers
+            .CommentCreate({
+              id: childCommentId,
+              organizationId: fixture.organizationId,
+              postId: fixture.postId,
+              content: "Reply",
+              visibility: "PUBLIC" as const,
+              parentCommentId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(result.message).toBe("Comment created successfully");
+        })
+      );
+
+      it.effect("rejects replying to a comment on a different post", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const otherPostId = yield* addPost(fixture, fixture.boardId);
+          const parentCommentId = yield* CommentId.generate;
+          const childCommentId = yield* CommentId.generate;
+
+          // Parent comment on the first post.
+          yield* handlers
+            .CommentCreate(
+              commentCreateInput(fixture, parentCommentId, "Parent")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // Child comment on the second post pointing at the first post's comment.
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreate({
+                id: childCommentId,
+                organizationId: fixture.organizationId,
+                postId: otherPostId,
+                content: "Cross-post reply",
+                visibility: "PUBLIC" as const,
+                parentCommentId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("rejects replying to a comment in another organization", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const orgA = yield* makeFixture();
+          const orgB = yield* makeFixture();
+          const orgBCommentId = yield* CommentId.generate;
+          const orgACommentId = yield* CommentId.generate;
+
+          // A comment in org B.
+          yield* handlers
+            .CommentCreate(
+              commentCreateInput(orgB, orgBCommentId, "Org B comment")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(orgB)));
+
+          // A comment in org A replying to org B's comment.
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreate({
+                id: orgACommentId,
+                organizationId: orgA.organizationId,
+                postId: orgA.postId,
+                content: "Cross-tenant reply",
+                visibility: "PUBLIC" as const,
+                parentCommentId: orgBCommentId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(orgA)))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
     });
 
     describe("CommentCreatePublic", () => {
@@ -435,20 +529,57 @@ describe("CommentRpcHandlers", () => {
             const comments = yield* handlers
               .CommentListPublic({
                 organizationId: fixture.organizationId,
-                postId: fixture.postId,
+                slug: fixture.postId,
               })
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
               );
 
             expect(comments).toHaveLength(1);
+            // Commenter identity is redacted on the public list; name stays.
             expect(comments[0]).toMatchObject({
               id: commentId,
-              userId: fixture.userId,
+              userId: null,
               memberId: null,
+              user: { name: "Test User" },
             });
             expect(comments[0]?.content).toContain("Public feedback");
           })
+      );
+
+      it.effect("keeps the session user's identity on the public list", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+
+          yield* handlers
+            .CommentCreatePublic(
+              commentCreateInput(fixture, commentId, "My comment")
+            )
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          const comments = yield* handlers
+            .CommentListPublic({
+              organizationId: fixture.organizationId,
+              slug: fixture.postId,
+            })
+            .pipe(
+              Effect.provideService(
+                OptionalCurrentSession,
+                Option.some(makeSession(fixture, null))
+              )
+            );
+
+          expect(comments).toHaveLength(1);
+          expect(comments[0]).toMatchObject({
+            id: commentId,
+            userId: fixture.userId,
+            memberId: null,
+          });
+        })
       );
 
       it.effect("rejects creating internal comments by non-members", () =>
@@ -508,7 +639,7 @@ describe("CommentRpcHandlers", () => {
             const publicComments = yield* handlers
               .CommentListPublic({
                 organizationId: fixture.organizationId,
-                postId: fixture.postId,
+                slug: fixture.postId,
               })
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
@@ -519,7 +650,7 @@ describe("CommentRpcHandlers", () => {
             const memberComments = yield* handlers
               .CommentList({
                 organizationId: fixture.organizationId,
-                postId: fixture.postId,
+                slug: fixture.postId,
               })
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
@@ -584,6 +715,48 @@ describe("CommentRpcHandlers", () => {
           expect(error._tag).toBe("PolicyDenied");
         })
       );
+
+      it.effect("rejects non-members replying to an internal comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const internalCommentId = yield* CommentId.generate;
+          const childCommentId = yield* CommentId.generate;
+
+          // A member creates an internal comment.
+          yield* handlers
+            .CommentCreate(
+              commentCreateInput(
+                fixture,
+                internalCommentId,
+                "Internal comment",
+                "INTERNAL"
+              )
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          // A non-member tries to reply to it via the public endpoint.
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreatePublic({
+                id: childCommentId,
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+                content: "Reply to internal",
+                visibility: "PUBLIC" as const,
+                parentCommentId: internalCommentId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
     });
 
     describe("CommentUpdate", () => {
@@ -614,7 +787,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -754,7 +927,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
@@ -842,7 +1015,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -995,7 +1168,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              postId: fixture.postId,
+              slug: fixture.postId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
