@@ -112,10 +112,15 @@ const makePostReactionRepository = Effect.gen(function* () {
             schema.postTable,
             eq(schema.postTable.id, schema.postReactionTable.postId)
           )
+          .innerJoin(
+            schema.boardTable,
+            eq(schema.boardTable.id, schema.postTable.boardId)
+          )
           .where(
             and(
               eq(schema.postTable.organizationId, organizationId),
-              eq(schema.postReactionTable.postId, post.value.id)
+              eq(schema.postReactionTable.postId, post.value.id),
+              eq(schema.boardTable.visibility, "PUBLIC")
             )
           );
 

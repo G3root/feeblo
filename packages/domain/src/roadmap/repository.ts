@@ -1,9 +1,10 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, asc, count, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
 import type {
   TRoadmapCreate,
   TRoadmapDelete,
@@ -61,12 +62,6 @@ const makeRoadmapRepository = Effect.gen(function* () {
         )
         .limit(1)
         .pipe(Effect.map(EffectArray.get(0))),
-    countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
-      db
-        .select({ count: count() })
-        .from(schema.roadmapTable)
-        .where(eq(schema.roadmapTable.organizationId, organizationId))
-        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
     delegatePrimary: ({
       organizationId,
       exceptRoadmapId,
@@ -101,20 +96,43 @@ const makeRoadmapRepository = Effect.gen(function* () {
           .pipe(Effect.asVoid);
       }),
     create: (input: TRoadmapCreate) =>
-      db
-        .insert(schema.roadmapTable)
-        .values({
+      Effect.gen(function* () {
+        const values = {
           id: input.id,
           organizationId: input.organizationId,
           name: input.name,
           slug: input.slug,
           description: input.description ?? null,
-          isPrimary: input.isPrimary ?? false,
           mode: input.mode,
           visibility: input.visibility,
           filter: toMutableRoadmapFilter(input.filter),
-        })
-        .pipe(Effect.asVoid),
+        };
+        const insert = (isPrimary: boolean) =>
+          db
+            .insert(schema.roadmapTable)
+            .values({ ...values, isPrimary })
+            .pipe(Effect.asVoid);
+
+        if (input.isPrimary) {
+          // Claim primary status atomically instead of racing count-then-create:
+          // the partial unique index roadmap_primary_organizationId_uidx allows
+          // at most one primary per organization, so when a concurrent create
+          // already claimed it this insert fails with a unique violation and we
+          // fall back to a regular (non-primary) create.
+          yield* insert(true).pipe(
+            Effect.catchIf(
+              (error) =>
+                isUniqueViolation(error) &&
+                getUniqueViolationConstraint(error) ===
+                  "roadmap_primary_organizationId_uidx",
+              () => insert(false)
+            )
+          );
+          return;
+        }
+
+        yield* insert(false);
+      }),
     update: (input: Omit<TRoadmapUpdate, "isPrimary">) =>
       db
         .update(schema.roadmapTable)

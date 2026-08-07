@@ -31,6 +31,7 @@ describe("CommentRpcHandlers", () => {
     membershipId: string;
     organizationId: LegidOf<"WorkspaceId">;
     postId: LegidOf<"PostId">;
+    postSlug: string;
     statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
@@ -65,6 +66,7 @@ describe("CommentRpcHandlers", () => {
       const boardId = yield* BoardId.generate;
       const statusId = yield* PostStatusId.generate;
       const postId = yield* PostId.generate;
+      const postSlug = `slug-${postId}`;
       const userId = `user_${organizationId}`;
       const membershipId = `membership_${organizationId}`;
       const now = new Date();
@@ -113,7 +115,7 @@ describe("CommentRpcHandlers", () => {
         statusId,
         creatorId: userId,
         creatorMemberId: membershipId,
-        slug: postId,
+        slug: postSlug,
         excerpt: "Test excerpt",
         createdAt: now,
         updatedAt: now,
@@ -124,6 +126,7 @@ describe("CommentRpcHandlers", () => {
         membershipId,
         organizationId,
         postId,
+        postSlug,
         statusId,
         userId,
       } satisfies Fixture;
@@ -197,7 +200,7 @@ describe("CommentRpcHandlers", () => {
             handlers
               .CommentList({
                 organizationId: fixture.organizationId,
-                slug: fixture.postId,
+                slug: fixture.postSlug,
               })
               .pipe(
                 Effect.provideService(
@@ -226,7 +229,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -267,7 +270,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
@@ -294,7 +297,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
@@ -372,7 +375,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -470,6 +473,32 @@ describe("CommentRpcHandlers", () => {
         })
       );
 
+      it.effect("rejects replying to a nonexistent parent comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const missingParentId = yield* CommentId.generate;
+          const childCommentId = yield* CommentId.generate;
+
+          // A generated, never-persisted parent id exercises the
+          // Option.none branch of canReplyToParent.
+          const error = yield* Effect.flip(
+            handlers
+              .CommentCreate({
+                id: childCommentId,
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+                content: "Reply to missing parent",
+                visibility: "PUBLIC" as const,
+                parentCommentId: missingParentId,
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
       it.effect("rejects replying to a comment in another organization", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -529,7 +558,7 @@ describe("CommentRpcHandlers", () => {
             const comments = yield* handlers
               .CommentListPublic({
                 organizationId: fixture.organizationId,
-                slug: fixture.postId,
+                slug: fixture.postSlug,
               })
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
@@ -564,7 +593,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(
               Effect.provideService(
@@ -577,6 +606,39 @@ describe("CommentRpcHandlers", () => {
           expect(comments[0]).toMatchObject({
             id: commentId,
             userId: fixture.userId,
+            memberId: null,
+          });
+
+          // An authenticated caller who is not the commenter sees the
+          // commenter's identifiers redacted, same as an anonymous caller.
+          const otherUserId = `other_${fixture.organizationId}`;
+          const otherSession: Session = {
+            user: {
+              id: otherUserId,
+              email: `${otherUserId}@example.com`,
+              name: "Other User",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId: otherUserId, token: "other-token" },
+            organizations: [{ id: fixture.organizationId }],
+            memberships: [],
+          };
+          const asOther = yield* handlers
+            .CommentListPublic({
+              organizationId: fixture.organizationId,
+              slug: fixture.postSlug,
+            })
+            .pipe(
+              Effect.provideService(
+                OptionalCurrentSession,
+                Option.some(otherSession)
+              )
+            );
+
+          expect(asOther).toHaveLength(1);
+          expect(asOther[0]).toMatchObject({
+            id: commentId,
+            userId: null,
             memberId: null,
           });
         })
@@ -639,7 +701,7 @@ describe("CommentRpcHandlers", () => {
             const publicComments = yield* handlers
               .CommentListPublic({
                 organizationId: fixture.organizationId,
-                slug: fixture.postId,
+                slug: fixture.postSlug,
               })
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
@@ -650,7 +712,7 @@ describe("CommentRpcHandlers", () => {
             const memberComments = yield* handlers
               .CommentList({
                 organizationId: fixture.organizationId,
-                slug: fixture.postId,
+                slug: fixture.postSlug,
               })
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
@@ -787,7 +849,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -927,7 +989,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
@@ -1015,7 +1077,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentList({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
@@ -1168,7 +1230,7 @@ describe("CommentRpcHandlers", () => {
           const comments = yield* handlers
             .CommentListPublic({
               organizationId: fixture.organizationId,
-              slug: fixture.postId,
+              slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 

@@ -6,6 +6,7 @@ import * as Schema from "effect/Schema";
 
 const DatabaseDriverError = Schema.Struct({
   code: Schema.String,
+  constraint: Schema.optional(Schema.String),
 });
 
 const DatabaseCauseFailure = Schema.TaggedStruct("Fail", {
@@ -32,7 +33,10 @@ const DatabaseSqlErrorCause = Schema.Struct({
   reasons: Schema.Array(DatabaseSqlCauseFailure),
 });
 
-const getDatabaseErrorCode = (cause: unknown): string | undefined =>
+const getDatabaseErrorField = (
+  cause: unknown,
+  field: "code" | "constraint"
+): string | undefined =>
   Option.match(Schema.decodeUnknownOption(DatabaseDriverError)(cause), {
     onNone: () =>
       Option.match(Schema.decodeUnknownOption(DatabaseErrorCause)(cause), {
@@ -41,17 +45,30 @@ const getDatabaseErrorCode = (cause: unknown): string | undefined =>
             Schema.decodeUnknownOption(DatabaseSqlErrorCause)(cause),
             {
               onNone: () => undefined,
-              onSome: ({ reasons }) => reasons[0]?.error.cause.cause.code,
+              onSome: ({ reasons }) => reasons[0]?.error.cause.cause[field],
             }
           ),
-        onSome: ({ reasons }) => reasons[0]?.error.code,
+        onSome: ({ reasons }) => reasons[0]?.error[field],
       }),
-    onSome: ({ code }) => code,
+    onSome: (error) => error[field],
   });
 
 export const isUniqueViolation = (error: unknown): boolean =>
   error instanceof EffectDrizzleQueryError &&
-  getDatabaseErrorCode(error.cause) === "23505";
+  getDatabaseErrorField(error.cause, "code") === "23505";
+
+/**
+ * Returns the name of the constraint that triggered a unique violation, when
+ * the driver exposes one (e.g. "post_organizationId_slug_uidx"). Lets callers
+ * distinguish which unique index rejected an insert instead of treating every
+ * 23505 as the same collision.
+ */
+export const getUniqueViolationConstraint = (
+  error: unknown
+): string | undefined =>
+  error instanceof EffectDrizzleQueryError
+    ? getDatabaseErrorField(error.cause, "constraint")
+    : undefined;
 
 type DbAction = "update" | "create" | "delete" | "select" | "upsert";
 

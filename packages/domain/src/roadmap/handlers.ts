@@ -45,24 +45,25 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Roadmap", "select")
         ),
     RoadmapCreate: (args: TRoadmapCreate) =>
-      Effect.gen(function* () {
-        // The first roadmap in an organization becomes the primary one.
-        const count = yield* repository.countByOrganizationId({
-          organizationId: args.organizationId,
-        });
-        yield* repository.create({
+      // The first roadmap in an organization becomes the primary one; the
+      // repository claims primary status atomically (backed by the partial
+      // unique index roadmap_primary_organizationId_uidx) and falls back to a
+      // non-primary create when another roadmap already holds it, so
+      // concurrent creates cannot both become primary.
+      repository
+        .create({
           ...args,
-          isPrimary: count === 0,
-        });
-      }).pipe(
-        Policy.withPolicy(
-          roadmapPolicy.canCreate({
-            organizationId: args.organizationId,
-            visibility: args.visibility,
-          })
+          isPrimary: true,
+        })
+        .pipe(
+          Policy.withPolicy(
+            roadmapPolicy.canCreate({
+              organizationId: args.organizationId,
+              visibility: args.visibility,
+            })
+          ),
+          withRemapDbErrors("Roadmap", "create")
         ),
-        withRemapDbErrors("Roadmap", "create")
-      ),
     RoadmapUpdate: (args: TRoadmapUpdate) =>
       repository.update(args).pipe(
         Policy.withPolicy(

@@ -26,6 +26,7 @@ describe("PostReactionRpcHandlers", () => {
     membershipId: string;
     organizationId: LegidOf<"WorkspaceId">;
     postId: LegidOf<"PostId">;
+    postSlug: string;
     userId: string;
   };
   const session = (f: Fixture, member = true): Session => ({
@@ -53,6 +54,7 @@ describe("PostReactionRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const boardId = yield* BoardId.generate;
       const postId = yield* PostId.generate;
+      const postSlug = `slug-${postId}`;
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
       const membershipId = `member_${organizationId}`;
@@ -96,7 +98,7 @@ describe("PostReactionRpcHandlers", () => {
         id: postId,
         title: "Post",
         content: "Content",
-        slug: postId,
+        slug: postSlug,
         excerpt: "Content",
         boardId,
         organizationId,
@@ -111,6 +113,7 @@ describe("PostReactionRpcHandlers", () => {
         membershipId,
         organizationId,
         postId,
+        postSlug,
         userId,
       } satisfies Fixture;
     });
@@ -131,7 +134,7 @@ describe("PostReactionRpcHandlers", () => {
             handlers
               .PostReactionList({
                 organizationId: f.organizationId,
-                slug: f.postId,
+                slug: f.postSlug,
               })
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           );
@@ -155,7 +158,7 @@ describe("PostReactionRpcHandlers", () => {
           const reactions = yield* handlers
             .PostReactionList({
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             })
             .pipe(Effect.provideService(CurrentSession, session(f)));
           expect(reactions).toHaveLength(1);
@@ -188,7 +191,7 @@ describe("PostReactionRpcHandlers", () => {
           const anonymous = yield* handlers
             .PostReactionListPublic({
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
           expect(anonymous).toHaveLength(1);
@@ -202,7 +205,7 @@ describe("PostReactionRpcHandlers", () => {
           const own = yield* handlers
             .PostReactionListPublic({
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             })
             .pipe(
               Effect.provideService(

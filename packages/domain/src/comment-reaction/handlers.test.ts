@@ -27,6 +27,7 @@ describe("CommentReactionRpcHandlers", () => {
     membershipId: string;
     organizationId: LegidOf<"WorkspaceId">;
     postId: LegidOf<"PostId">;
+    postSlug: string;
     userId: string;
   };
   const session = (f: Fixture, member = true): Session => ({
@@ -57,6 +58,7 @@ describe("CommentReactionRpcHandlers", () => {
       const organizationId = yield* WorkspaceId.generate;
       const boardId = yield* BoardId.generate;
       const postId = yield* PostId.generate;
+      const postSlug = `slug-${postId}`;
       const commentId = yield* CommentId.generate;
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
@@ -101,7 +103,7 @@ describe("CommentReactionRpcHandlers", () => {
         id: postId,
         title: "Post",
         content: "Content",
-        slug: postId,
+        slug: postSlug,
         excerpt: "Content",
         boardId,
         organizationId,
@@ -128,6 +130,7 @@ describe("CommentReactionRpcHandlers", () => {
         membershipId,
         organizationId,
         postId,
+        postSlug,
         userId,
       } satisfies Fixture;
     });
@@ -148,7 +151,7 @@ describe("CommentReactionRpcHandlers", () => {
             handlers
               .CommentReactionList({
                 organizationId: f.organizationId,
-                slug: f.postId,
+                slug: f.postSlug,
               })
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           );
@@ -173,7 +176,7 @@ describe("CommentReactionRpcHandlers", () => {
           const reactions = yield* handlers
             .CommentReactionList({
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             })
             .pipe(Effect.provideService(CurrentSession, session(f)));
           expect(reactions).toHaveLength(1);
@@ -221,7 +224,7 @@ describe("CommentReactionRpcHandlers", () => {
           const anonymous = yield* handlers
             .CommentReactionListPublic({
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
           expect(anonymous).toHaveLength(1);
@@ -235,7 +238,7 @@ describe("CommentReactionRpcHandlers", () => {
           const own = yield* handlers
             .CommentReactionListPublic({
               organizationId: f.organizationId,
-              slug: f.postId,
+              slug: f.postSlug,
             })
             .pipe(
               Effect.provideService(
@@ -247,6 +250,39 @@ describe("CommentReactionRpcHandlers", () => {
             commentId: f.commentId,
             userId: f.userId,
             memberId: f.membershipId,
+            emoji: "rocket",
+          });
+
+          // An authenticated caller who is not the reactor sees the reactor's
+          // identifiers redacted, same as an anonymous caller.
+          const otherUserId = `other_user_${f.organizationId}`;
+          const otherSession: Session = {
+            user: {
+              id: otherUserId,
+              email: `${otherUserId}@example.com`,
+              name: "Other User",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId: otherUserId, token: "other-token" },
+            organizations: [{ id: f.organizationId }],
+            memberships: [],
+          };
+          const other = yield* handlers
+            .CommentReactionListPublic({
+              organizationId: f.organizationId,
+              slug: f.postSlug,
+            })
+            .pipe(
+              Effect.provideService(
+                OptionalCurrentSession,
+                Option.some(otherSession)
+              )
+            );
+          expect(other).toHaveLength(1);
+          expect(other[0]).toMatchObject({
+            commentId: f.commentId,
+            userId: null,
+            memberId: null,
             emoji: "rocket",
           });
         })
@@ -268,7 +304,7 @@ describe("CommentReactionRpcHandlers", () => {
             const reactions = yield* handlers
               .CommentReactionListPublic({
                 organizationId: f.organizationId,
-                slug: f.postId,
+                slug: f.postSlug,
               })
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())

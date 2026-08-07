@@ -55,7 +55,14 @@ function getCurrentPostSlug() {
     return undefined;
   }
 
-  return decodeURIComponent(segments[postIndex + 1]);
+  try {
+    return decodeURIComponent(segments[postIndex + 1]);
+  } catch {
+    // Malformed percent-encoding (e.g. "%" in a post slug) throws; treat the
+    // slug as missing so callers fall back to an unscoped query instead of
+    // crashing the route loader.
+    return undefined;
+  }
 }
 
 /**

@@ -199,11 +199,11 @@ export const WidgetApiLive = HttpApiBuilder.group(
           withRemapDbErrors("Boards", "select")
         )
       )
-      .handle("createFeedback", ({ payload }) =>
-        Effect.gen(function* () {
-          const { boardId, organizationId, title, content, metadata, token } =
-            payload;
+      .handle("createFeedback", ({ payload }) => {
+        const { boardId, organizationId, title, content, metadata, token } =
+          payload;
 
+        return Effect.gen(function* () {
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
           const jwtSecretRepository = yield* JwtSecretRepository;
@@ -329,7 +329,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
             title,
           });
 
-          if (!slug) {
+          // The post repository always assigns a slug (an empty title yields
+          // an empty slug that is still persisted); only the "no create ran"
+          // case leaves the variable unassigned.
+          if (slug === undefined) {
             return yield* new InternalServerError({
               message: "Failed to create feedback",
             });
@@ -358,13 +361,20 @@ export const WidgetApiLive = HttpApiBuilder.group(
             PostStatusRepository.layer,
           ]),
           Effect.catchTag("PostAlreadyExistsError", () =>
-            Effect.fail(
-              new InternalServerError({
-                message: "Failed to create feedback",
-              })
+            Effect.logWarning(
+              "Exhausted post slug candidates while creating widget feedback; post was not stored",
+              { organizationId, boardId }
+            ).pipe(
+              Effect.andThen(
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to create feedback",
+                  })
+                )
+              )
             )
           ),
           withRemapDbErrors("Feedback", "create")
-        )
-      )
+        );
+      })
 );

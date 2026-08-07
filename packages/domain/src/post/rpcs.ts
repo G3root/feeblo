@@ -50,13 +50,17 @@ export class PostRpcs extends RpcGroup.make(
     .middleware(PublicRpcRateLimitMiddleware),
 
   Rpc.make("PostCreate", {
-    success: Schema.Void,
+    // Returns the slug the insert actually persisted (including any
+    // collision suffix) so callers can reference the stored post.
+    success: Schema.String,
     payload: PostCreate,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 
   Rpc.make("PostCreatePublic", {
-    success: Schema.Void,
+    // Returns the slug the insert actually persisted (including any
+    // collision suffix) so callers can reference the stored post.
+    success: Schema.String,
     payload: PostCreate,
     error: Schema.Union([PostServiceErrors, RateLimitErrors]),
   })

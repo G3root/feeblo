@@ -337,7 +337,7 @@ describe("PostRpcHandlers", () => {
             .select({ id: schema.postTable.id, slug: schema.postTable.slug })
             .from(schema.postTable)
             .where(eq(schema.postTable.organizationId, fixture.organizationId))
-            .orderBy(schema.postTable.createdAt);
+            .orderBy(schema.postTable.slug);
 
           expect(rows).toHaveLength(2);
           expect(rows[0]).toMatchObject({

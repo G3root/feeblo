@@ -22,7 +22,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
-import { isUniqueViolation } from "../rpc-errors";
+import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
 import { FailedToMergePostError, PostAlreadyExistsError } from "./errors";
 import type { TPostAdminUpdate } from "./schema";
 import { scheduleSubmissionNotificationBatch } from "./workflow";
@@ -685,8 +685,12 @@ const makePostRepository = Effect.gen(function* () {
                 .pipe(Effect.as(slug))
             )
             .pipe(
-              Effect.catchIf(isUniqueViolation, () =>
-                Effect.fail(slugCollision)
+              Effect.catchIf(
+                (error) =>
+                  isUniqueViolation(error) &&
+                  getUniqueViolationConstraint(error) ===
+                    "post_organizationId_slug_uidx",
+                () => Effect.fail(slugCollision)
               )
             );
         });

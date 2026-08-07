@@ -339,6 +339,48 @@ describe("parseContactCustomAttributes", () => {
     })
   );
 
+  it("rejects an invalid Date instance for a DATE attribute", async () => {
+    const def = makeContactDef({
+      key: "birthday",
+      type: "DATE",
+    });
+    try {
+      await Effect.runPromise(
+        parseContactCustomAttributes(
+          { customFields: { birthday: new Date(Number.NaN) } },
+          [def]
+        )
+      );
+      expect.fail("Expected error was not thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect((error as DataValidationError).message).toContain(
+        'Invalid value for attribute "birthday"'
+      );
+    }
+  });
+
+  it("rejects a non-date string for a DATE attribute", async () => {
+    const def = makeContactDef({
+      key: "birthday",
+      type: "DATE",
+    });
+    try {
+      await Effect.runPromise(
+        parseContactCustomAttributes(
+          { customFields: { birthday: "not-a-date" } },
+          [def]
+        )
+      );
+      expect.fail("Expected error was not thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(DataValidationError);
+      expect((error as DataValidationError).message).toContain(
+        'Invalid value for attribute "birthday"'
+      );
+    }
+  });
+
   it.effect("allows null value for non-required attribute", () =>
     Effect.gen(function* () {
       const def = makeContactDef({

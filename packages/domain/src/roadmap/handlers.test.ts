@@ -418,6 +418,45 @@ describe("RoadmapRpcHandlers", () => {
         });
       })
     );
+    it.effect("keeps exactly one primary under concurrent creates", () =>
+      Effect.gen(function* () {
+        const handlers = yield* RoadmapRpcHandlersEffect;
+        const fixture = yield* makeFixture("PUBLIC", false);
+        const firstId = yield* RoadmapId.generate;
+        const secondId = yield* RoadmapId.generate;
+
+        // Both creates run at the same time against an organization without
+        // any roadmap; exactly one may claim primary, the other must fall back.
+        yield* Effect.all(
+          [
+            handlers
+              .RoadmapCreate(
+                roadmapCreateInput(fixture, firstId, "Concurrent roadmap A")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              ),
+            handlers
+              .RoadmapCreate(
+                roadmapCreateInput(fixture, secondId, "Concurrent roadmap B")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              ),
+          ],
+          { concurrency: 2 }
+        );
+
+        const roadmaps = yield* handlers
+          .RoadmapList({
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        expect(roadmaps).toHaveLength(2);
+        expect(roadmaps.filter((roadmap) => roadmap.isPrimary)).toHaveLength(1);
+      })
+    );
     it.effect("does not allow updates to change primary status", () =>
       Effect.gen(function* () {
         const handlers = yield* RoadmapRpcHandlersEffect;
