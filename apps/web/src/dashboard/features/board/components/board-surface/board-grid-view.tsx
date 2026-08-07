@@ -182,8 +182,8 @@ export function BoardGridView({
       onDragStart={handleDragStart}
       sensors={sensors}
     >
-      <section className="overflow-x-auto pb-3">
-        <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 p-3">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3 pb-[max(calc(var(--spacing)*3),env(safe-area-inset-bottom))]">
+        <div className="grid h-full min-h-0 min-w-max auto-cols-max grid-flow-col gap-4">
           {items.map((lane, columnIndex) => {
             const column = lane.status;
             const rows = lane.posts;
@@ -213,7 +213,7 @@ export function BoardGridView({
             );
           })}
         </div>
-      </section>
+      </div>
     </DragDropProvider>
   );
 }

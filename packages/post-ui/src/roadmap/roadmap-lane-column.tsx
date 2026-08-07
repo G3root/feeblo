@@ -1,3 +1,4 @@
+import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { cn } from "@feeblo/ui/utils";
 import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
 import type { ReactNode, Ref } from "react";
@@ -38,15 +39,15 @@ export function RoadmapLaneColumn({
         </div>
       </div>
 
-      <div
+      <ScrollArea
         className={cn(
-          "flex-1 space-y-2 overflow-y-auto p-3 transition-colors",
+          "min-h-0 flex-1 transition-colors",
           isHighlighted && "bg-muted/50"
         )}
-        ref={contentRef}
+        viewportRef={contentRef}
       >
-        {children}
-      </div>
+        <div className="space-y-2 p-3">{children}</div>
+      </ScrollArea>
     </div>
   );
 }
