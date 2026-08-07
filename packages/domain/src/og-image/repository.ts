@@ -39,7 +39,11 @@ const makeOgImageRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.postTable.organizationId, organizationId),
-            eq(schema.postTable.slug, postSlug)
+            eq(schema.postTable.slug, postSlug),
+            // The route is unauthenticated and slugs are slugified titles, so
+            // never render metadata for posts on PRIVATE boards — only PUBLIC
+            // boards are reachable through the public site anyway.
+            eq(schema.boardTable.visibility, "PUBLIC")
           )
         )
         .groupBy(
