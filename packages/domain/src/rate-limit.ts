@@ -2,11 +2,12 @@ import * as Context from "effect/Context";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Headers from "effect/unstable/http/Headers";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
-import { getClientIpFromHeaders } from "./client-ip";
+import { ClientIp, getClientIpFromHeaders } from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";
 
 export const publicRpcLimits = {
@@ -129,14 +130,25 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
     const rateLimitService = yield* RateLimitService;
 
     return PublicRpcRateLimitMiddleware.of((effect, options) =>
-      Effect.provideService(
-        effect,
-        PublicRpcRateLimiter,
-        makePublicRpcRateLimiter({
-          clientIp: getClientIpFromHeaders(Headers.fromInput(options.headers)),
-          rateLimitService,
-        })
-      )
+      Effect.gen(function* () {
+        // Prefer the peer-anchored client IP provided by the global HTTP
+        // middleware. Only fall back to forwarding headers when that is not
+        // installed; getClientIpFromHeaders refuses to trust them unless proxy
+        // trust is explicitly configured.
+        const clientIpOption = yield* Effect.serviceOption(ClientIp);
+        const clientIp = Option.isSome(clientIpOption)
+          ? clientIpOption.value
+          : getClientIpFromHeaders(Headers.fromInput(options.headers));
+
+        return yield* Effect.provideService(
+          effect,
+          PublicRpcRateLimiter,
+          makePublicRpcRateLimiter({
+            clientIp,
+            rateLimitService,
+          })
+        );
+      })
     );
   })
 );
