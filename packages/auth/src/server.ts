@@ -217,6 +217,38 @@ export const initAuthHandler = (
       }
     };
 
+    /**
+     * Best-effort cancellation of a deleted tenant's Polar subscription. Runs
+     * before the organization row (and its cascaded subscription rows) are
+     * deleted so the external subscription id is still queryable; a failure to
+     * reach Polar must never block the deletion.
+     */
+    const cancelOrganizationSubscription = async (organizationId: string) => {
+      await callbackRuntime.runPromise(
+        BillingRepository.use((billingRepository) =>
+          billingRepository.findSubscriptionByOrganizationId({
+            organizationId,
+          })
+        ).pipe(
+          Effect.flatMap((subscription) =>
+            Option.match(subscription, {
+              onNone: () => Effect.void,
+              onSome: (sub) =>
+                PolarService.use((polarService) =>
+                  polarService.revokeSubscription({ id: sub.externalId })
+                ),
+            })
+          ),
+          Effect.catchCause((cause) =>
+            Effect.logWarning(
+              "Failed to cancel billing for deleted organization",
+              cause
+            ).pipe(Effect.annotateLogs({ organizationId }))
+          )
+        )
+      );
+    };
+
     // Local OAuth emulator (vercel-labs/emulate) support.
     //
     // better-auth's built-in GitHub/Google providers hardcode the token and
@@ -625,6 +657,12 @@ export const initAuthHandler = (
                   })
                 )
               );
+            },
+            // Cancels the Polar subscription before the org row (and its
+            // cascaded subscription/site rows) disappear, so the subdomain is
+            // released and billing stops for the deleted tenant.
+            async beforeDeleteOrganization(data) {
+              await cancelOrganizationSubscription(data.organization.id);
             },
           },
           async sendInvitationEmail(data) {
