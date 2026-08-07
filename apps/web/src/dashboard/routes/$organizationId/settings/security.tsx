@@ -87,10 +87,6 @@ function SecuritySettingsContent({
     return null;
   }
 
-  if (!activeSecret) {
-    throw new Error("secret not found");
-  }
-
   const handleCopy = () => {
     navigator.clipboard.writeText(activeSecret.secret).then(
       () => {
@@ -105,6 +101,24 @@ function SecuritySettingsContent({
         toastManager.add({ title: "Failed to copy secret", type: "error" });
       }
     );
+  };
+
+  const handleGenerate = async () => {
+    try {
+      // JwtSecretRotate doubles as first-time generation: when no secret
+      // exists it revokes nothing and simply creates a new active one.
+      await fetchRpc((rpc) => rpc.JwtSecretRotate({ organizationId }));
+      trackEvent("sso_secret_generated", { success: true });
+      toastManager.add({
+        title: "Secret generated successfully",
+        type: "success",
+      });
+    } catch {
+      trackEvent("sso_secret_generated", { success: false });
+      toastManager.add({ title: "Failed to generate secret", type: "error" });
+      return;
+    }
+    await jwtSecretCollection.utils.refetch();
   };
 
   const handleRotate = async () => {
@@ -159,41 +173,59 @@ function SecuritySettingsContent({
             </SettingsItem.Description>
           </SettingsItem.Header>
           <SettingsItem.Content>
-            <SettingsItem.Item>
-              <SettingsItem.ItemContent>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="default">Active</Badge>
-                    <span className="text-muted-foreground text-sm">
-                      Created {formatDate(activeSecret.createdAt)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button onClick={handleCopy} size="sm" variant="outline">
-                      Copy Secret
-                    </Button>
-                    <Menu>
-                      <MenuTrigger
-                        render={
-                          <Button size="icon-sm" variant="outline">
-                            <HugeiconsIcon icon={MoreVerticalIcon} />
-                          </Button>
-                        }
-                      />
+            {activeSecret ? (
+              <SettingsItem.Item>
+                <SettingsItem.ItemContent>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="default">Active</Badge>
+                      <span className="text-muted-foreground text-sm">
+                        Created {formatDate(activeSecret.createdAt)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button onClick={handleCopy} size="sm" variant="outline">
+                        Copy Secret
+                      </Button>
+                      <Menu>
+                        <MenuTrigger
+                          render={
+                            <Button size="icon-sm" variant="outline">
+                              <HugeiconsIcon icon={MoreVerticalIcon} />
+                            </Button>
+                          }
+                        />
 
-                      <MenuPopup align="end" className="w-40">
-                        <MenuItem onClick={handleRevoke} variant="destructive">
-                          Revoke Immediately
-                        </MenuItem>
-                        <MenuItem onClick={handleRotate}>
-                          Rotate (24h grace period)
-                        </MenuItem>
-                      </MenuPopup>
-                    </Menu>
+                        <MenuPopup align="end" className="w-40">
+                          <MenuItem
+                            onClick={handleRevoke}
+                            variant="destructive"
+                          >
+                            Revoke Immediately
+                          </MenuItem>
+                          <MenuItem onClick={handleRotate}>
+                            Rotate (24h grace period)
+                          </MenuItem>
+                        </MenuPopup>
+                      </Menu>
+                    </div>
                   </div>
-                </div>
-              </SettingsItem.ItemContent>
-            </SettingsItem.Item>
+                </SettingsItem.ItemContent>
+              </SettingsItem.Item>
+            ) : (
+              <SettingsItem.Item>
+                <SettingsItem.ItemContent>
+                  <div className="flex items-center justify-between">
+                    <p className="text-muted-foreground text-sm">
+                      No active JWT secret. Generate one to enable widget SSO.
+                    </p>
+                    <Button onClick={handleGenerate} size="sm">
+                      Generate Secret
+                    </Button>
+                  </div>
+                </SettingsItem.ItemContent>
+              </SettingsItem.Item>
+            )}
 
             {gracePeriodSecrets.map((s) => (
               <SettingsItem.Item key={s.id}>

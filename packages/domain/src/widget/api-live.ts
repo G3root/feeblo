@@ -268,7 +268,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
 
             const jwtPayload = yield* verifyJwt(
               token,
-              secrets.map((s) => s.secret)
+              secrets.map((s) => s.secret),
+              organizationId
             );
 
             const parsedContact = yield* parsePersonAttributes(
