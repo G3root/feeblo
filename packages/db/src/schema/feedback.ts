@@ -69,9 +69,9 @@ export const DEFAULT_POST_STATUSES = [
 }>;
 
 export const DEFAULT_CHANGELOG_CATEGORIES = [
-  { name: "New", iconType: "color", icon: "#22c55e" },
-  { name: "Improved", iconType: "color", icon: "#3b82f6" },
-  { name: "Fixed", iconType: "color", icon: "#ef4444" },
+  { name: "New", iconType: "color", icon: "oklch(0.723 0.192 149.579)" },
+  { name: "Improved", iconType: "color", icon: "oklch(0.623 0.188 259.815)" },
+  { name: "Fixed", iconType: "color", icon: "oklch(0.637 0.208 25.331)" },
 ] as const satisfies ReadonlyArray<{
   name: string;
   iconType: TChangelogCategoryIconType;

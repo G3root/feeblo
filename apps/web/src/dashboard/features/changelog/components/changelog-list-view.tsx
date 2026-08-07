@@ -113,7 +113,7 @@ export function ChangelogListView({
                           className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium text-xs"
                           key={category.id}
                           style={{
-                            backgroundColor: `${category.icon}1f`,
+                            backgroundColor: `color-mix(in oklab, ${category.icon} 12%, transparent)`,
                             color: category.icon,
                           }}
                         >

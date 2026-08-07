@@ -2,11 +2,11 @@ import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
 export const CHANGELOG_CATEGORY_COLORS = [
-  "#22c55e",
-  "#3b82f6",
-  "#ef4444",
-  "#f59e0b",
-  "#a855f7",
+  "oklch(0.723 0.192 149.579)",
+  "oklch(0.623 0.188 259.815)",
+  "oklch(0.637 0.208 25.331)",
+  "oklch(0.769 0.165 70.08)",
+  "oklch(0.627 0.233 303.9)",
 ] as const;
 
 type TColor = (typeof CHANGELOG_CATEGORY_COLORS)[number];

@@ -31,7 +31,7 @@ export const ChangelogCategoryColorField = withForm({
               {CHANGELOG_CATEGORY_COLORS.map((swatch) => (
                 <RadioPrimitive.Root
                   aria-label={`Pick color ${swatch}`}
-                  className="relative flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-disabled:cursor-not-allowed data-disabled:opacity-64"
+                  className="relative flex size-8 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110 hover:ring-2 hover:ring-ring hover:ring-offset-2 hover:ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-disabled:cursor-not-allowed data-disabled:opacity-64 data-checked:ring-2 data-checked:ring-ring data-checked:ring-offset-2 data-checked:ring-offset-background"
                   key={swatch}
                   style={{ backgroundColor: swatch }}
                   value={swatch}
@@ -39,7 +39,7 @@ export const ChangelogCategoryColorField = withForm({
                   <RadioPrimitive.Indicator
                     className={cn(
                       "drop-shadow-sm data-unchecked:hidden",
-                      swatch === "#f59e0b" ? "text-black" : "text-white"
+                      isLightOklch(swatch) ? "text-black" : "text-white"
                     )}
                     keepMounted
                   >
@@ -55,3 +55,14 @@ export const ChangelogCategoryColorField = withForm({
     );
   },
 });
+
+/**
+ * Picks the check-mark color from the OKLCh lightness channel (L in [0, 1]);
+ * light swatches get a dark check, dark swatches get a light one.
+ */
+function isLightOklch(color: string) {
+  const lightness = Number.parseFloat(
+    color.match(/^oklch\(([\d.]+)/)?.[1] ?? "0"
+  );
+  return lightness > 0.7;
+}

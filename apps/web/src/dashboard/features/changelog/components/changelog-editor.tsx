@@ -30,7 +30,7 @@ import {
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { and, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, use, useRef } from "react";
 import { z } from "zod";
@@ -452,17 +452,17 @@ export function ChangelogEditorDetails() {
     {
       icon: Clock01Icon,
       label: "Publish At",
-      value: formatDateTime(changelog.publishedAt, changelog.scheduledAt),
+      value: formatPublishAt(changelog.publishedAt, changelog.scheduledAt),
     },
     {
       icon: Calendar03Icon,
       label: "Created",
-      value: changelog.createdAt.toLocaleDateString(),
+      value: formatDate(changelog.createdAt),
     },
     {
       icon: RefreshIcon,
       label: "Updated",
-      value: changelog.updatedAt.toLocaleDateString(),
+      value: formatDate(changelog.updatedAt),
     },
   ];
 
@@ -570,10 +570,25 @@ export function ChangelogEditorCategoryField() {
   };
 
   const removeCategory = async (categoryId: string) => {
+    // Read the freshest confirmed links straight from the collection instead
+    // of React-synced state, so rapid add/remove sequences build their
+    // payloads from the latest data rather than a stale render snapshot.
+    const currentLinks = await queryOnce((q) =>
+      q
+        .from({ link: changelogCategoryLinkCollection })
+        .where(({ link }) =>
+          and(
+            eq(link.changelogId, changelog.id),
+            eq(link.organizationId, organizationId)
+          )
+        )
+        .select(({ link }) => ({ categoryId: link.categoryId }))
+    );
+
     await updateCategories(
-      selectedCategories
-        .filter((category) => category.id !== categoryId)
-        .map((category) => category.id)
+      currentLinks
+        .map((link) => link.categoryId)
+        .filter((id) => id !== categoryId)
     );
   };
 
@@ -682,9 +697,9 @@ export function ChangelogEditorSidebarActions() {
                   {...props}
                   aria-label="Copy changelog link"
                   className="rounded-full"
-                  onClick={() => {
+                  onClick={async () => {
                     try {
-                      navigator.clipboard.writeText(
+                      await navigator.clipboard.writeText(
                         `${publicSiteUrl}/changelog/${changelog.slug}`
                       );
                       toastManager.add({
@@ -738,15 +753,18 @@ export function ChangelogEditorSidebarActions() {
   );
 }
 
-function formatDateTime(publishedAt: Date | null, scheduledAt: Date | null) {
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  }).format(date);
+}
+
+function formatPublishAt(publishedAt: Date | null, scheduledAt: Date | null) {
   const value = publishedAt ?? scheduledAt;
 
   if (!value) {
     return "Not scheduled";
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value);
+  return formatDate(value);
 }

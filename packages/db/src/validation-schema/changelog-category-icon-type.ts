@@ -14,15 +14,18 @@ export type TChangelogCategoryIconType = S.Schema.Type<
 >;
 
 /**
- * A `#RRGGBB` / `#RGB` hex color value used for color icon payloads.
+ * An `oklch()` color value used for color icon payloads.
  */
 export const ChangelogCategoryColorIcon = {
   iconType: S.Literal("color"),
   schema: S.String.pipe(
     S.check(
-      S.isPattern(/^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$/, {
-        message: "must be a valid hex color",
-      })
+      S.isPattern(
+        /^oklch\(\d+(?:\.\d+)?%?\s+\d+(?:\.\d+)?%?\s+\d+(?:\.\d+)?(?:deg)?\)$/,
+        {
+          message: "must be a valid oklch color",
+        }
+      )
     )
   ),
 };
