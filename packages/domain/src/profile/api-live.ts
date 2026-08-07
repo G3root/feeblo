@@ -9,6 +9,7 @@ import { AssetRepository } from "../asset/repository";
 import { replaceSingletonAsset } from "../asset/service";
 import { Api } from "../http/api";
 import { UploadLimitsMiddlewareLive } from "../http/upload-limits";
+import { sniffMediaType } from "../media/api-live";
 import {
   BadRequestError,
   InternalServerError,
@@ -77,6 +78,20 @@ export const ProfileApiLive = HttpApiBuilder.group(
         if (bytes.length === 0 || bytes.length > MAX_PROFILE_IMAGE_BYTES) {
           return yield* new BadRequestError({
             message: "Profile image must be between 1B and 5MB",
+          });
+        }
+
+        // Match the media upload path: verify the declared Content-Type against
+        // the file's magic bytes so arbitrary payloads are never stored as
+        // "images" in the public-read bucket.
+        const sniffedContentType = sniffMediaType(bytes);
+        if (
+          sniffedContentType === null ||
+          sniffedContentType !== file.contentType
+        ) {
+          return yield* new BadRequestError({
+            message:
+              "File content does not match its declared type. Use JPEG, PNG, or WEBP",
           });
         }
 
