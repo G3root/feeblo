@@ -501,9 +501,8 @@ export const postTable = pgTable(
       table.id,
       table.organizationId
     ),
-    uniqueIndex("post_organizationId_boardId_slug_uidx").on(
+    uniqueIndex("post_organizationId_slug_uidx").on(
       table.organizationId,
-      table.boardId,
       table.slug
     ),
     check(
