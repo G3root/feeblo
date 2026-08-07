@@ -1,21 +1,41 @@
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
+import {
+  Combobox,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxPopup,
+} from "@feeblo/ui/combobox";
 import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
-  Delete02Icon,
-  Ellipsis,
+  Calendar03Icon,
+  Cancel01Icon,
+  Clock01Icon,
+  Copy01Icon,
+  Link03Icon,
+  LinkSquare02Icon,
+  RefreshIcon,
+  Search01Icon,
+  StatusIcon,
+  Trash2,
+  UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { and, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { createContext, type ReactNode, use, useRef } from "react";
 import { z } from "zod";
+import { getPublicSiteUrl } from "~/hooks/use-site";
+import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
 import {
@@ -407,99 +427,344 @@ export function ChangelogEditorContentField() {
   );
 }
 
-export function ChangelogEditorStatus() {
+export function ChangelogEditorDetails() {
   const { changelog } = useChangelogEditor();
-
-  return <ChangelogStatusBadge status={changelog.status} />;
-}
-
-export function ChangelogEditorMetadata() {
-  const { changelog } = useChangelogEditor();
+  const details: Array<{
+    icon: typeof Link03Icon;
+    label: string;
+    value: ReactNode;
+  }> = [
+    {
+      icon: Link03Icon,
+      label: "Slug",
+      value: changelog.slug,
+    },
+    {
+      icon: UserIcon,
+      label: "Author",
+      value: changelog.user.name ?? "Unknown author",
+    },
+    {
+      icon: StatusIcon,
+      label: "Status",
+      value: <ChangelogStatusBadge status={changelog.status} />,
+    },
+    {
+      icon: Clock01Icon,
+      label: "Publish At",
+      value: formatPublishAt(changelog.publishedAt, changelog.scheduledAt),
+    },
+    {
+      icon: Calendar03Icon,
+      label: "Created",
+      value: formatDate(changelog.createdAt),
+    },
+    {
+      icon: RefreshIcon,
+      label: "Updated",
+      value: formatDate(changelog.updatedAt),
+    },
+  ];
 
   return (
-    <>
-      <MetadataRow label="Slug" value={changelog.slug} />
-      <MetadataRow
-        label="Author"
-        value={changelog.user.name ?? "Unknown author"}
-      />
-      <MetadataRow
-        label="Publish At"
-        value={formatDateTime(changelog.publishedAt, changelog.scheduledAt)}
-      />
-      <MetadataRow
-        label="Created"
-        value={changelog.createdAt.toLocaleDateString()}
-      />
-      <MetadataRow
-        label="Updated"
-        value={changelog.updatedAt.toLocaleDateString()}
-      />
-    </>
+    <section
+      aria-labelledby="changelog-details-heading"
+      className="space-y-2.5"
+    >
+      <h2 className="sr-only" id="changelog-details-heading">
+        Details
+      </h2>
+      <dl className="space-y-2">
+        {details.map((detail) => (
+          <div
+            className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs"
+            key={detail.label}
+          >
+            <HugeiconsIcon
+              aria-hidden="true"
+              className="size-4 text-muted-foreground/72"
+              icon={detail.icon}
+              strokeWidth={1.75}
+            />
+            <dt className="text-muted-foreground">{detail.label}</dt>
+            <dd
+              className={
+                typeof detail.value === "string"
+                  ? "max-w-32 truncate font-medium text-foreground"
+                  : "font-medium text-foreground"
+              }
+            >
+              {detail.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
-export function ChangelogEditorMoreActions() {
+export function ChangelogEditorCategoryField() {
+  const { changelog, isOwner, organizationId } = useChangelogEditor();
+  const { changelogCategoryCollection, changelogCategoryLinkCollection } =
+    useDashboardCollections();
+
+  const categoriesQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ category: changelogCategoryCollection })
+        .where(({ category }) => eq(category.organizationId, organizationId))
+        .orderBy(({ category }) => category.createdAt, "asc"),
+    [organizationId]
+  );
+  const categories = categoriesQuery.data ?? [];
+
+  const linksQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ link: changelogCategoryLinkCollection })
+        .where(({ link }) =>
+          and(
+            eq(link.changelogId, changelog.id),
+            eq(link.organizationId, organizationId)
+          )
+        ),
+    [organizationId, changelog.id]
+  );
+  const links = linksQuery.data ?? [];
+
+  const selectedCategoryIds = new Set(links.map((link) => link.categoryId));
+  const selectedCategories = categories.filter((category) =>
+    selectedCategoryIds.has(category.id)
+  );
+
+  const updateCategories = async (nextCategoryIds: readonly string[]) => {
+    if (!isOwner) {
+      return;
+    }
+    try {
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCategorySet({
+          changelogId: changelog.id,
+          organizationId,
+          categoryIds: [...nextCategoryIds],
+        })
+      );
+      await changelogCategoryLinkCollection.utils.refetch();
+      toastManager.add({
+        title: "Categories updated",
+        type: "success",
+      });
+    } catch (_error) {
+      toastManager.add({
+        title: "Failed to update categories",
+        type: "error",
+      });
+    }
+  };
+
+  const handleValueChange = async (nextSelected: typeof selectedCategories) => {
+    const nextIds = new Set(nextSelected.map((category) => category.id));
+    await updateCategories(
+      categories.filter((category) => nextIds.has(category.id)).map((c) => c.id)
+    );
+  };
+
+  const removeCategory = async (categoryId: string) => {
+    // Read the freshest confirmed links straight from the collection instead
+    // of React-synced state, so rapid add/remove sequences build their
+    // payloads from the latest data rather than a stale render snapshot.
+    const currentLinks = await queryOnce((q) =>
+      q
+        .from({ link: changelogCategoryLinkCollection })
+        .where(({ link }) =>
+          and(
+            eq(link.changelogId, changelog.id),
+            eq(link.organizationId, organizationId)
+          )
+        )
+        .select(({ link }) => ({ categoryId: link.categoryId }))
+    );
+
+    await updateCategories(
+      currentLinks
+        .map((link) => link.categoryId)
+        .filter((id) => id !== categoryId)
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Combobox
+        disabled={!isOwner}
+        items={categories}
+        multiple
+        onValueChange={handleValueChange}
+        value={selectedCategories}
+      >
+        <ComboboxInput
+          aria-label="Add categories"
+          placeholder="Add categories..."
+          size="sm"
+          startAddon={<HugeiconsIcon icon={Search01Icon} strokeWidth={2} />}
+        />
+        <ComboboxPopup aria-label="Select categories">
+          <ComboboxEmpty>No categories found.</ComboboxEmpty>
+          <ComboboxList>
+            {(category) => (
+              <ComboboxItem key={category.id} value={category}>
+                <span className="flex items-center gap-2 whitespace-nowrap">
+                  <span
+                    aria-hidden="true"
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: category.icon }}
+                  />
+                  {category.name}
+                </span>
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxPopup>
+      </Combobox>
+
+      {selectedCategories.length > 0 ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {selectedCategories.map((category) => (
+            <li
+              className="flex min-w-0 items-center gap-1 rounded-md border border-input bg-background py-0.5 ps-2 pe-0.5 text-sm"
+              key={category.id}
+            >
+              <span
+                aria-hidden="true"
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: category.icon }}
+              />
+              <span className="truncate font-medium">{category.name}</span>
+              <Button
+                aria-label={`Remove ${category.name}`}
+                disabled={!isOwner}
+                onClick={() => removeCategory(category.id)}
+                size="icon-xs"
+                variant="ghost"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+export function ChangelogEditorSidebarActions() {
   const { changelog, isOwner } = useChangelogEditor();
   const deleteDialogStore = useChangelogDeleteDialogContext();
-
-  if (!isOwner) {
-    return null;
-  }
+  const publicSiteUrl = getPublicSiteUrl();
 
   return (
-    <Menu>
-      <MenuTrigger
-        render={(props) => (
-          <Button
-            {...props}
-            aria-label="More actions"
-            className="rounded-full transition-transform active:scale-[0.96]"
-            size="icon-sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={Ellipsis} />
-          </Button>
-        )}
-      />
-      <MenuPopup align="end" className="w-48">
-        <MenuItem
-          onClick={() =>
-            deleteDialogStore.send({
-              type: "toggle",
-              data: { changelogId: changelog.id },
-            })
-          }
-          variant="destructive"
-        >
-          <HugeiconsIcon icon={Delete02Icon} />
-          <span>Delete</span>
-        </MenuItem>
-      </MenuPopup>
-    </Menu>
+    <div className="flex items-center justify-end gap-2">
+      {publicSiteUrl ? (
+        <>
+          <Tooltip>
+            <TooltipTrigger
+              render={(props) => (
+                <Button
+                  {...props}
+                  aria-label="Go to public changelog"
+                  className="rounded-full"
+                  render={(buttonProps) => (
+                    <a
+                      {...buttonProps}
+                      href={`${publicSiteUrl}/changelog/${changelog.slug}`}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      <HugeiconsIcon icon={LinkSquare02Icon} />
+                    </a>
+                  )}
+                  size="icon-sm"
+                  variant="outline"
+                />
+              )}
+            />
+            <TooltipPopup>Go to public changelog</TooltipPopup>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger
+              render={(props) => (
+                <Button
+                  {...props}
+                  aria-label="Copy changelog link"
+                  className="rounded-full"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        `${publicSiteUrl}/changelog/${changelog.slug}`
+                      );
+                      toastManager.add({
+                        title: "Changelog link copied to clipboard",
+                        type: "success",
+                      });
+                    } catch (_error) {
+                      toastManager.add({
+                        title: "Failed to copy changelog link",
+                        type: "error",
+                      });
+                    }
+                  }}
+                  size="icon-sm"
+                  variant="outline"
+                >
+                  <HugeiconsIcon icon={Copy01Icon} />
+                </Button>
+              )}
+            />
+            <TooltipPopup>Copy changelog link</TooltipPopup>
+          </Tooltip>
+        </>
+      ) : null}
+
+      {isOwner ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={(props) => (
+              <Button
+                {...props}
+                aria-label="Delete changelog"
+                className="rounded-full"
+                onClick={() =>
+                  deleteDialogStore.send({
+                    type: "toggle",
+                    data: { changelogId: changelog.id },
+                  })
+                }
+                size="icon-sm"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={Trash2} />
+              </Button>
+            )}
+          />
+          <TooltipPopup>Delete changelog</TooltipPopup>
+        </Tooltip>
+      ) : null}
+    </div>
   );
 }
 
-function MetadataRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <>
-      <p className="text-muted-foreground text-xs uppercase tracking-[0.2em]">
-        {label}
-      </p>
-      <div className="text-sm">{value}</div>
-    </>
-  );
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+  }).format(date);
 }
 
-function formatDateTime(publishedAt: Date | null, scheduledAt: Date | null) {
+function formatPublishAt(publishedAt: Date | null, scheduledAt: Date | null) {
   const value = publishedAt ?? scheduledAt;
 
   if (!value) {
     return "Not scheduled";
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value);
+  return formatDate(value);
 }

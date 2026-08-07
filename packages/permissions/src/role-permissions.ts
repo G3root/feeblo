@@ -25,6 +25,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "members.remove",
     "posts.*",
     "changelog.*",
+    "changelog-categories.*",
     "tags.*",
     "roadmap.*",
     "comments.*",

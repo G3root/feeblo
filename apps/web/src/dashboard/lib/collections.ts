@@ -245,6 +245,107 @@ export const changelogCollection = createCollection(
   })
 );
 
+export const changelogCategoryLinkCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("changelog-category-link"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogCategoryListLinks({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+  })
+);
+
+export const changelogCategoryCollection = createCollection(
+  queryCollectionOptions({
+    queryKey: () => getOrganizationScopedQueryKey("changelog-category"),
+    queryFn: async (ctx) => {
+      const organizationId = getCurrentOrganizationId();
+
+      if (!organizationId) {
+        return [];
+      }
+
+      const data = await fetchRpc(
+        (rpc) => rpc.ChangelogCategoryList({ organizationId }),
+        {
+          signal: ctx.signal,
+        }
+      );
+
+      return [...data];
+    },
+    queryClient,
+    getKey: (item) => item.id,
+    onInsert: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: newCategory } = mutation;
+      const iconType = newCategory.iconType;
+
+      if (iconType !== "color") {
+        throw new Error(
+          "Unsupported changelog category icon type; only color is supported"
+        );
+      }
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCategoryCreate({
+          id: newCategory.id,
+          name: newCategory.name,
+          iconType,
+          icon: newCategory.icon,
+          organizationId: newCategory.organizationId,
+        })
+      );
+    },
+    onUpdate: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { modified: updatedCategory } = mutation;
+      const iconType = updatedCategory.iconType;
+
+      if (iconType !== "color") {
+        throw new Error(
+          "Unsupported changelog category icon type; only color is supported"
+        );
+      }
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCategoryUpdate({
+          id: updatedCategory.id,
+          name: updatedCategory.name,
+          iconType,
+          icon: updatedCategory.icon,
+          organizationId: updatedCategory.organizationId,
+        })
+      );
+    },
+    onDelete: async ({ transaction }) => {
+      const mutation = transaction.mutations[0];
+      const { original: deletedCategory } = mutation;
+
+      await fetchRpc((rpc) =>
+        rpc.ChangelogCategoryDelete({
+          id: deletedCategory.id,
+          organizationId: deletedCategory.organizationId,
+        })
+      );
+    },
+  })
+);
+
 export const getChangelogPostKey = ({
   changelogId,
   postId,
@@ -1496,6 +1597,8 @@ export const roadmapColumnCollection = createCollection(
 
 export const dashboardCollections = {
   boardCollection,
+  changelogCategoryCollection,
+  changelogCategoryLinkCollection,
   changelogCollection,
   changelogPostCollection,
   changelogTagCollection,

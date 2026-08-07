@@ -4,6 +4,8 @@ import {
   assetTable,
   boardTable,
   changelogAssetTable,
+  changelogCategoryLinkTable,
+  changelogCategoryTable,
   changelogPostTable,
   changelogTable,
   changelogTagTable,
@@ -69,6 +71,8 @@ export const relations = defineRelations(
     commentTable,
     commentReactionTable,
     siteTable,
+    changelogCategoryLinkTable,
+    changelogCategoryTable,
     changelogTable,
     changelogPostTable,
     changelogTagTable,
@@ -246,6 +250,10 @@ export const relations = defineRelations(
       changelogs: r.many.changelogTable({
         from: r.organizationTable.id,
         to: r.changelogTable.organizationId,
+      }),
+      changelogCategories: r.many.changelogCategoryTable({
+        from: r.organizationTable.id,
+        to: r.changelogCategoryTable.organizationId,
       }),
       changelogTags: r.many.changelogTagTable({
         from: r.organizationTable.id,
@@ -628,6 +636,16 @@ export const relations = defineRelations(
         to: r.roadmapTable.id,
       }),
     },
+    changelogCategoryTable: {
+      organization: r.one.organizationTable({
+        from: r.changelogCategoryTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      changelogLinks: r.many.changelogCategoryLinkTable({
+        from: r.changelogCategoryTable.id,
+        to: r.changelogCategoryLinkTable.categoryId,
+      }),
+    },
     changelogTable: {
       organization: r.one.organizationTable({
         from: r.changelogTable.organizationId,
@@ -641,6 +659,10 @@ export const relations = defineRelations(
         from: r.changelogTable.creatorMemberId,
         to: r.memberTable.id,
       }),
+      changelogCategories: r.many.changelogCategoryLinkTable({
+        from: r.changelogTable.id,
+        to: r.changelogCategoryLinkTable.changelogId,
+      }),
       changelogTags: r.many.changelogTagTable({
         from: r.changelogTable.id,
         to: r.changelogTagTable.changelogId,
@@ -652,6 +674,20 @@ export const relations = defineRelations(
       assets: r.many.changelogAssetTable({
         from: r.changelogTable.id,
         to: r.changelogAssetTable.changelogId,
+      }),
+    },
+    changelogCategoryLinkTable: {
+      changelog: r.one.changelogTable({
+        from: r.changelogCategoryLinkTable.changelogId,
+        to: r.changelogTable.id,
+      }),
+      category: r.one.changelogCategoryTable({
+        from: r.changelogCategoryLinkTable.categoryId,
+        to: r.changelogCategoryTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.changelogCategoryLinkTable.organizationId,
+        to: r.organizationTable.id,
       }),
     },
     changelogPostTable: {

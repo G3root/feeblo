@@ -12,11 +12,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChangelogCompletedPosts } from "~/features/changelog/components/changelog-completed-posts";
 import {
   ChangelogEditorBackLink,
+  ChangelogEditorCategoryField,
   ChangelogEditorContentField,
+  ChangelogEditorDetails,
   ChangelogEditorForm,
-  ChangelogEditorMoreActions,
   ChangelogEditorProvider,
-  ChangelogEditorStatus,
+  ChangelogEditorSidebarActions,
   ChangelogEditorSubmitAction,
   ChangelogEditorTitleField,
 } from "~/features/changelog/components/changelog-editor";
@@ -30,6 +31,8 @@ import {
   ChangelogMoveToDraftDialogProvider,
 } from "~/features/changelog/dialog-stores";
 import {
+  changelogCategoryCollection,
+  changelogCategoryLinkCollection,
   changelogCollection,
   changelogPostCollection,
   postCollection,
@@ -46,6 +49,8 @@ export const Route = createFileRoute(
       changelogPostCollection.preload(),
       postCollection.preload(),
       postStatusCollection.preload(),
+      changelogCategoryCollection.preload(),
+      changelogCategoryLinkCollection.preload(),
     ]);
   },
   component: RouteComponent,
@@ -122,14 +127,10 @@ function RouteComponent() {
       <ChangelogMoveToDraftDialogProvider>
         <ChangelogDeleteDialogProvider>
           <ChangelogEditorForm>
-            <ChangelogEditor className="max-w-6xl">
-              <ChangelogEditor.Main className="mx-auto flex w-full flex-col space-y-6 px-4 py-4 sm:px-6 sm:py-6">
+            <ChangelogEditor>
+              <ChangelogEditor.Main>
                 <ChangelogEditor.Header className="items-center gap-3">
                   <ChangelogEditorBackLink />
-                  <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-                    <ChangelogEditorStatus />
-                    <ChangelogEditorMoreActions />
-                  </div>
                 </ChangelogEditor.Header>
 
                 <ChangelogEditorTitleField />
@@ -139,6 +140,12 @@ function RouteComponent() {
                   <ChangelogEditorSubmitAction />
                 </div>
               </ChangelogEditor.Main>
+              <ChangelogEditor.Sidebar>
+                <ChangelogEditorSidebarActions />
+                <ChangelogEditorCategoryField />
+                <ChangelogEditor.SidebarSeparator />
+                <ChangelogEditorDetails />
+              </ChangelogEditor.Sidebar>
             </ChangelogEditor>
           </ChangelogEditorForm>
           <ChangelogMoveToDraftDialog />
@@ -152,20 +159,12 @@ function RouteComponent() {
 function ChangelogEditorLoadingState() {
   return (
     <SkeletonLoader isLoading>
-      <ChangelogEditor className="max-w-6xl">
-        <ChangelogEditor.Main className="mx-auto flex w-full flex-col space-y-6 px-4 py-4 sm:px-6 sm:py-6">
+      <ChangelogEditor>
+        <ChangelogEditor.Main>
           <ChangelogEditor.Header className="items-center gap-3">
             <SkeletonWrapper>
               <div className="size-8 rounded-full border bg-background" />
             </SkeletonWrapper>
-            <div className="flex flex-1 items-center justify-end gap-2">
-              <SkeletonWrapper>
-                <div className="h-6 w-24 rounded-full" />
-              </SkeletonWrapper>
-              <SkeletonWrapper>
-                <div className="size-8 rounded-full border bg-background" />
-              </SkeletonWrapper>
-            </div>
           </ChangelogEditor.Header>
 
           <SkeletonWrapper>
@@ -182,6 +181,28 @@ function ChangelogEditorLoadingState() {
             </SkeletonWrapper>
           </div>
         </ChangelogEditor.Main>
+        <ChangelogEditor.Sidebar>
+          <div className="flex items-center justify-end gap-2">
+            <SkeletonWrapper>
+              <div className="size-8 rounded-full border bg-background" />
+            </SkeletonWrapper>
+            <SkeletonWrapper>
+              <div className="size-8 rounded-full border bg-background" />
+            </SkeletonWrapper>
+            <SkeletonWrapper>
+              <div className="size-8 rounded-full border bg-background" />
+            </SkeletonWrapper>
+          </div>
+          <SkeletonWrapper>
+            <div className="h-8 w-full rounded-md" />
+          </SkeletonWrapper>
+          <SkeletonWrapper>
+            <div className="h-24 w-full rounded-md" />
+          </SkeletonWrapper>
+          <SkeletonWrapper>
+            <div className="h-6 w-20 rounded-full" />
+          </SkeletonWrapper>
+        </ChangelogEditor.Sidebar>
       </ChangelogEditor>
     </SkeletonLoader>
   );

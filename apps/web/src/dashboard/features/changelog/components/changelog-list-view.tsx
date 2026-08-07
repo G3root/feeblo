@@ -7,7 +7,9 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import type { ChangelogStatus } from "../constants";
 import { ChangelogStatusBadge } from "./changelog-status";
 
@@ -25,7 +27,14 @@ type TChangelogListItem = {
   };
 };
 
-const headItems = ["Title", "Author", "Status", "Publish date", "Updated"];
+const headItems = [
+  "Title",
+  "Category",
+  "Author",
+  "Status",
+  "Publish date",
+  "Updated",
+];
 
 export function ChangelogListView({
   changelogs,
@@ -34,6 +43,35 @@ export function ChangelogListView({
   changelogs: TChangelogListItem[];
   organizationId: string;
 }) {
+  const { changelogCategoryCollection, changelogCategoryLinkCollection } =
+    useDashboardCollections();
+  const categoriesQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ category: changelogCategoryCollection })
+        .where(({ category }) => eq(category.organizationId, organizationId)),
+    [organizationId]
+  );
+  const categories = categoriesQuery.data ?? [];
+  const categoryById = new Map(
+    categories.map((category) => [category.id, category])
+  );
+
+  const linksQuery = useLiveQuery(
+    (q) =>
+      q
+        .from({ link: changelogCategoryLinkCollection })
+        .where(({ link }) => eq(link.organizationId, organizationId)),
+    [organizationId]
+  );
+  const links = linksQuery.data ?? [];
+  const categoryIdsByChangelog = new Map<string, string[]>();
+  for (const link of links) {
+    const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
+    ids.push(link.categoryId);
+    categoryIdsByChangelog.set(link.changelogId, ids);
+  }
+
   return (
     <div className="p-3">
       <Table>
@@ -47,29 +85,65 @@ export function ChangelogListView({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {changelogs.map((changelog) => (
-            <TableRow key={changelog.id}>
-              <TableCell>
-                <Link
-                  params={{ organizationId, changelogSlug: changelog.slug }}
-                  to="/$organizationId/changelog/edit/$changelogSlug"
-                >
-                  {changelog.title}
-                </Link>
-              </TableCell>
-              <TableCell>{changelog.user.name ?? "Unknown"}</TableCell>
-              <TableCell>
-                <ChangelogStatusBadge status={changelog.status} />
-              </TableCell>
-              <TableCell>
-                {formatPublishDate(
-                  changelog.publishedAt,
-                  changelog.scheduledAt
-                )}
-              </TableCell>
-              <TableCell>{formatDate(changelog.updatedAt)}</TableCell>
-            </TableRow>
-          ))}
+          {changelogs.map((changelog) => {
+            const changelogCategories = (
+              categoryIdsByChangelog.get(changelog.id) ?? []
+            )
+              .map((categoryId) => categoryById.get(categoryId))
+              .filter(
+                (category): category is NonNullable<typeof category> =>
+                  category !== undefined
+              );
+
+            return (
+              <TableRow key={changelog.id}>
+                <TableCell>
+                  <Link
+                    params={{ organizationId, changelogSlug: changelog.slug }}
+                    to="/$organizationId/changelog/edit/$changelogSlug"
+                  >
+                    {changelog.title}
+                  </Link>
+                </TableCell>
+                <TableCell>
+                  {changelogCategories.length > 0 ? (
+                    <span className="flex flex-wrap gap-1.5">
+                      {changelogCategories.map((category) => (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium text-xs"
+                          key={category.id}
+                          style={{
+                            backgroundColor: `color-mix(in oklab, ${category.icon} 12%, transparent)`,
+                            color: category.icon,
+                          }}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="size-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: category.icon }}
+                          />
+                          {category.name}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell>{changelog.user.name ?? "Unknown"}</TableCell>
+                <TableCell>
+                  <ChangelogStatusBadge status={changelog.status} />
+                </TableCell>
+                <TableCell>
+                  {formatPublishDate(
+                    changelog.publishedAt,
+                    changelog.scheduledAt
+                  )}
+                </TableCell>
+                <TableCell>{formatDate(changelog.updatedAt)}</TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

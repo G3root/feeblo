@@ -19,6 +19,7 @@ import {
 import * as Schema from "effect/Schema";
 import type { TPostActivityKind } from "../validation-schema/activity-kind";
 import type { TAttributeType } from "../validation-schema/attribute-type";
+import type { TChangelogCategoryIconType } from "../validation-schema/changelog-category-icon-type";
 import type { TEntitySource } from "../validation-schema/entity-source";
 import type { TNotificationEventType } from "../validation-schema/notification-kind";
 import type { TPostSource } from "../validation-schema/post-source";
@@ -65,6 +66,16 @@ export const DEFAULT_POST_STATUSES = [
 ] as const satisfies ReadonlyArray<{
   orderIndex: number;
   type: TPostStatus;
+}>;
+
+export const DEFAULT_CHANGELOG_CATEGORIES = [
+  { name: "New", iconType: "color", icon: "oklch(0.723 0.192 149.579)" },
+  { name: "Improved", iconType: "color", icon: "oklch(0.623 0.188 259.815)" },
+  { name: "Fixed", iconType: "color", icon: "oklch(0.637 0.208 25.331)" },
+] as const satisfies ReadonlyArray<{
+  name: string;
+  iconType: TChangelogCategoryIconType;
+  icon: string;
 }>;
 
 export const changelogStatusEnum = pgEnum("changelog_status", [
@@ -744,6 +755,36 @@ export const siteTable = pgTable(
   ]
 );
 
+export const changelogCategoryTable = pgTable(
+  "changelog_category",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    // Icon types are plain text; vocabulary lives in `../changelog-category-icon-type`.
+    iconType: text("icon_type")
+      .$type<TChangelogCategoryIconType>()
+      .notNull()
+      .default("color"),
+    icon: text("icon").notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("changelog_category_organizationId_name_uidx").on(
+      table.organizationId,
+      table.name
+    ),
+  ]
+);
+
 export const changelogTable = pgTable(
   "changelog",
   {
@@ -780,6 +821,37 @@ export const changelogTable = pgTable(
     uniqueIndex("changelog_organizationId_slug_uidx").on(
       table.organizationId,
       table.slug
+    ),
+  ]
+);
+
+export const changelogCategoryLinkTable = pgTable(
+  "changelog_category_link",
+  {
+    id: text("id").primaryKey(),
+    changelogId: text("changelog_id")
+      .notNull()
+      .references(() => changelogTable.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => changelogCategoryTable.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("changelog_category_link_changelogId_idx").on(table.changelogId),
+    index("changelog_category_link_categoryId_idx").on(table.categoryId),
+    uniqueIndex("changelog_category_link_changelogId_categoryId_uidx").on(
+      table.changelogId,
+      table.categoryId
     ),
   ]
 );

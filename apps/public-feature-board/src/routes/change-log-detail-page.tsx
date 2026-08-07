@@ -12,6 +12,7 @@ import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
+import { ChangelogCategoryBadges } from "../components/changelog/changelog-category-badge";
 import {
   ChangelogPageLayout,
   ChangelogStickyRail,
@@ -31,6 +32,7 @@ export function ChangeLogDetailPage() {
   const site = useSite();
   const { changelogSlug } = useParams({ from: "/changelog/$changelogSlug" });
   const {
+    publicChangelogCategoryLinkCollection,
     publicChangelogCollection,
     publicChangelogPostCollection,
     publicPostCollection,
@@ -53,6 +55,26 @@ export function ChangeLogDetailPage() {
         .findOne(),
     [site.organizationId, changelogSlug]
   );
+
+  const { data: categoryLinks = [] } = useLiveQuery(
+    (q) => {
+      if (!changelog) {
+        return undefined;
+      }
+
+      return q
+        .from({ link: publicChangelogCategoryLinkCollection })
+        .where(({ link }) =>
+          and(
+            eq(link.changelogId, changelog.id),
+            eq(link.organizationId, site.organizationId)
+          )
+        )
+        .select(({ link }) => ({ categoryId: link.categoryId }));
+    },
+    [changelog?.id, site.organizationId]
+  );
+  const categoryIds = categoryLinks.map((link) => link.categoryId);
 
   const {
     data: linkedPosts = [],
@@ -142,6 +164,7 @@ export function ChangeLogDetailPage() {
               )}
             </p>
             <div className="space-y-3">
+              <ChangelogCategoryBadges categoryIds={categoryIds} />
               <h1 className="max-w-3xl font-semibold text-4xl tracking-tight sm:text-5xl">
                 {changelog.title}
               </h1>

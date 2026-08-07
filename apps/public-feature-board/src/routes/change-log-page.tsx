@@ -17,6 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, ilike, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { ChangelogCategoryBadges } from "../components/changelog/changelog-category-badge";
 import {
   ChangelogPageLayout,
   ChangelogTimeline,
@@ -34,7 +35,10 @@ export const Route = createLazyRoute("/changelog")({
 
 export function ChangelogPage() {
   const site = useSite();
-  const { publicChangelogCollection } = usePublicCollections();
+  const {
+    publicChangelogCategoryLinkCollection,
+    publicChangelogCollection,
+  } = usePublicCollections();
   const [search, setSearch] = useState("");
   const normalizedSearch = search.trim();
   const {
@@ -60,6 +64,20 @@ export function ChangelogPage() {
         .orderBy(({ changelog }) => changelog.publishedAt, "desc"),
     [site.organizationId, normalizedSearch]
   );
+
+  const { data: categoryLinks = [] } = useLiveQuery(
+    (q) =>
+      q
+        .from({ link: publicChangelogCategoryLinkCollection })
+        .where(({ link }) => eq(link.organizationId, site.organizationId)),
+    [site.organizationId]
+  );
+  const categoryIdsByChangelog = new Map<string, string[]>();
+  for (const link of categoryLinks) {
+    const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
+    ids.push(link.categoryId);
+    categoryIdsByChangelog.set(link.changelogId, ids);
+  }
 
   if (isLoading) {
     return <ChangelogPageLayout>Loading changelog...</ChangelogPageLayout>;
@@ -141,7 +159,10 @@ export function ChangelogPage() {
                 </ChangelogTimelineDate>
 
                 <ChangelogTimelineBody className="space-y-6 p-0 sm:p-0">
-                  <header>
+                  <header className="space-y-3">
+                    <ChangelogCategoryBadges
+                      categoryIds={categoryIdsByChangelog.get(item.id) ?? []}
+                    />
                     <Link
                       className="block w-fit transition-opacity hover:opacity-80"
                       params={{ changelogSlug: item.slug }}

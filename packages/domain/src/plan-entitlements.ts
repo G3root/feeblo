@@ -1,6 +1,9 @@
 export type OrganizationPlan = "free" | "starter" | "professional";
 
-export type LimitFeatureKey = "feedbackBoards" | "privilegedMembers";
+export type LimitFeatureKey =
+  | "feedbackBoards"
+  | "privilegedMembers"
+  | "changelogCategories";
 export type CapabilityFeatureKey =
   | "roadmap"
   | "changelog"
@@ -45,6 +48,11 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "Admin Role",
     pluralLabel: "Admin Roles",
   },
+  changelogCategories: {
+    kind: "limit",
+    singularLabel: "Changelog Category",
+    pluralLabel: "Changelog Categories",
+  },
   roadmap: { kind: "capability", label: "Roadmap" },
   changelog: { kind: "capability", label: "Changelog" },
   unlimitedEndUsers: {
@@ -70,6 +78,7 @@ const defineFeatureOrder =
 const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "feedbackBoards",
   "privilegedMembers",
+  "changelogCategories",
 ] as const);
 
 const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
@@ -87,6 +96,7 @@ export const PLAN_ENTITLEMENTS = {
     limits: {
       feedbackBoards: 2,
       privilegedMembers: 2,
+      changelogCategories: 3,
     },
     capabilities: {
       roadmap: true,
@@ -102,6 +112,7 @@ export const PLAN_ENTITLEMENTS = {
     limits: {
       feedbackBoards: 5,
       privilegedMembers: 5,
+      changelogCategories: null,
     },
     capabilities: {
       roadmap: true,
@@ -117,6 +128,7 @@ export const PLAN_ENTITLEMENTS = {
     limits: {
       feedbackBoards: null,
       privilegedMembers: null,
+      changelogCategories: null,
     },
     capabilities: {
       roadmap: true,

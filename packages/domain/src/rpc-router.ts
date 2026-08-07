@@ -6,6 +6,7 @@ import * as RpcServer from "effect/unstable/rpc/RpcServer";
 import { AttributeDefinitionRpcHandlers } from "./attribute-definition/handlers";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
+import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
 import { ChangelogPostRpcHandlers } from "./changelog-post/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
@@ -42,7 +43,7 @@ export const RpcRoute = RpcServer.layerHttp({
 }).pipe(
   Layer.provide(Layer.merge(PostRpcHandlers, PostActivityRpcHandlers)),
   Layer.provide(BillingRpcHandlers),
-  Layer.provide(BoardRpcHandlers),
+  Layer.provide(Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)),
   Layer.provide(Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)),
   Layer.provide(JwtSecretRpcHandlers),
   Layer.provide(Layer.mergeAll(MembershipRpcHandlers, NotificationRpcHandlers)),
