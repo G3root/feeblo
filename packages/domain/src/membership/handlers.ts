@@ -44,7 +44,14 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
           organizationId,
         })
         .pipe(
-          Policy.withPolicy(Policy.hasMembership(organizationId)),
+          // Pending invitations expose invitee emails + assigned roles, so the
+          // same grant that can create/cancel them is required to read them.
+          Policy.withPolicy(
+            Policy.all(
+              Policy.hasMembership(organizationId),
+              Policy.canPermission(organizationId, "members.invite")
+            )
+          ),
           withRemapDbErrors("Invitation", "select")
         ),
     OrganizationUpdateMemberRole: ({

@@ -71,6 +71,7 @@ describe("BillingRpcHandlers", () => {
       Effect.succeed({ url: "https://sandbox.polar.sh/checkout" }),
     createPortal: ({ customerId }: { customerId: string }) =>
       Effect.succeed({ url: `https://sandbox.polar.sh/portal/${customerId}` }),
+    revokeSubscription: () => Effect.void,
   });
   const TestLayer = Layer.mergeAll(
     BillingRepository.layer,
