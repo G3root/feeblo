@@ -21,7 +21,10 @@ export interface RenderedTestEmail {
 
 export interface TestMailerState {
   readonly attempts: number;
+  /** Fail every delivery attempt. */
   readonly failDelivery: boolean;
+  /** Fail deliveries to these exact recipient addresses only. */
+  readonly failForRecipients: readonly string[];
   readonly renderedMessages: readonly RenderedTestEmail[];
   readonly sentMessages: readonly MailMessage[];
 }
@@ -29,6 +32,7 @@ export interface TestMailerState {
 export const initialTestMailerState: TestMailerState = {
   attempts: 0,
   failDelivery: false,
+  failForRecipients: [],
   renderedMessages: [],
   sentMessages: [],
 };
@@ -56,13 +60,15 @@ const mailerLayer = Layer.effect(
             }),
         });
         const text = toPlainText(html);
-        const failDelivery = yield* Ref.modify(mailbox, (state) => {
+        const state = yield* Ref.modify(mailbox, (state) => {
+          const failThisDelivery =
+            state.failDelivery || state.failForRecipients.includes(message.to);
           return [
-            state.failDelivery,
+            state,
             {
               ...state,
               attempts: state.attempts + 1,
-              renderedMessages: state.failDelivery
+              renderedMessages: failThisDelivery
                 ? state.renderedMessages
                 : [
                     ...state.renderedMessages,
@@ -74,14 +80,18 @@ const mailerLayer = Layer.effect(
                       to: message.to,
                     },
                   ],
-              sentMessages: state.failDelivery
+              sentMessages: failThisDelivery
                 ? state.sentMessages
                 : [...state.sentMessages, message],
             },
           ];
         });
+        const failDelivery = state.failDelivery;
+        const failForRecipients = state.failForRecipients;
+        const failThisDelivery =
+          failDelivery || failForRecipients.includes(message.to);
 
-        if (failDelivery) {
+        if (failThisDelivery) {
           return yield* new MailDeliveryError({
             subject: message.subject,
             cause: new Error("Test mail delivery failure"),
@@ -102,12 +112,14 @@ export const MailerTestLayer = Layer.unwrap(
 
 export const resetTestMailer = (options?: {
   readonly failDelivery?: boolean;
+  readonly failForRecipients?: readonly string[];
 }) =>
   Effect.gen(function* () {
     const mailbox = yield* TestMailer;
     yield* Ref.set(mailbox, {
       ...initialTestMailerState,
       failDelivery: options?.failDelivery ?? false,
+      failForRecipients: options?.failForRecipients ?? [],
     });
   });
 

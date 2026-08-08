@@ -103,6 +103,9 @@
     "./workflows": {
       "default": "./src/workflows.ts"
     },
+    "./email/unsubscribe-route": {
+      "default": "./src/email/unsubscribe-route.ts"
+    },
     "./site/schema": {
       "default": "./src/site/schema.ts"
     },

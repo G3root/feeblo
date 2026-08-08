@@ -6,13 +6,14 @@ import * as RpcServer from "effect/unstable/rpc/RpcServer";
 import { AttributeDefinitionRpcHandlers } from "./attribute-definition/handlers";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
-import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
+import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
 import { ChangelogPostRpcHandlers } from "./changelog-post/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
+import { EmailAdminRpcHandlers } from "./email/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
@@ -57,7 +58,7 @@ export const RpcRoute = RpcServer.layerHttp({
       ContactRpcHandlers
     )
   ),
-  Layer.provide(SiteRpcHandlers),
+  Layer.provide(Layer.mergeAll(EmailAdminRpcHandlers, SiteRpcHandlers)),
   Layer.provide(TagRpcHandlers),
   Layer.provide(UpvoteRpcHandlers),
   Layer.provide(PostReactionRpcHandlers),

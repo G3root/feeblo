@@ -5,6 +5,10 @@ import {
   SingleRunner,
   TestRunner,
 } from "effect/unstable/cluster";
+import { EmailConfig } from "./email/config";
+import { EmailReaperCron } from "./email/reaper";
+import { EmailEventRepository } from "./email/repository";
+import { PostStatusChangedEmailWorkflowLayer } from "./email/workflow";
 import { SubmissionEmailNotificationWorkflowLayer } from "./post/workflow";
 import { WelcomeUserWorkflowLayer } from "./user/workflows";
 
@@ -26,6 +30,11 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
     WelcomeUserWorkflowLayer.pipe(Layer.provide(makeMailerLayer())),
     SubmissionEmailNotificationWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer())
+    ),
+    PostStatusChangedEmailWorkflowLayer.pipe(
+      Layer.provide(makeMailerLayer()),
+      Layer.provide(EmailEventRepository.layer),
+      Layer.provide(EmailConfig.layer)
     )
   );
 
@@ -33,6 +42,11 @@ export const makeWorkflowsLive = (
   makeMailerLayer: MakeMailerLayer = () => Mailer.layer
 ) =>
   makeWorkflowLayers(makeMailerLayer).pipe(
+    // Merge order matters: `provideMerge` only subtracts the dependency's own
+    // services, so each requirement must be satisfied by a layer merged after
+    // the layer that introduces it.
+    Layer.provideMerge(EmailReaperCron),
+    Layer.provideMerge(EmailEventRepository.layer),
     Layer.provideMerge(WorkflowClusterEngineLive)
   );
 

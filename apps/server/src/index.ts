@@ -8,6 +8,7 @@ import {
 } from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
+import { EmailUnsubscribeRouter } from "@feeblo/domain/email/unsubscribe-route";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
@@ -233,6 +234,7 @@ const program = Effect.gen(function* () {
   const MergedRoutes = Layer.mergeAll(
     PublicRouters,
     HealthRouter,
+    EmailUnsubscribeRouter,
     RpcRoute,
     HttpRoute,
     BetterAuthRouterLive,

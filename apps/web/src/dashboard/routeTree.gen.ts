@@ -26,6 +26,7 @@ import { Route as OrganizationIdSettingsChangelogPrivacyRouteImport } from "./ro
 import { Route as OrganizationIdSettingsChangelogTagsRouteImport } from "./routes/$organizationId/settings/changelog-tags"
 import { Route as OrganizationIdSettingsCustomAttributesRouteImport } from "./routes/$organizationId/settings/custom-attributes"
 import { Route as OrganizationIdSettingsCustomizeRouteImport } from "./routes/$organizationId/settings/customize"
+import { Route as OrganizationIdSettingsEmailsRouteImport } from "./routes/$organizationId/settings/emails"
 import { Route as OrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/$organizationId/settings/feedback-tags"
 import { Route as OrganizationIdSettingsMembersRouteImport } from "./routes/$organizationId/settings/members"
 import { Route as OrganizationIdSettingsPreferencesRouteImport } from "./routes/$organizationId/settings/preferences"
@@ -140,6 +141,12 @@ const OrganizationIdSettingsCustomizeRoute =
   OrganizationIdSettingsCustomizeRouteImport.update({
     id: "/customize",
     path: "/customize",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsEmailsRoute =
+  OrganizationIdSettingsEmailsRouteImport.update({
+    id: "/emails",
+    path: "/emails",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
 const OrganizationIdSettingsFeedbackTagsRoute =
@@ -290,6 +297,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
   "/$organizationId/settings/custom-attributes": typeof OrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
+  "/$organizationId/settings/emails": typeof OrganizationIdSettingsEmailsRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/preferences": typeof OrganizationIdSettingsPreferencesRoute
@@ -329,6 +337,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
   "/$organizationId/settings/custom-attributes": typeof OrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
+  "/$organizationId/settings/emails": typeof OrganizationIdSettingsEmailsRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/preferences": typeof OrganizationIdSettingsPreferencesRoute
@@ -370,6 +379,7 @@ export interface FileRoutesById {
   "/$organizationId/settings/changelog-tags": typeof OrganizationIdSettingsChangelogTagsRoute
   "/$organizationId/settings/custom-attributes": typeof OrganizationIdSettingsCustomAttributesRoute
   "/$organizationId/settings/customize": typeof OrganizationIdSettingsCustomizeRoute
+  "/$organizationId/settings/emails": typeof OrganizationIdSettingsEmailsRoute
   "/$organizationId/settings/feedback-tags": typeof OrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof OrganizationIdSettingsMembersRoute
   "/$organizationId/settings/preferences": typeof OrganizationIdSettingsPreferencesRoute
@@ -412,6 +422,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/changelog-tags"
     | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
+    | "/$organizationId/settings/emails"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/preferences"
@@ -451,6 +462,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/changelog-tags"
     | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
+    | "/$organizationId/settings/emails"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/preferences"
@@ -491,6 +503,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/changelog-tags"
     | "/$organizationId/settings/custom-attributes"
     | "/$organizationId/settings/customize"
+    | "/$organizationId/settings/emails"
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/preferences"
@@ -646,6 +659,13 @@ declare module "@tanstack/react-router" {
       path: "/customize"
       fullPath: "/$organizationId/settings/customize"
       preLoaderRoute: typeof OrganizationIdSettingsCustomizeRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/emails": {
+      id: "/$organizationId/settings/emails"
+      path: "/emails"
+      fullPath: "/$organizationId/settings/emails"
+      preLoaderRoute: typeof OrganizationIdSettingsEmailsRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/settings/feedback-tags": {
@@ -872,6 +892,7 @@ interface OrganizationIdSettingsRouteChildren {
   OrganizationIdSettingsChangelogTagsRoute: typeof OrganizationIdSettingsChangelogTagsRoute
   OrganizationIdSettingsCustomAttributesRoute: typeof OrganizationIdSettingsCustomAttributesRoute
   OrganizationIdSettingsCustomizeRoute: typeof OrganizationIdSettingsCustomizeRoute
+  OrganizationIdSettingsEmailsRoute: typeof OrganizationIdSettingsEmailsRoute
   OrganizationIdSettingsFeedbackTagsRoute: typeof OrganizationIdSettingsFeedbackTagsRoute
   OrganizationIdSettingsMembersRoute: typeof OrganizationIdSettingsMembersRoute
   OrganizationIdSettingsPreferencesRoute: typeof OrganizationIdSettingsPreferencesRoute
@@ -894,6 +915,7 @@ const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
     OrganizationIdSettingsCustomAttributesRoute:
       OrganizationIdSettingsCustomAttributesRoute,
     OrganizationIdSettingsCustomizeRoute: OrganizationIdSettingsCustomizeRoute,
+    OrganizationIdSettingsEmailsRoute: OrganizationIdSettingsEmailsRoute,
     OrganizationIdSettingsFeedbackTagsRoute:
       OrganizationIdSettingsFeedbackTagsRoute,
     OrganizationIdSettingsMembersRoute: OrganizationIdSettingsMembersRoute,

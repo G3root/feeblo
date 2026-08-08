@@ -14,6 +14,7 @@ import {
   syncPostAssetReferences,
 } from "../asset/service";
 import { BoardRepository } from "../board/repository";
+import { EmailEventRepository } from "../email/repository";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
@@ -163,7 +164,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         })
       );
 
-      if (!deleted && !canDeleteEngagedPost) {
+      if (!(deleted || canDeleteEngagedPost)) {
         return yield* new Policy.PolicyDeniedError({
           reason: "Posts with comments or other users' votes cannot be deleted",
         });
@@ -179,9 +180,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             Effect.logWarning(
               "Failed to clean up orphaned editor assets",
               cause
-            ).pipe(
-              Effect.annotateLogs({ organizationId: args.organizationId })
-            )
+            ).pipe(Effect.annotateLogs({ organizationId: args.organizationId }))
           )
         )
       )
@@ -191,7 +190,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
-      yield* transaction(
+      const emailEvents = yield* Effect.serviceOption(EmailEventRepository);
+      const enqueuedEmailEvent = yield* transaction(
         Effect.gen(function* () {
           const previous = yield* repository.findActivityState({
             id: args.id,
@@ -237,9 +237,48 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                     : {}),
                 }),
             });
+            // Transactional outbox: the email-worthy event is written in the
+            // same transaction as the mutation — no outbox write, no commit.
+            return yield* Option.match(emailEvents, {
+              onNone: () => Effect.succeed(null),
+              onSome: (service) =>
+                service.enqueuePostStatusChanged({
+                  organizationId: args.organizationId,
+                  postId: args.id,
+                  actorMemberId: membership?.membershipId ?? null,
+                  actorUserId: session.session.userId,
+                  previousStatusId: previous.statusId,
+                  nextStatusId: args.statusId,
+                }),
+            });
           }
+          return null;
         })
       );
+      // Best-effort post-commit scheduling: a failure never fails the user's
+      // action — the durable event row stays pending and drains via the next
+      // mutation or the periodic reaper.
+      if (enqueuedEmailEvent) {
+        const eventId = enqueuedEmailEvent.eventId;
+        yield* Option.match(emailEvents, {
+          onNone: () => Effect.void,
+          onSome: (service) =>
+            service.scheduleEvent(eventId, args.organizationId).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logWarning(
+                  "Failed to schedule status-change email workflow",
+                  cause
+                ).pipe(
+                  Effect.annotateLogs({
+                    postId: args.id,
+                    organizationId: args.organizationId,
+                    eventId,
+                  })
+                )
+              )
+            ),
+        });
+      }
     });
 
   const updatePostEtaEffect = (args: TPostUpdateEta) =>
@@ -817,5 +856,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(PostEmbeddingService.layer),
-  Layer.provide(NotificationService.layer)
+  Layer.provide(NotificationService.layer),
+  Layer.provide(EmailEventRepository.layer)
 );

@@ -1,4 +1,4 @@
-import { describe, expect, layer } from "@effect/vitest";
+import { assert, describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   BoardId,
@@ -16,6 +16,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { BoardRepository } from "../board/repository";
+import { EmailEventRepository } from "../email/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
@@ -161,7 +162,8 @@ describe("PostRpcHandlers", () => {
     BoardRepository.layer,
     PostRepository.layer,
     PostActivityRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    EmailEventRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = PostPolicy.layer.pipe(
@@ -560,6 +562,120 @@ describe("PostRpcHandlers", () => {
           expect(post).toMatchObject({ id: postId, title: "Updated feedback" });
           expect(post?.content).toContain("Updated content");
         })
+      );
+
+      it.effect(
+        "enqueues a status-change email event in the mutation transaction",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* Database.Database;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const otherStatusId = yield* PostStatusId.generate;
+
+            yield* db.insert(schema.postStatusTable).values({
+              id: otherStatusId,
+              type: "IN_PROGRESS",
+              orderIndex: 1,
+              organizationId: fixture.organizationId,
+            });
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // No email-worthy event before a status change.
+            const before = yield* db.query.emailEventTable.findMany({
+              where: { organizationId: fixture.organizationId },
+            });
+            expect(before).toHaveLength(0);
+
+            yield* handlers
+              .PostUpdate({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: otherStatusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const events = yield* db.query.emailEventTable.findMany({
+              where: { organizationId: fixture.organizationId },
+            });
+            expect(events).toHaveLength(1);
+            const [event] = events;
+            expect(event).toMatchObject({
+              kind: "post_status_changed",
+              organizationId: fixture.organizationId,
+              status: "pending",
+            });
+            expect(event?.payload.kind).toBe("post_status_changed");
+            assert(event?.payload.kind === "post_status_changed");
+            expect(event.payload).toMatchObject({
+              postId,
+              actorMemberId: fixture.membershipId,
+              actorUserId: fixture.userId,
+            });
+            expect(event.payload.changes).toHaveLength(1);
+            expect(event.payload.changes[0]).toMatchObject({
+              previousStatusType: "PENDING",
+              nextStatusType: "IN_PROGRESS",
+              previousStatusLabel: "Pending",
+              nextStatusLabel: "In progress",
+            });
+          })
+      );
+
+      it.effect(
+        "rolls back the email event when the mutation transaction fails",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* Database.Database;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const otherStatusId = yield* PostStatusId.generate;
+
+            yield* db.insert(schema.postStatusTable).values({
+              id: otherStatusId,
+              type: "IN_PROGRESS",
+              orderIndex: 1,
+              organizationId: fixture.organizationId,
+            });
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Movable feedback"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // Contributor cannot change the status — the whole transaction
+            // (including the outbox write) must roll back.
+            const error = yield* Effect.flip(
+              handlers
+                .PostUpdate({
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                  statusId: otherStatusId,
+                })
+                .pipe(
+                  Effect.provideService(
+                    CurrentSession,
+                    makeSession(fixture, "contributor")
+                  )
+                )
+            );
+            expect(error._tag).toBe("PolicyDenied");
+
+            const events = yield* db.query.emailEventTable.findMany({
+              where: { organizationId: fixture.organizationId },
+            });
+            expect(events).toHaveLength(0);
+          })
       );
     });
 

@@ -17,6 +17,8 @@ import {
   contactAttributeDefinitionTable,
   contactAttributeValueTable,
   contactTable,
+  emailDeliveryTable,
+  emailEventTable,
   invitationTable,
   jwtSecretTable,
   memberTable,
@@ -82,6 +84,8 @@ export const relations = defineRelations(
     companyAttributeValueTable,
     contactAttributeDefinitionTable,
     contactAttributeValueTable,
+    emailDeliveryTable,
+    emailEventTable,
     submissionNotificationBatchTable,
     submissionNotificationQueueTable,
   },
@@ -718,6 +722,30 @@ export const relations = defineRelations(
       post: r.one.postTable({
         from: r.submissionNotificationQueueTable.postId,
         to: r.postTable.id,
+      }),
+    },
+    emailEventTable: {
+      organization: r.one.organizationTable({
+        from: r.emailEventTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      deliveries: r.many.emailDeliveryTable({
+        from: r.emailEventTable.id,
+        to: r.emailDeliveryTable.eventId,
+      }),
+    },
+    emailDeliveryTable: {
+      event: r.one.emailEventTable({
+        from: r.emailDeliveryTable.eventId,
+        to: r.emailEventTable.id,
+      }),
+      organization: r.one.organizationTable({
+        from: r.emailDeliveryTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      member: r.one.memberTable({
+        from: r.emailDeliveryTable.memberId,
+        to: r.memberTable.id,
       }),
     },
     changelogTagTable: {
