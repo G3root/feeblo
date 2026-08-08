@@ -1,4 +1,8 @@
-import { currentDb, schema } from "@feeblo/db";
+import {
+  currentDb,
+  ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
+  schema,
+} from "@feeblo/db";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
@@ -183,7 +187,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
                   (error) =>
                     isUniqueViolation(error) &&
                     getUniqueViolationConstraint(error) ===
-                      "roadmap_primary_organizationId_uidx",
+                      ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
                   () => db.transaction(() => insert(false))
                 )
               );

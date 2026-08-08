@@ -10,6 +10,7 @@ import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+import { useRef } from "react";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
@@ -60,6 +61,11 @@ function SecuritySettingsContent({
 }: {
   organizationId: string;
 }) {
+  // Ref (not state) because nothing needs to re-render while generating: the
+  // guard blocks duplicate invocations synchronously, which also covers a
+  // same-tick double click that a re-render-based disabled attribute could miss.
+  const isGeneratingRef = useRef(false);
+
   const { data: secrets, isLoading } = useLiveQuery(
     (q) =>
       q
@@ -104,6 +110,10 @@ function SecuritySettingsContent({
   };
 
   const handleGenerate = async () => {
+    if (isGeneratingRef.current) {
+      return;
+    }
+    isGeneratingRef.current = true;
     try {
       // JwtSecretRotate doubles as first-time generation: when no secret
       // exists it revokes nothing and simply creates a new active one.
@@ -117,6 +127,8 @@ function SecuritySettingsContent({
       trackEvent("sso_secret_generated", { success: false });
       toastManager.add({ title: "Failed to generate secret", type: "error" });
       return;
+    } finally {
+      isGeneratingRef.current = false;
     }
     await jwtSecretCollection.utils.refetch();
   };
