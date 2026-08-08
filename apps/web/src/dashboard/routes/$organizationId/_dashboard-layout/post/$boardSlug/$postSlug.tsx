@@ -9,6 +9,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Separator } from "@feeblo/ui/separator";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import {
   Activity01Icon,
@@ -63,7 +64,7 @@ function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
 
-  const { data: postRow } = useLiveQuery(
+  const { data: postRow, isLoading: isPostLoading } = useLiveQuery(
     (q) => {
       return q
         .from({ post: postCollection })
@@ -83,6 +84,15 @@ function RouteComponent() {
 
   const board = postRow?.board;
   const post = postRow?.post;
+
+  // The post query is derived from the preloaded collections, but it still
+  // passes through a brief `loading` phase on mount and post navigation.
+  // Rendering the "Post not found" empty state then would flash the wrong
+  // page (title, content and the reaction row unmount and remount), so show
+  // a skeleton with the same layout while it resolves.
+  if (isPostLoading) {
+    return <PostPageSkeleton />;
+  }
 
   if (!(board && post)) {
     return (
@@ -197,6 +207,37 @@ function RouteComponent() {
         </aside>
       </div>
     </PostPage.Root>
+  );
+}
+
+function PostPageSkeleton() {
+  return (
+    <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">
+        <section className="space-y-6">
+          <div className="space-y-3">
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-7 w-2/3" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <div className="flex items-center justify-between py-1">
+            <Skeleton className="h-7 w-28 rounded-full" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-7 w-16 rounded-full" />
+              <Skeleton className="h-7 w-16 rounded-full" />
+            </div>
+          </div>
+          <Skeleton className="h-10 w-full" />
+        </section>
+      </div>
+      <aside className="px-6 py-6">
+        <Skeleton className="h-40 w-full" />
+      </aside>
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
 import { UpvoteId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "@feeblo/ui/utils";
 import { getUpvoteCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
@@ -202,7 +203,21 @@ export function UpvoteButton({ variant }: UpvoteButtonProps) {
     );
 
   if (isUpvotesLoading || isUserUpvotedLoading) {
-    return null;
+    // Keep the button's footprint while the upvote queries load instead of
+    // returning null: unmounting made the button (and the whole action row)
+    // flicker out and back in on post navigation and when session.user.id
+    // resolves after mount.
+    return (
+      <div className="flex h-9 items-center">
+        <Skeleton
+          className={
+            variant === "compact"
+              ? "h-9 w-10 rounded-md"
+              : "h-9 w-20 rounded-full"
+          }
+        />
+      </div>
+    );
   }
 
   const onToggle = async () => {

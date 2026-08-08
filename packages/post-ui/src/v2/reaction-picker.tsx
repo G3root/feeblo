@@ -1,6 +1,7 @@
 import { CommentReactionId, PostReactionId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { toastManager } from "@feeblo/ui/toast";
 import {
   getReactionEmoji,
@@ -15,7 +16,7 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, count, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
-import { createContext, type ReactNode, use, useState } from "react";
+import { createContext, type ReactNode, use, useRef, useState } from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -147,6 +148,37 @@ function ReactionPickerGrid() {
   );
 }
 
+// Fixed-size placeholder for the reaction counts row. The pickers used to
+// return null while their live queries were loading, which unmounted the whole
+// row (chips, trigger and popover) so it flickered out and back in on every
+// fresh query: post navigation, comment-list mounts, and auth hydration (the
+// "my reactions" query rebuilds when session.user.id appears). A skeleton of
+// the same footprint keeps the layout stable so nothing jumps or disappears.
+function ReactionCountsSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex flex-row gap-1">
+      <Skeleton className="h-7 w-16 rounded-full" />
+    </div>
+  );
+}
+
+// `useLiveQuery` rebuilds the "my reactions" query whenever session.user.id
+// resolves (the dashboard hint phase → real session, which happens on every
+// page load) or the post changes. During a rebuild for the SAME post the data
+// briefly goes undefined; falling back to the last-known rows keeps the
+// selected-emojis highlight from blinking off and on.
+function useLastKnownUserReactions(
+  key: string,
+  userReactions: Array<{ emoji: string }> | undefined
+): Array<{ emoji: string }> | undefined {
+  const cacheRef = useRef(new Map<string, Array<{ emoji: string }>>());
+  const cache = cacheRef.current;
+  if (userReactions !== undefined) {
+    cache.set(key, userReactions);
+  }
+  return userReactions ?? cache.get(key);
+}
+
 function ReactionPickerDisplayRow() {
   const { actions, state } = useReactionPicker();
 
@@ -221,28 +253,32 @@ export function PostReactionPicker() {
       [organizationId, postSlug]
     );
 
-  const { data: userReactions, isLoading: isUserReactionsLoading } =
-    useLiveQuery(
-      (q) => {
-        if (!(postSlug && session?.user?.id)) {
-          return undefined;
-        }
-        return q
-          .from({ postReaction: postReactionCollection })
-          .where(({ postReaction }) =>
-            and(
-              eq(postReaction.organizationId, organizationId),
-              eq(postReaction.postSlug, postSlug),
-              eq(postReaction.userId, session.user.id)
-            )
+  const { data: userReactions } = useLiveQuery(
+    (q) => {
+      if (!(postSlug && session?.user?.id)) {
+        return undefined;
+      }
+      return q
+        .from({ postReaction: postReactionCollection })
+        .where(({ postReaction }) =>
+          and(
+            eq(postReaction.organizationId, organizationId),
+            eq(postReaction.postSlug, postSlug),
+            eq(postReaction.userId, session.user.id)
           )
-          .select(({ postReaction }) => ({
-            emoji: postReaction.emoji,
-          }))
-          .distinct();
-      },
-      [organizationId, postSlug, session?.user?.id]
-    );
+        )
+        .select(({ postReaction }) => ({
+          emoji: postReaction.emoji,
+        }))
+        .distinct();
+    },
+    [organizationId, postSlug, session?.user?.id]
+  );
+
+  const currentUserReactions = useLastKnownUserReactions(
+    `${postSlug}:${organizationId}:${session?.user?.id ?? "anonymous"}`,
+    userReactions
+  );
 
   const handleToggleReaction = async (emoji: ReactionEmoji) => {
     if (disabled) {
@@ -305,14 +341,8 @@ export function PostReactionPicker() {
     await tx.isPersisted.promise;
   };
 
-  const isLoading = isUserReactionsLoading || isReactionCountsLoading;
-
-  if (isLoading) {
-    return null;
-  }
-
   const existingReactions = new Set(
-    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
+    (currentUserReactions ?? []).map((r) => r.emoji as ReactionEmoji)
   );
 
   const reactionList = new Map(
@@ -330,7 +360,11 @@ export function PostReactionPicker() {
       reactionList={reactionList}
     >
       <div className="flex items-center gap-1">
-        <ReactionPickerDisplayRow />
+        {isReactionCountsLoading ? (
+          <ReactionCountsSkeleton />
+        ) : (
+          <ReactionPickerDisplayRow />
+        )}
         <ReactionPickerTrigger />
       </div>
       <ReactionPickerGrid />
@@ -382,28 +416,32 @@ export function CommentReactionPicker({
       [organizationId, postSlug]
     );
 
-  const { data: userReactions, isLoading: isUserReactionsLoading } =
-    useLiveQuery(
-      (q) => {
-        if (!(postSlug && session?.user?.id)) {
-          return undefined;
-        }
-        return q
-          .from({ commentReaction: commentReactionCollection })
-          .where(({ commentReaction }) =>
-            and(
-              eq(commentReaction.commentId, commentId),
-              eq(commentReaction.userId, session.user.id),
-              eq(commentReaction.postSlug, postSlug)
-            )
+  const { data: userReactions } = useLiveQuery(
+    (q) => {
+      if (!(postSlug && session?.user?.id)) {
+        return undefined;
+      }
+      return q
+        .from({ commentReaction: commentReactionCollection })
+        .where(({ commentReaction }) =>
+          and(
+            eq(commentReaction.commentId, commentId),
+            eq(commentReaction.userId, session.user.id),
+            eq(commentReaction.postSlug, postSlug)
           )
-          .select(({ commentReaction }) => ({
-            emoji: commentReaction.emoji,
-          }))
-          .distinct();
-      },
-      [organizationId, postSlug, session?.user?.id]
-    );
+        )
+        .select(({ commentReaction }) => ({
+          emoji: commentReaction.emoji,
+        }))
+        .distinct();
+    },
+    [organizationId, postSlug, session?.user?.id]
+  );
+
+  const currentUserReactions = useLastKnownUserReactions(
+    `${postSlug}:${commentId}:${organizationId}:${session?.user?.id ?? "anonymous"}`,
+    userReactions
+  );
 
   const handleToggleReaction = async (emoji: ReactionEmoji) => {
     if (disabled) {
@@ -467,14 +505,8 @@ export function CommentReactionPicker({
     await tx.isPersisted.promise;
   };
 
-  const isLoading = isReactionCountsLoading || isUserReactionsLoading;
-
-  if (isLoading) {
-    return null;
-  }
-
   const existingReactions = new Set(
-    (userReactions ?? []).map((r) => r.emoji as ReactionEmoji)
+    (currentUserReactions ?? []).map((r) => r.emoji as ReactionEmoji)
   );
 
   const reactionList = new Map(
@@ -492,7 +524,11 @@ export function CommentReactionPicker({
       reactionList={reactionList}
     >
       <div className="flex items-center gap-1">
-        <ReactionPickerDisplayRow />
+        {isReactionCountsLoading ? (
+          <ReactionCountsSkeleton />
+        ) : (
+          <ReactionPickerDisplayRow />
+        )}
         <ReactionPickerTrigger />
       </div>
       <ReactionPickerGrid />
