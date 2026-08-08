@@ -149,7 +149,9 @@ function VisibilityToggle() {
         <TooltipTrigger
           render={
             <Toggle
-              aria-label={visibilityLabel}
+              aria-label={
+                state.isPrivate ? "Switch to public" : "Switch to internal"
+              }
               disabled={state.disabled}
               onPressedChange={(pressed) => actions.onVisibilityChange(pressed)}
               pressed={state.isPrivate}

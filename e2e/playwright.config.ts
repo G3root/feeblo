@@ -1,7 +1,12 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
+
+// Anchors the webServer commands to this config's directory so tests can be
+// run from the repo root (via playwright.config.ts) or from e2e/ alike.
+const configDir = path.dirname(fileURLToPath(import.meta.url));
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
@@ -69,6 +74,7 @@ export default defineConfig({
       command: reuseBuiltApps
         ? "../node_modules/.bin/tsx scripts/migrate-pglite.ts && ../node_modules/.bin/tsx ../apps/server/src/index.ts"
         : "pnpm run dev:server:e2e",
+      cwd: configDir,
       env: e2eEnv,
       reuseExistingServer: false,
       timeout: 240_000,
@@ -78,6 +84,7 @@ export default defineConfig({
       command: reuseBuiltApps
         ? "node ../apps/web/dist/server/entry.mjs"
         : "pnpm run dev:web:e2e",
+      cwd: configDir,
       env: e2eEnv,
       reuseExistingServer: false,
       timeout: 240_000,
