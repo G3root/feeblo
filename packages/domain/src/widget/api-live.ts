@@ -2,7 +2,6 @@ import { transaction } from "@feeblo/db";
 import { PostId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { slugify } from "@feeblo/utils/url";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
@@ -200,11 +199,11 @@ export const WidgetApiLive = HttpApiBuilder.group(
           withRemapDbErrors("Boards", "select")
         )
       )
-      .handle("createFeedback", ({ payload }) =>
-        Effect.gen(function* () {
-          const { boardId, organizationId, title, content, metadata, token } =
-            payload;
+      .handle("createFeedback", ({ payload }) => {
+        const { boardId, organizationId, title, content, metadata, token } =
+          payload;
 
+        return Effect.gen(function* () {
           const boardRepository = yield* BoardRepository;
           const postStatusRepository = yield* PostStatusRepository;
           const jwtSecretRepository = yield* JwtSecretRepository;
@@ -243,9 +242,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const id = yield* PostId.generate;
           const now = new Date();
           const excerpt = htmlToExcerpt(sanitizedHtml);
-          const slug = slugify(title);
 
           let contactId: string | undefined;
+          let slug: string | undefined;
 
           if (token) {
             const secrets = yield* jwtSecretRepository.getSecretsForOrg({
@@ -269,7 +268,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
 
             const jwtPayload = yield* verifyJwt(
               token,
-              secrets.map((s) => s.secret)
+              secrets.map((s) => s.secret),
+              organizationId
             );
 
             const parsedContact = yield* parsePersonAttributes(
@@ -292,7 +292,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   )
                 );
 
-                yield* postRepository.create({
+                slug = yield* postRepository.create({
                   id,
                   boardId,
                   organizationId,
@@ -307,7 +307,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               })
             );
           } else {
-            yield* transaction(
+            slug = yield* transaction(
               postRepository.create({
                 id,
                 boardId,
@@ -329,6 +329,15 @@ export const WidgetApiLive = HttpApiBuilder.group(
             organizationId,
             title,
           });
+
+          // The post repository always assigns a slug (an empty title yields
+          // an empty slug that is still persisted); only the "no create ran"
+          // case leaves the variable unassigned.
+          if (slug === undefined) {
+            return yield* new InternalServerError({
+              message: "Failed to create feedback",
+            });
+          }
 
           return {
             id,
@@ -352,7 +361,21 @@ export const WidgetApiLive = HttpApiBuilder.group(
             PostRepository.layer,
             PostStatusRepository.layer,
           ]),
+          Effect.catchTag("PostAlreadyExistsError", () =>
+            Effect.logWarning(
+              "Exhausted post slug candidates while creating widget feedback; post was not stored",
+              { organizationId, boardId }
+            ).pipe(
+              Effect.andThen(
+                Effect.fail(
+                  new InternalServerError({
+                    message: "Failed to create feedback",
+                  })
+                )
+              )
+            )
+          ),
           withRemapDbErrors("Feedback", "create")
-        )
-      )
+        );
+      })
 );

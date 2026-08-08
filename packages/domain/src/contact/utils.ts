@@ -197,9 +197,13 @@ const valueSchemaForDefinition = (
       return S.Boolean as unknown as S.Codec<AttributeValue>;
     }
     case "DATE": {
-      return S.Union([S.Date, S.DateFromString]).check(
-        S.isDateValid({ message: "must be a valid date" })
-      ) as unknown as S.Codec<AttributeValue>;
+      // S.Date already rejects NaN/invalid Date instances, and S.DateFromString
+      // fails to decode garbage strings into a valid date, so no extra
+      // validity filter is needed.
+      return S.Union([
+        S.Date,
+        S.DateFromString,
+      ]) as unknown as S.Codec<AttributeValue>;
     }
     default: {
       return S.Never as unknown as S.Codec<AttributeValue>;

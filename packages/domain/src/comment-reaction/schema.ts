@@ -6,8 +6,11 @@ export const CommentReaction = S.Struct({
   id: S.String,
   commentId: S.String,
   postId: S.String,
+  /** Denormalized post slug; unique per organization (post_organizationId_slug_uidx). */
+  postSlug: S.String,
   organizationId: S.String,
-  userId: S.String,
+  /** Null on public endpoints for reactors other than the session user. */
+  userId: S.NullOr(S.String),
   memberId: S.Union([S.String, S.Null]),
   emoji: ReactionEmojiSchema,
   createdAt: S.DateFromString,
@@ -18,7 +21,7 @@ export type TCommentReaction = S.Schema.Type<typeof CommentReaction>;
 
 export const CommentReactionList = S.Struct({
   organizationId: S.String,
-  postId: S.String,
+  slug: S.String,
 });
 
 export type TCommentReactionList = S.Schema.Type<typeof CommentReactionList>;

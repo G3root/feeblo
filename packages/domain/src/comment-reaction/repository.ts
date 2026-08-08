@@ -10,7 +10,7 @@ import * as Option from "effect/Option";
 
 interface TCommentReactionList {
   organizationId: string;
-  postId: string;
+  slug: string;
 }
 
 interface TCommentReactionToggle {
@@ -25,12 +25,13 @@ const makeCommentReactionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    list: ({ organizationId, postId }: TCommentReactionList) =>
+    list: ({ organizationId, slug }: TCommentReactionList) =>
       db
         .select({
           id: schema.commentReactionTable.id,
           commentId: schema.commentReactionTable.commentId,
           postId: schema.commentTable.postId,
+          postSlug: schema.postTable.slug,
           organizationId: schema.commentTable.organizationId,
           userId: schema.commentReactionTable.userId,
           memberId: schema.commentReactionTable.memberId,
@@ -43,10 +44,14 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           schema.commentTable,
           eq(schema.commentTable.id, schema.commentReactionTable.commentId)
         )
+        .innerJoin(
+          schema.postTable,
+          eq(schema.postTable.id, schema.commentTable.postId)
+        )
         .where(
           and(
             eq(schema.commentTable.organizationId, organizationId),
-            eq(schema.commentTable.postId, postId)
+            eq(schema.postTable.slug, slug)
           )
         )
         .pipe(
@@ -58,12 +63,13 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           )
         ),
 
-    listPublic: ({ organizationId, postId }: TCommentReactionList) =>
+    listPublic: ({ organizationId, slug }: TCommentReactionList) =>
       db
         .select({
           id: schema.commentReactionTable.id,
           commentId: schema.commentReactionTable.commentId,
           postId: schema.commentTable.postId,
+          postSlug: schema.postTable.slug,
           organizationId: schema.commentTable.organizationId,
           userId: schema.commentReactionTable.userId,
           memberId: schema.commentReactionTable.memberId,
@@ -87,7 +93,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.commentTable.organizationId, organizationId),
-            eq(schema.commentTable.postId, postId),
+            eq(schema.postTable.slug, slug),
             eq(schema.commentTable.visibility, "PUBLIC"),
             eq(schema.boardTable.visibility, "PUBLIC")
           )

@@ -150,7 +150,8 @@ export const createSsoSession = ({
 
     const jwtPayload = yield* verifyJwt(
       token,
-      secrets.map((s) => s.secret)
+      secrets.map((s) => s.secret),
+      organizationId
     ).pipe(Effect.mapError(() => new SsoError({ code: "INVALID_JWT" })));
 
     const contactDefs =

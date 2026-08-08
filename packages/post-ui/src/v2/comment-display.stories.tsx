@@ -33,6 +33,7 @@ export function Default() {
           onDelete={() => {}}
           onReply={noopReply}
           postId="post-1"
+          postSlug="post-1"
         />
       </div>
     </div>
@@ -52,6 +53,7 @@ export function InternalNote() {
           onDelete={() => {}}
           onReply={noopReply}
           postId="post-1"
+          postSlug="post-1"
         />
       </div>
     </div>
@@ -84,6 +86,7 @@ export function AsAuthor() {
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
           postId="post-1"
+          postSlug="post-1"
         />
       </div>
     </div>
@@ -102,6 +105,7 @@ export function WithReactions() {
           onDelete={() => {}}
           onReply={noopReply}
           postId="post-1"
+          postSlug="post-1"
         />
       </div>
     </div>
@@ -121,6 +125,7 @@ export function Disabled() {
           onDelete={() => {}}
           onReply={noopReply}
           postId="post-1"
+          postSlug="post-1"
         />
       </div>
     </div>
@@ -153,6 +158,7 @@ export function Composed() {
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
           postId="post-1"
+          postSlug="post-1"
         >
           <div className="rounded-md border border-border p-4">
             <div className="flex items-start gap-3">
@@ -257,6 +263,7 @@ export function TimelineComposition() {
                     });
                   }}
                   postId="post-1"
+                  postSlug="post-1"
                 />
               </TimelineContent>
             </TimelineItem>

@@ -51,15 +51,55 @@ const DEFAULT_RESERVED_SUBDOMAINS = [
   "feeblo",
   "s",
   "feedback-widget",
+  // Common infrastructure names: reserving them prevents a workspace from
+  // squatting a subdomain that conventionally belongs to the platform (e.g.
+  // api.<rootDomain>, mail.<rootDomain>).
+  "api",
+  "api-v1",
+  "graphql",
+  "auth",
+  "accounts",
+  "login",
+  "admin",
+  "mail",
+  "smtp",
+  "imap",
+  "support",
+  "help",
+  "status",
+  "docs",
+  "blog",
+  "cdn",
+  "assets",
+  "static",
+  "media",
+  "billing",
+  "portal",
+  "settings",
+  "security",
+  "legal",
+  "privacy",
+  "terms",
+  "contact",
+  "newsletter",
+  "community",
+  "forum",
+  "roadmap",
+  "changelog",
 ];
 
 export function getReservedSubdomains(): string[] {
   const envValue = process.env.RESERVED_SUBDOMAINS;
-  if (envValue) {
-    return envValue
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-  return DEFAULT_RESERVED_SUBDOMAINS;
+  const envSubdomains = envValue
+    ? envValue
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  // The env var is additive: it can reserve extra names but never removes the
+  // platform defaults (including the infrastructure names above).
+  return Array.from(
+    new Set([...DEFAULT_RESERVED_SUBDOMAINS, ...envSubdomains])
+  );
 }

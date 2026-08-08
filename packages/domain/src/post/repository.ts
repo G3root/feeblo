@@ -22,7 +22,8 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
 
-import { FailedToMergePostError } from "./errors";
+import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
+import { FailedToMergePostError, PostAlreadyExistsError } from "./errors";
 import type { TPostAdminUpdate } from "./schema";
 import { scheduleSubmissionNotificationBatch } from "./workflow";
 
@@ -590,9 +591,7 @@ const makePostRepository = Effect.gen(function* () {
                   db
                     .select({ id: schema.commentTable.id })
                     .from(schema.commentTable)
-                    .where(
-                      eq(schema.commentTable.postId, schema.postTable.id)
-                    )
+                    .where(eq(schema.commentTable.postId, schema.postTable.id))
                 ),
                 notExists(
                   db
@@ -639,28 +638,76 @@ const makePostRepository = Effect.gen(function* () {
     }: TPostCreate) =>
       Effect.gen(function* () {
         const excerpt = inputExcerpt ?? htmlToExcerpt(content);
+        const baseSlug = slugify(title);
 
-        return yield* db
-          .insert(schema.postTable)
-          .values({
-            id,
-            boardId,
-            organizationId,
-            title,
-            content,
-            excerpt,
-            statusId,
-            creatorId: creatorId ?? null,
-            creatorMemberId: creatorMemberId ?? null,
-            contactId: contactId ?? null,
-            source: source ?? "DASHBOARD",
-            metadata: metadata ?? {},
-            createdAt: new Date(),
-            slug: slugify(title),
-            updatedAt: new Date(),
-            etaQuarter: etaQuarter ?? null,
-          })
-          .pipe(Effect.asVoid);
+        // Slugs are unique per organization (see post_organizationId_slug_uidx),
+        // so a title that already exists anywhere in the organization must be
+        // deduplicated instead of rejected. Each insert attempt runs in its own
+        // savepoint (nested db.transaction), so a unique-violation failure rolls
+        // back without aborting the enclosing transaction and the next suffix
+        // can be tried. The native Effect retry policy re-executes the insert
+        // with the next candidate slug until one succeeds; when the suffix
+        // space is exhausted a typed PostAlreadyExistsError is returned.
+        const MAX_SLUG_ATTEMPTS = 10;
+        const slugCollision = { _tag: "SlugCollision" } as const;
+
+        // The candidate slug depends on the attempt index, so the insert
+        // effect is rebuilt lazily per attempt via Effect.suspend. Effect.retry
+        // re-executes it, incrementing the counter on each retry.
+        let attemptIndex = 0;
+        const tryCreate = Effect.suspend(() => {
+          const slug =
+            attemptIndex === 0 ? baseSlug : `${baseSlug}-${attemptIndex + 1}`;
+          attemptIndex += 1;
+
+          return db
+            .transaction(() =>
+              db
+                .insert(schema.postTable)
+                .values({
+                  id,
+                  boardId,
+                  organizationId,
+                  title,
+                  content,
+                  excerpt,
+                  statusId,
+                  creatorId: creatorId ?? null,
+                  creatorMemberId: creatorMemberId ?? null,
+                  contactId: contactId ?? null,
+                  source: source ?? "DASHBOARD",
+                  metadata: metadata ?? {},
+                  createdAt: new Date(),
+                  slug,
+                  updatedAt: new Date(),
+                  etaQuarter: etaQuarter ?? null,
+                })
+                .pipe(Effect.as(slug))
+            )
+            .pipe(
+              Effect.catchIf(
+                (error) =>
+                  isUniqueViolation(error) &&
+                  getUniqueViolationConstraint(error) ===
+                    "post_organizationId_slug_uidx",
+                () => Effect.fail(slugCollision)
+              )
+            );
+        });
+
+        return yield* Effect.retry(tryCreate, {
+          // Initial attempt plus MAX_SLUG_ATTEMPTS - 1 retries.
+          times: MAX_SLUG_ATTEMPTS - 1,
+          while: (error) => error._tag === "SlugCollision",
+        }).pipe(
+          Effect.catchTag(
+            "SlugCollision",
+            () =>
+              new PostAlreadyExistsError({
+                message: "A post with this slug already exists",
+              })
+          )
+        );
       }),
 
     merge: ({ organizationId, sourcePostId, targetPostId }: TPostMerge) =>

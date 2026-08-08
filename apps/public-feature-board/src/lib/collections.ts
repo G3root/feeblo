@@ -37,6 +37,35 @@ export function getCurrentOrganizationId() {
 }
 
 /**
+ * Post detail pages are served at `/p/:slug`; parse the slug from the current
+ * URL so the comment/reaction collections can be keyed and fetched when the
+ * query is created without an explicit filter (e.g. from a route loader).
+ */
+function getCurrentPostSlug() {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+
+  const segments = window.location.pathname
+    .split("/")
+    .filter((segment) => segment.length > 0);
+  const postIndex = segments.indexOf("p");
+
+  if (postIndex === -1 || !segments[postIndex + 1]) {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(segments[postIndex + 1]);
+  } catch {
+    // Malformed percent-encoding (e.g. "%" in a post slug) throws; treat the
+    // slug as missing so callers fall back to an unscoped query instead of
+    // crashing the route loader.
+    return undefined;
+  }
+}
+
+/**
  * Mutations are always scoped to the organization hosting this public board.
  * A restricted SSO session must never use a client-supplied entity organization
  * id to act on a different board.
@@ -436,19 +465,22 @@ export const publicCommentCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      return postId
-        ? getOrganizationScopedQueryKey("public-comment", "postId", postId)
+      return slug
+        ? getOrganizationScopedQueryKey("public-comment", "postSlug", slug)
         : getOrganizationScopedQueryKey("public-comment");
     },
     syncMode: "on-demand",
+    staleTime: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      if (!(postId && organizationId)) {
+      if (!(slug && organizationId)) {
         return [];
       }
 
@@ -457,7 +489,7 @@ export const publicCommentCollection = createCollection(
           (rpc) =>
             rpc.CommentListPublic({
               organizationId,
-              postId,
+              slug,
             }),
           { signal: ctx.signal }
         );
@@ -519,29 +551,32 @@ export const publicCommentReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      return postId
+      return slug
         ? getOrganizationScopedQueryKey(
             "public-comment-reaction",
-            "postId",
-            postId
+            "postSlug",
+            slug
           )
         : getOrganizationScopedQueryKey("public-comment-reaction");
     },
     syncMode: "on-demand",
+    staleTime: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      if (!(postId && organizationId)) {
+      if (!(slug && organizationId)) {
         return [];
       }
 
       try {
         const data = await fetchRpc(
-          (rpc) => rpc.CommentReactionListPublic({ organizationId, postId }),
+          (rpc) => rpc.CommentReactionListPublic({ organizationId, slug }),
           { signal: ctx.signal }
         );
 
@@ -635,28 +670,31 @@ export const publicPostReactionCollection = createCollection(
   queryCollectionOptions({
     queryKey: (opts) => {
       const parsed = parseLoadSubsetOptions(opts);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      return postId
+      return slug
         ? getOrganizationScopedQueryKey(
             "public-post-reaction",
-            "postId",
-            postId
+            "postSlug",
+            slug
           )
         : getOrganizationScopedQueryKey("public-post-reaction");
     },
     syncMode: "on-demand",
+    staleTime: Duration.toMillis(Duration.minutes(5)),
     queryFn: async (ctx) => {
       const organizationId = getCurrentOrganizationId();
       const parsed = parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions);
-      const postId = getEqFilterValue(parsed.filters, "postId");
+      const slug =
+        getEqFilterValue(parsed.filters, "postSlug") ?? getCurrentPostSlug();
 
-      if (!(postId && organizationId)) {
+      if (!(slug && organizationId)) {
         return [];
       }
 
       const data = await fetchRpc(
-        (rpc) => rpc.PostReactionListPublic({ organizationId, postId }),
+        (rpc) => rpc.PostReactionListPublic({ organizationId, slug }),
         {
           signal: ctx.signal,
         }

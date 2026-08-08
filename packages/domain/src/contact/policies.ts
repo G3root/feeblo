@@ -26,13 +26,33 @@ const makeContactPolicy = Effect.gen(function* () {
           })
     );
 
+  /**
+   * companyId is written verbatim by the repository; a caller-supplied id from
+   * another organization would create a cross-tenant reference. Succeeds when
+   * no company is set or the company belongs to this organization.
+   */
+  const companyBelongsToOrganization = (args: {
+    organizationId: string;
+    companyId?: string | null | undefined;
+  }) =>
+    Policy.policy(() => {
+      if (args.companyId == null) {
+        return Effect.succeed(true);
+      }
+      return repository.companyExistsInOrganization({
+        id: args.companyId,
+        organizationId: args.organizationId,
+      });
+    });
+
   const canCreate = (args: TContactCreate) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "contacts.create"),
       userIsOrgMember({
         organizationId: args.organizationId,
         userId: args.userId,
-      })
+      }),
+      companyBelongsToOrganization(args)
     );
 
   const canUpdate = (args: TContactUpdate) =>
@@ -42,7 +62,8 @@ const makeContactPolicy = Effect.gen(function* () {
       userIsOrgMember({
         organizationId: args.organizationId,
         userId: args.userId,
-      })
+      }),
+      companyBelongsToOrganization(args)
     );
 
   const canDelete = (args: TContactDelete) =>

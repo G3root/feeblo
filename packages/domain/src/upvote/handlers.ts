@@ -5,9 +5,10 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
-import { CurrentSession } from "../session-middleware";
+import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import { UpvotePolicy } from "./policies";
 import { UpvoteRepository } from "./repository";
 import { UpvoteRpcs } from "./rpcs";
@@ -73,18 +74,28 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Upvote", "update")
       ),
     UpvoteListPublic: (args: TUpvoteList) =>
-      repository
-        .list({
+      Effect.gen(function* () {
+        const sessionOption = yield* OptionalCurrentSession;
+        const sessionUserId =
+          sessionOption._tag === "Some"
+            ? sessionOption.value.session.userId
+            : undefined;
+
+        const upvotes = yield* repository.list({
           organizationId: args.organizationId,
           publicOnly: true,
-        })
-        .pipe(
-          RateLimit.withPublicRpcRateLimit({
-            name: "UpvoteListPublic",
-            level: "read",
-          }),
-          withRemapDbErrors("Upvote", "select")
-        ),
+          ...(args.postId ? { postId: args.postId } : {}),
+        });
+
+        // Never leak internal voter identifiers to public callers.
+        return redactActorIdentities(upvotes, sessionUserId);
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "UpvoteListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Upvote", "select")
+      ),
     UpvoteTogglePublic: (args: TUpvoteToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;

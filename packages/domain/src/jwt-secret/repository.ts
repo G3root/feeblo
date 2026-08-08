@@ -8,7 +8,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { InternalServerError, NotFoundError } from "../rpc-errors";
+import { NotFoundError } from "../rpc-errors";
 
 interface TJwtSecretGetOrCreate {
   organizationId: string;
@@ -54,31 +54,11 @@ const makeJwtSecretRepository = Effect.gen(function* () {
           const active = existing.find((s) => s.revokedAt === null);
           const revoked = existing.filter((s) => s.revokedAt !== null);
 
-          if (!active) {
-            const id = yield* JwtSecretId.generate;
-            const secret = generateSecret();
-            const createdAt = yield* DateTime.nowAsDate;
-
-            const [created] = yield* tx
-              .insert(schema.jwtSecretTable)
-              .values({
-                id,
-                organizationId,
-                secret,
-                createdAt,
-                revokedAt: null,
-              })
-              .returning();
-
-            if (created === undefined) {
-              return yield* new InternalServerError({
-                message: "Failed to create JWT secret",
-              });
-            }
-
-            return [created, ...revoked.slice(0, 1)];
-          }
-
+          // Secret creation is explicit (admin generates one in the settings
+          // UI); merely reading must never materialize a signing secret, so
+          // probing an organization id cannot create one. Return the active
+          // secret (if any) plus the most recent grace-period revoked secret
+          // so tokens minted before a rotation keep verifying for 24h.
           if (revoked.length > 1) {
             yield* tx.delete(schema.jwtSecretTable).where(
               inArray(
@@ -88,7 +68,9 @@ const makeJwtSecretRepository = Effect.gen(function* () {
             );
           }
 
-          return [active, ...revoked.slice(0, 1)];
+          return active
+            ? [active, ...revoked.slice(0, 1)]
+            : revoked.slice(0, 1);
         })
       ),
     revoke: ({ organizationId, secretId }: TJwtSecretRevoke) =>

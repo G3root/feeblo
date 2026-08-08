@@ -134,6 +134,30 @@ const makeContactRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0] !== undefined)),
 
+    /**
+     * A contact's companyId must reference a company inside the same
+     * organization; without this check an authenticated member could create a
+     * dangling cross-tenant reference to another org's company row.
+     */
+    companyExistsInOrganization: ({
+      id,
+      organizationId,
+    }: {
+      id: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ id: schema.companyTable.id })
+        .from(schema.companyTable)
+        .where(
+          and(
+            eq(schema.companyTable.id, id),
+            eq(schema.companyTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0] !== undefined)),
+
     upsertContact: (args: TContactUpsert) =>
       Effect.gen(function* () {
         if (!(args.externalId || args.email)) {

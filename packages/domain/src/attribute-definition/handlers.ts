@@ -123,6 +123,10 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),
+            // Writing contact attribute values writes contact data, so it must
+            // require the same grant as ContactUpdate; otherwise a contributor
+            // with no CRM grants could overwrite SSO-synced attribute values.
+            Policy.canPermission(args.organizationId, "contacts.update"),
             Policy.policy(() =>
               repository.contactExists(args.contactId, args.organizationId)
             ),
@@ -158,6 +162,10 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPolicy(
           Policy.all(
             Policy.hasMembership(args.organizationId),
+            // Writing company attribute values writes company data, so it must
+            // require the same grant as CompanyUpdate; otherwise a contributor
+            // with no CRM grants could overwrite SSO-synced attribute values.
+            Policy.canPermission(args.organizationId, "companies.update"),
             Policy.policy(() =>
               repository.companyExists(args.companyId, args.organizationId)
             ),

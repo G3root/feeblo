@@ -29,7 +29,10 @@ import { PostTagField } from "~/features/post/components/post-tag-field";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
 import {
   boardCollection,
+  commentCollection,
+  commentReactionCollection,
   postCollection,
+  postReactionCollection,
   postStatusCollection,
   postTagCollection,
   tagCollection,
@@ -49,6 +52,9 @@ export const Route = createFileRoute(
       postTagCollection.preload(),
       tagCollection.preload(),
       upvoteCollection.preload(),
+      commentCollection.preload(),
+      commentReactionCollection.preload(),
+      postReactionCollection.preload(),
     ]);
   },
 });

@@ -16,17 +16,27 @@ type TCanUpdate = {
 };
 
 const makeChangelogPolicy = Effect.gen(function* () {
-  yield* ChangelogRepository;
+  const repository = yield* ChangelogRepository;
 
-  //TODO CHECK ORGANIZATION OWNED
   const canCreate = (organizationId: string) =>
     Policy.canPermission(organizationId, "changelog.create");
 
   const canDelete = (args: TCanDelete) =>
     Policy.canPermission(args.organizationId, "changelog.*");
 
+  // The changelog must belong to the caller's organization; changelog ids are
+  // enumerable via public listings, so permission alone would let a manager in
+  // one organization act on another organization's changelog.
   const canUpdate = (args: TCanUpdate) =>
-    Policy.canPermission(args.organizationId, "changelog.*");
+    Policy.all(
+      Policy.canPermission(args.organizationId, "changelog.*"),
+      Policy.policy(() =>
+        repository.existsInOrganization({
+          id: args.changelogId,
+          organizationId: args.organizationId,
+        })
+      )
+    );
 
   return { canCreate, canDelete, canUpdate };
 });

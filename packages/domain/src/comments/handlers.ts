@@ -8,9 +8,10 @@ import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
-import { CurrentSession } from "../session-middleware";
+import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import {
   FailedToDeleteCommentError,
   FailedToUpdateCommentError,
@@ -179,7 +180,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
       repository
         .findMany({
           organizationId: args.organizationId,
-          postId: args.postId,
+          slug: args.slug,
         })
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -187,18 +188,27 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     CommentListPublic: (args: TCommentList) =>
-      repository
-        .findManyPublic({
+      Effect.gen(function* () {
+        const sessionOption = yield* OptionalCurrentSession;
+        const sessionUserId =
+          sessionOption._tag === "Some"
+            ? sessionOption.value.session.userId
+            : undefined;
+
+        const comments = yield* repository.findManyPublic({
           organizationId: args.organizationId,
-          postId: args.postId,
-        })
-        .pipe(
-          RateLimit.withPublicRpcRateLimit({
-            name: "CommentListPublic",
-            level: "read",
-          }),
-          withRemapDbErrors("Comment", "select")
-        ),
+          slug: args.slug,
+        });
+
+        // Never leak internal commenter identifiers to public callers.
+        return redactActorIdentities(comments, sessionUserId);
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "CommentListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Comment", "select")
+      ),
 
     CommentCreate: (args: TCommentCreate) =>
       createCommentEffect(args).pipe(
@@ -207,6 +217,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             visibility: args.visibility,
             postId: args.postId,
+            parentCommentId: args.parentCommentId,
             source: "dashboard",
           })
         ),
@@ -224,6 +235,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             visibility: args.visibility,
             postId: args.postId,
+            parentCommentId: args.parentCommentId,
             source: "public",
           })
         ),

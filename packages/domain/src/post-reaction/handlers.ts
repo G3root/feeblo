@@ -4,9 +4,10 @@ import * as Layer from "effect/Layer";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
+import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
-import { CurrentSession } from "../session-middleware";
+import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
 import type { TPostReactionList, TPostReactionToggle } from "./schema";
@@ -20,7 +21,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
     PostReactionList: (args: TPostReactionList) =>
       repository
         .list({
-          postId: args.postId,
+          slug: args.slug,
           organizationId: args.organizationId,
         })
         .pipe(
@@ -52,18 +53,27 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("PostReaction", "update")
       ),
     PostReactionListPublic: (args: TPostReactionList) =>
-      repository
-        .listPublic({
-          postId: args.postId,
+      Effect.gen(function* () {
+        const sessionOption = yield* OptionalCurrentSession;
+        const sessionUserId =
+          sessionOption._tag === "Some"
+            ? sessionOption.value.session.userId
+            : undefined;
+
+        const reactions = yield* repository.listPublic({
+          slug: args.slug,
           organizationId: args.organizationId,
-        })
-        .pipe(
-          RateLimit.withPublicRpcRateLimit({
-            name: "PostReactionListPublic",
-            level: "read",
-          }),
-          withRemapDbErrors("PostReaction", "select")
-        ),
+        });
+
+        // Never leak internal reactor identifiers to public callers.
+        return redactActorIdentities(reactions, sessionUserId);
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "PostReactionListPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("PostReaction", "select")
+      ),
     PostReactionTogglePublic: (args: TPostReactionToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;

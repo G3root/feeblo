@@ -207,6 +207,14 @@ export const postStatusTable = pgTable(
   ]
 );
 
+/**
+ * Name of the partial unique index enforcing at most one primary roadmap per
+ * organization. Shared with the roadmap repository's unique-violation
+ * fallback so renames stay synchronized with generated migrations.
+ */
+export const ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX =
+  "roadmap_primary_organizationId_uidx";
+
 export const roadmapTable = pgTable(
   "roadmap",
   {
@@ -250,7 +258,7 @@ export const roadmapTable = pgTable(
       table.slug
     ),
     index("roadmap_organizationId_idx").on(table.organizationId),
-    uniqueIndex("roadmap_primary_organizationId_uidx")
+    uniqueIndex(ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX)
       .on(table.organizationId)
       .where(sql`${table.isPrimary}`),
   ]
@@ -501,9 +509,8 @@ export const postTable = pgTable(
       table.id,
       table.organizationId
     ),
-    uniqueIndex("post_organizationId_boardId_slug_uidx").on(
+    uniqueIndex("post_organizationId_slug_uidx").on(
       table.organizationId,
-      table.boardId,
       table.slug
     ),
     check(

@@ -67,13 +67,31 @@ describe("JwtSecretRpcHandlers", () => {
   );
 
   layer(TestLayer)("handlers", (it) => {
-    it.effect("creates and returns the active secret for owners", () =>
+    it.effect("returns an empty list until a secret is generated", () =>
       Effect.gen(function* () {
         const handlers = yield* JwtSecretRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const secrets = yield* handlers
           .JwtSecretList({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        // Reading must never materialize a signing secret.
+        expect(secrets).toHaveLength(0);
+      })
+    );
+
+    it.effect("creates the active secret on first rotation", () =>
+      Effect.gen(function* () {
+        const handlers = yield* JwtSecretRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+
+        yield* handlers
+          .JwtSecretRotate({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const secrets = yield* handlers
+          .JwtSecretList({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
         expect(secrets).toHaveLength(1);
         expect(secrets[0]).toMatchObject({
           organizationId: fixture.organizationId,
@@ -106,9 +124,15 @@ describe("JwtSecretRpcHandlers", () => {
         const handlers = yield* JwtSecretRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const session = makeSession(fixture, "admin");
+
+        // Generate the initial secret first (creation is explicit now).
+        yield* handlers
+          .JwtSecretRotate({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
         const initial = yield* handlers
           .JwtSecretList({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         yield* handlers
           .JwtSecretRotate({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));

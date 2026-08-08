@@ -43,7 +43,6 @@ import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
 import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import { ServerConfig } from "./config";
 import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
-import { corsVaryFix } from "./middlewares/cors-vary";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
 
@@ -78,21 +77,20 @@ const BetterAuthRouterLive = HttpRouter.use((router) =>
   })
 );
 
-const OgImageRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
-  HttpRouter.use((router) =>
-    Effect.gen(function* () {
-      const ogImageService = yield* OgImageService;
-      return yield* router.add("GET", "/og-image", (request) =>
-        handleOgImage(request).pipe(
-          Effect.provideService(OgImageService, ogImageService)
-        )
-      );
-    })
-  ).pipe(
-    Layer.provide(OgImageService.layer),
-    Layer.provide(Database.DatabaseContextLive),
-    Layer.orDie
-  );
+const OgImageRouterLive = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const ogImageService = yield* OgImageService;
+    return yield* router.add("GET", "/og-image", (request) =>
+      handleOgImage(request).pipe(
+        Effect.provideService(OgImageService, ogImageService)
+      )
+    );
+  })
+).pipe(
+  Layer.provide(OgImageService.layer),
+  Layer.provide(Database.DatabaseContextLive),
+  Layer.orDie
+);
 
 const DocsRoute = HttpApiScalar.layer(Api, {
   path: "/docs",
@@ -184,8 +182,7 @@ const program = Effect.gen(function* () {
           e2eRoadmapSeedRouter
         )
       : RootRouter;
-  const PublicRouters: Layer.Layer<never, never, HttpRouter.HttpRouter> =
-    Layer.merge(RootRouterLive, OgImageRouterLive);
+  const PublicRouters = Layer.merge(RootRouterLive, OgImageRouterLive);
   const isLocalDevHost = (host: string): boolean =>
     host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost");
 
@@ -252,8 +249,7 @@ const program = Effect.gen(function* () {
         }),
         { global: true }
       )
-    ),
-    Layer.provide(corsVaryFix)
+    )
   );
 
   const server = HttpRouter.serve(AllRoutes, {

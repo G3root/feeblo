@@ -438,9 +438,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         assetIds: args.assetIds,
       });
 
-      yield* transaction(
+      const slug = yield* transaction(
         Effect.gen(function* () {
-          yield* repository.create({
+          const persistedSlug = yield* repository.create({
             ...args,
             content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
@@ -488,6 +488,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                   : {}),
               }),
           });
+
+          return persistedSlug;
         })
       ).pipe(
         Effect.tapCause(() =>
@@ -517,6 +519,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         organizationId: args.organizationId,
         title: args.title,
       });
+
+      // The slug actually persisted by the insert (including any collision
+      // suffix) so callers can reference the stored post.
+      return slug;
     });
 
   // -- RPC handlers --

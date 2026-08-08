@@ -8,7 +8,10 @@ export const Comment = S.Struct({
   updatedAt: S.DateFromString,
   organizationId: S.String,
   postId: S.String,
-  userId: S.String,
+  /** Denormalized post slug; unique per organization (post_organizationId_slug_uidx). */
+  postSlug: S.String,
+  /** Null on public endpoints for commenters other than the session user. */
+  userId: S.NullOr(S.String),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([S.String, S.Null]),
   memberId: S.Union([S.String, S.Null]),
@@ -21,7 +24,7 @@ export type TComment = S.Schema.Type<typeof Comment>;
 
 export const CommentList = S.Struct({
   organizationId: S.String,
-  postId: S.String,
+  slug: S.String,
 });
 
 export type TCommentList = S.Schema.Type<typeof CommentList>;

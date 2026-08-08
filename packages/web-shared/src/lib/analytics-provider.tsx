@@ -81,6 +81,7 @@ export interface AnalyticsEvents {
 
   // ── SSO ──────────────────────────────────────────────────────────────────
   sso_secret_copied: { success: boolean };
+  sso_secret_generated: { success: boolean };
   sso_secret_revoked: { success: boolean };
   sso_secret_rotated: { success: boolean };
 }
