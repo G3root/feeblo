@@ -14,14 +14,22 @@ const sdkBundlePath = fileURLToPath(
 
 function signWidgetToken(
   secret: string,
-  identity: { email: string; name: string; userId: string }
+  identity: { email: string; name: string; userId: string },
+  organizationId: string
 ) {
   const header = Buffer.from(
     JSON.stringify({ alg: "HS256", typ: "JWT" })
   ).toString("base64url");
   const now = Math.floor(Date.now() / 1000);
   const payload = Buffer.from(
-    JSON.stringify({ ...identity, iat: now, exp: now + 5 * 60 })
+    JSON.stringify({
+      ...identity,
+      iat: now,
+      exp: now + 5 * 60,
+      // Pins the token to exactly one workspace: the server rejects tokens
+      // without (or with a mismatched) aud claim.
+      aud: organizationId,
+    })
   ).toString("base64url");
   const unsignedToken = `${header}.${payload}`;
   const signature = createHmac("sha256", secret)
@@ -59,7 +67,29 @@ test(
           origin: baseURL,
         });
       await page.goto(`/${organizationId}/settings/security`);
-      await page.getByRole("button", { name: "Copy Secret" }).click();
+
+      // Secret creation is explicit: a fresh workspace has no active JWT
+      // secret, so the page offers "Generate Secret" until an admin creates
+      // one. Generate it when needed so the "Copy Secret" button is present.
+      const copySecretButton = page.getByRole("button", {
+        name: "Copy Secret",
+      });
+      const generateSecretButton = page.getByRole("button", {
+        name: "Generate Secret",
+      });
+      await Promise.race([
+        copySecretButton.waitFor({ state: "visible" }),
+        generateSecretButton.waitFor({ state: "visible" }),
+      ]);
+      if (await generateSecretButton.isVisible()) {
+        await generateSecretButton.click();
+        await expect(
+          page.getByText("Secret generated successfully")
+        ).toBeVisible();
+        await expect(copySecretButton).toBeVisible();
+      }
+
+      await copySecretButton.click();
       await expect(page.getByText("Secret copied to clipboard")).toBeVisible();
     });
 
@@ -78,7 +108,7 @@ test(
       name: "Widget SSO Visitor",
       email: `widget-${randomUUID().slice(0, 12)}@feeblo.dev`,
     };
-    const token = signWidgetToken(secret, visitor);
+    const token = signWidgetToken(secret, visitor, organizationId);
     const feedbackTitle = `Widget feedback ${randomUUID().slice(0, 8)}`;
     const feedbackContent =
       "Submitted from the embedded feedback widget by an identified user.";
