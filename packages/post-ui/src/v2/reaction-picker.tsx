@@ -276,7 +276,7 @@ export function PostReactionPicker() {
   );
 
   const currentUserReactions = useLastKnownUserReactions(
-    postSlug,
+    `${postSlug}:${organizationId}:${session?.user?.id ?? "anonymous"}`,
     userReactions
   );
 
@@ -439,7 +439,7 @@ export function CommentReactionPicker({
   );
 
   const currentUserReactions = useLastKnownUserReactions(
-    `${postSlug}:${commentId}`,
+    `${postSlug}:${commentId}:${organizationId}:${session?.user?.id ?? "anonymous"}`,
     userReactions
   );
 
