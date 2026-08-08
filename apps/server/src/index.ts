@@ -8,6 +8,7 @@ import {
 } from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
+import { ClientIpGlobalMiddlewareLive } from "@feeblo/domain/client-ip";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
@@ -249,7 +250,11 @@ const program = Effect.gen(function* () {
         }),
         { global: true }
       )
-    )
+    ),
+    // Provides the peer-anchored client IP (socket remoteAddress) to every
+    // route, including RPC middleware, so public rate limits are keyed on an
+    // IP the client cannot spoof via forwarding headers.
+    Layer.provide(ClientIpGlobalMiddlewareLive)
   );
 
   const server = HttpRouter.serve(AllRoutes, {
