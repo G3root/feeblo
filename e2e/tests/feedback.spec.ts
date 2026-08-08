@@ -49,6 +49,18 @@ async function openPost(page: Page, title: string) {
   await expect(page.getByLabel("Post Title")).toHaveValue(title);
 }
 
+/** Resolves when the given subscription RPC completes on the wire. */
+function waitForSubscriptionRpc(
+  page: Page,
+  method: "PostSubscriptionCreate" | "PostSubscriptionDelete"
+) {
+  return page.waitForResponse(
+    (response) =>
+      response.url().includes("/rpc") &&
+      Boolean(response.request().postData()?.includes(method))
+  );
+}
+
 async function chooseFirstReaction(page: Page) {
   await page.getByRole("button", { name: "Add reaction" }).first().click();
   await page
@@ -182,14 +194,27 @@ test.describe("feedback workflow", () => {
     await expect(unsubscribeButton).toBeVisible();
 
     // Unsubscribe, then re-subscribe.
+    const deleteRpc = waitForSubscriptionRpc(page, "PostSubscriptionDelete");
     await unsubscribeButton.click();
     const subscribeButton = page.getByRole("button", {
       name: "Subscribe",
       exact: true,
     });
     await expect(subscribeButton).toBeVisible();
+    // Wait for the RPC to settle so the reload cannot race it.
+    await deleteRpc;
 
+    // Reload to verify the unsubscribe persisted on the server.
+    await page.reload();
+    await expect(subscribeButton).toBeVisible();
+
+    const createRpc = waitForSubscriptionRpc(page, "PostSubscriptionCreate");
     await subscribeButton.click();
+    await expect(unsubscribeButton).toBeVisible();
+    await createRpc;
+
+    // Reload to verify the re-subscribe persisted on the server.
+    await page.reload();
     await expect(unsubscribeButton).toBeVisible();
   });
 });

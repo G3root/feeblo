@@ -1,11 +1,13 @@
 import { PostSubscriptionId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
+import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { getPostSubscriptionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { BellIcon, BellOffIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { useRef } from "react";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -33,6 +35,9 @@ export function SubscribeButton({ variant = "default" }: SubscribeButtonProps) {
   } = usePostCollections();
 
   const postId = post.id;
+  // Re-entrancy guard: blocks a second toggle while the previous mutation is
+  // still persisting. A ref avoids re-rendering the button on every toggle.
+  const isPersistingRef = useRef(false);
   const disabled = isLocked;
 
   const { data: hasUserSubscribed, isLoading: isSubscriptionLoading } =
@@ -67,37 +72,53 @@ export function SubscribeButton({ variant = "default" }: SubscribeButtonProps) {
       return;
     }
 
+    if (isPersistingRef.current) {
+      return;
+    }
+
     if (!session) {
       onAuthRequired?.();
       return;
     }
 
-    const userId = session.user.id;
-    const key = getPostSubscriptionCollectionKey({ userId, postId });
+    // A rejected persistence is caught below so the error does not escape
+    // unhandled; the optimistic flip is rolled back by the collection.
+    isPersistingRef.current = true;
+    try {
+      const userId = session.user.id;
+      const key = getPostSubscriptionCollectionKey({ userId, postId });
 
-    if (postSubscriptionCollection.has(key)) {
-      const transaction = postSubscriptionCollection.delete(key);
+      if (postSubscriptionCollection.has(key)) {
+        const transaction = postSubscriptionCollection.delete(key);
+        await transaction.isPersisted.promise;
+        return;
+      }
+
+      const membership = session.memberships.find(
+        (value) =>
+          value.organizationId === organizationId &&
+          value.userId === session.user.id
+      );
+
+      const id = await PostSubscriptionId.unsafeGenerate();
+      const transaction = postSubscriptionCollection.insert({
+        id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        organizationId,
+        postId,
+        userId,
+        memberId: membership?.membershipId ?? null,
+      });
       await transaction.isPersisted.promise;
-      return;
+    } catch (_error) {
+      toastManager.add({
+        title: "Failed to update subscription",
+        type: "error",
+      });
+    } finally {
+      isPersistingRef.current = false;
     }
-
-    const membership = session.memberships.find(
-      (value) =>
-        value.organizationId === organizationId &&
-        value.userId === session.user.id
-    );
-
-    const id = await PostSubscriptionId.unsafeGenerate();
-    const transaction = postSubscriptionCollection.insert({
-      id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      organizationId,
-      postId,
-      userId,
-      memberId: membership?.membershipId ?? null,
-    });
-    await transaction.isPersisted.promise;
   };
 
   const label = isSubscribed ? "Unsubscribe" : "Subscribe";
