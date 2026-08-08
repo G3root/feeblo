@@ -2,16 +2,18 @@ import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
-  SelectPopup,
   SelectItem,
+  SelectPopup,
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
 import {
   Sheet,
-  SheetPopup,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
+  SheetPanel,
+  SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
 import { Switch } from "@feeblo/ui/switch";
@@ -61,7 +63,7 @@ export function CustomAttributeEditDialog() {
             Update the settings for this custom attribute.
           </SheetDescription>
         </SheetHeader>
-        <div className="p-4">{open ? <CustomAttributeEditForm /> : null}</div>
+        {open ? <CustomAttributeEditForm /> : null}
       </SheetPopup>
     </Sheet>
   );
@@ -146,13 +148,15 @@ function CustomAttributeEditForm() {
 
   return (
     <form
+      className="contents"
+      data-slot="form"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <div className="space-y-5">
+      <SheetPanel className="grid gap-4">
         <form.AppField
           children={(field) => <field.TextField label="Name" />}
           name="name"
@@ -203,12 +207,12 @@ function CustomAttributeEditForm() {
           )}
           name="isRequired"
         />
-      </div>
-      <div className="fixed right-2 bottom-8 w-full sm:max-w-92.5">
+      </SheetPanel>
+      <SheetFooter>
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Save changes" />
+          <form.SubscribeButton label="Save changes" />
         </form.AppForm>
-      </div>
+      </SheetFooter>
     </form>
   );
 }

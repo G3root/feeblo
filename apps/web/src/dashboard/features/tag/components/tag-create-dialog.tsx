@@ -1,12 +1,16 @@
 import { TagId } from "@feeblo/id";
-import { useAppForm } from "@feeblo/ui/hooks/form";
+import { Button } from "@feeblo/ui/button";
 import {
-  Sheet,
-  SheetDescription,
-  SheetHeader,
-  SheetPopup,
-  SheetTitle,
-} from "@feeblo/ui/sheet";
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@feeblo/ui/dialog";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
 import { useSelector } from "@xstate/store-react";
@@ -32,19 +36,17 @@ export function TagCreateDialog({
   const open = useSelector(store, (state) => state.context.open);
 
   return (
-    <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetPopup>
-        <SheetHeader>
-          <SheetTitle>Create Tag</SheetTitle>
-          <SheetDescription>
+    <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
+      <DialogPopup>
+        <DialogHeader>
+          <DialogTitle>Create Tag</DialogTitle>
+          <DialogDescription>
             Create a new tag for this workspace.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="p-4">
-          <TagCreateForm onCreated={onCreated} />
-        </div>
-      </SheetPopup>
-    </Sheet>
+          </DialogDescription>
+        </DialogHeader>
+        <TagCreateForm onCreated={onCreated} />
+      </DialogPopup>
+    </Dialog>
   );
 }
 
@@ -105,22 +107,26 @@ function TagCreateForm({
 
   return (
     <form
+      className="contents"
+      data-slot="form"
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <form.AppField
-        children={(field) => <field.TextField label="Name" />}
-        name="name"
-      />
-
-      <div className="fixed right-2 bottom-8 w-full sm:max-w-[370px]">
+      <DialogPanel className="grid gap-4">
+        <form.AppField
+          children={(field) => <field.TextField label="Name" />}
+          name="name"
+        />
+      </DialogPanel>
+      <DialogFooter>
+        <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Save" />
+          <form.SubscribeButton label="Save" />
         </form.AppForm>
-      </div>
+      </DialogFooter>
     </form>
   );
 }

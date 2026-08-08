@@ -16,6 +16,7 @@ import {
   SheetDescription,
   SheetFooter,
   SheetHeader,
+  SheetPanel,
   SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
@@ -146,14 +147,15 @@ function CustomAttributeCreateForm({
 
   return (
     <form
-      className="flex min-h-0 flex-1 flex-col"
+      className="contents"
+      data-slot="form"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <div className="flex-1 space-y-5 overflow-y-auto px-6 py-2">
+      <SheetPanel className="grid gap-4">
         <form.AppField
           children={(field) => (
             <field.TextField
@@ -237,10 +239,10 @@ function CustomAttributeCreateForm({
           )}
           name="isRequired"
         />
-      </div>
+      </SheetPanel>
       <SheetFooter>
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Create attribute" />
+          <form.SubscribeButton label="Create attribute" />
         </form.AppForm>
       </SheetFooter>
     </form>

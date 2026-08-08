@@ -14,7 +14,9 @@ import {
 import {
   Sheet,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
+  SheetPanel,
   SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
@@ -47,7 +49,7 @@ export function ContactEditDialog() {
           <SheetTitle>Edit contact</SheetTitle>
           <SheetDescription>Update this person's details.</SheetDescription>
         </SheetHeader>
-        <div className="p-4">{open ? <ContactEditForm /> : null}</div>
+        {open ? <ContactEditForm /> : null}
       </SheetPopup>
     </Sheet>
   );
@@ -196,13 +198,15 @@ function ContactEditFormFields({
 
   return (
     <form
+      className="contents"
+      data-slot="form"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <div className="space-y-4">
+      <SheetPanel className="grid gap-4">
         <form.AppField
           children={(field) => <field.TextField label="Name" />}
           name="name"
@@ -267,10 +271,12 @@ function ContactEditFormFields({
             />
           )}
         </form.Subscribe>
+      </SheetPanel>
+      <SheetFooter>
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Save changes" />
+          <form.SubscribeButton label="Save changes" />
         </form.AppForm>
-      </div>
+      </SheetFooter>
     </form>
   );
 }

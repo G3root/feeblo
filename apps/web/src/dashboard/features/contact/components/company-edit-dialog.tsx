@@ -8,7 +8,9 @@ import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
+  SheetPanel,
   SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
@@ -44,9 +46,7 @@ export function CompanyEditDialog() {
             {mode === "display" ? "Company details" : "Update company name."}
           </SheetDescription>
         </SheetHeader>
-        <div className="p-4">
-          {open ? <CompanyEditFormLoader mode={mode} /> : null}
-        </div>
+        {open ? <CompanyEditFormLoader mode={mode} /> : null}
       </SheetPopup>
     </Sheet>
   );
@@ -182,13 +182,15 @@ function CompanyEditForm({
 
   return (
     <form
+      className="contents"
+      data-slot="form"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <div className="space-y-4">
+      <SheetPanel className="grid gap-4">
         <form.AppField
           children={(field) => (
             <field.TextField disabled={isDisplay} label="Name" />
@@ -214,9 +216,10 @@ function CompanyEditForm({
             />
           )}
         </form.Subscribe>
+      </SheetPanel>
+      <SheetFooter>
         {isDisplay ? (
           <Button
-            className="w-full"
             onClick={() => {
               const currentData = store.getSnapshot().context.data;
               store.send({
@@ -230,10 +233,10 @@ function CompanyEditForm({
           </Button>
         ) : (
           <form.AppForm>
-            <form.SubscribeButton className="w-full" label="Save changes" />
+            <form.SubscribeButton label="Save changes" />
           </form.AppForm>
         )}
-      </div>
+      </SheetFooter>
     </form>
   );
 }

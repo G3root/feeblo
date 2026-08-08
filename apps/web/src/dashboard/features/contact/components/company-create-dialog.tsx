@@ -3,7 +3,9 @@ import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Sheet,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
+  SheetPanel,
   SheetPopup,
   SheetTitle,
 } from "@feeblo/ui/sheet";
@@ -34,9 +36,7 @@ export function CompanyCreateDialog() {
           <SheetTitle>Create company</SheetTitle>
           <SheetDescription>Add a company to this workspace.</SheetDescription>
         </SheetHeader>
-        <div className="p-4">
-          <CompanyCreateForm />
-        </div>
+        <CompanyCreateForm />
       </SheetPopup>
     </Sheet>
   );
@@ -125,13 +125,15 @@ function CompanyCreateForm() {
 
   return (
     <form
+      className="contents"
+      data-slot="form"
       onSubmit={(event) => {
         event.preventDefault();
         event.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <div className="space-y-4">
+      <SheetPanel className="grid gap-4">
         <form.AppField
           children={(field) => <field.TextField label="Name" />}
           name="name"
@@ -152,10 +154,12 @@ function CompanyCreateForm() {
             />
           )}
         </form.Subscribe>
+      </SheetPanel>
+      <SheetFooter>
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Create company" />
+          <form.SubscribeButton label="Create company" />
         </form.AppForm>
-      </div>
+      </SheetFooter>
     </form>
   );
 }

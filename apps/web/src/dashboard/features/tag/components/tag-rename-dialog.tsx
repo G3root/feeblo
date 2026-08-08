@@ -1,16 +1,20 @@
+import { Button } from "@feeblo/ui/button";
 import {
-  Sheet,
-  SheetPopup,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@feeblo/ui/sheet";
+  Dialog,
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@feeblo/ui/dialog";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
-import { useAppForm } from "@feeblo/ui/hooks/form";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 import { useTagEditDialogContext } from "../dialog-stores";
@@ -20,15 +24,15 @@ export function TagRenameDialog() {
   const open = useSelector(store, (state) => state.context.open);
 
   return (
-    <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <SheetPopup>
-        <SheetHeader>
-          <SheetTitle>Rename Tag</SheetTitle>
-          <SheetDescription>Rename the tag to a new name.</SheetDescription>
-        </SheetHeader>
-        <div className="p-4">{open ? <TagRenameForm /> : null}</div>
-      </SheetPopup>
-    </Sheet>
+    <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
+      <DialogPopup>
+        <DialogHeader>
+          <DialogTitle>Rename Tag</DialogTitle>
+          <DialogDescription>Rename the tag to a new name.</DialogDescription>
+        </DialogHeader>
+        {open ? <TagRenameForm /> : null}
+      </DialogPopup>
+    </Dialog>
   );
 }
 
@@ -90,22 +94,26 @@ function TagRenameForm() {
 
   return (
     <form
+      className="contents"
+      data-slot="form"
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <form.AppField
-        children={(field) => <field.TextField label="Name" />}
-        name="name"
-      />
-
-      <div className="fixed right-2 bottom-8 w-full sm:max-w-[370px]">
+      <DialogPanel className="grid gap-4">
+        <form.AppField
+          children={(field) => <field.TextField label="Name" />}
+          name="name"
+        />
+      </DialogPanel>
+      <DialogFooter>
+        <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>
         <form.AppForm>
-          <form.SubscribeButton className="w-full" label="Save" />
+          <form.SubscribeButton label="Save" />
         </form.AppForm>
-      </div>
+      </DialogFooter>
     </form>
   );
 }
