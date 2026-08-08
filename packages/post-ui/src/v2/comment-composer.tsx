@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@feeblo/ui/tooltip";
+import { cn } from "@feeblo/ui/utils";
 import { CircleLockIcon, CircleUnlockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, type ReactNode, use, useState } from "react";
@@ -18,17 +19,21 @@ type CommentComposerState = {
   isPrivate: boolean;
   placeholder: string;
   resetKey: number;
+  showVisibilityToggle: boolean;
 };
 
 type CommentComposerActions = {
+  onCancel?: () => void;
   onContentChange: (content: string) => void;
   onSubmit?: () => void;
   onVisibilityChange: (isPrivate: boolean) => void;
 };
 
 type CommentComposerMeta = {
+  cancelLabel: string;
   privateLabel: string;
   publicLabel: string;
+  submitLabel?: string;
 };
 
 type CommentComposerContextValue = {
@@ -52,9 +57,11 @@ function useCommentComposer() {
 
 export type CommentComposerProviderProps = {
   children?: ReactNode;
+  cancelLabel?: string;
   content?: string;
   disabled?: boolean;
   isPrivate?: boolean;
+  onCancel?: () => void;
   onContentChange?: (content: string) => void;
   onSubmit?: () => void;
   onVisibilityChange?: (isPrivate: boolean) => void;
@@ -62,13 +69,17 @@ export type CommentComposerProviderProps = {
   privateLabel?: string;
   publicLabel?: string;
   resetKey?: number;
+  showVisibilityToggle?: boolean;
+  submitLabel?: string;
 };
 
 function CommentComposerProvider({
   children,
+  cancelLabel = "Cancel",
   content = "",
   disabled = false,
   isPrivate = false,
+  onCancel,
   onContentChange,
   onSubmit,
   onVisibilityChange,
@@ -76,16 +87,19 @@ function CommentComposerProvider({
   privateLabel = "Internal",
   publicLabel = "Public",
   resetKey = 0,
+  showVisibilityToggle = true,
+  submitLabel,
 }: CommentComposerProviderProps) {
   return (
     <CommentComposerContext
       value={{
         actions: {
+          onCancel,
           onContentChange: onContentChange ?? (() => {}),
           onSubmit,
           onVisibilityChange: onVisibilityChange ?? (() => {}),
         },
-        meta: { privateLabel, publicLabel },
+        meta: { cancelLabel, privateLabel, publicLabel, submitLabel },
         state: {
           content,
           disabled,
@@ -94,6 +108,7 @@ function CommentComposerProvider({
             placeholder ??
             (isPrivate ? "Add an internal note..." : "Add a comment..."),
           resetKey,
+          showVisibilityToggle,
         },
       }}
     >
@@ -106,8 +121,12 @@ function CommentComposerEditor() {
   const { actions, state } = useCommentComposer();
 
   return (
-    <EditorProvider key={state.resetKey}>
+    <EditorProvider
+      defaultValue={{ postContent: state.content }}
+      key={state.resetKey}
+    >
       <Editor
+        className="text-sm"
         minimal
         onChange={(doc) => actions.onContentChange(doc)}
         placeholder={state.placeholder}
@@ -164,26 +183,43 @@ function SubmitButton() {
           }
         : {})}
     >
-      {state.isPrivate
-        ? `Comment ${meta.privateLabel}`
-        : `Comment ${meta.publicLabel}`}
+      {meta.submitLabel ??
+        (state.isPrivate
+          ? `Comment ${meta.privateLabel}`
+          : `Comment ${meta.publicLabel}`)}
     </Button>
   );
 }
 
 function CommentComposerSubmit() {
+  const { actions, meta, state } = useCommentComposer();
+
   return (
-    <div className="flex items-center justify-between pt-2">
-      <VisibilityToggle />
-      <SubmitButton />
+    <div
+      className={cn(
+        "flex items-center pt-2",
+        state.showVisibilityToggle ? "justify-between" : "justify-end"
+      )}
+    >
+      {state.showVisibilityToggle ? <VisibilityToggle /> : null}
+      <div className="flex items-center gap-2">
+        {actions.onCancel ? (
+          <Button onClick={actions.onCancel} size="sm" variant="ghost">
+            {meta.cancelLabel}
+          </Button>
+        ) : null}
+        <SubmitButton />
+      </div>
     </div>
   );
 }
 
 type CommentComposerRootProps = {
+  cancelLabel?: string;
   content?: string;
   disabled?: boolean;
   isPrivate?: boolean;
+  onCancel?: () => void;
   onContentChange?: (content: string) => void;
   onSubmit?: (value: {
     content: string;
@@ -193,18 +229,24 @@ type CommentComposerRootProps = {
   placeholder?: string;
   privateLabel?: string;
   publicLabel?: string;
+  showVisibilityToggle?: boolean;
+  submitLabel?: string;
 };
 
 function CommentComposerComponent({
+  cancelLabel,
   content: externalContent,
   disabled,
   isPrivate: externalIsPrivate,
+  onCancel,
   onContentChange: externalOnContentChange,
   onSubmit,
   onVisibilityChange: externalOnVisibilityChange,
   placeholder,
   privateLabel,
   publicLabel,
+  showVisibilityToggle,
+  submitLabel,
 }: CommentComposerRootProps) {
   const [internalContent, setInternalContent] = useState(externalContent ?? "");
   const [internalIsPrivate, setInternalIsPrivate] = useState(
@@ -249,9 +291,11 @@ function CommentComposerComponent({
 
   return (
     <CommentComposerProvider
+      cancelLabel={cancelLabel}
       content={content}
       disabled={disabled}
       isPrivate={isPrivate}
+      onCancel={onCancel}
       onContentChange={handleContentChange}
       onSubmit={onSubmit ? handleSubmit : undefined}
       onVisibilityChange={handleVisibilityChange}
@@ -259,6 +303,8 @@ function CommentComposerComponent({
       privateLabel={privateLabel}
       publicLabel={publicLabel}
       resetKey={resetKey}
+      showVisibilityToggle={showVisibilityToggle}
+      submitLabel={submitLabel}
     >
       <div className="rounded-md border border-border p-3">
         <CommentComposerEditor />

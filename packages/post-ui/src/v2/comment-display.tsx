@@ -1,10 +1,13 @@
 import type { TComment } from "@feeblo/domain/src/comments/schema.js";
+import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
+import { Card } from "@feeblo/ui/card";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
+  CircleLockIcon,
   Delete02Icon,
   Edit01Icon,
   Ellipsis,
@@ -59,17 +62,23 @@ type CommentDisplayState = {
   createdAt: Date;
   disabled: boolean;
   isAuthor: boolean;
+  isEditing: boolean;
   isInternal: boolean;
 };
 
 type CommentDisplayActions = {
+  onCancelEdit: () => void;
   onDelete: () => void;
-  onEdit: () => void;
   onReply: (value: {
     content: string;
     isPrivate: boolean;
   }) => void | Promise<void>;
+  onStartEdit: () => void;
   onToggleVisibility: () => void;
+  onUpdate: (value: {
+    content: string;
+    isPrivate: boolean;
+  }) => void | Promise<void>;
 };
 
 type CommentDisplayMeta = {
@@ -112,14 +121,20 @@ type CommentDisplayProviderProps = {
   disabled?: boolean;
   editLabel?: string;
   isAuthor?: boolean;
+  isEditing?: boolean;
   isInternal?: boolean;
+  onCancelEdit?: () => void;
   onDelete: () => void;
-  onEdit?: () => void;
   onReply: (value: {
     content: string;
     isPrivate: boolean;
   }) => void | Promise<void>;
+  onStartEdit?: () => void;
   onToggleVisibility?: () => void;
+  onUpdate?: (value: {
+    content: string;
+    isPrivate: boolean;
+  }) => void | Promise<void>;
   replyLabel?: string;
   toggleToInternalLabel?: string;
   toggleToPublicLabel?: string;
@@ -137,11 +152,14 @@ function CommentDisplayProvider({
   disabled = false,
   editLabel = "Edit",
   isAuthor = false,
+  isEditing = false,
   isInternal = false,
+  onCancelEdit = () => undefined,
   onDelete,
-  onEdit = () => {},
   onReply,
-  onToggleVisibility = () => {},
+  onStartEdit = () => undefined,
+  onToggleVisibility = () => undefined,
+  onUpdate = () => undefined,
   replyLabel = "Reply",
   toggleToInternalLabel = "Make internal",
   toggleToPublicLabel = "Make public",
@@ -150,10 +168,12 @@ function CommentDisplayProvider({
     <CommentDisplayContext
       value={{
         actions: {
+          onCancelEdit,
           onDelete,
-          onEdit,
           onReply,
+          onStartEdit,
           onToggleVisibility,
+          onUpdate,
         },
         meta: {
           deleteLabel,
@@ -169,6 +189,7 @@ function CommentDisplayProvider({
           createdAt,
           disabled,
           isAuthor,
+          isEditing,
           isInternal,
           postId,
           postSlug,
@@ -196,9 +217,9 @@ function CommentDisplayHeader() {
         {formatRelativeTime(state.createdAt)}
       </span>
       {state.isInternal && (
-        <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary text-xs">
-          Internal
-        </span>
+        <Badge variant="info">
+          <HugeiconsIcon icon={CircleLockIcon} /> Internal
+        </Badge>
       )}
     </div>
   );
@@ -207,12 +228,50 @@ function CommentDisplayHeader() {
 function CommentDisplayBody() {
   const { state } = useCommentDisplay();
 
+  if (state.isEditing) {
+    return <CommentDisplayEditForm />;
+  }
+
   return <MarkdownContent className="mt-1 text-sm" content={state.content} />;
+}
+
+function CommentDisplayEditForm() {
+  const { actions, state } = useCommentDisplay();
+  const [content, setContent] = useState(state.content);
+  const [isPrivate, setIsPrivate] = useState(state.isInternal);
+
+  return (
+    <div className="mt-2">
+      <CommentComposer
+        content={content}
+        isPrivate={isPrivate}
+        onCancel={actions.onCancelEdit}
+        onContentChange={setContent}
+        onSubmit={async ({
+          content: submittedContent,
+          isPrivate: submittedIsPrivate,
+        }) => {
+          await actions.onUpdate({
+            content: submittedContent,
+            isPrivate: submittedIsPrivate,
+          });
+          actions.onCancelEdit();
+        }}
+        onVisibilityChange={setIsPrivate}
+        showVisibilityToggle={false}
+        submitLabel="Save"
+      />
+    </div>
+  );
 }
 
 function CommentDisplayActions() {
   const { actions, state } = useCommentDisplay();
   const [isReplying, setIsReplying] = useState(false);
+
+  if (state.isEditing) {
+    return null;
+  }
 
   return (
     <>
@@ -271,10 +330,10 @@ function DeleteButton() {
 }
 
 function EditButton() {
-  const { meta, actions } = useCommentDisplay();
+  const { actions, meta } = useCommentDisplay();
 
   return (
-    <MenuItem onClick={actions.onEdit}>
+    <MenuItem onClick={actions.onStartEdit}>
       <HugeiconsIcon icon={Edit01Icon} />
       {meta.editLabel}
     </MenuItem>
@@ -339,16 +398,17 @@ type CommentDisplayRootProps = Omit<CommentDisplayProviderProps, "children"> & {
 };
 
 function CommentDisplayComponent(props: CommentDisplayRootProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
   return (
-    <CommentDisplayProvider {...props}>
-      <div
-        className={
-          props.isInternal
-            ? "rounded-2xl border border-border bg-primary/5 p-4"
-            : "rounded-2xl border border-border p-4"
-        }
-      >
-        <div className="flex items-start gap-3">
+    <CommentDisplayProvider
+      {...props}
+      isEditing={isEditing}
+      onCancelEdit={() => setIsEditing(false)}
+      onStartEdit={() => setIsEditing(true)}
+    >
+      <Card>
+        <div className="flex items-start gap-3 p-4">
           <CommentDisplayAvatar />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between">
@@ -359,7 +419,7 @@ function CommentDisplayComponent(props: CommentDisplayRootProps) {
             <CommentDisplayActions />
           </div>
         </div>
-      </div>
+      </Card>
     </CommentDisplayProvider>
   );
 }
@@ -414,6 +474,10 @@ interface CommentDisplayItemProps {
 }
 
 function CommentDisplayitem({ data, currentUserId }: CommentDisplayItemProps) {
+  const {
+    collections: { commentCollection },
+  } = usePostCollections();
+
   return (
     <CommentDisplayComponent
       authorName={data.user.name}
@@ -424,6 +488,13 @@ function CommentDisplayitem({ data, currentUserId }: CommentDisplayItemProps) {
       isInternal={data.visibility === "INTERNAL"}
       onDelete={() => {}}
       onReply={() => {}}
+      onUpdate={async ({ content, isPrivate }) => {
+        const tx = commentCollection.update(data.id, (draft) => {
+          draft.content = content;
+          draft.visibility = isPrivate ? "INTERNAL" : "PUBLIC";
+        });
+        await tx.isPersisted.promise;
+      }}
       postId={data.postId}
       postSlug={data.postSlug}
     />

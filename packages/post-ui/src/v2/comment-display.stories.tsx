@@ -19,6 +19,9 @@ export default {
 const SAMPLE_HTML =
   "<p>This is a sample comment with <strong>bold</strong> text and a <a href='#'>link</a>.</p>";
 
+const SAMPLE_MARKDOWN =
+  "This is a sample comment with **bold** text and a [link](https://example.com).";
+
 const noopReply = async () => {};
 
 export function Default() {
@@ -61,6 +64,7 @@ export function InternalNote() {
 }
 
 export function AsAuthor() {
+  const [content, setContent] = useState(SAMPLE_MARKDOWN);
   const [isInternal, setIsInternal] = useState(false);
 
   return (
@@ -69,22 +73,23 @@ export function AsAuthor() {
         <CommentDisplay
           authorName="You"
           commentId="3"
-          content={SAMPLE_HTML}
+          content={content}
           createdAt={new Date(Date.now() - 1000 * 60 * 5)}
           isInternal={isInternal}
           onDelete={() => {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Delete comment");
           }}
-          onEdit={() => {
-            // biome-ignore lint/suspicious/noConsole: story demo
-            console.log("Edit comment");
-          }}
           onReply={async ({ content, isPrivate }) => {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Reply", { content, isPrivate });
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
+          onUpdate={({ content }) => {
+            // biome-ignore lint/suspicious/noConsole: story demo
+            console.log("Update comment", content);
+            setContent(content);
+          }}
           postId="post-1"
           postSlug="post-1"
         />
@@ -148,15 +153,15 @@ export function Composed() {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Delete comment");
           }}
-          onEdit={() => {
-            // biome-ignore lint/suspicious/noConsole: story demo
-            console.log("Edit comment");
-          }}
           onReply={async ({ content, isPrivate }) => {
             // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Reply", { content, isPrivate });
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
+          onUpdate={({ content, isPrivate }) => {
+            // biome-ignore lint/suspicious/noConsole: story demo
+            console.log("Update comment", { content, isPrivate });
+          }}
           postId="post-1"
           postSlug="post-1"
         >
@@ -240,10 +245,6 @@ export function TimelineComposition() {
                     // biome-ignore lint/suspicious/noConsole: story demo
                     console.log(`Delete ${comment.commentId}`);
                   }}
-                  onEdit={() => {
-                    // biome-ignore lint/suspicious/noConsole: story demo
-                    console.log(`Edit ${comment.commentId}`);
-                  }}
                   onReply={async ({ content, isPrivate }) => {
                     // biome-ignore lint/suspicious/noConsole: story demo
                     console.log(`Reply to ${comment.commentId}`, {
@@ -261,6 +262,10 @@ export function TimelineComposition() {
                       }
                       return next;
                     });
+                  }}
+                  onUpdate={({ content }) => {
+                    // biome-ignore lint/suspicious/noConsole: story demo
+                    console.log(`Update ${comment.commentId}`, content);
                   }}
                   postId="post-1"
                   postSlug="post-1"

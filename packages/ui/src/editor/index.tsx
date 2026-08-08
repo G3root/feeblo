@@ -75,7 +75,8 @@ export function Editor(props: EditorProps) {
       <div
         aria-multiline="true"
         className={cn(
-          'ProseMirror typeset box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-primary'
+          'ProseMirror typeset box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-primary',
+          props.className
         )}
         ref={editor.mount}
         role="textbox"
