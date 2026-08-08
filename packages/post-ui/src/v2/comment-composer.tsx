@@ -1,8 +1,14 @@
 import { Button } from "@feeblo/ui/button";
 import { Editor } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
-import { Group } from "@feeblo/ui/group";
-import { GlobeIcon, ViewOffIcon } from "@hugeicons/core-free-icons";
+import { Toggle } from "@feeblo/ui/toggle";
+import {
+  Tooltip,
+  TooltipPopup,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@feeblo/ui/tooltip";
+import { CircleLockIcon, CircleUnlockIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createContext, type ReactNode, use, useState } from "react";
 
@@ -111,27 +117,40 @@ function CommentComposerEditor() {
   );
 }
 
-function SubmitButton() {
-  const { actions, state } = useCommentComposer();
+function VisibilityToggle() {
+  const { actions, meta, state } = useCommentComposer();
+
+  const visibilityLabel = state.isPrivate
+    ? meta.privateLabel
+    : meta.publicLabel;
 
   return (
-    <Button
-      aria-label={state.isPrivate ? "Switch to public" : "Switch to internal"}
-      disabled={state.disabled}
-      onClick={() => actions.onVisibilityChange(!state.isPrivate)}
-      size="sm"
-      type="button"
-      variant={state.isPrivate ? "default" : "outline"}
-    >
-      <HugeiconsIcon
-        icon={state.isPrivate ? ViewOffIcon : GlobeIcon}
-        strokeWidth={2}
-      />
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Toggle
+              aria-label={visibilityLabel}
+              disabled={state.disabled}
+              onPressedChange={(pressed) => actions.onVisibilityChange(pressed)}
+              pressed={state.isPrivate}
+              size="sm"
+              variant="outline"
+            >
+              <HugeiconsIcon
+                icon={state.isPrivate ? CircleLockIcon : CircleUnlockIcon}
+                strokeWidth={2}
+              />
+            </Toggle>
+          }
+        />
+        <TooltipPopup>{visibilityLabel}</TooltipPopup>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
-function VisibilitySwitcher() {
+function SubmitButton() {
   const { actions, meta, state } = useCommentComposer();
   return (
     <Button
@@ -154,11 +173,9 @@ function VisibilitySwitcher() {
 
 function CommentComposerSubmit() {
   return (
-    <div className="flex items-center justify-end pt-2">
-      <Group>
-        <VisibilitySwitcher />
-        <SubmitButton />
-      </Group>
+    <div className="flex items-center justify-between pt-2">
+      <VisibilityToggle />
+      <SubmitButton />
     </div>
   );
 }
