@@ -1,4 +1,5 @@
 import { EmailEventKind } from "@feeblo/db/validation-schema/email-event-kind";
+import { EmailEventStatus as EmailEventStatusSchema } from "@feeblo/db/validation-schema/email-event-status";
 import { WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
@@ -60,3 +61,28 @@ export const EmailDeliveryStatsResult = S.Struct({
 export type TEmailDeliveryStatsResult = S.Schema.Type<
   typeof EmailDeliveryStatsResult
 >;
+
+/**
+ * Triage row: one email event with the originating post and a per-status
+ * delivery summary — "did this member get the email about post X?".
+ */
+export const EmailEvent = S.Struct({
+  id: S.String,
+  kind: EmailEventKind,
+  status: EmailEventStatusSchema,
+  attempts: S.Number,
+  lastError: S.NullOr(S.String),
+  createdAt: S.DateFromString,
+  postId: S.NullOr(S.String),
+  postTitle: S.NullOr(S.String),
+  deliveries: S.Record(S.String, S.Number),
+});
+
+export type TEmailEvent = S.Schema.Type<typeof EmailEvent>;
+
+export const EmailEventList = S.Struct({
+  organizationId: WorkspaceId.schema,
+  limit: S.optional(S.Number),
+});
+
+export type TEmailEventList = S.Schema.Type<typeof EmailEventList>;

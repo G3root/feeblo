@@ -3,7 +3,8 @@ export type OrganizationPlan = "free" | "starter" | "professional";
 export type LimitFeatureKey =
   | "feedbackBoards"
   | "privilegedMembers"
-  | "changelogCategories";
+  | "changelogCategories"
+  | "emailSendsPerDay";
 export type CapabilityFeatureKey =
   | "roadmap"
   | "changelog"
@@ -53,6 +54,11 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "Changelog Category",
     pluralLabel: "Changelog Categories",
   },
+  emailSendsPerDay: {
+    kind: "limit",
+    singularLabel: "Notification Email / Day",
+    pluralLabel: "Notification Emails / Day",
+  },
   roadmap: { kind: "capability", label: "Roadmap" },
   changelog: { kind: "capability", label: "Changelog" },
   unlimitedEndUsers: {
@@ -79,6 +85,7 @@ const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "feedbackBoards",
   "privilegedMembers",
   "changelogCategories",
+  "emailSendsPerDay",
 ] as const);
 
 const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
@@ -97,6 +104,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 2,
       privilegedMembers: 2,
       changelogCategories: 3,
+      emailSendsPerDay: 100,
     },
     capabilities: {
       roadmap: true,
@@ -113,6 +121,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 5,
       privilegedMembers: 5,
       changelogCategories: null,
+      emailSendsPerDay: 2000,
     },
     capabilities: {
       roadmap: true,
@@ -129,6 +138,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: null,
       privilegedMembers: null,
       changelogCategories: null,
+      emailSendsPerDay: null,
     },
     capabilities: {
       roadmap: true,

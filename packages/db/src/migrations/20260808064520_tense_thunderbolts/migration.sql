@@ -1,6 +1,3 @@
-CREATE TYPE "email_delivery_status" AS ENUM('sent', 'skipped', 'failed', 'suppressed');--> statement-breakpoint
-CREATE TYPE "email_event_status" AS ENUM('pending', 'processing', 'sent', 'failed');--> statement-breakpoint
-CREATE TYPE "email_suppression_reason" AS ENUM('hard_bounce', 'complaint', 'manual');--> statement-breakpoint
 CREATE TABLE "email_delivery" (
 	"id" text PRIMARY KEY,
 	"event_id" text NOT NULL,
@@ -8,10 +5,12 @@ CREATE TABLE "email_delivery" (
 	"member_id" text,
 	"recipient" text NOT NULL,
 	"template" text NOT NULL,
-	"status" "email_delivery_status" NOT NULL,
+	"status" text NOT NULL,
 	"provider_message_id" text,
 	"attempts" integer DEFAULT 0 NOT NULL,
 	"sent_at" timestamp with time zone,
+	"bounced_at" timestamp with time zone,
+	"complained_at" timestamp with time zone,
 	"error" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -22,7 +21,7 @@ CREATE TABLE "email_event" (
 	"organization_id" text NOT NULL,
 	"payload" jsonb NOT NULL,
 	"dedupe_key" text NOT NULL,
-	"status" "email_event_status" DEFAULT 'pending'::"email_event_status" NOT NULL,
+	"status" text DEFAULT 'pending' NOT NULL,
 	"attempts" integer DEFAULT 0 NOT NULL,
 	"available_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -32,7 +31,7 @@ CREATE TABLE "email_event" (
 --> statement-breakpoint
 CREATE TABLE "suppressed_email" (
 	"email" text PRIMARY KEY,
-	"reason" "email_suppression_reason" NOT NULL,
+	"reason" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

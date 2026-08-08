@@ -2,35 +2,17 @@ import {
   index,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { TEmailDeliveryStatus } from "../validation-schema/email-delivery-status";
 import type { TEmailEventKind } from "../validation-schema/email-event-kind";
 import type { EmailEventPayload } from "../validation-schema/email-event-payload";
+import type { TEmailEventStatus } from "../validation-schema/email-event-status";
+import type { TEmailSuppressionReason } from "../validation-schema/email-suppression-reason";
 import { memberTable, organizationTable } from "./auth";
-
-export const emailEventStatusEnum = pgEnum("email_event_status", [
-  "pending",
-  "processing",
-  "sent",
-  "failed",
-]);
-
-export const emailDeliveryStatusEnum = pgEnum("email_delivery_status", [
-  "sent",
-  "skipped",
-  "failed",
-  "suppressed",
-]);
-
-export const emailSuppressionReasonEnum = pgEnum("email_suppression_reason", [
-  "hard_bounce",
-  "complaint",
-  "manual",
-]);
 
 /**
  * Transactional outbox: one row per email-worthy event, written in the same
@@ -41,6 +23,10 @@ export const emailSuppressionReasonEnum = pgEnum("email_suppression_reason", [
  * `dedupeKey` is the coalescing/claim lock: concurrent enqueues for the same
  * post inside the same digest window collapse onto one row (see
  * `EmailEventRepository.enqueuePostStatusChanged`).
+ *
+ * Status/kind columns are plain text typed from Effect Schema vocabulary
+ * (`../validation-schema/*`) — the same pattern as `notification.kind` — so
+ * new states and kinds never require a migration.
  */
 export const emailEventTable = pgTable(
   "email_event",
@@ -52,7 +38,10 @@ export const emailEventTable = pgTable(
       .references(() => organizationTable.id, { onDelete: "cascade" }),
     payload: jsonb("payload").$type<EmailEventPayload>().notNull(),
     dedupeKey: text("dedupe_key").notNull(),
-    status: emailEventStatusEnum("status").default("pending").notNull(),
+    status: text("status")
+      .$type<TEmailEventStatus>()
+      .default("pending")
+      .notNull(),
     attempts: integer("attempts").default(0).notNull(),
     availableAt: timestamp("available_at", { withTimezone: true })
       .defaultNow()
@@ -78,6 +67,9 @@ export const emailEventTable = pgTable(
  * about post Y?". The unique `(eventId, recipient)` pair is also the
  * crash-restart guard — a resumed activity never re-sends a recipient that
  * already has a `sent` row.
+ *
+ * `bouncedAt`/`complainedAt` are stamped by the webhook ingestion endpoint
+ * when the provider reports a hard bounce or complaint for the message.
  */
 export const emailDeliveryTable = pgTable(
   "email_delivery",
@@ -94,10 +86,12 @@ export const emailDeliveryTable = pgTable(
     }),
     recipient: text("recipient").notNull(),
     template: text("template").notNull(),
-    status: emailDeliveryStatusEnum("status").notNull(),
+    status: text("status").$type<TEmailDeliveryStatus>().notNull(),
     providerMessageId: text("provider_message_id"),
     attempts: integer("attempts").default(0).notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    bouncedAt: timestamp("bounced_at", { withTimezone: true }),
+    complainedAt: timestamp("complained_at", { withTimezone: true }),
     error: text("error"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -113,10 +107,13 @@ export const emailDeliveryTable = pgTable(
   ]
 );
 
-/** Emails that must never be sent again (hard bounce / complaint / manual). */
+/**
+ * Emails that must never be sent again (hard bounce / complaint / manual).
+ * Reason is plain text typed from Effect Schema vocabulary.
+ */
 export const suppressedEmailTable = pgTable("suppressed_email", {
   email: text("email").primaryKey(),
-  reason: emailSuppressionReasonEnum("reason").notNull(),
+  reason: text("reason").$type<TEmailSuppressionReason>().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

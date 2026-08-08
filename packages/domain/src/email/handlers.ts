@@ -8,6 +8,7 @@ import { EmailAdminRpcs } from "./rpcs";
 import type {
   TEmailDeadLetterList,
   TEmailDeliveryStats,
+  TEmailEventList,
   TEmailSuppressedDelete,
   TEmailSuppressedList,
 } from "./schema";
@@ -56,6 +57,14 @@ export const EmailAdminRpcHandlersEffect = Effect.gen(function* () {
         .pipe(
           Policy.withPolicy(canManageEmails(organizationId)),
           withRemapDbErrors("EmailDelivery", "select")
+        ),
+
+    EmailEventList: ({ organizationId, limit }: TEmailEventList) =>
+      repository
+        .listRecentEvents(organizationId, limit ?? 20)
+        .pipe(
+          Policy.withPolicy(canManageEmails(organizationId)),
+          withRemapDbErrors("EmailEvent", "select")
         ),
   };
 });

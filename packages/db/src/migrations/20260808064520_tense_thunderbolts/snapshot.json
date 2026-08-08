@@ -1,43 +1,11 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "7a75ae74-7b1a-4cbf-afaf-9e6140c8a36c",
+  "id": "30f06361-53c9-4b90-8ae8-c51841537fe6",
   "prevIds": [
     "50127c7b-2cce-49a5-bcd6-3c1ccd427343"
   ],
   "ddl": [
-    {
-      "values": [
-        "sent",
-        "skipped",
-        "failed",
-        "suppressed"
-      ],
-      "name": "email_delivery_status",
-      "entityType": "enums",
-      "schema": "public"
-    },
-    {
-      "values": [
-        "pending",
-        "processing",
-        "sent",
-        "failed"
-      ],
-      "name": "email_event_status",
-      "entityType": "enums",
-      "schema": "public"
-    },
-    {
-      "values": [
-        "hard_bounce",
-        "complaint",
-        "manual"
-      ],
-      "name": "email_suppression_reason",
-      "entityType": "enums",
-      "schema": "public"
-    },
     {
       "values": [
         "PUBLIC",
@@ -1924,8 +1892,8 @@
       "table": "email_delivery"
     },
     {
-      "type": "email_delivery_status",
-      "typeSchema": "public",
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -1971,6 +1939,32 @@
       "generated": null,
       "identity": null,
       "name": "sent_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "email_delivery"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "bounced_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "email_delivery"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "complained_at",
       "entityType": "columns",
       "schema": "public",
       "table": "email_delivery"
@@ -2067,8 +2061,8 @@
       "table": "email_event"
     },
     {
-      "type": "email_event_status",
-      "typeSchema": "public",
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": "'pending'",
@@ -2158,8 +2152,8 @@
       "table": "suppressed_email"
     },
     {
-      "type": "email_suppression_reason",
-      "typeSchema": "public",
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,

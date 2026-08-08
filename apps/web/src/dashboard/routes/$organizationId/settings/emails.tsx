@@ -46,6 +46,18 @@ type DeliveryStats = {
   byTemplate: Record<string, number>;
 };
 
+type EmailEvent = {
+  id: string;
+  kind: string;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: Date;
+  postId: string | null;
+  postTitle: string | null;
+  deliveries: Record<string, number>;
+};
+
 function RouteComponent() {
   const organizationId = useOrganizationId();
   const { allowed: canManageEmails, isPending: isPolicyPending } = usePolicy(
@@ -66,19 +78,21 @@ function EmailsSettingsContent({ organizationId }: { organizationId: string }) {
   const [stats, setStats] = useState<DeliveryStats | null>(null);
   const [suppressed, setSuppressed] = useState<SuppressedEmail[]>([]);
   const [deadLetters, setDeadLetters] = useState<DeadLetter[]>([]);
+  const [recentEvents, setRecentEvents] = useState<EmailEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const [statsResult, suppressedResult, deadLetterResult] = await Promise.all(
-      [
+    const [statsResult, suppressedResult, deadLetterResult, eventsResult] =
+      await Promise.all([
         fetchRpc((rpc) => rpc.EmailDeliveryStats({ organizationId })),
         fetchRpc((rpc) => rpc.EmailSuppressedList({ organizationId })),
         fetchRpc((rpc) => rpc.EmailDeadLetterList({ organizationId })),
-      ]
-    );
+        fetchRpc((rpc) => rpc.EmailEventList({ organizationId, limit: 20 })),
+      ]);
     setStats(statsResult);
     setSuppressed(suppressedResult as unknown as SuppressedEmail[]);
     setDeadLetters(deadLetterResult as unknown as DeadLetter[]);
+    setRecentEvents(eventsResult as unknown as EmailEvent[]);
     setIsLoading(false);
   }, [organizationId]);
 
@@ -204,6 +218,62 @@ function EmailsSettingsContent({ organizationId }: { organizationId: string }) {
                       >
                         Un-suppress
                       </Button>
+                    </div>
+                  </SettingsItem.ItemContent>
+                </SettingsItem.Item>
+              ))
+            )}
+          </SettingsItem.Content>
+        </SettingsItem.Root>
+
+        <SettingsItem.Root>
+          <SettingsItem.Header>
+            <SettingsItem.Title>Recent notifications</SettingsItem.Title>
+            <SettingsItem.Description>
+              Recent email events with per-recipient delivery outcomes — check
+              whether a member received the email about a post.
+            </SettingsItem.Description>
+          </SettingsItem.Header>
+          <SettingsItem.Content>
+            {recentEvents.length === 0 ? (
+              <SettingsItem.Item>
+                <SettingsItem.ItemContent>
+                  <p className="text-muted-foreground text-sm">
+                    No email events yet.
+                  </p>
+                </SettingsItem.ItemContent>
+              </SettingsItem.Item>
+            ) : (
+              recentEvents.map((event) => (
+                <SettingsItem.Item key={event.id}>
+                  <SettingsItem.ItemContent>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm">
+                        {event.postTitle ?? event.kind}
+                      </p>
+                      <p className="flex flex-wrap gap-2 text-muted-foreground text-xs">
+                        <span>
+                          {new Date(event.createdAt).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                        <Badge variant="outline">{event.status}</Badge>
+                        {Object.entries(event.deliveries).map(
+                          ([status, count]) => (
+                            <span key={status}>
+                              {status}: {count}
+                            </span>
+                          )
+                        )}
+                      </p>
+                      {event.lastError !== null && (
+                        <p className="truncate text-muted-foreground text-xs">
+                          {event.lastError}
+                        </p>
+                      )}
                     </div>
                   </SettingsItem.ItemContent>
                 </SettingsItem.Item>

@@ -5,6 +5,7 @@ import {
   SingleRunner,
   TestRunner,
 } from "effect/unstable/cluster";
+import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import { EmailConfig } from "./email/config";
 import { EmailReaperCron } from "./email/reaper";
 import { EmailEventRepository } from "./email/repository";
@@ -25,7 +26,12 @@ type MakeMailerLayer = () => Layer.Layer<
   Layer.Error<typeof Mailer.layer>
 >;
 
-const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
+type MakeRateLimiterLayer = () => Layer.Layer<RateLimiter.RateLimiter>;
+
+const makeWorkflowLayers = (
+  makeMailerLayer: MakeMailerLayer,
+  makeRateLimiterLayer: MakeRateLimiterLayer
+) =>
   Layer.mergeAll(
     WelcomeUserWorkflowLayer.pipe(Layer.provide(makeMailerLayer())),
     SubmissionEmailNotificationWorkflowLayer.pipe(
@@ -34,14 +40,17 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
     PostStatusChangedEmailWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer()),
       Layer.provide(EmailEventRepository.layer),
-      Layer.provide(EmailConfig.layer)
+      Layer.provide(EmailConfig.layer),
+      Layer.provide(makeRateLimiterLayer())
     )
   );
 
 export const makeWorkflowsLive = (
-  makeMailerLayer: MakeMailerLayer = () => Mailer.layer
+  makeMailerLayer: MakeMailerLayer = () => Mailer.layer,
+  makeRateLimiterLayer: MakeRateLimiterLayer = () =>
+    RateLimiter.layer.pipe(Layer.provide(RateLimiter.layerStoreMemory))
 ) =>
-  makeWorkflowLayers(makeMailerLayer).pipe(
+  makeWorkflowLayers(makeMailerLayer, makeRateLimiterLayer).pipe(
     // Merge order matters: `provideMerge` only subtracts the dependency's own
     // services, so each requirement must be satisfied by a layer merged after
     // the layer that introduces it.
@@ -53,8 +62,10 @@ export const makeWorkflowsLive = (
 export const WorkflowsLive = makeWorkflowsLive();
 
 export const makeWorkflowsTest = (
-  makeMailerLayer: MakeMailerLayer = () => Mailer.layer
+  makeMailerLayer: MakeMailerLayer = () => Mailer.layer,
+  makeRateLimiterLayer: MakeRateLimiterLayer = () =>
+    RateLimiter.layer.pipe(Layer.provide(RateLimiter.layerStoreMemory))
 ) =>
-  makeWorkflowLayers(makeMailerLayer).pipe(
+  makeWorkflowLayers(makeMailerLayer, makeRateLimiterLayer).pipe(
     Layer.provideMerge(WorkflowClusterEngineTest)
   );

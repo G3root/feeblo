@@ -1,17 +1,21 @@
 # Plan: Industry-standard email notification architecture
 
-Status: **Implemented — Phases 1–4 core + Phase 5 observability basics shipped**
-(2026-08-08). Phase 1 (generalized outbox + durable workflow), Phase 2
-(batched dispatcher + per-recipient delivery records), Phase 3 (stateless
-unsubscribe tokens + suppression list + admin surface), and Phase 4 items 1–2
-(daily per-recipient cap with hold-and-recycle; windowed per-post digests)
-are implemented for the `post_status_changed` kind, with tests in
-`packages/domain/src/email/workflow.test.ts` and
-`packages/domain/src/post/handlers.test.ts`. Phase 4 item 3 (provider rate
-limiter) and Phase 5 (health-check extension, Sentry alerting) are not yet
-implemented; the `email_delivery`/`email_event` admin RPCs cover the
-observability baseline. In-app notifications remain out of scope
-(documented in `docs/notifications.md` and working as designed).
+Status: **Implemented — all phases shipped** (2026-08-08). Phase 1
+(generalized outbox + durable workflow), Phase 2 (batched dispatcher +
+per-recipient delivery records), Phase 3 (stateless unsubscribe tokens +
+suppression list + webhook ingestion + admin surface), Phase 4 (daily
+per-recipient cap with hold-and-recycle; windowed per-post digests; provider
+send budget via the shared RateLimiter; per-workspace daily quota wired to
+plan entitlements), and Phase 5 (health endpoint with SMTP/last-send/failure
+state + Sentry-captured alerting; admin dashboard with per-template volume,
+success/error split, digest-vs-instant split, suppressed list, dead letters,
+and per-post triage) are implemented for the `post_status_changed` kind, with
+tests in `packages/domain/src/email/workflow.test.ts`,
+`packages/domain/src/email/delivery.test.ts`, and
+`packages/domain/src/post/handlers.test.ts`. Status/kind/reason columns are
+plain text typed from Effect Schema vocabulary (no Postgres enums). In-app
+notifications remain out of scope (documented in `docs/notifications.md` and
+working as designed).
 
 ## 1. Current state (ground truth — verify each point before changing code)
 

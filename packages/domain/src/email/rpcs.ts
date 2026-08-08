@@ -10,6 +10,8 @@ import {
   EmailDeadLetterList,
   EmailDeliveryStats,
   EmailDeliveryStatsResult,
+  EmailEvent,
+  EmailEventList,
   EmailSuppressed,
   EmailSuppressedDelete,
   EmailSuppressedList,
@@ -40,6 +42,11 @@ export class EmailAdminRpcs extends RpcGroup.make(
   Rpc.make("EmailDeliveryStats", {
     payload: EmailDeliveryStats,
     success: EmailDeliveryStatsResult,
+    error: EmailAdminServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("EmailEventList", {
+    payload: EmailEventList,
+    success: Schema.Array(EmailEvent),
     error: EmailAdminServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

@@ -8,7 +8,9 @@ import {
 } from "@effect/platform-node";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
+import { EmailHealthService } from "@feeblo/domain/email/health";
 import { EmailUnsubscribeRouter } from "@feeblo/domain/email/unsubscribe-route";
+import { EmailWebhookRouter } from "@feeblo/domain/email/webhook";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
@@ -18,7 +20,7 @@ import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
-import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
+import { makeWorkflowsLive, makeWorkflowsTest } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
@@ -99,14 +101,31 @@ const DocsRoute = HttpApiScalar.layer(Api, {
 
 const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
   HttpRouter.use((router) =>
-    router.add(
-      "GET",
-      "/health",
-      HttpServerResponse.jsonUnsafe({
-        status: "ok",
-        release: process.env.APP_RELEASE ?? "dev",
-      })
-    )
+    Effect.gen(function* () {
+      const emailHealth = yield* EmailHealthService;
+
+      return yield* router.add("GET", "/health", (request) =>
+        Effect.gen(function* () {
+          // Alert (log, captured by Sentry when enabled) when the delivery
+          // failure rate crosses the configured threshold.
+          yield* emailHealth.checkAndAlert();
+          const email = yield* emailHealth.health();
+
+          return HttpServerResponse.jsonUnsafe({
+            status: "ok",
+            release: process.env.APP_RELEASE ?? "dev",
+            email,
+          });
+        }).pipe(
+          Effect.provideService(HttpServerRequest.HttpServerRequest, request),
+          Effect.orDie
+        )
+      );
+    })
+  ).pipe(
+    Layer.provide(EmailHealthService.layer),
+    Layer.provide(Database.DatabaseContextLive),
+    Layer.orDie
   );
 
 const RootRouter = HttpRouter.use((router) =>
@@ -147,20 +166,24 @@ const program = Effect.gen(function* () {
     Mailer,
     Layer.Error<typeof Mailer.layer>
   > => (mailbox ? makeMailerTestLayer(mailbox) : Mailer.layer);
-  const WorkFlowLayer = mailbox
-    ? makeWorkflowsTest(makeMailerLayer).pipe(
-        Layer.provide(Database.DatabaseContextLive)
-      )
-    : WorkflowsLive.pipe(
-        Layer.provide(Database.DatabaseContextLive),
-        Layer.provide(Database.SqlClientContextLive)
-      );
   const RateLimitStoreLayer: Layer.Layer<RateLimiter.RateLimiterStore> =
     config.nodeEnv === "test" || useTestMailer || !config.redisUrl
       ? RateLimiter.layerStoreMemory
       : RateLimiter.layerStoreRedis({ prefix: "feeblo:rate-limit" }).pipe(
           Layer.provide(NodeRedis.layer(redisOptions(config.redisUrl)))
         );
+  // The email dispatcher's shared provider send budget uses the same
+  // Redis/memory store selection as the rest of the rate limiting.
+  const makeRateLimiterLayer = (): Layer.Layer<RateLimiter.RateLimiter> =>
+    RateLimiter.layer.pipe(Layer.provide(RateLimitStoreLayer));
+  const WorkFlowLayer = mailbox
+    ? makeWorkflowsTest(makeMailerLayer, makeRateLimiterLayer).pipe(
+        Layer.provide(Database.DatabaseContextLive)
+      )
+    : makeWorkflowsLive(makeMailerLayer, makeRateLimiterLayer).pipe(
+        Layer.provide(Database.DatabaseContextLive),
+        Layer.provide(Database.SqlClientContextLive)
+      );
   const RateLimitLayer: Layer.Layer<RateLimitService> =
     RateLimitService.layer.pipe(
       Layer.provide(RateLimiter.layer),
@@ -235,6 +258,7 @@ const program = Effect.gen(function* () {
     PublicRouters,
     HealthRouter,
     EmailUnsubscribeRouter,
+    EmailWebhookRouter,
     RpcRoute,
     HttpRoute,
     BetterAuthRouterLive,

@@ -11,6 +11,7 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
+import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import * as Workflow from "effect/unstable/workflow/Workflow";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import * as jose from "jose";
@@ -27,21 +28,36 @@ import {
   PostStatusChangedEmailWorkflowLayer,
 } from "./workflow";
 
-const TestConfig = Layer.succeed(
-  EmailConfig,
+const makeTestConfig = (overrides: {
+  readonly dailyCapPerRecipient?: number;
+  readonly digestWindow?: Duration.Duration;
+  readonly maxAttempts?: number;
+  readonly providerSendsPerSecond?: number;
+  readonly unsubscribeSecrets?: string[];
+}) =>
   EmailConfig.of({
-    dailyCapPerRecipient: 10,
-    digestWindow: Duration.minutes(15),
-    maxAttempts: 8,
-    unsubscribeSecrets: ["test-unsubscribe-secret"],
-  })
-);
+    consecutiveFailuresAlertThreshold: 5,
+    dailyCapPerRecipient: overrides.dailyCapPerRecipient ?? 10,
+    digestWindow: overrides.digestWindow ?? Duration.minutes(15),
+    maxAttempts: overrides.maxAttempts ?? 8,
+    providerSendsPerSecond: overrides.providerSendsPerSecond ?? 100,
+    smtpConfigured: true,
+    unsubscribeSecrets: overrides.unsubscribeSecrets ?? [
+      "test-unsubscribe-secret",
+    ],
+    webhookSecret: null,
+  });
+
+const TestConfig = Layer.succeed(EmailConfig, makeTestConfig({}));
 
 const TestLayer = PostStatusChangedEmailWorkflowLayer.pipe(
   Layer.provideMerge(MailerTestLayer),
   Layer.provideMerge(WorkflowEngine.layerMemory),
   Layer.provideMerge(EmailEventRepository.layer),
   Layer.provideMerge(Database.PgliteDatabaseLive),
+  Layer.provideMerge(
+    RateLimiter.layer.pipe(Layer.provide(RateLimiter.layerStoreMemory))
+  ),
   Layer.provideMerge(TestConfig)
 );
 
@@ -581,15 +597,7 @@ describe("PostStatusChangedEmailWorkflow", () => {
         const token = decodeURIComponent(tokenValue);
 
         const payload = yield* verifyUnsubscribeToken(token).pipe(
-          Effect.provideService(
-            EmailConfig,
-            EmailConfig.of({
-              dailyCapPerRecipient: 10,
-              digestWindow: Duration.minutes(15),
-              maxAttempts: 8,
-              unsubscribeSecrets: ["test-unsubscribe-secret"],
-            })
-          )
+          Effect.provideService(EmailConfig, makeTestConfig({}))
         );
         expect(payload).toMatchObject({
           action: "unsubscribe_post",
@@ -603,12 +611,7 @@ describe("PostStatusChangedEmailWorkflow", () => {
   layer(TestLayer)("unsubscribe tokens", (it) => {
     it.effect("rejects forged and expired tokens", () =>
       Effect.gen(function* () {
-        const config = EmailConfig.of({
-          dailyCapPerRecipient: 10,
-          digestWindow: Duration.minutes(15),
-          maxAttempts: 8,
-          unsubscribeSecrets: ["test-unsubscribe-secret"],
-        });
+        const config = makeTestConfig({});
 
         const forged = yield* Effect.tryPromise({
           try: () =>

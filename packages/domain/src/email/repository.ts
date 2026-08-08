@@ -1,18 +1,21 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
+import type { TEmailDeliveryStatus } from "@feeblo/db/validation-schema/email-delivery-status";
 import type { PostStatusChangedEmailPayload } from "@feeblo/db/validation-schema/email-event-payload";
 import { EmailDeliveryId, EmailEventId } from "@feeblo/id";
-import { and, count, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { WorkflowEngine } from "effect/unstable/workflow/WorkflowEngine";
+import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
+import { WorkspaceRepository } from "../workspace/repository";
 import { EmailConfig } from "./config";
 import { digestWindowKey, formatStatusLabel, postUrl } from "./payload";
 import { PostStatusChangedEmailWorkflow } from "./workflow";
 
-export type EmailDeliveryStatus =
-  (typeof schema.emailDeliveryStatusEnum.enumValues)[number];
+export type EmailDeliveryStatus = TEmailDeliveryStatus;
 
 export type EmailEventRow = {
   attempts: number;
@@ -34,6 +37,21 @@ type TEnqueuePostStatusChanged = {
 const makeEmailEventRepository = Effect.gen(function* () {
   const db = yield* currentDb;
   const config = yield* EmailConfig;
+  const workspaceRepository = yield* WorkspaceRepository;
+
+  /** Emails sent for this workspace in the last 24 hours (plan quota). */
+  const sentCountForOrganization = (organizationId: string, since: Date) =>
+    db
+      .select({ value: count() })
+      .from(schema.emailDeliveryTable)
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.organizationId, organizationId),
+          eq(schema.emailDeliveryTable.status, "sent"),
+          gte(schema.emailDeliveryTable.sentAt, since)
+        )
+      )
+      .pipe(Effect.map((rows) => rows[0]?.value ?? 0));
 
   /**
    * Appends a status change to the coalescing outbox row for this post +
@@ -44,10 +62,36 @@ const makeEmailEventRepository = Effect.gen(function* () {
    * enqueue time so later edits or deletes cannot corrupt delivery. Returns
    * the event id; `inserted: true` means the caller should schedule a
    * workflow (re-scheduling an existing event is also safe — execution ids
-   * dedupe on event id).
+   * dedupe on event id). Returns null when the workspace is over its plan's
+   * daily email quota (overflow is logged, never surfaced to the mutation).
    */
   const enqueuePostStatusChanged = (input: TEnqueuePostStatusChanged) =>
     Effect.gen(function* () {
+      const planState = yield* workspaceRepository.findPlanByOrganizationId({
+        organizationId: input.organizationId,
+      });
+      const quotaLimit =
+        PLAN_ENTITLEMENTS[planState.plan].limits.emailSendsPerDay;
+      if (quotaLimit !== null) {
+        const sentToday = yield* sentCountForOrganization(
+          input.organizationId,
+          new Date(Date.now() - Duration.toMillis(Duration.days(1)))
+        );
+        if (sentToday >= quotaLimit) {
+          yield* Effect.logWarning(
+            "Email event dropped: workspace daily email quota exceeded",
+            {
+              organizationId: input.organizationId,
+              postId: input.postId,
+              plan: planState.plan,
+              sentToday,
+              quotaLimit,
+            }
+          );
+          return null;
+        }
+      }
+
       const post = yield* db
         .select({
           boardSlug: schema.boardTable.slug,
@@ -529,6 +573,159 @@ const makeEmailEventRepository = Effect.gen(function* () {
       return { byStatus: statusCounts, byTemplate: templateCounts };
     });
 
+  // -- Webhook ingestion (bounce / complaint) --------------------------------
+
+  /**
+   * Applies a provider webhook event: suppress the address and stamp the
+   * matching delivery rows. Idempotent — repeated events are no-ops.
+   */
+  const recordBounceOrComplaint = ({
+    email,
+    messageId,
+    type,
+  }: {
+    email: string;
+    messageId?: string | undefined;
+    type: "hard_bounce" | "complaint";
+  }) =>
+    transaction(
+      Effect.gen(function* () {
+        const normalized = email.trim().toLowerCase();
+        const now = new Date();
+
+        yield* db
+          .insert(schema.suppressedEmailTable)
+          .values({
+            email: normalized,
+            reason: type === "hard_bounce" ? "hard_bounce" : "complaint",
+            createdAt: now,
+          })
+          .onConflictDoNothing()
+          .pipe(Effect.asVoid);
+
+        const stamp =
+          type === "hard_bounce" ? { bouncedAt: now } : { complainedAt: now };
+        const matches =
+          messageId !== undefined
+            ? or(
+                eq(schema.emailDeliveryTable.providerMessageId, messageId),
+                eq(schema.emailDeliveryTable.recipient, normalized)
+              )
+            : eq(schema.emailDeliveryTable.recipient, normalized);
+
+        yield* db
+          .update(schema.emailDeliveryTable)
+          .set(stamp)
+          .where(
+            and(
+              matches,
+              eq(schema.emailDeliveryTable.status, "sent"),
+              sql`${type === "hard_bounce" ? schema.emailDeliveryTable.bouncedAt : schema.emailDeliveryTable.complainedAt} is null`
+            )
+          )
+          .pipe(Effect.asVoid);
+      })
+    );
+
+  // -- Health / observability ------------------------------------------------
+
+  /** Timestamp of the most recent successful send (null when none). */
+  const lastSuccessfulSendAt = () =>
+    db
+      .select({ sentAt: schema.emailDeliveryTable.sentAt })
+      .from(schema.emailDeliveryTable)
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.status, "sent"),
+          sql`${schema.emailDeliveryTable.sentAt} is not null`
+        )
+      )
+      .orderBy(sql`${schema.emailDeliveryTable.sentAt} desc`)
+      .limit(1)
+      .pipe(Effect.map((rows) => rows[0]?.sentAt ?? null));
+
+  /** Count of events that failed (dead-lettered) since `since`. */
+  const recentFailedEvents = (since: Date) =>
+    db
+      .select({ value: count() })
+      .from(schema.emailEventTable)
+      .where(
+        and(
+          eq(schema.emailEventTable.status, "failed"),
+          gte(schema.emailEventTable.createdAt, since)
+        )
+      )
+      .pipe(Effect.map((rows) => rows[0]?.value ?? 0));
+
+  /**
+   * Triage: recent events with the originating post and a per-status delivery
+   * summary — answers "did this member get the email about post X?".
+   */
+  const listRecentEvents = (organizationId: string, limit: number) =>
+    Effect.gen(function* () {
+      const events = yield* db
+        .select({
+          id: schema.emailEventTable.id,
+          kind: schema.emailEventTable.kind,
+          status: schema.emailEventTable.status,
+          attempts: schema.emailEventTable.attempts,
+          lastError: schema.emailEventTable.lastError,
+          createdAt: schema.emailEventTable.createdAt,
+          payload: schema.emailEventTable.payload,
+        })
+        .from(schema.emailEventTable)
+        .where(eq(schema.emailEventTable.organizationId, organizationId))
+        .orderBy(sql`${schema.emailEventTable.createdAt} desc`)
+        .limit(limit);
+
+      if (events.length === 0) {
+        return [];
+      }
+
+      const byStatus = yield* db
+        .select({
+          eventId: schema.emailDeliveryTable.eventId,
+          status: schema.emailDeliveryTable.status,
+          value: count(),
+        })
+        .from(schema.emailDeliveryTable)
+        .where(
+          inArray(
+            schema.emailDeliveryTable.eventId,
+            events.map((event) => event.id)
+          )
+        )
+        .groupBy(
+          schema.emailDeliveryTable.eventId,
+          schema.emailDeliveryTable.status
+        );
+
+      const summaryByEvent = new Map<string, Record<string, number>>();
+      for (const row of byStatus) {
+        const summary = summaryByEvent.get(row.eventId) ?? {};
+        summary[row.status] = row.value;
+        summaryByEvent.set(row.eventId, summary);
+      }
+
+      return events.map((event) => ({
+        id: event.id,
+        kind: event.kind,
+        status: event.status,
+        attempts: event.attempts,
+        lastError: event.lastError,
+        createdAt: event.createdAt,
+        postId:
+          event.payload.kind === "post_status_changed"
+            ? event.payload.postId
+            : null,
+        postTitle:
+          event.payload.kind === "post_status_changed"
+            ? event.payload.postTitle
+            : null,
+        deliveries: summaryByEvent.get(event.id) ?? {},
+      }));
+    });
+
   return {
     claim,
     complete,
@@ -540,8 +737,12 @@ const makeEmailEventRepository = Effect.gen(function* () {
     findSuppressed,
     hasSentDelivery,
     isOverMaxAttempts: (attempts: number) => attempts >= config.maxAttempts,
+    lastSuccessfulSendAt,
     listDeadLetters,
+    listRecentEvents,
     listSuppressed,
+    recentFailedEvents,
+    recordBounceOrComplaint,
     recycle,
     resolveRecipients,
     scheduleEvent,
@@ -554,5 +755,7 @@ export class EmailEventRepository extends Context.Service<EmailEventRepository>(
   "EmailEventRepository",
   { make: makeEmailEventRepository.pipe(Effect.provide(EmailConfig.layer)) }
 ) {
-  static readonly layer = Layer.effect(this, this.make);
+  static readonly layer = Layer.effect(this, this.make).pipe(
+    Layer.provide(WorkspaceRepository.layer)
+  );
 }

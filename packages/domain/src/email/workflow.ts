@@ -8,6 +8,7 @@ import { createPostStatusChangedEmail } from "@feeblo/transactional/templates/po
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
+import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import * as W from "effect/unstable/workflow";
 
 import { EmailConfig } from "./config";
@@ -87,6 +88,10 @@ export const PostStatusChangedEmailWorkflowLayer =
 
         execute: Effect.gen(function* () {
           const mailer = yield* Mailer;
+          // Shared provider send budget (sends/second), fail-open: when the
+          // limiter is unavailable the batch proceeds unthrottled rather than
+          // blocking delivery forever.
+          const limiter = yield* RateLimiter.RateLimiter;
 
           const claimed = yield* repository
             .claim(payload.eventId)
@@ -136,6 +141,13 @@ export const PostStatusChangedEmailWorkflowLayer =
             })
             .pipe(mapDataError("resolve email recipients"));
 
+          // Digests (multiple coalesced changes) are tracked separately from
+          // single-change sends for the admin delivery split.
+          const template =
+            eventPayload.changes.length > 1
+              ? "post-status-changed-digest"
+              : "post-status-changed";
+
           const suppressed = yield* repository
             .findSuppressed(recipients.map((recipient) => recipient.email))
             .pipe(mapDataError("read suppressed emails"));
@@ -165,7 +177,7 @@ export const PostStatusChangedEmailWorkflowLayer =
                       organizationId: eventPayload.organizationId,
                       memberId: recipient.memberId,
                       recipient: recipient.email,
-                      template: "post-status-changed",
+                      template,
                       status: "suppressed",
                     })
                     .pipe(mapDataError("record suppressed email delivery"));
@@ -184,6 +196,28 @@ export const PostStatusChangedEmailWorkflowLayer =
                 }
 
                 const messageId = `<email-event.${payload.eventId}.${encodeURIComponent(recipient.email)}@notifications.feeblo>`;
+
+                // Provider rate limiter: one token per send; when the per-second
+                // budget is exhausted the whole batch backs off (the returned
+                // delay applies to this send). Fail-open on limiter errors.
+                const consumed = yield* limiter
+                  .consume({
+                    algorithm: "token-bucket",
+                    key: "email-provider",
+                    limit: config.providerSendsPerSecond,
+                    window: "1 second",
+                    onExceeded: "delay",
+                  })
+                  .pipe(
+                    Effect.catch(() =>
+                      Effect.succeed({
+                        delay: Duration.zero,
+                        limit: 0,
+                        remaining: 0,
+                        resetAfter: Duration.zero,
+                      })
+                    )
+                  );
 
                 // Stateless unsubscribe link: token minted per recipient, or
                 // the settings fallback when no signing secret is configured.
@@ -214,6 +248,7 @@ export const PostStatusChangedEmailWorkflowLayer =
                     to: recipient.email,
                   })
                   .pipe(
+                    Effect.delay(consumed.delay),
                     Effect.catch((error) =>
                       repository
                         .upsertDelivery({
@@ -221,7 +256,7 @@ export const PostStatusChangedEmailWorkflowLayer =
                           organizationId: eventPayload.organizationId,
                           memberId: recipient.memberId,
                           recipient: recipient.email,
-                          template: "post-status-changed",
+                          template,
                           status: "failed",
                           error: String(error),
                         })
@@ -242,7 +277,7 @@ export const PostStatusChangedEmailWorkflowLayer =
                     organizationId: eventPayload.organizationId,
                     memberId: recipient.memberId,
                     recipient: recipient.email,
-                    template: "post-status-changed",
+                    template,
                     status: "sent",
                     providerMessageId: messageId,
                   })

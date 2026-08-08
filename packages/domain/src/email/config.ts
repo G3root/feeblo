@@ -37,6 +37,12 @@ export class EmailConfig extends Context.Service<EmailConfig>()("EmailConfig", {
       })
     );
     const maxAttempts = yield* optionalInteger("EMAIL_MAX_ATTEMPTS", 8);
+    // Shared provider send budget (sends/second), fail-open. The dispatcher
+    // consumes one token per send and delays the whole batch when exceeded.
+    const providerSendsPerSecond = yield* optionalInteger(
+      "EMAIL_PROVIDER_SENDS_PER_SECOND",
+      10
+    );
     const unsubscribeSecret = yield* optionalString(
       "EMAIL_UNSUBSCRIBE_JWT_SECRET"
     );
@@ -46,11 +52,27 @@ export class EmailConfig extends Context.Service<EmailConfig>()("EmailConfig", {
     const rotationSecrets = yield* optionalString(
       "EMAIL_UNSUBSCRIBE_JWT_SECRETS"
     );
+    // Optional shared secret for webhook ingestion (bounce/complaint).
+    // When set, requests must carry `X-Feeblo-Signature: sha256=<hmac>`.
+    const webhookSecret = yield* optionalString("EMAIL_WEBHOOK_SECRET");
+    // Alert (log, picked up by Sentry) when failed events in the last 24h
+    // reach this count.
+    const consecutiveFailuresAlertThreshold = yield* optionalInteger(
+      "EMAIL_CONSECUTIVE_FAILURES_ALERT_THRESHOLD",
+      5
+    );
+    // SMTP is considered configured when a host or service is explicitly
+    // provided (MailerConfig defaults to 127.0.0.1:2500 otherwise).
+    const smtpHost = yield* optionalString("SMTP_HOST");
+    const smtpService = yield* optionalString("SMTP_SERVICE");
 
     return {
+      consecutiveFailuresAlertThreshold,
       dailyCapPerRecipient,
       digestWindow,
       maxAttempts,
+      providerSendsPerSecond,
+      smtpConfigured: smtpHost._tag === "Some" || smtpService._tag === "Some",
       unsubscribeSecrets: Option.isSome(unsubscribeSecret)
         ? [
             unsubscribeSecret.value,
@@ -62,6 +84,7 @@ export class EmailConfig extends Context.Service<EmailConfig>()("EmailConfig", {
               : []),
           ]
         : [],
+      webhookSecret: Option.isSome(webhookSecret) ? webhookSecret.value : null,
     } as const;
   }),
 }) {

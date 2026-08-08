@@ -106,6 +106,12 @@
     "./email/unsubscribe-route": {
       "default": "./src/email/unsubscribe-route.ts"
     },
+    "./email/webhook": {
+      "default": "./src/email/webhook.ts"
+    },
+    "./email/health": {
+      "default": "./src/email/health.ts"
+    },
     "./site/schema": {
       "default": "./src/site/schema.ts"
     },
