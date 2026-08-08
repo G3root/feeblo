@@ -132,9 +132,10 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
     return PublicRpcRateLimitMiddleware.of((effect, options) =>
       Effect.gen(function* () {
         // Prefer the peer-anchored client IP provided by the global HTTP
-        // middleware. Only fall back to forwarding headers when that is not
-        // installed; getClientIpFromHeaders refuses to trust them unless proxy
-        // trust is explicitly configured.
+        // middleware. Only fall back to the headers when that is not
+        // installed; without a TCP peer, getClientIpFromHeaders cannot
+        // validate the provenance of any forwarded header and returns the
+        // shared "unknown" bucket rather than accepting spoofable values.
         const clientIpOption = yield* Effect.serviceOption(ClientIp);
         const clientIp = Option.isSome(clientIpOption)
           ? clientIpOption.value

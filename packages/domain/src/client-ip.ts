@@ -17,27 +17,29 @@ const normalizeIp = (value: string | undefined): string | undefined => {
   return normalized ? normalized : undefined;
 };
 
-const firstForwardedIp = (value: string | undefined): string | undefined =>
-  normalizeIp(value?.split(",", 1)[0]);
-
-const forwardedHeaderIp = (headers: Headers.Headers): string | undefined =>
-  normalizeIp(
-    Option.getOrUndefined(Headers.get(headers, "cf-connecting-ip"))
-  ) ??
-  firstForwardedIp(
-    Option.getOrUndefined(Headers.get(headers, "x-forwarded-for"))
-  ) ??
-  normalizeIp(Option.getOrUndefined(Headers.get(headers, "x-real-ip")));
+const forwardedForAddresses = (headers: Headers.Headers): readonly string[] =>
+  (Option.getOrUndefined(Headers.get(headers, "x-forwarded-for")) ?? "")
+    .split(",")
+    .map((address) => address.trim())
+    .filter((address) => address.length > 0);
 
 /**
  * Forwarded-client headers (`cf-connecting-ip`, `x-forwarded-for`, `x-real-ip`)
- * are trivially spoofable by any client that can reach the origin directly.
- * They must only be trusted when the operator has opted in:
+ * are trivially spoofable by any client that can reach the origin directly, so
+ * they are only honored when the immediate TCP peer proves they were written
+ * by a trusted intermediary (see `resolveForwardedClientIp`):
  *
  * - `TRUSTED_PROXY_IPS` — comma-separated IPs/CIDRs of the reverse proxies that
  *   terminate client connections and set these headers.
- * - `TRUST_PROXY_HEADERS=true` — trust the headers regardless of the peer
- *   (use when proxy IPs are dynamic, e.g. a cloud load balancer).
+ * - `TRUST_PROXY_HEADERS=true` — treat every peer as a trusted proxy (use when
+ *   proxy IPs are dynamic, e.g. a cloud load balancer; requires that clients
+ *   cannot reach the origin directly).
+ *
+ * Proxy contract: each configured proxy must append the address of the peer it
+ * saw to `x-forwarded-for` (client-supplied entries then always sit left of the
+ * trusted chain and are never reached), or overwrite the header with exactly
+ * that peer. A proxy that forwards client-supplied values for its own hop
+ * breaks the provenance guarantee and must not be trusted.
  */
 const isProxyTrustEnabled = (): boolean =>
   process.env.TRUST_PROXY_HEADERS === "true";
@@ -79,9 +81,30 @@ const parseIp = (ip: string): ParsedIp | null => {
 
   if (trimmed.includes(":")) {
     const [left, right] = trimmed.toLowerCase().split("::");
-    const leftParts = left === undefined || left === "" ? [] : left.split(":");
-    const rightParts =
+    let leftParts = left === undefined || left === "" ? [] : left.split(":");
+    let rightParts =
       right === undefined || right === "" ? [] : right.split(":");
+
+    // An IPv4 dotted-quad tail (e.g. `::ffff:10.0.0.4`) occupies the final
+    // 32 bits and must expand into the last two 16-bit groups.
+    const lastGroup =
+      rightParts.length > 0 ? rightParts.at(-1) : leftParts.at(-1);
+    if (lastGroup?.includes(".")) {
+      const quad = parseIp(lastGroup);
+      if (!quad || quad.version !== 4) {
+        return null;
+      }
+      const quadGroups = [
+        (quad.value >> 16n).toString(16),
+        (quad.value & 0xffffn).toString(16),
+      ];
+      if (rightParts.length > 0) {
+        rightParts = [...rightParts.slice(0, -1), ...quadGroups];
+      } else {
+        leftParts = [...leftParts.slice(0, -1), ...quadGroups];
+      }
+    }
+
     const missing = 8 - leftParts.length - rightParts.length;
     if (missing < 0) {
       return null;
@@ -100,6 +123,12 @@ const parseIp = (ip: string): ParsedIp | null => {
         return null;
       }
       value = (value << 16n) | BigInt(`0x${group}`);
+    }
+
+    // Normalize IPv4-mapped IPv6 addresses (`::ffff:a.b.c.d`) to IPv4 so they
+    // match trusted IPv4 CIDRs.
+    if (value >> 32n === 0xffffn) {
+      return { version: 4, value: value & 0xffffffffn };
     }
     return { version: 6, value };
   }
@@ -133,6 +162,48 @@ const ipInCidr = (ip: ParsedIp, cidr: string): boolean => {
   return (ip.value & mask) === (rangeIp.value & mask);
 };
 
+/**
+ * Cloudflare's published edge ranges (https://www.cloudflare.com/ips/).
+ * `cf-connecting-ip` is only honored when the immediate TCP peer falls inside
+ * one of these ranges; any other peer can set the header to an arbitrary
+ * value. Keep in sync with Cloudflare's published list.
+ */
+const CLOUDFLARE_IP_RANGES: readonly string[] = [
+  // IPv4
+  "173.245.48.0/20",
+  "103.21.244.0/22",
+  "103.22.200.0/22",
+  "103.31.4.0/22",
+  "141.101.64.0/18",
+  "108.162.192.0/18",
+  "190.93.240.0/20",
+  "188.114.96.0/20",
+  "197.234.240.0/22",
+  "198.41.128.0/17",
+  "162.158.0.0/15",
+  "104.16.0.0/13",
+  "104.24.0.0/14",
+  "172.64.0.0/13",
+  "131.0.72.0/22",
+  // IPv6
+  "2400:cb00::/32",
+  "2606:4700::/32",
+  "2803:f800::/32",
+  "2405:b500::/32",
+  "2405:8100::/32",
+  "2a06:98c0::/29",
+  "2c0f:f248::/32",
+];
+
+/** True when the immediate TCP peer is a Cloudflare edge address. */
+const isCloudflarePeer = (peerIp: string): boolean => {
+  const parsed = parseIp(peerIp);
+  if (!parsed) {
+    return false;
+  }
+  return CLOUDFLARE_IP_RANGES.some((cidr) => ipInCidr(parsed, cidr));
+};
+
 /** True when the immediate TCP peer is a trusted reverse proxy. */
 export const isTrustedProxy = (peerIp: string): boolean => {
   if (isProxyTrustEnabled()) {
@@ -148,37 +219,83 @@ export const isTrustedProxy = (peerIp: string): boolean => {
 };
 
 /**
- * Resolves the client IP from request headers alone (no peer info, e.g. the
- * RPC rate-limit middleware). Forwarded headers are only honored when proxy
- * trust is configured; otherwise every caller is indistinguishable and gets
- * the shared "unknown" bucket rather than letting attackers self-assign IPs.
+ * Resolves the client IP from forwarded headers whose provenance is
+ * established by the immediate TCP peer:
+ *
+ * - `cf-connecting-ip` is honored only when the peer is a Cloudflare edge
+ *   address (only Cloudflare sets this header on the connections it
+ *   terminates).
+ * - `x-forwarded-for` is honored only when the peer is a configured trusted
+ *   proxy. The chain is walked right-to-left, skipping only configured trusted
+ *   proxy hops; the first remaining address is the client. A malformed chain
+ *   carries no client information.
+ * - `x-real-ip` is honored only when the peer is a configured trusted proxy
+ *   (the single hop that sets it).
+ *
+ * Returns undefined when no header can be attributed to the peer.
+ */
+const resolveForwardedClientIp = (
+  headers: Headers.Headers,
+  peer: string
+): string | undefined => {
+  const cfConnectingIp = normalizeIp(
+    Option.getOrUndefined(Headers.get(headers, "cf-connecting-ip"))
+  );
+  if (cfConnectingIp && isCloudflarePeer(peer)) {
+    return cfConnectingIp;
+  }
+
+  if (!isTrustedProxy(peer)) {
+    return undefined;
+  }
+
+  const forwardedFor = forwardedForAddresses(headers);
+  const chainIsValid =
+    forwardedFor.length > 0 &&
+    forwardedFor.every((address) => parseIp(address) !== null);
+  if (chainIsValid) {
+    for (let index = forwardedFor.length - 1; index >= 0; index -= 1) {
+      const address = forwardedFor[index];
+      if (address && !isTrustedProxy(address)) {
+        return address;
+      }
+    }
+  }
+
+  return normalizeIp(Option.getOrUndefined(Headers.get(headers, "x-real-ip")));
+};
+
+/**
+ * Resolves the client IP from request headers and an optional TCP peer. The
+ * peer is required to validate the provenance of any forwarded header; without
+ * it (e.g. the RPC rate-limit fallback) every forwarded value is
+ * indistinguishable from a client-supplied forgery, so the shared "unknown"
+ * bucket is returned instead of letting attackers self-assign IPs.
  */
 export const getClientIpFromHeaders = (
   headers: Headers.Headers,
-  options: { readonly trustForwardedHeaders?: boolean } = {}
+  options: { readonly peer?: string } = {}
 ): string => {
-  const trust = options.trustForwardedHeaders ?? isProxyTrustEnabled();
-  if (!trust) {
+  const peer = normalizeIp(options.peer);
+  if (!peer) {
     return "unknown";
   }
-  return forwardedHeaderIp(headers) ?? "unknown";
+  return resolveForwardedClientIp(headers, peer) ?? "unknown";
 };
 
 /**
  * Resolves the client IP from the request. The TCP socket peer
  * (`remoteAddress`) cannot be spoofed by the client, so it is preferred; the
- * forwarded headers are only consulted when the peer is a trusted proxy (or
- * when there is no peer information and proxy trust is configured).
+ * forwarded headers are only consulted when the peer's provenance establishes
+ * them (Cloudflare edge for `cf-connecting-ip`, a configured trusted proxy for
+ * `x-forwarded-for` / `x-real-ip`).
  */
 export const getClientIpFromRequest = (
   request: HttpServerRequest.HttpServerRequest
 ): string => {
   const peer = normalizeIp(Option.getOrUndefined(request.remoteAddress));
   if (peer) {
-    if (isTrustedProxy(peer)) {
-      return forwardedHeaderIp(request.headers) ?? peer;
-    }
-    return peer;
+    return resolveForwardedClientIp(request.headers, peer) ?? peer;
   }
   return getClientIpFromHeaders(request.headers);
 };
