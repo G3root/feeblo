@@ -131,7 +131,10 @@ function RouteComponent() {
             <div className="flex items-center justify-between py-1">
               <PostPage.Reactions />
 
-              <PostPage.Vote />
+              <div className="flex items-center gap-2">
+                <PostPage.Subscribe />
+                <PostPage.Vote />
+              </div>
             </div>
             <Tabs defaultValue="comments">
               <TabsList variant="underline">

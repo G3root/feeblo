@@ -19,6 +19,7 @@ import {
   publicPostCollection,
   publicPostReactionCollection,
   publicPostStatusCollection,
+  publicPostSubscriptionCollection,
   publicUpvoteCollection,
 } from "../../lib/collections";
 import { useSite } from "../../providers/site-provider";
@@ -65,6 +66,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
     commentCollection: publicCommentCollection,
     postReactionCollection: publicPostReactionCollection,
     commentReactionCollection: publicCommentReactionCollection,
+    postSubscriptionCollection: publicPostSubscriptionCollection,
     //todo add member collection
   };
 

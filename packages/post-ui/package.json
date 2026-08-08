@@ -72,6 +72,10 @@
       "types": "./src/v2/upvote-toggle.tsx",
       "default": "./src/v2/upvote-toggle.tsx"
     },
+    "./subscribe-toggle": {
+      "types": "./src/v2/subscribe-toggle.tsx",
+      "default": "./src/v2/subscribe-toggle.tsx"
+    },
     "./post-title-input": {
       "types": "./src/v2/post-title-input.tsx",
       "default": "./src/v2/post-title-input.tsx"

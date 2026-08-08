@@ -42,6 +42,13 @@ vi.mock("./upvote-toggle", () => ({
     </button>
   ),
 }));
+vi.mock("./subscribe-toggle", () => ({
+  SubscribeButton: ({ variant }: { variant?: string }) => (
+    <button type="button">
+      {variant === "compact" ? "compact subscribe" : "subscribe"}
+    </button>
+  ),
+}));
 
 const board = { visibility: "PUBLIC" } as TBoard;
 
@@ -195,6 +202,7 @@ describe("PostPage composition", () => {
         <PostPage.Content />
         <PostPage.Reactions />
         <PostPage.CompactVote />
+        <PostPage.Subscribe />
         <PostPage.PublicCommentComposer />
         <PostPage.Comments />
       </PostCollectionStateProvider>
@@ -213,6 +221,9 @@ describe("PostPage composition", () => {
     await expect.element(screen.getByText("reaction picker")).toBeVisible();
     await expect
       .element(screen.getByRole("button", { name: "compact vote" }))
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("button", { name: "subscribe" }))
       .toBeVisible();
     await expect.element(screen.getByText("comment composer")).toBeVisible();
     await expect.element(screen.getByText("comments list")).toBeVisible();

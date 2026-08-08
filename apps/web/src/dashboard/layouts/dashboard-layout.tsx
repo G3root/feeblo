@@ -48,6 +48,7 @@ import {
   postCollection,
   postReactionCollection,
   postStatusCollection,
+  postSubscriptionCollection,
   upvoteCollection,
 } from "~/lib/collections";
 
@@ -88,6 +89,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           membersCollection,
           postCollection,
           postStatusCollection,
+          postSubscriptionCollection,
           upvoteCollection,
           postReactionCollection,
           commentReactionCollection,
