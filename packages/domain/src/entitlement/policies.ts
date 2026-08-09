@@ -134,13 +134,13 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
-  const canUseAutomaticSso = (organizationId: string) =>
+  const canUseWidgetSso = (organizationId: string) =>
     Effect.gen(function* () {
       const { entitlements } = yield* findEntitlements(organizationId);
 
-      if (!entitlements.capabilities.automaticSso) {
+      if (!entitlements.capabilities.widgetSso) {
         return yield* new Policy.PolicyDeniedError({
-          reason: "Automatic SSO requires the Starter plan or higher.",
+          reason: "Widget SSO requires the Starter plan or higher.",
         });
       }
     });
@@ -196,7 +196,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateBoard,
     canUpdateBoardVisibility,
     canHidePoweredByBranding,
-    canUseAutomaticSso,
+    canUseWidgetSso,
     canAssignPrivilegedRole,
     canCreateRoadmap,
     canUpdateRoadmapVisibility,

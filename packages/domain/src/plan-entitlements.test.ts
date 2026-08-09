@@ -23,8 +23,8 @@ describe("plan feature catalog", () => {
       label: "Remove Feeblo Branding",
     });
     expect(rows).not.toContainEqual({
-      key: "automaticSso",
-      label: "Automatic SSO",
+      key: "widgetSso",
+      label: "Widget SSO",
     });
   });
 
@@ -37,7 +37,7 @@ describe("plan feature catalog", () => {
       },
       capabilities: {
         changelog: true,
-        automaticSso: true,
+        widgetSso: true,
         privateBoards: true,
         privateRoadmaps: true,
         removeBranding: true,
@@ -58,7 +58,7 @@ describe("plan feature catalog", () => {
       { key: "privateBoards", label: "Private Boards" },
       { key: "privateRoadmaps", label: "Private Roadmaps" },
       { key: "removeBranding", label: "Remove Feeblo Branding" },
-      { key: "automaticSso", label: "Automatic SSO" },
+      { key: "widgetSso", label: "Widget SSO" },
     ]);
   });
 

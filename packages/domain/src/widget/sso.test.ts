@@ -136,7 +136,7 @@ describe("createSsoSession", () => {
         const error = yield* Effect.flip(
           createSsoSession({ organizationId: fixture.organizationId, token })
         );
-        expect(error.code).toBe("AUTOMATIC_SSO_NOT_ENTITLED");
+        expect(error.code).toBe("WIDGET_SSO_NOT_ENTITLED");
       })
     );
 

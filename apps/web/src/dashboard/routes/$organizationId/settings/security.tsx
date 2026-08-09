@@ -57,19 +57,19 @@ function RouteComponent() {
 
   return (
     <SecuritySettingsContent
-      automaticSsoAvailable={
-        isEntitlementsLoading || entitlements.capabilities.automaticSso
-      }
       organizationId={organizationId}
+      widgetSsoAvailable={
+        isEntitlementsLoading || entitlements.capabilities.widgetSso
+      }
     />
   );
 }
 
 function SecuritySettingsContent({
-  automaticSsoAvailable,
+  widgetSsoAvailable,
   organizationId,
 }: {
-  automaticSsoAvailable: boolean;
+  widgetSsoAvailable: boolean;
   organizationId: string;
 }) {
   // Ref (not state) because nothing needs to re-render while generating: the
@@ -184,9 +184,9 @@ function SecuritySettingsContent({
         <SettingsLayout.HeaderTitle>Security</SettingsLayout.HeaderTitle>
         <SettingsLayout.HeaderDescription>
           Manage JWT secrets for widget SSO authentication.{" "}
-          {automaticSsoAvailable
+          {widgetSsoAvailable
             ? null
-            : "Automatic SSO is available only on paid plans."}
+            : "Widget SSO is available only on paid plans."}
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
@@ -194,19 +194,19 @@ function SecuritySettingsContent({
           <SettingsItem.Header>
             <SettingsItem.Title>
               JWT Authentication
-              {automaticSsoAvailable ? null : (
+              {widgetSsoAvailable ? null : (
                 <SettingsItem.PaidPlanIndicator
                   className="ml-2 inline-block"
-                  content="Automatic SSO requires the Starter plan or higher."
+                  content="Widget SSO requires the Starter plan or higher."
                 />
               )}
             </SettingsItem.Title>
             <SettingsItem.Description>
               Sign user data with your secret so Feeblo can verify who is
               submitting feedback.{" "}
-              {automaticSsoAvailable
+              {widgetSsoAvailable
                 ? null
-                : "Automatic SSO requires the Starter plan or higher."}
+                : "Widget SSO requires the Starter plan or higher."}
             </SettingsItem.Description>
           </SettingsItem.Header>
           <SettingsItem.Content>

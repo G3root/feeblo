@@ -37,7 +37,7 @@ export class SsoError extends S.TaggedErrorClass<SsoError>()("SsoError", {
     "SSO_TOKEN_MISSING_EMAIL_OR_NAME",
     "FAILED_TO_CREATE_SSO_USER",
     "FAILED_TO_CREATE_SSO_CONTACT",
-    "AUTOMATIC_SSO_NOT_ENTITLED",
+    "WIDGET_SSO_NOT_ENTITLED",
   ]),
   message: S.optional(S.String),
 }) {}
@@ -143,11 +143,11 @@ export const createSsoSession = ({
     const userRepository = yield* UserRepository;
 
     yield* entitlementPolicy
-      .canUseAutomaticSso(organizationId)
+      .canUseWidgetSso(organizationId)
       .pipe(
         Effect.mapError((error) =>
           error instanceof PolicyDeniedError
-            ? new SsoError({ code: "AUTOMATIC_SSO_NOT_ENTITLED" })
+            ? new SsoError({ code: "WIDGET_SSO_NOT_ENTITLED" })
             : error
         )
       );
