@@ -2,6 +2,7 @@ import { createHmac, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
+import { setPlan } from "../helpers/set-plan";
 import { createTestUser } from "../helpers/test-users";
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";
@@ -59,6 +60,11 @@ test(
       throw new Error("Workspace URL did not contain an organization id");
     }
     expect(organizationId).toMatch(organizationIdPattern);
+
+    // Widget SSO is a paid capability (Starter plan or higher): a fresh
+    // workspace signs up on the free plan, so put it on Starter before
+    // exercising the JWT auto-login flow.
+    await setPlan(page.request, { organizationId, plan: "starter" });
 
     await test.step("copy the workspace JWT secret", async () => {
       await page

@@ -134,6 +134,17 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
+  const canUseWidgetSso = (organizationId: string) =>
+    Effect.gen(function* () {
+      const { entitlements } = yield* findEntitlements(organizationId);
+
+      if (!entitlements.capabilities.widgetSso) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Widget SSO requires the Starter plan or higher.",
+        });
+      }
+    });
+
   const canAssignPrivilegedRole = <E, R>(
     args: TCanAssignPrivilegedRole & {
       privilegedRoleCount: Effect.Effect<number, E, R>;
@@ -185,6 +196,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateBoard,
     canUpdateBoardVisibility,
     canHidePoweredByBranding,
+    canUseWidgetSso,
     canAssignPrivilegedRole,
     canCreateRoadmap,
     canUpdateRoadmapVisibility,

@@ -14,6 +14,7 @@ import { useRef } from "react";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { jwtSecretCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
@@ -45,6 +46,7 @@ function RouteComponent() {
   const { allowed: canManageSecurity, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "workspace.update")
   );
+  const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
 
   if (isPolicyPending) {
     return null;
@@ -53,12 +55,21 @@ function RouteComponent() {
     return <SettingsAccessDenied />;
   }
 
-  return <SecuritySettingsContent organizationId={organizationId} />;
+  return (
+    <SecuritySettingsContent
+      organizationId={organizationId}
+      widgetSsoAvailable={
+        isEntitlementsLoading || entitlements.capabilities.widgetSso
+      }
+    />
+  );
 }
 
 function SecuritySettingsContent({
+  widgetSsoAvailable,
   organizationId,
 }: {
+  widgetSsoAvailable: boolean;
   organizationId: string;
 }) {
   // Ref (not state) because nothing needs to re-render while generating: the
@@ -172,16 +183,30 @@ function SecuritySettingsContent({
       <SettingsLayout.Header>
         <SettingsLayout.HeaderTitle>Security</SettingsLayout.HeaderTitle>
         <SettingsLayout.HeaderDescription>
-          Manage JWT secrets for widget SSO authentication.
+          Manage JWT secrets for widget SSO authentication.{" "}
+          {widgetSsoAvailable
+            ? null
+            : "Widget SSO is available only on paid plans."}
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <SettingsItem.Root>
           <SettingsItem.Header>
-            <SettingsItem.Title>JWT Authentication</SettingsItem.Title>
+            <SettingsItem.Title>
+              JWT Authentication
+              {widgetSsoAvailable ? null : (
+                <SettingsItem.PaidPlanIndicator
+                  className="ml-2 inline-block"
+                  content="Widget SSO requires the Starter plan or higher."
+                />
+              )}
+            </SettingsItem.Title>
             <SettingsItem.Description>
               Sign user data with your secret so Feeblo can verify who is
-              submitting feedback.
+              submitting feedback.{" "}
+              {widgetSsoAvailable
+                ? null
+                : "Widget SSO requires the Starter plan or higher."}
             </SettingsItem.Description>
           </SettingsItem.Header>
           <SettingsItem.Content>

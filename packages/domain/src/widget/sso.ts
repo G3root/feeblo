@@ -19,8 +19,10 @@ import type { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
+import { PolicyDeniedError } from "../policy";
 import { UserRepository } from "../user/repository";
 
 /**
@@ -35,6 +37,7 @@ export class SsoError extends S.TaggedErrorClass<SsoError>()("SsoError", {
     "SSO_TOKEN_MISSING_EMAIL_OR_NAME",
     "FAILED_TO_CREATE_SSO_USER",
     "FAILED_TO_CREATE_SSO_CONTACT",
+    "WIDGET_SSO_NOT_ENTITLED",
   ]),
   message: S.optional(S.String),
 }) {}
@@ -134,9 +137,20 @@ export const createSsoSession = ({
   token: string;
 }) =>
   Effect.gen(function* () {
+    const entitlementPolicy = yield* EntitlementPolicy;
     const jwtSecretRepository = yield* JwtSecretRepository;
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const userRepository = yield* UserRepository;
+
+    yield* entitlementPolicy
+      .canUseWidgetSso(organizationId)
+      .pipe(
+        Effect.mapError((error) =>
+          error instanceof PolicyDeniedError
+            ? new SsoError({ code: "WIDGET_SSO_NOT_ENTITLED" })
+            : error
+        )
+      );
 
     const secrets = yield* jwtSecretRepository.getSecretsForOrg({
       organizationId,

@@ -11,7 +11,8 @@ export type CapabilityFeatureKey =
   | "unlimitedPosts"
   | "privateBoards"
   | "privateRoadmaps"
-  | "removeBranding";
+  | "removeBranding"
+  | "widgetSso";
 export type PlanFeatureKey = LimitFeatureKey | CapabilityFeatureKey;
 
 type PlanLimits = Record<LimitFeatureKey, number | null>;
@@ -66,6 +67,7 @@ export const PLAN_FEATURE_CATALOG = {
     kind: "capability",
     label: "Remove Feeblo Branding",
   },
+  widgetSso: { kind: "capability", label: "Widget SSO" },
 } as const satisfies Record<PlanFeatureKey, PlanFeatureDefinition>;
 
 const defineFeatureOrder =
@@ -89,6 +91,7 @@ const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
   "privateBoards",
   "privateRoadmaps",
   "removeBranding",
+  "widgetSso",
 ] as const);
 
 export const PLAN_ENTITLEMENTS = {
@@ -106,6 +109,7 @@ export const PLAN_ENTITLEMENTS = {
       privateBoards: false,
       privateRoadmaps: false,
       removeBranding: false,
+      widgetSso: false,
     },
   },
   starter: {
@@ -122,6 +126,7 @@ export const PLAN_ENTITLEMENTS = {
       privateBoards: true,
       privateRoadmaps: true,
       removeBranding: true,
+      widgetSso: true,
     },
   },
   professional: {
@@ -138,6 +143,7 @@ export const PLAN_ENTITLEMENTS = {
       privateBoards: true,
       privateRoadmaps: true,
       removeBranding: true,
+      widgetSso: true,
     },
   },
 } as const satisfies Record<OrganizationPlan, PlanEntitlements>;

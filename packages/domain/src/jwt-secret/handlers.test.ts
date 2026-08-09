@@ -61,9 +61,8 @@ describe("JwtSecretRpcHandlers", () => {
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
-  const TestLayer = Layer.merge(
-    JwtSecretRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
-    Database.PgliteDatabaseLive
+  const TestLayer = JwtSecretRepository.layer.pipe(
+    Layer.provideMerge(Database.PgliteDatabaseLive)
   );
 
   layer(TestLayer)("handlers", (it) => {
@@ -74,7 +73,6 @@ describe("JwtSecretRpcHandlers", () => {
         const secrets = yield* handlers
           .JwtSecretList({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-        // Reading must never materialize a signing secret.
         expect(secrets).toHaveLength(0);
       })
     );

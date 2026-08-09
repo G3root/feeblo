@@ -15,6 +15,8 @@ export const JWT_AUTO_LOGIN_ERROR_CODES = defineErrorCodes({
   // SSO (widget portal) specific failures raised while verifying the
   // organization JWT and provisioning the restricted widget user/contact.
   ORGANIZATION_HAS_NO_JWT_SECRET: "Organization has no JWT secret configured",
+  WIDGET_SSO_NOT_ENTITLED:
+    "Widget SSO requires the Starter plan or higher",
   INVALID_JWT: "Invalid JWT",
   SSO_TOKEN_MISSING_EMAIL_OR_NAME: "SSO token must include email and name",
   FAILED_TO_CREATE_SSO_CONTACT: "Failed to create contact for SSO session",

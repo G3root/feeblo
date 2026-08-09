@@ -43,6 +43,7 @@ import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
 import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import { ServerConfig } from "./config";
 import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
+import { e2eSetPlanRouter } from "./e2e-set-plan";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
 
@@ -179,7 +180,8 @@ const program = Effect.gen(function* () {
       ? Layer.mergeAll(
           RootRouter,
           testMailboxRouter(mailbox),
-          e2eRoadmapSeedRouter
+          e2eRoadmapSeedRouter,
+          e2eSetPlanRouter
         )
       : RootRouter;
   const PublicRouters = Layer.merge(RootRouterLive, OgImageRouterLive);
