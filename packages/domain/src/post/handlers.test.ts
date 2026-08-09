@@ -41,6 +41,7 @@ import { PostRepository } from "./repository";
 describe("PostRpcHandlers", () => {
   type Fixture = {
     boardId: LegidOf<"BoardId">;
+    creatorEmail: string;
     membershipId: string;
     organizationId: LegidOf<"WorkspaceId">;
     statusId: LegidOf<"PostStatusId">;
@@ -53,7 +54,7 @@ describe("PostRpcHandlers", () => {
   ): Session => ({
     user: {
       id: fixture.userId,
-      email: "user@example.com",
+      email: fixture.creatorEmail,
       name: "Test User",
       restrictedToOrganizationId: null,
     },
@@ -77,6 +78,7 @@ describe("PostRpcHandlers", () => {
       const boardId = yield* BoardId.generate;
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
+      const creatorEmail = `${organizationId}@example.com`;
       const membershipId = `membership_${organizationId}`;
       const now = new Date();
 
@@ -88,7 +90,7 @@ describe("PostRpcHandlers", () => {
       });
       yield* db.insert(schema.userTable).values({
         id: userId,
-        email: `${organizationId}@example.com`,
+        email: creatorEmail,
         name: "Test User",
       });
       yield* db.insert(schema.memberTable).values({
@@ -118,6 +120,7 @@ describe("PostRpcHandlers", () => {
 
       return {
         boardId,
+        creatorEmail,
         membershipId,
         organizationId,
         statusId,
@@ -333,7 +336,7 @@ describe("PostRpcHandlers", () => {
               );
 
             const subscription = yield* repository.findSubscription({
-              email: `${fixture.organizationId}@example.com`,
+              email: fixture.creatorEmail,
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });

@@ -515,10 +515,7 @@ describe("EmailOutbox workflows", () => {
             .where(
               and(
                 eq(schema.emailDeliveryTable.outboxId, intent.intent.id),
-                eq(
-                  schema.emailDeliveryTable.contactId,
-                  suppressed.contactId
-                )
+                eq(schema.emailDeliveryTable.contactId, suppressed.contactId)
               )
             );
           expect(suppressedDelivery).toBeUndefined();

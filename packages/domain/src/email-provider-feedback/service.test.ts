@@ -133,12 +133,7 @@ describe("EmailProviderFeedbackService", () => {
         const deliveries = yield* db
           .select({ id: schema.emailDeliveryTable.id })
           .from(schema.emailDeliveryTable)
-          .where(
-            eq(
-              schema.emailDeliveryTable.outboxId,
-              delivery.outboxId
-            )
-          );
+          .where(eq(schema.emailDeliveryTable.outboxId, delivery.outboxId));
 
         expect(stored).toMatchObject({
           nextAttemptAt: null,
