@@ -17,6 +17,11 @@ import {
   contactAttributeDefinitionTable,
   contactAttributeValueTable,
   contactTable,
+  emailContactTable,
+  emailDeliveryTable,
+  emailOutboxTable,
+  emailProviderEventTable,
+  emailSubscriptionTable,
   invitationTable,
   jwtSecretTable,
   memberTable,
@@ -84,6 +89,11 @@ export const relations = defineRelations(
     contactAttributeValueTable,
     submissionNotificationBatchTable,
     submissionNotificationQueueTable,
+    emailOutboxTable,
+    emailDeliveryTable,
+    emailProviderEventTable,
+    emailContactTable,
+    emailSubscriptionTable,
   },
   (r) => ({
     userTable: {
@@ -266,6 +276,18 @@ export const relations = defineRelations(
       contacts: r.many.contactTable({
         from: r.organizationTable.id,
         to: r.contactTable.organizationId,
+      }),
+      emailOutbox: r.many.emailOutboxTable({
+        from: r.organizationTable.id,
+        to: r.emailOutboxTable.organizationId,
+      }),
+      emailContacts: r.many.emailContactTable({
+        from: r.organizationTable.id,
+        to: r.emailContactTable.organizationId,
+      }),
+      emailSubscriptions: r.many.emailSubscriptionTable({
+        from: r.organizationTable.id,
+        to: r.emailSubscriptionTable.organizationId,
       }),
       contactAttributeDefinitions: r.many.contactAttributeDefinitionTable({
         from: r.organizationTable.id,
@@ -564,6 +586,56 @@ export const relations = defineRelations(
       attributeValues: r.many.contactAttributeValueTable({
         from: r.contactTable.id,
         to: r.contactAttributeValueTable.contactId,
+      }),
+    },
+    emailOutboxTable: {
+      organization: r.one.organizationTable({
+        from: r.emailOutboxTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      deliveries: r.many.emailDeliveryTable({
+        from: r.emailOutboxTable.id,
+        to: r.emailDeliveryTable.outboxId,
+      }),
+    },
+    emailDeliveryTable: {
+      outbox: r.one.emailOutboxTable({
+        from: r.emailDeliveryTable.outboxId,
+        to: r.emailOutboxTable.id,
+      }),
+      providerEvents: r.many.emailProviderEventTable({
+        from: r.emailDeliveryTable.id,
+        to: r.emailProviderEventTable.deliveryId,
+      }),
+    },
+    emailProviderEventTable: {
+      delivery: r.one.emailDeliveryTable({
+        from: r.emailProviderEventTable.deliveryId,
+        to: r.emailDeliveryTable.id,
+      }),
+    },
+    emailContactTable: {
+      organization: r.one.organizationTable({
+        from: r.emailContactTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      user: r.one.userTable({
+        from: r.emailContactTable.userId,
+        to: r.userTable.id,
+      }),
+      subscriptions: r.many.emailSubscriptionTable({
+        from: r.emailContactTable.id,
+        to: r.emailSubscriptionTable.contactId,
+      }),
+    },
+    emailSubscriptionTable: {
+      organization: r.one.organizationTable({
+        from: r.emailSubscriptionTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      contact: r.one.emailContactTable({
+        from: r.emailSubscriptionTable.contactId,
+        to: r.emailContactTable.id,
       }),
     },
     contactAttributeDefinitionTable: {

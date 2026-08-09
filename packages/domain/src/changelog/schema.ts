@@ -67,6 +67,17 @@ export const ChangelogUpdate = S.Struct({
 
 export type TChangelogUpdate = S.Schema.Type<typeof ChangelogUpdate>;
 
+/** Idempotent request to email subscribers about an already-published entry. */
+export const ChangelogSendUpdate = S.Struct({
+  id: ChangelogId.schema,
+  organizationId: WorkspaceId.schema,
+  requestId: S.NonEmptyString,
+});
+
+export type TChangelogSendUpdate = S.Schema.Type<
+  typeof ChangelogSendUpdate
+>;
+
 export const ChangelogDelete = S.Struct({
   id: ChangelogId.schema,
   organizationId: WorkspaceId.schema,

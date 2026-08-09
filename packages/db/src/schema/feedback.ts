@@ -14,6 +14,7 @@ import {
   real,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
@@ -1072,6 +1073,266 @@ export const submissionNotificationBatchTable = pgTable(
       .defaultNow()
       .notNull(),
   }
+);
+
+export type TEmailIntentKind =
+  | "submission.created"
+  | "changelog.published"
+  | "changelog.update_requested"
+  | "post.status_changed"
+  | "post.official_update_published"
+  | "post.merged"
+  | "post.closed";
+
+export type TEmailOutboxState =
+  | "pending"
+  | "materialized"
+  | "paused_by_plan"
+  | "expired";
+
+export type TEmailDeliveryState =
+  | "queued"
+  | "sending"
+  | "accepted"
+  | "delivered"
+  | "deferred"
+  | "bounced"
+  | "failed"
+  | "suppressed"
+  | "paused_by_plan"
+  | "expired";
+
+export type TEmailContactVerificationState = "pending" | "verified";
+
+export type TEmailSubscriptionTopicType = "changelog" | "post";
+
+export type TEmailSubscriptionSource = "explicit" | "post_creator";
+
+export type TEmailSubscriptionState =
+  | "pending_verification"
+  | "active"
+  | "paused_by_plan"
+  | "unsubscribed";
+
+export type TEmailSuppressionReason =
+  | "hard_bounce"
+  | "complaint"
+  | "administrative_block";
+
+export type TEmailProviderEventType =
+  | "delivered"
+  | "deferred"
+  | "bounced"
+  | "failed"
+  | "complained";
+
+/**
+ * Durable product events that may materialize into one or more email
+ * deliveries. The payload is decoded by the owning email-outbox repository;
+ * JSONB itself remains a serialized boundary.
+ */
+export const emailOutboxTable = pgTable(
+  "email_outbox",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<TEmailIntentKind>().notNull(),
+    aggregateType: text("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    deduplicationKey: text("deduplication_key").notNull(),
+    payload: jsonb("payload").$type<unknown>().notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    state: text("state").$type<TEmailOutboxState>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_outbox_organizationId_deduplicationKey_uidx").on(
+      table.organizationId,
+      table.deduplicationKey
+    ),
+    index("email_outbox_state_scheduledAt_idx").on(
+      table.state,
+      table.scheduledAt
+    ),
+    index("email_outbox_organizationId_state_idx").on(
+      table.organizationId,
+      table.state
+    ),
+    uniqueIndex("email_outbox_pendingStatusAggregate_uidx")
+      .on(table.organizationId, table.kind, table.aggregateId)
+      .where(
+        sql`${table.state} = 'pending' AND ${table.kind} = 'post.status_changed'`
+      ),
+  ]
+);
+
+/** One independently retryable recipient delivery for an email outbox intent. */
+export const emailDeliveryTable = pgTable(
+  "email_delivery",
+  {
+    id: text("id").primaryKey(),
+    outboxId: text("outbox_id")
+      .notNull()
+      .references(() => emailOutboxTable.id, { onDelete: "cascade" }),
+    contactId: text("contact_id").references(() => emailContactTable.id, {
+      onDelete: "set null",
+    }),
+    recipientEmail: text("recipient_email").notNull(),
+    template: text("template").notNull(),
+    templateVersion: integer("template_version").notNull(),
+    templatePayload: jsonb("template_payload").$type<unknown>().notNull(),
+    messageId: text("message_id").notNull(),
+    state: text("state").$type<TEmailDeliveryState>().notNull(),
+    attemptCount: integer("attempt_count").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    lastError: jsonb("last_error").$type<unknown>(),
+    providerMetadata: jsonb("provider_metadata").$type<unknown>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_delivery_outboxId_recipientEmail_uidx").on(
+      table.outboxId,
+      table.recipientEmail
+    ),
+    uniqueIndex("email_delivery_messageId_uidx").on(table.messageId),
+    index("email_delivery_state_nextAttemptAt_idx").on(
+      table.state,
+      table.nextAttemptAt
+    ),
+  ]
+);
+
+/** A workspace-scoped email address that can optionally belong to a user. */
+export const emailContactTable = pgTable(
+  "email_contact",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => userTable.id, {
+      onDelete: "set null",
+    }),
+    email: text("email").notNull(),
+    verificationState: text("verification_state")
+      .$type<TEmailContactVerificationState>()
+      .notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_contact_organizationId_email_uidx").on(
+      table.organizationId,
+      table.email
+    ),
+    index("email_contact_userId_idx").on(table.userId),
+  ]
+);
+
+export const emailSubscriptionTable = pgTable(
+  "email_subscription",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => emailContactTable.id, { onDelete: "cascade" }),
+    topicType: text("topic_type").$type<TEmailSubscriptionTopicType>().notNull(),
+    topicId: text("topic_id"),
+    source: text("source").$type<TEmailSubscriptionSource>().notNull(),
+    state: text("state").$type<TEmailSubscriptionState>().notNull(),
+    verificationTokenHash: text("verification_token_hash"),
+    verificationExpiresAt: timestamp("verification_expires_at", {
+      withTimezone: true,
+    }),
+    unsubscribeTokenHash: text("unsubscribe_token_hash"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    unique("email_subscription_contactId_topicType_topicId_uidx")
+      .on(table.contactId, table.topicType, table.topicId)
+      .nullsNotDistinct(),
+    index("email_subscription_organizationId_state_idx").on(
+      table.organizationId,
+      table.state
+    ),
+  ]
+);
+
+export const emailSuppressionTable = pgTable(
+  "email_suppression",
+  {
+    email: text("email").primaryKey(),
+    reason: text("reason").$type<TEmailSuppressionReason>().notNull(),
+    providerEventId: text("provider_event_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_suppression_providerEventId_uidx").on(
+      table.providerEventId
+    ),
+  ]
+);
+
+/**
+ * Provider lifecycle events are an idempotency ledger. The event payload is
+ * reduced to a safe, provider-neutral schema before it reaches this table.
+ */
+export const emailProviderEventTable = pgTable(
+  "email_provider_event",
+  {
+    providerEventId: text("provider_event_id").primaryKey(),
+    deliveryId: text("delivery_id")
+      .notNull()
+      .references(() => emailDeliveryTable.id, { onDelete: "cascade" }),
+    type: text("type").$type<TEmailProviderEventType>().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    metadata: jsonb("metadata").$type<unknown>().notNull(),
+  },
+  (table) => [
+    index("email_provider_event_deliveryId_occurredAt_idx").on(
+      table.deliveryId,
+      table.occurredAt
+    ),
+  ]
 );
 
 export const notificationTable = pgTable(

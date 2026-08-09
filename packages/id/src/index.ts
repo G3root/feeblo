@@ -51,6 +51,18 @@ export const PostReactionId = makeId("post_reaction", "rct", {
 export const PostSubscriptionId = makeId("post_subscription", "psb", {
   approximateLength,
 });
+export const EmailOutboxId = makeId("email_outbox", "eob", {
+  approximateLength,
+});
+export const EmailDeliveryId = makeId("email_delivery", "edl", {
+  approximateLength,
+});
+export const EmailContactId = makeId("email_contact", "ect", {
+  approximateLength,
+});
+export const EmailSubscriptionId = makeId("email_subscription", "esb", {
+  approximateLength,
+});
 export const PostActivityId = makeId("post_activity", "pac", {
   approximateLength,
 });

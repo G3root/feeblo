@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { WorkspaceRepository } from "../workspace/repository";
+import type { EmailIntentKind } from "../email-outbox/schema";
 
 type TCanCreateBoard = {
   organizationId: string;
@@ -192,6 +193,40 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
+  /** Whether a workspace may create public changelog or post email subscriptions. */
+  const mayCreatePublicEmailSubscriptions = Effect.fn(
+    "EntitlementPolicy.mayCreatePublicEmailSubscriptions"
+  )(function* (organizationId: string) {
+    const { entitlements } = yield* findEntitlements(organizationId);
+    return entitlements.capabilities.subscriberEmails;
+  });
+
+  /** Whether the workspace plan currently permits an email intent to materialize. */
+  const mayMaterializeEmailIntent = Effect.fn(
+    "EntitlementPolicy.mayMaterializeEmailIntent"
+  )(function* ({
+    organizationId,
+    kind,
+  }: {
+    readonly organizationId: string;
+    readonly kind: EmailIntentKind;
+  }) {
+    if (kind === "submission.created") {
+      return true;
+    }
+
+    const { entitlements } = yield* findEntitlements(organizationId);
+    return entitlements.capabilities.subscriberEmails;
+  });
+
+  /** Maximum submission-notification recipients, or `null` when unlimited. */
+  const submissionNotificationRecipientLimit = Effect.fn(
+    "EntitlementPolicy.submissionNotificationRecipientLimit"
+  )(function* (organizationId: string) {
+    const { entitlements } = yield* findEntitlements(organizationId);
+    return entitlements.limits.submissionNotificationRecipients;
+  });
+
   return {
     canCreateBoard,
     canUpdateBoardVisibility,
@@ -201,6 +236,9 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateRoadmap,
     canUpdateRoadmapVisibility,
     canCreateChangelogCategory,
+    mayCreatePublicEmailSubscriptions,
+    mayMaterializeEmailIntent,
+    submissionNotificationRecipientLimit,
   };
 });
 

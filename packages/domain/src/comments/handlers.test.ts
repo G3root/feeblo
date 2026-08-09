@@ -1286,5 +1286,27 @@ describe("CommentRpcHandlers", () => {
         })
       );
     });
+
+    it.effect("does not subscribe a user when they comment", () =>
+      Effect.gen(function* () {
+        const handlers = yield* CommentRpcHandlersEffect;
+        const subscriptions = yield* PostSubscriptionRepository;
+        const fixture = yield* makeFixture();
+        const commentId = yield* CommentId.generate;
+
+        yield* handlers
+          .CommentCreate(
+            commentCreateInput(fixture, commentId, "A comment without opt-in")
+          )
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        const isSubscribed = yield* subscriptions.isSubscribed({
+          organizationId: fixture.organizationId,
+          postId: fixture.postId,
+          userId: fixture.userId,
+        });
+        expect(isSubscribed).toBe(false);
+      })
+    );
   });
 });

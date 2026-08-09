@@ -7,7 +7,6 @@ import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import { PostActivityRepository } from "../post-activity/repository";
-import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
@@ -32,7 +31,6 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   const commentPolicy = yield* CommentPolicy;
   // const sitePolicy = yield* SitePolicy;
 
-  const subscriptionRepository = yield* PostSubscriptionRepository;
   const notifications = yield* Effect.serviceOption(NotificationService);
 
   // -- Shared effect helpers (no policy applied) --
@@ -60,14 +58,6 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             kind: "COMMENT_CREATED",
             commentId: args.id,
             nextValue: args.visibility,
-          });
-
-          // Commenting on a post automatically subscribes the user to it.
-          yield* subscriptionRepository.subscribe({
-            organizationId: args.organizationId,
-            postId: args.postId,
-            userId: session.session.userId,
-            ...(membership ? { memberId: membership.membershipId } : {}),
           });
 
           yield* Option.match(notifications, {
@@ -313,6 +303,5 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(PostRepository.layer),
   Layer.provide(CommentRepository.layer),
   Layer.provide(PostActivityRepository.layer),
-  Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(NotificationService.layer)
 );

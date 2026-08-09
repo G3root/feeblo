@@ -9,7 +9,9 @@ import {
 } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import { PostPolicy } from "../post/policies";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { PostRepository } from "../post/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { PostSubscriptionRpcHandlersEffect } from "./handlers";
@@ -111,7 +113,8 @@ describe("PostSubscriptionRpcHandlers", () => {
     });
   const Repositories = Layer.mergeAll(
     PostRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    EmailSubscriptionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
@@ -162,6 +165,15 @@ describe("PostSubscriptionRpcHandlers", () => {
               .PostSubscriptionList(input)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toHaveLength(0);
+          const emailSubscription = yield* (yield* EmailSubscriptionRepository)
+            .findSubscription({
+              email: "user@example.com",
+              organizationId: f.organizationId,
+              topic: { topicId: f.postId, topicType: "post" },
+            });
+          expect(emailSubscription.pipe(Option.getOrUndefined)).toMatchObject({
+            state: "unsubscribed",
+          });
         })
       );
       it.effect("lists only the authenticated public subscriber", () =>

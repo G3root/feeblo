@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
+import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { S3UploadService } from "../services/s3";
 import { S3Test } from "../services/s3-test";
@@ -66,10 +67,40 @@ describe("ChangelogRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+      const productId = `product_${organizationId}`;
+      yield* db.insert(schema.productTable).values({
+        id: productId,
+        name: "Starter",
+        isRecurring: true,
+        isArchived: false,
+        externalOrganizationId: "feeblo",
+        visibility: "public",
+        metadata: { plan: "starter", variant: "monthly" },
+        createdAt: now,
+        updatedAt: now,
+      });
+      yield* db.insert(schema.subscriptionTable).values({
+        id: `subscription_${organizationId}`,
+        externalId: `external_${organizationId}`,
+        organizationId,
+        amount: 1000,
+        cancelAtPeriodEnd: false,
+        currency: "usd",
+        recurringInterval: "month",
+        recurringIntervalCount: 1,
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+        customerId: `customer_${organizationId}`,
+        productId,
+        createdAt: now,
+        updatedAt: now,
+      });
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
   const Repositories = Layer.mergeAll(
     ChangelogRepository.layer,
+    EmailOutboxRepository.layer,
     SiteRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
@@ -272,6 +303,144 @@ describe("ChangelogRpcHandlers", () => {
             )
         );
         expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("records one email intent when a changelog is first published", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const outbox = yield* EmailOutboxRepository;
+        const fixture = yield* makeFixture();
+        const id = yield* ChangelogId.generate;
+        const session = makeSession(fixture);
+
+        yield* handlers
+          .ChangelogCreate({
+            assetIds: [],
+            id,
+            organizationId: fixture.organizationId,
+            title: "Published release",
+            slug: "published-release",
+            content: "First publication",
+            status: "published",
+            scheduledAt: null,
+            publishedAt: new Date(),
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const intents = yield* outbox.findPending({
+          before: new Date(Date.now() + 60_000),
+          organizationId: fixture.organizationId,
+        });
+        expect(intents.map(({ kind }) => kind)).toEqual([
+          "changelog.published",
+        ]);
+      })
+    );
+
+    it.effect("does not send publication again when an already-published changelog is edited", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const outbox = yield* EmailOutboxRepository;
+        const fixture = yield* makeFixture();
+        const id = yield* ChangelogId.generate;
+        const session = makeSession(fixture);
+        const publishedAt = new Date();
+
+        yield* handlers
+          .ChangelogCreate({
+            assetIds: [],
+            id,
+            organizationId: fixture.organizationId,
+            title: "Draft release",
+            slug: "draft-release",
+            content: "Draft",
+            status: "draft",
+            scheduledAt: null,
+            publishedAt: null,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+        yield* handlers
+          .ChangelogUpdate({
+            assetIds: [],
+            id,
+            organizationId: fixture.organizationId,
+            title: "Published release",
+            slug: "published-release",
+            content: "Published",
+            status: "published",
+            scheduledAt: null,
+            publishedAt,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+        yield* handlers
+          .ChangelogUpdate({
+            assetIds: [],
+            id,
+            organizationId: fixture.organizationId,
+            title: "Edited release",
+            slug: "edited-release",
+            content: "Edited after publication",
+            status: "published",
+            scheduledAt: null,
+            publishedAt,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const intents = yield* outbox.findPending({
+          before: new Date(Date.now() + 60_000),
+          organizationId: fixture.organizationId,
+        });
+        expect(intents.map(({ kind }) => kind)).toEqual([
+          "changelog.published",
+        ]);
+      })
+    );
+
+    it.effect("records distinct explicit changelog update requests idempotently", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const outbox = yield* EmailOutboxRepository;
+        const fixture = yield* makeFixture();
+        const id = yield* ChangelogId.generate;
+        const session = makeSession(fixture);
+
+        yield* handlers
+          .ChangelogCreate({
+            assetIds: [],
+            id,
+            organizationId: fixture.organizationId,
+            title: "Published release",
+            slug: "published-release",
+            content: "Published",
+            status: "published",
+            scheduledAt: null,
+            publishedAt: new Date(),
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const sendUpdate = (requestId: string) =>
+          handlers
+            .ChangelogSendUpdate({
+              id,
+              organizationId: fixture.organizationId,
+              requestId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+        yield* sendUpdate("request-one");
+        yield* sendUpdate("request-one");
+        yield* sendUpdate("request-two");
+
+        const intents = yield* outbox.findPending({
+          before: new Date(Date.now() + 60_000),
+          organizationId: fixture.organizationId,
+        });
+        expect(intents.map(({ kind }) => kind)).toEqual([
+          "changelog.published",
+          "changelog.update_requested",
+          "changelog.update_requested",
+        ]);
       })
     );
   });
