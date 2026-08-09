@@ -40,7 +40,7 @@ export function BoardListView({
         {groupedPosts.map((lane) => (
           <AccordionPrimitive.Item key={lane.statusId} value={lane.statusId}>
             <div className="relative">
-              <AccordionTrigger className="rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden">
+              <AccordionTrigger className="group/accordion-trigger rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-indicator]:hidden">
                 <div className="flex items-center gap-2">
                   <HugeiconsIcon
                     className="size-4 text-muted-foreground group-aria-expanded/accordion-trigger:hidden"
