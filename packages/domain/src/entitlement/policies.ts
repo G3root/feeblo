@@ -134,6 +134,17 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
+  const canUseAutomaticSso = (organizationId: string) =>
+    Effect.gen(function* () {
+      const { entitlements } = yield* findEntitlements(organizationId);
+
+      if (!entitlements.capabilities.automaticSso) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Automatic SSO requires the Starter plan or higher.",
+        });
+      }
+    });
+
   const canAssignPrivilegedRole = <E, R>(
     args: TCanAssignPrivilegedRole & {
       privilegedRoleCount: Effect.Effect<number, E, R>;
@@ -185,6 +196,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateBoard,
     canUpdateBoardVisibility,
     canHidePoweredByBranding,
+    canUseAutomaticSso,
     canAssignPrivilegedRole,
     canCreateRoadmap,
     canUpdateRoadmapVisibility,

@@ -29,7 +29,8 @@ export interface SsoUserError {
     | "INVALID_JWT"
     | "SSO_TOKEN_MISSING_EMAIL_OR_NAME"
     | "FAILED_TO_CREATE_SSO_USER"
-    | "FAILED_TO_CREATE_SSO_CONTACT";
+    | "FAILED_TO_CREATE_SSO_CONTACT"
+    | "AUTOMATIC_SSO_NOT_ENTITLED";
   message?: string;
 }
 

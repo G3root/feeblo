@@ -15,6 +15,7 @@ import { SettingsAccessDenied } from "~/features/settings/components/settings-ac
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import { jwtSecretCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 
@@ -45,12 +46,29 @@ function RouteComponent() {
   const { allowed: canManageSecurity, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "workspace.update")
   );
+  const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
 
   if (isPolicyPending) {
     return null;
   }
   if (!canManageSecurity) {
     return <SettingsAccessDenied />;
+  }
+
+  if (isEntitlementsLoading) {
+    return null;
+  }
+  if (!entitlements.capabilities.automaticSso) {
+    return (
+      <SettingsLayout.Root>
+        <SettingsLayout.Header>
+          <SettingsLayout.HeaderTitle>Security</SettingsLayout.HeaderTitle>
+          <SettingsLayout.HeaderDescription>
+            Automatic SSO requires the Starter plan or higher.
+          </SettingsLayout.HeaderDescription>
+        </SettingsLayout.Header>
+      </SettingsLayout.Root>
+    );
   }
 
   return <SecuritySettingsContent organizationId={organizationId} />;

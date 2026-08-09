@@ -7,6 +7,8 @@ import * as Layer from "effect/Layer";
 import { CurrentSession, type Session } from "../session-middleware";
 import { JwtSecretRpcHandlersEffect } from "./handlers";
 import { JwtSecretRepository } from "./repository";
+import { EntitlementPolicy } from "../entitlement/policies";
+import { WorkspaceRepository } from "../workspace/repository";
 
 describe("JwtSecretRpcHandlers", () => {
   type Fixture = {
@@ -33,7 +35,7 @@ describe("JwtSecretRpcHandlers", () => {
     ],
   });
 
-  const makeFixture = () =>
+  const makeFixture = (hasAutomaticSso = true) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
@@ -58,24 +60,61 @@ describe("JwtSecretRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+      if (hasAutomaticSso) {
+        const productId = `prod_sso_${organizationId}`;
+        yield* db.insert(schema.productTable).values({
+          id: productId,
+          name: "Starter monthly",
+          isRecurring: true,
+          isArchived: false,
+          externalOrganizationId: "polar_org",
+          visibility: "PUBLIC",
+          recurringInterval: "month",
+          metadata: { plan: "starter", variant: "monthly" },
+        });
+        yield* db.insert(schema.subscriptionTable).values({
+          id: `sub_sso_${organizationId}`,
+          externalId: `sub_ext_sso_${organizationId}`,
+          organizationId,
+          amount: 4900,
+          cancelAtPeriodEnd: false,
+          currency: "usd",
+          recurringInterval: "month",
+          recurringIntervalCount: 1,
+          status: "trialing",
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+          customerId: `cus_sso_${organizationId}`,
+          productId,
+        });
+      }
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
-  const TestLayer = Layer.merge(
-    JwtSecretRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+  const Repositories = Layer.mergeAll(
+    JwtSecretRepository.layer,
+    WorkspaceRepository.layer,
     Database.PgliteDatabaseLive
+  );
+  const TestLayer = Layer.mergeAll(
+    Repositories,
+    EntitlementPolicy.layer.pipe(Layer.provide(Repositories))
   );
 
   layer(TestLayer)("handlers", (it) => {
-    it.effect("returns an empty list until a secret is generated", () =>
+    it.effect("rejects free-plan organizations from managing SSO secrets", () =>
       Effect.gen(function* () {
         const handlers = yield* JwtSecretRpcHandlersEffect;
-        const fixture = yield* makeFixture();
-        const secrets = yield* handlers
+        const fixture = yield* makeFixture(false);
+        const error = yield* Effect.flip(
+          handlers
           .JwtSecretList({ organizationId: fixture.organizationId })
-          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-        // Reading must never materialize a signing secret.
-        expect(secrets).toHaveLength(0);
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+        expect(error).toMatchObject({
+          _tag: "PolicyDenied",
+          reason: "Automatic SSO requires the Starter plan or higher.",
+        });
       })
     );
 

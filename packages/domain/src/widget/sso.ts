@@ -22,6 +22,8 @@ import { parsePersonAttributes } from "../contact/utils";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import { UserRepository } from "../user/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
+import { PolicyDeniedError } from "../policy";
 
 /**
  * Tagged error raised by the SSO programs. The `code` is mapped back to a
@@ -35,6 +37,7 @@ export class SsoError extends S.TaggedErrorClass<SsoError>()("SsoError", {
     "SSO_TOKEN_MISSING_EMAIL_OR_NAME",
     "FAILED_TO_CREATE_SSO_USER",
     "FAILED_TO_CREATE_SSO_CONTACT",
+    "AUTOMATIC_SSO_NOT_ENTITLED",
   ]),
   message: S.optional(S.String),
 }) {}
@@ -134,9 +137,19 @@ export const createSsoSession = ({
   token: string;
 }) =>
   Effect.gen(function* () {
+    const entitlementPolicy = yield* EntitlementPolicy;
     const jwtSecretRepository = yield* JwtSecretRepository;
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const userRepository = yield* UserRepository;
+
+    yield* entitlementPolicy.canUseAutomaticSso(organizationId).pipe(
+      Effect.mapError(
+        (error) =>
+          error instanceof PolicyDeniedError
+            ? new SsoError({ code: "AUTOMATIC_SSO_NOT_ENTITLED" })
+            : error
+      )
+    );
 
     const secrets = yield* jwtSecretRepository.getSecretsForOrg({
       organizationId,

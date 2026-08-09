@@ -6,6 +6,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as jose from "jose";
 import { createSsoSession, SsoRepositoriesLive } from "./sso";
+import { EntitlementPolicy } from "../entitlement/policies";
+import { WorkspaceRepository } from "../workspace/repository";
 
 const signToken = (payload: jose.JWTPayload, secret: string) =>
   Effect.promise(() =>
@@ -17,8 +19,14 @@ const signToken = (payload: jose.JWTPayload, secret: string) =>
 const futureExp = Math.floor(Date.now() / 1000) + 3600;
 const pastExp = Math.floor(Date.now() / 1000) - 3600;
 
-const TestLayer = SsoRepositoriesLive.pipe(
-  Layer.provideMerge(Database.PgliteDatabaseLive)
+const Repositories = Layer.mergeAll(
+  SsoRepositoriesLive,
+  WorkspaceRepository.layer,
+  Database.PgliteDatabaseLive
+);
+const TestLayer = Layer.mergeAll(
+  Repositories,
+  EntitlementPolicy.layer.pipe(Layer.provide(Repositories))
 );
 
 describe("createSsoSession", () => {
@@ -27,7 +35,7 @@ describe("createSsoSession", () => {
     secret: string;
   };
 
-  const makeFixture = (withSecret: boolean) =>
+  const makeFixture = (withSecret: boolean, hasAutomaticSso = true) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
@@ -47,6 +55,35 @@ describe("createSsoSession", () => {
           secret: `secret-${organizationId}`,
           createdAt: now,
           revokedAt: null,
+        });
+      }
+
+      if (hasAutomaticSso) {
+        const productId = `prod_sso_${organizationId}`;
+        yield* db.insert(schema.productTable).values({
+          id: productId,
+          name: "Starter monthly",
+          isRecurring: true,
+          isArchived: false,
+          externalOrganizationId: "polar_org",
+          visibility: "PUBLIC",
+          recurringInterval: "month",
+          metadata: { plan: "starter", variant: "monthly" },
+        });
+        yield* db.insert(schema.subscriptionTable).values({
+          id: `sub_sso_${organizationId}`,
+          externalId: `sub_ext_sso_${organizationId}`,
+          organizationId,
+          amount: 4900,
+          cancelAtPeriodEnd: false,
+          currency: "usd",
+          recurringInterval: "month",
+          recurringIntervalCount: 1,
+          status: "trialing",
+          currentPeriodStart: now,
+          currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+          customerId: `cus_sso_${organizationId}`,
+          productId,
         });
       }
 
@@ -93,6 +130,18 @@ describe("createSsoSession", () => {
           .where(eq(schema.contactTable.email, "ada@example.com"));
         expect(contact?.email).toBe("ada@example.com");
         expect(contact?.userId).toBe(result.userId);
+      })
+    );
+
+    it.effect("rejects automatic SSO for free-plan organizations", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture(true, false);
+        const token = yield* signToken(validPayload(fixture), fixture.secret);
+
+        const error = yield* Effect.flip(
+          createSsoSession({ organizationId: fixture.organizationId, token })
+        );
+        expect(error.code).toBe("AUTOMATIC_SSO_NOT_ENTITLED");
       })
     );
 
