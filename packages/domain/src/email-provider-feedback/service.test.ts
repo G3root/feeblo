@@ -12,7 +12,10 @@ describe("EmailProviderFeedbackService", () => {
     Layer.provideMerge(Database.PgliteDatabaseLive)
   );
 
-  const makeDelivery = (state: "accepted" | "delivered" | "sending") =>
+  const makeDelivery = (
+    state: "accepted" | "delivered" | "sending",
+    recipientEmail = "feedback@example.com"
+  ) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
@@ -43,7 +46,7 @@ describe("EmailProviderFeedbackService", () => {
         id: deliveryId,
         outboxId,
         contactId: null,
-        recipientEmail: "feedback@example.com",
+        recipientEmail,
         template: "submission-notification",
         templateVersion: 1,
         templatePayload: { postId: "pst_feedback" },
@@ -57,7 +60,7 @@ describe("EmailProviderFeedbackService", () => {
         providerMetadata: null,
       });
 
-      return { deliveryId, messageId };
+      return { deliveryId, messageId, outboxId };
     });
 
   layer(TestLayer)("service", (it) => {
@@ -133,7 +136,7 @@ describe("EmailProviderFeedbackService", () => {
           .where(
             eq(
               schema.emailDeliveryTable.outboxId,
-              `eob_${delivery.deliveryId.slice(4)}`
+              delivery.outboxId
             )
           );
 
@@ -151,7 +154,10 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
-          const delivery = yield* makeDelivery("accepted");
+          const delivery = yield* makeDelivery(
+            "accepted",
+            "bounce-feedback@example.com"
+          );
           const event = {
             bounceType: "hard" as const,
             eventId: "provider-bounce-1",
@@ -169,7 +175,10 @@ describe("EmailProviderFeedbackService", () => {
             .select({ reason: schema.emailSuppressionTable.reason })
             .from(schema.emailSuppressionTable)
             .where(
-              eq(schema.emailSuppressionTable.email, "feedback@example.com")
+              eq(
+                schema.emailSuppressionTable.email,
+                "bounce-feedback@example.com"
+              )
             );
           const events = yield* db
             .select({
@@ -191,8 +200,14 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
-          const failedDelivery = yield* makeDelivery("sending");
-          const complaintDelivery = yield* makeDelivery("delivered");
+          const failedDelivery = yield* makeDelivery(
+            "sending",
+            "failed-feedback@example.com"
+          );
+          const complaintDelivery = yield* makeDelivery(
+            "delivered",
+            "complaint-feedback@example.com"
+          );
 
           yield* service.ingest({
             eventId: "provider-failed-1",
@@ -221,7 +236,10 @@ describe("EmailProviderFeedbackService", () => {
             .select({ reason: schema.emailSuppressionTable.reason })
             .from(schema.emailSuppressionTable)
             .where(
-              eq(schema.emailSuppressionTable.email, "feedback@example.com")
+              eq(
+                schema.emailSuppressionTable.email,
+                "complaint-feedback@example.com"
+              )
             );
 
           expect(failed?.state).toBe("failed");

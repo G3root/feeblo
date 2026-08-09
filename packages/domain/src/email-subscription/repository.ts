@@ -100,8 +100,11 @@ const verifiedStateFor = (
   subscription: Subscription | undefined,
   alreadyVerified: boolean
 ): Subscription["state"] => {
-  if (subscription?.state === "paused_by_plan") {
-    return "paused_by_plan";
+  if (
+    subscription?.state === "paused_by_plan" ||
+    subscription?.state === "unsubscribed"
+  ) {
+    return subscription.state;
   }
   if (alreadyVerified || subscription?.state === "active") {
     return "active";
@@ -239,6 +242,14 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       input.topic
     );
     const priorSubscription = Option.getOrUndefined(existingSubscription);
+    if (priorSubscription?.state === "unsubscribed") {
+      return {
+        contact: persistedContact,
+        subscription: priorSubscription,
+        unsubscribeToken: Option.none<EmailSubscriptionToken>(),
+        verificationToken: Option.none<EmailSubscriptionToken>(),
+      };
+    }
     const state = verifiedStateFor(priorSubscription, alreadyVerified);
     const unsubscribeToken =
       priorSubscription === undefined
@@ -570,46 +581,36 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       input.email,
       "upsertSuppression"
     );
-    const [inserted] = yield* db
+    if (input.providerEventId !== null) {
+      const [inserted] = yield* db
+        .insert(schema.emailSuppressionTable)
+        .values({
+          email,
+          reason: input.reason,
+          providerEventId: input.providerEventId,
+        })
+        .onConflictDoNothing({
+          target: schema.emailSuppressionTable.providerEventId,
+        })
+        .returning({ email: schema.emailSuppressionTable.email });
+      return inserted === undefined
+        ? { _tag: "DuplicateEvent" as const }
+        : { _tag: "Upserted" as const };
+    }
+
+    const [upserted] = yield* db
       .insert(schema.emailSuppressionTable)
       .values({
         email,
         reason: input.reason,
-        providerEventId: input.providerEventId,
+        providerEventId: null,
       })
-      .onConflictDoNothing()
-      .returning({ email: schema.emailSuppressionTable.email });
-    if (inserted !== undefined) {
-      return { _tag: "Upserted" as const };
-    }
-
-    if (input.providerEventId !== null) {
-      const [duplicate] = yield* db
-        .select({
-          providerEventId: schema.emailSuppressionTable.providerEventId,
-        })
-        .from(schema.emailSuppressionTable)
-        .where(
-          eq(
-            schema.emailSuppressionTable.providerEventId,
-            input.providerEventId
-          )
-        )
-        .limit(1);
-      if (duplicate !== undefined) {
-        return { _tag: "DuplicateEvent" as const };
-      }
-    }
-
-    const updated = yield* db
-      .update(schema.emailSuppressionTable)
-      .set({
-        reason: input.reason,
-        providerEventId: input.providerEventId,
+      .onConflictDoUpdate({
+        target: schema.emailSuppressionTable.email,
+        set: { reason: input.reason },
       })
-      .where(eq(schema.emailSuppressionTable.email, email))
       .returning({ email: schema.emailSuppressionTable.email });
-    return updated.length === 1
+    return upserted !== undefined
       ? { _tag: "Upserted" as const }
       : yield* dataError(
           "upsertSuppression",

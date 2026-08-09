@@ -6,7 +6,7 @@ import {
   resetTestMailer,
   testMailerState,
 } from "@feeblo/transactional/mailer/test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { TestClock } from "effect/testing";
@@ -509,7 +509,19 @@ describe("EmailOutbox workflows", () => {
             (yield* (yield* EmailOutboxRepository).findById(intent.intent.id))
               ?.state
           ).toBe("materialized");
-          expect(suppressed.contactId).toBeDefined();
+          const [suppressedDelivery] = yield* db
+            .select({ id: schema.emailDeliveryTable.id })
+            .from(schema.emailDeliveryTable)
+            .where(
+              and(
+                eq(schema.emailDeliveryTable.outboxId, intent.intent.id),
+                eq(
+                  schema.emailDeliveryTable.contactId,
+                  suppressed.contactId
+                )
+              )
+            );
+          expect(suppressedDelivery).toBeUndefined();
         })
     );
 

@@ -1,5 +1,5 @@
 import { describe, expect, layer } from "@effect/vitest";
-import { currentDb, Database, schema } from "@feeblo/db";
+import { currentDb, Database, schema, transaction } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
@@ -179,6 +179,40 @@ describe("EmailSubscriptionRepository", () => {
               unsubscribeToken,
             })
           ).toEqual({ _tag: "Unsubscribed" });
+        })
+    );
+
+    it.effect(
+      "does not re-enroll an unsubscribed address when requested again",
+      () =>
+        Effect.gen(function* () {
+          const organizationId = yield* WorkspaceId.generate;
+          const repository = yield* EmailSubscriptionRepository;
+
+          yield* createOrganization(organizationId);
+          const created = yield* repository.requestSubscription(
+            pendingChangelogSubscription(organizationId)
+          );
+          if (Option.isNone(created.unsubscribeToken)) {
+            return expect.fail(
+              "A new subscription must issue an unsubscribe token"
+            );
+          }
+          yield* repository.unsubscribe({
+            now: new Date("2026-08-09T00:01:00.000Z"),
+            unsubscribeToken: Redacted.value(created.unsubscribeToken.value),
+          });
+
+          const repeated = yield* repository.requestSubscription({
+            ...pendingChangelogSubscription(organizationId),
+            now: new Date("2026-08-09T00:02:00.000Z"),
+          });
+
+          expect(repeated.subscription.state).toBe("unsubscribed");
+          expect(Option.isNone(repeated.verificationToken)).toBe(true);
+          expect(repeated.subscription.unsubscribedAt).toEqual(
+            new Date("2026-08-09T00:01:00.000Z")
+          );
         })
     );
 
@@ -477,11 +511,13 @@ describe("EmailSubscriptionRepository", () => {
           const results = yield* Effect.all(
             ["first-bounce@example.com", "second-bounce@example.com"].map(
               (email) =>
-                repository.upsertSuppression({
-                  email,
-                  providerEventId: "evt_concurrent",
-                  reason: "hard_bounce",
-                })
+                transaction(
+                  repository.upsertSuppression({
+                    email,
+                    providerEventId: "evt_concurrent",
+                    reason: "hard_bounce",
+                  })
+                )
             ),
             { concurrency: "unbounded" }
           );

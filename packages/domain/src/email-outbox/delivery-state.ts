@@ -24,18 +24,11 @@ const transitionTargets: Readonly<
   suppressed: [],
 };
 
-const deliveryStates = [
-  "accepted",
-  "bounced",
-  "deferred",
-  "delivered",
-  "expired",
-  "failed",
-  "paused_by_plan",
-  "queued",
-  "sending",
-  "suppressed",
-] as const satisfies readonly EmailDeliveryState[];
+// SAFETY: transitionTargets is exhaustively keyed by EmailDeliveryState, so
+// Object.keys returns only EmailDeliveryState values.
+const deliveryStates = Object.keys(
+  transitionTargets
+) as readonly EmailDeliveryState[];
 
 /** Returns whether a delivery may move between two persisted lifecycle states. */
 export const canTransitionDelivery = (

@@ -4,6 +4,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import { deliverySourceStatesFor } from "../email-outbox/delivery-state";
 import { EmailDeliveryState } from "../email-outbox/schema";
 import { recordEmailDeliveryTransition } from "../email-outbox/telemetry";
 import { EmailAddress } from "../email-subscription/schema";
@@ -108,8 +109,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
         }
 
         const transitionDelivery = (
-          nextState: "delivered" | "deferred" | "bounced" | "failed",
-          states: readonly ("queued" | "sending" | "accepted" | "deferred")[]
+          nextState: "delivered" | "deferred" | "bounced" | "failed"
         ) =>
           db
             .update(schema.emailDeliveryTable)
@@ -123,7 +123,10 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             .where(
               and(
                 eq(schema.emailDeliveryTable.id, delivery.id),
-                inArray(schema.emailDeliveryTable.state, states)
+                inArray(
+                  schema.emailDeliveryTable.state,
+                  deliverySourceStatesFor(nextState)
+                )
               )
             )
             .returning({ id: schema.emailDeliveryTable.id })
@@ -148,11 +151,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
 
         switch (event.type) {
           case "delivered": {
-            const deliveryUpdated = yield* transitionDelivery("delivered", [
-              "sending",
-              "accepted",
-              "deferred",
-            ]);
+            const deliveryUpdated = yield* transitionDelivery("delivered");
             yield* recordEmailDeliveryTransition(
               "delivered",
               deliveryUpdated ? 1 : 0
@@ -174,12 +173,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             };
           }
           case "bounced": {
-            const deliveryUpdated = yield* transitionDelivery("bounced", [
-              "queued",
-              "sending",
-              "accepted",
-              "deferred",
-            ]);
+            const deliveryUpdated = yield* transitionDelivery("bounced");
             yield* recordEmailDeliveryTransition(
               "bounced",
               deliveryUpdated ? 1 : 0
@@ -191,12 +185,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             return { _tag: "Processed" as const, deliveryUpdated, suppressed };
           }
           case "failed": {
-            const deliveryUpdated = yield* transitionDelivery("failed", [
-              "queued",
-              "sending",
-              "accepted",
-              "deferred",
-            ]);
+            const deliveryUpdated = yield* transitionDelivery("failed");
             yield* recordEmailDeliveryTransition(
               "failed",
               deliveryUpdated ? 1 : 0
@@ -208,12 +197,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             };
           }
           case "complained": {
-            const deliveryUpdated = yield* transitionDelivery("failed", [
-              "queued",
-              "sending",
-              "accepted",
-              "deferred",
-            ]);
+            const deliveryUpdated = yield* transitionDelivery("failed");
             yield* recordEmailDeliveryTransition(
               "complained",
               deliveryUpdated ? 1 : 0

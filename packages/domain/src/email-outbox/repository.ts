@@ -626,8 +626,8 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     return rows.map((row) => row.id);
   });
 
-  const releaseSendingDelivery = Effect.fn(
-    "EmailOutboxRepository.releaseSendingDelivery"
+  const deferSendingDelivery = Effect.fn(
+    "EmailOutboxRepository.deferSendingDelivery"
   )(function* ({
     id,
     nextAttemptAt,
@@ -655,6 +655,8 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     yield* recordEmailDeliveryTransition("deferred", rows.length);
     return rows.length === 1;
   });
+
+  const releaseSendingDelivery = deferSendingDelivery;
 
   const markDeliveryAccepted = Effect.fn(
     "EmailOutboxRepository.markDeliveryAccepted"
@@ -686,35 +688,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     return rows.length === 1;
   });
 
-  const markDeliveryDeferred = Effect.fn(
-    "EmailOutboxRepository.markDeliveryDeferred"
-  )(function* ({
-    id,
-    nextAttemptAt,
-    lastError,
-  }: {
-    readonly id: string;
-    readonly nextAttemptAt: Date;
-    readonly lastError: unknown;
-  }) {
-    const rows = yield* db
-      .update(schema.emailDeliveryTable)
-      .set({
-        state: "deferred",
-        nextAttemptAt,
-        lastError,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(schema.emailDeliveryTable.id, id),
-          eq(schema.emailDeliveryTable.state, "sending")
-        )
-      )
-      .returning({ id: schema.emailDeliveryTable.id });
-    yield* recordEmailDeliveryTransition("deferred", rows.length);
-    return rows.length === 1;
-  });
+  const markDeliveryDeferred = deferSendingDelivery;
 
   const markDeliveryOutcome = Effect.fn(
     "EmailOutboxRepository.markDeliveryOutcome"

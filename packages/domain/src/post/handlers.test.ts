@@ -333,7 +333,7 @@ describe("PostRpcHandlers", () => {
               );
 
             const subscription = yield* repository.findSubscription({
-              email: "user@example.com",
+              email: `${fixture.organizationId}@example.com`,
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
