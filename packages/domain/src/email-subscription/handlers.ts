@@ -10,16 +10,22 @@ import {
   RateLimitUnavailableError,
 } from "../rate-limit";
 import { RateLimitService } from "../rate-limit/service";
-import { withRemapDbErrors } from "../rpc-errors";
+import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { WorkspaceRepository } from "../workspace/repository";
-import { EmailSubscriptionRpcs } from "./rpcs";
-import { normalizeEmailAddress } from "./schema";
 import { EmailSubscriptionRepository } from "./repository";
+import { EmailSubscriptionRpcs } from "./rpcs";
+import {
+  type EmailSubscriptionDataError,
+  type EmailSubscriptionInputError,
+  normalizeEmailAddress,
+} from "./schema";
+import type { EmailSubscriptionTokenError } from "./tokens";
 
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const EMAIL_SUBSCRIPTION_VERIFICATION_WINDOW = "24 hours";
 
 const verificationExpiration = (now: Date): Date =>
-  new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  new Date(now.getTime() + VERIFICATION_TOKEN_TTL_MS);
 
 export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
@@ -61,10 +67,13 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
     readonly organizationId: string;
   }) {
     const maySubscribe =
-      yield* entitlementPolicy.mayCreatePublicEmailSubscriptions(organizationId);
+      yield* entitlementPolicy.mayCreatePublicEmailSubscriptions(
+        organizationId
+      );
     if (!maySubscribe) {
       return yield* new Policy.PolicyDeniedError({
-        reason: "Changelog email subscriptions require the Starter plan or higher.",
+        reason:
+          "Changelog email subscriptions require the Starter plan or higher.",
       });
     }
     const email = yield* normalizeEmailAddress(
@@ -116,6 +125,22 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
 export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const consent = yield* EmailSubscriptionConsentHandlersEffect;
 
+  const internalConsentFailure = (
+    error:
+      | EmailSubscriptionDataError
+      | EmailSubscriptionInputError
+      | EmailSubscriptionTokenError
+  ) =>
+    Effect.logError("Email subscription request failed internally", error).pipe(
+      Effect.andThen(
+        Effect.fail(
+          new InternalServerError({
+            message: "Could not process the email subscription request",
+          })
+        )
+      )
+    );
+
   return {
     EmailSubscriptionChangelogSubscribePublic: ({
       email,
@@ -124,20 +149,35 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       readonly email: string;
       readonly organizationId: string;
     }) =>
-      consent
-        .requestChangelogSubscription({ email, organizationId })
-        .pipe(
-          Effect.map(({ verificationRequired }) => ({ verificationRequired })),
-          withRemapDbErrors("EmailSubscription", "create")
-        ),
-    EmailSubscriptionUnsubscribePublic: ({ token }: { readonly token: string }) =>
-      consent
-        .unsubscribe({ unsubscribeToken: token })
-        .pipe(withRemapDbErrors("EmailSubscription", "update")),
+      consent.requestChangelogSubscription({ email, organizationId }).pipe(
+        Effect.map(({ verificationRequired }) => ({ verificationRequired })),
+        Effect.catchTags({
+          EmailSubscriptionDataError: internalConsentFailure,
+          EmailSubscriptionInputError: internalConsentFailure,
+          EmailSubscriptionTokenError: internalConsentFailure,
+        }),
+        withRemapDbErrors("EmailSubscription", "create")
+      ),
+    EmailSubscriptionUnsubscribePublic: ({
+      token,
+    }: {
+      readonly token: string;
+    }) =>
+      consent.unsubscribe({ unsubscribeToken: token }).pipe(
+        Effect.catchTags({
+          EmailSubscriptionDataError: internalConsentFailure,
+          EmailSubscriptionTokenError: internalConsentFailure,
+        }),
+        withRemapDbErrors("EmailSubscription", "update")
+      ),
     EmailSubscriptionVerifyPublic: ({ token }: { readonly token: string }) =>
-      consent
-        .verifySubscription({ verificationToken: token })
-        .pipe(withRemapDbErrors("EmailSubscription", "update")),
+      consent.verifySubscription({ verificationToken: token }).pipe(
+        Effect.catchTags({
+          EmailSubscriptionDataError: internalConsentFailure,
+          EmailSubscriptionTokenError: internalConsentFailure,
+        }),
+        withRemapDbErrors("EmailSubscription", "update")
+      ),
   };
 });
 

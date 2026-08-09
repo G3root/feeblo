@@ -674,12 +674,13 @@ describe("UpvoteRpcHandlers", () => {
         const postId = yield* PostId.generate;
 
         yield* createPost(fixture, postId, "No implicit subscription");
-        yield* handlers
+        const result = yield* handlers
           .UpvoteToggle({
             organizationId: fixture.organizationId,
             postId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(result.upvoted).toBe(true);
 
         const isSubscribed = yield* subscriptions.isSubscribed({
           organizationId: fixture.organizationId,

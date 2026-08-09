@@ -1294,11 +1294,12 @@ describe("CommentRpcHandlers", () => {
         const fixture = yield* makeFixture();
         const commentId = yield* CommentId.generate;
 
-        yield* handlers
+        const result = yield* handlers
           .CommentCreate(
             commentCreateInput(fixture, commentId, "A comment without opt-in")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(result.message).toBe("Comment created successfully");
 
         const isSubscribed = yield* subscriptions.isSubscribed({
           organizationId: fixture.organizationId,

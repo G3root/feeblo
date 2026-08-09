@@ -68,14 +68,13 @@ export const EmailIntentPayload = Schema.Union([
   PostClosedEmailIntentPayload,
 ]);
 
-export type EmailIntentPayload = Schema.Schema.Type<
-  typeof EmailIntentPayload
->;
+export type EmailIntentPayload = Schema.Schema.Type<typeof EmailIntentPayload>;
 
 export const EmailOutboxState = Schema.Literals([
   "pending",
   "materialized",
   "paused_by_plan",
+  "failed",
   "expired",
 ]);
 
@@ -94,9 +93,7 @@ export const EmailDeliveryState = Schema.Literals([
   "expired",
 ]);
 
-export type EmailDeliveryState = Schema.Schema.Type<
-  typeof EmailDeliveryState
->;
+export type EmailDeliveryState = Schema.Schema.Type<typeof EmailDeliveryState>;
 
 /** Immutable, provider-neutral renderer input for version one notifications. */
 export const NotificationTemplatePayload = Schema.Struct({
@@ -114,11 +111,13 @@ export const NotificationTemplatePayload = Schema.Struct({
   unsubscribeUrl: Schema.String,
 });
 
-export type NotificationTemplatePayload =
-  Schema.Schema.Type<typeof NotificationTemplatePayload>;
+export type NotificationTemplatePayload = Schema.Schema.Type<
+  typeof NotificationTemplatePayload
+>;
 
 /** Backwards-compatible name for the original submission-only template. */
-export const SubmissionNotificationTemplatePayload = NotificationTemplatePayload;
+export const SubmissionNotificationTemplatePayload =
+  NotificationTemplatePayload;
 
 export type SubmissionNotificationTemplatePayload = NotificationTemplatePayload;
 

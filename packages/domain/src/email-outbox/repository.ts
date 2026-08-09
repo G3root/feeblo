@@ -6,15 +6,15 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { canTransitionDelivery } from "./delivery-state";
+import { deliverySourceStatesFor } from "./delivery-state";
 import {
+  type EmailDeliveryRecord as EmailDelivery,
   EmailDeliveryRecord,
+  type EmailOutboxRecord as EmailIntent,
+  type EmailIntentKind,
   EmailIntentPayload,
   EmailOutboxRecord,
-  type EmailDeliveryRecord as EmailDelivery,
-  type EmailIntentKind,
   type EmailIntentPayload as IntentPayload,
-  type EmailOutboxRecord as EmailIntent,
 } from "./schema";
 import {
   recordEmailDeliveryTransition,
@@ -35,9 +35,12 @@ export interface RecordEmailIntentInput {
   readonly aggregateType: string;
   readonly deduplicationKey: string;
   readonly expiresAt: Date | null;
-  readonly kind: EmailIntentKind;
+  readonly kind: Exclude<EmailIntentKind, "post.status_changed">;
   readonly organizationId: string;
-  readonly payload: IntentPayload;
+  readonly payload: Exclude<
+    IntentPayload,
+    { readonly kind: "post.status_changed" }
+  >;
   readonly scheduledAt: Date;
 }
 
@@ -65,11 +68,13 @@ export interface CreateEmailDeliveryInput {
 
 export interface FindPendingEmailIntentsInput {
   readonly before: Date;
+  readonly limit?: number;
   readonly organizationId?: string;
 }
 
 export interface FindDueEmailDeliveriesInput {
   readonly before: Date;
+  readonly limit?: number;
   readonly staleSendingBefore: Date;
 }
 
@@ -81,7 +86,9 @@ const decodeIntentPayload = (
   operation: string
 ): Effect.Effect<IntentPayload, EmailOutboxDataError> =>
   Schema.decodeUnknownEffect(EmailIntentPayload)(input).pipe(
-    Effect.mapError(() => dataError(operation, "Stored email intent payload is invalid"))
+    Effect.mapError(() =>
+      dataError(operation, "Stored email intent payload is invalid")
+    )
   );
 
 const decodeEmailIntent = (
@@ -89,7 +96,9 @@ const decodeEmailIntent = (
   operation: string
 ): Effect.Effect<EmailIntent, EmailOutboxDataError> =>
   Effect.gen(function* () {
-    const intent = yield* Schema.decodeUnknownEffect(EmailOutboxRecord)(input).pipe(
+    const intent = yield* Schema.decodeUnknownEffect(EmailOutboxRecord)(
+      input
+    ).pipe(
       Effect.mapError(() =>
         dataError(operation, "Stored email intent record is invalid")
       )
@@ -202,47 +211,104 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
 
     const id = yield* EmailOutboxId.generate;
-    const [written] = yield* db
+    const values = {
+      id,
+      organizationId: input.organizationId,
+      kind: "post.status_changed" as const,
+      aggregateType: input.aggregateType,
+      aggregateId: input.aggregateId,
+      deduplicationKey: input.deduplicationKey,
+      payload,
+      scheduledAt: input.scheduledAt,
+      expiresAt: input.expiresAt,
+      state: "pending" as const,
+    };
+    const [inserted] = yield* db
       .insert(schema.emailOutboxTable)
-      .values({
-        id,
-        organizationId: input.organizationId,
-        kind: "post.status_changed",
-        aggregateType: input.aggregateType,
-        aggregateId: input.aggregateId,
-        deduplicationKey: input.deduplicationKey,
-        payload,
-        scheduledAt: input.scheduledAt,
-        expiresAt: input.expiresAt,
-        state: "pending",
-      })
-      .onConflictDoUpdate({
-        target: [
-          schema.emailOutboxTable.organizationId,
-          schema.emailOutboxTable.kind,
-          schema.emailOutboxTable.aggregateId,
-        ],
-        targetWhere: sql`${schema.emailOutboxTable.state} = 'pending' AND ${schema.emailOutboxTable.kind} = 'post.status_changed'`,
-        set: {
-          payload,
-          updatedAt: new Date(),
-        },
-      })
+      .values(values)
+      .onConflictDoNothing()
       .returning();
 
-    return written
-      ? {
-          _tag: "Written" as const,
-          intent: yield* decodeEmailIntent(
-            written,
-            "upsertPendingStatusChange.decodeResult"
-          ),
-        }
+    if (inserted !== undefined) {
+      yield* recordEmailIntentTransition("post.status_changed", "pending");
+      return {
+        _tag: "Written" as const,
+        intent: yield* decodeEmailIntent(
+          inserted,
+          "upsertPendingStatusChange.decodeResult"
+        ),
+      };
+    }
+
+    const [coalesced] = yield* db
+      .update(schema.emailOutboxTable)
+      .set({ payload, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.emailOutboxTable.organizationId, input.organizationId),
+          eq(schema.emailOutboxTable.kind, "post.status_changed"),
+          eq(schema.emailOutboxTable.aggregateId, input.aggregateId),
+          eq(schema.emailOutboxTable.state, "pending")
+        )
+      )
+      .returning();
+
+    if (coalesced !== undefined) {
+      return {
+        _tag: "Written" as const,
+        intent: yield* decodeEmailIntent(
+          coalesced,
+          "upsertPendingStatusChange.decodeResult"
+        ),
+      };
+    }
+
+    // The pending row may have materialized between the insert conflict and
+    // guarded update. A second conflict-safe insert opens the next window when
+    // the business key is new, while the stable deduplication key still blocks
+    // replay of the materialized window.
+    const [retried] = yield* db
+      .insert(schema.emailOutboxTable)
+      .values(values)
+      .onConflictDoNothing()
+      .returning();
+
+    if (retried !== undefined) {
+      yield* recordEmailIntentTransition("post.status_changed", "pending");
+      return {
+        _tag: "Written" as const,
+        intent: yield* decodeEmailIntent(
+          retried,
+          "upsertPendingStatusChange.decodeResult"
+        ),
+      };
+    }
+
+    const [existingWindow] = yield* db
+      .select({ id: schema.emailOutboxTable.id })
+      .from(schema.emailOutboxTable)
+      .where(
+        and(
+          eq(schema.emailOutboxTable.organizationId, input.organizationId),
+          eq(schema.emailOutboxTable.deduplicationKey, input.deduplicationKey)
+        )
+      )
+      .limit(1);
+
+    return existingWindow === undefined
+      ? yield* dataError(
+          "upsertPendingStatusChange",
+          "Could not resolve a concurrent status intent conflict"
+        )
       : { _tag: "AlreadyMaterialized" as const };
   });
 
   const findPending = Effect.fn("EmailOutboxRepository.findPending")(
-    function* ({ before, organizationId }: FindPendingEmailIntentsInput) {
+    function* ({
+      before,
+      limit = 100,
+      organizationId,
+    }: FindPendingEmailIntentsInput) {
       const rows = yield* db
         .select()
         .from(schema.emailOutboxTable)
@@ -255,7 +321,8 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
               : [])
           )
         )
-        .orderBy(schema.emailOutboxTable.scheduledAt);
+        .orderBy(schema.emailOutboxTable.scheduledAt)
+        .limit(limit);
 
       return yield* Effect.forEach(rows, (row) =>
         decodeEmailIntent(row, "findPending.decodeIntent")
@@ -264,29 +331,44 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   );
 
   const findPausedByPlan = Effect.fn("EmailOutboxRepository.findPausedByPlan")(
-    function* ({ before }: { readonly before: Date }) {
-      const rows = yield* db.select().from(schema.emailOutboxTable).where(and(
-        eq(schema.emailOutboxTable.state, "paused_by_plan"),
-        lte(schema.emailOutboxTable.scheduledAt, before),
-      ));
+    function* ({
+      before,
+      limit = 100,
+    }: {
+      readonly before: Date;
+      readonly limit?: number;
+    }) {
+      const rows = yield* db
+        .select()
+        .from(schema.emailOutboxTable)
+        .where(
+          and(
+            eq(schema.emailOutboxTable.state, "paused_by_plan"),
+            lte(schema.emailOutboxTable.scheduledAt, before)
+          )
+        )
+        .orderBy(schema.emailOutboxTable.scheduledAt)
+        .limit(limit);
       return yield* Effect.forEach(rows, (row) =>
         decodeEmailIntent(row, "findPausedByPlan.decodeIntent")
       );
     }
   );
 
-  const findById = Effect.fn("EmailOutboxRepository.findById")(
-    function* (id: string) {
-      const row = yield* db.query.emailOutboxTable.findFirst({ where: { id } });
-      return row
-        ? yield* decodeEmailIntent(row, "findById.decodeIntent")
-        : undefined;
-    }
-  );
+  const findById = Effect.fn("EmailOutboxRepository.findById")(function* (
+    id: string
+  ) {
+    const row = yield* db.query.emailOutboxTable.findFirst({ where: { id } });
+    return row
+      ? yield* decodeEmailIntent(row, "findById.decodeIntent")
+      : undefined;
+  });
 
   const findDeliveryById = Effect.fn("EmailOutboxRepository.findDeliveryById")(
     function* (id: string) {
-      const row = yield* db.query.emailDeliveryTable.findFirst({ where: { id } });
+      const row = yield* db.query.emailDeliveryTable.findFirst({
+        where: { id },
+      });
       return row
         ? yield* decodeEmailDelivery(row, "findDeliveryById.decodeDelivery")
         : undefined;
@@ -294,74 +376,131 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   );
 
   const markIntentState = Effect.fn("EmailOutboxRepository.markIntentState")(
-    function* ({ id, state }: { readonly id: string; readonly state: "materialized" | "paused_by_plan" | "expired" }) {
-      const rows = yield* db.update(schema.emailOutboxTable).set({ state, updatedAt: new Date() })
-        .where(and(
-          eq(schema.emailOutboxTable.id, id),
-          state === "expired"
-            ? inArray(schema.emailOutboxTable.state, ["pending", "paused_by_plan"])
-            : eq(schema.emailOutboxTable.state, "pending")
-        ))
+    function* ({
+      id,
+      state,
+    }: {
+      readonly id: string;
+      readonly state: "materialized" | "paused_by_plan" | "failed" | "expired";
+    }) {
+      const rows = yield* db
+        .update(schema.emailOutboxTable)
+        .set({ state, updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.emailOutboxTable.id, id),
+            state === "expired" || state === "failed"
+              ? inArray(schema.emailOutboxTable.state, [
+                  "pending",
+                  "paused_by_plan",
+                ])
+              : eq(schema.emailOutboxTable.state, "pending")
+          )
+        )
         .returning({ id: schema.emailOutboxTable.id });
       return rows.length === 1;
     }
   );
 
-  const resumePausedIntent = Effect.fn("EmailOutboxRepository.resumePausedIntent")(
-    function* ({ id }: { readonly id: string }) {
-      const rows = yield* db.update(schema.emailOutboxTable).set({
+  const resumePausedIntent = Effect.fn(
+    "EmailOutboxRepository.resumePausedIntent"
+  )(function* ({ id }: { readonly id: string }) {
+    const rows = yield* db
+      .update(schema.emailOutboxTable)
+      .set({
         state: "pending",
         updatedAt: new Date(),
-      }).where(and(
-        eq(schema.emailOutboxTable.id, id),
-        eq(schema.emailOutboxTable.state, "paused_by_plan"),
-      )).returning({ id: schema.emailOutboxTable.id });
-      return rows.length === 1;
-    }
-  );
+      })
+      .where(
+        and(
+          eq(schema.emailOutboxTable.id, id),
+          eq(schema.emailOutboxTable.state, "paused_by_plan")
+        )
+      )
+      .returning({ id: schema.emailOutboxTable.id });
+    return rows.length === 1;
+  });
 
-  const resumePausedDeliveries = Effect.fn("EmailOutboxRepository.resumePausedDeliveries")(
-    function* ({ now, organizationId }: { readonly now: Date; readonly organizationId: string }) {
-      const rows = yield* db.select({ id: schema.emailDeliveryTable.id })
-        .from(schema.emailDeliveryTable)
-        .innerJoin(schema.emailOutboxTable, eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId))
-        .where(and(
+  const resumePausedDeliveries = Effect.fn(
+    "EmailOutboxRepository.resumePausedDeliveries"
+  )(function* ({
+    now,
+    organizationId,
+  }: {
+    readonly now: Date;
+    readonly organizationId: string;
+  }) {
+    const resumableIds = db
+      .select({ id: schema.emailDeliveryTable.id })
+      .from(schema.emailDeliveryTable)
+      .innerJoin(
+        schema.emailOutboxTable,
+        eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId)
+      )
+      .where(
+        and(
           eq(schema.emailDeliveryTable.state, "paused_by_plan"),
           eq(schema.emailOutboxTable.organizationId, organizationId),
-          or(isNull(schema.emailOutboxTable.expiresAt), gte(schema.emailOutboxTable.expiresAt, now)),
-        ));
-      const resumed = yield* Effect.forEach(rows, (row) => db.update(schema.emailDeliveryTable).set({
-        state: "queued", nextAttemptAt: null, updatedAt: now,
-      }).where(and(
-        eq(schema.emailDeliveryTable.id, row.id),
-        eq(schema.emailDeliveryTable.state, "paused_by_plan"),
-      )).returning({ id: schema.emailDeliveryTable.id }));
-      return resumed.flatMap((row) => row.map((value) => value.id));
-    }
-  );
+          or(
+            isNull(schema.emailOutboxTable.expiresAt),
+            gte(schema.emailOutboxTable.expiresAt, now)
+          )
+        )
+      );
+    const resumed = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state: "queued",
+        nextAttemptAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          inArray(schema.emailDeliveryTable.id, resumableIds),
+          eq(schema.emailDeliveryTable.state, "paused_by_plan")
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
+    return resumed.map((row) => row.id);
+  });
 
-  const expirePausedDeliveries = Effect.fn("EmailOutboxRepository.expirePausedDeliveries")(
-    function* ({ now }: { readonly now: Date }) {
-      const rows = yield* db.select({ id: schema.emailDeliveryTable.id })
-        .from(schema.emailDeliveryTable)
-        .innerJoin(schema.emailOutboxTable, eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId))
-        .where(and(
+  const expirePausedDeliveries = Effect.fn(
+    "EmailOutboxRepository.expirePausedDeliveries"
+  )(function* ({ now }: { readonly now: Date }) {
+    const expirableIds = db
+      .select({ id: schema.emailDeliveryTable.id })
+      .from(schema.emailDeliveryTable)
+      .innerJoin(
+        schema.emailOutboxTable,
+        eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId)
+      )
+      .where(
+        and(
           eq(schema.emailDeliveryTable.state, "paused_by_plan"),
           lte(schema.emailOutboxTable.expiresAt, now)
-        ));
-      const expired = yield* Effect.forEach(rows, (row) => db.update(schema.emailDeliveryTable).set({
-        state: "expired", updatedAt: now,
-      }).where(and(
-        eq(schema.emailDeliveryTable.id, row.id),
-        eq(schema.emailDeliveryTable.state, "paused_by_plan")
-      )).returning({ id: schema.emailDeliveryTable.id }));
-      return expired.flatMap((result) => result.map((row) => row.id));
-    }
-  );
+        )
+      );
+    const expired = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state: "expired",
+        updatedAt: now,
+      })
+      .where(
+        and(
+          inArray(schema.emailDeliveryTable.id, expirableIds),
+          eq(schema.emailDeliveryTable.state, "paused_by_plan")
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
+    return expired.map((row) => row.id);
+  });
 
   const createDelivery = Effect.fn("EmailOutboxRepository.createDelivery")(
     function* (input: CreateEmailDeliveryInput) {
-      const recipientEmail = yield* normalizeRecipientEmail(input.recipientEmail);
+      const recipientEmail = yield* normalizeRecipientEmail(
+        input.recipientEmail
+      );
       const id = yield* EmailDeliveryId.generate;
       const [inserted] = yield* db
         .insert(schema.emailDeliveryTable)
@@ -406,15 +545,23 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
   );
 
-  const findDueDeliveries = Effect.fn("EmailOutboxRepository.findDueDeliveries")(
-    function* ({ before, staleSendingBefore }: FindDueEmailDeliveriesInput) {
-      const rows = yield* db.select().from(schema.emailDeliveryTable).where(
+  const findDueDeliveries = Effect.fn(
+    "EmailOutboxRepository.findDueDeliveries"
+  )(function* ({
+    before,
+    limit = 100,
+    staleSendingBefore,
+  }: FindDueEmailDeliveriesInput) {
+    const rows = yield* db
+      .select()
+      .from(schema.emailDeliveryTable)
+      .where(
         or(
           and(
             inArray(schema.emailDeliveryTable.state, ["queued", "deferred"]),
             or(
               lte(schema.emailDeliveryTable.nextAttemptAt, before),
-              sql`${schema.emailDeliveryTable.nextAttemptAt} IS NULL`
+              isNull(schema.emailDeliveryTable.nextAttemptAt)
             )
           ),
           and(
@@ -422,20 +569,17 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
             lte(schema.emailDeliveryTable.updatedAt, staleSendingBefore)
           )
         )
-      );
-      return yield* Effect.forEach(rows, (row) =>
-        decodeEmailDelivery(row, "findDueDeliveries.decodeDelivery")
-      );
-    }
-  );
+      )
+      .orderBy(schema.emailDeliveryTable.createdAt)
+      .limit(limit);
+    return yield* Effect.forEach(rows, (row) =>
+      decodeEmailDelivery(row, "findDueDeliveries.decodeDelivery")
+    );
+  });
 
   const claimDeliveryForSending = Effect.fn(
     "EmailOutboxRepository.claimDeliveryForSending"
   )(function* ({ id, now }: { readonly id: string; readonly now: Date }) {
-    if (!canTransitionDelivery("queued", "sending")) {
-      return false;
-    }
-
     const claimed = yield* db
       .update(schema.emailDeliveryTable)
       .set({
@@ -447,7 +591,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .where(
         and(
           eq(schema.emailDeliveryTable.id, id),
-          inArray(schema.emailDeliveryTable.state, ["queued", "deferred"])
+          inArray(
+            schema.emailDeliveryTable.state,
+            deliverySourceStatesFor("sending")
+          )
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
@@ -460,14 +607,20 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   const recoverStaleSendingDeliveries = Effect.fn(
     "EmailOutboxRepository.recoverStaleSendingDeliveries"
   )(function* ({ before }: { readonly before: Date }) {
-    const rows = yield* db.update(schema.emailDeliveryTable).set({
-      state: "deferred",
-      nextAttemptAt: new Date(),
-      updatedAt: new Date(),
-    }).where(and(
-      eq(schema.emailDeliveryTable.state, "sending"),
-      lte(schema.emailDeliveryTable.updatedAt, before)
-    )).returning({ id: schema.emailDeliveryTable.id });
+    const rows = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state: "deferred",
+        nextAttemptAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.state, "sending"),
+          lte(schema.emailDeliveryTable.updatedAt, before)
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
     yield* recordEmailDeliveryTransition("deferred", rows.length);
     yield* recordEmailReconciliationRecoveries(rows.length);
     return rows.map((row) => row.id);
@@ -475,61 +628,135 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
 
   const releaseSendingDelivery = Effect.fn(
     "EmailOutboxRepository.releaseSendingDelivery"
-  )(function* ({ id, nextAttemptAt, lastError }: {
+  )(function* ({
+    id,
+    nextAttemptAt,
+    lastError,
+  }: {
     readonly id: string;
     readonly nextAttemptAt: Date;
     readonly lastError: unknown;
   }) {
-    const rows = yield* db.update(schema.emailDeliveryTable).set({
-      state: "deferred",
-      nextAttemptAt,
-      lastError,
-      updatedAt: new Date(),
-    }).where(and(
-      eq(schema.emailDeliveryTable.id, id),
-      eq(schema.emailDeliveryTable.state, "sending")
-    )).returning({ id: schema.emailDeliveryTable.id });
+    const rows = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state: "deferred",
+        nextAttemptAt,
+        lastError,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.id, id),
+          eq(schema.emailDeliveryTable.state, "sending")
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
     yield* recordEmailDeliveryTransition("deferred", rows.length);
     return rows.length === 1;
   });
 
-  const markDeliveryAccepted = Effect.fn("EmailOutboxRepository.markDeliveryAccepted")(
-    function* ({ id, acceptedAt, providerMetadata }: { readonly id: string; readonly acceptedAt: Date; readonly providerMetadata: unknown }) {
-      const rows = yield* db.update(schema.emailDeliveryTable).set({
-        state: "accepted", acceptedAt, providerMetadata, updatedAt: acceptedAt,
-      }).where(and(eq(schema.emailDeliveryTable.id, id), eq(schema.emailDeliveryTable.state, "sending"))).returning({ id: schema.emailDeliveryTable.id });
-      yield* recordEmailDeliveryTransition("accepted", rows.length);
-      return rows.length === 1;
-    }
-  );
+  const markDeliveryAccepted = Effect.fn(
+    "EmailOutboxRepository.markDeliveryAccepted"
+  )(function* ({
+    id,
+    acceptedAt,
+    providerMetadata,
+  }: {
+    readonly id: string;
+    readonly acceptedAt: Date;
+    readonly providerMetadata: unknown;
+  }) {
+    const rows = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state: "accepted",
+        acceptedAt,
+        providerMetadata,
+        updatedAt: acceptedAt,
+      })
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.id, id),
+          eq(schema.emailDeliveryTable.state, "sending")
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
+    yield* recordEmailDeliveryTransition("accepted", rows.length);
+    return rows.length === 1;
+  });
 
-  const markDeliveryDeferred = Effect.fn("EmailOutboxRepository.markDeliveryDeferred")(
-    function* ({ id, nextAttemptAt, lastError }: { readonly id: string; readonly nextAttemptAt: Date; readonly lastError: unknown }) {
-      const rows = yield* db.update(schema.emailDeliveryTable).set({
-        state: "deferred", nextAttemptAt, lastError, updatedAt: new Date(),
-      }).where(and(eq(schema.emailDeliveryTable.id, id), eq(schema.emailDeliveryTable.state, "sending"))).returning({ id: schema.emailDeliveryTable.id });
-      yield* recordEmailDeliveryTransition("deferred", rows.length);
-      return rows.length === 1;
-    }
-  );
+  const markDeliveryDeferred = Effect.fn(
+    "EmailOutboxRepository.markDeliveryDeferred"
+  )(function* ({
+    id,
+    nextAttemptAt,
+    lastError,
+  }: {
+    readonly id: string;
+    readonly nextAttemptAt: Date;
+    readonly lastError: unknown;
+  }) {
+    const rows = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state: "deferred",
+        nextAttemptAt,
+        lastError,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.id, id),
+          eq(schema.emailDeliveryTable.state, "sending")
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
+    yield* recordEmailDeliveryTransition("deferred", rows.length);
+    return rows.length === 1;
+  });
 
-  const markDeliveryTerminal = Effect.fn("EmailOutboxRepository.markDeliveryTerminal")(
-    function* ({ id, state, lastError }: { readonly id: string; readonly state: "failed" | "suppressed" | "expired" | "paused_by_plan"; readonly lastError?: unknown }) {
-      const rows = yield* db.update(schema.emailDeliveryTable).set({
-        state, ...(lastError === undefined ? {} : { lastError }), updatedAt: new Date(),
-      }).where(and(eq(schema.emailDeliveryTable.id, id), inArray(schema.emailDeliveryTable.state, ["queued", "deferred", "sending"]))).returning({ id: schema.emailDeliveryTable.id });
-      yield* recordEmailDeliveryTransition(state, rows.length);
-      return rows.length === 1;
-    }
-  );
+  const markDeliveryOutcome = Effect.fn(
+    "EmailOutboxRepository.markDeliveryOutcome"
+  )(function* ({
+    id,
+    state,
+    lastError,
+  }: {
+    readonly id: string;
+    readonly state: "failed" | "suppressed" | "expired" | "paused_by_plan";
+    readonly lastError?: unknown;
+  }) {
+    const rows = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state,
+        ...(lastError === undefined ? {} : { lastError }),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.id, id),
+          inArray(
+            schema.emailDeliveryTable.state,
+            deliverySourceStatesFor(state)
+          )
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
+    yield* recordEmailDeliveryTransition(state, rows.length);
+    return rows.length === 1;
+  });
 
   const markDeliveryDelivered = Effect.fn(
     "EmailOutboxRepository.markDeliveryDelivered"
-  )(function* ({ id, deliveredAt }: { readonly id: string; readonly deliveredAt: Date }) {
-    if (!canTransitionDelivery("sending", "delivered")) {
-      return false;
-    }
-
+  )(function* ({
+    id,
+    deliveredAt,
+  }: {
+    readonly id: string;
+    readonly deliveredAt: Date;
+  }) {
     const delivered = yield* db
       .update(schema.emailDeliveryTable)
       .set({
@@ -540,7 +767,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .where(
         and(
           eq(schema.emailDeliveryTable.id, id),
-          inArray(schema.emailDeliveryTable.state, ["sending", "accepted"])
+          inArray(
+            schema.emailDeliveryTable.state,
+            deliverySourceStatesFor("delivered")
+          )
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
@@ -568,7 +798,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     claimDeliveryForSending,
     markDeliveryAccepted,
     markDeliveryDeferred,
-    markDeliveryTerminal,
+    markDeliveryOutcome,
     markDeliveryDelivered,
   };
 });

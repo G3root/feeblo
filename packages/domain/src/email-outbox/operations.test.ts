@@ -11,62 +11,120 @@ const TestLayer = EmailOutboxOperations.layer.pipe(
 
 describe("EmailOutboxOperations", () => {
   layer(TestLayer)("inspection", (it) => {
-    it.effect("reports inspectable state counts and oldest queued age by workspace", () =>
-      Effect.gen(function* () {
-        const db = yield* currentDb;
-        const operations = yield* EmailOutboxOperations;
-        const organizationId = yield* WorkspaceId.generate;
-        const now = new Date("2026-08-09T12:00:00.000Z");
-        const createdAt = new Date(now.getTime() - 120_000);
-        yield* db.insert(schema.organizationTable).values({
-          id: organizationId,
-          name: "Outbox operations",
-          slug: organizationId,
-          createdAt,
-        });
-        yield* db.insert(schema.emailOutboxTable).values({
-          id: `eob_${organizationId}`,
-          organizationId,
-          kind: "submission.created",
-          aggregateType: "post",
-          aggregateId: "pst_ops",
-          deduplicationKey: `ops:${organizationId}`,
-          payload: { kind: "submission.created", postId: "pst_ops" },
-          scheduledAt: createdAt,
-          expiresAt: null,
-          state: "materialized",
-          createdAt,
-          updatedAt: createdAt,
-        });
-        yield* db.insert(schema.emailDeliveryTable).values([
-          {
-            id: `edl_queued_${organizationId}`,
-            outboxId: `eob_${organizationId}`,
-            contactId: null,
-            recipientEmail: "queued@example.com",
-            template: "notification",
-            templateVersion: 1,
-            templatePayload: {},
-            messageId: `<queued.${organizationId}@notifications.feeblo>`,
-            state: "queued",
-            attemptCount: 0,
-            nextAttemptAt: null,
-            acceptedAt: null,
-            deliveredAt: null,
-            lastError: null,
-            providerMetadata: null,
+    it.effect(
+      "reports inspectable state counts and oldest queued age by workspace",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const operations = yield* EmailOutboxOperations;
+          const organizationId = yield* WorkspaceId.generate;
+          const now = new Date("2026-08-09T12:00:00.000Z");
+          const createdAt = new Date(now.getTime() - 120_000);
+          const failedCreatedAt = new Date(now.getTime() - 600_000);
+          yield* db.insert(schema.organizationTable).values({
+            id: organizationId,
+            name: "Outbox operations",
+            slug: organizationId,
+            createdAt,
+          });
+          yield* db.insert(schema.emailOutboxTable).values({
+            id: `eob_${organizationId}`,
+            organizationId,
+            kind: "submission.created",
+            aggregateType: "post",
+            aggregateId: "pst_ops",
+            deduplicationKey: `ops:${organizationId}`,
+            payload: { kind: "submission.created", postId: "pst_ops" },
+            scheduledAt: createdAt,
+            expiresAt: null,
+            state: "materialized",
             createdAt,
             updatedAt: createdAt,
-          },
-          {
+          });
+          yield* db.insert(schema.emailDeliveryTable).values([
+            {
+              id: `edl_queued_${organizationId}`,
+              outboxId: `eob_${organizationId}`,
+              contactId: null,
+              recipientEmail: "queued@example.com",
+              template: "notification",
+              templateVersion: 1,
+              templatePayload: {},
+              messageId: `<queued.${organizationId}@notifications.feeblo>`,
+              state: "queued",
+              attemptCount: 0,
+              nextAttemptAt: null,
+              acceptedAt: null,
+              deliveredAt: null,
+              lastError: null,
+              providerMetadata: null,
+              createdAt,
+              updatedAt: createdAt,
+            },
+            {
+              id: `edl_failed_${organizationId}`,
+              outboxId: `eob_${organizationId}`,
+              contactId: null,
+              recipientEmail: "failed@example.com",
+              template: "notification",
+              templateVersion: 1,
+              templatePayload: {},
+              messageId: `<failed.${organizationId}@notifications.feeblo>`,
+              state: "failed",
+              attemptCount: 5,
+              nextAttemptAt: null,
+              acceptedAt: null,
+              deliveredAt: null,
+              lastError: { tag: "retry_exhausted" },
+              providerMetadata: null,
+              createdAt: failedCreatedAt,
+              updatedAt: failedCreatedAt,
+            },
+          ]);
+
+          const snapshot = yield* operations.inspect({ organizationId, now });
+          expect(snapshot.intentStates.materialized).toBe(1);
+          expect(snapshot.deliveryStates.queued).toBe(1);
+          expect(snapshot.deliveryStates.failed).toBe(1);
+          expect(snapshot.oldestQueuedAgeMs).toBe(120_000);
+        })
+    );
+
+    it.effect(
+      "reports no queued age when an organization has only terminal deliveries",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const operations = yield* EmailOutboxOperations;
+          const organizationId = yield* WorkspaceId.generate;
+          const now = new Date("2026-08-09T12:00:00.000Z");
+          yield* db.insert(schema.organizationTable).values({
+            id: organizationId,
+            name: "Terminal outbox operations",
+            slug: organizationId,
+            createdAt: now,
+          });
+          yield* db.insert(schema.emailOutboxTable).values({
+            id: `eob_${organizationId}`,
+            organizationId,
+            kind: "submission.created",
+            aggregateType: "post",
+            aggregateId: "pst_terminal_ops",
+            deduplicationKey: `terminal-ops:${organizationId}`,
+            payload: { kind: "submission.created", postId: "pst_terminal_ops" },
+            scheduledAt: now,
+            expiresAt: null,
+            state: "materialized",
+          });
+          yield* db.insert(schema.emailDeliveryTable).values({
             id: `edl_failed_${organizationId}`,
             outboxId: `eob_${organizationId}`,
             contactId: null,
-            recipientEmail: "failed@example.com",
+            recipientEmail: "terminal@example.com",
             template: "notification",
             templateVersion: 1,
             templatePayload: {},
-            messageId: `<failed.${organizationId}@notifications.feeblo>`,
+            messageId: `<terminal.${organizationId}@notifications.feeblo>`,
             state: "failed",
             attemptCount: 5,
             nextAttemptAt: null,
@@ -74,17 +132,11 @@ describe("EmailOutboxOperations", () => {
             deliveredAt: null,
             lastError: { tag: "retry_exhausted" },
             providerMetadata: null,
-            createdAt,
-            updatedAt: createdAt,
-          },
-        ]);
+          });
 
-        const snapshot = yield* operations.inspect({ organizationId, now });
-        expect(snapshot.intentStates.materialized).toBe(1);
-        expect(snapshot.deliveryStates.queued).toBe(1);
-        expect(snapshot.deliveryStates.failed).toBe(1);
-        expect(snapshot.oldestQueuedAgeMs).toBe(120_000);
-      })
+          const snapshot = yield* operations.inspect({ organizationId, now });
+          expect(snapshot.oldestQueuedAgeMs).toBeNull();
+        })
     );
   });
 });

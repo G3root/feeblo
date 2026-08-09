@@ -73,107 +73,129 @@ describe("EmailSubscriptionConsentHandlers", () => {
     });
 
   layer(TestLayer)("handlers", (it) => {
-    it.effect("rejects manual changelog subscriptions for free workspaces", () =>
-      Effect.gen(function* () {
-        const handlers = yield* EmailSubscriptionConsentHandlersEffect;
-        const organizationId = yield* createWorkspace({ paid: false });
+    it.effect(
+      "rejects manual changelog subscriptions for free workspaces",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionConsentHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: false });
 
-        const error = yield* Effect.flip(
-          handlers.requestChangelogSubscription({
+          const error = yield* Effect.flip(
+            handlers.requestChangelogSubscription({
+              email: "subscriber@example.com",
+              organizationId,
+            })
+          );
+          expect(error._tag).toBe("PolicyDenied");
+        })
+    );
+
+    it.effect(
+      "creates a pending double-opt-in subscription with redacted mail-boundary tokens",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionConsentHandlersEffect;
+          const repository = yield* EmailSubscriptionRepository;
+          const organizationId = yield* createWorkspace({ paid: true });
+
+          const accepted = yield* handlers.requestChangelogSubscription({
+            email: " Subscriber@Example.com ",
+            organizationId,
+          });
+          expect(accepted.verificationRequired).toBe(true);
+          expect(Option.isSome(accepted.verificationToken)).toBe(true);
+          const subscription = yield* repository.findSubscription({
             email: "subscriber@example.com",
             organizationId,
-          })
-        );
-        expect(error._tag).toBe("PolicyDenied");
-      })
+            topic: { topicId: null, topicType: "changelog" },
+          });
+          expect(Option.getOrUndefined(subscription)).toMatchObject({
+            state: "pending_verification",
+          });
+        })
     );
 
-    it.effect("creates a pending double-opt-in subscription with redacted mail-boundary tokens", () =>
-      Effect.gen(function* () {
-        const handlers = yield* EmailSubscriptionConsentHandlersEffect;
-        const repository = yield* EmailSubscriptionRepository;
-        const organizationId = yield* createWorkspace({ paid: true });
+    it.effect(
+      "keeps verification tokens out of the public RPC acknowledgement",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionRpcHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
 
-        const accepted = yield* handlers.requestChangelogSubscription({
-          email: " Subscriber@Example.com ",
-          organizationId,
-        });
-        expect(accepted.verificationRequired).toBe(true);
-        expect(Option.isSome(accepted.verificationToken)).toBe(true);
-        const subscription = yield* repository.findSubscription({
-          email: "subscriber@example.com",
-          organizationId,
-          topic: { topicId: null, topicType: "changelog" },
-        });
-        expect(Option.getOrUndefined(subscription)).toMatchObject({
-          state: "pending_verification",
-        });
-      })
+          expect(
+            yield* handlers.EmailSubscriptionChangelogSubscribePublic({
+              email: "subscriber@example.com",
+              organizationId,
+            })
+          ).toEqual({ verificationRequired: true });
+        })
     );
 
-    it.effect("keeps verification tokens out of the public RPC acknowledgement", () =>
-      Effect.gen(function* () {
-        const handlers = yield* EmailSubscriptionRpcHandlersEffect;
-        const organizationId = yield* createWorkspace({ paid: true });
+    it.effect(
+      "rate-limits verification requests by workspace and normalized address",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionConsentHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+          for (const email of [
+            "subscriber@example.com",
+            " SUBSCRIBER@example.com ",
+            "subscriber@example.com",
+          ]) {
+            yield* handlers.requestChangelogSubscription({
+              email,
+              organizationId,
+            });
+          }
+          const error = yield* Effect.flip(
+            handlers.requestChangelogSubscription({
+              email: "subscriber@example.com",
+              organizationId,
+            })
+          );
+          expect(error._tag).toBe("RateLimitExceededError");
+        })
+    );
 
-        expect(
-          yield* handlers.EmailSubscriptionChangelogSubscribePublic({
+    it.effect(
+      "activates verification and unsubscribes idempotently by opaque tokens",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionConsentHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+          const accepted = yield* handlers.requestChangelogSubscription({
             email: "subscriber@example.com",
             organizationId,
-          })
-        ).toEqual({ verificationRequired: true });
-      })
-    );
+          });
+          if (
+            Option.isNone(accepted.verificationToken) ||
+            Option.isNone(accepted.unsubscribeToken)
+          ) {
+            return expect.fail(
+              "A new consent request must issue both link tokens"
+            );
+          }
+          const verificationToken = Redacted.value(
+            accepted.verificationToken.value
+          );
+          const verified = yield* handlers.verifySubscription({
+            verificationToken,
+          });
+          expect(verified.verified).toBe(true);
+          expect(
+            yield* handlers.verifySubscription({ verificationToken })
+          ).toEqual({ verified: true });
 
-    it.effect("rate-limits verification requests by workspace and normalized address", () =>
-      Effect.gen(function* () {
-        const handlers = yield* EmailSubscriptionConsentHandlersEffect;
-        const organizationId = yield* createWorkspace({ paid: true });
-        for (const email of [
-          "subscriber@example.com",
-          " SUBSCRIBER@example.com ",
-          "subscriber@example.com",
-        ]) {
-          yield* handlers.requestChangelogSubscription({ email, organizationId });
-        }
-        const error = yield* Effect.flip(
-          handlers.requestChangelogSubscription({
-            email: "subscriber@example.com",
-            organizationId,
-          })
-        );
-        expect(error._tag).toBe("RateLimitExceededError");
-      })
-    );
-
-    it.effect("activates verification and unsubscribes idempotently by opaque tokens", () =>
-      Effect.gen(function* () {
-        const handlers = yield* EmailSubscriptionConsentHandlersEffect;
-        const organizationId = yield* createWorkspace({ paid: true });
-        const accepted = yield* handlers.requestChangelogSubscription({
-          email: "subscriber@example.com",
-          organizationId,
-        });
-        if (Option.isNone(accepted.verificationToken)) {
-          return;
-        }
-        const verificationToken = Redacted.value(accepted.verificationToken.value);
-        const verified = yield* handlers.verifySubscription({ verificationToken });
-        expect(verified.verified).toBe(true);
-        expect(
-          yield* handlers.verifySubscription({ verificationToken })
-        ).toEqual({ verified: true });
-
-        const unsubscribed = yield* handlers.unsubscribe({
-          unsubscribeToken: Redacted.value(accepted.unsubscribeToken),
-        });
-        expect(unsubscribed).toEqual({ unsubscribed: true });
-        expect(
-          yield* handlers.unsubscribe({
-            unsubscribeToken: Redacted.value(accepted.unsubscribeToken),
-          })
-        ).toEqual({ unsubscribed: true });
-      })
+          const unsubscribed = yield* handlers.unsubscribe({
+            unsubscribeToken: Redacted.value(accepted.unsubscribeToken.value),
+          });
+          expect(unsubscribed).toEqual({ unsubscribed: true });
+          expect(
+            yield* handlers.unsubscribe({
+              unsubscribeToken: Redacted.value(accepted.unsubscribeToken.value),
+            })
+          ).toEqual({ unsubscribed: true });
+        })
     );
 
     it.effect("keeps changelog consent isolated from a post topic", () =>
@@ -185,8 +207,13 @@ describe("EmailSubscriptionConsentHandlers", () => {
           email: "subscriber@example.com",
           organizationId,
         });
-        if (Option.isNone(accepted.verificationToken)) {
-          return;
+        if (
+          Option.isNone(accepted.verificationToken) ||
+          Option.isNone(accepted.unsubscribeToken)
+        ) {
+          return expect.fail(
+            "A new consent request must issue both link tokens"
+          );
         }
         yield* handlers.verifySubscription({
           verificationToken: Redacted.value(accepted.verificationToken.value),
@@ -200,7 +227,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
           verificationExpiresAt: new Date(Date.now() + 86_400_000),
         });
         yield* handlers.unsubscribe({
-          unsubscribeToken: Redacted.value(accepted.unsubscribeToken),
+          unsubscribeToken: Redacted.value(accepted.unsubscribeToken.value),
         });
         const changelog = yield* repository.findSubscription({
           email: "subscriber@example.com",

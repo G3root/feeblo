@@ -3,26 +3,17 @@ import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
 import * as Policy from "../policy";
-import {
-  PublicRpcRateLimitMiddleware,
-  RateLimitErrors,
-} from "../rate-limit";
+import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { InternalServerError } from "../rpc-errors";
 import {
   ChangelogSubscriptionRequest,
-  EmailSubscriptionDataError,
-  EmailSubscriptionInputError,
   EmailSubscriptionRequestAccepted,
   EmailSubscriptionTokenRequest,
   EmailSubscriptionUnsubscribeAccepted,
   EmailSubscriptionVerificationAccepted,
 } from "./schema";
-import { EmailSubscriptionTokenError } from "./tokens";
 
 const EmailSubscriptionPublicErrors = Schema.Union([
-  EmailSubscriptionDataError,
-  EmailSubscriptionInputError,
-  EmailSubscriptionTokenError,
   Policy.PolicyDeniedError,
   RateLimitErrors,
   InternalServerError,

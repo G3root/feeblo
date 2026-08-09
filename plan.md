@@ -27,7 +27,7 @@ Cloudflare Email Service will be the initial delivery provider. Effect Workflow 
 
 ### Submission notifications
 
-- A notification is created only after a new submission is committed successfully.
+- The notification intent is inserted atomically with the new submission; dispatch is woken only after the transaction commits successfully.
 - Submission notifications are sent immediately.
 - Failure or throttling of the email must never fail or roll back the submission.
 - Free workspaces fan out to one configured recipient; paid workspaces fan out to opted-in administrators.
@@ -165,7 +165,7 @@ Names are provisional and should follow repository naming conventions during imp
 | `payload` | Effect Schema-validated event data. |
 | `scheduled_at` | Earliest materialization time. |
 | `expires_at` | Point after which the intent must not send. |
-| `state` | `pending`, `materialized`, `paused_by_plan`, or `expired`. |
+| `state` | `pending`, `materialized`, `paused_by_plan`, `failed`, or `expired`. |
 | `created_at` / `updated_at` | Audit timestamps. |
 
 Use a unique index on `deduplication_key`.
@@ -255,7 +255,7 @@ The product mutation and its outbox insert must use the same database transactio
 
 1. Validate the product command.
 2. Apply the product mutation.
-3. Insert the outbox intent with `onConflictDoNothing` against its business deduplication key.
+3. Insert immutable intents with `onConflictDoNothing` against their business deduplication key. For an open status-coalescing window, conditionally update the pending intent payload instead.
 4. Commit.
 5. Best-effort wake the dispatcher.
 
@@ -392,7 +392,7 @@ Avoid logging email bodies, verification tokens, unsubscribe tokens, or raw prov
 - Duplicate business events produce one intent.
 - Recipient fan-out follows free and paid plan policy.
 - Downgrade pauses and upgrade resumes eligible recent delivery.
-- Deliveries older than seven days expire.
+- Paid-only deliveries paused by a downgrade expire after seven days.
 - Changelog publication sends once; edits do not.
 - Explicit changelog update creates a distinct intent.
 - Post creators subscribe automatically.

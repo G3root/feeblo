@@ -11,9 +11,9 @@ import {
   rollbackPreparedEditorAssets,
   syncChangelogAssetReferences,
 } from "../asset/service";
-import { EntitlementPolicy } from "../entitlement/policies";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutbox } from "../email-outbox/workflow";
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
@@ -39,17 +39,29 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
   const changelogPolicy = yield* ChangelogPolicy;
   const sitePolicy = yield* SitePolicy;
 
+  const wakeEmailOutboxBestEffort = (
+    outboxId: string,
+    organizationId: string
+  ) =>
+    wakeEmailOutbox(outboxId).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning(
+          "Failed to wake email outbox; reconciliation will retry",
+          cause
+        ).pipe(Effect.annotateLogs({ organizationId, outboxId }))
+      )
+    );
+
   const recordChangelogPublishedIntent = Effect.fn(
     "Changelog.recordPublishedEmailIntent"
   )(function* (args: {
     readonly changelogId: string;
     readonly organizationId: string;
   }) {
-    const mayMaterialize =
-      yield* entitlementPolicy.mayMaterializeEmailIntent({
-        organizationId: args.organizationId,
-        kind: "changelog.published",
-      });
+    const mayMaterialize = yield* entitlementPolicy.mayMaterializeEmailIntent({
+      organizationId: args.organizationId,
+      kind: "changelog.published",
+    });
     if (!mayMaterialize) {
       return;
     }
@@ -70,6 +82,17 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         scheduledAt: now,
       })
       .pipe(
+        Effect.tapError((error) =>
+          Effect.logError(
+            "Failed to record changelog publication email intent",
+            error
+          ).pipe(
+            Effect.annotateLogs({
+              changelogId: args.changelogId,
+              organizationId: args.organizationId,
+            })
+          )
+        ),
         Effect.mapError(
           () =>
             new InternalServerError({
@@ -124,12 +147,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
-            const createdOutboxId = args.status === "published"
-              ? yield* recordChangelogPublishedIntent({
-                changelogId: args.id,
-                organizationId: args.organizationId,
-              })
-              : undefined;
+            const createdOutboxId =
+              args.status === "published"
+                ? yield* recordChangelogPublishedIntent({
+                    changelogId: args.id,
+                    organizationId: args.organizationId,
+                  })
+                : undefined;
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -147,7 +171,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
         if (outboxId) {
-          yield* wakeEmailOutbox(outboxId).pipe(Effect.catchCause(() => Effect.void));
+          yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
         }
       }).pipe(
         Policy.withPolicy(changelogPolicy.canCreate(args.organizationId)),
@@ -204,15 +228,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               content: prepared.content,
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
-            const createdOutboxId = (
-              previousStatus !== "published" &&
-              args.status === "published"
-            )
-              ? yield* recordChangelogPublishedIntent({
-                changelogId: args.id,
-                organizationId: args.organizationId,
-              })
-              : undefined;
+            const createdOutboxId =
+              previousStatus !== "published" && args.status === "published"
+                ? yield* recordChangelogPublishedIntent({
+                    changelogId: args.id,
+                    organizationId: args.organizationId,
+                  })
+                : undefined;
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -230,7 +252,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
         if (outboxId) {
-          yield* wakeEmailOutbox(outboxId).pipe(Effect.catchCause(() => Effect.void));
+          yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
         }
       }).pipe(
         Policy.withPolicy(
@@ -244,57 +266,71 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     },
 
     ChangelogSendUpdate: (args: TChangelogSendUpdate) =>
-      transaction(
-        Effect.gen(function* () {
-          const status = yield* repository.findStatus({
-            id: args.id,
-            organizationId: args.organizationId,
-          });
-          if (status !== "published") {
-            return yield* new Policy.PolicyDeniedError({
-              reason: "Only published changelog entries can send updates.",
-            });
-          }
-
-          const mayMaterialize =
-            yield* entitlementPolicy.mayMaterializeEmailIntent({
+      Effect.gen(function* () {
+        const outboxId = yield* transaction(
+          Effect.gen(function* () {
+            const status = yield* repository.findStatus({
+              id: args.id,
               organizationId: args.organizationId,
-              kind: "changelog.update_requested",
             });
-          if (!mayMaterialize) {
-            return yield* new Policy.PolicyDeniedError({
-              reason: "Changelog subscriber emails require a paid plan.",
-            });
-          }
+            if (status !== "published") {
+              return yield* new Policy.PolicyDeniedError({
+                reason: "Only published changelog entries can send updates.",
+              });
+            }
 
-          const now = new Date();
-          yield* emailOutbox
-            .recordIntent({
-              aggregateId: args.id,
-              aggregateType: "changelog",
-              deduplicationKey: `changelog.update_requested:${args.id}:${args.requestId}`,
-              expiresAt: new Date(
-                now.getTime() + 7 * 24 * 60 * 60 * 1000
-              ),
-              kind: "changelog.update_requested",
-              organizationId: args.organizationId,
-              payload: {
+            const mayMaterialize =
+              yield* entitlementPolicy.mayMaterializeEmailIntent({
+                organizationId: args.organizationId,
                 kind: "changelog.update_requested",
-                changelogId: args.id,
-              },
-              scheduledAt: now,
-            })
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({
-                    message:
-                      "Failed to record changelog update email intent",
-                  })
-              )
-            );
-        })
-      ).pipe(
+              });
+            if (!mayMaterialize) {
+              return yield* new Policy.PolicyDeniedError({
+                reason: "Changelog subscriber emails require a paid plan.",
+              });
+            }
+
+            const now = new Date();
+            const result = yield* emailOutbox
+              .recordIntent({
+                aggregateId: args.id,
+                aggregateType: "changelog",
+                deduplicationKey: `changelog.update_requested:${args.id}:${args.requestId}`,
+                expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+                kind: "changelog.update_requested",
+                organizationId: args.organizationId,
+                payload: {
+                  kind: "changelog.update_requested",
+                  changelogId: args.id,
+                },
+                scheduledAt: now,
+              })
+              .pipe(
+                Effect.tapError((error) =>
+                  Effect.logError(
+                    "Failed to record changelog update email intent",
+                    error
+                  ).pipe(
+                    Effect.annotateLogs({
+                      changelogId: args.id,
+                      organizationId: args.organizationId,
+                    })
+                  )
+                ),
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Failed to record changelog update email intent",
+                    })
+                )
+              );
+            return result._tag === "Inserted" ? result.intent.id : undefined;
+          })
+        );
+        if (outboxId) {
+          yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+        }
+      }).pipe(
         Policy.withPolicy(
           changelogPolicy.canUpdate({
             organizationId: args.organizationId,

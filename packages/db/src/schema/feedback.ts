@@ -1088,6 +1088,7 @@ export type TEmailOutboxState =
   | "pending"
   | "materialized"
   | "paused_by_plan"
+  | "failed"
   | "expired";
 
 export type TEmailDeliveryState =
@@ -1216,6 +1217,7 @@ export const emailDeliveryTable = pgTable(
       table.state,
       table.nextAttemptAt
     ),
+    index("email_delivery_contactId_idx").on(table.contactId),
   ]
 );
 
@@ -1262,7 +1264,9 @@ export const emailSubscriptionTable = pgTable(
     contactId: text("contact_id")
       .notNull()
       .references(() => emailContactTable.id, { onDelete: "cascade" }),
-    topicType: text("topic_type").$type<TEmailSubscriptionTopicType>().notNull(),
+    topicType: text("topic_type")
+      .$type<TEmailSubscriptionTopicType>()
+      .notNull(),
     topicId: text("topic_id"),
     source: text("source").$type<TEmailSubscriptionSource>().notNull(),
     state: text("state").$type<TEmailSubscriptionState>().notNull(),
@@ -1288,6 +1292,17 @@ export const emailSubscriptionTable = pgTable(
     index("email_subscription_organizationId_state_idx").on(
       table.organizationId,
       table.state
+    ),
+    index("email_subscription_recipientLookup_idx").on(
+      table.organizationId,
+      table.topicType,
+      table.topicId,
+      table.state,
+      table.contactId
+    ),
+    index("email_subscription_state_organizationId_idx").on(
+      table.state,
+      table.organizationId
     ),
   ]
 );

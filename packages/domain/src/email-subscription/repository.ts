@@ -7,23 +7,23 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
+  type EmailContactRecord as Contact,
   EmailContactRecord,
   EmailSubscriptionDataError,
   EmailSubscriptionInputError,
   EmailSubscriptionRecord,
-  type EmailContactRecord as Contact,
-  type EmailSubscriptionRecord as Subscription,
   type EmailSubscriptionSource,
-  type EmailSubscriptionTopic as Topic,
   type EmailSuppressionReason,
   normalizeEmailAddress,
+  type EmailSubscriptionRecord as Subscription,
+  type EmailSubscriptionTopic as Topic,
 } from "./schema";
 import {
+  type EmailSubscriptionToken,
+  type EmailSubscriptionTokenError,
   generateEmailSubscriptionToken,
   hashEmailSubscriptionToken,
   redactEmailSubscriptionToken,
-  type EmailSubscriptionToken,
-  type EmailSubscriptionTokenError,
 } from "./tokens";
 
 export interface RequestEmailSubscriptionInput {
@@ -59,7 +59,10 @@ export interface UpsertEmailSuppressionInput {
   readonly reason: EmailSuppressionReason;
 }
 
-const dataError = (operation: string, reason: string): EmailSubscriptionDataError =>
+const dataError = (
+  operation: string,
+  reason: string
+): EmailSubscriptionDataError =>
   new EmailSubscriptionDataError({ operation, reason });
 
 const decodeContact = (
@@ -67,7 +70,9 @@ const decodeContact = (
   operation: string
 ): Effect.Effect<Contact, EmailSubscriptionDataError> =>
   Schema.decodeUnknownEffect(EmailContactRecord)(input).pipe(
-    Effect.mapError(() => dataError(operation, "Stored email contact is invalid"))
+    Effect.mapError(() =>
+      dataError(operation, "Stored email contact is invalid")
+    )
   );
 
 const decodeSubscription = (
@@ -129,7 +134,12 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       const [row] = yield* db
         .select()
         .from(schema.emailSubscriptionTable)
-        .where(and(eq(schema.emailSubscriptionTable.contactId, contactId), topicCondition(schema.emailSubscriptionTable, topic)))
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.contactId, contactId),
+            topicCondition(schema.emailSubscriptionTable, topic)
+          )
+        )
         .limit(1);
       return row === undefined
         ? Option.none<Subscription>()
@@ -139,11 +149,15 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   const requestSubscription = Effect.fn(
     "EmailSubscriptionRepository.requestSubscription"
   )(function* (input: RequestEmailSubscriptionInput) {
-    const email = yield* normalizeEmailAddress(input.email, "requestSubscription");
+    const email = yield* normalizeEmailAddress(
+      input.email,
+      "requestSubscription"
+    );
     const alreadyVerified = input.alreadyVerifiedUser !== undefined;
     if (
       alreadyVerified &&
-      (input.userId === undefined || input.userId !== input.alreadyVerifiedUser.userId)
+      (input.userId === undefined ||
+        input.userId !== input.alreadyVerifiedUser.userId)
     ) {
       return yield* new EmailSubscriptionInputError({
         operation: "requestSubscription",
@@ -151,36 +165,51 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       });
     }
 
-    const existingContact = yield* findContact(input.organizationId, email);
-    const contact = Option.isSome(existingContact)
-      ? existingContact.value
-      : yield* Effect.gen(function* () {
-          const id = yield* EmailContactId.generate;
-          const [created] = yield* db
-            .insert(schema.emailContactTable)
-            .values({
-              id,
-              organizationId: input.organizationId,
-              userId: input.userId ?? null,
-              email,
-              verificationState: alreadyVerified ? "verified" : "pending",
-              verifiedAt: alreadyVerified ? input.now : null,
-              createdAt: input.now,
-              updatedAt: input.now,
-            })
-            .returning();
-          if (created === undefined) {
-            return yield* dataError(
-              "requestSubscription.createContact",
-              "Email contact insert did not return a row"
-            );
-          }
-          return yield* decodeContact(created, "requestSubscription.createContact");
-        });
+    const contactId = yield* EmailContactId.generate;
+    const [createdContact] = yield* db
+      .insert(schema.emailContactTable)
+      .values({
+        id: contactId,
+        organizationId: input.organizationId,
+        userId: input.userId ?? null,
+        email,
+        verificationState: alreadyVerified ? "verified" : "pending",
+        verifiedAt: alreadyVerified ? input.now : null,
+        createdAt: input.now,
+        updatedAt: input.now,
+      })
+      .onConflictDoNothing({
+        target: [
+          schema.emailContactTable.organizationId,
+          schema.emailContactTable.email,
+        ],
+      })
+      .returning();
+    const contact =
+      createdContact === undefined
+        ? yield* findContact(input.organizationId, email).pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () =>
+                  Effect.fail(
+                    dataError(
+                      "requestSubscription.createContact",
+                      "Email contact conflict did not resolve to a stored row"
+                    )
+                  ),
+                onSome: Effect.succeed,
+              })
+            )
+          )
+        : yield* decodeContact(
+            createdContact,
+            "requestSubscription.createContact"
+          );
 
     const persistedContact =
       alreadyVerified &&
-      (contact.verificationState !== "verified" || contact.userId !== input.userId)
+      (contact.verificationState !== "verified" ||
+        contact.userId !== input.userId)
         ? yield* Effect.gen(function* () {
             const [updated] = yield* db
               .update(schema.emailContactTable)
@@ -198,7 +227,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                 "Email contact update did not return a row"
               );
             }
-            return yield* decodeContact(updated, "requestSubscription.verifyContact");
+            return yield* decodeContact(
+              updated,
+              "requestSubscription.verifyContact"
+            );
           })
         : contact;
 
@@ -208,8 +240,13 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     );
     const priorSubscription = Option.getOrUndefined(existingSubscription);
     const state = verifiedStateFor(priorSubscription, alreadyVerified);
-    const unsubscribeToken = yield* generateEmailSubscriptionToken;
-    const unsubscribeTokenHash = yield* hashEmailSubscriptionToken(unsubscribeToken);
+    const unsubscribeToken =
+      priorSubscription === undefined
+        ? Option.some(yield* generateEmailSubscriptionToken)
+        : Option.none<EmailSubscriptionToken>();
+    const unsubscribeTokenHash = Option.isSome(unsubscribeToken)
+      ? yield* hashEmailSubscriptionToken(unsubscribeToken.value)
+      : null;
     const verificationToken =
       state === "pending_verification"
         ? Option.some(yield* generateEmailSubscriptionToken)
@@ -230,7 +267,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                 state === "pending_verification"
                   ? input.verificationExpiresAt
                   : null,
-              unsubscribeTokenHash,
               verifiedAt:
                 state === "active" && priorSubscription.verifiedAt === null
                   ? input.now
@@ -287,18 +323,23 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           );
         });
 
-    return { contact: persistedContact, subscription, unsubscribeToken, verificationToken };
+    return {
+      contact: persistedContact,
+      subscription,
+      unsubscribeToken,
+      verificationToken,
+    };
   });
 
-  const findSubscription = Effect.fn("EmailSubscriptionRepository.findSubscription")(
-    function* (input: FindEmailSubscriptionInput) {
-      const email = yield* normalizeEmailAddress(input.email, "findSubscription");
-      const contact = yield* findContact(input.organizationId, email);
-      return Option.isSome(contact)
-        ? yield* findSubscriptionForContact(contact.value.id, input.topic)
-        : Option.none<Subscription>();
-    }
-  );
+  const findSubscription = Effect.fn(
+    "EmailSubscriptionRepository.findSubscription"
+  )(function* (input: FindEmailSubscriptionInput) {
+    const email = yield* normalizeEmailAddress(input.email, "findSubscription");
+    const contact = yield* findContact(input.organizationId, email);
+    return Option.isSome(contact)
+      ? yield* findSubscriptionForContact(contact.value.id, input.topic)
+      : Option.none<Subscription>();
+  });
 
   const verifySubscription = Effect.fn(
     "EmailSubscriptionRepository.verifySubscription"
@@ -315,7 +356,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       return { _tag: "Invalid" as const };
     }
     const subscription = yield* decodeSubscription(row, "verifySubscription");
-    if (subscription.state === "active" || subscription.state === "paused_by_plan") {
+    if (
+      subscription.state === "active" ||
+      subscription.state === "paused_by_plan"
+    ) {
       return { _tag: "AlreadyVerified" as const };
     }
     if (
@@ -330,6 +374,8 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       .update(schema.emailSubscriptionTable)
       .set({
         state: "active",
+        verificationExpiresAt: null,
+        verificationTokenHash: null,
         verifiedAt: input.now,
         updatedAt: input.now,
       })
@@ -360,7 +406,9 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       const [row] = yield* db
         .select()
         .from(schema.emailSubscriptionTable)
-        .where(eq(schema.emailSubscriptionTable.unsubscribeTokenHash, tokenHash))
+        .where(
+          eq(schema.emailSubscriptionTable.unsubscribeTokenHash, tokenHash)
+        )
         .limit(1);
       if (row === undefined) {
         return { _tag: "Invalid" as const };
@@ -391,13 +439,18 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   /** Authenticated post-topic unsubscribe; it never accepts a bearer token. */
   const unsubscribeAuthenticatedPostSubscription = Effect.fn(
     "EmailSubscriptionRepository.unsubscribeAuthenticatedPostSubscription"
-  )(function* ({ now, organizationId, postId, userId }: {
+  )(function* ({
+    now,
+    organizationId,
+    postId,
+    userId,
+  }: {
     readonly now: Date;
     readonly organizationId: string;
     readonly postId: string;
     readonly userId: string;
   }) {
-    const [row] = yield* db
+    const rows = yield* db
       .select({
         id: schema.emailSubscriptionTable.id,
         state: schema.emailSubscriptionTable.state,
@@ -407,62 +460,88 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         schema.emailContactTable,
         eq(schema.emailContactTable.id, schema.emailSubscriptionTable.contactId)
       )
-      .where(and(
-        eq(schema.emailSubscriptionTable.organizationId, organizationId),
-        eq(schema.emailSubscriptionTable.topicType, "post"),
-        eq(schema.emailSubscriptionTable.topicId, postId),
-        eq(schema.emailContactTable.organizationId, organizationId),
-        eq(schema.emailContactTable.userId, userId),
-      ))
-      .limit(1);
-    if (row === undefined) {
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.organizationId, organizationId),
+          eq(schema.emailSubscriptionTable.topicType, "post"),
+          eq(schema.emailSubscriptionTable.topicId, postId),
+          eq(schema.emailContactTable.organizationId, organizationId),
+          eq(schema.emailContactTable.userId, userId)
+        )
+      );
+    if (rows.length === 0) {
       return { _tag: "NotSubscribed" as const };
     }
-    if (row.state === "unsubscribed") {
+    const subscribedIds = rows.flatMap((row) =>
+      row.state === "unsubscribed" ? [] : [row.id]
+    );
+    if (subscribedIds.length === 0) {
       return { _tag: "AlreadyUnsubscribed" as const };
     }
-    const [updated] = yield* db
+    const updated = yield* db
       .update(schema.emailSubscriptionTable)
       .set({
         state: "unsubscribed",
         unsubscribedAt: now,
         updatedAt: now,
       })
-      .where(eq(schema.emailSubscriptionTable.id, row.id))
+      .where(
+        and(
+          inArray(schema.emailSubscriptionTable.id, subscribedIds),
+          inArray(schema.emailSubscriptionTable.state, [
+            "pending_verification",
+            "active",
+            "paused_by_plan",
+          ])
+        )
+      )
       .returning({ id: schema.emailSubscriptionTable.id });
-    if (updated === undefined) {
-      return yield* dataError(
-        "unsubscribeAuthenticatedPostSubscription",
-        "Email subscription update did not return a row"
-      );
-    }
-    return { _tag: "Unsubscribed" as const };
+    return updated.length === 0
+      ? { _tag: "AlreadyUnsubscribed" as const }
+      : { _tag: "Unsubscribed" as const };
   });
 
   /** Synchronizes only reversible consent states with the workspace email plan. */
   const reconcileSubscriptionPlanStates = Effect.fn(
     "EmailSubscriptionRepository.reconcileSubscriptionPlanStates"
-  )(function* ({ eligible, organizationId }: {
+  )(function* ({
+    eligible,
+    now,
+    organizationId,
+  }: {
     readonly eligible: boolean;
+    readonly now: Date;
     readonly organizationId: string;
   }) {
     const paused = eligible
       ? []
-      : yield* db.update(schema.emailSubscriptionTable).set({
-          state: "paused_by_plan",
-          updatedAt: new Date(),
-        }).where(and(
-          eq(schema.emailSubscriptionTable.organizationId, organizationId),
-          eq(schema.emailSubscriptionTable.state, "active"),
-        )).returning({ id: schema.emailSubscriptionTable.id });
+      : yield* db
+          .update(schema.emailSubscriptionTable)
+          .set({
+            state: "paused_by_plan",
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.emailSubscriptionTable.organizationId, organizationId),
+              eq(schema.emailSubscriptionTable.state, "active")
+            )
+          )
+          .returning({ id: schema.emailSubscriptionTable.id });
     const resumed = eligible
-      ? yield* db.update(schema.emailSubscriptionTable).set({
-          state: "active",
-          updatedAt: new Date(),
-        }).where(and(
-          eq(schema.emailSubscriptionTable.organizationId, organizationId),
-          eq(schema.emailSubscriptionTable.state, "paused_by_plan"),
-        )).returning({ id: schema.emailSubscriptionTable.id })
+      ? yield* db
+          .update(schema.emailSubscriptionTable)
+          .set({
+            state: "active",
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.emailSubscriptionTable.organizationId, organizationId),
+              eq(schema.emailSubscriptionTable.state, "paused_by_plan")
+            )
+          )
+          .returning({ id: schema.emailSubscriptionTable.id })
       : [];
     return { paused: paused.length, resumed: resumed.length };
   });
@@ -470,49 +549,80 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   const findPlanStateOrganizationIds = Effect.fn(
     "EmailSubscriptionRepository.findPlanStateOrganizationIds"
   )(function* () {
-    const rows = yield* db.selectDistinct({
-      organizationId: schema.emailSubscriptionTable.organizationId,
-    }).from(schema.emailSubscriptionTable).where(inArray(
-      schema.emailSubscriptionTable.state,
-      ["active", "paused_by_plan"]
-    ));
+    const rows = yield* db
+      .selectDistinct({
+        organizationId: schema.emailSubscriptionTable.organizationId,
+      })
+      .from(schema.emailSubscriptionTable)
+      .where(
+        inArray(schema.emailSubscriptionTable.state, [
+          "active",
+          "paused_by_plan",
+        ])
+      );
     return rows.map((row) => row.organizationId);
   });
 
   const upsertSuppression = Effect.fn(
     "EmailSubscriptionRepository.upsertSuppression"
   )(function* (input: UpsertEmailSuppressionInput) {
-    const email = yield* normalizeEmailAddress(input.email, "upsertSuppression");
-    if (input.providerEventId !== null) {
-      const [duplicate] = yield* db
-        .select({ providerEventId: schema.emailSuppressionTable.providerEventId })
-        .from(schema.emailSuppressionTable)
-        .where(eq(schema.emailSuppressionTable.providerEventId, input.providerEventId))
-        .limit(1);
-      if (duplicate !== undefined) {
-        return { _tag: "DuplicateEvent" as const };
-      }
-    }
-    yield* db
+    const email = yield* normalizeEmailAddress(
+      input.email,
+      "upsertSuppression"
+    );
+    const [inserted] = yield* db
       .insert(schema.emailSuppressionTable)
       .values({
         email,
         reason: input.reason,
         providerEventId: input.providerEventId,
       })
-      .onConflictDoUpdate({
-        target: schema.emailSuppressionTable.email,
-        set: {
-          reason: input.reason,
-          providerEventId: input.providerEventId,
-        },
-      });
-    return { _tag: "Upserted" as const };
+      .onConflictDoNothing()
+      .returning({ email: schema.emailSuppressionTable.email });
+    if (inserted !== undefined) {
+      return { _tag: "Upserted" as const };
+    }
+
+    if (input.providerEventId !== null) {
+      const [duplicate] = yield* db
+        .select({
+          providerEventId: schema.emailSuppressionTable.providerEventId,
+        })
+        .from(schema.emailSuppressionTable)
+        .where(
+          eq(
+            schema.emailSuppressionTable.providerEventId,
+            input.providerEventId
+          )
+        )
+        .limit(1);
+      if (duplicate !== undefined) {
+        return { _tag: "DuplicateEvent" as const };
+      }
+    }
+
+    const updated = yield* db
+      .update(schema.emailSuppressionTable)
+      .set({
+        reason: input.reason,
+        providerEventId: input.providerEventId,
+      })
+      .where(eq(schema.emailSuppressionTable.email, email))
+      .returning({ email: schema.emailSuppressionTable.email });
+    return updated.length === 1
+      ? { _tag: "Upserted" as const }
+      : yield* dataError(
+          "upsertSuppression",
+          "Suppression conflict did not resolve to a stored row"
+        );
   });
 
   const isSuppressed = Effect.fn("EmailSubscriptionRepository.isSuppressed")(
     function* ({ email }: { readonly email: string }) {
-      const normalizedEmail = yield* normalizeEmailAddress(email, "isSuppressed");
+      const normalizedEmail = yield* normalizeEmailAddress(
+        email,
+        "isSuppressed"
+      );
       const [suppression] = yield* db
         .select({ email: schema.emailSuppressionTable.email })
         .from(schema.emailSuppressionTable)

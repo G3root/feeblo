@@ -7,8 +7,8 @@ import { render, toPlainText } from "react-email";
 import {
   Mailer,
   type MailMessage,
-  type MailSendResult,
   MailPermanentDeliveryError,
+  type MailSendResult,
   MailTemplateRenderError,
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
@@ -100,7 +100,7 @@ const mailerLayer = Layer.effect(
           try: () => toPlainText(html),
           catch: () => new MailTemplateRenderError({}),
         });
-        const outcome = yield* Ref.modify(mailbox, (state) => {
+        const attempt = yield* Ref.modify(mailbox, (state) => {
           const [nextOutcome, ...remainingOutcomes] = state.outcomes;
           const resolvedOutcome =
             nextOutcome ??
@@ -110,7 +110,10 @@ const mailerLayer = Layer.effect(
           const failed = resolvedOutcome._tag !== "accepted";
 
           return [
-            resolvedOutcome,
+            {
+              number: state.attempts + 1,
+              outcome: resolvedOutcome,
+            },
             {
               ...state,
               attempts: state.attempts + 1,
@@ -138,27 +141,25 @@ const mailerLayer = Layer.effect(
           ];
         });
 
-        switch (outcome._tag) {
+        switch (attempt.outcome._tag) {
           case "permanentFailure":
             return yield* new MailPermanentDeliveryError(
-              outcome.smtpStatusCode === undefined
+              attempt.outcome.smtpStatusCode === undefined
                 ? {}
-                : { smtpStatusCode: outcome.smtpStatusCode }
+                : { smtpStatusCode: attempt.outcome.smtpStatusCode }
             );
           case "temporaryFailure":
             return yield* new MailTemporaryDeliveryError(
-              outcome.smtpStatusCode === undefined
+              attempt.outcome.smtpStatusCode === undefined
                 ? {}
-                : { smtpStatusCode: outcome.smtpStatusCode }
+                : { smtpStatusCode: attempt.outcome.smtpStatusCode }
             );
           case "uncertainFailure":
             return yield* new MailUncertainDeliveryError({});
           case "accepted":
-            return resultForOutcome(
-              message,
-              (yield* Ref.get(mailbox)).attempts,
-              outcome
-            );
+            return resultForOutcome(message, attempt.number, attempt.outcome);
+          default:
+            return attempt.outcome satisfies never;
         }
       }),
     });

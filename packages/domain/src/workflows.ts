@@ -1,8 +1,4 @@
 import { Mailer } from "@feeblo/transactional/mailer";
-import { EntitlementPolicy } from "./entitlement/policies";
-import { EmailSubscriptionRepository } from "./email-subscription/repository";
-import { EmailOutboxRepository } from "./email-outbox/repository";
-import { EmailOutboxWorkflowLayer, reconcileEmailOutbox } from "./email-outbox/workflow";
 import * as Cron from "effect/Cron";
 import * as Layer from "effect/Layer";
 import {
@@ -11,7 +7,14 @@ import {
   SingleRunner,
   TestRunner,
 } from "effect/unstable/cluster";
-import { SubmissionEmailNotificationWorkflowLayer } from "./post/workflow";
+import { EmailOutboxConfig } from "./email-outbox/config";
+import { EmailOutboxRepository } from "./email-outbox/repository";
+import {
+  EmailOutboxWorkflowLayer,
+  reconcileEmailOutbox,
+} from "./email-outbox/workflow";
+import { EmailSubscriptionRepository } from "./email-subscription/repository";
+import { EntitlementPolicy } from "./entitlement/policies";
 import { WelcomeUserWorkflowLayer } from "./user/workflows";
 import { WorkspaceRepository } from "./workspace/repository";
 
@@ -25,9 +28,10 @@ const WorkflowClusterEngineTest = ClusterWorkflowEngine.layer.pipe(
 
 const EmailOutboxReconciliationLayer = ClusterCron.make({
   name: "EmailOutboxReconciliation",
-  cron: Cron.parseUnsafe("0 * * * * *"),
+  cron: Cron.parseUnsafe("0 0 * * * *"),
   execute: reconcileEmailOutbox(),
 }).pipe(
+  Layer.provide(EmailOutboxConfig.layer),
   Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(
@@ -43,11 +47,9 @@ type MakeMailerLayer = () => Layer.Layer<
 const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
   Layer.mergeAll(
     WelcomeUserWorkflowLayer.pipe(Layer.provide(makeMailerLayer())),
-    SubmissionEmailNotificationWorkflowLayer.pipe(
-      Layer.provide(makeMailerLayer())
-    ),
     EmailOutboxWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer()),
+      Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(EmailOutboxRepository.layer),
       Layer.provide(
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))

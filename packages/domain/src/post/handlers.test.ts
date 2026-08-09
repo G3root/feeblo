@@ -16,9 +16,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { BoardRepository } from "../board/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
@@ -28,6 +28,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import {
   DEFAULT_POST_EMBEDDING_DIMENSIONS,
   DEFAULT_POST_EMBEDDING_MODEL,
@@ -36,7 +37,6 @@ import {
 import { PostRpcHandlersEffect } from "./handlers";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
-import { WorkspaceRepository } from "../workspace/repository";
 
 describe("PostRpcHandlers", () => {
   type Fixture = {
@@ -316,25 +316,32 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostCreate", () => {
-      it.effect("creates an active verified email subscription for the post creator", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostRpcHandlersEffect;
-          const repository = yield* EmailSubscriptionRepository;
-          const fixture = yield* makeFixture();
-          const postId = yield* PostId.generate;
-          yield* handlers.PostCreate(postCreateInput(fixture, postId, "Creator subscription"))
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+      it.effect(
+        "creates an active verified email subscription for the post creator",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const repository = yield* EmailSubscriptionRepository;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            yield* handlers
+              .PostCreate(
+                postCreateInput(fixture, postId, "Creator subscription")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
 
-          const subscription = yield* repository.findSubscription({
-            email: "user@example.com",
-            organizationId: fixture.organizationId,
-            topic: { topicId: postId, topicType: "post" },
-          });
-          expect(Option.getOrUndefined(subscription)).toMatchObject({
-            source: "post_creator",
-            state: "active",
-          });
-        })
+            const subscription = yield* repository.findSubscription({
+              email: "user@example.com",
+              organizationId: fixture.organizationId,
+              topic: { topicId: postId, topicType: "post" },
+            });
+            expect(Option.getOrUndefined(subscription)).toMatchObject({
+              source: "post_creator",
+              state: "active",
+            });
+          })
       );
 
       it.effect("rolls back the post when its outbox insertion fails", () =>
@@ -343,30 +350,52 @@ describe("PostRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const postId = yield* PostId.generate;
           const db = yield* currentDb;
-          yield* db.execute(sql.raw(`
+          yield* db.execute(
+            sql.raw(`
             CREATE FUNCTION reject_email_outbox_insert() RETURNS trigger AS $$
             BEGIN
               RAISE EXCEPTION 'email outbox unavailable';
             END;
             $$ LANGUAGE plpgsql;
-          `));
-          yield* db.execute(sql.raw(`
+          `)
+          );
+          yield* db.execute(
+            sql.raw(`
             CREATE TRIGGER reject_email_outbox_insert
             BEFORE INSERT ON email_outbox
             FOR EACH ROW EXECUTE FUNCTION reject_email_outbox_insert();
-          `));
+          `)
+          );
 
           yield* Effect.flip(
-            handlers.PostCreate(postCreateInput(fixture, postId, "Atomic outbox"))
+            handlers
+              .PostCreate(postCreateInput(fixture, postId, "Atomic outbox"))
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          ).pipe(
+            Effect.ensuring(
+              db
+                .execute(
+                  sql.raw(
+                    "DROP TRIGGER reject_email_outbox_insert ON email_outbox"
+                  )
+                )
+                .pipe(
+                  Effect.andThen(
+                    db.execute(
+                      sql.raw("DROP FUNCTION reject_email_outbox_insert()")
+                    )
+                  ),
+                  Effect.orDie
+                )
+            )
           );
-          yield* db.execute(sql.raw("DROP TRIGGER reject_email_outbox_insert ON email_outbox"));
-          yield* db.execute(sql.raw("DROP FUNCTION reject_email_outbox_insert()"));
 
-          const posts = yield* db.select({ id: schema.postTable.id })
+          const posts = yield* db
+            .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
-          const legacyQueue = yield* db.select({ postId: schema.submissionNotificationQueueTable.postId })
+          const legacyQueue = yield* db
+            .select({ postId: schema.submissionNotificationQueueTable.postId })
             .from(schema.submissionNotificationQueueTable)
             .where(eq(schema.submissionNotificationQueueTable.postId, postId));
           expect(posts).toEqual([]);
@@ -374,27 +403,37 @@ describe("PostRpcHandlers", () => {
         })
       );
 
-      it.effect("records the submission email intent with the post transaction", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-          const postId = yield* PostId.generate;
-          const db = yield* currentDb;
+      it.effect(
+        "records the submission email intent with the post transaction",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const db = yield* currentDb;
 
-          yield* handlers.PostCreate(postCreateInput(fixture, postId, "Email intent"))
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Email intent"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
 
-          const intents = yield* db.select({
-            aggregateId: schema.emailOutboxTable.aggregateId,
-            kind: schema.emailOutboxTable.kind,
-            organizationId: schema.emailOutboxTable.organizationId,
-          }).from(schema.emailOutboxTable).where(eq(schema.emailOutboxTable.aggregateId, postId));
-          expect(intents).toEqual([{
-            aggregateId: postId,
-            kind: "submission.created",
-            organizationId: fixture.organizationId,
-          }]);
-        })
+            const intents = yield* db
+              .select({
+                aggregateId: schema.emailOutboxTable.aggregateId,
+                kind: schema.emailOutboxTable.kind,
+                organizationId: schema.emailOutboxTable.organizationId,
+              })
+              .from(schema.emailOutboxTable)
+              .where(eq(schema.emailOutboxTable.aggregateId, postId));
+            expect(intents).toEqual([
+              {
+                aggregateId: postId,
+                kind: "submission.created",
+                organizationId: fixture.organizationId,
+              },
+            ]);
+          })
       );
 
       it.effect("allows contributors to create posts", () =>
@@ -573,74 +612,119 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostUpdate", () => {
-      it.effect("coalesces paid status changes into the final five-minute intent", () =>
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const handlers = yield* PostRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-          yield* activateStarterPlan(fixture.organizationId);
-          const postId = yield* PostId.generate;
-          const reviewStatusId = yield* PostStatusId.generate;
-          const plannedStatusId = yield* PostStatusId.generate;
-          yield* db.insert(schema.postStatusTable).values([
-            { id: reviewStatusId, type: "REVIEW", orderIndex: 1, organizationId: fixture.organizationId },
-            { id: plannedStatusId, type: "PLANNED", orderIndex: 2, organizationId: fixture.organizationId },
-          ]);
-          yield* handlers.PostCreate(postCreateInput(fixture, postId, "Coalesced status"))
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+      it.effect(
+        "coalesces paid status changes into the final five-minute intent",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* activateStarterPlan(fixture.organizationId);
+            const postId = yield* PostId.generate;
+            const reviewStatusId = yield* PostStatusId.generate;
+            const plannedStatusId = yield* PostStatusId.generate;
+            yield* db.insert(schema.postStatusTable).values([
+              {
+                id: reviewStatusId,
+                type: "REVIEW",
+                orderIndex: 1,
+                organizationId: fixture.organizationId,
+              },
+              {
+                id: plannedStatusId,
+                type: "PLANNED",
+                orderIndex: 2,
+                organizationId: fixture.organizationId,
+              },
+            ]);
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Coalesced status"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
 
-          const firstChangeAt = Date.now();
-          for (const statusId of [reviewStatusId, plannedStatusId]) {
-            yield* handlers.PostUpdate({
-              id: postId,
-              organizationId: fixture.organizationId,
-              boardId: fixture.boardId,
-              statusId,
-            }).pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-          }
+            const firstChangeAt = Date.now();
+            for (const statusId of [reviewStatusId, plannedStatusId]) {
+              yield* handlers
+                .PostUpdate({
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                  statusId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
 
-          const intents = yield* db.select().from(schema.emailOutboxTable).where(and(
-            eq(schema.emailOutboxTable.aggregateId, postId),
-            eq(schema.emailOutboxTable.kind, "post.status_changed")
-          ));
-          expect(intents).toHaveLength(1);
-          expect(intents[0]?.payload).toMatchObject({ statusId: plannedStatusId });
-          expect(intents[0]?.scheduledAt.getTime()).toBeGreaterThanOrEqual(firstChangeAt + 299_000);
-          expect(intents[0]?.scheduledAt.getTime()).toBeLessThanOrEqual(firstChangeAt + 301_000);
-        })
+            const intents = yield* db
+              .select()
+              .from(schema.emailOutboxTable)
+              .where(
+                and(
+                  eq(schema.emailOutboxTable.aggregateId, postId),
+                  eq(schema.emailOutboxTable.kind, "post.status_changed")
+                )
+              );
+            expect(intents).toHaveLength(1);
+            expect(intents[0]?.payload).toMatchObject({
+              statusId: plannedStatusId,
+            });
+            expect(intents[0]?.scheduledAt.getTime()).toBeGreaterThanOrEqual(
+              firstChangeAt + 299_000
+            );
+            expect(intents[0]?.scheduledAt.getTime()).toBeLessThanOrEqual(
+              Date.now() + 300_000
+            );
+          })
       );
 
-      it.effect("records closure instead of a duplicate status email intent", () =>
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const handlers = yield* PostRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-          yield* activateStarterPlan(fixture.organizationId);
-          const postId = yield* PostId.generate;
-          const closedStatusId = yield* PostStatusId.generate;
-          yield* db.insert(schema.postStatusTable).values({
-            id: closedStatusId,
-            type: "CLOSED",
-            orderIndex: 1,
-            organizationId: fixture.organizationId,
-          });
-          yield* handlers.PostCreate(postCreateInput(fixture, postId, "Closing"))
-            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
-          yield* handlers.PostUpdate({
-            id: postId,
-            organizationId: fixture.organizationId,
-            boardId: fixture.boardId,
-            statusId: closedStatusId,
-          }).pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+      it.effect(
+        "records closure instead of a duplicate status email intent",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* activateStarterPlan(fixture.organizationId);
+            const postId = yield* PostId.generate;
+            const closedStatusId = yield* PostStatusId.generate;
+            yield* db.insert(schema.postStatusTable).values({
+              id: closedStatusId,
+              type: "CLOSED",
+              orderIndex: 1,
+              organizationId: fixture.organizationId,
+            });
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Closing"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostUpdate({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: closedStatusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
 
-          const intents = yield* db.select({ kind: schema.emailOutboxTable.kind })
-            .from(schema.emailOutboxTable)
-            .where(and(eq(schema.emailOutboxTable.aggregateId, postId), inArray(
-              schema.emailOutboxTable.kind,
-              ["post.status_changed", "post.closed"]
-            )));
-          expect(intents).toEqual([{ kind: "post.closed" }]);
-        })
+            const intents = yield* db
+              .select({ kind: schema.emailOutboxTable.kind })
+              .from(schema.emailOutboxTable)
+              .where(
+                and(
+                  eq(schema.emailOutboxTable.aggregateId, postId),
+                  inArray(schema.emailOutboxTable.kind, [
+                    "post.status_changed",
+                    "post.closed",
+                  ])
+                )
+              );
+            expect(intents).toEqual([{ kind: "post.closed" }]);
+          })
       );
 
       it.effect(
@@ -1468,22 +1552,38 @@ describe("PostRpcHandlers", () => {
           yield* activateStarterPlan(fixture.organizationId);
           const sourcePostId = yield* PostId.generate;
           const targetPostId = yield* PostId.generate;
-          for (const [id, title] of [[sourcePostId, "Source"], [targetPostId, "Target"]] as const) {
-            yield* handlers.PostCreate(postCreateInput(fixture, id, title))
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          for (const [id, title] of [
+            [sourcePostId, "Source"],
+            [targetPostId, "Target"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
           }
-          yield* handlers.PostMerge({
-            organizationId: fixture.organizationId,
-            sourcePostId,
-            targetPostId,
-          }).pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          const intents = yield* db.select().from(schema.emailOutboxTable).where(and(
-            eq(schema.emailOutboxTable.aggregateId, sourcePostId),
-            eq(schema.emailOutboxTable.kind, "post.merged")
-          ));
+          const intents = yield* db
+            .select()
+            .from(schema.emailOutboxTable)
+            .where(
+              and(
+                eq(schema.emailOutboxTable.aggregateId, sourcePostId),
+                eq(schema.emailOutboxTable.kind, "post.merged")
+              )
+            );
           expect(intents).toHaveLength(1);
-          expect(intents[0]?.payload).toMatchObject({ postId: sourcePostId, targetPostId });
+          expect(intents[0]?.payload).toMatchObject({
+            postId: sourcePostId,
+            targetPostId,
+          });
         })
       );
 
