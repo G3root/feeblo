@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "email_outbox_pendingStatusAggregate_uidx" ON "email_outbox" ("organization_id","kind","aggregate_id") WHERE "state" = 'pending' AND "kind" = 'post.status_changed';

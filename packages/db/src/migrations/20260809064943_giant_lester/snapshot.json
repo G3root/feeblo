@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "e7175235-b2ff-4cab-85bf-957bc65ca3ac",
+  "id": "26c7e363-abe9-4bb6-93f3-fa3e851a3ca2",
   "prevIds": [
-    "de691351-17cd-4e0a-a2b6-79ecb67ee736"
+    "50127c7b-2cce-49a5-bcd6-3c1ccd427343"
   ],
   "ddl": [
     {
@@ -7287,6 +7287,27 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "contact_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "email_delivery_contactId_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "email_delivery"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "organization_id",
           "isExpression": false,
           "asc": true,
@@ -7454,6 +7475,83 @@
       "method": "btree",
       "concurrently": false,
       "name": "email_subscription_organizationId_state_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "email_subscription"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "organization_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "topic_type",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "topic_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "state",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "contact_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "email_subscription_recipientLookup_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "email_subscription"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "organization_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "email_subscription_state_organizationId_idx",
       "entityType": "indexes",
       "schema": "public",
       "table": "email_subscription"
