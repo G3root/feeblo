@@ -5,9 +5,9 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as jose from "jose";
-import { createSsoSession, SsoRepositoriesLive } from "./sso";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { WorkspaceRepository } from "../workspace/repository";
+import { createSsoSession, SsoRepositoriesLive } from "./sso";
 
 const signToken = (payload: jose.JWTPayload, secret: string) =>
   Effect.promise(() =>
@@ -19,15 +19,10 @@ const signToken = (payload: jose.JWTPayload, secret: string) =>
 const futureExp = Math.floor(Date.now() / 1000) + 3600;
 const pastExp = Math.floor(Date.now() / 1000) - 3600;
 
-const Repositories = Layer.mergeAll(
-  SsoRepositoriesLive,
-  WorkspaceRepository.layer,
-  Database.PgliteDatabaseLive
-);
 const TestLayer = Layer.mergeAll(
-  Repositories,
-  EntitlementPolicy.layer.pipe(Layer.provide(Repositories))
-);
+  SsoRepositoriesLive,
+  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
 describe("createSsoSession", () => {
   type Fixture = {

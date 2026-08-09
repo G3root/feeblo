@@ -14,8 +14,8 @@ import { useRef } from "react";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useEntitlements } from "~/hooks/use-entitlements";
+import { useOrganizationId } from "~/hooks/use-organization-id";
 import { jwtSecretCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 
@@ -55,28 +55,21 @@ function RouteComponent() {
     return <SettingsAccessDenied />;
   }
 
-  if (isEntitlementsLoading) {
-    return null;
-  }
-  if (!entitlements.capabilities.automaticSso) {
-    return (
-      <SettingsLayout.Root>
-        <SettingsLayout.Header>
-          <SettingsLayout.HeaderTitle>Security</SettingsLayout.HeaderTitle>
-          <SettingsLayout.HeaderDescription>
-            Automatic SSO requires the Starter plan or higher.
-          </SettingsLayout.HeaderDescription>
-        </SettingsLayout.Header>
-      </SettingsLayout.Root>
-    );
-  }
-
-  return <SecuritySettingsContent organizationId={organizationId} />;
+  return (
+    <SecuritySettingsContent
+      automaticSsoAvailable={
+        isEntitlementsLoading || entitlements.capabilities.automaticSso
+      }
+      organizationId={organizationId}
+    />
+  );
 }
 
 function SecuritySettingsContent({
+  automaticSsoAvailable,
   organizationId,
 }: {
+  automaticSsoAvailable: boolean;
   organizationId: string;
 }) {
   // Ref (not state) because nothing needs to re-render while generating: the
@@ -190,16 +183,30 @@ function SecuritySettingsContent({
       <SettingsLayout.Header>
         <SettingsLayout.HeaderTitle>Security</SettingsLayout.HeaderTitle>
         <SettingsLayout.HeaderDescription>
-          Manage JWT secrets for widget SSO authentication.
+          Manage JWT secrets for widget SSO authentication.{" "}
+          {automaticSsoAvailable
+            ? null
+            : "Automatic SSO is available only on paid plans."}
         </SettingsLayout.HeaderDescription>
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <SettingsItem.Root>
           <SettingsItem.Header>
-            <SettingsItem.Title>JWT Authentication</SettingsItem.Title>
+            <SettingsItem.Title>
+              JWT Authentication
+              {automaticSsoAvailable ? null : (
+                <SettingsItem.PaidPlanIndicator
+                  className="ml-2 inline-block"
+                  content="Automatic SSO requires the Starter plan or higher."
+                />
+              )}
+            </SettingsItem.Title>
             <SettingsItem.Description>
               Sign user data with your secret so Feeblo can verify who is
-              submitting feedback.
+              submitting feedback.{" "}
+              {automaticSsoAvailable
+                ? null
+                : "Automatic SSO requires the Starter plan or higher."}
             </SettingsItem.Description>
           </SettingsItem.Header>
           <SettingsItem.Content>

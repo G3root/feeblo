@@ -19,11 +19,11 @@ import type { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import type { ParsedPersonAttributes } from "../contact/utils";
 import { parsePersonAttributes } from "../contact/utils";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
-import { UserRepository } from "../user/repository";
-import { EntitlementPolicy } from "../entitlement/policies";
 import { PolicyDeniedError } from "../policy";
+import { UserRepository } from "../user/repository";
 
 /**
  * Tagged error raised by the SSO programs. The `code` is mapped back to a
@@ -142,14 +142,15 @@ export const createSsoSession = ({
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const userRepository = yield* UserRepository;
 
-    yield* entitlementPolicy.canUseAutomaticSso(organizationId).pipe(
-      Effect.mapError(
-        (error) =>
+    yield* entitlementPolicy
+      .canUseAutomaticSso(organizationId)
+      .pipe(
+        Effect.mapError((error) =>
           error instanceof PolicyDeniedError
             ? new SsoError({ code: "AUTOMATIC_SSO_NOT_ENTITLED" })
             : error
-      )
-    );
+        )
+      );
 
     const secrets = yield* jwtSecretRepository.getSecretsForOrg({
       organizationId,
