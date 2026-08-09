@@ -13,6 +13,8 @@ export type BoardPostRow = {
   title: string;
   summary: string;
   updatedAt: Date | string;
+  upvoteCount: number;
+  user: { image: string | null; name: string | null };
 };
 
 export type BoardPostLane = {
