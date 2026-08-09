@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import { ChangelogRepository } from "../changelog/repository";
+import { ClientIp } from "../client-ip";
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError } from "../rpc-errors";
 import { listWidgetUpdates, withWidgetRateLimit } from "./api-live";
@@ -129,6 +130,7 @@ layer(TestLayer)("widget updates", (it) => {
         expect(error._tag).toBe("RateLimitExceededError");
       }).pipe(
         Effect.provide(RateLimitService.layerMemory),
+        Effect.provideService(ClientIp, "203.0.113.9"),
         Effect.provideService(HttpServerRequest.HttpServerRequest, request)
       );
     }

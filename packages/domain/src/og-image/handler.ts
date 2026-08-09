@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
-import { getClientIpFromRequest } from "../client-ip";
+import { ClientIp } from "../client-ip";
 import * as RateLimit from "../rate-limit";
 import { RateLimitService } from "../rate-limit/service";
 import {
@@ -76,7 +76,7 @@ export const handleOgImage = (
 ): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
   never,
-  OgImageService | RateLimitService
+  ClientIp | OgImageService | RateLimitService
 > =>
   Effect.gen(function* () {
     const rateLimitService = yield* RateLimitService;
@@ -125,7 +125,7 @@ export const handleOgImage = (
       ),
       RateLimit.PublicRpcRateLimiter,
       RateLimit.makePublicRpcRateLimiter({
-        clientIp: getClientIpFromRequest(request),
+        clientIp: yield* ClientIp,
         rateLimitService,
       })
     );

@@ -4,7 +4,6 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import type {
@@ -13,7 +12,7 @@ import type {
 } from "../attribute-definition/schema";
 import { BoardRepository } from "../board/repository";
 import { ChangelogRepository } from "../changelog/repository";
-import { getClientIpFromRequest } from "../client-ip";
+import { ClientIp } from "../client-ip";
 import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
@@ -46,14 +45,14 @@ export const withWidgetRateLimit =
   (options: RateLimit.PublicRpcRateLimitOptions) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     Effect.gen(function* () {
-      const request = yield* HttpServerRequest.HttpServerRequest;
+      const clientIp = yield* ClientIp;
       const rateLimitService = yield* RateLimitService;
 
       return yield* Effect.provideService(
         effect.pipe(RateLimit.withPublicRpcRateLimit(options)),
         RateLimit.PublicRpcRateLimiter,
         RateLimit.makePublicRpcRateLimiter({
-          clientIp: getClientIpFromRequest(request),
+          clientIp,
           rateLimitService,
         })
       );
