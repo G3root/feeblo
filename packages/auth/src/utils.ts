@@ -3,7 +3,8 @@ import * as Effect from "effect/Effect";
 import { AuthConfig } from "./config";
 
 const makeTrustedOrigins = Effect.fnUntraced(function* () {
-  const { trustedOrigins, apiUrl, appUrl, nodeEnv } = yield* AuthConfig;
+  const { appRootDomain, trustedOrigins, apiUrl, appUrl, nodeEnv } =
+    yield* AuthConfig;
 
   if (trustedOrigins._tag === "Some") {
     const origins = trustedOrigins.value
@@ -19,9 +20,19 @@ const makeTrustedOrigins = Effect.fnUntraced(function* () {
   // `*.localhost:3001` is a development convenience; trusting it in production
   // would let any locally-resolving origin (evil.localhost:3001 -> 127.0.0.1)
   // pass better-auth's origin/redirect validation.
-  return nodeEnv === "production"
-    ? [appUrl, apiUrl]
-    : [appUrl, apiUrl, "*.localhost:3001"];
+  if (nodeEnv === "production") {
+    // Public boards live on arbitrary subdomains of the app root domain, and
+    // better-auth validates the request Origin and callbackURL against
+    // trustedOrigins exactly (no suffix matching) for sign-in/sign-up. Without
+    // the wildcard, every board-hosted sign-in would be rejected with
+    // INVALID_ORIGIN / INVALID_CALLBACK_URL. DNS under the real root domain is
+    // controlled, so `*.<root>` is safe to trust (unlike the dev
+    // `*.localhost:3001` convenience).
+    const appProtocol = new URL(appUrl).protocol;
+    return [appUrl, apiUrl, `${appProtocol}//*.${appRootDomain.split(":")[0]}`];
+  }
+
+  return [appUrl, apiUrl, "*.localhost:3001"];
 });
 
 export const getTrustedOrigins = makeTrustedOrigins();

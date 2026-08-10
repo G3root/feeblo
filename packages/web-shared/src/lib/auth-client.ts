@@ -4,7 +4,18 @@ import { getClientTimeZone } from "./client-hints";
 import { getRuntimePublicEnv } from "./runtime-public-env";
 
 const API_URL = getRuntimePublicEnv().apiUrl;
-const baseUrl = API_URL?.endsWith("/") ? API_URL : `${API_URL}/`;
+// In the dev server the injected API_URL is origin-relative ("/api") so auth
+// requests stay same-origin through the Vite proxy and cookies remain
+// first-party on *.localhost subdomains. Better Auth requires an absolute base
+// URL and appends "/api/auth" itself, so a relative value resolves to the bare
+// page origin.
+const resolvedApiUrl =
+  API_URL?.startsWith("/") && typeof window !== "undefined"
+    ? window.location.origin
+    : API_URL;
+const baseUrl = resolvedApiUrl?.endsWith("/")
+  ? resolvedApiUrl
+  : `${resolvedApiUrl}/`;
 
 export const verificationOtpEndpoint = `${baseUrl}api/auth/verification-otp`;
 export const profilePictureUploadEndpoint = `${baseUrl}api/profile/picture`;

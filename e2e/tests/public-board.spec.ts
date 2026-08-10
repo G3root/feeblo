@@ -67,6 +67,62 @@ async function signInThroughPublicBoard(
 }
 
 test(
+  "visitors can sign in from the sign-in page on a public board subdomain",
+  { tag: "@critical" },
+  async ({ browser, page }) => {
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
+
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+
+    try {
+      const boardUrl = publicBoardUrl(user.workspaceName);
+      const signInUrl = `${boardUrl}/sign-in`;
+
+      // Auth pages render on the public board subdomain instead of the board's
+      // not-found page, so a visitor can sign in without leaving the board.
+      await visitorPage.goto(signInUrl);
+      await expect(
+        visitorPage.getByRole("textbox", { name: "Email" })
+      ).toBeVisible();
+      await expect(
+        visitorPage.getByText("Enter your account credentials to continue.")
+      ).toBeVisible();
+
+      await visitorPage
+        .getByRole("textbox", { name: "Email" })
+        .fill(user.email);
+      await visitorPage
+        .getByRole("textbox", { name: "Password", exact: true })
+        .fill(user.password);
+
+      const signInResponse = visitorPage.waitForResponse(
+        (response) =>
+          response.url().includes("/api/auth/sign-in/email") &&
+          response.request().method() === "POST"
+      );
+      await visitorPage
+        .getByRole("button", { name: "Login", exact: true })
+        .click();
+      expect((await signInResponse).ok()).toBeTruthy();
+
+      // Signing in from the public board lands the visitor back on the board
+      // root, now authenticated.
+      await expect(visitorPage).toHaveURL(boardUrl);
+      await expect(
+        visitorPage.getByRole("button", { name: "Sign out" })
+      ).toBeVisible();
+      await expect(
+        visitorPage.getByRole("button", { name: "Sign in", exact: true })
+      ).toHaveCount(0);
+    } finally {
+      await visitorContext.close();
+    }
+  }
+);
+
+test(
   "public board sign-in grants authenticated actions and sign-out revokes them",
   { tag: "@critical" },
   async ({ browser, page }) => {
@@ -154,9 +210,9 @@ test(
         visitorPage.request,
         visitor.email
       );
-      await verificationDialog.locator("#otp").fill(
-        verificationCodeFromEmail(email)
-      );
+      await verificationDialog
+        .locator("#otp")
+        .fill(verificationCodeFromEmail(email));
       await verificationDialog
         .getByRole("button", { name: "Verify", exact: true })
         .click();
