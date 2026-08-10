@@ -75,9 +75,10 @@ export default defineConfig({
           changeOrigin: true,
           rewrite: (path) => {
             // The feedback widget builds `${apiUrl}//api/widget/v1/...`; drop the
-            // redundant /api prefix exactly like the direct API call does.
+            // redundant /api prefix plus the doubled slash, forwarding
+            // /api/widget/... exactly like the direct API call does.
             if (path.startsWith("/api//api/")) {
-              return path.slice("/api".length);
+              return path.slice("/api/".length);
             }
             // The RPC client prefixes its /rpc endpoint with the API base.
             if (path === "/api/rpc" || path === "/api/rpc/") {

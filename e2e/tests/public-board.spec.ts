@@ -109,7 +109,7 @@ test(
 
       // Signing in from the public board lands the visitor back on the board
       // root, now authenticated.
-      await expect(visitorPage).toHaveURL(boardUrl);
+      await expect(visitorPage).toHaveURL(`${boardUrl}/`);
       await expect(
         visitorPage.getByRole("button", { name: "Sign out" })
       ).toBeVisible();
@@ -217,7 +217,7 @@ test(
         .getByRole("button", { name: "Verify", exact: true })
         .click();
 
-      await expect(visitorPage).toHaveURL(boardUrl);
+      await expect(visitorPage).toHaveURL(`${boardUrl}/`);
       await expect(
         visitorPage.getByRole("button", { name: "Sign out" })
       ).toBeVisible();
