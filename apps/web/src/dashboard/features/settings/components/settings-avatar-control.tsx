@@ -35,6 +35,10 @@ const SettingsAvatarControlContext =
 
 const MAX_CROPPED_IMAGE_DIMENSION = 1024;
 const MAX_CROPPED_IMAGE_SIZE = 5 * 1024 * 1024;
+// Cap decoded source dimensions (~25MP) so getImage() can never allocate a
+// natural-resolution canvas from an unbounded source (e.g. a huge PNG/WebP
+// with a small byte size).
+const MAX_SOURCE_IMAGE_PIXELS = 25_000_000;
 const EDITOR_SIZE = 288;
 
 function useSettingsAvatarControl() {
@@ -47,6 +51,18 @@ function useSettingsAvatarControl() {
   }
 
   return value;
+}
+
+async function hasExcessiveSourcePixels(file: File): Promise<boolean> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const excessive = bitmap.width * bitmap.height > MAX_SOURCE_IMAGE_PIXELS;
+    bitmap.close();
+    return excessive;
+  } catch {
+    // Let AvatarEditor surface decode failures via onLoadFailure.
+    return false;
+  }
 }
 
 async function createCroppedImage(
@@ -173,6 +189,15 @@ function Root({
       return;
     }
 
+    if (await hasExcessiveSourcePixels(file)) {
+      toastManager.add({
+        title: "Image dimensions exceed the 25MP limit",
+        type: "error",
+      });
+      event.target.value = "";
+      return;
+    }
+
     setSelectedFile(file);
     setZoom(1);
     setIsImageReady(false);
@@ -262,6 +287,7 @@ function Root({
                 onClick={() => {
                   setZoom(1);
                   setResetKey((key) => key + 1);
+                  setIsImageReady(false);
                 }}
                 variant="outline"
               >
