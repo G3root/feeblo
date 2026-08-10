@@ -1,13 +1,6 @@
 /** biome-ignore-all lint/suspicious/useAwait: <explanation> */
 import { Button } from "@feeblo/ui/button";
 import {
-  Cropper,
-  CropperArea,
-  type CropperAreaData,
-  CropperImage,
-  type CropperPoint,
-} from "@feeblo/ui/cropper";
-import {
   Dialog,
   DialogDescription,
   DialogFooter,
@@ -23,14 +16,8 @@ import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
-import {
-  createContext,
-  use,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { createContext, use, useCallback, useRef, useState } from "react";
+import AvatarEditor, { type AvatarEditorRef } from "react-avatar-editor";
 
 interface SettingsAvatarControlContextValue {
   ariaLabel: string;
@@ -48,6 +35,7 @@ const SettingsAvatarControlContext =
 
 const MAX_CROPPED_IMAGE_DIMENSION = 1024;
 const MAX_CROPPED_IMAGE_SIZE = 5 * 1024 * 1024;
+const EDITOR_SIZE = 288;
 
 function useSettingsAvatarControl() {
   const value = use(SettingsAvatarControlContext);
@@ -62,69 +50,48 @@ function useSettingsAvatarControl() {
 }
 
 async function createCroppedImage(
-  imageSrc: string,
-  cropData: CropperAreaData,
+  source: HTMLCanvasElement,
   fileName: string
 ): Promise<File> {
-  const image = new Image();
-  image.crossOrigin = "anonymous";
+  const scale = Math.min(
+    1,
+    MAX_CROPPED_IMAGE_DIMENSION / Math.max(source.width, source.height)
+  );
+  const outputWidth = Math.max(1, Math.round(source.width * scale));
+  const outputHeight = Math.max(1, Math.round(source.height * scale));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = outputWidth;
+  canvas.height = outputHeight;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Could not get canvas context");
+  }
+
+  ctx.drawImage(source, 0, 0, outputWidth, outputHeight);
 
   return new Promise((resolve, reject) => {
-    image.onload = () => {
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Canvas is empty"));
+          return;
+        }
 
-      if (!ctx) {
-        reject(new Error("Could not get canvas context"));
-        return;
-      }
+        if (blob.size > MAX_CROPPED_IMAGE_SIZE) {
+          reject(new Error("Cropped image exceeds the 5MB limit"));
+          return;
+        }
 
-      const scale = Math.min(
-        1,
-        MAX_CROPPED_IMAGE_DIMENSION / Math.max(cropData.width, cropData.height)
-      );
-      const outputWidth = Math.max(1, Math.round(cropData.width * scale));
-      const outputHeight = Math.max(1, Math.round(cropData.height * scale));
-
-      canvas.width = outputWidth;
-      canvas.height = outputHeight;
-
-      ctx.drawImage(
-        image,
-        cropData.x,
-        cropData.y,
-        cropData.width,
-        cropData.height,
-        0,
-        0,
-        outputWidth,
-        outputHeight
-      );
-
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error("Canvas is empty"));
-            return;
-          }
-
-          if (blob.size > MAX_CROPPED_IMAGE_SIZE) {
-            reject(new Error("Cropped image exceeds the 5MB limit"));
-            return;
-          }
-
-          const croppedFile = new File([blob], `cropped-${fileName}`, {
-            type: "image/webp",
-          });
-          resolve(croppedFile);
-        },
-        "image/webp",
-        0.9
-      );
-    };
-
-    image.onerror = () => reject(new Error("Failed to load image"));
-    image.src = imageSrc;
+        const croppedFile = new File([blob], `cropped-${fileName}`, {
+          type: "image/webp",
+        });
+        resolve(croppedFile);
+      },
+      "image/webp",
+      0.9
+    );
   });
 }
 
@@ -150,41 +117,32 @@ function Root({
   onRemove?: (() => Promise<void>) | undefined;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<AvatarEditorRef>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-  const [crop, setCrop] = useState<CropperPoint>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [croppedArea, setCroppedArea] = useState<CropperAreaData | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (selectedImageUrl) {
-        URL.revokeObjectURL(selectedImageUrl);
-      }
-    };
-  }, [selectedImageUrl]);
+  const [resetKey, setResetKey] = useState(0);
+  const [isImageReady, setIsImageReady] = useState(false);
 
   const handleCropDialogOpenChange = useCallback((open: boolean) => {
     setCropDialogOpen(open);
     if (!open) {
-      setCrop({ x: 0, y: 0 });
       setZoom(1);
-      setCroppedArea(null);
+      setResetKey((key) => key + 1);
       setSelectedFile(null);
-      setSelectedImageUrl(null);
+      setIsImageReady(false);
     }
   }, []);
 
   const onCropApply = useCallback(async () => {
-    if (!(selectedFile && croppedArea && selectedImageUrl)) {
+    const editor = editorRef.current;
+    if (!(selectedFile && editor)) {
       return;
     }
 
     try {
       const croppedFile = await createCroppedImage(
-        selectedImageUrl,
-        croppedArea,
+        editor.getImage(),
         selectedFile.name
       );
 
@@ -197,13 +155,7 @@ function Root({
         type: "error",
       });
     }
-  }, [
-    selectedFile,
-    croppedArea,
-    selectedImageUrl,
-    onUpload,
-    handleCropDialogOpenChange,
-  ]);
+  }, [selectedFile, onUpload, handleCropDialogOpenChange]);
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -221,12 +173,9 @@ function Root({
       return;
     }
 
-    const url = URL.createObjectURL(file);
     setSelectedFile(file);
-    setSelectedImageUrl(url);
-    setCrop({ x: 0, y: 0 });
     setZoom(1);
-    setCroppedArea(null);
+    setIsImageReady(false);
     setCropDialogOpen(true);
     event.target.value = "";
   }
@@ -266,31 +215,28 @@ function Root({
               </DialogDescription>
             </DialogHeader>
             <div className="px-6 pb-4">
-              {selectedFile && selectedImageUrl ? (
+              {selectedFile ? (
                 <div className="flex flex-col gap-4">
-                  <Cropper
-                    aspectRatio={1}
-                    className="h-80"
-                    crop={crop}
-                    onCropAreaChange={(_, croppedAreaPixels) =>
-                      setCroppedArea(croppedAreaPixels)
-                    }
-                    onCropChange={setCrop}
-                    onCropComplete={(_, croppedAreaPixels) =>
-                      setCroppedArea(croppedAreaPixels)
-                    }
-                    onZoomChange={setZoom}
-                    shape="circle"
-                    withGrid
-                    zoom={zoom}
-                  >
-                    <CropperImage
-                      alt={selectedFile.name}
-                      crossOrigin="anonymous"
-                      src={selectedImageUrl}
-                    />
-                    <CropperArea />
-                  </Cropper>
+                  <AvatarEditor
+                    border={0}
+                    borderRadius={EDITOR_SIZE / 2}
+                    color={[0, 0, 0, 0.5]}
+                    gridColor="rgba(255, 255, 255, 0.5)"
+                    height={EDITOR_SIZE}
+                    image={selectedFile}
+                    key={resetKey}
+                    onImageReady={() => setIsImageReady(true)}
+                    onLoadFailure={() => {
+                      toastManager.add({
+                        title: "Failed to load image",
+                        type: "error",
+                      });
+                    }}
+                    ref={editorRef}
+                    scale={zoom}
+                    showGrid
+                    width={EDITOR_SIZE}
+                  />
                   <div className="flex items-center gap-3">
                     <Label className="whitespace-nowrap text-sm">Zoom</Label>
                     <Slider
@@ -314,15 +260,14 @@ function Root({
             <DialogFooter>
               <Button
                 onClick={() => {
-                  setCrop({ x: 0, y: 0 });
                   setZoom(1);
-                  setCroppedArea(null);
+                  setResetKey((key) => key + 1);
                 }}
                 variant="outline"
               >
                 Reset
               </Button>
-              <Button disabled={!croppedArea} onClick={onCropApply}>
+              <Button disabled={!isImageReady} onClick={onCropApply}>
                 Crop
               </Button>
             </DialogFooter>
