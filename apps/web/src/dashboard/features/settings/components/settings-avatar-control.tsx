@@ -322,12 +322,7 @@ function ButtonComponent(props: React.ComponentProps<"button">) {
         type="button"
         {...props}
       >
-        <UserAvatar
-          className="size-20 text-xl"
-          image={imageUrl}
-          imageAlt={imageAlt}
-          name={name}
-        />
+        <UserAvatar image={imageUrl} imageAlt={imageAlt} name={name} />
       </button>
     </div>
   );
