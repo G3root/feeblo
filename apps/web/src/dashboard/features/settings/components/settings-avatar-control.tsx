@@ -134,6 +134,11 @@ function Root({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<AvatarEditorRef>(null);
+  // Bumped on every new file selection and on crop dialog close; in-flight
+  // validations compare against it to discard stale continuations.
+  const selectionVersionRef = useRef(0);
+  const isCroppingRef = useRef(false);
+  const [isCropping, setIsCropping] = useState(false);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -143,6 +148,7 @@ function Root({
   const handleCropDialogOpenChange = useCallback((open: boolean) => {
     setCropDialogOpen(open);
     if (!open) {
+      selectionVersionRef.current += 1;
       setZoom(1);
       setResetKey((key) => key + 1);
       setSelectedFile(null);
@@ -151,10 +157,17 @@ function Root({
   }, []);
 
   const onCropApply = useCallback(async () => {
+    if (isCroppingRef.current) {
+      return;
+    }
+
     const editor = editorRef.current;
     if (!(selectedFile && editor)) {
       return;
     }
+
+    isCroppingRef.current = true;
+    setIsCropping(true);
 
     try {
       const croppedFile = await createCroppedImage(
@@ -170,6 +183,9 @@ function Root({
         title: error instanceof Error ? error.message : "Failed to crop image",
         type: "error",
       });
+    } finally {
+      isCroppingRef.current = false;
+      setIsCropping(false);
     }
   }, [selectedFile, onUpload, handleCropDialogOpenChange]);
 
@@ -179,6 +195,9 @@ function Root({
     if (!file) {
       return;
     }
+
+    // A new selection supersedes any in-flight validation.
+    const version = ++selectionVersionRef.current;
 
     if (maxSize !== undefined && file.size > maxSize) {
       toastManager.add({
@@ -190,10 +209,19 @@ function Root({
     }
 
     if (await hasExcessiveSourcePixels(file)) {
+      if (selectionVersionRef.current !== version) {
+        event.target.value = "";
+        return;
+      }
       toastManager.add({
         title: "Image dimensions exceed the 25MP limit",
         type: "error",
       });
+      event.target.value = "";
+      return;
+    }
+
+    if (selectionVersionRef.current !== version) {
       event.target.value = "";
       return;
     }
@@ -293,7 +321,10 @@ function Root({
               >
                 Reset
               </Button>
-              <Button disabled={!isImageReady} onClick={onCropApply}>
+              <Button
+                disabled={!isImageReady || isCropping}
+                onClick={onCropApply}
+              >
                 Crop
               </Button>
             </DialogFooter>
