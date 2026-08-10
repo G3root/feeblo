@@ -21,6 +21,17 @@ import * as Schema from "effect/Schema";
 import type { TPostActivityKind } from "../validation-schema/activity-kind";
 import type { TAttributeType } from "../validation-schema/attribute-type";
 import type { TChangelogCategoryIconType } from "../validation-schema/changelog-category-icon-type";
+import type {
+  TEmailContactVerificationState,
+  TEmailDeliveryState,
+  TEmailIntentKind,
+  TEmailOutboxState,
+  TEmailProviderEventType,
+  TEmailSubscriptionSource,
+  TEmailSubscriptionState,
+  TEmailSubscriptionTopicType,
+  TEmailSuppressionReason,
+} from "../validation-schema/email";
 import type { TEntitySource } from "../validation-schema/entity-source";
 import type { TNotificationEventType } from "../validation-schema/notification-kind";
 import type { TPostSource } from "../validation-schema/post-source";
@@ -1075,63 +1086,6 @@ export const submissionNotificationBatchTable = pgTable(
   }
 );
 
-export type TEmailIntentKind =
-  | "submission.created"
-  | "changelog.published"
-  | "changelog.update_requested"
-  | "post.status_changed"
-  | "post.official_update_published"
-  | "post.merged"
-  | "post.closed";
-
-export type TEmailOutboxState =
-  | "pending"
-  | "materialized"
-  | "paused_by_plan"
-  | "failed"
-  | "expired";
-
-export type TEmailDeliveryState =
-  | "queued"
-  | "sending"
-  | "accepted"
-  | "delivered"
-  | "deferred"
-  | "bounced"
-  | "failed"
-  | "suppressed"
-  | "paused_by_plan"
-  | "expired";
-
-export type TEmailContactVerificationState = "pending" | "verified";
-
-export type TEmailSubscriptionTopicType = "changelog" | "post";
-
-export type TEmailSubscriptionSource = "explicit" | "post_creator";
-
-export type TEmailSubscriptionState =
-  | "pending_verification"
-  | "active"
-  | "paused_by_plan"
-  | "unsubscribed";
-
-export type TEmailSuppressionReason =
-  | "hard_bounce"
-  | "complaint"
-  | "administrative_block";
-
-export type TEmailProviderEventType =
-  | "delivered"
-  | "deferred"
-  | "bounced"
-  | "failed"
-  | "complained";
-
-/**
- * Durable product events that may materialize into one or more email
- * deliveries. The payload is decoded by the owning email-outbox repository;
- * JSONB itself remains a serialized boundary.
- */
 export const emailOutboxTable = pgTable(
   "email_outbox",
   {

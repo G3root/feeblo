@@ -1,11 +1,11 @@
-import * as Metric from "effect/Metric";
 import type {
-  EmailDeliveryState,
-  EmailIntentKind,
-  EmailOutboxState,
-} from "./schema";
+  TEmailDeliveryState,
+  TEmailIntentKind,
+  TEmailOutboxState,
+} from "@feeblo/db/validation-schema/email";
+import * as Metric from "effect/Metric";
 
-type EmailDeliveryTransitionLabel = EmailDeliveryState | "complained";
+type EmailDeliveryTransitionLabel = TEmailDeliveryState | "complained";
 
 const emailIntentTransitions = Metric.counter(
   "feeblo_email_intent_transitions_total",
@@ -30,8 +30,8 @@ const emailReconciliationRecoveries = Metric.counter(
 
 /** Records a low-cardinality outbox lifecycle metric without recipient data. */
 export const recordEmailIntentTransition = (
-  kind: EmailIntentKind,
-  state: EmailOutboxState
+  kind: TEmailIntentKind,
+  state: TEmailOutboxState
 ) =>
   Metric.update(
     Metric.withAttributes(emailIntentTransitions, { kind, state }),

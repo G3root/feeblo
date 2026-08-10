@@ -176,6 +176,33 @@ describe("PostSubscriptionRpcHandlers", () => {
           });
         })
       );
+      it.effect("rolls back the legacy subscription when email consent fails", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostSubscriptionRpcHandlersEffect;
+          const f = yield* fixture();
+          const input = { organizationId: f.organizationId, postId: f.postId };
+          const validSession = session(f);
+          const invalidEmailSession: Session = {
+            ...validSession,
+            user: { ...validSession.user, email: "invalid-email" },
+          };
+
+          const error = yield* Effect.flip(
+            handlers
+              .PostSubscriptionCreate(input)
+              .pipe(
+                Effect.provideService(CurrentSession, invalidEmailSession)
+              )
+          );
+
+          expect(error._tag).toBe("InternalServerError");
+          expect(
+            yield* handlers
+              .PostSubscriptionList(input)
+              .pipe(Effect.provideService(CurrentSession, validSession))
+          ).toHaveLength(0);
+        })
+      );
       it.effect("lists only the authenticated public subscriber", () =>
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;

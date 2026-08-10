@@ -1,6 +1,17 @@
+import {
+  EmailContactVerificationState,
+  EmailSubscriptionSource,
+  EmailSubscriptionState,
+  EmailSuppressionReason,
+} from "@feeblo/db/validation-schema/email";
+import { WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { WorkspaceId } from "@feeblo/id";
+
+// The email-subscription vocabularies are canonical in
+// `@feeblo/db/validation-schema`; the record structs below embed them so the
+// persisted row shapes and their inferred union types stay derived from the
+// single source of truth.
 
 const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
@@ -60,36 +71,6 @@ export type EmailSubscriptionTopic = Schema.Schema.Type<
   typeof EmailSubscriptionTopic
 >;
 
-export const EmailSubscriptionState = Schema.Literals([
-  "pending_verification",
-  "active",
-  "paused_by_plan",
-  "unsubscribed",
-]);
-
-export type EmailSubscriptionState = Schema.Schema.Type<
-  typeof EmailSubscriptionState
->;
-
-export const EmailSubscriptionSource = Schema.Literals([
-  "explicit",
-  "post_creator",
-]);
-
-export type EmailSubscriptionSource = Schema.Schema.Type<
-  typeof EmailSubscriptionSource
->;
-
-export const EmailSuppressionReason = Schema.Literals([
-  "hard_bounce",
-  "complaint",
-  "administrative_block",
-]);
-
-export type EmailSuppressionReason = Schema.Schema.Type<
-  typeof EmailSuppressionReason
->;
-
 export const EmailContactRecord = Schema.Struct({
   createdAt: PersistedDate,
   email: EmailAddress,
@@ -97,7 +78,7 @@ export const EmailContactRecord = Schema.Struct({
   organizationId: Schema.String,
   updatedAt: PersistedDate,
   userId: Schema.NullOr(Schema.String),
-  verificationState: Schema.Literals(["pending", "verified"]),
+  verificationState: EmailContactVerificationState,
   verifiedAt: Schema.NullOr(PersistedDate),
 });
 

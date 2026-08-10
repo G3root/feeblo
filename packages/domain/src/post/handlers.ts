@@ -15,7 +15,7 @@ import {
 } from "../asset/service";
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { wakeEmailOutbox } from "../email-outbox/workflow";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { NotificationService } from "../notification/service";
@@ -56,6 +56,8 @@ import type {
 } from "./schema";
 import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 
+const postStatusCoalescingDelayMs = 5 * 60 * 1000;
+
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
   const repository = yield* PostRepository;
@@ -67,18 +69,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const notifications = yield* Effect.serviceOption(NotificationService);
   const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
-
-  const wakeEmailOutboxBestEffort = (
-    outboxId: string,
-    organizationId: string
-  ) =>
-    wakeEmailOutbox(outboxId).pipe(
-      Effect.catchCause((cause) =>
-        Effect.logWarning("Failed to wake email outbox dispatcher", cause).pipe(
-          Effect.annotateLogs({ organizationId, outboxId })
-        )
-      )
-    );
 
   // -- Shared effect helpers (no policy applied) --
 
@@ -289,7 +279,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                     aggregateType: "post",
                     deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
                     expiresAt: new Date(
-                      now.getTime() + 300_000 + 7 * 86_400_000
+                      now.getTime() + postStatusCoalescingDelayMs + 7 * 86_400_000
                     ),
                     organizationId: args.organizationId,
                     payload: {
@@ -297,7 +287,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                       postId: args.id,
                       statusId: args.statusId,
                     },
-                    scheduledAt: new Date(now.getTime() + 300_000),
+                    scheduledAt: new Date(
+                      now.getTime() + postStatusCoalescingDelayMs
+                    ),
                   })
                   .pipe(
                     Effect.mapError(
@@ -570,7 +562,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               organizationId: args.organizationId,
               source: "post_creator",
               topic: { topicId: args.id, topicType: "post" },
-              userId: session.session.userId,
               verificationExpiresAt: new Date(
                 subscriptionNow.getTime() + 86_400_000
               ),

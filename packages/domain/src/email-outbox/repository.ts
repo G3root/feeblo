@@ -6,12 +6,15 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import {
+  type EmailAddress,
+  normalizeEmailAddress,
+} from "../email-subscription/schema";
 import { deliverySourceStatesFor } from "./delivery-state";
 import {
   type EmailDeliveryRecord as EmailDelivery,
   EmailDeliveryRecord,
   type EmailOutboxRecord as EmailIntent,
-  type EmailIntentKind,
   EmailIntentPayload,
   EmailOutboxRecord,
   type EmailIntentPayload as IntentPayload,
@@ -30,41 +33,41 @@ export class EmailOutboxDataError extends Schema.TaggedErrorClass<EmailOutboxDat
   }
 ) {}
 
-export interface RecordEmailIntentInput {
-  readonly aggregateId: string;
-  readonly aggregateType: string;
-  readonly deduplicationKey: string;
-  readonly expiresAt: Date | null;
-  readonly kind: Exclude<EmailIntentKind, "post.status_changed">;
-  readonly organizationId: string;
+type EmailIntentWriteFields = Pick<
+  EmailIntent,
+  | "aggregateId"
+  | "aggregateType"
+  | "deduplicationKey"
+  | "expiresAt"
+  | "organizationId"
+  | "scheduledAt"
+>;
+
+export type RecordEmailIntentInput = EmailIntentWriteFields & {
+  readonly kind: Exclude<EmailIntent["kind"], "post.status_changed">;
   readonly payload: Exclude<
     IntentPayload,
     { readonly kind: "post.status_changed" }
   >;
-  readonly scheduledAt: Date;
-}
+};
 
-export interface RecordStatusChangeIntentInput {
-  readonly aggregateId: string;
-  readonly aggregateType: string;
-  readonly deduplicationKey: string;
-  readonly expiresAt: Date | null;
-  readonly organizationId: string;
+export type RecordStatusChangeIntentInput = EmailIntentWriteFields & {
   readonly payload: Extract<
     IntentPayload,
     { readonly kind: "post.status_changed" }
   >;
-  readonly scheduledAt: Date;
-}
+};
 
-export interface CreateEmailDeliveryInput {
-  readonly contactId?: string | null;
-  readonly outboxId: string;
-  readonly recipientEmail: string;
-  readonly template: string;
-  readonly templatePayload: unknown;
-  readonly templateVersion: number;
-}
+export type CreateEmailDeliveryInput = Pick<
+  EmailDelivery,
+  | "outboxId"
+  | "recipientEmail"
+  | "template"
+  | "templatePayload"
+  | "templateVersion"
+> & {
+  readonly contactId?: EmailDelivery["contactId"];
+};
 
 export interface FindPendingEmailIntentsInput {
   readonly before: Date;
@@ -126,12 +129,12 @@ const decodeEmailDelivery = (
 
 const normalizeRecipientEmail = (
   recipientEmail: string
-): Effect.Effect<string, EmailOutboxDataError> => {
-  const normalized = recipientEmail.trim().toLowerCase();
-  return normalized.length > 0
-    ? Effect.succeed(normalized)
-    : Effect.fail(dataError("createDelivery", "Recipient email is empty"));
-};
+): Effect.Effect<EmailAddress, EmailOutboxDataError> =>
+  normalizeEmailAddress(recipientEmail, "createDelivery").pipe(
+    Effect.mapError(() =>
+      dataError("createDelivery", "Recipient email is invalid")
+    )
+  );
 
 /** Deterministic, non-PII RFC message identifier for one outbox recipient. */
 export const emailDeliveryMessageId = (
@@ -656,8 +659,6 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     return rows.length === 1;
   });
 
-  const releaseSendingDelivery = deferSendingDelivery;
-
   const markDeliveryAccepted = Effect.fn(
     "EmailOutboxRepository.markDeliveryAccepted"
   )(function* ({
@@ -687,8 +688,6 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     yield* recordEmailDeliveryTransition("accepted", rows.length);
     return rows.length === 1;
   });
-
-  const markDeliveryDeferred = deferSendingDelivery;
 
   const markDeliveryOutcome = Effect.fn(
     "EmailOutboxRepository.markDeliveryOutcome"
@@ -768,10 +767,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     createDelivery,
     findDueDeliveries,
     recoverStaleSendingDeliveries,
-    releaseSendingDelivery,
+    deferSendingDelivery,
     claimDeliveryForSending,
     markDeliveryAccepted,
-    markDeliveryDeferred,
     markDeliveryOutcome,
     markDeliveryDelivered,
   };

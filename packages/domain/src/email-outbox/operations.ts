@@ -1,10 +1,17 @@
 import { currentDb, schema } from "@feeblo/db";
+import type {
+  TEmailDeliveryState,
+  TEmailOutboxState,
+} from "@feeblo/db/validation-schema/email";
+import {
+  EmailDeliveryState,
+  EmailOutboxState,
+} from "@feeblo/db/validation-schema/email";
 import { count, eq, min } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
-import { EmailDeliveryState, EmailOutboxState } from "./schema";
 
 const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
@@ -20,7 +27,7 @@ const emptyIntentStates = () =>
     paused_by_plan: 0,
     failed: 0,
     expired: 0,
-  }) satisfies Record<EmailOutboxState, number>;
+  }) satisfies Record<TEmailOutboxState, number>;
 
 const emptyDeliveryStates = () =>
   ({
@@ -34,7 +41,7 @@ const emptyDeliveryStates = () =>
     suppressed: 0,
     paused_by_plan: 0,
     expired: 0,
-  }) satisfies Record<EmailDeliveryState, number>;
+  }) satisfies Record<TEmailDeliveryState, number>;
 
 const makeEmailOutboxOperations = Effect.gen(function* () {
   const db = yield* currentDb;

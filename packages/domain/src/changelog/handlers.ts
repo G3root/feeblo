@@ -12,7 +12,7 @@ import {
   syncChangelogAssetReferences,
 } from "../asset/service";
 import { EmailOutboxRepository } from "../email-outbox/repository";
-import { wakeEmailOutbox } from "../email-outbox/workflow";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -38,19 +38,6 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
   const changelogPolicy = yield* ChangelogPolicy;
   const sitePolicy = yield* SitePolicy;
-
-  const wakeEmailOutboxBestEffort = (
-    outboxId: string,
-    organizationId: string
-  ) =>
-    wakeEmailOutbox(outboxId).pipe(
-      Effect.catchCause((cause) =>
-        Effect.logWarning(
-          "Failed to wake email outbox; reconciliation will retry",
-          cause
-        ).pipe(Effect.annotateLogs({ organizationId, outboxId }))
-      )
-    );
 
   const recordChangelogPublishedIntent = Effect.fn(
     "Changelog.recordPublishedEmailIntent"

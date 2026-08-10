@@ -1,11 +1,11 @@
 import { currentDb, schema } from "@feeblo/db";
+import { EmailDeliveryState } from "@feeblo/db/validation-schema/email";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { deliverySourceStatesFor } from "../email-outbox/delivery-state";
-import { EmailDeliveryState } from "../email-outbox/schema";
 import { recordEmailDeliveryTransition } from "../email-outbox/telemetry";
 import { EmailAddress } from "../email-subscription/schema";
 import {

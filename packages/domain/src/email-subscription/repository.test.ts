@@ -253,14 +253,12 @@ describe("EmailSubscriptionRepository", () => {
             ...pendingChangelogSubscription(organizationId),
             alreadyVerifiedUser: { userId: "usr_subscriber" },
             email: "subscriber@example.com",
-            userId: "usr_subscriber",
           });
           const post = yield* repository.requestSubscription({
             ...pendingChangelogSubscription(organizationId),
             alreadyVerifiedUser: { userId: "usr_subscriber" },
             email: "subscriber@example.com",
             topic: { topicId: "pst_1", topicType: "post" },
-            userId: "usr_subscriber",
           });
           expect(Option.isSome(changelog.unsubscribeToken)).toBe(true);
           if (Option.isNone(changelog.unsubscribeToken)) {
@@ -322,14 +320,12 @@ describe("EmailSubscriptionRepository", () => {
             alreadyVerifiedUser: { userId: "usr_post_subscriber" },
             email: "usr_post_subscriber@example.com",
             topic: { topicId: "post_a", topicType: "post" },
-            userId: "usr_post_subscriber",
           });
           yield* repository.requestSubscription({
             ...pendingChangelogSubscription(organizationId),
             alreadyVerifiedUser: { userId: "usr_post_subscriber" },
             email: "usr_post_subscriber@example.com",
             topic: { topicId: "post_b", topicType: "post" },
-            userId: "usr_post_subscriber",
           });
 
           const first =
@@ -385,7 +381,6 @@ describe("EmailSubscriptionRepository", () => {
                 alreadyVerifiedUser: { userId },
                 email,
                 topic: { topicId: "post_multi", topicType: "post" },
-                userId,
               }),
             { discard: true }
           );
@@ -430,7 +425,6 @@ describe("EmailSubscriptionRepository", () => {
             alreadyVerifiedUser: { userId: "usr_plan_state" },
             email: "usr_plan_state@example.com",
             topic: { topicId: "post_active", topicType: "post" },
-            userId: "usr_plan_state",
           });
           yield* repository.requestSubscription({
             ...pendingChangelogSubscription(organizationId),

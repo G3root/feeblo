@@ -1,11 +1,10 @@
+import type { TEmailIntentKind } from "@feeblo/db/validation-schema/email";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
 import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { WorkspaceRepository } from "../workspace/repository";
-import type { EmailIntentKind } from "../email-outbox/schema";
 
 type TCanCreateBoard = {
   organizationId: string;
@@ -209,7 +208,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     kind,
   }: {
     readonly organizationId: string;
-    readonly kind: EmailIntentKind;
+    readonly kind: TEmailIntentKind;
   }) {
     if (kind === "submission.created") {
       return true;

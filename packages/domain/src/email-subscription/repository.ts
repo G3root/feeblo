@@ -10,12 +10,12 @@ import {
   type EmailContactRecord as Contact,
   EmailContactRecord,
   EmailSubscriptionDataError,
-  EmailSubscriptionInputError,
+  type EmailSubscriptionInputError,
   EmailSubscriptionRecord,
-  type EmailSubscriptionSource,
-  type EmailSuppressionReason,
+  type EmailSubscriptionTokenRequest,
   normalizeEmailAddress,
   type EmailSubscriptionRecord as Subscription,
+  type EmailSuppressionRecord as Suppression,
   type EmailSubscriptionTopic as Topic,
 } from "./schema";
 import {
@@ -26,38 +26,40 @@ import {
   redactEmailSubscriptionToken,
 } from "./tokens";
 
-export interface RequestEmailSubscriptionInput {
-  readonly alreadyVerifiedUser?: { readonly userId: string };
-  readonly email: string;
-  readonly now: Date;
-  readonly organizationId: string;
-  readonly source: EmailSubscriptionSource;
-  readonly topic: Topic;
-  readonly userId?: string;
-  readonly verificationExpiresAt: Date;
-}
+export type RequestEmailSubscriptionInput = Pick<
+  Contact,
+  "email" | "organizationId"
+> &
+  Pick<Subscription, "source"> & {
+    readonly alreadyVerifiedUser?: {
+      readonly userId: NonNullable<Contact["userId"]>;
+    };
+    readonly now: Contact["updatedAt"];
+    readonly topic: Topic;
+    readonly verificationExpiresAt: Subscription["verificationExpiresAt"];
+  };
 
-export interface FindEmailSubscriptionInput {
-  readonly email: string;
-  readonly organizationId: string;
+export type FindEmailSubscriptionInput = Pick<
+  Contact,
+  "email" | "organizationId"
+> & {
   readonly topic: Topic;
-}
+};
 
 export interface VerifyEmailSubscriptionInput {
-  readonly now: Date;
-  readonly verificationToken: string;
+  readonly now: Subscription["updatedAt"];
+  readonly verificationToken: EmailSubscriptionTokenRequest["token"];
 }
 
 export interface UnsubscribeEmailSubscriptionInput {
-  readonly now: Date;
-  readonly unsubscribeToken: string;
+  readonly now: Subscription["updatedAt"];
+  readonly unsubscribeToken: EmailSubscriptionTokenRequest["token"];
 }
 
-export interface UpsertEmailSuppressionInput {
-  readonly email: string;
-  readonly providerEventId: string | null;
-  readonly reason: EmailSuppressionReason;
-}
+export type UpsertEmailSuppressionInput = Pick<
+  Suppression,
+  "email" | "providerEventId" | "reason"
+>;
 
 const dataError = (
   operation: string,
@@ -156,17 +158,8 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       input.email,
       "requestSubscription"
     );
-    const alreadyVerified = input.alreadyVerifiedUser !== undefined;
-    if (
-      alreadyVerified &&
-      (input.userId === undefined ||
-        input.userId !== input.alreadyVerifiedUser.userId)
-    ) {
-      return yield* new EmailSubscriptionInputError({
-        operation: "requestSubscription",
-        reason: "Verified user evidence must match the subscription user",
-      });
-    }
+    const userId = input.alreadyVerifiedUser?.userId;
+    const alreadyVerified = userId !== undefined;
 
     const contactId = yield* EmailContactId.generate;
     const [createdContact] = yield* db
@@ -174,7 +167,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       .values({
         id: contactId,
         organizationId: input.organizationId,
-        userId: input.userId ?? null,
+        userId: userId ?? null,
         email,
         verificationState: alreadyVerified ? "verified" : "pending",
         verifiedAt: alreadyVerified ? input.now : null,
@@ -211,13 +204,12 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
 
     const persistedContact =
       alreadyVerified &&
-      (contact.verificationState !== "verified" ||
-        contact.userId !== input.userId)
+      (contact.verificationState !== "verified" || contact.userId !== userId)
         ? yield* Effect.gen(function* () {
             const [updated] = yield* db
               .update(schema.emailContactTable)
               .set({
-                userId: input.userId,
+                userId,
                 verificationState: "verified",
                 verifiedAt: input.now,
                 updatedAt: input.now,

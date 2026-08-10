@@ -1,20 +1,18 @@
+import {
+  EmailDeliveryState,
+  EmailIntentKind,
+  EmailOutboxState,
+} from "@feeblo/db/validation-schema/email";
 import * as Schema from "effect/Schema";
+
+// The email-outbox lifecycle vocabularies are canonical in
+// `@feeblo/db/validation-schema`; the record structs below embed them so the
+// persisted row shapes and their inferred union types stay derived from the
+// single source of truth.
 
 // The production Postgres driver and PGlite test driver may return timestamps
 // as Date instances or ISO strings respectively. Both decode into Date here.
 const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
-
-export const EmailIntentKind = Schema.Literals([
-  "submission.created",
-  "changelog.published",
-  "changelog.update_requested",
-  "post.status_changed",
-  "post.official_update_published",
-  "post.merged",
-  "post.closed",
-]);
-
-export type EmailIntentKind = Schema.Schema.Type<typeof EmailIntentKind>;
 
 export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
   kind: Schema.Literal("submission.created"),
@@ -37,12 +35,6 @@ export const PostStatusChangedEmailIntentPayload = Schema.Struct({
   statusId: Schema.String,
 });
 
-export const PostOfficialUpdatePublishedEmailIntentPayload = Schema.Struct({
-  kind: Schema.Literal("post.official_update_published"),
-  postId: Schema.String,
-  updateId: Schema.String,
-});
-
 export const PostMergedEmailIntentPayload = Schema.Struct({
   kind: Schema.Literal("post.merged"),
   postId: Schema.String,
@@ -63,37 +55,11 @@ export const EmailIntentPayload = Schema.Union([
   ChangelogPublishedEmailIntentPayload,
   ChangelogUpdateRequestedEmailIntentPayload,
   PostStatusChangedEmailIntentPayload,
-  PostOfficialUpdatePublishedEmailIntentPayload,
   PostMergedEmailIntentPayload,
   PostClosedEmailIntentPayload,
 ]);
 
 export type EmailIntentPayload = Schema.Schema.Type<typeof EmailIntentPayload>;
-
-export const EmailOutboxState = Schema.Literals([
-  "pending",
-  "materialized",
-  "paused_by_plan",
-  "failed",
-  "expired",
-]);
-
-export type EmailOutboxState = Schema.Schema.Type<typeof EmailOutboxState>;
-
-export const EmailDeliveryState = Schema.Literals([
-  "queued",
-  "sending",
-  "accepted",
-  "delivered",
-  "deferred",
-  "bounced",
-  "failed",
-  "suppressed",
-  "paused_by_plan",
-  "expired",
-]);
-
-export type EmailDeliveryState = Schema.Schema.Type<typeof EmailDeliveryState>;
 
 /** Immutable, provider-neutral renderer input for version one notifications. */
 export const NotificationTemplatePayload = Schema.Struct({
@@ -119,7 +85,9 @@ export type NotificationTemplatePayload = Schema.Schema.Type<
 export const SubmissionNotificationTemplatePayload =
   NotificationTemplatePayload;
 
-export type SubmissionNotificationTemplatePayload = NotificationTemplatePayload;
+export type SubmissionNotificationTemplatePayload = Schema.Schema.Type<
+  typeof SubmissionNotificationTemplatePayload
+>;
 
 export const EmailOutboxRecord = Schema.Struct({
   aggregateId: Schema.String,

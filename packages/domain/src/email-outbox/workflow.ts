@@ -16,11 +16,13 @@ import * as Schema from "effect/Schema";
 import * as W from "effect/unstable/workflow";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import type { EmailSubscriptionTopic } from "../email-subscription/schema";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { EmailOutboxConfig } from "./config";
 import { EmailOutboxDataError, EmailOutboxRepository } from "./repository";
 import {
   type EmailIntentPayload,
+  type EmailOutboxRecord,
   type NotificationTemplatePayload as NotificationPayload,
   NotificationTemplatePayload,
 } from "./schema";
@@ -81,10 +83,7 @@ export const EmailDeliveryWorkflow = W.Workflow.make("EmailDeliveryWorkflow", {
 
 type NotificationContent = {
   readonly templatePayload: Omit<NotificationPayload, "unsubscribeUrl">;
-  readonly topic: {
-    readonly topicId: string | null;
-    readonly topicType: "changelog" | "post";
-  };
+  readonly topic: EmailSubscriptionTopic;
 };
 
 const submissionPayload = (
@@ -137,10 +136,7 @@ const subscriptionTopicForIntent = (payload: EmailIntentPayload) => {
 
 const subscriptionNotificationContent = (
   appUrl: string,
-  intent: {
-    readonly organizationId: string;
-    readonly payload: EmailIntentPayload;
-  }
+  intent: Pick<EmailOutboxRecord, "organizationId" | "payload">
 ) =>
   Effect.gen(function* () {
     const db = yield* Database.Database;
@@ -254,11 +250,6 @@ const materializeSubmission = (outboxId: string) =>
         return [] as readonly string[];
       }
     } else if (intent.state !== "pending") {
-      return [] as readonly string[];
-    }
-    if (intent.payload.kind === "post.official_update_published") {
-      yield* repository.markIntentState({ id: intent.id, state: "failed" });
-      yield* recordEmailIntentTransition(intent.kind, "failed");
       return [] as readonly string[];
     }
 
@@ -408,13 +399,7 @@ const materializeSubmission = (outboxId: string) =>
     );
   });
 
-const sendDeliveryAttempt = (
-  deliveryId: string
-): Effect.Effect<
-  DeliveryAttemptOutcome,
-  unknown,
-  DatabaseService | EmailOutboxRepository | EntitlementPolicy | Mailer
-> =>
+const sendDeliveryAttempt = (deliveryId: string) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
     const policy = yield* EntitlementPolicy;
@@ -541,7 +526,7 @@ const sendDeliveryAttempt = (
       }
       const delayMs = retryDelayMs(delivery.id, attempt);
       return repository
-        .markDeliveryDeferred({
+        .deferSendingDelivery({
           id: delivery.id,
           nextAttemptAt: new Date(Date.now() + delayMs),
           lastError: { tag: error._tag },
@@ -805,6 +790,12 @@ export const EmailOutboxWorkflowLayer = Layer.mergeAll(
           success: DeliveryAttemptOutcomeSchema,
           error: workflowError,
           execute: sendDeliveryAttempt(deliveryId).pipe(
+            // Preserve repository-level typed failures; only the residual
+            // infrastructure channel (SqlError and other untyped drivers)
+            // collapses into the activity's EmailOutboxDataError envelope.
+            Effect.catchTags({
+              EmailOutboxDataError: (error) => Effect.fail(error),
+            }),
             Effect.mapError(
               () =>
                 new EmailOutboxDataError({
@@ -820,7 +811,7 @@ export const EmailOutboxWorkflowLayer = Layer.mergeAll(
           Effect.catch(() => {
             const delayMs = retryDelayMs(deliveryId, attempt);
             return repository
-              .releaseSendingDelivery({
+              .deferSendingDelivery({
                 id: deliveryId,
                 nextAttemptAt: new Date(Date.now() + delayMs),
                 lastError: { tag: "EmailDeliveryActivityError" },
@@ -898,6 +889,20 @@ export const wakeEmailOutbox = (outboxId: string) =>
     ).pipe(Effect.provideService(WorkflowEngine.WorkflowEngine, engine.value));
   });
 
+/** Logs a failed post-commit wake; reconciliation closes the lost-wake window. */
+export const wakeEmailOutboxBestEffort = (
+  outboxId: string,
+  organizationId: string
+): Effect.Effect<void> =>
+  wakeEmailOutbox(outboxId).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning(
+        "Failed to wake email outbox; reconciliation will retry",
+        cause
+      ).pipe(Effect.annotateLogs({ organizationId, outboxId }))
+    )
+  );
+
 /** Recover database intents and delivery rows whose best-effort workflow wake was lost. */
 export const reconcileEmailOutbox = ({
   now = new Date(),
@@ -966,7 +971,6 @@ export const reconcileEmailOutbox = ({
       resumedDeliveryIds.reduce((count, ids) => count + ids.length, 0) +
         resumedPausedDeliveryIds.reduce((count, ids) => count + ids.length, 0)
     );
-    const intents = pending;
     yield* repository.recoverStaleSendingDeliveries({
       before: new Date(now.getTime() - staleSendingAfterMs),
     });
@@ -975,7 +979,7 @@ export const reconcileEmailOutbox = ({
       limit: reconciliationBatchSize,
       staleSendingBefore: new Date(now.getTime() - staleSendingAfterMs),
     });
-    yield* Effect.forEach(intents, (intent) => wakeEmailOutbox(intent.id), {
+    yield* Effect.forEach(pending, (intent) => wakeEmailOutbox(intent.id), {
       discard: true,
     });
     yield* Effect.forEach(

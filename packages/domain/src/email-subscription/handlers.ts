@@ -15,8 +15,10 @@ import { WorkspaceRepository } from "../workspace/repository";
 import { EmailSubscriptionRepository } from "./repository";
 import { EmailSubscriptionRpcs } from "./rpcs";
 import {
+  type ChangelogSubscriptionRequest,
   type EmailSubscriptionDataError,
   type EmailSubscriptionInputError,
+  type EmailSubscriptionTokenRequest,
   normalizeEmailAddress,
 } from "./schema";
 import type { EmailSubscriptionTokenError } from "./tokens";
@@ -53,19 +55,15 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
       );
 
   /**
-   * Creates a manual changelog consent request. Tokens remain Redacted and
-   * are returned only to the caller responsible for creating its future
-   * verification-email outbox intent; public RPC responses must omit them.
+   * Creates a manual changelog consent request. Link tokens remain Redacted,
+   * and public RPC responses omit them.
    */
   const requestChangelogSubscription = Effect.fn(
     "EmailSubscriptionConsent.requestChangelogSubscription"
   )(function* ({
     email: requestedEmail,
     organizationId,
-  }: {
-    readonly email: string;
-    readonly organizationId: string;
-  }) {
+  }: ChangelogSubscriptionRequest) {
     const maySubscribe =
       yield* entitlementPolicy.mayCreatePublicEmailSubscriptions(
         organizationId
@@ -145,10 +143,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     EmailSubscriptionChangelogSubscribePublic: ({
       email,
       organizationId,
-    }: {
-      readonly email: string;
-      readonly organizationId: string;
-    }) =>
+    }: ChangelogSubscriptionRequest) =>
       consent.requestChangelogSubscription({ email, organizationId }).pipe(
         Effect.map(({ verificationRequired }) => ({ verificationRequired })),
         Effect.catchTags({
@@ -160,9 +155,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       ),
     EmailSubscriptionUnsubscribePublic: ({
       token,
-    }: {
-      readonly token: string;
-    }) =>
+    }: EmailSubscriptionTokenRequest) =>
       consent.unsubscribe({ unsubscribeToken: token }).pipe(
         Effect.catchTags({
           EmailSubscriptionDataError: internalConsentFailure,
@@ -170,7 +163,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("EmailSubscription", "update")
       ),
-    EmailSubscriptionVerifyPublic: ({ token }: { readonly token: string }) =>
+    EmailSubscriptionVerifyPublic: ({ token }: EmailSubscriptionTokenRequest) =>
       consent.verifySubscription({ verificationToken: token }).pipe(
         Effect.catchTags({
           EmailSubscriptionDataError: internalConsentFailure,
