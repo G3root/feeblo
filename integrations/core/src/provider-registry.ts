@@ -108,6 +108,20 @@ export const makeIntegrationProviderRegistry = (
         }
       }
 
+      const advertisedCapabilities = new Set(
+        registration.manifest.capabilities.map((capability) => capability.key)
+      );
+      for (const handler of registration.handlers) {
+        if (!advertisedCapabilities.has(handler.capabilityKey)) {
+          return yield* registryValidationFailure({
+            capabilityKey: handler.capabilityKey,
+            message:
+              "Integration provider registry handler for unadvertised capability",
+            provider,
+          });
+        }
+      }
+
       registrationsByProvider.set(provider, registration);
     }
 

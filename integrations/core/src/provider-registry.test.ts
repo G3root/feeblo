@@ -65,4 +65,27 @@ describe("makeIntegrationProviderRegistry", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
   });
+
+  it("rejects a handler for a capability not advertised in the manifest", () => {
+    const registration = webhookRegistration();
+    const exit = Effect.runSyncExit(
+      makeIntegrationProviderRegistry([
+        {
+          ...registration,
+          handlers: [
+            {
+              capabilityKey: "events.post",
+              deliver: () => Effect.succeed({}),
+            },
+          ],
+          manifest: {
+            ...registration.manifest,
+            capabilities: [],
+          },
+        },
+      ])
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
 });

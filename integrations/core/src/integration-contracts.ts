@@ -11,6 +11,7 @@ import {
   IntegrationSafeDisplayMetadata as DbIntegrationSafeDisplayMetadata,
   SubscribableIntegrationEventType as DbSubscribableIntegrationEventType,
   type TIntegrationCapabilityDirection,
+  type TIntegrationCapabilityKey,
   type TIntegrationConnectionLifecycleStatus,
   type TIntegrationConnectionMode,
   type TIntegrationDeliveryState,
@@ -319,7 +320,7 @@ export interface IntegrationProviderDeliveryResult {
 
 /** One provider implementation for one advertised outbound capability. */
 export interface IntegrationCapabilityHandler {
-  readonly capabilityKey: string;
+  readonly capabilityKey: TIntegrationCapabilityKey;
   readonly deliver: (
     input: IntegrationProviderDeliveryInput
   ) => Effect.Effect<
