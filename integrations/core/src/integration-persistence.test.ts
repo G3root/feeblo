@@ -409,5 +409,75 @@ describe("integration persistence", () => {
           ).toHaveLength(1);
         })
     );
+
+    it.effect(
+      "cascades integration records away when the organization is deleted",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const recorder = yield* IntegrationEventRecorder;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository;
+          const route = yield* seedRoute;
+          const input = yield* makePostCreatedEvent;
+          const event = {
+            ...input.event,
+            organizationId: route.organizationId,
+          };
+          yield* transaction(recorder.recordIntegrationEvent({ event }));
+          const [claimed] = yield* repository.claimDueDeliveries({
+            leaseDurationMs: 60_000,
+            leaseOwner: "cascade-test",
+            limit: 1,
+          });
+          expect(claimed).toBeDefined();
+          const deliveryId = claimed?.input.delivery.id ?? "missing";
+          const [attempt] = yield* db
+            .select({ id: schema.integrationDeliveryAttemptTable.id })
+            .from(schema.integrationDeliveryAttemptTable)
+            .where(
+              eq(schema.integrationDeliveryAttemptTable.deliveryId, deliveryId)
+            );
+          expect(attempt?.id).toBeDefined();
+
+          yield* db
+            .delete(schema.organizationTable)
+            .where(eq(schema.organizationTable.id, route.organizationId));
+
+          expect(
+            yield* db
+              .select()
+              .from(schema.integrationConnectionTable)
+              .where(
+                eq(schema.integrationConnectionTable.id, route.connectionId)
+              )
+          ).toHaveLength(0);
+          expect(
+            yield* db
+              .select()
+              .from(schema.integrationRouteTable)
+              .where(eq(schema.integrationRouteTable.id, route.routeId))
+          ).toHaveLength(0);
+          expect(
+            yield* db
+              .select()
+              .from(schema.integrationEventTable)
+              .where(eq(schema.integrationEventTable.id, event.id))
+          ).toHaveLength(0);
+          expect(
+            yield* db
+              .select()
+              .from(schema.integrationDeliveryTable)
+              .where(eq(schema.integrationDeliveryTable.id, deliveryId))
+          ).toHaveLength(0);
+          expect(
+            yield* db
+              .select()
+              .from(schema.integrationDeliveryAttemptTable)
+              .where(
+                eq(schema.integrationDeliveryAttemptTable.deliveryId, deliveryId)
+              )
+          ).toHaveLength(0);
+        })
+    );
   });
 });

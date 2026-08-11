@@ -2,6 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { IntegrationDeliveryId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -80,9 +81,11 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
     if (matched.length === 0) {
       return { deliveryCount: 0, eventRecorded: false };
     }
-    const now = yield* DateTime.nowAsDate;
+    const now = yield* DateTime.now;
     const occurredAt = DateTime.toDate(event.occurredAt);
-    const retentionExpiresAt = new Date(now.getTime() + 30 * 86_400_000);
+    const retentionExpiresAt = DateTime.toDate(
+      DateTime.addDuration(now, Duration.days(30))
+    );
     yield* db.insert(schema.integrationEventTable).values({
       causalHopCount: event.causalHopCount,
       causationId: event.causationId ?? null,
@@ -104,7 +107,7 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
           connectionId: route.connectionId,
           eventId: event.id,
           id,
-          nextAttemptAt: now,
+          nextAttemptAt: DateTime.toDate(now),
           organizationId: event.organizationId,
           retentionExpiresAt,
           routeId: route.id,

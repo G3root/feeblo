@@ -2,6 +2,7 @@ import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+import { TestClock } from "effect/testing";
 import { Webhook } from "standardwebhooks";
 import { describe, expect } from "vitest";
 
@@ -10,10 +11,12 @@ import {
   signWebhookDelivery,
 } from "./webhook-signing";
 
+const fixedNow = new Date();
+
 describe("signWebhookDelivery", () => {
   it.effect("signs the exact raw body with a stable delivery ID", () =>
     Effect.gen(function* () {
-      const now = new Date();
+      yield* TestClock.setTime(fixedNow.getTime());
       const secret = Redacted.make(
         "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
       );
@@ -21,13 +24,12 @@ describe("signWebhookDelivery", () => {
       const headers = yield* signWebhookDelivery({
         deliveryId: "delivery_123",
         keyring: { current: secret },
-        now,
         rawBody,
       });
 
       expect(headers["webhook-id"]).toBe("delivery_123");
       expect(headers["webhook-timestamp"]).toBe(
-        String(Math.floor(now.getTime() / 1000))
+        String(Math.floor(fixedNow.getTime() / 1000))
       );
       expect(
         new Webhook(Redacted.value(secret)).verify(rawBody, headers)
@@ -43,25 +45,23 @@ describe("signWebhookDelivery", () => {
     "emits both signatures only while the prior key is in its 24-hour rotation grace period",
     () =>
       Effect.gen(function* () {
-        const now = new Date();
+        yield* TestClock.setTime(fixedNow.getTime());
         const oldSecret = Redacted.make(
           "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
         );
-        const rotated = yield* rotateWebhookSigningKeyring(
-          { current: oldSecret },
-          now
-        );
+        const rotated = yield* rotateWebhookSigningKeyring({
+          current: oldSecret,
+        });
         const rawBody = '{"type":"webhook.test"}';
         const duringGrace = yield* signWebhookDelivery({
           deliveryId: "delivery_123",
           keyring: rotated,
-          now,
           rawBody,
         });
+        yield* TestClock.adjust("24 hours");
         const afterGrace = yield* signWebhookDelivery({
           deliveryId: "delivery_123",
           keyring: rotated,
-          now: new Date(now.getTime() + 24 * 60 * 60 * 1000),
           rawBody,
         });
 

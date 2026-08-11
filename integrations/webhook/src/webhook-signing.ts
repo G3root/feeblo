@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { Webhook } from "standardwebhooks";
@@ -13,7 +14,7 @@ export type WebhookSigningSecret = Redacted.Redacted<string>;
 export interface WebhookSigningKeyring {
   readonly current: WebhookSigningSecret;
   readonly previous?: {
-    readonly expiresAt: Date;
+    readonly expiresAt: DateTime.Utc;
     readonly secret: WebhookSigningSecret;
   };
 }
@@ -40,19 +41,18 @@ export const generateWebhookSigningSecret = (): Effect.Effect<
     catch: () => new WebhookSigningError({ operation: "generate" }),
   });
 
-/** Replaces the active signing key and retains it for the required 24-hour rotation grace period. */
+/** Replaces the active signing key and retains it for the required 24-hour rotation grace period; the clock (and thus TestClock) drives expiry. */
 export const rotateWebhookSigningKeyring = (
-  keyring: WebhookSigningKeyring,
-  now?: Date
+  keyring: WebhookSigningKeyring
 ): Effect.Effect<WebhookSigningKeyring, WebhookSigningError> =>
   Effect.gen(function* () {
-    const rotationTime = now ?? (yield* DateTime.nowAsDate);
+    const rotationTime = yield* DateTime.now;
     const current = yield* generateWebhookSigningSecret();
     return {
       current,
       previous: {
         secret: keyring.current,
-        expiresAt: new Date(rotationTime.getTime() + 24 * 60 * 60 * 1000),
+        expiresAt: DateTime.addDuration(rotationTime, Duration.days(1)),
       },
     };
   });
@@ -61,27 +61,27 @@ export const rotateWebhookSigningKeyring = (
 export const signWebhookDelivery = ({
   deliveryId,
   keyring,
-  now,
   rawBody,
 }: {
   readonly deliveryId: string;
   readonly keyring: WebhookSigningKeyring;
-  readonly now?: Date;
   readonly rawBody: string;
 }): Effect.Effect<WebhookSigningHeaders, WebhookSigningError> =>
   Effect.gen(function* () {
-    const signingTime = now ?? (yield* DateTime.nowAsDate);
+    const signingTime = yield* DateTime.now;
     return yield* Effect.try({
       try: () => {
+        const signingDate = DateTime.toDate(signingTime);
         const currentSignature = new Webhook(
           Redacted.value(keyring.current)
-        ).sign(deliveryId, signingTime, rawBody);
+        ).sign(deliveryId, signingDate, rawBody);
         const priorSignature =
           keyring.previous !== undefined &&
-          keyring.previous.expiresAt > signingTime
+          keyring.previous.expiresAt.epochMilliseconds >
+            signingTime.epochMilliseconds
             ? new Webhook(Redacted.value(keyring.previous.secret)).sign(
                 deliveryId,
-                signingTime,
+                signingDate,
                 rawBody
               )
             : undefined;
@@ -89,7 +89,7 @@ export const signWebhookDelivery = ({
         return {
           "webhook-id": deliveryId,
           "webhook-timestamp": String(
-            Math.floor(signingTime.getTime() / 1000)
+            Math.floor(signingTime.epochMilliseconds / 1000)
           ),
           "webhook-signature": [currentSignature, priorSignature]
             .filter((signature): signature is string => signature !== undefined)

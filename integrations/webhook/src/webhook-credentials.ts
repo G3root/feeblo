@@ -77,7 +77,7 @@ export const decryptWebhookCredentialMaterial = (
     readonly signingKeyring: {
       readonly current: Redacted.Redacted<string>;
       readonly previous?: {
-        readonly expiresAt: Date;
+        readonly expiresAt: DateTime.Utc;
         readonly secret: Redacted.Redacted<string>;
       };
     };
@@ -101,9 +101,7 @@ export const decryptWebhookCredentialMaterial = (
                   ? {}
                   : {
                       previous: {
-                      expiresAt: DateTime.toDate(
-                        decoded.signingKeyring.previous.expiresAt
-                      ),
+                        expiresAt: decoded.signingKeyring.previous.expiresAt,
                         secret: Redacted.make(
                           decoded.signingKeyring.previous.secret
                         ),
