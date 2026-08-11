@@ -111,17 +111,16 @@ export const makeIntegrationLayers = Effect.gen(function* () {
   });
   return {
     layer: Layer.mergeAll(
-      WebhookManagementServiceLive.pipe(
-        Layer.provide(WebhookIntegrationConfig.layer)
-      ),
+      WebhookManagementServiceLive,
       IntegrationEventRecorderLive
     ),
     maintenance: DateTime.nowAsDate.pipe(
       Effect.flatMap((before) =>
         lifecycleRepository.cleanupRetention({ before })
       ),
-      Effect.catch(() =>
+      Effect.catch((error) =>
         Effect.logError("Integration retention cleanup failed", {
+          error,
           errorTag: "IntegrationRetentionError",
         })
       ),
