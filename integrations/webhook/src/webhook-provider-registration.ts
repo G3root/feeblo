@@ -7,6 +7,7 @@ import {
   type IntegrationProviderRegistration,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -168,9 +169,9 @@ export const makeWebhookProviderRegistration = ({
               httpStatus: response.status,
               message: "Webhook receiver rate limited delivery",
               provider: webhookProviderKey,
-              ...(response.retryAfterSeconds === undefined
+              ...(response.retryAfter === undefined
                 ? {}
-                : { retryAfterMs: response.retryAfterSeconds * 1000 }),
+                : { retryAfterMs: Duration.toMillis(response.retryAfter) }),
             });
           }
           if (response.retry) {

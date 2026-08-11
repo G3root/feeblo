@@ -1,9 +1,14 @@
-import * as http from "node:http";
-import * as https from "node:https";
+import { NodeHttpClient } from "@effect/platform-node";
 import { isIP, type LookupFunction } from "node:net";
 
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
+import * as Stream from "effect/Stream";
+import * as Headers from "effect/unstable/http/Headers";
+import * as HttpBody from "effect/unstable/http/HttpBody";
+import * as HttpClient from "effect/unstable/http/HttpClient";
 
 import type { ValidatedWebhookEndpoint } from "./webhook-endpoint-security";
 import { WebhookTransportError } from "./webhook-errors";
@@ -17,50 +22,49 @@ export const WEBHOOK_REQUEST_TIMEOUT_MS = 10_000;
 /** Safe outbound response data persisted by the delivery kernel. Response bodies are never retained. */
 export interface WebhookDeliveryResponse {
   readonly retry: boolean;
-  readonly retryAfterSeconds?: number;
+  readonly retryAfter?: Duration.Duration;
   readonly status: number;
 }
 
 /** Bounded Retry-After parser: accepts seconds and caps a receiver request at one day. */
-export const parseWebhookRetryAfterSeconds = (
+export const parseWebhookRetryAfter = (
   value: string | undefined,
-  now: Date
-): number | undefined => {
+  now: DateTime.DateTime
+): Duration.Duration | undefined => {
   if (value === undefined) {
     return undefined;
   }
   const seconds = Number(value);
   if (Number.isSafeInteger(seconds) && seconds >= 0) {
-    return Math.min(seconds, 24 * 60 * 60);
+    return Duration.min(Duration.seconds(seconds), Duration.days(1));
   }
   const retryAt = Date.parse(value);
   if (Number.isNaN(retryAt)) {
     return undefined;
   }
-  const delta = Math.ceil((retryAt - now.getTime()) / 1000);
-  return delta < 0 ? 0 : Math.min(delta, 24 * 60 * 60);
+  const delta = Math.ceil((retryAt - now.epochMilliseconds) / 1000);
+  return Duration.min(Duration.seconds(Math.max(0, delta)), Duration.days(1));
 };
 
-/** Classifies HTTP status codes according to the durable webhook retry policy. */
+/** Classifies HTTP status codes according to the durable webhook retry policy; the clock (and thus TestClock) drives Retry-After deltas. */
 export const classifyWebhookResponse = (
   status: number,
-  retryAfter: string | undefined,
-  now: Date
-): WebhookDeliveryResponse => {
-  const retry =
-    status === 408 ||
-    status === 409 ||
-    status === 425 ||
-    status === 429 ||
-    (status >= 500 && status <= 599);
-  const retryAfterSeconds =
-    status === 429
-      ? parseWebhookRetryAfterSeconds(retryAfter, now)
-      : undefined;
-  return retryAfterSeconds === undefined
-    ? { status, retry }
-    : { status, retry, retryAfterSeconds };
-};
+  retryAfter: string | undefined
+): Effect.Effect<WebhookDeliveryResponse> =>
+  Effect.gen(function* () {
+    const now = yield* DateTime.now;
+    const retryAfterDuration =
+      status === 429 ? parseWebhookRetryAfter(retryAfter, now) : undefined;
+    const retry =
+      status === 408 ||
+      status === 409 ||
+      status === 425 ||
+      status === 429 ||
+      (status >= 500 && status <= 599);
+    return retryAfterDuration === undefined
+      ? { status, retry }
+      : { status, retry, retryAfter: retryAfterDuration };
+  });
 
 /** Sends a signed raw JSON body through a pinned DNS lookup, with redirects disabled and no response body retention. */
 export const sendWebhookDelivery = ({
@@ -85,75 +89,51 @@ export const sendWebhookDelivery = ({
     return Effect.fail(new WebhookTransportError({ kind: "network" }));
   }
 
-  return Effect.callback((resume, signal) => {
-    const transport = endpoint.url.protocol === "https:" ? https : http;
-    const lookupPinnedAddress: LookupFunction = (
-      _hostname,
-      _options,
-      callback
-    ) => {
-      callback(null, pinnedAddress, isIP(pinnedAddress));
-    };
-    const agent = new transport.Agent({ keepAlive: false });
-    let settled = false;
-    const finish = (
-      effect: Effect.Effect<WebhookDeliveryResponse, WebhookTransportError>
-    ) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(deadline);
-        resume(effect);
-      }
-    };
-    const request = transport.request(
-      {
-        protocol: endpoint.url.protocol,
-        hostname: endpoint.hostname,
-        ...(endpoint.url.port === "" ? {} : { port: endpoint.url.port }),
-        path: `${endpoint.url.pathname}${endpoint.url.search}`,
-        method: "POST",
+  const pinnedLookup: LookupFunction = (_hostname, _options, callback) => {
+    callback(null, pinnedAddress, isIP(pinnedAddress));
+  };
+  const networkFailure = () => new WebhookTransportError({ kind: "network" });
+
+  return Effect.scoped(
+    Effect.gen(function* () {
+      // One-off agent pinned to the validated address; released with the scope.
+      const agent = yield* NodeHttpClient.makeAgent({
+        keepAlive: false,
+        lookup: pinnedLookup,
+      });
+      const client = yield* NodeHttpClient.makeNodeHttp.pipe(
+        Effect.provideService(NodeHttpClient.HttpAgent, agent)
+      );
+
+      const response = yield* HttpClient.post(endpoint.url, {
         headers: {
           "content-type": "application/json",
-          "content-length": String(contentLength),
           "user-agent": "Feeblo-Webhooks/1",
           "x-feeblo-event": eventType,
           ...signingHeaders,
         },
-        agent,
-        lookup: lookupPinnedAddress,
-      },
-      (response) => {
-        response.resume();
-        response.on("end", () => {
-          const retryAfter = response.headers["retry-after"];
-          finish(
-            DateTime.nowAsDate.pipe(
-              Effect.map((now) =>
-                classifyWebhookResponse(
-                  response.statusCode ?? 0,
-                  Array.isArray(retryAfter) ? retryAfter[0] : retryAfter,
-                  now
-                )
-              )
-            )
-          );
-        });
-        response.on("aborted", () =>
-          finish(Effect.fail(new WebhookTransportError({ kind: "network" })))
-        );
-        response.on("error", () =>
-          finish(Effect.fail(new WebhookTransportError({ kind: "network" })))
-        );
-      }
-    );
-    const deadline = setTimeout(() => {
-      request.destroy();
-      finish(Effect.fail(new WebhookTransportError({ kind: "timeout" })));
-    }, WEBHOOK_REQUEST_TIMEOUT_MS);
-    request.on("error", () =>
-      finish(Effect.fail(new WebhookTransportError({ kind: "network" })))
-    );
-    signal.addEventListener("abort", () => request.destroy(), { once: true });
-    request.end(rawBody, "utf8");
-  });
+        body: HttpBody.text(rawBody),
+      }).pipe(
+        Effect.provideService(HttpClient.HttpClient, client),
+        Effect.mapError(networkFailure)
+      );
+
+      // Drain the body without retaining it; a truncated body is a network failure.
+      yield* response.stream.pipe(
+        Stream.runDrain,
+        Effect.mapError(networkFailure)
+      );
+
+      return yield* classifyWebhookResponse(
+        response.status,
+        Option.getOrUndefined(Headers.get(response.headers, "retry-after"))
+      );
+    })
+  ).pipe(
+    Effect.timeout(WEBHOOK_REQUEST_TIMEOUT_MS),
+    Effect.catchTag(
+      "TimeoutError",
+      () => new WebhookTransportError({ kind: "timeout" })
+    )
+  );
 };
