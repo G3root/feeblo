@@ -46,13 +46,34 @@ describe("webhook endpoint security", () => {
       "192.0.2.1",
       "203.0.113.1",
       "224.0.0.1",
+      "0.0.0.0",
+      "::",
       "::1",
       "fe80::1",
+      "fea1::1",
       "2001:db8::1",
+      "2002::1",
+      "2001::1",
+      "fc00::1",
+      "ff02::1",
+      "::ffff:127.0.0.1",
+      "::ffff:169.254.169.254",
+      "::ffff:7f00:1",
+      "::ffff:0a00:1",
+      "0:0:0:0:0:ffff:7f00:1",
+      "0000:0000:0000:0000:0000:ffff:0a00:0001",
     ]) {
       expect(isWebhookPrivateOrReservedAddress(address)).toBe(true);
     }
-    expect(isWebhookPrivateOrReservedAddress("8.8.8.8")).toBe(false);
+    for (const address of [
+      "8.8.8.8",
+      "2606:4700:4700::1111",
+      "::ffff:8.8.8.8",
+      "::ffff:808:808",
+      "0:0:0:0:0:ffff:808:808",
+    ]) {
+      expect(isWebhookPrivateOrReservedAddress(address)).toBe(false);
+    }
   });
 
   it("rejects a mixed public/private DNS answer before it can be pinned", async () => {

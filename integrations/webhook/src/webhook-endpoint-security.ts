@@ -1,5 +1,5 @@
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { BlockList, isIP } from "node:net";
 
 import * as Effect from "effect/Effect";
 
@@ -27,6 +27,26 @@ const bracketPattern = /^\[|\]$/g;
 const ipv4MappedPattern = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/;
 const ipv4MappedHexPattern = /^::ffff:([a-f\d]{1,4}):([a-f\d]{1,4})$/;
 
+/** IPv6 ranges that must never be webhook targets; checked via net.BlockList subnet matching. */
+const ipv6Blocklist = new BlockList();
+for (const [network, prefix] of [
+  ["::", 128], // unspecified
+  ["::1", 128], // loopback
+  ["64:ff9b::", 96], // NAT64 well-known prefix (RFC 6052)
+  ["64:ff9b:1::", 48], // NAT64 local-use prefix (RFC 8215)
+  ["100::", 64], // discard-only (RFC 6666)
+  ["2001::", 23], // IETF protocol assignments: Teredo, benchmarking, AMT, ORCHID, ...
+  ["2001:db8::", 32], // documentation (RFC 3849)
+  ["2002::", 16], // 6to4 (RFC 3056)
+  ["3fff::", 20], // documentation (RFC 9637)
+  ["fc00::", 7], // unique local (RFC 4193)
+  ["fe80::", 10], // link-local (RFC 4291)
+  ["fec0::", 10], // site-local, deprecated (RFC 3879)
+  ["ff00::", 8], // multicast (RFC 4291)
+] as const) {
+  ipv6Blocklist.addSubnet(network, prefix, "ipv6");
+}
+
 const privateIpv4Address = (address: string): boolean => {
   const octets = address.split(".").map(Number);
   const [first, second] = octets;
@@ -51,7 +71,13 @@ const privateIpv4Address = (address: string): boolean => {
 };
 
 const privateIpv6Address = (address: string): boolean => {
-  const value = address.replace(bracketPattern, "").toLowerCase();
+  // Canonicalize to compressed form (RFC 5952) so every spelling of an address
+  // (e.g. "0:0:0:0:0:ffff:7f00:1" vs "::ffff:7f00:1") classifies identically.
+  const value = new URL(
+    `http://[${address.replace(bracketPattern, "")}]/`
+  ).hostname
+    .replace(bracketPattern, "")
+    .toLowerCase();
   const ipv4Mapped = value.match(ipv4MappedPattern)?.[1];
   if (ipv4Mapped !== undefined) {
     return privateIpv4Address(ipv4Mapped);
@@ -64,24 +90,7 @@ const privateIpv6Address = (address: string): boolean => {
       `${Math.floor(high / 256)}.${high % 256}.${Math.floor(low / 256)}.${low % 256}`
     );
   }
-  return (
-    value === "::" ||
-    value === "::1" ||
-    value.startsWith("fc") ||
-    value.startsWith("fd") ||
-    value.startsWith("fe80:") ||
-    value.startsWith("fe90:") ||
-    value.startsWith("fea0:") ||
-    value.startsWith("feb0:") ||
-    value.startsWith("fec0:") ||
-    value.startsWith("fed0:") ||
-    value.startsWith("fee0:") ||
-    value.startsWith("fef0:") ||
-    value.startsWith("ff") ||
-    value.startsWith("64:ff9b:") ||
-    value.startsWith("100:") ||
-    value.startsWith("2001:db8:")
-  );
+  return ipv6Blocklist.check(value, "ipv6");
 };
 
 /** Returns whether an IP literal is private, loopback, link-local, multicast, documentation, or reserved. */
