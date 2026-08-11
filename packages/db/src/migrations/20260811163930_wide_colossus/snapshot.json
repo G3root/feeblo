@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "856de3fc-3a43-47c9-a640-33d24d98d740",
+  "id": "62dfe7d2-fb03-4a01-aad7-ee84020cdf83",
   "prevIds": [
     "26c7e363-abe9-4bb6-93f3-fa3e851a3ca2"
   ],
@@ -9405,8 +9405,20 @@
     {
       "nameExplicit": true,
       "columns": [
-        { "value": "organization_id", "isExpression": false, "asc": true, "nullsFirst": false, "opclass": null },
-        { "value": "id", "isExpression": false, "asc": true, "nullsFirst": false, "opclass": null }
+        {
+          "value": "organization_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
       ],
       "isUnique": true,
       "where": null,
@@ -9597,6 +9609,34 @@
       "nameExplicit": true,
       "columns": [
         {
+          "value": "organization_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "state",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "integration_delivery_organization_state_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "integration_delivery"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
           "value": "retention_expires_at",
           "isExpression": false,
           "asc": true,
@@ -9666,8 +9706,20 @@
     {
       "nameExplicit": true,
       "columns": [
-        { "value": "organization_id", "isExpression": false, "asc": true, "nullsFirst": false, "opclass": null },
-        { "value": "id", "isExpression": false, "asc": true, "nullsFirst": false, "opclass": null }
+        {
+          "value": "organization_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
       ],
       "isUnique": true,
       "where": null,
@@ -9738,8 +9790,20 @@
     {
       "nameExplicit": true,
       "columns": [
-        { "value": "organization_id", "isExpression": false, "asc": true, "nullsFirst": false, "opclass": null },
-        { "value": "id", "isExpression": false, "asc": true, "nullsFirst": false, "opclass": null }
+        {
+          "value": "organization_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
       ],
       "isUnique": true,
       "where": null,
@@ -11530,7 +11594,7 @@
       "table": "integration_delivery"
     },
     {
-      "nameExplicit": false,
+      "nameExplicit": true,
       "columns": [
         "organization_id",
         "connection_id"
@@ -11542,14 +11606,14 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
+      "onDelete": "CASCADE",
       "name": "integration_delivery_organization_connection_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "integration_delivery"
     },
     {
-      "nameExplicit": false,
+      "nameExplicit": true,
       "columns": [
         "organization_id",
         "route_id"
@@ -11561,14 +11625,14 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
+      "onDelete": "CASCADE",
       "name": "integration_delivery_organization_route_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "integration_delivery"
     },
     {
-      "nameExplicit": false,
+      "nameExplicit": true,
       "columns": [
         "organization_id",
         "event_id"
@@ -11580,7 +11644,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
+      "onDelete": "CASCADE",
       "name": "integration_delivery_organization_event_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -11621,7 +11685,7 @@
       "table": "integration_route"
     },
     {
-      "nameExplicit": false,
+      "nameExplicit": true,
       "columns": [
         "organization_id",
         "connection_id"
@@ -11633,7 +11697,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
+      "onDelete": "CASCADE",
       "name": "integration_route_organization_connection_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -12391,13 +12455,6 @@
       "table": "post"
     },
     {
-      "value": "\"lifecycle\" IN ('connecting', 'active', 'paused', 'reauth_required', 'disconnecting', 'disconnected', 'revocation_unconfirmed', 'archived')",
-      "name": "integration_connection_lifecycle_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "integration_connection"
-    },
-    {
       "value": "\"credential_generation\" > 0",
       "name": "integration_connection_credential_generation_check",
       "entityType": "checks",
@@ -12431,13 +12488,6 @@
       "entityType": "checks",
       "schema": "public",
       "table": "integration_delivery_attempt"
-    },
-    {
-      "value": "\"state\" IN ('pending', 'leased', 'succeeded', 'exhausted', 'canceled')",
-      "name": "integration_delivery_state_check",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "integration_delivery"
     },
     {
       "value": "\"attempt_count\" >= 0",

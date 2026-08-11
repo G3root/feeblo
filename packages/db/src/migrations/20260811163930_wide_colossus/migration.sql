@@ -15,7 +15,6 @@ CREATE TABLE "integration_connection" (
 	"retention_expires_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "integration_connection_lifecycle_check" CHECK ("lifecycle" IN ('connecting', 'active', 'paused', 'reauth_required', 'disconnecting', 'disconnected', 'revocation_unconfirmed', 'archived')),
 	CONSTRAINT "integration_connection_credential_generation_check" CHECK ("credential_generation" > 0),
 	CONSTRAINT "integration_connection_exhausted_count_check" CHECK ("consecutive_exhausted_deliveries" >= 0)
 );
@@ -58,7 +57,6 @@ CREATE TABLE "integration_delivery" (
 	"retention_expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "integration_delivery_state_check" CHECK ("state" IN ('pending', 'leased', 'succeeded', 'exhausted', 'canceled')),
 	CONSTRAINT "integration_delivery_attempt_count_check" CHECK ("attempt_count" >= 0),
 	CONSTRAINT "integration_delivery_lease_state_check" CHECK (("state" = 'leased') = ("lease_owner" IS NOT NULL AND "lease_expires_at" IS NOT NULL)),
 	CONSTRAINT "integration_delivery_terminal_timestamp_check" CHECK (("state" = 'succeeded') = ("succeeded_at" IS NOT NULL) AND ("state" = 'exhausted') = ("exhausted_at" IS NOT NULL) AND ("state" = 'canceled') = ("canceled_at" IS NOT NULL))
@@ -105,6 +103,7 @@ CREATE INDEX "integration_delivery_attempt_retention_expires_at_idx" ON "integra
 CREATE UNIQUE INDEX "integration_delivery_route_event_action_uidx" ON "integration_delivery" ("route_id","event_id","action_key");--> statement-breakpoint
 CREATE INDEX "integration_delivery_lease_claim_idx" ON "integration_delivery" ("state","next_attempt_at","lease_expires_at");--> statement-breakpoint
 CREATE INDEX "integration_delivery_connection_state_idx" ON "integration_delivery" ("connection_id","state");--> statement-breakpoint
+CREATE INDEX "integration_delivery_organization_state_idx" ON "integration_delivery" ("organization_id","state");--> statement-breakpoint
 CREATE INDEX "integration_delivery_retention_expires_at_idx" ON "integration_delivery" ("retention_expires_at");--> statement-breakpoint
 CREATE INDEX "integration_event_organization_occurred_at_idx" ON "integration_event" ("organization_id","occurred_at");--> statement-breakpoint
 CREATE INDEX "integration_event_retention_expires_at_idx" ON "integration_event" ("retention_expires_at");--> statement-breakpoint
@@ -115,9 +114,9 @@ CREATE UNIQUE INDEX "integration_route_organization_id_uidx" ON "integration_rou
 ALTER TABLE "integration_connection" ADD CONSTRAINT "integration_connection_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "integration_delivery_attempt" ADD CONSTRAINT "integration_delivery_attempt_xOqDtFxhvWcc_fkey" FOREIGN KEY ("delivery_id") REFERENCES "integration_delivery"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE RESTRICT;--> statement-breakpoint
-ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_organization_route_fkey" FOREIGN KEY ("organization_id","route_id") REFERENCES "integration_route"("organization_id","id") ON DELETE RESTRICT;--> statement-breakpoint
-ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_organization_event_fkey" FOREIGN KEY ("organization_id","event_id") REFERENCES "integration_event"("organization_id","id") ON DELETE RESTRICT;--> statement-breakpoint
+ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_organization_route_fkey" FOREIGN KEY ("organization_id","route_id") REFERENCES "integration_route"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_organization_event_fkey" FOREIGN KEY ("organization_id","event_id") REFERENCES "integration_event"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "integration_event" ADD CONSTRAINT "integration_event_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "integration_route" ADD CONSTRAINT "integration_route_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "integration_route" ADD CONSTRAINT "integration_route_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE RESTRICT;
+ALTER TABLE "integration_route" ADD CONSTRAINT "integration_route_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE CASCADE;
