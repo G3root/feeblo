@@ -60,6 +60,10 @@ layer(TestLayer)("widget updates", (it) => {
             slug: "newest-release",
             content:
               "![Cover](https://cdn.example.com/cover.png)\n\nThe newest improvement.",
+            // The app stores these at edit time (see changelog/handlers.ts);
+            // seed them the same way so the widget returns real data.
+            excerpt: "The newest improvement.",
+            coverImage: "https://cdn.example.com/cover.png",
             status: "published",
             publishedAt: new Date("2026-02-01T00:00:00Z"),
             organizationId,
