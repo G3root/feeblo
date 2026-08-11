@@ -102,85 +102,99 @@ export const runIntegrationDeliveryWorkerPoll = ({
     yield* Effect.forEach(
       claimed,
       (delivery) =>
-        connectionSemaphore(delivery.input.connection.id).withPermit(
-          repository.canExecuteClaimedDelivery({ claimed: delivery }).pipe(
-            Effect.flatMap((canExecute) =>
-              Effect.gen(function* () {
-                if (!canExecute) {
-                  yield* repository.cancelClaimedDelivery({
-                    claimed: delivery,
+        connectionSemaphore(delivery.input.connection.id)
+          .withPermit(
+            repository.canExecuteClaimedDelivery({ claimed: delivery }).pipe(
+              Effect.flatMap((canExecute) =>
+                Effect.gen(function* () {
+                  if (!canExecute) {
+                    yield* repository.cancelClaimedDelivery({
+                      claimed: delivery,
+                    });
+                    return;
+                  }
+                  const startedAt = yield* DateTime.nowAsDate;
+                  const handler = registry.getHandler({
+                    capabilityKey: delivery.input.route.capabilityKey,
+                    provider: delivery.input.route.provider,
                   });
-                  return;
-                }
-                const startedAt = yield* DateTime.nowAsDate;
-                const handler = registry.getHandler({
-                  capabilityKey: delivery.input.route.capabilityKey,
-                  provider: delivery.input.route.provider,
-                });
-                const result: {
-                  readonly errorTag?: string;
-                  readonly httpStatus?: number;
-                  readonly outcome: IntegrationDeliveryOutcome;
-                } =
-                  handler === undefined
-                    ? {
-                        errorTag: "MissingIntegrationCapabilityHandler",
-                        outcome: { _tag: "Terminal" } as const,
-                      }
-                    : yield* handler.deliver(delivery.input).pipe(
-                        Effect.withSpan("IntegrationProvider.deliver", {
-                          attributes: {
-                            "integration.connection_id":
-                              delivery.input.connection.id,
-                            "integration.correlation_id":
-                              delivery.input.event.correlationId,
-                            "integration.delivery_id":
-                              delivery.input.delivery.id,
-                            "integration.event_id": delivery.input.event.id,
-                            "integration.provider":
-                              delivery.input.connection.provider,
-                            "integration.route_id": delivery.input.route.id,
-                          },
-                        }),
-                        Effect.match({
-                          onFailure: (failure) => ({
-                            errorTag: failure._tag,
-                            ...(failure.httpStatus === undefined
-                              ? {}
-                              : { httpStatus: failure.httpStatus }),
-                            outcome:
-                              classifyIntegrationProviderDeliveryFailure(
-                                failure
-                              ),
+                  const result: {
+                    readonly errorTag?: string;
+                    readonly httpStatus?: number;
+                    readonly outcome: IntegrationDeliveryOutcome;
+                  } =
+                    handler === undefined
+                      ? {
+                          errorTag: "MissingIntegrationCapabilityHandler",
+                          outcome: { _tag: "Terminal" } as const,
+                        }
+                      : yield* handler.deliver(delivery.input).pipe(
+                          Effect.withSpan("IntegrationProvider.deliver", {
+                            attributes: {
+                              "integration.connection_id":
+                                delivery.input.connection.id,
+                              "integration.correlation_id":
+                                delivery.input.event.correlationId,
+                              "integration.delivery_id":
+                                delivery.input.delivery.id,
+                              "integration.event_id": delivery.input.event.id,
+                              "integration.provider":
+                                delivery.input.connection.provider,
+                              "integration.route_id": delivery.input.route.id,
+                            },
                           }),
-                          onSuccess: (response) => ({
-                            ...(response.httpStatus === undefined
-                              ? {}
-                              : { httpStatus: response.httpStatus }),
-                            outcome: { _tag: "Succeeded" } as const,
-                          }),
-                        })
-                      );
-                yield* repository.persistDeliveryResult({
-                  claimed: delivery,
-                  ...(result.errorTag === undefined
-                    ? {}
-                    : { errorTag: result.errorTag }),
-                  ...(result.httpStatus === undefined
-                    ? {}
-                    : { httpStatus: result.httpStatus }),
-                  outcome: result.outcome,
-                });
-                const finishedAt = yield* DateTime.nowAsDate;
-                yield* recordIntegrationDeliveryOutcome(
-                  metricOutcome(result.outcome),
-                  finishedAt.getTime() - startedAt.getTime(),
-                  result.errorTag
-                );
-              })
+                          Effect.match({
+                            onFailure: (failure) => ({
+                              errorTag: failure._tag,
+                              ...(failure.httpStatus === undefined
+                                ? {}
+                                : { httpStatus: failure.httpStatus }),
+                              outcome:
+                                classifyIntegrationProviderDeliveryFailure(
+                                  failure
+                                ),
+                            }),
+                            onSuccess: (response) => ({
+                              ...(response.httpStatus === undefined
+                                ? {}
+                                : { httpStatus: response.httpStatus }),
+                              outcome: { _tag: "Succeeded" } as const,
+                            }),
+                          })
+                        );
+                  yield* repository.persistDeliveryResult({
+                    claimed: delivery,
+                    ...(result.errorTag === undefined
+                      ? {}
+                      : { errorTag: result.errorTag }),
+                    ...(result.httpStatus === undefined
+                      ? {}
+                      : { httpStatus: result.httpStatus }),
+                    outcome: result.outcome,
+                  });
+                  const finishedAt = yield* DateTime.nowAsDate;
+                  yield* recordIntegrationDeliveryOutcome(
+                    metricOutcome(result.outcome),
+                    finishedAt.getTime() - startedAt.getTime(),
+                    result.errorTag
+                  );
+                })
+              )
             )
           )
-        ),
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logError(
+                "Integration delivery skipped after worker persistence failure",
+                {
+                  connectionId: delivery.input.connection.id,
+                  deliveryId: delivery.input.delivery.id,
+                  errorTag: error._tag,
+                  operation: error.operation,
+                }
+              )
+            )
+          ),
       { concurrency: globalConcurrency, discard: true }
     );
   });
