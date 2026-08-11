@@ -47,7 +47,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   ...(process.env.CI ? { workers: 2 } : {}),
   reporter: process.env.CI
-    ? [["list"], ["github"], ["html", { open: "never" }]]
+    ? [["line"], ["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
   timeout: 60_000,
   expect: {
@@ -58,7 +58,9 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 20_000,
     screenshot: "only-on-failure",
-    trace: "on-first-retry",
+    // Keep the first attempt's trace as well as its video when a retry passes.
+    // This makes intermittent CI failures debuggable from the uploaded artifact.
+    trace: "retain-on-failure",
     video: "retain-on-failure",
   },
 
@@ -77,6 +79,8 @@ export default defineConfig({
       cwd: configDir,
       env: e2eEnv,
       reuseExistingServer: false,
+      stdout: "pipe",
+      stderr: "pipe",
       timeout: 240_000,
       url: `${apiURL}/health`,
     },
@@ -87,6 +91,8 @@ export default defineConfig({
       cwd: configDir,
       env: e2eEnv,
       reuseExistingServer: false,
+      stdout: "pipe",
+      stderr: "pipe",
       timeout: 240_000,
       url: baseURL,
     },
