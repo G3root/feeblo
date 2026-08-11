@@ -17,6 +17,14 @@ const databaseURL =
   process.env.E2E_DATABASE_URL ??
   `pglite:${mkdtempSync(path.join(tmpdir(), "feeblo-e2e-"))}`;
 
+const toIPv4LoopbackURL = (url: string): string => {
+  const readinessURL = new URL(url);
+  if (readinessURL.hostname === "localhost") {
+    readinessURL.hostname = "127.0.0.1";
+  }
+  return readinessURL.toString();
+};
+
 const e2eEnv = {
   APP_ROOT_DOMAIN: "localhost",
   APP_URL: baseURL,
@@ -82,7 +90,7 @@ export default defineConfig({
       stdout: "pipe",
       stderr: "pipe",
       timeout: 240_000,
-      url: `${apiURL}/health`,
+      url: toIPv4LoopbackURL(`${apiURL}/health`),
     },
     {
       command: reuseBuiltApps
@@ -94,7 +102,7 @@ export default defineConfig({
       stdout: "pipe",
       stderr: "pipe",
       timeout: 240_000,
-      url: baseURL,
+      url: toIPv4LoopbackURL(baseURL),
     },
   ],
 });
