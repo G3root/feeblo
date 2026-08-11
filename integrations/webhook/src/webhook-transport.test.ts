@@ -129,6 +129,41 @@ describe("sendWebhookDelivery", () => {
     expect(classifyWebhookResponse(503, undefined, now).retry).toBe(true);
   });
 
+  it("settles with a network failure when the receiver terminates the response early", async () => {
+    const endpointUrl = await startServer((_request, response) => {
+      response.writeHead(200);
+      response.write("partial");
+      response.socket!.destroy();
+    });
+    const endpoint = await Effect.runPromise(
+      resolveAndValidateWebhookEndpoint(endpointUrl, {
+        environment: "development",
+        allowPrivateNetworkInDevelopment: true,
+      })
+    );
+    const signingHeaders = await Effect.runPromise(
+      signWebhookDelivery({
+        deliveryId: "delivery_123",
+        keyring: {
+          current: Redacted.make(
+            "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
+          ),
+        },
+        rawBody: "{}",
+      })
+    );
+    await expect(
+      Effect.runPromise(
+        sendWebhookDelivery({
+          endpoint,
+          eventType: "webhook.test",
+          rawBody: "{}",
+          signingHeaders,
+        })
+      )
+    ).rejects.toMatchObject({ kind: "network" });
+  });
+
   it("rejects a payload before opening a request", async () => {
     const endpoint = {
       url: new URL("http://127.0.0.1:1/hook"),

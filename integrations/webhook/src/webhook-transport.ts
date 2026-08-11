@@ -101,6 +101,7 @@ export const sendWebhookDelivery = ({
     ) => {
       if (!settled) {
         settled = true;
+        clearTimeout(deadline);
         resume(effect);
       }
     };
@@ -137,13 +138,18 @@ export const sendWebhookDelivery = ({
             )
           );
         });
+        response.on("aborted", () =>
+          finish(Effect.fail(new WebhookTransportError({ kind: "network" })))
+        );
+        response.on("error", () =>
+          finish(Effect.fail(new WebhookTransportError({ kind: "network" })))
+        );
       }
     );
     const deadline = setTimeout(() => {
       request.destroy();
       finish(Effect.fail(new WebhookTransportError({ kind: "timeout" })));
     }, WEBHOOK_REQUEST_TIMEOUT_MS);
-    request.on("close", () => clearTimeout(deadline));
     request.on("error", () =>
       finish(Effect.fail(new WebhookTransportError({ kind: "network" })))
     );
