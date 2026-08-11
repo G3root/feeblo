@@ -1,8 +1,23 @@
 import { currentDb, schema } from "@feeblo/db";
+import type { TIntegrationDeliveryState } from "@feeblo/db/validation-schema/integration";
 import { and, eq, inArray, lte } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
 /** Idempotent retention cleanup for safe integration history and archived metadata. */
+
+/**
+ * Terminal delivery states (per the schema's terminal timestamp check). Pending
+ * and leased deliveries are still queued or in flight and must never be purged;
+ * exhausted is terminal too — its manual-retry window is bounded by retention
+ * anyway (retries span at most ~7 days against a 30-day window, and retrying a
+ * delivery past retention is impossible since its event row is already purged).
+ */
+const purgeableDeliveryStates = [
+  "succeeded",
+  "exhausted",
+  "canceled",
+] as const satisfies readonly TIntegrationDeliveryState[];
+
 export const makeIntegrationManagementRepository = Effect.gen(function* () {
   const db = yield* currentDb;
   const cleanupRetention = Effect.fn(
@@ -21,7 +36,13 @@ export const makeIntegrationManagementRepository = Effect.gen(function* () {
         yield* db
           .delete(schema.integrationDeliveryTable)
           .where(
-            lte(schema.integrationDeliveryTable.retentionExpiresAt, before)
+            and(
+              inArray(
+                schema.integrationDeliveryTable.state,
+                purgeableDeliveryStates
+              ),
+              lte(schema.integrationDeliveryTable.retentionExpiresAt, before)
+            )
           );
         yield* db
           .delete(schema.integrationEventTable)
