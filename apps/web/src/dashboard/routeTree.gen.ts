@@ -32,6 +32,7 @@ import { Route as OrganizationIdSettingsPreferencesRouteImport } from "./routes/
 import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
 import { Route as OrganizationIdSettingsRoadmapRouteImport } from "./routes/$organizationId/settings/roadmap"
 import { Route as OrganizationIdSettingsSecurityRouteImport } from "./routes/$organizationId/settings/security"
+import { Route as OrganizationIdSettingsWebhooksRouteImport } from "./routes/$organizationId/settings/webhooks"
 import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$organizationId/settings/workspace"
 import { Route as OrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/index"
 import { Route as OrganizationIdDashboardLayoutChangelogDraftRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/draft"
@@ -178,6 +179,12 @@ const OrganizationIdSettingsSecurityRoute =
     path: "/security",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
+const OrganizationIdSettingsWebhooksRoute =
+  OrganizationIdSettingsWebhooksRouteImport.update({
+    id: "/webhooks",
+    path: "/webhooks",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
 const OrganizationIdSettingsWorkspaceRoute =
   OrganizationIdSettingsWorkspaceRouteImport.update({
     id: "/workspace",
@@ -296,6 +303,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof OrganizationIdSettingsSecurityRoute
+  "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
@@ -335,6 +343,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof OrganizationIdSettingsSecurityRoute
+  "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
   "/$organizationId/changelog/draft": typeof OrganizationIdDashboardLayoutChangelogDraftRoute
@@ -376,6 +385,7 @@ export interface FileRoutesById {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof OrganizationIdSettingsSecurityRoute
+  "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/_dashboard-layout/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
@@ -418,6 +428,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
+    | "/$organizationId/settings/webhooks"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/"
     | "/$organizationId/settings/"
@@ -457,6 +468,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
+    | "/$organizationId/settings/webhooks"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/settings"
     | "/$organizationId/changelog/draft"
@@ -497,6 +509,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
+    | "/$organizationId/settings/webhooks"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/_dashboard-layout/"
     | "/$organizationId/settings/"
@@ -690,6 +703,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsSecurityRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
+    "/$organizationId/settings/webhooks": {
+      id: "/$organizationId/settings/webhooks"
+      path: "/webhooks"
+      fullPath: "/$organizationId/settings/webhooks"
+      preLoaderRoute: typeof OrganizationIdSettingsWebhooksRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
     "/$organizationId/settings/workspace": {
       id: "/$organizationId/settings/workspace"
       path: "/workspace"
@@ -878,6 +898,7 @@ interface OrganizationIdSettingsRouteChildren {
   OrganizationIdSettingsProfileRoute: typeof OrganizationIdSettingsProfileRoute
   OrganizationIdSettingsRoadmapRoute: typeof OrganizationIdSettingsRoadmapRoute
   OrganizationIdSettingsSecurityRoute: typeof OrganizationIdSettingsSecurityRoute
+  OrganizationIdSettingsWebhooksRoute: typeof OrganizationIdSettingsWebhooksRoute
   OrganizationIdSettingsWorkspaceRoute: typeof OrganizationIdSettingsWorkspaceRoute
   OrganizationIdSettingsIndexRoute: typeof OrganizationIdSettingsIndexRoute
 }
@@ -902,6 +923,7 @@ const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
     OrganizationIdSettingsProfileRoute: OrganizationIdSettingsProfileRoute,
     OrganizationIdSettingsRoadmapRoute: OrganizationIdSettingsRoadmapRoute,
     OrganizationIdSettingsSecurityRoute: OrganizationIdSettingsSecurityRoute,
+    OrganizationIdSettingsWebhooksRoute: OrganizationIdSettingsWebhooksRoute,
     OrganizationIdSettingsWorkspaceRoute: OrganizationIdSettingsWorkspaceRoute,
     OrganizationIdSettingsIndexRoute: OrganizationIdSettingsIndexRoute,
   }

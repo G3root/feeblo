@@ -17,8 +17,8 @@ export {
 
 export {
   isPrivilegedRole,
-  permissionsForRole,
   PRIVILEGED_ROLES,
+  permissionsForRole,
   ROLE_PERMISSIONS,
   roleGrants,
 } from "./role-permissions";

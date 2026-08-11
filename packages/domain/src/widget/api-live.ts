@@ -1,7 +1,10 @@
-import { transaction } from "@feeblo/db";
-import { PostId } from "@feeblo/id";
+import { currentDb, schema, transaction } from "@feeblo/db";
+import { IntegrationEventId, PostId } from "@feeblo/id";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
@@ -17,6 +20,7 @@ import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
@@ -209,6 +213,75 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const attributeDefinitionRepository =
             yield* AttributeDefinitionRepository;
           const postRepository = yield* PostRepository;
+          const integrationEventRecorder = yield* IntegrationEventRecorder;
+          const { appUrl } = yield* EmailOutboxConfig;
+          const db = yield* currentDb;
+
+          const recordWidgetPostCreatedEvent = ({
+            postSlug,
+            status,
+          }: {
+            postSlug: string;
+            status: { readonly id: string; readonly type: string };
+          }) =>
+            Effect.gen(function* () {
+              const boardRows = yield* db
+                .select({
+                  id: schema.boardTable.id,
+                  name: schema.boardTable.name,
+                  slug: schema.boardTable.slug,
+                })
+                .from(schema.boardTable)
+                .where(
+                  and(
+                    eq(schema.boardTable.id, boardId),
+                    eq(schema.boardTable.organizationId, organizationId)
+                  )
+                )
+                .limit(1);
+              const boardDetails = boardRows[0];
+              if (!boardDetails) {
+                return yield* new InternalServerError({
+                  message: "Could not record widget integration event.",
+                });
+              }
+              const correlationId = yield* IntegrationEventId.generate;
+              const occurredAt = yield* DateTime.now;
+              yield* integrationEventRecorder
+                .recordIntegrationEvent({
+                  event: {
+                    causalHopCount: 0,
+                    correlationId,
+                    data: {
+                      actor: { kind: "end_user" },
+                      board: boardDetails,
+                      post: {
+                        id,
+                        status,
+                        title,
+                        url: new URL(
+                          `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(boardDetails.slug)}/${encodeURIComponent(postSlug)}`,
+                          appUrl
+                        ).href,
+                      },
+                    },
+                    id: yield* IntegrationEventId.generate,
+                    occurredAt,
+                    organizationId,
+                    origin: { kind: "feeblo" },
+                    type: "feedback.post.created",
+                    version: 1,
+                  },
+                })
+                .pipe(
+                  Effect.mapError(
+                    () =>
+                      new InternalServerError({
+                        message: "Could not record widget integration event.",
+                      })
+                  )
+                );
+            });
 
           const board = yield* boardRepository.getById({
             id: boardId,
@@ -235,6 +308,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               message: "Organization has no post statuses configured",
             });
           }
+          const selectedDefaultStatus = defaultStatus;
 
           const { sanitizedMarkdown: sanitizedContent, sanitizedHtml } =
             sanitizeMarkdown(content);
@@ -303,22 +377,35 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   metadata: metadata ?? {},
                   source: "WIDGET",
                 });
+                yield* recordWidgetPostCreatedEvent({
+                  postSlug: slug,
+                  status: selectedDefaultStatus,
+                });
               })
             );
           } else {
             slug = yield* transaction(
-              postRepository.create({
-                id,
-                boardId,
-                organizationId,
-                title,
-                content: sanitizedContent,
-                statusId: defaultStatus.id,
-                excerpt,
-                contactId: null,
-                metadata: metadata ?? {},
-                source: "WIDGET",
-              })
+              postRepository
+                .create({
+                  id,
+                  boardId,
+                  organizationId,
+                  title,
+                  content: sanitizedContent,
+                  statusId: defaultStatus.id,
+                  excerpt,
+                  contactId: null,
+                  metadata: metadata ?? {},
+                  source: "WIDGET",
+                })
+                .pipe(
+                  Effect.tap((postSlug) =>
+                    recordWidgetPostCreatedEvent({
+                      postSlug,
+                      status: selectedDefaultStatus,
+                    })
+                  )
+                )
             );
           }
 
@@ -357,9 +444,17 @@ export const WidgetApiLive = HttpApiBuilder.group(
             CompanyRepository.layer,
             ContactRepository.layer,
             JwtSecretRepository.layer,
+            EmailOutboxConfig.layer,
             PostRepository.layer,
             PostStatusRepository.layer,
           ]),
+          Effect.catchTag("ConfigError", () =>
+            Effect.fail(
+              new InternalServerError({
+                message: "Missing APP_URL for widget integration events",
+              })
+            )
+          ),
           Effect.catchTag("PostAlreadyExistsError", () =>
             Effect.logWarning(
               "Exhausted post slug candidates while creating widget feedback; post was not stored",

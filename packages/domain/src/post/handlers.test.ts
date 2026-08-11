@@ -9,6 +9,7 @@ import {
   UpvoteId,
   WorkspaceId,
 } from "@feeblo/id";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import * as Deferred from "effect/Deferred";
@@ -17,6 +18,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
 import { BoardRepository } from "../board/repository";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
@@ -41,6 +43,7 @@ import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 
 describe("PostRpcHandlers", () => {
+  const recordedIntegrationEvents: unknown[] = [];
   type Fixture = {
     boardId: LegidOf<"BoardId">;
     creatorEmail: string;
@@ -225,7 +228,17 @@ describe("PostRpcHandlers", () => {
   const TestLayer = Layer.mergeAll(
     HandlerTest,
     Database.PgliteDatabaseLive,
-    S3Test
+    S3Test,
+    EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
+    Layer.succeed(
+      IntegrationEventRecorder,
+      IntegrationEventRecorder.of({
+        recordIntegrationEvent: ({ event }) =>
+          Effect.sync(() => {
+            recordedIntegrationEvents.push(event);
+          }).pipe(Effect.as({ deliveryCount: 0, eventRecorded: false })),
+      })
+    )
   );
 
   layer(TestLayer)("handlers", (it) => {
@@ -327,6 +340,56 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostCreate", () => {
+      it.effect(
+        "records equivalent safe creation envelopes for dashboard and public-board posts",
+        () =>
+          Effect.gen(function* () {
+            recordedIntegrationEvents.length = 0;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const dashboardPostId = yield* PostId.generate;
+            const publicPostId = yield* PostId.generate;
+
+            yield* handlers
+              .PostCreate(
+                postCreateInput(fixture, dashboardPostId, "Dashboard event")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostCreatePublic(
+                postCreateInput(fixture, publicPostId, "Public event")
+              )
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              );
+
+            expect(recordedIntegrationEvents).toHaveLength(2);
+            expect(recordedIntegrationEvents).toEqual(
+              expect.arrayContaining([
+                expect.objectContaining({
+                  type: "feedback.post.created",
+                  data: expect.objectContaining({
+                    actor: expect.objectContaining({ kind: "member" }),
+                    board: expect.objectContaining({ id: fixture.boardId }),
+                  }),
+                }),
+                expect.objectContaining({
+                  type: "feedback.post.created",
+                  data: expect.objectContaining({
+                    actor: { kind: "end_user" },
+                    board: expect.objectContaining({ id: fixture.boardId }),
+                  }),
+                }),
+              ])
+            );
+          })
+      );
+
       it.effect(
         "creates an active verified email subscription for the post creator",
         () =>
@@ -623,6 +686,62 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostUpdate", () => {
+      it.effect(
+        "records one event for a real status transition and none for a no-op",
+        () =>
+          Effect.gen(function* () {
+            recordedIntegrationEvents.length = 0;
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const nextStatusId = yield* PostStatusId.generate;
+            yield* db.insert(schema.postStatusTable).values({
+              id: nextStatusId,
+              organizationId: fixture.organizationId,
+              orderIndex: 1,
+              type: "PLANNED",
+            });
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Transition event"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            recordedIntegrationEvents.length = 0;
+
+            yield* handlers
+              .PostUpdate({
+                boardId: fixture.boardId,
+                id: postId,
+                organizationId: fixture.organizationId,
+                statusId: fixture.statusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            expect(recordedIntegrationEvents).toHaveLength(0);
+
+            yield* handlers
+              .PostUpdate({
+                boardId: fixture.boardId,
+                id: postId,
+                organizationId: fixture.organizationId,
+                statusId: nextStatusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            expect(recordedIntegrationEvents).toEqual([
+              expect.objectContaining({
+                type: "feedback.post.status_changed",
+                data: expect.objectContaining({
+                  previousStatus: { id: fixture.statusId, type: "PENDING" },
+                }),
+              }),
+            ]);
+          })
+      );
+
       it.effect(
         "coalesces paid status changes into the final five-minute intent",
         () =>

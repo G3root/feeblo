@@ -154,3 +154,30 @@ export const CompanyAttributeValueId = makeId(
 export const AssetId = makeId("asset", "ast", {
   approximateLength,
 });
+
+/** Identifies one configured external integration connection. */
+export const IntegrationConnectionId = makeId("integration_connection", "icn", {
+  approximateLength,
+});
+
+/** Identifies one capability route beneath an integration connection. */
+export const IntegrationRouteId = makeId("integration_route", "irt", {
+  approximateLength,
+});
+
+/** Identifies one immutable fact emitted for external integrations. */
+export const IntegrationEventId = makeId("integration_event", "iev", {
+  approximateLength,
+});
+
+/** Identifies one durable execution of an event against a route. */
+export const IntegrationDeliveryId = makeId("integration_delivery", "idl", {
+  approximateLength,
+});
+
+/** Identifies one append-only integration delivery attempt. */
+export const IntegrationDeliveryAttemptId = makeId(
+  "integration_delivery_attempt",
+  "ida",
+  { approximateLength }
+);

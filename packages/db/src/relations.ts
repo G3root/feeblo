@@ -22,6 +22,11 @@ import {
   emailOutboxTable,
   emailProviderEventTable,
   emailSubscriptionTable,
+  integrationConnectionTable,
+  integrationDeliveryAttemptTable,
+  integrationDeliveryTable,
+  integrationEventTable,
+  integrationRouteTable,
   invitationTable,
   jwtSecretTable,
   memberTable,
@@ -60,6 +65,11 @@ export const relations = defineRelations(
     organizationTable,
     memberTable,
     invitationTable,
+    integrationConnectionTable,
+    integrationRouteTable,
+    integrationEventTable,
+    integrationDeliveryTable,
+    integrationDeliveryAttemptTable,
     subscriptionTable,
     productTable,
     boardTable,
@@ -820,6 +830,72 @@ export const relations = defineRelations(
       subscriptions: r.many.subscriptionTable({
         from: r.productTable.id,
         to: r.subscriptionTable.productId,
+      }),
+    },
+    integrationConnectionTable: {
+      organization: r.one.organizationTable({
+        from: r.integrationConnectionTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      routes: r.many.integrationRouteTable({
+        from: r.integrationConnectionTable.id,
+        to: r.integrationRouteTable.connectionId,
+      }),
+      deliveries: r.many.integrationDeliveryTable({
+        from: r.integrationConnectionTable.id,
+        to: r.integrationDeliveryTable.connectionId,
+      }),
+    },
+    integrationRouteTable: {
+      organization: r.one.organizationTable({
+        from: r.integrationRouteTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      connection: r.one.integrationConnectionTable({
+        from: r.integrationRouteTable.connectionId,
+        to: r.integrationConnectionTable.id,
+      }),
+      deliveries: r.many.integrationDeliveryTable({
+        from: r.integrationRouteTable.id,
+        to: r.integrationDeliveryTable.routeId,
+      }),
+    },
+    integrationEventTable: {
+      organization: r.one.organizationTable({
+        from: r.integrationEventTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      deliveries: r.many.integrationDeliveryTable({
+        from: r.integrationEventTable.id,
+        to: r.integrationDeliveryTable.eventId,
+      }),
+    },
+    integrationDeliveryTable: {
+      organization: r.one.organizationTable({
+        from: r.integrationDeliveryTable.organizationId,
+        to: r.organizationTable.id,
+      }),
+      connection: r.one.integrationConnectionTable({
+        from: r.integrationDeliveryTable.connectionId,
+        to: r.integrationConnectionTable.id,
+      }),
+      route: r.one.integrationRouteTable({
+        from: r.integrationDeliveryTable.routeId,
+        to: r.integrationRouteTable.id,
+      }),
+      event: r.one.integrationEventTable({
+        from: r.integrationDeliveryTable.eventId,
+        to: r.integrationEventTable.id,
+      }),
+      attempts: r.many.integrationDeliveryAttemptTable({
+        from: r.integrationDeliveryTable.id,
+        to: r.integrationDeliveryAttemptTable.deliveryId,
+      }),
+    },
+    integrationDeliveryAttemptTable: {
+      delivery: r.one.integrationDeliveryTable({
+        from: r.integrationDeliveryAttemptTable.deliveryId,
+        to: r.integrationDeliveryTable.id,
       }),
     },
   })

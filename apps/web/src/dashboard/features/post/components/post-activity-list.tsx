@@ -64,6 +64,7 @@ const activityIconMap: Record<TPostActivityKind, typeof FileAddIcon> = {
   POST_UNLOCKED: SquareUnlock02Icon,
   POST_ARCHIVED: Archive01Icon,
   POST_UNARCHIVED: ArchiveRestoreIcon,
+  OFFICIAL_UPDATE_PUBLISHED: NoteEditIcon,
   COMMENT_CREATED: CommentAdd01Icon,
   COMMENT_UPDATED: MessageEdit01Icon,
   COMMENT_DELETED: CommentRemove01Icon,
@@ -102,6 +103,7 @@ function getActivityDescription({
     POST_UNLOCKED: "unlocked the post",
     POST_ARCHIVED: "archived the post",
     POST_UNARCHIVED: "restored the post",
+    OFFICIAL_UPDATE_PUBLISHED: "published an official update",
     COMMENT_CREATED:
       activity.nextValue === "INTERNAL"
         ? "added an internal note"

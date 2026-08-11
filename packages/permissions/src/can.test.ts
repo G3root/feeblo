@@ -11,14 +11,14 @@ import {
   isOwnerOrAdmin,
   isPrivilegedRole,
   isRole,
+  PERMISSIONS,
   type PermissionContext,
   permissionsForRole,
-  PERMISSIONS,
+  ROLES,
   type Role,
   roleAtLeast,
   roleGrants,
   roleIn,
-  ROLES,
 } from "./index";
 
 const ctx = (
@@ -54,9 +54,7 @@ describe("roles", () => {
     // Privilege is derived from the workspace.update grant, not a hardcoded
     // role list — this invariant pins that equivalence for every role.
     for (const role of ROLES) {
-      expect(isPrivilegedRole(role)).toBe(
-        roleGrants(role, "workspace.update")
-      );
+      expect(isPrivilegedRole(role)).toBe(roleGrants(role, "workspace.update"));
     }
   });
 
@@ -76,6 +74,13 @@ describe("roles", () => {
 });
 
 describe("role permissions", () => {
+  it("grants webhook management only to administrators and owners", () => {
+    expect(roleGrants("contributor", "webhooks.manage")).toBe(false);
+    expect(roleGrants("manager", "webhooks.manage")).toBe(false);
+    expect(roleGrants("admin", "webhooks.manage")).toBe(true);
+    expect(roleGrants("owner", "webhooks.manage")).toBe(true);
+  });
+
   it("creates action permissions and one resource wildcard", () => {
     expect(createPermissions("posts", ["create", "delete"] as const)).toEqual([
       "posts.create",
@@ -83,13 +88,15 @@ describe("role permissions", () => {
       "posts.*",
     ]);
 
-    const resources = new Set(PERMISSIONS.map((permission) => permission.split(".")[0]));
+    const resources = new Set(
+      PERMISSIONS.map((permission) => permission.split(".")[0])
+    );
     for (const resource of resources) {
       expect(PERMISSIONS).toContain(`${resource}.*`);
     }
-    expect(PERMISSIONS.every((permission) => permission.split(".").length === 2)).toBe(
-      true
-    );
+    expect(
+      PERMISSIONS.every((permission) => permission.split(".").length === 2)
+    ).toBe(true);
   });
 
   it("only grants contributors the cross-post move permission", () => {
@@ -225,15 +232,9 @@ describe("can()", () => {
 
   it("canAny/canAll compose correctly", () => {
     const session = ctx([[org, "admin"]]);
-    expect(canAny(session, org, ["posts.*", "workspace.delete"])).toBe(
-      true
-    );
-    expect(canAll(session, org, ["posts.*", "billing.*"])).toBe(
-      true
-    );
-    expect(canAll(session, org, ["posts.*", "workspace.delete"])).toBe(
-      true
-    );
+    expect(canAny(session, org, ["posts.*", "workspace.delete"])).toBe(true);
+    expect(canAll(session, org, ["posts.*", "billing.*"])).toBe(true);
+    expect(canAll(session, org, ["posts.*", "workspace.delete"])).toBe(true);
   });
 
   it("roleIn/isMember/isOwnerOrAdmin helpers agree", () => {

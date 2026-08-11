@@ -1,7 +1,10 @@
-import { transaction } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
+import { IntegrationEventId, type LegidOf, PostStatusId } from "@feeblo/id";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,6 +18,7 @@ import {
   syncPostAssetReferences,
 } from "../asset/service";
 import { BoardRepository } from "../board/repository";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
@@ -62,6 +66,9 @@ const postStatusCoalescingDelayMs = 5 * 60 * 1000;
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
+  const db = yield* currentDb;
+  const integrationEventRecorder = yield* IntegrationEventRecorder;
+  const { appUrl } = yield* EmailOutboxConfig;
   const repository = yield* PostRepository;
   const emailOutbox = yield* EmailOutboxRepository;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
@@ -73,6 +80,115 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // const sitePolicy = yield* SitePolicy;
 
   // -- Shared effect helpers (no policy applied) --
+
+  const recordPostIntegrationEvent = ({
+    actorMemberId,
+    actorName,
+    boardId,
+    eventType,
+    organizationId,
+    postId,
+    postSlug,
+    previousStatusId,
+    statusId,
+    title,
+  }: {
+    actorMemberId: string | null;
+    actorName: string | null | undefined;
+    boardId: LegidOf<"BoardId">;
+    eventType: "feedback.post.created" | "feedback.post.status_changed";
+    organizationId: LegidOf<"WorkspaceId">;
+    postId: LegidOf<"PostId">;
+    postSlug: string;
+    previousStatusId?: LegidOf<"PostStatusId">;
+    statusId: LegidOf<"PostStatusId">;
+    title: string;
+  }) =>
+    Effect.gen(function* () {
+      const board = yield* db
+        .select({
+          id: schema.boardTable.id,
+          name: schema.boardTable.name,
+          slug: schema.boardTable.slug,
+        })
+        .from(schema.boardTable)
+        .where(
+          and(
+            eq(schema.boardTable.id, boardId),
+            eq(schema.boardTable.organizationId, organizationId)
+          )
+        )
+        .limit(1);
+      const boardDetails = board[0];
+      if (!boardDetails) {
+        return yield* new FailedToUpdatePostError();
+      }
+      const statusType = yield* repository.findStatusType({
+        id: statusId,
+        organizationId,
+      });
+      if (!statusType) {
+        return yield* new FailedToUpdatePostError();
+      }
+      const previousStatusType = previousStatusId
+        ? yield* repository.findStatusType({
+            id: previousStatusId,
+            organizationId,
+          })
+        : undefined;
+      const id = yield* IntegrationEventId.generate;
+      const correlationId = yield* IntegrationEventId.generate;
+      const occurredAt = yield* DateTime.now;
+      const url = new URL(
+        `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(boardDetails.slug)}/${encodeURIComponent(postSlug)}`,
+        appUrl
+      ).href;
+      yield* integrationEventRecorder
+        .recordIntegrationEvent({
+          event: {
+            causalHopCount: 0,
+            correlationId,
+            data: {
+              actor: actorMemberId
+                ? {
+                    ...(actorName ? { displayName: actorName } : {}),
+                    kind: "member",
+                    memberId: actorMemberId,
+                  }
+                : { kind: "end_user" },
+              board: boardDetails,
+              post: {
+                id: postId,
+                status: { id: statusId, type: statusType },
+                title,
+                url,
+              },
+              ...(previousStatusId && previousStatusType
+                ? {
+                    previousStatus: {
+                      id: previousStatusId,
+                      type: previousStatusType,
+                    },
+                  }
+                : {}),
+            },
+            id,
+            occurredAt,
+            organizationId,
+            origin: { kind: "feeblo" },
+            type: eventType,
+            version: 1,
+          },
+        })
+        .pipe(
+          Effect.mapError(
+            () =>
+              new InternalServerError({
+                message: "Could not record integration event.",
+              })
+          )
+        );
+    });
 
   const scheduleEmbedding = ({
     content,
@@ -241,6 +357,32 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* activityRepository.createMany(activities);
           let createdOutboxId: string | undefined;
           if (previous.statusId !== args.statusId) {
+            const postRows = yield* db
+              .select({ slug: schema.postTable.slug })
+              .from(schema.postTable)
+              .where(
+                and(
+                  eq(schema.postTable.id, args.id),
+                  eq(schema.postTable.organizationId, args.organizationId)
+                )
+              )
+              .limit(1);
+            const postSlug = postRows[0]?.slug;
+            if (!postSlug) {
+              return yield* new FailedToUpdatePostError();
+            }
+            yield* recordPostIntegrationEvent({
+              actorMemberId: membership?.membershipId ?? null,
+              actorName: membership ? session.user.name : undefined,
+              boardId: args.boardId,
+              eventType: "feedback.post.status_changed",
+              organizationId: args.organizationId,
+              postId: args.id,
+              postSlug,
+              previousStatusId: yield* PostStatusId.parse(previous.statusId),
+              statusId: args.statusId,
+              title: previous.title,
+            });
             const maySend = yield* entitlementPolicy.mayMaterializeEmailIntent({
               organizationId: args.organizationId,
               kind: "post.status_changed",
@@ -546,6 +688,17 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             actorId: session.session.userId,
             actorMemberId: membership?.membershipId ?? null,
             kind: "POST_CREATED",
+          });
+          yield* recordPostIntegrationEvent({
+            actorMemberId: membership?.membershipId ?? null,
+            actorName: membership ? session.user.name : undefined,
+            boardId: args.boardId,
+            eventType: "feedback.post.created",
+            organizationId: args.organizationId,
+            postId: args.id,
+            postSlug: persistedSlug,
+            statusId: args.statusId,
+            title: args.title,
           });
 
           // The creator of a post is automatically subscribed to it.
@@ -1031,6 +1184,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
+  Layer.provide(EmailOutboxConfig.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),

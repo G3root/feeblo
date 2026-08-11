@@ -9,6 +9,7 @@ export default defineConfig({
   schema: [
     "./src/schema/auth.ts",
     "./src/schema/feedback.ts",
+    "./src/schema/integration.ts",
     "./src/schema/media.ts",
   ],
   out: "./src/migrations",

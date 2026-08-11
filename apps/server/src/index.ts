@@ -9,6 +9,10 @@ import {
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
+import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
+import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
+import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feedback/service";
+import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
@@ -45,6 +49,7 @@ import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import { ServerConfig } from "./config";
 import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
 import { e2eSetPlanRouter } from "./e2e-set-plan";
+import { makeIntegrationLayers } from "./integrations";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
 
@@ -171,9 +176,17 @@ const program = Effect.gen(function* () {
     Auth,
     initAuthHandler(makeMailerLayer, RateLimitLayer)
   );
+  const integrationRuntime = yield* makeIntegrationLayers.pipe(
+    Effect.provideService(ServerConfig, config)
+  );
   const ServiceLayers = Layer.mergeAll(
     WorkFlowLayer,
     SiteRepository.layer,
+    EmailOutboxRepository.layer,
+    EmailProviderFeedbackConfig.layer,
+    EmailProviderFeedbackService.layer,
+    EmailSubscriptionRepository.layer,
+    integrationRuntime.layer,
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
@@ -280,11 +293,14 @@ const program = Effect.gen(function* () {
     )
   );
 
+  yield* integrationRuntime.worker.pipe(Effect.forkScoped);
+  yield* integrationRuntime.maintenance.pipe(Effect.forkScoped);
+
   return yield* Layer.launch(server);
 });
 
 program.pipe(
   Effect.scoped,
-  Effect.provide(ServerConfig.layer),
+  Effect.provide(Layer.merge(ServerConfig.layer, Database.DatabaseContextLive)),
   NodeRuntime.runMain
 );

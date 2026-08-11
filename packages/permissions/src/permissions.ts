@@ -17,7 +17,8 @@ export const createPermissions = <
   actions: Actions
 ): readonly `${Resource}.${Actions[number] | "*"}`[] =>
   [...actions, "*"].map(
-    (action) => `${resource}.${action}` as `${Resource}.${Actions[number] | "*"}`
+    (action) =>
+      `${resource}.${action}` as `${Resource}.${Actions[number] | "*"}`
   );
 
 const PERMISSION_ACTIONS = {
@@ -34,6 +35,7 @@ const PERMISSION_ACTIONS = {
   tags: ["create", "update", "delete"],
   contacts: ["create", "update", "delete"],
   companies: ["create", "update", "delete"],
+  webhooks: ["manage"],
 } as const satisfies Record<string, readonly string[]>;
 
 type PermissionGroups = typeof PERMISSION_ACTIONS;
@@ -63,6 +65,7 @@ export const PERMISSIONS = [
   ...createPermissions("tags", PERMISSION_ACTIONS.tags),
   ...createPermissions("contacts", PERMISSION_ACTIONS.contacts),
   ...createPermissions("companies", PERMISSION_ACTIONS.companies),
+  ...createPermissions("webhooks", PERMISSION_ACTIONS.webhooks),
 ] satisfies readonly Permission[];
 
 export type PermissionDefinition = {
@@ -84,9 +87,7 @@ const RESOURCE_SCOPED_PERMISSIONS = new Set<Permission>([
 const humanize = (value: string): string =>
   value.charAt(0).toUpperCase() + value.slice(1);
 
-const permissionDefinition = (
-  permission: Permission
-): PermissionDefinition => {
+const permissionDefinition = (permission: Permission): PermissionDefinition => {
   const separator = permission.indexOf(".");
   const resource = permission.slice(0, separator);
   const action = permission.slice(separator + 1);
@@ -106,5 +107,8 @@ const permissionDefinition = (
 };
 
 export const PERMISSION_CATALOG = Object.fromEntries(
-  PERMISSIONS.map((permission) => [permission, permissionDefinition(permission)])
+  PERMISSIONS.map((permission) => [
+    permission,
+    permissionDefinition(permission),
+  ])
 ) as Record<Permission, PermissionDefinition>;

@@ -4,6 +4,8 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 
 export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
@@ -15,6 +17,26 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const nodeEnv = yield* Config.string("NODE_ENV").pipe(
         Config.withDefault("development")
       );
+      const integrationEncryptionKey = yield* Config.redacted(
+        "INTEGRATION_ENCRYPTION_KEY"
+      ).pipe(
+        nodeEnv === "production"
+          ? (config) => config
+          : Config.withDefault(
+              Redacted.make("development-integration-key-change-me-32-bytes")
+            )
+      );
+      const integrationAllowPrivateNetwork = yield* Config.boolean(
+        "INTEGRATION_ALLOW_PRIVATE_NETWORK"
+      ).pipe(Config.withDefault(false));
+      const integrationConnectionConcurrency = yield* Config.schema(
+        Schema.Int.check(Schema.isGreaterThan(0)),
+        "INTEGRATION_CONNECTION_CONCURRENCY"
+      ).pipe(Config.withDefault(5));
+      const integrationGlobalConcurrency = yield* Config.schema(
+        Schema.Int.check(Schema.isGreaterThan(0)),
+        "INTEGRATION_GLOBAL_CONCURRENCY"
+      ).pipe(Config.withDefault(25));
       const redisUrl = yield* Config.string("REDIS_URL").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
@@ -57,6 +79,11 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         appUrl,
         appRootDomain,
         clientIpProxyTrust,
+        integrationAllowPrivateNetwork:
+          nodeEnv === "development" && integrationAllowPrivateNetwork,
+        integrationConnectionConcurrency,
+        integrationEncryptionKey,
+        integrationGlobalConcurrency,
         nodeEnv,
         redisUrl,
         sentryDsn,
