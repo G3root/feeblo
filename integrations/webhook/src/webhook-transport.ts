@@ -1,5 +1,5 @@
-import { NodeHttpClient } from "@effect/platform-node";
 import { isIP, type LookupFunction } from "node:net";
+import { NodeHttpClient } from "@effect/platform-node";
 
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -19,14 +19,22 @@ export const WEBHOOK_MAX_PAYLOAD_BYTES = 256 * 1024;
 /** Maximum outbound webhook request duration. */
 export const WEBHOOK_REQUEST_TIMEOUT_MS = 10_000;
 
-/** Safe outbound response data persisted by the delivery kernel. Response bodies are never retained. */
+/**
+ * Raw receiver response facts for the delivery kernel; response bodies are never retained.
+ * Retry classification of statuses is owned by the kernel's delivery policy, not by transport.
+ */
 export interface WebhookDeliveryResponse {
-  readonly retry: boolean;
+  /** Bounded Retry-After delay, present only when the receiver asked for a backoff. */
   readonly retryAfter?: Duration.Duration;
+  /** HTTP status received from the receiver. */
   readonly status: number;
 }
 
-/** Bounded Retry-After parser: accepts seconds and caps a receiver request at one day. */
+/** RFC 7231 IMF-fixdate shape; guards `Date.parse` from misreading values like "-5" as calendar years. */
+const httpDatePattern =
+  /^[A-Za-z]{3}, \d{1,2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+
+/** Bounded Retry-After parser: accepts delay-seconds or HTTP dates, and caps a receiver request at one day. */
 export const parseWebhookRetryAfter = (
   value: string | undefined,
   now: DateTime.DateTime
@@ -38,6 +46,9 @@ export const parseWebhookRetryAfter = (
   if (Number.isSafeInteger(seconds) && seconds >= 0) {
     return Duration.min(Duration.seconds(seconds), Duration.days(1));
   }
+  if (!httpDatePattern.test(value)) {
+    return undefined;
+  }
   const retryAt = Date.parse(value);
   if (Number.isNaN(retryAt)) {
     return undefined;
@@ -46,28 +57,16 @@ export const parseWebhookRetryAfter = (
   return Duration.min(Duration.seconds(Math.max(0, delta)), Duration.days(1));
 };
 
-/** Classifies HTTP status codes according to the durable webhook retry policy; the clock (and thus TestClock) drives Retry-After deltas. */
-export const classifyWebhookResponse = (
-  status: number,
-  retryAfter: string | undefined
-): Effect.Effect<WebhookDeliveryResponse> =>
-  Effect.gen(function* () {
-    const now = yield* DateTime.now;
-    const retryAfterDuration =
-      status === 429 ? parseWebhookRetryAfter(retryAfter, now) : undefined;
-    const retry =
-      status === 408 ||
-      status === 409 ||
-      status === 425 ||
-      status === 429 ||
-      (status >= 500 && status <= 599);
-    return retryAfterDuration === undefined
-      ? { status, retry }
-      : { status, retry, retryAfter: retryAfterDuration };
-  });
-
-/** Sends a signed raw JSON body through a pinned DNS lookup, with redirects disabled and no response body retention. */
-export const sendWebhookDelivery = ({
+/**
+ * Sends a signed raw JSON body through a pinned DNS lookup, with redirects disabled and no
+ * response body retention.
+ *
+ * @returns The raw receiver status and any bounded Retry-After; fails with `WebhookTransportError`
+ * for oversized payloads, network failures, and request timeouts.
+ */
+export const sendWebhookDelivery = Effect.fn(
+  "WebhookTransport.sendWebhookDelivery"
+)(function* ({
   endpoint,
   eventType,
   rawBody,
@@ -77,38 +76,34 @@ export const sendWebhookDelivery = ({
   readonly eventType: string;
   readonly rawBody: string;
   readonly signingHeaders: WebhookSigningHeaders;
-}): Effect.Effect<WebhookDeliveryResponse, WebhookTransportError> => {
+}) {
   const contentLength = Buffer.byteLength(rawBody, "utf8");
   if (contentLength > WEBHOOK_MAX_PAYLOAD_BYTES) {
-    return Effect.fail(
-      new WebhookTransportError({
-        kind: "payload_too_large",
-        message: "WebhookTransportError: webhook payload exceeds the 256 KiB limit",
-      })
-    );
+    return yield* new WebhookTransportError({
+      kind: "payload_too_large",
+      message:
+        "WebhookTransportError: webhook payload exceeds the 256 KiB limit",
+    });
   }
-  const pinnedAddress = endpoint.pinnedAddresses[0];
-  if (pinnedAddress === undefined) {
-    return Effect.fail(
-      new WebhookTransportError({
-        kind: "network",
-        message:
-          "WebhookTransportError: network failure while sending the webhook delivery",
-      })
-    );
-  }
-
-  const pinnedLookup: LookupFunction = (_hostname, _options, callback) => {
-    callback(null, pinnedAddress, isIP(pinnedAddress));
-  };
+  // The client error cause is intentionally dropped when mapping transport
+  // failures: it can carry the endpoint URL and request metadata that must
+  // stay out of persisted and logged failures.
   const networkFailure = () =>
     new WebhookTransportError({
       kind: "network",
       message:
         "WebhookTransportError: network failure while sending the webhook delivery",
     });
+  const pinnedAddress = endpoint.pinnedAddresses[0];
+  if (pinnedAddress === undefined) {
+    return yield* networkFailure();
+  }
 
-  return Effect.scoped(
+  const pinnedLookup: LookupFunction = (_hostname, _options, callback) => {
+    callback(null, pinnedAddress, isIP(pinnedAddress));
+  };
+
+  return yield* Effect.scoped(
     Effect.gen(function* () {
       // One-off agent pinned to the validated address; released with the scope.
       const agent = yield* NodeHttpClient.makeAgent({
@@ -138,10 +133,16 @@ export const sendWebhookDelivery = ({
         Effect.mapError(networkFailure)
       );
 
-      return yield* classifyWebhookResponse(
-        response.status,
-        Option.getOrUndefined(Headers.get(response.headers, "retry-after"))
+      const now = yield* DateTime.now;
+      const retryAfter = Option.getOrUndefined(
+        Headers.get(response.headers, "retry-after")
       );
+      return {
+        status: response.status,
+        ...(retryAfter === undefined
+          ? {}
+          : { retryAfter: parseWebhookRetryAfter(retryAfter, now) }),
+      };
     })
   ).pipe(
     Effect.timeout(WEBHOOK_REQUEST_TIMEOUT_MS),
@@ -154,4 +155,4 @@ export const sendWebhookDelivery = ({
         })
     )
   );
-};
+});

@@ -13,12 +13,23 @@ describe("integration delivery retry policy", () => {
     });
   });
 
-  it("retries transport-equivalent retryable HTTP statuses and terminals other 4xx", () => {
-    expect(classifyIntegrationHttpDeliveryStatus(429)).toEqual({
+  it("retries every transport-equivalent retryable status and terminals other statuses", () => {
+    for (const status of [408, 409, 425, 429, 500, 502, 503, 504, 599]) {
+      expect(classifyIntegrationHttpDeliveryStatus(status)).toEqual({
+        _tag: "Retry",
+      });
+    }
+    for (const status of [301, 302, 400, 401, 403, 404, 422]) {
+      expect(classifyIntegrationHttpDeliveryStatus(status)).toEqual({
+        _tag: "Terminal",
+      });
+    }
+  });
+
+  it("carries a bounded Retry-After into the retry outcome", () => {
+    expect(classifyIntegrationHttpDeliveryStatus(429, 120_000)).toEqual({
       _tag: "Retry",
-    });
-    expect(classifyIntegrationHttpDeliveryStatus(422)).toEqual({
-      _tag: "Terminal",
+      retryAfterMs: 120_000,
     });
   });
 

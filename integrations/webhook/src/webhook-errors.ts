@@ -18,17 +18,15 @@ export class WebhookSigningError extends Schema.TaggedErrorClass<WebhookSigningE
   { operation: Schema.Literals(["generate", "sign"]) }
 ) {}
 
-/** Typed transport failure that records no endpoint, secret, response body, or raw payload. */
+/**
+ * Typed transport failure that records no endpoint, secret, response body, or raw payload.
+ * The underlying client error cause is intentionally dropped: it can carry the endpoint URL
+ * and request metadata that must stay out of persisted and logged failures.
+ */
 export class WebhookTransportError extends Schema.TaggedErrorClass<WebhookTransportError>()(
   "WebhookTransportError",
   {
-    kind: Schema.Literals([
-      "timeout",
-      "network",
-      "redirect",
-      "payload_too_large",
-    ]),
+    kind: Schema.Literals(["timeout", "network", "payload_too_large"]),
     message: Schema.String,
-    status: Schema.optionalKey(Schema.Number),
   }
 ) {}

@@ -1,4 +1,6 @@
-import { createServer } from "node:http";
+import type { Server } from "node:http";
+import { createServer, type RequestListener } from "node:http";
+import { afterEach, describe, expect, it } from "@effect/vitest";
 import {
   BoardId,
   IntegrationConnectionId,
@@ -19,10 +21,137 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { Webhook } from "standardwebhooks";
-import { describe, expect, it } from "vitest";
 import { webhookProviderKey } from "./webhook-manifest";
 import { WebhookExternalPayload } from "./webhook-payload";
 import { makeWebhookProviderRegistration } from "./webhook-provider-registration";
+
+const servers: Server[] = [];
+afterEach(async () => {
+  await Promise.all(
+    servers
+      .splice(0)
+      .map(
+        (server) =>
+          new Promise<void>((resolve) => server.close(() => resolve()))
+      )
+  );
+});
+
+const startServer = (handler: RequestListener) =>
+  Effect.tryPromise(
+    () =>
+      new Promise<URL>((resolve, reject) => {
+        const server = createServer(handler);
+        servers.push(server);
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", () => {
+          const address = server.address();
+          if (address === null || typeof address === "string") {
+            reject(new TypeError("Expected TCP test server"));
+            return;
+          }
+          resolve(new URL(`http://127.0.0.1:${address.port}/hook`));
+        });
+      })
+  );
+
+const secret = Redacted.make(
+  "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
+);
+
+const makeRegistration = (endpointUrl: URL) =>
+  makeWebhookProviderRegistration({
+    credentialResolver: {
+      loadWebhookCredentials: () =>
+        Effect.succeed({
+          endpointUrl: Redacted.make(endpointUrl.toString()),
+          signingKeyring: { current: secret },
+        }),
+    },
+    endpointSecurityPolicy: {
+      allowPrivateNetworkInDevelopment: true,
+      environment: "development",
+    },
+  });
+
+const makeDeliveryFixture = () =>
+  Effect.gen(function* () {
+    const boardId = yield* BoardId.generate;
+    const connectionId = yield* IntegrationConnectionId.generate;
+    const deliveryId = yield* IntegrationDeliveryId.generate;
+    const eventId = yield* IntegrationEventId.generate;
+    const memberId = yield* MemberId.generate;
+    const organizationId = yield* WorkspaceId.generate;
+    const postId = yield* PostId.generate;
+    const routeId = yield* IntegrationRouteId.generate;
+    const statusId = yield* PostStatusId.generate;
+    const now = DateTime.makeUnsafe(new Date());
+    const input: IntegrationProviderDeliveryInput = {
+      connection: {
+        credentialGeneration: 1,
+        id: connectionId,
+        lifecycleStatus: "active",
+        name: "Test endpoint",
+        organizationId,
+        provider: webhookProviderKey,
+        safeMetadata: { hostname: "127.0.0.1" },
+      },
+      delivery: {
+        actionKey: "test-action",
+        attemptCount: 1,
+        eventId,
+        id: deliveryId,
+        leaseExpiresAt: now,
+        leaseOwner: "test-worker",
+        nextAttemptAt: now,
+        orderingKey: null,
+        routeId,
+        state: "leased",
+      },
+      event: {
+        causalHopCount: 0,
+        correlationId: eventId,
+        data: {
+          actor: {
+            displayName: "Ada",
+            kind: "member",
+            memberId,
+          },
+          board: { id: boardId, name: "Feedback", slug: "feedback" },
+          post: {
+            id: postId,
+            status: { id: statusId, type: "PENDING" },
+            title: "Canonical post",
+            url: "https://app.example.test/org/post/feedback/canonical-post",
+          },
+        },
+        id: eventId,
+        occurredAt: now,
+        organizationId,
+        origin: { kind: "feeblo" },
+        type: "feedback.post.created",
+        version: 1,
+      },
+      route: {
+        capabilityKey: "events.post",
+        configVersion: 1,
+        connectionId,
+        enabled: true,
+        eventTypes: ["feedback.post.created"],
+        id: routeId,
+        provider: webhookProviderKey,
+        safeMetadata: {},
+      },
+    };
+    return {
+      boardId,
+      input,
+      memberId,
+      now,
+      postId,
+      statusId,
+    };
+  });
 
 describe("webhook provider registration", () => {
   it("is accepted by the real core startup registry", () => {
@@ -54,173 +183,131 @@ describe("webhook provider registration", () => {
     ).toBeDefined();
   });
 
-  it("maps canonical post data and signs the exact external wire payload", async () => {
-    let receiveRequest: (request: {
-      readonly body: string;
-      readonly headers: Record<string, string | string[] | undefined>;
-    }) => void = () => undefined;
-    const received = new Promise<{
-      readonly body: string;
-      readonly headers: Record<string, string | string[] | undefined>;
-    }>((resolve) => {
-      receiveRequest = resolve;
-    });
-    const server = createServer((request, response) => {
-      const chunks: Buffer[] = [];
-      request.on("data", (chunk: Buffer) => chunks.push(chunk));
-      request.on("end", () => {
-        receiveRequest({
-          body: Buffer.concat(chunks).toString("utf8"),
-          headers: request.headers,
+  it.live(
+    "delivers canonical post data and signs the exact external wire payload",
+    () =>
+      Effect.gen(function* () {
+        let receiveRequest: (request: {
+          readonly body: string;
+          readonly headers: Record<string, string | string[] | undefined>;
+        }) => void = () => undefined;
+        const received = new Promise<{
+          readonly body: string;
+          readonly headers: Record<string, string | string[] | undefined>;
+        }>((resolve) => {
+          receiveRequest = resolve;
         });
-        response.writeHead(204).end();
-      });
-    });
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(0, "127.0.0.1", resolve);
-    });
+        const endpointUrl = yield* startServer((request, response) => {
+          const chunks: Buffer[] = [];
+          request.on("data", (chunk: Buffer) => chunks.push(chunk));
+          request.on("end", () => {
+            receiveRequest({
+              body: Buffer.concat(chunks).toString("utf8"),
+              headers: request.headers,
+            });
+            response.writeHead(204).end();
+          });
+        });
+        const { boardId, input, memberId, now, postId, statusId } =
+          yield* makeDeliveryFixture();
+        const handler = makeRegistration(endpointUrl).handlers[0];
+        expect(handler).toBeDefined();
+        if (handler === undefined) {
+          return;
+        }
 
-    try {
-      const address = server.address();
-      expect(address).not.toBeNull();
-      expect(typeof address).toBe("object");
-      if (address === null || typeof address !== "object") {
-        return;
-      }
-      const ids = await Effect.runPromise(
-        Effect.gen(function* () {
-          return {
-            boardId: yield* BoardId.generate,
-            connectionId: yield* IntegrationConnectionId.generate,
-            deliveryId: yield* IntegrationDeliveryId.generate,
-            eventId: yield* IntegrationEventId.generate,
-            memberId: yield* MemberId.generate,
-            organizationId: yield* WorkspaceId.generate,
-            postId: yield* PostId.generate,
-            routeId: yield* IntegrationRouteId.generate,
-            statusId: yield* PostStatusId.generate,
-          };
-        })
-      );
-      const now = DateTime.makeUnsafe(new Date());
-      const secret = Redacted.make(
-        "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
-      );
-      const input: IntegrationProviderDeliveryInput = {
-        connection: {
-          credentialGeneration: 1,
-          id: ids.connectionId,
-          lifecycleStatus: "active",
-          name: "Test endpoint",
-          organizationId: ids.organizationId,
-          provider: webhookProviderKey,
-          safeMetadata: { hostname: "127.0.0.1" },
-        },
-        delivery: {
-          actionKey: "test-action",
-          attemptCount: 1,
-          eventId: ids.eventId,
-          id: ids.deliveryId,
-          leaseExpiresAt: now,
-          leaseOwner: "test-worker",
-          nextAttemptAt: now,
-          orderingKey: null,
-          routeId: ids.routeId,
-          state: "leased",
-        },
-        event: {
-          causalHopCount: 0,
-          correlationId: ids.eventId,
-          data: {
-            actor: {
-              displayName: "Ada",
-              kind: "member",
-              memberId: ids.memberId,
-            },
-            board: { id: ids.boardId, name: "Feedback", slug: "feedback" },
-            post: {
-              id: ids.postId,
-              status: { id: ids.statusId, type: "PENDING" },
-              title: "Canonical post",
-              url: "https://app.example.test/org/post/feedback/canonical-post",
-            },
+        const result = yield* handler.deliver(input);
+        expect(result).toEqual({ httpStatus: 204 });
+        const request = yield* Effect.tryPromise(() => received);
+        const decodedRequest = yield* Schema.decodeUnknownEffect(
+          Schema.fromJsonString(WebhookExternalPayload)
+        )(request.body);
+        expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
+        expect(decodedRequest).toEqual({
+          actor: { displayName: "Ada", memberId, type: "member" },
+          board: { id: boardId, name: "Feedback", slug: "feedback" },
+          id: input.event.id,
+          occurredAt: now.toString(),
+          organizationId: input.event.organizationId,
+          post: {
+            id: postId,
+            title: "Canonical post",
+            url: "https://app.example.test/org/post/feedback/canonical-post",
           },
-          id: ids.eventId,
-          occurredAt: now,
-          organizationId: ids.organizationId,
-          origin: { kind: "feeblo" },
+          status: { id: statusId, type: "PENDING" },
           type: "feedback.post.created",
           version: 1,
-        },
-        route: {
-          capabilityKey: "events.post",
-          configVersion: 1,
-          connectionId: ids.connectionId,
-          enabled: true,
-          eventTypes: ["feedback.post.created"],
-          id: ids.routeId,
-          provider: webhookProviderKey,
-          safeMetadata: {},
-        },
-      };
-      const registration = makeWebhookProviderRegistration({
-        credentialResolver: {
-          loadWebhookCredentials: () =>
-            Effect.succeed({
-              endpointUrl: Redacted.make(
-                `http://127.0.0.1:${address.port}/hook`
-              ),
-              signingKeyring: { current: secret },
-            }),
-        },
-        endpointSecurityPolicy: {
-          allowPrivateNetworkInDevelopment: true,
-          environment: "development",
-        },
-      });
-      const handler = registration.handlers[0];
+        });
+        expect(
+          new Webhook(Redacted.value(secret)).verify(request.body, {
+            "webhook-id": String(request.headers["webhook-id"]),
+            "webhook-signature": String(request.headers["webhook-signature"]),
+            "webhook-timestamp": String(request.headers["webhook-timestamp"]),
+          })
+        ).toEqual(decodedRequest);
+      })
+  );
+
+  it.live("maps a retryable 500 receiver response to a temporary failure", () =>
+    Effect.gen(function* () {
+      const endpointUrl = yield* startServer((_request, response) =>
+        response.writeHead(500).end()
+      );
+      const { input } = yield* makeDeliveryFixture();
+      const handler = makeRegistration(endpointUrl).handlers[0];
       expect(handler).toBeDefined();
       if (handler === undefined) {
         return;
       }
 
-      await Effect.runPromise(handler.deliver(input));
-      const request = await received;
-      const decodedRequest = await Effect.runPromise(
-        Schema.decodeUnknownEffect(
-          Schema.fromJsonString(WebhookExternalPayload)
-        )(request.body)
-      );
-      expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
-      expect(decodedRequest).toEqual({
-        actor: { displayName: "Ada", memberId: ids.memberId, type: "member" },
-        board: { id: ids.boardId, name: "Feedback", slug: "feedback" },
-        id: ids.eventId,
-        occurredAt: now.toString(),
-        organizationId: ids.organizationId,
-        post: {
-          id: ids.postId,
-          title: "Canonical post",
-          url: "https://app.example.test/org/post/feedback/canonical-post",
-        },
-        status: { id: ids.statusId, type: "PENDING" },
-        type: "feedback.post.created",
-        version: 1,
+      const failure = yield* Effect.flip(handler.deliver(input));
+      expect(failure).toMatchObject({
+        _tag: "IntegrationProviderTemporaryFailure",
+        httpStatus: 500,
       });
-      expect(
-        new Webhook(Redacted.value(secret)).verify(request.body, {
-          "webhook-id": String(request.headers["webhook-id"]),
-          "webhook-signature": String(request.headers["webhook-signature"]),
-          "webhook-timestamp": String(request.headers["webhook-timestamp"]),
-        })
-      ).toEqual(decodedRequest);
-    } finally {
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) =>
-          error === undefined ? resolve() : reject(error)
+    })
+  );
+
+  it.live(
+    "maps a terminal 400 receiver response to a permanent rejection",
+    () =>
+      Effect.gen(function* () {
+        const endpointUrl = yield* startServer((_request, response) =>
+          response.writeHead(400).end()
         );
+        const { input } = yield* makeDeliveryFixture();
+        const handler = makeRegistration(endpointUrl).handlers[0];
+        expect(handler).toBeDefined();
+        if (handler === undefined) {
+          return;
+        }
+
+        const failure = yield* Effect.flip(handler.deliver(input));
+        expect(failure).toMatchObject({
+          _tag: "IntegrationProviderPermanentRejection",
+          httpStatus: 400,
+        });
+      })
+  );
+
+  it.live("maps a 429 response with Retry-After to a rate-limit failure", () =>
+    Effect.gen(function* () {
+      const endpointUrl = yield* startServer((_request, response) =>
+        response.writeHead(429, { "retry-after": "120" }).end()
+      );
+      const { input } = yield* makeDeliveryFixture();
+      const handler = makeRegistration(endpointUrl).handlers[0];
+      expect(handler).toBeDefined();
+      if (handler === undefined) {
+        return;
+      }
+
+      const failure = yield* Effect.flip(handler.deliver(input));
+      expect(failure).toMatchObject({
+        _tag: "IntegrationProviderRateLimitedError",
+        httpStatus: 429,
+        retryAfterMs: 120_000,
       });
-    }
-  });
+    })
+  );
 });

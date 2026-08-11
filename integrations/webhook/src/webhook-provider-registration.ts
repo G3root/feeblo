@@ -7,6 +7,7 @@ import {
   type IntegrationProviderRegistration,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
+import { classifyIntegrationHttpDeliveryStatus } from "@feeblo/integration-core/delivery-policy";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
@@ -27,10 +28,7 @@ import {
   signWebhookDelivery,
   type WebhookSigningKeyring,
 } from "./webhook-signing";
-import {
-  sendWebhookDelivery,
-  WEBHOOK_REQUEST_TIMEOUT_MS,
-} from "./webhook-transport";
+import { sendWebhookDelivery } from "./webhook-transport";
 
 /** Decrypted provider credentials are supplied by the composition root, never stored in core-safe records. */
 export interface WebhookProviderCredentialResolver {
@@ -131,23 +129,29 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
+          // Signing is a local, transient crypto operation: a failure here is
+          // retryable, not a configuration problem for the endpoint.
+          const signingHeaders = yield* signWebhookDelivery({
+            deliveryId: input.delivery.id,
+            keyring: credentials.signingKeyring,
+            rawBody,
+          }).pipe(
+            Effect.mapError(
+              () =>
+                new IntegrationProviderTemporaryFailure({
+                  message: "Webhook request could not be signed",
+                  provider: webhookProviderKey,
+                })
+            )
+          );
+          // The transport enforces the delivery deadline itself, so no second
+          // timeout is applied here; its timeout error maps like any other
+          // transport failure below.
           const response = yield* sendWebhookDelivery({
             endpoint,
             eventType: input.event.type,
             rawBody,
-            signingHeaders: yield* signWebhookDelivery({
-              deliveryId: input.delivery.id,
-              keyring: credentials.signingKeyring,
-              rawBody,
-            }).pipe(
-              Effect.mapError(
-                () =>
-                  new IntegrationProviderInvalidConfigurationError({
-                    message: "Webhook request could not be signed",
-                    provider: webhookProviderKey,
-                  })
-              )
-            ),
+            signingHeaders,
           }).pipe(
             Effect.mapError((error) =>
               error.kind === "payload_too_large"
@@ -161,20 +165,26 @@ export const makeWebhookProviderRegistration = ({
                   })
             )
           );
-          if (response.status >= 200 && response.status <= 299) {
+          const retryAfterMs =
+            response.retryAfter === undefined
+              ? undefined
+              : Duration.toMillis(response.retryAfter);
+          const outcome = classifyIntegrationHttpDeliveryStatus(
+            response.status,
+            retryAfterMs
+          );
+          if (outcome._tag === "Succeeded") {
             return { httpStatus: response.status };
           }
-          if (response.status === 429) {
+          if (outcome._tag === "Retry" && response.status === 429) {
             return yield* new IntegrationProviderRateLimitedError({
               httpStatus: response.status,
               message: "Webhook receiver rate limited delivery",
               provider: webhookProviderKey,
-              ...(response.retryAfter === undefined
-                ? {}
-                : { retryAfterMs: Duration.toMillis(response.retryAfter) }),
+              ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
             });
           }
-          if (response.retry) {
+          if (outcome._tag === "Retry") {
             return yield* new IntegrationProviderTemporaryFailure({
               httpStatus: response.status,
               message: "Webhook receiver failed delivery",
@@ -186,17 +196,7 @@ export const makeWebhookProviderRegistration = ({
             message: "Webhook receiver rejected delivery",
             provider: webhookProviderKey,
           });
-        }).pipe(
-          Effect.timeout(WEBHOOK_REQUEST_TIMEOUT_MS),
-          Effect.catchTag(
-            "TimeoutError",
-            () =>
-              new IntegrationProviderTemporaryFailure({
-                message: "Webhook delivery timed out",
-                provider: webhookProviderKey,
-              })
-          )
-        ),
+        }),
     },
   ],
   manifest: webhookProviderManifest,
@@ -204,6 +204,3 @@ export const makeWebhookProviderRegistration = ({
     ["events.post", WebhookRouteConfiguration],
   ]),
 });
-
-/** Browser-safe manifest paired with the registration for dashboard discovery. */
-export const webhookProviderBrowserManifest = webhookProviderManifest;
