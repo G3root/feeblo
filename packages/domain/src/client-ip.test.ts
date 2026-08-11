@@ -187,6 +187,20 @@ describe("isTrustedProxy", () => {
     ).toBe(true);
   });
 
+  it("returns a configuration failure for an invalid CIDR prefix", () => {
+    const result = parseClientIpProxyTrust({
+      trustAllHeaders: false,
+      trustedProxyCidrs: ["10.0.0.0/33"],
+    });
+
+    expect(result).toEqual(
+      Result.fail({
+        _tag: "InvalidClientIpProxyTrustConfiguration",
+        entry: "10.0.0.0/33",
+      })
+    );
+  });
+
   it("still parses IPv6 addresses with a dotted-quad tail as IPv6 when not IPv4-mapped", () => {
     const trust = proxyTrust(["2001:db8::/32"]);
 

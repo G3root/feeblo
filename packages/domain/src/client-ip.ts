@@ -24,6 +24,8 @@ type ParsedIpCidr = {
   readonly prefixLength: number;
 };
 
+const CIDR_PREFIX_PATTERN = /^\d+$/;
+
 /** A syntactically valid, canonical IPv4 or IPv6 address. */
 export type ClientIpAddress = {
   readonly _tag: "ClientIpAddress";
@@ -84,15 +86,24 @@ const parseIpAddress = (input: string): ParsedIpAddress | undefined => {
 
 const parseIpCidr = (input: string): ParsedIpCidr | undefined => {
   const trimmed = input.trim();
-  const slashIndex = trimmed.indexOf("/");
-  if (slashIndex !== -1 && !ipaddr.isValidCIDR(trimmed)) {
+  const cidrParts = trimmed.split("/");
+  if (cidrParts.length > 2) {
     return undefined;
   }
-  const [originalAddress, originalPrefixLength] =
-    slashIndex === -1
-      ? [ipaddr.isValid(trimmed) ? ipaddr.parse(trimmed) : undefined, undefined]
-      : ipaddr.parseCIDR(trimmed);
-  if (!originalAddress) {
+  const [addressInput, prefixInput] = cidrParts;
+  if (!(addressInput && ipaddr.isValid(addressInput))) {
+    return undefined;
+  }
+  const originalAddress = ipaddr.parse(addressInput);
+  const maximumPrefixLength = originalAddress.kind() === "ipv4" ? 32 : 128;
+  let originalPrefixLength = maximumPrefixLength;
+  if (prefixInput !== undefined) {
+    if (!CIDR_PREFIX_PATTERN.test(prefixInput)) {
+      return undefined;
+    }
+    originalPrefixLength = Number(prefixInput);
+  }
+  if (originalPrefixLength > maximumPrefixLength) {
     return undefined;
   }
   const addressText = originalAddress.toString();
@@ -100,12 +111,10 @@ const parseIpCidr = (input: string): ParsedIpCidr | undefined => {
   if (!parsedAddress) {
     return undefined;
   }
-  const prefixLength =
-    originalPrefixLength ?? (originalAddress.kind() === "ipv4" ? 32 : 128);
   if (
     originalAddress instanceof ipaddr.IPv6 &&
     originalAddress.isIPv4MappedAddress() &&
-    prefixLength < 96
+    originalPrefixLength < 96
   ) {
     return undefined;
   }
@@ -114,8 +123,8 @@ const parseIpCidr = (input: string): ParsedIpCidr | undefined => {
     prefixLength:
       originalAddress instanceof ipaddr.IPv6 &&
       originalAddress.isIPv4MappedAddress()
-        ? prefixLength - 96
-        : prefixLength,
+        ? originalPrefixLength - 96
+        : originalPrefixLength,
   };
 };
 
