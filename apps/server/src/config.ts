@@ -1,3 +1,4 @@
+import { parseClientIpProxyTrust } from "@feeblo/domain/client-ip";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -18,9 +19,9 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         Config.option,
         Effect.map(Option.getOrUndefined)
       );
-      const sentryEnvironment = yield* Config.string(
-        "SENTRY_ENVIRONMENT"
-      ).pipe(Config.withDefault(nodeEnv));
+      const sentryEnvironment = yield* Config.string("SENTRY_ENVIRONMENT").pipe(
+        Config.withDefault(nodeEnv)
+      );
       const sentryDsn = yield* Config.string("SENTRY_DSN").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
@@ -28,11 +29,34 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const sentryTracesSampleRate = yield* Config.number(
         "SENTRY_TRACES_SAMPLE_RATE"
       ).pipe(Config.withDefault(0.1));
+      const trustAllProxyHeaders = yield* Config.boolean(
+        "TRUST_PROXY_HEADERS"
+      ).pipe(Config.withDefault(false));
+      const trustedProxyIps = yield* Config.string("TRUSTED_PROXY_IPS").pipe(
+        Config.option,
+        Effect.map(
+          Option.match({
+            onNone: () => [],
+            onSome: (value) =>
+              value
+                .split(",")
+                .map((entry) => entry.trim())
+                .filter((entry) => entry.length > 0),
+          })
+        )
+      );
+      const clientIpProxyTrust = yield* Effect.fromResult(
+        parseClientIpProxyTrust({
+          trustAllHeaders: trustAllProxyHeaders,
+          trustedProxyCidrs: trustedProxyIps,
+        })
+      );
 
       return {
         apiUrl,
         appUrl,
         appRootDomain,
+        clientIpProxyTrust,
         nodeEnv,
         redisUrl,
         sentryDsn,

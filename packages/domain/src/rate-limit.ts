@@ -2,11 +2,16 @@ import * as Context from "effect/Context";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Headers from "effect/unstable/http/Headers";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
-import { getClientIpFromHeaders } from "./client-ip";
+import {
+  ClientIp,
+  type ClientIpValue,
+  getClientIpFromHeaders,
+} from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";
 
 export const publicRpcLimits = {
@@ -70,7 +75,7 @@ export const makePublicRpcRateLimiter = ({
   clientIp,
   rateLimitService,
 }: {
-  readonly clientIp: string;
+  readonly clientIp: ClientIpValue;
   readonly rateLimitService: RateLimitService["Service"];
 }): PublicRpcRateLimiterService => ({
   consume: ({ name, level, limit, window }) => {
@@ -78,7 +83,9 @@ export const makePublicRpcRateLimiter = ({
 
     return rateLimitService
       .consume({
-        key: `public-rpc:${name}:${clientIp}`,
+        key: `public-rpc:${name}:${
+          clientIp._tag === "ClientIpAddress" ? clientIp.address : "unavailable"
+        }`,
         limit: limit ?? defaults.limit,
         window: window ?? defaults.window,
       })
@@ -129,14 +136,26 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
     const rateLimitService = yield* RateLimitService;
 
     return PublicRpcRateLimitMiddleware.of((effect, options) =>
-      Effect.provideService(
-        effect,
-        PublicRpcRateLimiter,
-        makePublicRpcRateLimiter({
-          clientIp: getClientIpFromHeaders(Headers.fromInput(options.headers)),
-          rateLimitService,
-        })
-      )
+      Effect.gen(function* () {
+        // Prefer the peer-anchored client IP provided by the global HTTP
+        // middleware. Only fall back to the headers when that is not
+        // installed; without a TCP peer, getClientIpFromHeaders cannot
+        // validate the provenance of any forwarded header and returns the
+        // shared "unknown" bucket rather than accepting spoofable values.
+        const clientIpOption = yield* Effect.serviceOption(ClientIp);
+        const clientIp = Option.isSome(clientIpOption)
+          ? clientIpOption.value
+          : getClientIpFromHeaders(Headers.fromInput(options.headers));
+
+        return yield* Effect.provideService(
+          effect,
+          PublicRpcRateLimiter,
+          makePublicRpcRateLimiter({
+            clientIp,
+            rateLimitService,
+          })
+        );
+      })
     );
   })
 );
