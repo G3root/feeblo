@@ -32,7 +32,6 @@ import { Route as OrganizationIdSettingsPreferencesRouteImport } from "./routes/
 import { Route as OrganizationIdSettingsProfileRouteImport } from "./routes/$organizationId/settings/profile"
 import { Route as OrganizationIdSettingsRoadmapRouteImport } from "./routes/$organizationId/settings/roadmap"
 import { Route as OrganizationIdSettingsSecurityRouteImport } from "./routes/$organizationId/settings/security"
-import { Route as OrganizationIdSettingsWebhooksRouteImport } from "./routes/$organizationId/settings/webhooks"
 import { Route as OrganizationIdSettingsWorkspaceRouteImport } from "./routes/$organizationId/settings/workspace"
 import { Route as OrganizationIdDashboardLayoutChangelogIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/index"
 import { Route as OrganizationIdDashboardLayoutChangelogDraftRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/draft"
@@ -44,6 +43,8 @@ import { Route as OrganizationIdDashboardLayoutFeedbackActiveRouteImport } from 
 import { Route as OrganizationIdDashboardLayoutFeedbackBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/backlog"
 import { Route as OrganizationIdDashboardLayoutRoadmapIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/index"
 import { Route as OrganizationIdDashboardLayoutRoadmapSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/$slug"
+import { Route as OrganizationIdSettingsWebhooksIndexRouteImport } from "./routes/$organizationId/settings/webhooks/index"
+import { Route as OrganizationIdSettingsWebhooksConnectionIdRouteImport } from "./routes/$organizationId/settings/webhooks/$connectionId"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/active"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
@@ -179,12 +180,6 @@ const OrganizationIdSettingsSecurityRoute =
     path: "/security",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
-const OrganizationIdSettingsWebhooksRoute =
-  OrganizationIdSettingsWebhooksRouteImport.update({
-    id: "/webhooks",
-    path: "/webhooks",
-    getParentRoute: () => OrganizationIdSettingsRoute,
-  } as any)
 const OrganizationIdSettingsWorkspaceRoute =
   OrganizationIdSettingsWorkspaceRouteImport.update({
     id: "/workspace",
@@ -251,6 +246,18 @@ const OrganizationIdDashboardLayoutRoadmapSlugRoute =
     path: "/roadmap/$slug",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
+const OrganizationIdSettingsWebhooksIndexRoute =
+  OrganizationIdSettingsWebhooksIndexRouteImport.update({
+    id: "/webhooks/",
+    path: "/webhooks/",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
+const OrganizationIdSettingsWebhooksConnectionIdRoute =
+  OrganizationIdSettingsWebhooksConnectionIdRouteImport.update({
+    id: "/webhooks/$connectionId",
+    path: "/webhooks/$connectionId",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
 const OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute =
   OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport.update({
     id: "/board/$boardSlug/",
@@ -303,7 +310,6 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof OrganizationIdSettingsSecurityRoute
-  "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
@@ -312,11 +318,13 @@ export interface FileRoutesByFullPath {
   "/$organizationId/feedback/active": typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/feedback/backlog": typeof OrganizationIdDashboardLayoutFeedbackBacklogRoute
   "/$organizationId/roadmap/$slug": typeof OrganizationIdDashboardLayoutRoadmapSlugRoute
+  "/$organizationId/settings/webhooks/$connectionId": typeof OrganizationIdSettingsWebhooksConnectionIdRoute
   "/$organizationId/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/company/": typeof OrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/contact/": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback/": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/roadmap/": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/webhooks/": typeof OrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
@@ -343,7 +351,6 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof OrganizationIdSettingsSecurityRoute
-  "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/settings": typeof OrganizationIdSettingsIndexRoute
   "/$organizationId/changelog/draft": typeof OrganizationIdDashboardLayoutChangelogDraftRoute
@@ -351,11 +358,13 @@ export interface FileRoutesByTo {
   "/$organizationId/feedback/active": typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/feedback/backlog": typeof OrganizationIdDashboardLayoutFeedbackBacklogRoute
   "/$organizationId/roadmap/$slug": typeof OrganizationIdDashboardLayoutRoadmapSlugRoute
+  "/$organizationId/settings/webhooks/$connectionId": typeof OrganizationIdSettingsWebhooksConnectionIdRoute
   "/$organizationId/changelog": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/company": typeof OrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/contact": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
@@ -385,7 +394,6 @@ export interface FileRoutesById {
   "/$organizationId/settings/profile": typeof OrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof OrganizationIdSettingsRoadmapRoute
   "/$organizationId/settings/security": typeof OrganizationIdSettingsSecurityRoute
-  "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksRoute
   "/$organizationId/settings/workspace": typeof OrganizationIdSettingsWorkspaceRoute
   "/$organizationId/_dashboard-layout/": typeof OrganizationIdDashboardLayoutIndexRoute
   "/$organizationId/settings/": typeof OrganizationIdSettingsIndexRoute
@@ -394,11 +402,13 @@ export interface FileRoutesById {
   "/$organizationId/_dashboard-layout/feedback/active": typeof OrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/_dashboard-layout/feedback/backlog": typeof OrganizationIdDashboardLayoutFeedbackBacklogRoute
   "/$organizationId/_dashboard-layout/roadmap/$slug": typeof OrganizationIdDashboardLayoutRoadmapSlugRoute
+  "/$organizationId/settings/webhooks/$connectionId": typeof OrganizationIdSettingsWebhooksConnectionIdRoute
   "/$organizationId/_dashboard-layout/changelog/": typeof OrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/_dashboard-layout/company/": typeof OrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/_dashboard-layout/contact/": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/_dashboard-layout/feedback/": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/_dashboard-layout/roadmap/": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/webhooks/": typeof OrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
@@ -428,7 +438,6 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
-    | "/$organizationId/settings/webhooks"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/"
     | "/$organizationId/settings/"
@@ -437,11 +446,13 @@ export interface FileRouteTypes {
     | "/$organizationId/feedback/active"
     | "/$organizationId/feedback/backlog"
     | "/$organizationId/roadmap/$slug"
+    | "/$organizationId/settings/webhooks/$connectionId"
     | "/$organizationId/changelog/"
     | "/$organizationId/company/"
     | "/$organizationId/contact/"
     | "/$organizationId/feedback/"
     | "/$organizationId/roadmap/"
+    | "/$organizationId/settings/webhooks/"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
@@ -468,7 +479,6 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
-    | "/$organizationId/settings/webhooks"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/settings"
     | "/$organizationId/changelog/draft"
@@ -476,11 +486,13 @@ export interface FileRouteTypes {
     | "/$organizationId/feedback/active"
     | "/$organizationId/feedback/backlog"
     | "/$organizationId/roadmap/$slug"
+    | "/$organizationId/settings/webhooks/$connectionId"
     | "/$organizationId/changelog"
     | "/$organizationId/company"
     | "/$organizationId/contact"
     | "/$organizationId/feedback"
     | "/$organizationId/roadmap"
+    | "/$organizationId/settings/webhooks"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
@@ -509,7 +521,6 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
     | "/$organizationId/settings/security"
-    | "/$organizationId/settings/webhooks"
     | "/$organizationId/settings/workspace"
     | "/$organizationId/_dashboard-layout/"
     | "/$organizationId/settings/"
@@ -518,11 +529,13 @@ export interface FileRouteTypes {
     | "/$organizationId/_dashboard-layout/feedback/active"
     | "/$organizationId/_dashboard-layout/feedback/backlog"
     | "/$organizationId/_dashboard-layout/roadmap/$slug"
+    | "/$organizationId/settings/webhooks/$connectionId"
     | "/$organizationId/_dashboard-layout/changelog/"
     | "/$organizationId/_dashboard-layout/company/"
     | "/$organizationId/_dashboard-layout/contact/"
     | "/$organizationId/_dashboard-layout/feedback/"
     | "/$organizationId/_dashboard-layout/roadmap/"
+    | "/$organizationId/settings/webhooks/"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/active"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
     | "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
@@ -703,13 +716,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsSecurityRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
-    "/$organizationId/settings/webhooks": {
-      id: "/$organizationId/settings/webhooks"
-      path: "/webhooks"
-      fullPath: "/$organizationId/settings/webhooks"
-      preLoaderRoute: typeof OrganizationIdSettingsWebhooksRouteImport
-      parentRoute: typeof OrganizationIdSettingsRoute
-    }
     "/$organizationId/settings/workspace": {
       id: "/$organizationId/settings/workspace"
       path: "/workspace"
@@ -786,6 +792,20 @@ declare module "@tanstack/react-router" {
       fullPath: "/$organizationId/roadmap/$slug"
       preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapSlugRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/settings/webhooks/": {
+      id: "/$organizationId/settings/webhooks/"
+      path: "/webhooks"
+      fullPath: "/$organizationId/settings/webhooks/"
+      preLoaderRoute: typeof OrganizationIdSettingsWebhooksIndexRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
+    "/$organizationId/settings/webhooks/$connectionId": {
+      id: "/$organizationId/settings/webhooks/$connectionId"
+      path: "/webhooks/$connectionId"
+      fullPath: "/$organizationId/settings/webhooks/$connectionId"
+      preLoaderRoute: typeof OrganizationIdSettingsWebhooksConnectionIdRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
     }
     "/$organizationId/_dashboard-layout/board/$boardSlug/": {
       id: "/$organizationId/_dashboard-layout/board/$boardSlug/"
@@ -898,9 +918,10 @@ interface OrganizationIdSettingsRouteChildren {
   OrganizationIdSettingsProfileRoute: typeof OrganizationIdSettingsProfileRoute
   OrganizationIdSettingsRoadmapRoute: typeof OrganizationIdSettingsRoadmapRoute
   OrganizationIdSettingsSecurityRoute: typeof OrganizationIdSettingsSecurityRoute
-  OrganizationIdSettingsWebhooksRoute: typeof OrganizationIdSettingsWebhooksRoute
   OrganizationIdSettingsWorkspaceRoute: typeof OrganizationIdSettingsWorkspaceRoute
   OrganizationIdSettingsIndexRoute: typeof OrganizationIdSettingsIndexRoute
+  OrganizationIdSettingsWebhooksConnectionIdRoute: typeof OrganizationIdSettingsWebhooksConnectionIdRoute
+  OrganizationIdSettingsWebhooksIndexRoute: typeof OrganizationIdSettingsWebhooksIndexRoute
 }
 
 const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
@@ -923,9 +944,12 @@ const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
     OrganizationIdSettingsProfileRoute: OrganizationIdSettingsProfileRoute,
     OrganizationIdSettingsRoadmapRoute: OrganizationIdSettingsRoadmapRoute,
     OrganizationIdSettingsSecurityRoute: OrganizationIdSettingsSecurityRoute,
-    OrganizationIdSettingsWebhooksRoute: OrganizationIdSettingsWebhooksRoute,
     OrganizationIdSettingsWorkspaceRoute: OrganizationIdSettingsWorkspaceRoute,
     OrganizationIdSettingsIndexRoute: OrganizationIdSettingsIndexRoute,
+    OrganizationIdSettingsWebhooksConnectionIdRoute:
+      OrganizationIdSettingsWebhooksConnectionIdRoute,
+    OrganizationIdSettingsWebhooksIndexRoute:
+      OrganizationIdSettingsWebhooksIndexRoute,
   }
 
 const OrganizationIdSettingsRouteWithChildren =

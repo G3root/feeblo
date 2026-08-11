@@ -62,28 +62,47 @@ export const parseWebhookRetryAfter = (
   return Duration.min(Duration.seconds(Math.max(0, delta)), Duration.days(1));
 };
 
+/** LookupOptions.family legacy string labels, normalized to their numeric forms. */
+const familyLabelToNumber: Record<"IPv4" | "IPv6", 4 | 6> = {
+  IPv4: 4,
+  IPv6: 6,
+};
+
 /**
  * Builds the DNS pin for a validated endpoint. Node 20+ (where
  * `autoSelectFamily` is the default) invokes the lookup with `all: true` and
  * expects the address-list form; returning every pinned address there also
  * lets happy-eyeballs skip an unreachable first family (for example IPv6 on
  * an IPv4-only host). The classic single-address form is kept for older
- * paths that pass `all: false`.
+ * paths that pass `all: false`. When the caller requests a specific record
+ * family (`options.family` of 4 or 6), only pinned addresses of that family
+ * are returned; family 0 or an unspecified family keeps every pinned
+ * address.
  */
 export const makeWebhookPinnedLookup =
   (pinnedAddresses: readonly string[]): LookupFunction =>
   (_hostname, options, callback) => {
+    const requestedFamily =
+      typeof options.family === "string"
+        ? familyLabelToNumber[options.family]
+        : options.family;
+    const matchingAddresses = pinnedAddresses.filter(
+      (address) =>
+        requestedFamily === undefined ||
+        requestedFamily === 0 ||
+        isIP(address) === requestedFamily
+    );
     if (options.all === true) {
       callback(
         null,
-        pinnedAddresses.map((address) => ({
+        matchingAddresses.map((address) => ({
           address,
           family: isIP(address),
         }))
       );
       return;
     }
-    const pinnedAddress = pinnedAddresses[0];
+    const pinnedAddress = matchingAddresses[0];
     if (pinnedAddress === undefined) {
       callback(null, []);
       return;

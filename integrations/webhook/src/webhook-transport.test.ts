@@ -49,6 +49,55 @@ describe("makeWebhookPinnedLookup", () => {
     });
     expect(captured).toEqual({ address: "178.63.67.153", family: 4 });
   });
+
+  it("returns only IPv4 pinned addresses when family 4 is requested", () => {
+    const lookup = makeWebhookPinnedLookup([
+      "2a01:4f8:121:114d::2",
+      "178.63.67.153",
+    ]);
+    let captured: unknown;
+    lookup("webhook.site", { all: true, family: 4 }, (error, result) => {
+      expect(error).toBeNull();
+      captured = result;
+    });
+    expect(captured).toEqual([{ address: "178.63.67.153", family: 4 }]);
+  });
+
+  it("returns only IPv6 pinned addresses when family 6 is requested", () => {
+    const lookup = makeWebhookPinnedLookup([
+      "178.63.67.153",
+      "2a01:4f8:121:114d::2",
+    ]);
+    let captured: unknown;
+    lookup("webhook.site", { all: true, family: 6 }, (error, result) => {
+      expect(error).toBeNull();
+      captured = result;
+    });
+    expect(captured).toEqual([{ address: "2a01:4f8:121:114d::2", family: 6 }]);
+  });
+
+  it("skips a leading wrong-family address in the single-address form", () => {
+    const lookup = makeWebhookPinnedLookup([
+      "2a01:4f8:121:114d::2",
+      "178.63.67.153",
+    ]);
+    let captured: unknown;
+    lookup("webhook.site", { family: 4 }, (error, address, family) => {
+      expect(error).toBeNull();
+      captured = { address, family };
+    });
+    expect(captured).toEqual({ address: "178.63.67.153", family: 4 });
+  });
+
+  it("returns no addresses when no pinned address matches the family", () => {
+    const lookup = makeWebhookPinnedLookup(["2a01:4f8:121:114d::2"]);
+    let captured: unknown;
+    lookup("webhook.site", { all: true, family: 4 }, (error, result) => {
+      expect(error).toBeNull();
+      captured = result;
+    });
+    expect(captured).toEqual([]);
+  });
 });
 
 describe("parseWebhookRetryAfter", () => {

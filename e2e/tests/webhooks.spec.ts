@@ -125,17 +125,28 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     const endpoint = page
       .getByRole("article")
       .filter({ hasText: "Product events" });
+    await expect(endpoint).toContainText("127.0.0.1");
+
+    // The list page is an index; management happens on the detail page.
+    await endpoint.getByRole("link", { name: "Details" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Product events" })
+    ).toBeVisible();
+
     const history = page.getByLabel("Webhook delivery history");
+    const refreshHistory = async () => {
+      await history.getByRole("button", { name: "Refresh" }).click();
+    };
     const refreshHistoryUntil = async (expected: string) => {
       await expect
         .poll(async () => {
-          await endpoint.getByRole("button", { name: "History" }).click();
-          return await history.textContent();
+          await refreshHistory();
+          return (await history.textContent()) ?? "";
         })
         .toContain(expected);
     };
-    await expect(endpoint).toContainText("127.0.0.1");
-    await endpoint.getByRole("button", { name: "Test", exact: true }).click();
+
+    await page.getByRole("button", { name: "Test", exact: true }).click();
     await expect(
       page.getByText("Test delivery queued", { exact: true })
     ).toBeVisible();
@@ -151,49 +162,74 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
       version: 1,
     });
 
-    await refreshHistoryUntil("webhook.test · succeeded · 1 attempts");
+    await refreshHistoryUntil("succeeded");
+    const deliveryRow = history
+      .getByRole("row")
+      .filter({ hasText: "webhook.test" });
 
     receiverStatus = 400;
-    await endpoint.getByRole("button", { name: "Test", exact: true }).click();
+    await page.getByRole("button", { name: "Test", exact: true }).click();
     const failedWebhook = await waitForWebhook(1);
-    await refreshHistoryUntil("webhook.test · exhausted · 1 attempts");
-    const exhaustedDelivery = history.locator("details").filter({
-      hasText: "webhook.test · exhausted · 1 attempts",
-    });
-    await expect(exhaustedDelivery).toBeVisible();
+    await refreshHistoryUntil("exhausted");
+    const exhaustedRow = history
+      .getByRole("row")
+      .filter({ hasText: "exhausted" });
+    await expect(
+      exhaustedRow.getByRole("button", { name: "Retry" })
+    ).toBeVisible();
 
     receiverStatus = 204;
-    await exhaustedDelivery.locator("summary").click();
-    await exhaustedDelivery
-      .getByRole("button", { name: "Retry delivery" })
-      .click();
+    await exhaustedRow.getByRole("button", { name: "Retry" }).click();
     const retriedWebhook = await waitForWebhook(2);
     expect(retriedWebhook.headers["webhook-id"]).toBe(
       failedWebhook.headers["webhook-id"]
     );
-    await refreshHistoryUntil("webhook.test · succeeded · 2 attempts");
+    await expect
+      .poll(async () => {
+        await refreshHistory();
+        const attemptsCell = deliveryRow
+          .filter({ hasText: "succeeded" })
+          .getByRole("cell")
+          .nth(2);
+        return (await attemptsCell.textContent()) ?? "";
+      })
+      .toBe("2");
 
-    await endpoint.getByRole("button", { name: "Pause" }).click();
+    await page.getByRole("button", { name: "Edit" }).click();
+    await page.getByLabel("Name").fill("Product events v2");
+    await page.getByRole("button", { name: "Save changes" }).click();
     await expect(
-      endpoint.getByRole("button", { name: "Resume" })
+      page.getByText("Webhook endpoint updated", { exact: true })
     ).toBeVisible();
-    await endpoint.getByRole("button", { name: "Resume" }).click();
-    await expect(endpoint.getByRole("button", { name: "Pause" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Product events v2" })
+    ).toBeVisible();
 
-    await endpoint.getByRole("button", { name: "Rotate secret" }).click();
+    await page.getByRole("button", { name: "Pause" }).click();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+    await page.getByRole("button", { name: "Resume" }).click();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Rotate secret" }).click();
     await expect(page.getByLabel("Webhook signing secret")).toBeVisible();
     await page
       .getByLabel("Webhook signing secret")
       .getByRole("button", { name: "Done" })
       .click();
 
-    await endpoint.getByRole("button", { name: "Remove" }).click();
+    await page.getByRole("button", { name: "Remove" }).click();
     const removal = page.getByRole("alertdialog", {
       name: "Remove webhook endpoint?",
     });
     await expect(removal).toContainText("erased immediately");
     await removal.getByRole("button", { name: "Remove endpoint" }).click();
-    await expect(endpoint).toHaveCount(0);
+    await expect(
+      page.getByText("Webhook endpoint removed", { exact: true })
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Webhooks" })).toBeVisible();
+    await expect(
+      page.getByText("No webhook endpoints yet.", { exact: true })
+    ).toBeVisible();
   } finally {
     await close(receiver);
   }
