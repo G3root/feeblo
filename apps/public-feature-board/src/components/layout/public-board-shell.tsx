@@ -79,9 +79,9 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
       suggestPosts={suggestPosts}
     >
       <PostCreateDialogProvider>
-        <div className="flex min-h-dvh flex-col bg-background text-foreground">
+        <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
           <Navbar />
-          <main className="min-h-0 flex-1">{children}</main>
+          <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
           <AuthDialogRoot />
           <PostCreateDialog />
           {site.hidePoweredBy ? null : <PoweredByTag />}

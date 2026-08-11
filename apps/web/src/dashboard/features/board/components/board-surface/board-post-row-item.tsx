@@ -1,4 +1,8 @@
+import { Badge } from "@feeblo/ui/badge";
 import { Checkbox } from "@feeblo/ui/checkbox";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 import { useBoardStore } from "~/features/board/state/board-store-context";
@@ -33,6 +37,7 @@ export function BoardPostRowItem({
           });
         }}
       />
+
       <Link
         className="flex min-w-0 flex-1 items-center justify-between gap-3"
         params={{
@@ -43,12 +48,35 @@ export function BoardPostRowItem({
         to="/$organizationId/post/$boardSlug/$postSlug"
       >
         <div className="flex min-w-0 items-center gap-2">
+          <Badge className="tabular-nums" variant="secondary">
+            <HugeiconsIcon
+              className="size-3.5"
+              icon={ArrowUp01Icon}
+              strokeWidth={2.5}
+            />
+            {post.upvoteCount}
+          </Badge>
           <StatusIcon status={post.status} />
-          <p className="no-underline! font-medium text-sm">{post.title}</p>
+          <p className="no-underline! truncate font-medium text-sm">
+            {post.title}
+          </p>
         </div>
-        <span className="shrink-0 text-muted-foreground text-xs">
-          {formatPostDate(post.updatedAt)}
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          {post.boardName ? (
+            <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-[11px] text-muted-foreground">
+              {post.boardName}
+            </span>
+          ) : null}
+          <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+            <UserAvatar
+              className="size-5"
+              image={post.user.image}
+              name={post.user.name}
+              size="sm"
+            />
+            {formatPostDate(post.updatedAt)}
+          </span>
+        </div>
       </Link>
     </div>
   );

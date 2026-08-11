@@ -64,6 +64,7 @@
     "effect": "catalog:",
     "posthog-js": "^1.411.0",
     "react": "catalog:",
+    "react-avatar-editor": "^15.1.0",
     "react-dom": "catalog:",
     "shadcn": "catalog:",
     "solid-js": "catalog:",
