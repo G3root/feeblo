@@ -41,6 +41,30 @@ const makeChangelogRepository = Effect.gen(function* () {
   const effectivePublishedAt = sql<Date>`COALESCE(${schema.changelogTable.publishedAt}, ${schema.changelogTable.createdAt})`;
   // TODO handle pagination
   return {
+    /**
+     * Locks the changelog row for a serialized status transition. Callers
+     * must run this operation inside an explicit database transaction.
+     */
+    findStatus: ({
+      id,
+      organizationId,
+    }: {
+      id: string;
+      organizationId: string;
+    }) =>
+      db
+        .select({ status: schema.changelogTable.status })
+        .from(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, id),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .for("update")
+        .pipe(Effect.map((rows) => rows[0]?.status)),
+
     findByCreatorId: ({ id, organizationId, memberId }: TFindByCreatorId) =>
       db
         .select({ id: schema.changelogTable.id })

@@ -10,12 +10,17 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { TestClock } from "effect/testing";
 import { BoardRepository } from "../board/repository";
+import { EmailOutboxRepository } from "../email-outbox/repository";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { BadRequestError } from "../rpc-errors";
@@ -25,6 +30,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import {
   DEFAULT_POST_EMBEDDING_DIMENSIONS,
   DEFAULT_POST_EMBEDDING_MODEL,
@@ -37,6 +43,7 @@ import { PostRepository } from "./repository";
 describe("PostRpcHandlers", () => {
   type Fixture = {
     boardId: LegidOf<"BoardId">;
+    creatorEmail: string;
     membershipId: string;
     organizationId: LegidOf<"WorkspaceId">;
     statusId: LegidOf<"PostStatusId">;
@@ -49,7 +56,7 @@ describe("PostRpcHandlers", () => {
   ): Session => ({
     user: {
       id: fixture.userId,
-      email: "user@example.com",
+      email: fixture.creatorEmail,
       name: "Test User",
       restrictedToOrganizationId: null,
     },
@@ -73,6 +80,7 @@ describe("PostRpcHandlers", () => {
       const boardId = yield* BoardId.generate;
       const statusId = yield* PostStatusId.generate;
       const userId = `user_${organizationId}`;
+      const creatorEmail = `${organizationId}@example.com`;
       const membershipId = `membership_${organizationId}`;
       const now = new Date();
 
@@ -84,7 +92,7 @@ describe("PostRpcHandlers", () => {
       });
       yield* db.insert(schema.userTable).values({
         id: userId,
-        email: `${organizationId}@example.com`,
+        email: creatorEmail,
         name: "Test User",
       });
       yield* db.insert(schema.memberTable).values({
@@ -114,6 +122,7 @@ describe("PostRpcHandlers", () => {
 
       return {
         boardId,
+        creatorEmail,
         membershipId,
         organizationId,
         statusId,
@@ -157,16 +166,61 @@ describe("PostRpcHandlers", () => {
       return id;
     });
 
+  const activateStarterPlan = (organizationId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const now = new Date();
+      const productId = `product_${organizationId}`;
+      yield* db.insert(schema.productTable).values({
+        id: productId,
+        name: "Starter",
+        isRecurring: true,
+        isArchived: false,
+        externalOrganizationId: "feeblo",
+        visibility: "public",
+        metadata: { plan: "starter", variant: "monthly" },
+        createdAt: now,
+        updatedAt: now,
+      });
+      yield* db.insert(schema.subscriptionTable).values({
+        id: `subscription_${organizationId}`,
+        externalId: `external_${organizationId}`,
+        organizationId,
+        amount: 1000,
+        cancelAtPeriodEnd: false,
+        currency: "usd",
+        recurringInterval: "month",
+        recurringIntervalCount: 1,
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+        customerId: `customer_${organizationId}`,
+        productId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
   const RepositoriesTest = Layer.mergeAll(
     BoardRepository.layer,
     PostRepository.layer,
     PostActivityRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    EmailOutboxRepository.layer,
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "post-handler-test-signing-secret"
+        )
+      )
+    ),
+    WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
-  const HandlerTest = PostPolicy.layer.pipe(
-    Layer.provideMerge(RepositoriesTest)
-  );
+  const HandlerTest = Layer.mergeAll(
+    PostPolicy.layer,
+    EntitlementPolicy.layer
+  ).pipe(Layer.provideMerge(RepositoriesTest));
 
   const TestLayer = Layer.mergeAll(
     HandlerTest,
@@ -273,6 +327,126 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostCreate", () => {
+      it.effect(
+        "creates an active verified email subscription for the post creator",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const repository = yield* EmailSubscriptionRepository;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            yield* handlers
+              .PostCreate(
+                postCreateInput(fixture, postId, "Creator subscription")
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const subscription = yield* repository.findSubscription({
+              email: fixture.creatorEmail,
+              organizationId: fixture.organizationId,
+              topic: { topicId: postId, topicType: "post" },
+            });
+            expect(Option.getOrUndefined(subscription)).toMatchObject({
+              source: "post_creator",
+              state: "active",
+            });
+          })
+      );
+
+      it.effect("rolls back the post when its outbox insertion fails", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+          const db = yield* currentDb;
+          yield* db.execute(
+            sql.raw(`
+            CREATE FUNCTION reject_email_outbox_insert() RETURNS trigger AS $$
+            BEGIN
+              RAISE EXCEPTION 'email outbox unavailable';
+            END;
+            $$ LANGUAGE plpgsql;
+          `)
+          );
+          yield* db.execute(
+            sql.raw(`
+            CREATE TRIGGER reject_email_outbox_insert
+            BEFORE INSERT ON email_outbox
+            FOR EACH ROW EXECUTE FUNCTION reject_email_outbox_insert();
+          `)
+          );
+
+          yield* Effect.flip(
+            handlers
+              .PostCreate(postCreateInput(fixture, postId, "Atomic outbox"))
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          ).pipe(
+            Effect.ensuring(
+              db
+                .execute(
+                  sql.raw(
+                    "DROP TRIGGER reject_email_outbox_insert ON email_outbox"
+                  )
+                )
+                .pipe(
+                  Effect.andThen(
+                    db.execute(
+                      sql.raw("DROP FUNCTION reject_email_outbox_insert()")
+                    )
+                  ),
+                  Effect.orDie
+                )
+            )
+          );
+
+          const posts = yield* db
+            .select({ id: schema.postTable.id })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          const legacyQueue = yield* db
+            .select({ postId: schema.submissionNotificationQueueTable.postId })
+            .from(schema.submissionNotificationQueueTable)
+            .where(eq(schema.submissionNotificationQueueTable.postId, postId));
+          expect(posts).toEqual([]);
+          expect(legacyQueue).toEqual([]);
+        })
+      );
+
+      it.effect(
+        "records the submission email intent with the post transaction",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const db = yield* currentDb;
+
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Email intent"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const intents = yield* db
+              .select({
+                aggregateId: schema.emailOutboxTable.aggregateId,
+                kind: schema.emailOutboxTable.kind,
+                organizationId: schema.emailOutboxTable.organizationId,
+              })
+              .from(schema.emailOutboxTable)
+              .where(eq(schema.emailOutboxTable.aggregateId, postId));
+            expect(intents).toEqual([
+              {
+                aggregateId: postId,
+                kind: "submission.created",
+                organizationId: fixture.organizationId,
+              },
+            ]);
+          })
+      );
+
       it.effect("allows contributors to create posts", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
@@ -449,6 +623,124 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostUpdate", () => {
+      it.effect(
+        "coalesces paid status changes into the final five-minute intent",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const firstChangeAt = new Date(
+              "2026-08-11T00:00:00.000Z"
+            ).getTime();
+            yield* TestClock.setTime(firstChangeAt);
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* activateStarterPlan(fixture.organizationId);
+            const postId = yield* PostId.generate;
+            const reviewStatusId = yield* PostStatusId.generate;
+            const plannedStatusId = yield* PostStatusId.generate;
+            yield* db.insert(schema.postStatusTable).values([
+              {
+                id: reviewStatusId,
+                type: "REVIEW",
+                orderIndex: 1,
+                organizationId: fixture.organizationId,
+              },
+              {
+                id: plannedStatusId,
+                type: "PLANNED",
+                orderIndex: 2,
+                organizationId: fixture.organizationId,
+              },
+            ]);
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Coalesced status"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            for (const statusId of [reviewStatusId, plannedStatusId]) {
+              yield* handlers
+                .PostUpdate({
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                  statusId,
+                })
+                .pipe(
+                  Effect.provideService(CurrentSession, makeSession(fixture))
+                );
+            }
+
+            const intents = yield* db
+              .select()
+              .from(schema.emailOutboxTable)
+              .where(
+                and(
+                  eq(schema.emailOutboxTable.aggregateId, postId),
+                  eq(schema.emailOutboxTable.kind, "post.status_changed")
+                )
+              );
+            expect(intents).toHaveLength(1);
+            expect(intents[0]?.payload).toMatchObject({
+              statusId: plannedStatusId,
+            });
+            expect(intents[0]?.scheduledAt.getTime()).toBeGreaterThanOrEqual(
+              firstChangeAt + 299_000
+            );
+            expect(intents[0]?.scheduledAt.getTime()).toBeLessThanOrEqual(
+              firstChangeAt + 300_000
+            );
+          })
+      );
+
+      it.effect(
+        "records closure instead of a duplicate status email intent",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture();
+            yield* activateStarterPlan(fixture.organizationId);
+            const postId = yield* PostId.generate;
+            const closedStatusId = yield* PostStatusId.generate;
+            yield* db.insert(schema.postStatusTable).values({
+              id: closedStatusId,
+              type: "CLOSED",
+              orderIndex: 1,
+              organizationId: fixture.organizationId,
+            });
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, postId, "Closing"))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+            yield* handlers
+              .PostUpdate({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: closedStatusId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const intents = yield* db
+              .select({ kind: schema.emailOutboxTable.kind })
+              .from(schema.emailOutboxTable)
+              .where(
+                and(
+                  eq(schema.emailOutboxTable.aggregateId, postId),
+                  inArray(schema.emailOutboxTable.kind, [
+                    "post.status_changed",
+                    "post.closed",
+                  ])
+                )
+              );
+            expect(intents).toEqual([{ kind: "post.closed" }]);
+          })
+      );
+
       it.effect(
         "lets contributors move posts but not change their status",
         () =>
@@ -1266,6 +1558,49 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("PostMerge", () => {
+      it.effect("records the paid merge email intent atomically", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          yield* activateStarterPlan(fixture.organizationId);
+          const sourcePostId = yield* PostId.generate;
+          const targetPostId = yield* PostId.generate;
+          for (const [id, title] of [
+            [sourcePostId, "Source"],
+            [targetPostId, "Target"],
+          ] as const) {
+            yield* handlers
+              .PostCreate(postCreateInput(fixture, id, title))
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+          yield* handlers
+            .PostMerge({
+              organizationId: fixture.organizationId,
+              sourcePostId,
+              targetPostId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const intents = yield* db
+            .select()
+            .from(schema.emailOutboxTable)
+            .where(
+              and(
+                eq(schema.emailOutboxTable.aggregateId, sourcePostId),
+                eq(schema.emailOutboxTable.kind, "post.merged")
+              )
+            );
+          expect(intents).toHaveLength(1);
+          expect(intents[0]?.payload).toMatchObject({
+            postId: sourcePostId,
+            targetPostId,
+          });
+        })
+      );
+
       it.effect("rejects merging a post into itself", () =>
         Effect.scoped(
           Effect.gen(function* () {

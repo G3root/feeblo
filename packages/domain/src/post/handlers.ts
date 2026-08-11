@@ -2,6 +2,7 @@ import { transaction } from "@feeblo/db";
 import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -14,6 +15,10 @@ import {
   syncPostAssetReferences,
 } from "../asset/service";
 import { BoardRepository } from "../board/repository";
+import { EmailOutboxRepository } from "../email-outbox/repository";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
@@ -22,8 +27,13 @@ import {
 } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
 import * as RateLimit from "../rate-limit";
-import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  withRemapDbErrors,
+} from "../rpc-errors";
 import { CurrentSession, OptionalCurrentSession } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import {
   PostEmbeddingService,
   postEmbeddingInput,
@@ -39,6 +49,7 @@ import type {
   TPostDelete,
   TPostList,
   TPostMerge,
+  TPostOfficialUpdatePublish,
   TPostSuggestions,
   TPostUpdate,
   TPostUpdateContent,
@@ -47,9 +58,14 @@ import type {
 } from "./schema";
 import { postLexicalSimilarity, SUGGESTION_MAX_DISTANCE } from "./suggestions";
 
+const postStatusCoalescingDelayMs = 5 * 60 * 1000;
+
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
   const repository = yield* PostRepository;
+  const emailOutbox = yield* EmailOutboxRepository;
+  const emailSubscriptions = yield* EmailSubscriptionRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
   const notifications = yield* Effect.serviceOption(NotificationService);
@@ -89,7 +105,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         ? yield* embeddingService.value
             .embed(input)
             .pipe(
-              Effect.catchCause((cause) =>
+              Effect.catch((cause) =>
                 Effect.logWarning(
                   "Failed to generate suggestion query embedding",
                   cause
@@ -163,7 +179,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         })
       );
 
-      if (!deleted && !canDeleteEngagedPost) {
+      if (!(deleted || canDeleteEngagedPost)) {
         return yield* new Policy.PolicyDeniedError({
           reason: "Posts with comments or other users' votes cannot be deleted",
         });
@@ -175,13 +191,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         cleanupOrphanedEditorAssets({
           organizationId: args.organizationId,
         }).pipe(
-          Effect.catchCause((cause) =>
+          Effect.catch((cause) =>
             Effect.logWarning(
               "Failed to clean up orphaned editor assets",
               cause
-            ).pipe(
-              Effect.annotateLogs({ organizationId: args.organizationId })
-            )
+            ).pipe(Effect.annotateLogs({ organizationId: args.organizationId }))
           )
         )
       )
@@ -191,7 +205,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
-      yield* transaction(
+      const outboxId = yield* transaction(
         Effect.gen(function* () {
           const previous = yield* repository.findActivityState({
             id: args.id,
@@ -225,7 +239,74 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           }
           yield* repository.update(args);
           yield* activityRepository.createMany(activities);
+          let createdOutboxId: string | undefined;
           if (previous.statusId !== args.statusId) {
+            const maySend = yield* entitlementPolicy.mayMaterializeEmailIntent({
+              organizationId: args.organizationId,
+              kind: "post.status_changed",
+            });
+            if (maySend) {
+              const now = yield* DateTime.nowAsDate;
+              const statusType = yield* repository.findStatusType({
+                id: args.statusId,
+                organizationId: args.organizationId,
+              });
+              if (statusType === "CLOSED") {
+                const result = yield* emailOutbox
+                  .recordIntent({
+                    aggregateId: args.id,
+                    aggregateType: "post",
+                    deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}`,
+                    expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                    kind: "post.closed",
+                    organizationId: args.organizationId,
+                    payload: { kind: "post.closed", postId: args.id },
+                    scheduledAt: now,
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      () =>
+                        new InternalServerError({
+                          message:
+                            "Could not record post closure email intent.",
+                        })
+                    )
+                  );
+                createdOutboxId =
+                  result._tag === "Inserted" ? result.intent.id : undefined;
+              } else {
+                const result = yield* emailOutbox
+                  .upsertPendingStatusChange({
+                    aggregateId: args.id,
+                    aggregateType: "post",
+                    deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
+                    expiresAt: new Date(
+                      now.getTime() +
+                        postStatusCoalescingDelayMs +
+                        7 * 86_400_000
+                    ),
+                    organizationId: args.organizationId,
+                    payload: {
+                      kind: "post.status_changed",
+                      postId: args.id,
+                      statusId: args.statusId,
+                    },
+                    scheduledAt: new Date(
+                      now.getTime() + postStatusCoalescingDelayMs
+                    ),
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      () =>
+                        new InternalServerError({
+                          message: "Could not record post status email intent.",
+                        })
+                    )
+                  );
+                createdOutboxId =
+                  result._tag === "Written" ? result.intent.id : undefined;
+              }
+            }
             yield* Option.match(notifications, {
               onNone: () => Effect.void,
               onSome: (service) =>
@@ -238,8 +319,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 }),
             });
           }
+          return createdOutboxId;
         })
       );
+      yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
     });
 
   const updatePostEtaEffect = (args: TPostUpdateEta) =>
@@ -438,7 +521,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         assetIds: args.assetIds,
       });
 
-      const slug = yield* transaction(
+      const persisted = yield* transaction(
         Effect.gen(function* () {
           const persistedSlug = yield* repository.create({
             ...args,
@@ -472,11 +555,48 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             userId: session.session.userId,
             ...(membership ? { memberId: membership.membershipId } : {}),
           });
+          const subscriptionNow = yield* DateTime.nowAsDate;
+          yield* emailSubscriptions
+            .requestSubscription({
+              alreadyVerifiedUser: { userId: session.session.userId },
+              email: session.user.email,
+              now: subscriptionNow,
+              organizationId: args.organizationId,
+              source: "post_creator",
+              topic: { topicId: args.id, topicType: "post" },
+              verificationExpiresAt: new Date(
+                subscriptionNow.getTime() + 86_400_000
+              ),
+            })
+            .pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message:
+                      "Could not record the post creator email subscription.",
+                  })
+              )
+            );
 
-          yield* repository.enqueueSubmissionNotification({
-            postId: args.id,
-            organizationId: args.organizationId,
-          });
+          const intent = yield* emailOutbox
+            .recordIntent({
+              aggregateId: args.id,
+              aggregateType: "post",
+              deduplicationKey: `submission.created:${args.organizationId}:${args.id}`,
+              expiresAt: null,
+              kind: "submission.created",
+              organizationId: args.organizationId,
+              payload: { kind: "submission.created", postId: args.id },
+              scheduledAt: subscriptionNow,
+            })
+            .pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message: "Could not record submission email intent.",
+                  })
+              )
+            );
           yield* Option.match(notifications, {
             onNone: () => Effect.void,
             onSome: (service) =>
@@ -489,7 +609,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               }),
           });
 
-          return persistedSlug;
+          return {
+            slug: persistedSlug,
+            outboxId: intent._tag === "Inserted" ? intent.intent.id : undefined,
+          };
         })
       ).pipe(
         Effect.tapCause(() =>
@@ -498,21 +621,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
       );
 
-      yield* repository
-        .scheduleSubmissionNotification(args.organizationId)
-        .pipe(
-          Effect.catchCause((cause) =>
-            Effect.logWarning(
-              "Failed to schedule submission notification workflow",
-              cause
-            ).pipe(
-              Effect.annotateLogs({
-                postId: args.id,
-                organizationId: args.organizationId,
-              })
-            )
-          )
-        );
+      yield* wakeEmailOutboxBestEffort(persisted.outboxId, args.organizationId);
       yield* scheduleEmbedding({
         content: prepared.content,
         id: args.id,
@@ -522,7 +631,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
       // The slug actually persisted by the insert (including any collision
       // suffix) so callers can reference the stored post.
-      return slug;
+      return persisted.slug;
     });
 
   // -- RPC handlers --
@@ -794,6 +903,72 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Post", "update")
       ),
 
+    PostOfficialUpdatePublish: (args: TPostOfficialUpdatePublish) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+        const now = yield* DateTime.nowAsDate;
+        const outboxId = yield* transaction(
+          Effect.gen(function* () {
+            const post = yield* repository.findActivityState({
+              id: args.postId,
+              organizationId: args.organizationId,
+            });
+            if (post === undefined) {
+              return yield* new FailedToUpdatePostError();
+            }
+            yield* activityRepository.create({
+              actorId: session.session.userId,
+              actorMemberId: membership?.membershipId ?? null,
+              id: args.updateId,
+              kind: "OFFICIAL_UPDATE_PUBLISHED",
+              nextValue: args.body,
+              organizationId: args.organizationId,
+              postId: args.postId,
+            });
+            if (
+              !(yield* entitlementPolicy.mayMaterializeEmailIntent({
+                organizationId: args.organizationId,
+                kind: "post.official_update_published",
+              }))
+            ) {
+              return undefined;
+            }
+            const recorded = yield* emailOutbox
+              .recordIntent({
+                aggregateId: args.postId,
+                aggregateType: "post",
+                deduplicationKey: `post.official_update_published:${args.updateId}`,
+                expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                kind: "post.official_update_published",
+                organizationId: args.organizationId,
+                payload: {
+                  body: args.body,
+                  kind: "post.official_update_published",
+                  postId: args.postId,
+                  updateId: args.updateId,
+                },
+                scheduledAt: now,
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record official update email intent.",
+                    })
+                )
+              );
+            return recorded._tag === "Inserted"
+              ? recorded.intent.id
+              : undefined;
+          })
+        );
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+      }).pipe(
+        Policy.withPolicy(postPolicy.canAdminUpdate(args.organizationId)),
+        withRemapDbErrors("Post", "update")
+      ),
+
     PostMerge: (args: TPostMerge) =>
       Effect.gen(function* () {
         if (args.sourcePostId === args.targetPostId) {
@@ -801,7 +976,45 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             message: "Source and target posts must be different",
           });
         }
-        return yield* repository.merge(args);
+        const outboxId = yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.merge(args);
+            if (
+              !(yield* entitlementPolicy.mayMaterializeEmailIntent({
+                organizationId: args.organizationId,
+                kind: "post.merged",
+              }))
+            ) {
+              return undefined;
+            }
+            const now = yield* DateTime.nowAsDate;
+            const result = yield* emailOutbox
+              .recordIntent({
+                aggregateId: args.sourcePostId,
+                aggregateType: "post",
+                deduplicationKey: `post.merged:${args.organizationId}:${args.sourcePostId}:${args.targetPostId}`,
+                expiresAt: new Date(now.getTime() + 7 * 86_400_000),
+                kind: "post.merged",
+                organizationId: args.organizationId,
+                payload: {
+                  kind: "post.merged",
+                  postId: args.sourcePostId,
+                  targetPostId: args.targetPostId,
+                },
+                scheduledAt: now,
+              })
+              .pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Could not record post merge email intent.",
+                    })
+                )
+              );
+            return result._tag === "Inserted" ? result.intent.id : undefined;
+          })
+        );
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")
@@ -816,6 +1029,11 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostRepository.layer),
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
+  Layer.provide(EmailOutboxRepository.layer),
+  Layer.provide(EmailSubscriptionRepository.layer),
+  Layer.provide(
+    EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+  ),
   Layer.provide(PostEmbeddingService.layer),
   Layer.provide(NotificationService.layer)
 );

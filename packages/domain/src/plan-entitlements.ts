@@ -3,7 +3,8 @@ export type OrganizationPlan = "free" | "starter" | "professional";
 export type LimitFeatureKey =
   | "feedbackBoards"
   | "privilegedMembers"
-  | "changelogCategories";
+  | "changelogCategories"
+  | "submissionNotificationRecipients";
 export type CapabilityFeatureKey =
   | "roadmap"
   | "changelog"
@@ -12,6 +13,7 @@ export type CapabilityFeatureKey =
   | "privateBoards"
   | "privateRoadmaps"
   | "removeBranding"
+  | "subscriberEmails"
   | "widgetSso";
 export type PlanFeatureKey = LimitFeatureKey | CapabilityFeatureKey;
 
@@ -54,6 +56,11 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "Changelog Category",
     pluralLabel: "Changelog Categories",
   },
+  submissionNotificationRecipients: {
+    kind: "limit",
+    singularLabel: "Submission Notification Recipient",
+    pluralLabel: "Submission Notification Recipients",
+  },
   roadmap: { kind: "capability", label: "Roadmap" },
   changelog: { kind: "capability", label: "Changelog" },
   unlimitedEndUsers: {
@@ -67,6 +74,7 @@ export const PLAN_FEATURE_CATALOG = {
     kind: "capability",
     label: "Remove Feeblo Branding",
   },
+  subscriberEmails: { kind: "capability", label: "Subscriber Emails" },
   widgetSso: { kind: "capability", label: "Widget SSO" },
 } as const satisfies Record<PlanFeatureKey, PlanFeatureDefinition>;
 
@@ -81,11 +89,13 @@ const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "feedbackBoards",
   "privilegedMembers",
   "changelogCategories",
+  "submissionNotificationRecipients",
 ] as const);
 
 const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
   "roadmap",
   "changelog",
+  "subscriberEmails",
   "unlimitedEndUsers",
   "unlimitedPosts",
   "privateBoards",
@@ -100,6 +110,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 2,
       privilegedMembers: 2,
       changelogCategories: 3,
+      submissionNotificationRecipients: 1,
     },
     capabilities: {
       roadmap: true,
@@ -109,6 +120,7 @@ export const PLAN_ENTITLEMENTS = {
       privateBoards: false,
       privateRoadmaps: false,
       removeBranding: false,
+      subscriberEmails: false,
       widgetSso: false,
     },
   },
@@ -117,6 +129,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 5,
       privilegedMembers: 5,
       changelogCategories: null,
+      submissionNotificationRecipients: null,
     },
     capabilities: {
       roadmap: true,
@@ -126,6 +139,7 @@ export const PLAN_ENTITLEMENTS = {
       privateBoards: true,
       privateRoadmaps: true,
       removeBranding: true,
+      subscriberEmails: true,
       widgetSso: true,
     },
   },
@@ -134,6 +148,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: null,
       privilegedMembers: null,
       changelogCategories: null,
+      submissionNotificationRecipients: null,
     },
     capabilities: {
       roadmap: true,
@@ -143,6 +158,7 @@ export const PLAN_ENTITLEMENTS = {
       privateBoards: true,
       privateRoadmaps: true,
       removeBranding: true,
+      subscriberEmails: true,
       widgetSso: true,
     },
   },

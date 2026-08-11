@@ -1,11 +1,12 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import * as RateLimit from "../rate-limit";
-import { withRemapDbErrors } from "../rpc-errors";
+import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
@@ -17,6 +18,7 @@ import type {
 
 export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostSubscriptionRepository;
+  const emailSubscriptions = yield* EmailSubscriptionRepository;
   const postPolicy = yield* PostPolicy;
 
   // -- Shared effect helpers (no policy applied) --
@@ -39,12 +41,35 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
 
-      yield* repository.subscribe({
-        organizationId: args.organizationId,
-        postId: args.postId,
-        userId: session.session.userId,
-        ...(membership ? { memberId: membership.membershipId } : {}),
-      });
+      const now = new Date();
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* repository.subscribe({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            userId: session.session.userId,
+            ...(membership ? { memberId: membership.membershipId } : {}),
+          });
+          yield* emailSubscriptions
+            .requestSubscription({
+              alreadyVerifiedUser: { userId: session.session.userId },
+              email: session.user.email,
+              now,
+              organizationId: args.organizationId,
+              source: "explicit",
+              topic: { topicId: args.postId, topicType: "post" },
+              verificationExpiresAt: new Date(now.getTime() + 86_400_000),
+            })
+            .pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message: "Could not record the post email subscription.",
+                  })
+              )
+            );
+        })
+      );
 
       return { subscribed: true };
     });
@@ -53,10 +78,30 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
 
-      yield* repository.unsubscribe({
-        postId: args.postId,
-        userId: session.session.userId,
-      });
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* repository.unsubscribe({
+            postId: args.postId,
+            userId: session.session.userId,
+          });
+          yield* emailSubscriptions
+            .unsubscribeAuthenticatedSubscription({
+              now: new Date(),
+              organizationId: args.organizationId,
+              topic: { topicId: args.postId, topicType: "post" },
+              userId: session.session.userId,
+            })
+            .pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message:
+                      "Could not unsubscribe the post email subscription.",
+                  })
+              )
+            );
+        })
+      );
 
       return { subscribed: false };
     });
@@ -156,5 +201,6 @@ export const PostSubscriptionRpcHandlers = PostSubscriptionRpcs.toLayer(
 ).pipe(
   Layer.provide(PostPolicy.layer),
   Layer.provide(PostRepository.layer),
-  Layer.provide(PostSubscriptionRepository.layer)
+  Layer.provide(PostSubscriptionRepository.layer),
+  Layer.provide(EmailSubscriptionRepository.layer)
 );

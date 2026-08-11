@@ -4,7 +4,6 @@ import * as Layer from "effect/Layer";
 
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
-import { PostSubscriptionRepository } from "../post-subscription/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
@@ -17,7 +16,6 @@ import type { TUpvoteList, TUpvoteToggle } from "./schema";
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
   const upvotePolicy = yield* UpvotePolicy;
-  const subscriptionRepository = yield* PostSubscriptionRepository;
   // const sitePolicy = yield* SitePolicy;
 
   return {
@@ -38,27 +36,11 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
     UpvoteToggle: (args: TUpvoteToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-
         const result = yield* transaction(
-          Effect.gen(function* () {
-            const result = yield* repository.toggle({
-              organizationId: args.organizationId,
-              postId: args.postId,
-              userId: session.session.userId,
-            });
-
-            // Upvoting a post automatically subscribes the user to it.
-            if (result.upvoted) {
-              yield* subscriptionRepository.subscribe({
-                organizationId: args.organizationId,
-                postId: args.postId,
-                userId: session.session.userId,
-                ...(membership ? { memberId: membership.membershipId } : {}),
-              });
-            }
-
-            return result;
+          repository.toggle({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            userId: session.session.userId,
           })
         );
 
@@ -99,30 +81,14 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
     UpvoteTogglePublic: (args: TUpvoteToggle) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
-        const membership = Policy.getMembership(session, args.organizationId);
-
         //TODO: comeback later
         // yield* sitePolicy.canViewRoadmap(args.organizationId);
 
         const result = yield* transaction(
-          Effect.gen(function* () {
-            const result = yield* repository.toggle({
-              organizationId: args.organizationId,
-              postId: args.postId,
-              userId: session.session.userId,
-            });
-
-            // Upvoting a post automatically subscribes the user to it.
-            if (result.upvoted) {
-              yield* subscriptionRepository.subscribe({
-                organizationId: args.organizationId,
-                postId: args.postId,
-                userId: session.session.userId,
-                ...(membership ? { memberId: membership.membershipId } : {}),
-              });
-            }
-
-            return result;
+          repository.toggle({
+            organizationId: args.organizationId,
+            postId: args.postId,
+            userId: session.session.userId,
           })
         );
 
@@ -149,6 +115,5 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
 ).pipe(
   Layer.provide(UpvotePolicy.layer),
   Layer.provide(PostRepository.layer),
-  Layer.provide(UpvoteRepository.layer),
-  Layer.provide(PostSubscriptionRepository.layer)
+  Layer.provide(UpvoteRepository.layer)
 );

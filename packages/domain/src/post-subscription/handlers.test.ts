@@ -9,6 +9,9 @@ import {
 } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -111,7 +114,14 @@ describe("PostSubscriptionRpcHandlers", () => {
     });
   const Repositories = Layer.mergeAll(
     PostRepository.layer,
-    PostSubscriptionRepository.layer
+    PostSubscriptionRepository.layer,
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "post-subscription-handler-test-signing-secret"
+        )
+      )
+    )
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
@@ -162,7 +172,48 @@ describe("PostSubscriptionRpcHandlers", () => {
               .PostSubscriptionList(input)
               .pipe(Effect.provideService(CurrentSession, session(f)))
           ).toHaveLength(0);
+          const emailSubscription =
+            yield* (yield* EmailSubscriptionRepository).findSubscription({
+              email: "user@example.com",
+              organizationId: f.organizationId,
+              topic: { topicId: f.postId, topicType: "post" },
+            });
+          expect(emailSubscription.pipe(Option.getOrUndefined)).toMatchObject({
+            state: "unsubscribed",
+          });
         })
+      );
+      it.effect(
+        "rolls back the legacy subscription when email consent fails",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostSubscriptionRpcHandlersEffect;
+            const f = yield* fixture();
+            const input = {
+              organizationId: f.organizationId,
+              postId: f.postId,
+            };
+            const validSession = session(f);
+            const invalidEmailSession: Session = {
+              ...validSession,
+              user: { ...validSession.user, email: "invalid-email" },
+            };
+
+            const error = yield* Effect.flip(
+              handlers
+                .PostSubscriptionCreate(input)
+                .pipe(
+                  Effect.provideService(CurrentSession, invalidEmailSession)
+                )
+            );
+
+            expect(error._tag).toBe("InternalServerError");
+            expect(
+              yield* handlers
+                .PostSubscriptionList(input)
+                .pipe(Effect.provideService(CurrentSession, validSession))
+            ).toHaveLength(0);
+          })
       );
       it.effect("lists only the authenticated public subscriber", () =>
         Effect.gen(function* () {
@@ -189,7 +240,7 @@ describe("PostSubscriptionRpcHandlers", () => {
           expect(
             yield* handlers
               .PostSubscriptionCreatePublic(input)
-            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+              .pipe(Effect.provideService(CurrentSession, session(f, false)))
           ).toEqual({ subscribed: true });
           yield* handlers
             .PostSubscriptionCreatePublic(input)

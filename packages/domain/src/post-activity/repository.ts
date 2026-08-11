@@ -1,5 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
+import type { LegidOf } from "@feeblo/id";
 import { PostActivityId } from "@feeblo/id";
 import { and, asc, eq, gte } from "drizzle-orm";
 import * as Context from "effect/Context";
@@ -10,6 +11,7 @@ export interface CreatePostActivity {
   actorId: string | null;
   actorMemberId: string | null;
   commentId?: string | null;
+  id?: LegidOf<"PostActivityId">;
   kind: TPostActivityKind;
   nextValue?: string | null;
   organizationId: string;
@@ -22,7 +24,7 @@ const makePostActivityRepository = Effect.gen(function* () {
 
   const makeRow = (input: CreatePostActivity) =>
     Effect.gen(function* () {
-      const id = yield* PostActivityId.generate;
+      const id = input.id ?? (yield* PostActivityId.generate);
       return {
         id,
         organizationId: input.organizationId,

@@ -5,23 +5,42 @@ import * as Ref from "effect/Ref";
 import { render, toPlainText } from "react-email";
 
 import {
-  MailDeliveryError,
   Mailer,
   type MailMessage,
+  MailPermanentDeliveryError,
+  type MailSendResult,
   MailTemplateRenderError,
+  MailTemporaryDeliveryError,
+  MailUncertainDeliveryError,
 } from "./mailer";
 
 export interface RenderedTestEmail {
   readonly from?: string;
+  readonly headers?: Readonly<Record<string, string>>;
   readonly html: string;
+  readonly messageId?: string;
   readonly subject: string;
   readonly text: string;
   readonly to: string;
 }
 
+/** A controlled provider result or classified failure for the next test send. */
+export type TestMailerOutcome =
+  | {
+      readonly _tag: "accepted";
+      readonly accepted?: boolean;
+      readonly providerMessageId?: string;
+      readonly responseCode?: number;
+    }
+  | { readonly _tag: "permanentFailure"; readonly smtpStatusCode?: number }
+  | { readonly _tag: "temporaryFailure"; readonly smtpStatusCode?: number }
+  | { readonly _tag: "uncertainFailure" };
+
 export interface TestMailerState {
   readonly attempts: number;
+  /** Legacy switch retained for existing workflow tests. */
   readonly failDelivery: boolean;
+  readonly outcomes: readonly TestMailerOutcome[];
   readonly renderedMessages: readonly RenderedTestEmail[];
   readonly sentMessages: readonly MailMessage[];
 }
@@ -29,6 +48,7 @@ export interface TestMailerState {
 export const initialTestMailerState: TestMailerState = {
   attempts: 0,
   failDelivery: false,
+  outcomes: [],
   renderedMessages: [],
   sentMessages: [],
 };
@@ -40,52 +60,126 @@ export class TestMailer extends Context.Service<TestMailer>()("TestMailer", {
   static readonly layer = Layer.effect(this, this.make);
 }
 
+const defaultMessageId = (attempt: number): string =>
+  `<test-mailer.${attempt}@notifications.feeblo>`;
+
+const resultForOutcome = (
+  message: MailMessage,
+  attempt: number,
+  outcome: Extract<TestMailerOutcome, { readonly _tag: "accepted" }> | undefined
+): MailSendResult => {
+  const accepted = outcome?.accepted ?? true;
+  return {
+    accepted,
+    messageId: message.messageId ?? defaultMessageId(attempt),
+    providerMetadata: {
+      acceptedRecipientCount: accepted ? 1 : 0,
+      ...(outcome?.providerMessageId
+        ? { providerMessageId: outcome.providerMessageId }
+        : {}),
+      rejectedRecipientCount: accepted ? 0 : 1,
+      ...(outcome?.responseCode === undefined
+        ? {}
+        : { responseCode: outcome.responseCode }),
+    },
+  };
+};
+
 const mailerLayer = Layer.effect(
   Mailer,
   Effect.gen(function* () {
     const mailbox = yield* TestMailer;
 
     return Mailer.of({
-      send: Effect.fn("TestMailer.send")(function* (message) {
+      send: Effect.fn("TestMailer.send")(function* (message: MailMessage) {
         const html = yield* Effect.tryPromise({
           try: () => render(message.react),
           catch: (cause) =>
             new MailTemplateRenderError({
-              subject: message.subject,
               cause,
+              message: "Test email template rendering failed",
+              operation: "TestMailer.renderHtml",
             }),
         });
-        const text = toPlainText(html);
-        const failDelivery = yield* Ref.modify(mailbox, (state) => {
+        const text = yield* Effect.try({
+          try: () => toPlainText(html),
+          catch: (cause) =>
+            new MailTemplateRenderError({
+              cause,
+              message: "Test email text rendering failed",
+              operation: "TestMailer.renderText",
+            }),
+        });
+        const attempt = yield* Ref.modify(mailbox, (state) => {
+          const [nextOutcome, ...remainingOutcomes] = state.outcomes;
+          const resolvedOutcome =
+            nextOutcome ??
+            (state.failDelivery
+              ? ({ _tag: "temporaryFailure" } as const)
+              : ({ _tag: "accepted" } as const));
+          const failed = resolvedOutcome._tag !== "accepted";
+
           return [
-            state.failDelivery,
+            {
+              number: state.attempts + 1,
+              outcome: resolvedOutcome,
+            },
             {
               ...state,
               attempts: state.attempts + 1,
-              renderedMessages: state.failDelivery
+              outcomes: remainingOutcomes,
+              renderedMessages: failed
                 ? state.renderedMessages
                 : [
                     ...state.renderedMessages,
                     {
                       ...(message.from ? { from: message.from } : {}),
+                      ...(message.headers ? { headers: message.headers } : {}),
+                      ...(message.messageId
+                        ? { messageId: message.messageId }
+                        : {}),
                       html,
                       subject: message.subject,
                       text,
                       to: message.to,
                     },
                   ],
-              sentMessages: state.failDelivery
+              sentMessages: failed
                 ? state.sentMessages
                 : [...state.sentMessages, message],
             },
           ];
         });
 
-        if (failDelivery) {
-          return yield* new MailDeliveryError({
-            subject: message.subject,
-            cause: new Error("Test mail delivery failure"),
-          });
+        switch (attempt.outcome._tag) {
+          case "permanentFailure":
+            return yield* new MailPermanentDeliveryError({
+              message: "Test SMTP provider rejected the message",
+              operation: "TestMailer.send",
+              provider: "smtp",
+              ...(attempt.outcome.smtpStatusCode === undefined
+                ? {}
+                : { smtpStatusCode: attempt.outcome.smtpStatusCode }),
+            });
+          case "temporaryFailure":
+            return yield* new MailTemporaryDeliveryError({
+              message: "Test SMTP provider temporarily rejected the message",
+              operation: "TestMailer.send",
+              provider: "smtp",
+              ...(attempt.outcome.smtpStatusCode === undefined
+                ? {}
+                : { smtpStatusCode: attempt.outcome.smtpStatusCode }),
+            });
+          case "uncertainFailure":
+            return yield* new MailUncertainDeliveryError({
+              message: "Test SMTP provider returned an uncertain result",
+              operation: "TestMailer.send",
+              provider: "smtp",
+            });
+          case "accepted":
+            return resultForOutcome(message, attempt.number, attempt.outcome);
+          default:
+            return attempt.outcome satisfies never;
         }
       }),
     });
@@ -102,12 +196,14 @@ export const MailerTestLayer = Layer.unwrap(
 
 export const resetTestMailer = (options?: {
   readonly failDelivery?: boolean;
+  readonly outcomes?: readonly TestMailerOutcome[];
 }) =>
   Effect.gen(function* () {
     const mailbox = yield* TestMailer;
     yield* Ref.set(mailbox, {
       ...initialTestMailerState,
       failDelivery: options?.failDelivery ?? false,
+      outcomes: options?.outcomes ?? [],
     });
   });
 

@@ -13,6 +13,7 @@ import {
   PostDeletePublic,
   PostList,
   PostMerge,
+  PostOfficialUpdatePublish,
   PostSuggestions,
   PostUpdate,
   PostUpdateContent,
@@ -138,6 +139,12 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("PostMerge", {
     success: Schema.Void,
     payload: PostMerge,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("PostOfficialUpdatePublish", {
+    success: Schema.Void,
+    payload: PostOfficialUpdatePublish,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}

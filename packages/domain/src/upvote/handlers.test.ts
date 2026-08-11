@@ -665,5 +665,30 @@ describe("UpvoteRpcHandlers", () => {
         })
       );
     });
+
+    it.effect("does not subscribe a user when they upvote", () =>
+      Effect.gen(function* () {
+        const handlers = yield* UpvoteRpcHandlersEffect;
+        const subscriptions = yield* PostSubscriptionRepository;
+        const fixture = yield* makeFixture();
+        const postId = yield* PostId.generate;
+
+        yield* createPost(fixture, postId, "No implicit subscription");
+        const result = yield* handlers
+          .UpvoteToggle({
+            organizationId: fixture.organizationId,
+            postId,
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        expect(result.upvoted).toBe(true);
+
+        const isSubscribed = yield* subscriptions.isSubscribed({
+          organizationId: fixture.organizationId,
+          postId,
+          userId: fixture.userId,
+        });
+        expect(isSubscribed).toBe(false);
+      })
+    );
   });
 });

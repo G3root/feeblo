@@ -1,6 +1,6 @@
 import {
-  MailDeliveryError,
   Mailer,
+  MailProviderDeliveryError,
   MailTemplateRenderError,
 } from "@feeblo/transactional/mailer";
 import { createUserFeedbackEmail } from "@feeblo/transactional/templates/user-feedback";
@@ -16,7 +16,7 @@ export const WelcomeUserWorkflow = W.Workflow.make("WelcomeUserWorkflow", {
     name: S.String,
     dashboardUrl: S.String,
   },
-  error: S.Union([MailTemplateRenderError, MailDeliveryError]),
+  error: S.Union([MailTemplateRenderError, MailProviderDeliveryError]),
   idempotencyKey: ({ userId }) => userId,
 });
 
@@ -35,7 +35,7 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
 
     yield* W.Activity.make({
       name: "SendWelcomeEmail",
-      error: S.Union([MailTemplateRenderError, MailDeliveryError]),
+      error: S.Union([MailTemplateRenderError, MailProviderDeliveryError]),
 
       execute: Effect.gen(function* () {
         const mailer = yield* Mailer;
@@ -68,7 +68,7 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
 
     yield* W.Activity.make({
       name: "SendUserFeedbackEmail",
-      error: S.Union([MailTemplateRenderError, MailDeliveryError]),
+      error: S.Union([MailTemplateRenderError, MailProviderDeliveryError]),
 
       execute: Effect.gen(function* () {
         const mailer = yield* Mailer;

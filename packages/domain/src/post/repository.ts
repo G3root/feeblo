@@ -194,6 +194,19 @@ const makePostRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0]?.statusId)),
 
+    findStatusType: ({ id, organizationId }: { readonly id: string; readonly organizationId: string }) =>
+      db
+        .select({ type: schema.postStatusTable.type })
+        .from(schema.postStatusTable)
+        .where(
+          and(
+            eq(schema.postStatusTable.id, id),
+            eq(schema.postStatusTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]?.type)),
+
     findByCreatorId: ({
       id,
       organizationId,

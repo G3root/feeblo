@@ -10,6 +10,7 @@ import {
   ChangelogCreate,
   ChangelogDelete,
   ChangelogList,
+  ChangelogSendUpdate,
   ChangelogUpdate,
 } from "./schema";
 
@@ -43,6 +44,12 @@ export class ChangelogRpcs extends RpcGroup.make(
   Rpc.make("ChangelogUpdate", {
     success: Schema.Void,
     payload: ChangelogUpdate,
+    error: ChangelogServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("ChangelogSendUpdate", {
+    success: Schema.Void,
+    payload: ChangelogSendUpdate,
     error: ChangelogServiceErrors,
   }).middleware(AuthMiddleware)
 ) {}
