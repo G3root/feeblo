@@ -222,7 +222,8 @@ describe("webhook provider registration", () => {
         const decodedRequest = yield* Schema.decodeUnknownEffect(
           Schema.fromJsonString(WebhookExternalPayload)
         )(request.body);
-        expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
+        expect(request.headers["content-type"]).toBe("application/json");
+      expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
         expect(decodedRequest).toEqual({
           actor: { displayName: "Ada", memberId, type: "member" },
           board: { id: boardId, name: "Feedback", slug: "feedback" },

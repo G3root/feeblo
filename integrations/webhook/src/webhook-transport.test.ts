@@ -104,6 +104,9 @@ describe("sendWebhookDelivery", () => {
             request.on("data", (chunk: Buffer) => chunks.push(chunk));
             request.on("end", () => {
               expect(Buffer.concat(chunks).toString("utf8")).toBe(rawBody);
+              expect(request.headers["content-type"]).toBe(
+                "application/json"
+              );
               expect(request.headers["user-agent"]).toBe("Feeblo-Webhooks/1");
               expect(request.headers["x-feeblo-event"]).toBe("webhook.test");
               expect(

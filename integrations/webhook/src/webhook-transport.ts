@@ -116,12 +116,15 @@ export const sendWebhookDelivery = Effect.fn(
 
       const response = yield* HttpClient.post(endpoint.url, {
         headers: {
-          "content-type": "application/json",
           "user-agent": "Feeblo-Webhooks/1",
           "x-feeblo-event": eventType,
           ...signingHeaders,
         },
-        body: HttpBody.text(rawBody),
+        // The explicit content type belongs on the body: HttpClientRequest's
+        // setBody overrides any content-type header with the body's own
+        // metadata, so HttpBody.text without a type would downgrade the
+        // request to text/plain.
+        body: HttpBody.text(rawBody, "application/json"),
       }).pipe(
         Effect.provideService(HttpClient.HttpClient, client),
         Effect.mapError(networkFailure)
