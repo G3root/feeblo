@@ -4,7 +4,6 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 export class ServerConfig extends Context.Service<ServerConfig>()(
@@ -17,14 +16,18 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const nodeEnv = yield* Config.string("NODE_ENV").pipe(
         Config.withDefault("development")
       );
+      // INTEGRATION_ENCRYPTION_KEY defaults to AUTH_ENCRYPTION_KEY when unset,
+      // so deployments can share a single required secret for both.
       const integrationEncryptionKey = yield* Config.redacted(
         "INTEGRATION_ENCRYPTION_KEY"
       ).pipe(
-        nodeEnv === "production"
-          ? (config) => config
-          : Config.withDefault(
-              Redacted.make("development-integration-key-change-me-32-bytes")
-            )
+        Config.option,
+        Effect.flatMap(
+          Option.match({
+            onNone: () => Config.redacted("AUTH_ENCRYPTION_KEY"),
+            onSome: (key) => Effect.succeed(key),
+          })
+        )
       );
       const integrationAllowPrivateNetwork = yield* Config.boolean(
         "INTEGRATION_ALLOW_PRIVATE_NETWORK"
