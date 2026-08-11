@@ -135,7 +135,9 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository([
+            "events.post",
+          ]);
           const route = yield* seedRoute;
           const input = yield* makePostCreatedEvent;
           const event = {
@@ -190,12 +192,49 @@ describe("integration persistence", () => {
     );
 
     it.effect(
+      "claims only deliveries whose capability the registry exposes",
+      () =>
+        Effect.gen(function* () {
+          const recorder = yield* IntegrationEventRecorder;
+          const route = yield* seedRoute;
+          const input = yield* makePostCreatedEvent;
+          yield* transaction(
+            recorder.recordIntegrationEvent({
+              event: { ...input.event, organizationId: route.organizationId },
+            })
+          );
+
+          const kernel = yield* makeIntegrationDeliveryWorkerRepository([
+            "other.capability",
+          ]);
+          const unclaimed = yield* kernel.claimDueDeliveries({
+            leaseDurationMs: 60_000,
+            leaseOwner: "kernel-only",
+            limit: 10,
+          });
+          expect(unclaimed).toHaveLength(0);
+
+          const webhookKernel = yield* makeIntegrationDeliveryWorkerRepository([
+            "events.post",
+          ]);
+          const claimed = yield* webhookKernel.claimDueDeliveries({
+            leaseDurationMs: 60_000,
+            leaseOwner: "webhook-kernel",
+            limit: 10,
+          });
+          expect(claimed).toHaveLength(1);
+        })
+    );
+
+    it.effect(
       "requeues expired leases and preserves the stable delivery ID",
       () =>
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository([
+            "events.post",
+          ]);
           const route = yield* seedRoute;
           const input = yield* makePostCreatedEvent;
           const event = {
@@ -277,7 +316,9 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository([
+            "events.post",
+          ]);
           const route = yield* seedRoute;
           const input = yield* makePostCreatedEvent;
           yield* transaction(
@@ -325,7 +366,9 @@ describe("integration persistence", () => {
       () =>
         Effect.gen(function* () {
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository([
+            "events.post",
+          ]);
           const route = yield* seedRoute;
           const input = yield* makePostCreatedEvent;
           yield* transaction(
@@ -358,7 +401,9 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository([
+            "events.post",
+          ]);
           const route = yield* seedRoute;
           for (let count = 0; count < 11; count++) {
             const input = yield* makePostCreatedEvent;
@@ -416,7 +461,9 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository([
+            "events.post",
+          ]);
           const route = yield* seedRoute;
           const input = yield* makePostCreatedEvent;
           const event = {
@@ -474,7 +521,10 @@ describe("integration persistence", () => {
               .select()
               .from(schema.integrationDeliveryAttemptTable)
               .where(
-                eq(schema.integrationDeliveryAttemptTable.deliveryId, deliveryId)
+                eq(
+                  schema.integrationDeliveryAttemptTable.deliveryId,
+                  deliveryId
+                )
               )
           ).toHaveLength(0);
         })

@@ -4,6 +4,8 @@ import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import { AuthMiddleware } from "../session-middleware";
 import { WebhookManagementErrors } from "./errors";
 import * as S from "./schema";
+
+/** Authenticated RPC surface for organization-scoped webhook management. */
 export class WebhookManagementRpcs extends RpcGroup.make(
   Rpc.make("WebhookEndpointList", {
     success: Schema.Array(S.WebhookEndpoint),

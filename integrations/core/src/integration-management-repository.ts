@@ -3,8 +3,6 @@ import type { TIntegrationDeliveryState } from "@feeblo/db/validation-schema/int
 import { and, eq, inArray, lte } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
-/** Idempotent retention cleanup for safe integration history and archived metadata. */
-
 /**
  * Terminal delivery states (per the schema's terminal timestamp check). Pending
  * and leased deliveries are still queued or in flight and must never be purged;
@@ -18,6 +16,10 @@ const purgeableDeliveryStates = [
   "canceled",
 ] as const satisfies readonly TIntegrationDeliveryState[];
 
+/**
+ * Management repository for idempotent retention cleanup of expired
+ * integration history and archived connection metadata.
+ */
 export const makeIntegrationManagementRepository = Effect.gen(function* () {
   const db = yield* currentDb;
   const cleanupRetention = Effect.fn(

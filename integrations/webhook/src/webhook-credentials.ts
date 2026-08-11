@@ -1,5 +1,5 @@
 import { symmetricDecrypt, symmetricEncrypt } from "@feeblo/utils/crypto";
-import * as DateTime from "effect/DateTime";
+import type * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";

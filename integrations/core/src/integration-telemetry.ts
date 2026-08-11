@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Metric from "effect/Metric";
 
+/** Counter of delivery attempts by durable outcome and error tag. */
 const deliveryTransitions = Metric.counter(
   "feeblo_integration_delivery_transitions_total",
   { description: "Integration delivery attempts by durable outcome" }
@@ -44,6 +45,7 @@ const automaticPauses = Metric.counter(
   { description: "Connections paused after consecutive exhausted deliveries" }
 );
 
+/** Records one finished delivery attempt by outcome and error tag. */
 export const recordIntegrationDeliveryOutcome = (
   outcome: "succeeded" | "retry" | "exhausted",
   durationMs: number,
@@ -60,17 +62,22 @@ export const recordIntegrationDeliveryOutcome = (
     )
   );
 
+/** Records the number of deliveries claimed by the latest worker poll. */
 export const recordIntegrationClaimedBacklog = (count: number) =>
   Metric.update(claimedBacklog, count);
 
+/** Records the number of due deliveries waiting to be claimed. */
 export const recordIntegrationDeliveryBacklog = (count: number) =>
   Metric.update(deliveryBacklog, count);
 
+/** Records the age of the oldest lease recovered by the latest worker poll. */
 export const recordIntegrationRecoveredLeaseAge = (ageMs: number) =>
   Metric.update(oldestRecoveredLeaseAge, Math.max(0, ageMs));
 
+/** Counts expired integration delivery leases recovered after interruption. */
 export const recordIntegrationLeaseRecoveries = (count: number) =>
   Metric.update(leaseRecoveries, count);
 
+/** Counts connections paused after consecutive exhausted deliveries. */
 export const recordIntegrationAutomaticPause = () =>
   Metric.update(automaticPauses, 1);

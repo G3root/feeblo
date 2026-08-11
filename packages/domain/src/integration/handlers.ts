@@ -3,7 +3,7 @@ import * as Policy from "../policy";
 import { WebhookManagementRpcs } from "./rpcs";
 import { WebhookManagementService } from "./webhook-management-service";
 
-/** Authenticated RPC handlers which authorize webhooks.manage before every service call. */
+/** Authenticated RPC handlers which authorize `webhooks.manage` before every service call. */
 export const WebhookManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* WebhookManagementService;
   const authorize = (organizationId: string) =>
@@ -41,7 +41,10 @@ export const WebhookManagementRpcHandlersEffect = Effect.gen(function* () {
   };
 });
 
-/** RPC layer intentionally leaves the concrete management service to server composition. */
+/**
+ * RPC layer that intentionally leaves the concrete management service to
+ * server composition.
+ */
 export const WebhookManagementRpcHandlers = WebhookManagementRpcs.toLayer(
   WebhookManagementRpcHandlersEffect
 );

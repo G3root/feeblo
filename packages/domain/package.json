@@ -271,6 +271,12 @@
     "./integration/rpcs": {
       "default": "./src/integration/rpcs.ts"
     },
+    "./integration/config": {
+      "default": "./src/integration/config.ts"
+    },
+    "./integration/webhook-management-live": {
+      "default": "./src/integration/webhook-management-live.ts"
+    },
     "./integration/webhook-management-service": {
       "default": "./src/integration/webhook-management-service.ts"
     },
@@ -297,6 +303,7 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
+    "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",

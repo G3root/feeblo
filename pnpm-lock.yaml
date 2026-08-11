@@ -779,6 +779,9 @@ importers:
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../../integrations/core
+      '@feeblo/integration-webhook':
+        specifier: workspace:*
+        version: link:../../integrations/webhook
       '@feeblo/permissions':
         specifier: workspace:*
         version: link:../permissions

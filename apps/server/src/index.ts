@@ -16,6 +16,7 @@ import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/r
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
+import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
@@ -301,6 +302,12 @@ const program = Effect.gen(function* () {
 
 program.pipe(
   Effect.scoped,
-  Effect.provide(Layer.merge(ServerConfig.layer, Database.DatabaseContextLive)),
+  Effect.provide(
+    Layer.mergeAll(
+      ServerConfig.layer,
+      Database.DatabaseContextLive,
+      WebhookIntegrationConfig.layer
+    )
+  ),
   NodeRuntime.runMain
 );

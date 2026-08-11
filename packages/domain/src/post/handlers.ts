@@ -1,6 +1,5 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
-import { IntegrationEventId, type LegidOf, PostStatusId } from "@feeblo/id";
-import { IntegrationEventRecorder } from "@feeblo/integration-core";
+import { type LegidOf, PostStatusId } from "@feeblo/id";
 import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
@@ -23,6 +22,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
@@ -67,8 +67,6 @@ const postStatusCoalescingDelayMs = 5 * 60 * 1000;
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
   const db = yield* currentDb;
-  const integrationEventRecorder = yield* IntegrationEventRecorder;
-  const { appUrl } = yield* EmailOutboxConfig;
   const repository = yield* PostRepository;
   const emailOutbox = yield* EmailOutboxRepository;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
@@ -81,6 +79,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
   // -- Shared effect helpers (no policy applied) --
 
+  // Post-handler adapter over the shared integration event recorder: converts
+  // the session actor facts into the safe actor shape and keeps the handler's
+  // existing failure classification (lookup problems are update failures,
+  // recording problems are internal errors).
   const recordPostIntegrationEvent = ({
     actorMemberId,
     actorName,
@@ -104,91 +106,34 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     statusId: LegidOf<"PostStatusId">;
     title: string;
   }) =>
-    Effect.gen(function* () {
-      const board = yield* db
-        .select({
-          id: schema.boardTable.id,
-          name: schema.boardTable.name,
-          slug: schema.boardTable.slug,
-        })
-        .from(schema.boardTable)
-        .where(
-          and(
-            eq(schema.boardTable.id, boardId),
-            eq(schema.boardTable.organizationId, organizationId)
-          )
-        )
-        .limit(1);
-      const boardDetails = board[0];
-      if (!boardDetails) {
-        return yield* new FailedToUpdatePostError();
-      }
-      const statusType = yield* repository.findStatusType({
-        id: statusId,
-        organizationId,
-      });
-      if (!statusType) {
-        return yield* new FailedToUpdatePostError();
-      }
-      const previousStatusType = previousStatusId
-        ? yield* repository.findStatusType({
-            id: previousStatusId,
-            organizationId,
-          })
-        : undefined;
-      const id = yield* IntegrationEventId.generate;
-      const correlationId = yield* IntegrationEventId.generate;
-      const occurredAt = yield* DateTime.now;
-      const url = new URL(
-        `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(boardDetails.slug)}/${encodeURIComponent(postSlug)}`,
-        appUrl
-      ).href;
-      yield* integrationEventRecorder
-        .recordIntegrationEvent({
-          event: {
-            causalHopCount: 0,
-            correlationId,
-            data: {
-              actor: actorMemberId
-                ? {
-                    ...(actorName ? { displayName: actorName } : {}),
-                    kind: "member",
-                    memberId: actorMemberId,
-                  }
-                : { kind: "end_user" },
-              board: boardDetails,
-              post: {
-                id: postId,
-                status: { id: statusId, type: statusType },
-                title,
-                url,
-              },
-              ...(previousStatusId && previousStatusType
-                ? {
-                    previousStatus: {
-                      id: previousStatusId,
-                      type: previousStatusType,
-                    },
-                  }
-                : {}),
+    recordPostIntegrationEventShared({
+      actor:
+        actorMemberId === null
+          ? { kind: "end_user" }
+          : {
+              ...(actorName === undefined || actorName === null
+                ? {}
+                : { displayName: actorName }),
+              kind: "member",
+              memberId: actorMemberId,
             },
-            id,
-            occurredAt,
-            organizationId,
-            origin: { kind: "feeblo" },
-            type: eventType,
-            version: 1,
-          },
-        })
-        .pipe(
-          Effect.mapError(
-            () =>
-              new InternalServerError({
-                message: "Could not record integration event.",
-              })
-          )
-        );
-    });
+      boardId,
+      eventType,
+      organizationId,
+      postId,
+      postSlug,
+      ...(previousStatusId === undefined ? {} : { previousStatusId }),
+      statusId,
+      title,
+    }).pipe(
+      Effect.mapError((error) =>
+        error.kind === "lookup"
+          ? new FailedToUpdatePostError()
+          : new InternalServerError({
+              message: "Could not record integration event.",
+            })
+      )
+    );
 
   const scheduleEmbedding = ({
     content,

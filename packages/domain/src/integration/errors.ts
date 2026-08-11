@@ -6,6 +6,8 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from "../rpc-errors";
+
+/** RPC error union for every webhook management operation. */
 export const WebhookManagementErrors = Schema.Union([
   BadRequestError,
   InternalServerError,

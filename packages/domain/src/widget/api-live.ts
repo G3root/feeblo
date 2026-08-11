@@ -1,10 +1,7 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
-import { IntegrationEventId, PostId } from "@feeblo/id";
-import { IntegrationEventRecorder } from "@feeblo/integration-core";
+import { transaction } from "@feeblo/db";
+import { asLegid, type LegidOf, PostId, PostStatusId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { and, eq } from "drizzle-orm";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
@@ -22,6 +19,7 @@ import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { Api } from "../http/api";
+import { recordPostIntegrationEvent } from "../integration/post-event-recording";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import {
@@ -213,75 +211,31 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const attributeDefinitionRepository =
             yield* AttributeDefinitionRepository;
           const postRepository = yield* PostRepository;
-          const integrationEventRecorder = yield* IntegrationEventRecorder;
-          const { appUrl } = yield* EmailOutboxConfig;
-          const db = yield* currentDb;
 
           const recordWidgetPostCreatedEvent = ({
             postSlug,
-            status,
+            statusId,
           }: {
             postSlug: string;
-            status: { readonly id: string; readonly type: string };
+            statusId: LegidOf<"PostStatusId">;
           }) =>
-            Effect.gen(function* () {
-              const boardRows = yield* db
-                .select({
-                  id: schema.boardTable.id,
-                  name: schema.boardTable.name,
-                  slug: schema.boardTable.slug,
-                })
-                .from(schema.boardTable)
-                .where(
-                  and(
-                    eq(schema.boardTable.id, boardId),
-                    eq(schema.boardTable.organizationId, organizationId)
-                  )
-                )
-                .limit(1);
-              const boardDetails = boardRows[0];
-              if (!boardDetails) {
-                return yield* new InternalServerError({
-                  message: "Could not record widget integration event.",
-                });
-              }
-              const correlationId = yield* IntegrationEventId.generate;
-              const occurredAt = yield* DateTime.now;
-              yield* integrationEventRecorder
-                .recordIntegrationEvent({
-                  event: {
-                    causalHopCount: 0,
-                    correlationId,
-                    data: {
-                      actor: { kind: "end_user" },
-                      board: boardDetails,
-                      post: {
-                        id,
-                        status,
-                        title,
-                        url: new URL(
-                          `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(boardDetails.slug)}/${encodeURIComponent(postSlug)}`,
-                          appUrl
-                        ).href,
-                      },
-                    },
-                    id: yield* IntegrationEventId.generate,
-                    occurredAt,
-                    organizationId,
-                    origin: { kind: "feeblo" },
-                    type: "feedback.post.created",
-                    version: 1,
-                  },
-                })
-                .pipe(
-                  Effect.mapError(
-                    () =>
-                      new InternalServerError({
-                        message: "Could not record widget integration event.",
-                      })
-                  )
-                );
-            });
+            recordPostIntegrationEvent({
+              actor: { kind: "end_user" },
+              boardId,
+              eventType: "feedback.post.created",
+              organizationId,
+              postId: id,
+              postSlug,
+              statusId,
+              title,
+            }).pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message: "Could not record widget integration event.",
+                  })
+              )
+            );
 
           const board = yield* boardRepository.getById({
             id: boardId,
@@ -308,7 +262,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
               message: "Organization has no post statuses configured",
             });
           }
-          const selectedDefaultStatus = defaultStatus;
 
           const { sanitizedMarkdown: sanitizedContent, sanitizedHtml } =
             sanitizeMarkdown(content);
@@ -379,7 +332,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 });
                 yield* recordWidgetPostCreatedEvent({
                   postSlug: slug,
-                  status: selectedDefaultStatus,
+                  statusId: asLegid(PostStatusId)(defaultStatus.id),
                 });
               })
             );
@@ -402,7 +355,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   Effect.tap((postSlug) =>
                     recordWidgetPostCreatedEvent({
                       postSlug,
-                      status: selectedDefaultStatus,
+                      statusId: asLegid(PostStatusId)(defaultStatus.id),
                     })
                   )
                 )
