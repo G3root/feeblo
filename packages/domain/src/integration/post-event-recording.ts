@@ -12,7 +12,7 @@ import { PostRepository } from "../post/repository";
 export class PostIntegrationEventRecordingError extends Schema.TaggedErrorClass<PostIntegrationEventRecordingError>()(
   "PostIntegrationEventRecordingError",
   {
-    kind: Schema.Literals(["lookup", "recording"]),
+    kind: Schema.Literals(["infrastructure", "lookup", "recording"]),
     message: Schema.String,
   }
 ) {}
@@ -46,7 +46,8 @@ export interface PostIntegrationEventInput {
  *
  * Fails with `PostIntegrationEventRecordingError`; `kind: "lookup"` means a
  * board or status snapshot could not be resolved, `kind: "recording"` means
- * the event itself could not be recorded.
+ * the event itself could not be recorded, and `kind: "infrastructure"` means
+ * the event could not be assembled (database, id, or time failure).
  */
 export const recordPostIntegrationEvent = Effect.fn(
   "IntegrationEventRecording.recordPost"
@@ -152,7 +153,7 @@ export const recordPostIntegrationEvent = Effect.fn(
         error instanceof PostIntegrationEventRecordingError
           ? error
           : new PostIntegrationEventRecordingError({
-              kind: "lookup",
+              kind: "infrastructure",
               message: "Post integration event could not be assembled",
             })
       )

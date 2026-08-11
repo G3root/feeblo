@@ -1,6 +1,4 @@
-import type { Server } from "node:http";
-import { createServer, type RequestListener } from "node:http";
-import { afterEach, describe, expect, it } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
 import {
   BoardId,
   IntegrationConnectionId,
@@ -21,39 +19,10 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { Webhook } from "standardwebhooks";
+import { startTestServer } from "./test-server";
 import { webhookProviderKey } from "./webhook-manifest";
 import { WebhookExternalPayload } from "./webhook-payload";
 import { makeWebhookProviderRegistration } from "./webhook-provider-registration";
-
-const servers: Server[] = [];
-afterEach(async () => {
-  await Promise.all(
-    servers
-      .splice(0)
-      .map(
-        (server) =>
-          new Promise<void>((resolve) => server.close(() => resolve()))
-      )
-  );
-});
-
-const startServer = (handler: RequestListener) =>
-  Effect.tryPromise(
-    () =>
-      new Promise<URL>((resolve, reject) => {
-        const server = createServer(handler);
-        servers.push(server);
-        server.once("error", reject);
-        server.listen(0, "127.0.0.1", () => {
-          const address = server.address();
-          if (address === null || typeof address === "string") {
-            reject(new TypeError("Expected TCP test server"));
-            return;
-          }
-          resolve(new URL(`http://127.0.0.1:${address.port}/hook`));
-        });
-      })
-  );
 
 const secret = Redacted.make(
   "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
@@ -197,7 +166,7 @@ describe("webhook provider registration", () => {
         }>((resolve) => {
           receiveRequest = resolve;
         });
-        const endpointUrl = yield* startServer((request, response) => {
+        const endpointUrl = yield* startTestServer((request, response) => {
           const chunks: Buffer[] = [];
           request.on("data", (chunk: Buffer) => chunks.push(chunk));
           request.on("end", () => {
@@ -211,9 +180,8 @@ describe("webhook provider registration", () => {
         const { boardId, input, memberId, now, postId, statusId } =
           yield* makeDeliveryFixture();
         const handler = makeRegistration(endpointUrl).handlers[0];
-        expect(handler).toBeDefined();
         if (handler === undefined) {
-          return;
+          throw new Error("Expected a webhook delivery handler");
         }
 
         const result = yield* handler.deliver(input);
@@ -223,7 +191,7 @@ describe("webhook provider registration", () => {
           Schema.fromJsonString(WebhookExternalPayload)
         )(request.body);
         expect(request.headers["content-type"]).toBe("application/json");
-      expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
+        expect(request.headers["x-feeblo-event"]).toBe("feedback.post.created");
         expect(decodedRequest).toEqual({
           actor: { displayName: "Ada", memberId, type: "member" },
           board: { id: boardId, name: "Feedback", slug: "feedback" },
@@ -251,14 +219,13 @@ describe("webhook provider registration", () => {
 
   it.live("maps a retryable 500 receiver response to a temporary failure", () =>
     Effect.gen(function* () {
-      const endpointUrl = yield* startServer((_request, response) =>
+      const endpointUrl = yield* startTestServer((_request, response) =>
         response.writeHead(500).end()
       );
       const { input } = yield* makeDeliveryFixture();
       const handler = makeRegistration(endpointUrl).handlers[0];
-      expect(handler).toBeDefined();
       if (handler === undefined) {
-        return;
+        throw new Error("Expected a webhook delivery handler");
       }
 
       const failure = yield* Effect.flip(handler.deliver(input));
@@ -273,14 +240,13 @@ describe("webhook provider registration", () => {
     "maps a terminal 400 receiver response to a permanent rejection",
     () =>
       Effect.gen(function* () {
-        const endpointUrl = yield* startServer((_request, response) =>
+        const endpointUrl = yield* startTestServer((_request, response) =>
           response.writeHead(400).end()
         );
         const { input } = yield* makeDeliveryFixture();
         const handler = makeRegistration(endpointUrl).handlers[0];
-        expect(handler).toBeDefined();
         if (handler === undefined) {
-          return;
+          throw new Error("Expected a webhook delivery handler");
         }
 
         const failure = yield* Effect.flip(handler.deliver(input));
@@ -293,14 +259,13 @@ describe("webhook provider registration", () => {
 
   it.live("maps a 429 response with Retry-After to a rate-limit failure", () =>
     Effect.gen(function* () {
-      const endpointUrl = yield* startServer((_request, response) =>
+      const endpointUrl = yield* startTestServer((_request, response) =>
         response.writeHead(429, { "retry-after": "120" }).end()
       );
       const { input } = yield* makeDeliveryFixture();
       const handler = makeRegistration(endpointUrl).handlers[0];
-      expect(handler).toBeDefined();
       if (handler === undefined) {
-        return;
+        throw new Error("Expected a webhook delivery handler");
       }
 
       const failure = yield* Effect.flip(handler.deliver(input));

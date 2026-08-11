@@ -11,6 +11,7 @@ import {
   IntegrationDeliveryId,
   IntegrationEventId,
   IntegrationRouteId,
+  MemberId,
   PostId,
   PostStatusId,
 } from "@feeblo/id";
@@ -688,7 +689,8 @@ export const WebhookManagementServiceLive = Layer.effect(
               if (
                 connection?.credentialsCiphertext === null ||
                 connection?.credentialsCiphertext === undefined ||
-                connection.lifecycle !== "active"
+                (connection.lifecycle !== "active" &&
+                  connection.lifecycle !== "paused")
               ) {
                 return yield* new NotFoundError({
                   message: "Webhook endpoint was not found",
@@ -804,6 +806,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               const eventId = yield* IntegrationEventId.generate;
               const deliveryId = yield* IntegrationDeliveryId.generate;
               const boardId = yield* BoardId.generate;
+              const memberId = yield* MemberId.generate;
               const postId = yield* PostId.generate;
               const statusId = yield* PostStatusId.generate;
               const now = yield* DateTime.nowAsDate;
@@ -815,7 +818,11 @@ export const WebhookManagementServiceLive = Layer.effect(
                 organizationId,
                 origin: { kind: "feeblo" },
                 payload: {
-                  actor: { kind: "member", displayName: "Webhook test" },
+                  actor: {
+                    displayName: "Webhook test",
+                    kind: "member",
+                    memberId,
+                  },
                   board: {
                     id: boardId,
                     name: "Synthetic test board",
@@ -993,7 +1000,8 @@ export const WebhookManagementServiceLive = Layer.effect(
                 .limit(1);
               if (delivery === undefined) {
                 return yield* new NotFoundError({
-                  message: "Webhook endpoint was not found",
+                  message:
+                    "Webhook delivery was not found or is unavailable for retry",
                 });
               }
               const [connection] = yield* lockWebhookConnection(
@@ -1026,6 +1034,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               yield* db
                 .update(schema.integrationDeliveryTable)
                 .set({
+                  attemptCount: 0,
                   exhaustedAt: null,
                   nextAttemptAt: now,
                   state: "pending",

@@ -1,5 +1,4 @@
-import * as http from "node:http";
-import { afterEach, describe, expect, it } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -7,44 +6,50 @@ import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
 import { TestClock } from "effect/testing";
 import { Webhook } from "standardwebhooks";
-
+import { startTestServer } from "./test-server";
 import { resolveAndValidateWebhookEndpoint } from "./webhook-endpoint-security";
 import { signWebhookDelivery } from "./webhook-signing";
 import {
+  makeWebhookPinnedLookup,
   parseWebhookRetryAfter,
   sendWebhookDelivery,
   WEBHOOK_MAX_PAYLOAD_BYTES,
   WEBHOOK_REQUEST_TIMEOUT_MS,
 } from "./webhook-transport";
 
-const servers: http.Server[] = [];
-afterEach(async () => {
-  await Promise.all(
-    servers
-      .splice(0)
-      .map(
-        (server) =>
-          new Promise<void>((resolve) => server.close(() => resolve()))
-      )
-  );
-});
-
-const startServer = async (handler: http.RequestListener) => {
-  const server = http.createServer(handler);
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  if (address === null || typeof address === "string") {
-    throw new TypeError("Expected TCP test server");
-  }
-  return `http://127.0.0.1:${address.port}/hook`;
-};
-
 const firstHeaderValue = (value: string | string[] | undefined): string =>
   Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 
 /** Fixed clock anchor for HTTP-date Retry-After deltas. */
 const fixedNow = DateTime.fromDateUnsafe(new Date("2026-08-11T00:00:00.000Z"));
+
+describe("makeWebhookPinnedLookup", () => {
+  it("returns every pinned address in the autoSelectFamily `all` form", () => {
+    const lookup = makeWebhookPinnedLookup([
+      "2a01:4f8:121:114d::2",
+      "178.63.67.153",
+    ]);
+    let captured: unknown;
+    lookup("webhook.site", { all: true }, (error, result) => {
+      expect(error).toBeNull();
+      captured = result;
+    });
+    expect(captured).toEqual([
+      { address: "2a01:4f8:121:114d::2", family: 6 },
+      { address: "178.63.67.153", family: 4 },
+    ]);
+  });
+
+  it("keeps the classic single-address form when `all` is not requested", () => {
+    const lookup = makeWebhookPinnedLookup(["178.63.67.153"]);
+    let captured: unknown;
+    lookup("webhook.site", {}, (error, address, family) => {
+      expect(error).toBeNull();
+      captured = { address, family };
+    });
+    expect(captured).toEqual({ address: "178.63.67.153", family: 4 });
+  });
+});
 
 describe("parseWebhookRetryAfter", () => {
   it("returns no retry delay without a Retry-After header", () => {
@@ -65,7 +70,9 @@ describe("parseWebhookRetryAfter", () => {
     expect(parseWebhookRetryAfter("90000", fixedNow)).toEqual(Duration.days(1));
   });
 
-  it("ignores malformed and negative values", () => {
+  it("ignores empty, malformed, and negative values", () => {
+    expect(parseWebhookRetryAfter("", fixedNow)).toBeUndefined();
+    expect(parseWebhookRetryAfter("0x10", fixedNow)).toBeUndefined();
     expect(parseWebhookRetryAfter("not-a-number", fixedNow)).toBeUndefined();
     expect(parseWebhookRetryAfter("-5", fixedNow)).toBeUndefined();
   });
@@ -98,36 +105,37 @@ describe("sendWebhookDelivery", () => {
           "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
         );
         const rawBody = '{"type":"webhook.test","value":"exact  spacing"}';
-        const endpointUrl = yield* Effect.tryPromise(() =>
-          startServer((request, response) => {
-            const chunks: Buffer[] = [];
-            request.on("data", (chunk: Buffer) => chunks.push(chunk));
-            request.on("end", () => {
-              expect(Buffer.concat(chunks).toString("utf8")).toBe(rawBody);
-              expect(request.headers["content-type"]).toBe(
-                "application/json"
-              );
-              expect(request.headers["user-agent"]).toBe("Feeblo-Webhooks/1");
-              expect(request.headers["x-feeblo-event"]).toBe("webhook.test");
-              expect(
-                new Webhook(Redacted.value(secret)).verify(rawBody, {
-                  "webhook-id": firstHeaderValue(request.headers["webhook-id"]),
-                  "webhook-timestamp": firstHeaderValue(
-                    request.headers["webhook-timestamp"]
-                  ),
-                  "webhook-signature": firstHeaderValue(
-                    request.headers["webhook-signature"]
-                  ),
-                })
-              ).toEqual({ type: "webhook.test", value: "exact  spacing" });
-              response.writeHead(204).end();
-            });
-          })
-        );
-        const endpoint = yield* resolveAndValidateWebhookEndpoint(endpointUrl, {
-          environment: "development",
-          allowPrivateNetworkInDevelopment: true,
+        // The receiver captures the request facts and always completes with
+        // 204; assertions run only after the delivery has settled so a failing
+        // expectation cannot hang the request handler.
+        let receiveRequest: (request: {
+          readonly body: string;
+          readonly headers: Record<string, string | string[] | undefined>;
+        }) => void = () => undefined;
+        const received = new Promise<{
+          readonly body: string;
+          readonly headers: Record<string, string | string[] | undefined>;
+        }>((resolve) => {
+          receiveRequest = resolve;
         });
+        const endpointUrl = yield* startTestServer((request, response) => {
+          const chunks: Buffer[] = [];
+          request.on("data", (chunk: Buffer) => chunks.push(chunk));
+          request.on("end", () => {
+            receiveRequest({
+              body: Buffer.concat(chunks).toString("utf8"),
+              headers: request.headers,
+            });
+            response.writeHead(204).end();
+          });
+        });
+        const endpoint = yield* resolveAndValidateWebhookEndpoint(
+          endpointUrl.toString(),
+          {
+            environment: "development",
+            allowPrivateNetworkInDevelopment: true,
+          }
+        );
         const signingHeaders = yield* signWebhookDelivery({
           deliveryId: "delivery_123",
           keyring: { current: secret },
@@ -140,20 +148,38 @@ describe("sendWebhookDelivery", () => {
           signingHeaders,
         });
         expect(result).toEqual({ status: 204 });
+
+        const request = yield* Effect.tryPromise(() => received);
+        expect(request.body).toBe(rawBody);
+        expect(request.headers["content-type"]).toBe("application/json");
+        expect(request.headers["user-agent"]).toBe("Feeblo-Webhooks/1");
+        expect(request.headers["x-feeblo-event"]).toBe("webhook.test");
+        expect(
+          new Webhook(Redacted.value(secret)).verify(rawBody, {
+            "webhook-id": firstHeaderValue(request.headers["webhook-id"]),
+            "webhook-timestamp": firstHeaderValue(
+              request.headers["webhook-timestamp"]
+            ),
+            "webhook-signature": firstHeaderValue(
+              request.headers["webhook-signature"]
+            ),
+          })
+        ).toEqual({ type: "webhook.test", value: "exact  spacing" });
       })
   );
 
   it.live("reports a redirect response without following it", () =>
     Effect.gen(function* () {
-      const endpointUrl = yield* Effect.tryPromise(() =>
-        startServer((_request, response) =>
-          response.writeHead(302, { location: "http://127.0.0.1/other" }).end()
-        )
+      const endpointUrl = yield* startTestServer((_request, response) =>
+        response.writeHead(302, { location: "http://127.0.0.1/other" }).end()
       );
-      const endpoint = yield* resolveAndValidateWebhookEndpoint(endpointUrl, {
-        environment: "development",
-        allowPrivateNetworkInDevelopment: true,
-      });
+      const endpoint = yield* resolveAndValidateWebhookEndpoint(
+        endpointUrl.toString(),
+        {
+          environment: "development",
+          allowPrivateNetworkInDevelopment: true,
+        }
+      );
       const signingHeaders = yield* signWebhookDelivery({
         deliveryId: "delivery_123",
         keyring: {
@@ -177,17 +203,18 @@ describe("sendWebhookDelivery", () => {
     "settles with a network failure when the receiver terminates the response early",
     () =>
       Effect.gen(function* () {
-        const endpointUrl = yield* Effect.tryPromise(() =>
-          startServer((_request, response) => {
-            response.writeHead(200);
-            response.write("partial");
-            response.destroy();
-          })
-        );
-        const endpoint = yield* resolveAndValidateWebhookEndpoint(endpointUrl, {
-          environment: "development",
-          allowPrivateNetworkInDevelopment: true,
+        const endpointUrl = yield* startTestServer((_request, response) => {
+          response.writeHead(200);
+          response.write("partial");
+          response.destroy();
         });
+        const endpoint = yield* resolveAndValidateWebhookEndpoint(
+          endpointUrl.toString(),
+          {
+            environment: "development",
+            allowPrivateNetworkInDevelopment: true,
+          }
+        );
         const signingHeaders = yield* signWebhookDelivery({
           deliveryId: "delivery_123",
           keyring: {
@@ -220,16 +247,17 @@ describe("sendWebhookDelivery", () => {
       const requestArrived = new Promise<void>((resolve) => {
         markRequestArrived = resolve;
       });
-      const endpointUrl = yield* Effect.tryPromise(() =>
-        startServer(() => {
-          // Never respond; the delivery must settle via WEBHOOK_REQUEST_TIMEOUT_MS.
-          markRequestArrived();
-        })
-      );
-      const endpoint = yield* resolveAndValidateWebhookEndpoint(endpointUrl, {
-        environment: "development",
-        allowPrivateNetworkInDevelopment: true,
+      const endpointUrl = yield* startTestServer(() => {
+        // Never respond; the delivery must settle via WEBHOOK_REQUEST_TIMEOUT_MS.
+        markRequestArrived();
       });
+      const endpoint = yield* resolveAndValidateWebhookEndpoint(
+        endpointUrl.toString(),
+        {
+          environment: "development",
+          allowPrivateNetworkInDevelopment: true,
+        }
+      );
       const signingHeaders = yield* signWebhookDelivery({
         deliveryId: "delivery_123",
         keyring: {

@@ -2,7 +2,6 @@ import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 
 /** Authentication configuration for the provider lifecycle webhook. */
@@ -11,19 +10,9 @@ export class EmailProviderFeedbackConfig extends Context.Service<EmailProviderFe
   {
     make: Effect.gen(function* () {
       return {
-        // Defaults to AUTH_ENCRYPTION_KEY when unset, so deployments can
-        // share a single required secret for both.
-        webhookToken: yield* Config.redacted(
-          "EMAIL_PROVIDER_WEBHOOK_TOKEN"
-        ).pipe(
-          Config.option,
-          Effect.flatMap(
-            Option.match({
-              onNone: () => Config.redacted("AUTH_ENCRYPTION_KEY"),
-              onSome: (token) => Effect.succeed(token),
-            })
-          )
-        ),
+        // Required, independent of AUTH_ENCRYPTION_KEY: the provider delivery
+        // secret must not be derivable from the at-rest auth encryption key.
+        webhookToken: yield* Config.redacted("EMAIL_PROVIDER_WEBHOOK_TOKEN"),
       } as const;
     }),
   }

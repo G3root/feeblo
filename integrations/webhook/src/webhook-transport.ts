@@ -34,6 +34,9 @@ export interface WebhookDeliveryResponse {
 const httpDatePattern =
   /^[A-Za-z]{3}, \d{1,2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/;
 
+/** RFC 7231 delay-seconds grammar: one or more ASCII digits. */
+const delaySecondsPattern = /^[0-9]+$/;
+
 /** Bounded Retry-After parser: accepts delay-seconds or HTTP dates, and caps a receiver request at one day. */
 export const parseWebhookRetryAfter = (
   value: string | undefined,
@@ -42,8 +45,10 @@ export const parseWebhookRetryAfter = (
   if (value === undefined) {
     return undefined;
   }
-  const seconds = Number(value);
-  if (Number.isSafeInteger(seconds) && seconds >= 0) {
+  // Number() alone would accept empty, hexadecimal, exponent, and sign forms;
+  // RFC 7231 only permits plain nonnegative decimal digits here.
+  const seconds = delaySecondsPattern.test(value) ? Number(value) : undefined;
+  if (seconds !== undefined && Number.isSafeInteger(seconds)) {
     return Duration.min(Duration.seconds(seconds), Duration.days(1));
   }
   if (!httpDatePattern.test(value)) {
@@ -56,6 +61,35 @@ export const parseWebhookRetryAfter = (
   const delta = Math.ceil((retryAt - now.epochMilliseconds) / 1000);
   return Duration.min(Duration.seconds(Math.max(0, delta)), Duration.days(1));
 };
+
+/**
+ * Builds the DNS pin for a validated endpoint. Node 20+ (where
+ * `autoSelectFamily` is the default) invokes the lookup with `all: true` and
+ * expects the address-list form; returning every pinned address there also
+ * lets happy-eyeballs skip an unreachable first family (for example IPv6 on
+ * an IPv4-only host). The classic single-address form is kept for older
+ * paths that pass `all: false`.
+ */
+export const makeWebhookPinnedLookup =
+  (pinnedAddresses: readonly string[]): LookupFunction =>
+  (_hostname, options, callback) => {
+    if (options.all === true) {
+      callback(
+        null,
+        pinnedAddresses.map((address) => ({
+          address,
+          family: isIP(address),
+        }))
+      );
+      return;
+    }
+    const pinnedAddress = pinnedAddresses[0];
+    if (pinnedAddress === undefined) {
+      callback(null, []);
+      return;
+    }
+    callback(null, pinnedAddress, isIP(pinnedAddress));
+  };
 
 /**
  * Sends a signed raw JSON body through a pinned DNS lookup, with redirects disabled and no
@@ -99,9 +133,7 @@ export const sendWebhookDelivery = Effect.fn(
     return yield* networkFailure();
   }
 
-  const pinnedLookup: LookupFunction = (_hostname, _options, callback) => {
-    callback(null, pinnedAddress, isIP(pinnedAddress));
-  };
+  const pinnedLookup = makeWebhookPinnedLookup(endpoint.pinnedAddresses);
 
   return yield* Effect.scoped(
     Effect.gen(function* () {
@@ -137,14 +169,18 @@ export const sendWebhookDelivery = Effect.fn(
       );
 
       const now = yield* DateTime.now;
-      const retryAfter = Option.getOrUndefined(
+      const retryAfterHeader = Option.getOrUndefined(
         Headers.get(response.headers, "retry-after")
       );
+      // Parse before the spread so an invalid header value (or an absent one)
+      // never materializes an explicit `retryAfter: undefined` key.
+      const retryAfter =
+        retryAfterHeader === undefined
+          ? undefined
+          : parseWebhookRetryAfter(retryAfterHeader, now);
       return {
         status: response.status,
-        ...(retryAfter === undefined
-          ? {}
-          : { retryAfter: parseWebhookRetryAfter(retryAfter, now) }),
+        ...(retryAfter === undefined ? {} : { retryAfter }),
       };
     })
   ).pipe(

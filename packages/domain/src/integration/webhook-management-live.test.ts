@@ -15,12 +15,21 @@ import { WebhookIntegrationConfig } from "./config";
 import { WebhookManagementServiceLive } from "./webhook-management-live";
 import { WebhookManagementService } from "./webhook-management-service";
 
+/** Single configuration source for the service tests: shared encryption key and the default policy. */
+const webhookTestConfig = {
+  allowPrivateNetworkInDevelopment: true,
+  encryptionKey: Redacted.make("0123456789abcdef0123456789abcdef"),
+  environment: "development",
+} as const;
+
 const TestLayer = Layer.mergeAll(
   WebhookManagementServiceLive.pipe(
     Layer.provide(
       WebhookIntegrationConfig.layerTest({
-        allowPrivateNetworkInDevelopment: true,
-        environment: "development",
+        allowPrivateNetworkInDevelopment:
+          webhookTestConfig.allowPrivateNetworkInDevelopment,
+        encryptionKey: webhookTestConfig.encryptionKey,
+        environment: webhookTestConfig.environment,
       })
     ),
     Layer.provide(Database.PgliteDatabaseLive)
@@ -33,6 +42,7 @@ const ProductionPolicyTestLayer = Layer.mergeAll(
     Layer.provide(
       WebhookIntegrationConfig.layerTest({
         allowPrivateNetworkInDevelopment: false,
+        encryptionKey: webhookTestConfig.encryptionKey,
         environment: "production",
       })
     ),
@@ -52,12 +62,6 @@ const seedOrganization = Effect.gen(function* () {
   });
   return organizationId;
 });
-
-const webhookTestConfig = {
-  allowPrivateNetworkInDevelopment: true,
-  encryptionKey: Redacted.make("0123456789abcdef0123456789abcdef"),
-  environment: "development",
-} as const;
 
 const signingSecretPattern = /^whsec_/;
 
@@ -339,6 +343,41 @@ describe("webhook management service", () => {
         })
     );
 
+    it.effect("rotates the signing secret of a paused endpoint", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* WebhookManagementService;
+        const organizationId = yield* seedOrganization;
+        const created = yield* service.createEndpoint(
+          createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
+        );
+        yield* service.pauseEndpoint({
+          connectionId: created.endpoint.id,
+          organizationId,
+        });
+
+        const rotated = yield* service.rotateSecret({
+          connectionId: created.endpoint.id,
+          organizationId,
+        });
+        expect(rotated.signingSecret).toMatch(signingSecretPattern);
+
+        const [connection] = yield* db
+          .select()
+          .from(schema.integrationConnectionTable)
+          .where(eq(schema.integrationConnectionTable.id, created.endpoint.id));
+        expect(connection?.lifecycle).toBe("paused");
+        expect(connection?.credentialGeneration).toBe(2);
+        const decrypted = yield* decryptWebhookCredentialMaterial(
+          webhookTestConfig.encryptionKey,
+          connection?.credentialsCiphertext ?? ""
+        );
+        expect(Redacted.value(decrypted.signingKeyring.current)).toBe(
+          rotated.signingSecret
+        );
+      })
+    );
+
     it.effect(
       "removes an endpoint, scrubs its ciphertext, and cancels pending work",
       () =>
@@ -555,6 +594,7 @@ describe("webhook management service", () => {
           .where(eq(schema.integrationDeliveryTable.id, queued.deliveryId));
         expect(retried?.state).toBe("pending");
         expect(retried?.exhaustedAt).toBeNull();
+        expect(retried?.attemptCount).toBe(0);
 
         // A paused endpoint refuses manual retries. Exhaust a second
         // delivery before pausing: pausing cancels pending work, but an
