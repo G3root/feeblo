@@ -11,9 +11,18 @@ const { organizationId, widgetConfig } = Astro.props;
 import { getPublicEnvServer } from "../dashboard/lib/server-runtime-public-env";
 
 const publicEnv = getPublicEnvServer();
+
+// In the dev server the browser talks to the API through the same-origin Vite
+// proxy (astro.config.mjs) so auth cookies are first-party on *.localhost
+// subdomains. Server-side code keeps using the absolute API_URL; only the
+// injected browser-facing value is made origin-relative.
+const browserPublicEnv = {
+  ...publicEnv,
+  API_URL: import.meta.env.DEV ? "/api" : publicEnv.API_URL,
+};
 ---
 
-<script is:inline define:vars={{ publicEnv, organizationId, widgetConfig }}>
+<script is:inline define:vars={{ publicEnv: browserPublicEnv, organizationId, widgetConfig }}>
   window.global = window.global || {};
   window.global.__ENV = {
     ...publicEnv,

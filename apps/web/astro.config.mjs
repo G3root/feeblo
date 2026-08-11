@@ -59,6 +59,38 @@ export default defineConfig({
   ],
 
   vite: {
+    server: {
+      proxy: {
+        // Dev only: the browser reaches the API through this same-origin proxy
+        // (API_URL is injected as "/api" in dev, see EnvScript.astro) so auth
+        // cookies are set first-party even on *.localhost subdomains. Without
+        // it, every *.localhost site is a distinct site from localhost:3000,
+        // and privacy browsers (Helium, third-party-cookie blocking) silently
+        // drop the cross-site session cookie, breaking sign-in on public
+        // boards. Most client paths already carry the API's full /api/...
+        // route and pass through unchanged; only the widget's double-prefixed
+        // URL and the RPC prefix need rewriting.
+        "/api": {
+          target: process.env.API_URL ?? "http://localhost:3000",
+          changeOrigin: true,
+          rewrite: (path) => {
+            // The feedback widget builds `${apiUrl}//api/widget/v1/...`; drop the
+            // redundant /api prefix plus the doubled slash, forwarding
+            // /api/widget/... exactly like the direct API call does.
+            if (path.startsWith("/api//api/")) {
+              return path.slice("/api/".length);
+            }
+            // The RPC client prefixes its /rpc endpoint with the API base.
+            if (path === "/api/rpc" || path === "/api/rpc/") {
+              return path.slice("/api".length);
+            }
+            // Everything else (better-auth /api/auth/*, uploads, verification
+            // OTP) already carries the API's full path — pass it through.
+            return path;
+          },
+        },
+      },
+    },
     plugins: [
       paraglideVitePlugin({
         project: "./project.inlang",

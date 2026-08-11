@@ -495,8 +495,13 @@ export const initAuthHandler = (
 
       advanced: {
         crossSubDomainCookies: {
+          // Production-only: a shared Domain cookie across *.localhost is
+          // impossible because Chromium treats localhost as an effective TLD
+          // and rejects Domain=localhost cookies set from subdomains. In dev,
+          // the same-origin proxy (astro.config.mjs) instead sets host-only
+          // cookies first-party per host, which privacy browsers accept.
           enabled: nodeEnv === "production",
-          domain: appRootDomain,
+          domain: appRootDomain.split(":")[0] ?? appRootDomain,
         },
         defaultCookieAttributes: {
           secure: true,
