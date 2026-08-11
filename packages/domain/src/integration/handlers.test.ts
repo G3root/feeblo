@@ -147,4 +147,43 @@ describe("WebhookManagementRpcHandlers", () => {
       })
     ).toEqual({ items: [], nextCursor: null });
   });
+
+  it("decodes in-progress attempts with a null retry decision", () => {
+    const page = Schema.decodeUnknownSync(WebhookDeliveryHistoryPage)({
+      items: [
+        {
+          attempts: [
+            {
+              completedAt: null,
+              durationMs: null,
+              errorTag: null,
+              httpStatus: null,
+              id: "ida_in_progress",
+              retryDecision: null,
+              startedAt: "2026-08-11T00:00:00.000Z",
+            },
+            {
+              completedAt: "2026-08-11T00:00:05.000Z",
+              durationMs: 5000,
+              errorTag: "IntegrationProviderTemporaryFailure",
+              httpStatus: 503,
+              id: "ida_completed",
+              retryDecision: "retry",
+              startedAt: "2026-08-11T00:00:00.000Z",
+            },
+          ],
+          attemptCount: 1,
+          createdAt: "2026-08-11T00:00:00.000Z",
+          eventType: "webhook.test",
+          id: "idl_1",
+          nextAttemptAt: "2026-08-11T00:00:00.000Z",
+          routeId: "irt_1",
+          state: "leased",
+        },
+      ],
+      nextCursor: null,
+    });
+    expect(page.items[0]?.attempts[0]?.retryDecision).toBeNull();
+    expect(page.items[0]?.attempts[1]?.retryDecision).toBe("retry");
+  });
 });

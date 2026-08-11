@@ -665,7 +665,8 @@ function DeliveryHistory({
               {delivery.attempts.map((attempt) => (
                 <li key={attempt.id}>
                   {attempt.startedAt.toLocaleString()} ·{" "}
-                  {attempt.httpStatus ?? "network"} · {attempt.retryDecision}
+                  {attempt.httpStatus ?? "network"} ·{" "}
+                  {attempt.retryDecision ?? "in progress"}
                   {attempt.errorTag === null ? "" : ` · ${attempt.errorTag}`}
                   {attempt.durationMs === null
                     ? ""

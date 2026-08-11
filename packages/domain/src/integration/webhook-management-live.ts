@@ -942,7 +942,9 @@ export const WebhookManagementServiceLive = Layer.effect(
                 errorTag: attempt.errorTag,
                 httpStatus: attempt.httpStatus,
                 id: asLegid(IntegrationDeliveryAttemptId)(attempt.id),
-                retryDecision: attempt.retryDecision ?? "pending",
+                // In-flight attempts have no retry decision yet; null is the
+                // truthful wire value and the schema models it as such.
+                retryDecision: attempt.retryDecision,
                 startedAt: attempt.startedAt.toISOString(),
               })),
             attemptCount: delivery.attemptCount,

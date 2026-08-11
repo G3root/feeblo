@@ -96,7 +96,7 @@ export const WebhookDeliveryHistory = Schema.Struct({
   ),
 });
 export type TWebhookDeliveryHistory = typeof WebhookDeliveryHistory.Type;
-/** One append-only execution attempt of a delivery. */
+/** One append-only execution attempt of a delivery; retryDecision is null while the attempt is in flight. */
 export const WebhookDeliveryAttempt = Schema.Struct({
   id: IntegrationDeliveryAttemptId.schema,
   startedAt: Schema.DateFromString,
@@ -104,7 +104,7 @@ export const WebhookDeliveryAttempt = Schema.Struct({
   durationMs: Schema.NullOr(Schema.Int),
   httpStatus: Schema.NullOr(Schema.Int),
   errorTag: Schema.NullOr(Schema.String),
-  retryDecision: IntegrationDeliveryRetryDecision,
+  retryDecision: Schema.NullOr(IntegrationDeliveryRetryDecision),
 });
 export type TWebhookDeliveryAttempt = typeof WebhookDeliveryAttempt.Type;
 /** One delivery with its attempts, newest first. */
