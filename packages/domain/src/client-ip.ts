@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noBitwiseOperators: IP/CIDR arithmetic requires bitwise operators on BigInt addresses.
 // NOTE: this module is imported by browser bundles, so it must not import any
 // Node.js built-ins or read process.env.
 import * as Context from "effect/Context";
@@ -8,16 +7,16 @@ import * as Result from "effect/Result";
 import * as Headers from "effect/unstable/http/Headers";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
+import ipaddr from "ipaddr.js";
 
 /** The peer-anchored client IP available during an HTTP request. */
-export class ClientIp extends Context.Service<ClientIp, string>()(
+export class ClientIp extends Context.Service<ClientIp, ClientIpValue>()(
   "@feeblo/domain/ClientIp"
 ) {}
 
 type ParsedIpAddress = {
+  readonly address: ipaddr.IPv4 | ipaddr.IPv6;
   readonly text: string;
-  readonly version: 4 | 6;
-  readonly value: bigint;
 };
 
 type ParsedIpCidr = {
@@ -25,115 +24,99 @@ type ParsedIpCidr = {
   readonly prefixLength: number;
 };
 
+/** A syntactically valid, canonical IPv4 or IPv6 address. */
+export type ClientIpAddress = {
+  readonly _tag: "ClientIpAddress";
+  readonly address: string;
+};
+
+/** Explicitly represents a request whose network peer cannot be determined. */
+export type ClientIpUnavailable = {
+  readonly _tag: "ClientIpUnavailable";
+};
+
+/** Client identity used to partition public rate-limit buckets. */
+export type ClientIpValue = ClientIpAddress | ClientIpUnavailable;
+
+/** Shared value for requests whose network peer cannot be determined. */
+export const ClientIpUnavailable: ClientIpUnavailable = {
+  _tag: "ClientIpUnavailable",
+};
+
 /** Parsed proxy trust policy, constructed once from server configuration. */
 export type ClientIpProxyTrust = {
+  /** Identifies this value as validated client IP proxy trust configuration. */
   readonly _tag: "ClientIpProxyTrust";
+  /** Trusts the entire forwarding chain; safe only when the server is unreachable except through controlled proxies. */
   readonly trustAllHeaders: boolean;
+  /** Immediate proxy peers and forwarding hops allowed to supply client IP headers. */
   readonly trustedProxyCidrs: readonly ParsedIpCidr[];
 };
 
 /** Raw proxy trust values read at the server composition root. */
 export type ClientIpProxyTrustInput = {
+  /** Whether every immediate peer and forwarded hop is trusted. */
   readonly trustAllHeaders: boolean;
+  /** Exact proxy addresses or CIDR ranges, as comma-separated configuration entries. */
   readonly trustedProxyCidrs: readonly string[];
 };
 
 /** Configuration error produced when a trusted proxy IP or CIDR is malformed. */
 export type InvalidClientIpProxyTrustConfiguration = {
+  /** Identifies malformed client IP proxy trust configuration. */
   readonly _tag: "InvalidClientIpProxyTrustConfiguration";
+  /** Unmodified configuration entry that could not be parsed as an IP address or CIDR. */
   readonly entry: string;
 };
 
-const IPV4_REGEX = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-const IPV6_GROUP_REGEX = /^[0-9a-f]{1,4}$/;
-
 const parseIpAddress = (input: string): ParsedIpAddress | undefined => {
   const text = input.trim();
-  const ipv4 = IPV4_REGEX.exec(text);
-  if (ipv4) {
-    const octets = [ipv4[1], ipv4[2], ipv4[3], ipv4[4]].map(Number);
-    if (octets.some((octet) => octet < 0 || octet > 255)) {
-      return undefined;
-    }
-    let value = 0n;
-    for (const octet of octets) {
-      value = (value << 8n) | BigInt(octet);
-    }
-    return { text, version: 4, value };
-  }
-
-  if (!text.includes(":")) {
+  if (!ipaddr.isValid(text)) {
     return undefined;
   }
-
-  const compressionParts = text.toLowerCase().split("::");
-  if (compressionParts.length > 2) {
-    return undefined;
-  }
-  const hasCompression = compressionParts.length === 2;
-  let leftParts = compressionParts[0] ? compressionParts[0].split(":") : [];
-  let rightParts = compressionParts[1] ? compressionParts[1].split(":") : [];
-
-  const lastGroup =
-    rightParts.length > 0 ? rightParts.at(-1) : leftParts.at(-1);
-  if (lastGroup?.includes(".")) {
-    const quad = parseIpAddress(lastGroup);
-    if (!quad || quad.version !== 4) {
-      return undefined;
-    }
-    const quadGroups = [
-      (quad.value >> 16n).toString(16),
-      (quad.value & 0xffffn).toString(16),
-    ];
-    if (rightParts.length > 0) {
-      rightParts = [...rightParts.slice(0, -1), ...quadGroups];
-    } else {
-      leftParts = [...leftParts.slice(0, -1), ...quadGroups];
-    }
-  }
-
-  const explicitGroupCount = leftParts.length + rightParts.length;
-  if (
-    (hasCompression && explicitGroupCount >= 8) ||
-    (!hasCompression && explicitGroupCount !== 8)
-  ) {
-    return undefined;
-  }
-  const groups = [
-    ...leftParts,
-    ...Array.from({ length: 8 - explicitGroupCount }, () => "0"),
-    ...rightParts,
-  ];
-  let value = 0n;
-  for (const group of groups) {
-    if (!IPV6_GROUP_REGEX.test(group)) {
-      return undefined;
-    }
-    value = (value << 16n) | BigInt(`0x${group}`);
-  }
-  return { text, version: 6, value };
+  const parsed = ipaddr.parse(text);
+  const address =
+    parsed instanceof ipaddr.IPv6 && parsed.isIPv4MappedAddress()
+      ? parsed.toIPv4Address()
+      : parsed;
+  return { address, text: address.toString() };
 };
 
 const parseIpCidr = (input: string): ParsedIpCidr | undefined => {
-  const parts = input.trim().split("/");
-  if (parts.length > 2 || !parts[0]) {
+  const trimmed = input.trim();
+  const slashIndex = trimmed.indexOf("/");
+  if (slashIndex !== -1 && !ipaddr.isValidCIDR(trimmed)) {
     return undefined;
   }
-  const address = parseIpAddress(parts[0]);
-  if (!address) {
+  const [originalAddress, originalPrefixLength] =
+    slashIndex === -1
+      ? [ipaddr.isValid(trimmed) ? ipaddr.parse(trimmed) : undefined, undefined]
+      : ipaddr.parseCIDR(trimmed);
+  if (!originalAddress) {
     return undefined;
   }
-  const maxBits = address.version === 4 ? 32 : 128;
-  const prefixLength = parts[1] === undefined ? maxBits : Number(parts[1]);
+  const addressText = originalAddress.toString();
+  const parsedAddress = parseIpAddress(addressText);
+  if (!parsedAddress) {
+    return undefined;
+  }
+  const prefixLength =
+    originalPrefixLength ?? (originalAddress.kind() === "ipv4" ? 32 : 128);
   if (
-    parts[1] === "" ||
-    !Number.isInteger(prefixLength) ||
-    prefixLength < 0 ||
-    prefixLength > maxBits
+    originalAddress instanceof ipaddr.IPv6 &&
+    originalAddress.isIPv4MappedAddress() &&
+    prefixLength < 96
   ) {
     return undefined;
   }
-  return { address, prefixLength };
+  return {
+    address: parsedAddress,
+    prefixLength:
+      originalAddress instanceof ipaddr.IPv6 &&
+      originalAddress.isIPv4MappedAddress()
+        ? prefixLength - 96
+        : prefixLength,
+  };
 };
 
 /** Parses raw proxy trust configuration into validated IP and CIDR values. */
@@ -168,33 +151,12 @@ export const ClientIpProxyTrustNone: ClientIpProxyTrust = {
   trustedProxyCidrs: [],
 };
 
-const ipv4MappedValue = (ipv4: ParsedIpAddress): bigint =>
-  (0xffffn << 32n) | ipv4.value;
-
 const ipAddressInCidr = (
   candidate: ParsedIpAddress,
   cidr: ParsedIpCidr
-): boolean => {
-  const maxBits = cidr.address.version === 4 ? 32 : 128;
-  let candidateValue: bigint;
-  if (candidate.version === cidr.address.version) {
-    candidateValue = candidate.value;
-  } else if (candidate.version === 4 && cidr.address.version === 6) {
-    candidateValue = ipv4MappedValue(candidate);
-  } else {
-    const mappedPrefix = candidate.value >> 32n;
-    if (mappedPrefix !== 0xffffn) {
-      return false;
-    }
-    candidateValue = candidate.value & 0xffffffffn;
-  }
-  const mask =
-    cidr.prefixLength === 0
-      ? 0n
-      : ((1n << BigInt(cidr.prefixLength)) - 1n) <<
-        BigInt(maxBits - cidr.prefixLength);
-  return (candidateValue & mask) === (cidr.address.value & mask);
-};
+): boolean =>
+  candidate.address.kind() === cidr.address.address.kind() &&
+  candidate.address.match(cidr.address.address, cidr.prefixLength);
 
 const CLOUDFLARE_IP_RANGES = [
   "173.245.48.0/20",
@@ -259,7 +221,7 @@ const resolveForwardedClientIp = (
   headers: Headers.Headers,
   peer: ParsedIpAddress,
   proxyTrust: ClientIpProxyTrust
-): string | undefined => {
+): ClientIpAddress | undefined => {
   const cfConnectingIp = Option.getOrUndefined(
     Headers.get(headers, "cf-connecting-ip")
   );
@@ -267,7 +229,10 @@ const resolveForwardedClientIp = (
     ? parseIpAddress(cfConnectingIp)
     : undefined;
   if (parsedCloudflareClientIp && isCloudflarePeer(peer)) {
-    return parsedCloudflareClientIp.text;
+    return {
+      _tag: "ClientIpAddress",
+      address: parsedCloudflareClientIp.text,
+    };
   }
 
   if (!isTrustedProxy(peer.text, proxyTrust)) {
@@ -277,18 +242,28 @@ const resolveForwardedClientIp = (
   const forwardedFor = forwardedForAddresses(headers);
   if (forwardedFor) {
     if (proxyTrust.trustAllHeaders) {
-      return forwardedFor.at(-1)?.text;
+      const originatingAddress = forwardedFor[0];
+      return originatingAddress
+        ? { _tag: "ClientIpAddress", address: originatingAddress.text }
+        : undefined;
     }
     for (let index = forwardedFor.length - 1; index >= 0; index -= 1) {
       const address = forwardedFor[index];
       if (address && !isTrustedProxy(address.text, proxyTrust)) {
-        return address.text;
+        return { _tag: "ClientIpAddress", address: address.text };
       }
+    }
+    const furthestAddress = forwardedFor[0];
+    if (furthestAddress) {
+      return { _tag: "ClientIpAddress", address: furthestAddress.text };
     }
   }
 
   const realIp = Option.getOrUndefined(Headers.get(headers, "x-real-ip"));
-  return realIp ? parseIpAddress(realIp)?.text : undefined;
+  const parsedRealIp = realIp ? parseIpAddress(realIp) : undefined;
+  return parsedRealIp
+    ? { _tag: "ClientIpAddress", address: parsedRealIp.text }
+    : undefined;
 };
 
 /** Resolves a validated forwarded client IP when a trusted peer is available. */
@@ -298,17 +273,17 @@ export const getClientIpFromHeaders = (
     readonly peer?: string;
     readonly proxyTrust?: ClientIpProxyTrust;
   } = {}
-): string => {
+): ClientIpValue => {
   const peer = options.peer ? parseIpAddress(options.peer) : undefined;
   if (!peer) {
-    return "unknown";
+    return ClientIpUnavailable;
   }
   return (
     resolveForwardedClientIp(
       headers,
       peer,
       options.proxyTrust ?? ClientIpProxyTrustNone
-    ) ?? "unknown"
+    ) ?? ClientIpUnavailable
   );
 };
 
@@ -316,14 +291,17 @@ export const getClientIpFromHeaders = (
 export const getClientIpFromRequest = (
   request: HttpServerRequest.HttpServerRequest,
   proxyTrust: ClientIpProxyTrust = ClientIpProxyTrustNone
-): string => {
+): ClientIpValue => {
   const remoteAddress = Option.getOrUndefined(request.remoteAddress);
   const peer = remoteAddress ? parseIpAddress(remoteAddress) : undefined;
   if (!peer) {
-    return "unknown";
+    return ClientIpUnavailable;
   }
   return (
-    resolveForwardedClientIp(request.headers, peer, proxyTrust) ?? peer.text
+    resolveForwardedClientIp(request.headers, peer, proxyTrust) ?? {
+      _tag: "ClientIpAddress",
+      address: peer.text,
+    }
   );
 };
 

@@ -277,6 +277,7 @@
     "cookie-es": "^3.1.1",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
+    "ipaddr.js": "^2.5.0",
     "jose": "catalog:",
     "leo-profanity": "^1.9.0",
     "react": "catalog:",

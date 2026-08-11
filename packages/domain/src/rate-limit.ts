@@ -7,7 +7,11 @@ import * as Schema from "effect/Schema";
 import * as Headers from "effect/unstable/http/Headers";
 import * as RpcMiddleware from "effect/unstable/rpc/RpcMiddleware";
 
-import { ClientIp, getClientIpFromHeaders } from "./client-ip";
+import {
+  ClientIp,
+  type ClientIpValue,
+  getClientIpFromHeaders,
+} from "./client-ip";
 import { RateLimitService } from "./rate-limit/service";
 
 export const publicRpcLimits = {
@@ -71,7 +75,7 @@ export const makePublicRpcRateLimiter = ({
   clientIp,
   rateLimitService,
 }: {
-  readonly clientIp: string;
+  readonly clientIp: ClientIpValue;
   readonly rateLimitService: RateLimitService["Service"];
 }): PublicRpcRateLimiterService => ({
   consume: ({ name, level, limit, window }) => {
@@ -79,7 +83,9 @@ export const makePublicRpcRateLimiter = ({
 
     return rateLimitService
       .consume({
-        key: `public-rpc:${name}:${clientIp}`,
+        key: `public-rpc:${name}:${
+          clientIp._tag === "ClientIpAddress" ? clientIp.address : "unavailable"
+        }`,
         limit: limit ?? defaults.limit,
         window: window ?? defaults.window,
       })

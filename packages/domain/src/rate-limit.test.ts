@@ -4,6 +4,11 @@ import { describe, expect, it } from "vitest";
 import * as RateLimit from "./rate-limit";
 import { RateLimitService } from "./rate-limit/service";
 
+const clientIpAddress = (address: string) => ({
+  _tag: "ClientIpAddress" as const,
+  address,
+});
+
 describe("publicRpc", () => {
   it("limits each client and RPC independently", async () => {
     const program = Effect.gen(function* () {
@@ -42,7 +47,7 @@ describe("publicRpc", () => {
           RateLimitService.use((rateLimitService) =>
             Effect.succeed(
               RateLimit.makePublicRpcRateLimiter({
-                clientIp: "203.0.113.2",
+                clientIp: clientIpAddress("203.0.113.2"),
                 rateLimitService,
               })
             )
@@ -61,7 +66,7 @@ describe("publicRpc", () => {
           RateLimitService.use((rateLimitService) =>
             Effect.succeed(
               RateLimit.makePublicRpcRateLimiter({
-                clientIp: "203.0.113.1",
+                clientIp: clientIpAddress("203.0.113.1"),
                 rateLimitService,
               })
             )
@@ -79,7 +84,7 @@ describe("publicRpc", () => {
     const program = Effect.gen(function* () {
       const rateLimitService = yield* RateLimitService;
       const limiter = RateLimit.makePublicRpcRateLimiter({
-        clientIp: "198.51.100.1",
+        clientIp: clientIpAddress("198.51.100.1"),
         rateLimitService,
       });
 

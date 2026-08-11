@@ -1,15 +1,29 @@
+import { describe, expect, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
+import { FastCheck } from "effect/testing";
 import * as Headers from "effect/unstable/http/Headers";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
-import { describe, expect, it } from "vitest";
+import ipaddr from "ipaddr.js";
 
 import {
-  getClientIpFromHeaders,
-  getClientIpFromRequest,
+  type ClientIpValue,
+  getClientIpFromHeaders as getClientIpValueFromHeaders,
+  getClientIpFromRequest as getClientIpValueFromRequest,
   isTrustedProxy,
   parseClientIpProxyTrust,
 } from "./client-ip";
+
+const clientIpText = (clientIp: ClientIpValue): string =>
+  clientIp._tag === "ClientIpAddress" ? clientIp.address : "unknown";
+
+const getClientIpFromHeaders = (
+  ...args: Parameters<typeof getClientIpValueFromHeaders>
+): string => clientIpText(getClientIpValueFromHeaders(...args));
+
+const getClientIpFromRequest = (
+  ...args: Parameters<typeof getClientIpValueFromRequest>
+): string => clientIpText(getClientIpValueFromRequest(...args));
 
 const proxyTrust = (
   trustedProxyCidrs: readonly string[] = [],
@@ -186,7 +200,7 @@ describe("isTrustedProxy", () => {
     expect(isTrustedProxy("203.0.113.7", trust)).toBe(true);
   });
 
-  it("uses the rightmost forwarded address with dynamic proxy trust", () => {
+  it("uses the originating forwarded address when every proxy is trusted", () => {
     const trust = proxyTrust([], true);
     const headers = Headers.fromInput({
       "x-forwarded-for": "192.0.2.99, 198.51.100.7",
@@ -197,8 +211,59 @@ describe("isTrustedProxy", () => {
         peer: "10.0.0.4",
         proxyTrust: trust,
       })
-    ).toBe("198.51.100.7");
+    ).toBe("192.0.2.99");
   });
+
+  it("does not let an IPv6 catch-all CIDR trust IPv4 peers", () => {
+    const trust = proxyTrust(["::/0"]);
+
+    expect(isTrustedProxy("203.0.113.7", trust)).toBe(false);
+    expect(isTrustedProxy("2001:db8::7", trust)).toBe(true);
+  });
+
+  it.prop(
+    "matches generated IPv4 CIDRs according to their numeric prefixes",
+    [
+      FastCheck.array(FastCheck.integer({ min: 0, max: 255 }), {
+        minLength: 4,
+        maxLength: 4,
+      }),
+      FastCheck.array(FastCheck.integer({ min: 0, max: 255 }), {
+        minLength: 4,
+        maxLength: 4,
+      }),
+      FastCheck.integer({ min: 0, max: 32 }),
+    ],
+    ([networkOctets, candidateOctets, prefixLength]) => {
+      const network = networkOctets.join(".");
+      const candidate = candidateOctets.join(".");
+      const networkValue = networkOctets.reduce(
+        (value, octet) => value * 256n + BigInt(octet),
+        0n
+      );
+      const candidateValue = candidateOctets.reduce(
+        (value, octet) => value * 256n + BigInt(octet),
+        0n
+      );
+      const prefixDivisor = 2n ** BigInt(32 - prefixLength);
+      const expected =
+        networkValue / prefixDivisor === candidateValue / prefixDivisor;
+      const trust = proxyTrust([`${network}/${prefixLength}`]);
+
+      expect(isTrustedProxy(candidate, trust)).toBe(expected);
+    }
+  );
+
+  it.prop(
+    "accepts generated canonical IPv6 addresses as exact trusted peers",
+    [FastCheck.uint8Array({ minLength: 16, maxLength: 16 })],
+    ([addressBytes]) => {
+      const address = ipaddr.fromByteArray([...addressBytes]).toString();
+      const trust = proxyTrust([address]);
+
+      expect(isTrustedProxy(address, trust)).toBe(true);
+    }
+  );
 
   it("rejects malformed single-address forwarding headers", () => {
     const trust = proxyTrust(["10.0.0.0/8"]);
@@ -285,7 +350,7 @@ describe("getClientIpFromRequest", () => {
     expect(getClientIpFromRequest(request, trust)).toBe("198.51.100.1");
   });
 
-  it("falls back to the proxy peer when every forwarding hop is trusted", () => {
+  it("uses the furthest forwarded address when every forwarding hop is trusted", () => {
     const trust = proxyTrust(["10.0.0.0/24"]);
     const request = HttpServerRequest.fromWeb(
       new Request("http://example.com", {
@@ -293,7 +358,7 @@ describe("getClientIpFromRequest", () => {
       })
     ).modify({ remoteAddress: Option.some("10.0.0.8") });
 
-    expect(getClientIpFromRequest(request, trust)).toBe("10.0.0.8");
+    expect(getClientIpFromRequest(request, trust)).toBe("10.0.0.7");
   });
 
   it("falls back to the proxy peer when no forwarding header is present", () => {

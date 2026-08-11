@@ -130,7 +130,10 @@ layer(TestLayer)("widget updates", (it) => {
         expect(error._tag).toBe("RateLimitExceededError");
       }).pipe(
         Effect.provide(RateLimitService.layerMemory),
-        Effect.provideService(ClientIp, "203.0.113.9"),
+        Effect.provideService(ClientIp, {
+          _tag: "ClientIpAddress",
+          address: "203.0.113.9",
+        }),
         Effect.provideService(HttpServerRequest.HttpServerRequest, request)
       );
     }
