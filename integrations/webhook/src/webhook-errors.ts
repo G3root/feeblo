@@ -28,6 +28,7 @@ export class WebhookTransportError extends Schema.TaggedErrorClass<WebhookTransp
       "redirect",
       "payload_too_large",
     ]),
+    message: Schema.String,
     status: Schema.optionalKey(Schema.Number),
   }
 ) {}

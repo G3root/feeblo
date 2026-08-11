@@ -81,18 +81,32 @@ export const sendWebhookDelivery = ({
   const contentLength = Buffer.byteLength(rawBody, "utf8");
   if (contentLength > WEBHOOK_MAX_PAYLOAD_BYTES) {
     return Effect.fail(
-      new WebhookTransportError({ kind: "payload_too_large" })
+      new WebhookTransportError({
+        kind: "payload_too_large",
+        message: "WebhookTransportError: webhook payload exceeds the 256 KiB limit",
+      })
     );
   }
   const pinnedAddress = endpoint.pinnedAddresses[0];
   if (pinnedAddress === undefined) {
-    return Effect.fail(new WebhookTransportError({ kind: "network" }));
+    return Effect.fail(
+      new WebhookTransportError({
+        kind: "network",
+        message:
+          "WebhookTransportError: network failure while sending the webhook delivery",
+      })
+    );
   }
 
   const pinnedLookup: LookupFunction = (_hostname, _options, callback) => {
     callback(null, pinnedAddress, isIP(pinnedAddress));
   };
-  const networkFailure = () => new WebhookTransportError({ kind: "network" });
+  const networkFailure = () =>
+    new WebhookTransportError({
+      kind: "network",
+      message:
+        "WebhookTransportError: network failure while sending the webhook delivery",
+    });
 
   return Effect.scoped(
     Effect.gen(function* () {
@@ -133,7 +147,11 @@ export const sendWebhookDelivery = ({
     Effect.timeout(WEBHOOK_REQUEST_TIMEOUT_MS),
     Effect.catchTag(
       "TimeoutError",
-      () => new WebhookTransportError({ kind: "timeout" })
+      () =>
+        new WebhookTransportError({
+          kind: "timeout",
+          message: "WebhookTransportError: webhook delivery request timed out",
+        })
     )
   );
 };
