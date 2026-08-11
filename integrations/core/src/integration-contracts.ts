@@ -205,7 +205,7 @@ export const IntegrationDeliveryAttempt = Schema.Struct({
   ),
   id: IntegrationDeliveryAttemptId.schema,
   number: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
-  retryDecision: IntegrationDeliveryRetryDecision,
+  retryDecision: Schema.NullOr(IntegrationDeliveryRetryDecision),
   startedAt: Schema.DateTimeUtcFromString,
 });
 export interface IntegrationDeliveryAttempt
