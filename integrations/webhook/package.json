@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@effect/platform-node": "catalog:",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "effect": "catalog:",

@@ -67,10 +67,6 @@ export const integrationConnectionTable = pgTable(
   },
   (table) => [
     check(
-      "integration_connection_lifecycle_check",
-      sql`${table.lifecycle} IN ('connecting', 'active', 'paused', 'reauth_required', 'disconnecting', 'disconnected', 'revocation_unconfirmed', 'archived')`
-    ),
-    check(
       "integration_connection_credential_generation_check",
       sql`${table.credentialGeneration} > 0`
     ),
@@ -136,7 +132,7 @@ export const integrationRouteTable = pgTable(
         integrationConnectionTable.id,
       ],
       name: "integration_route_organization_connection_fkey",
-    }).onDelete("restrict"),
+    }).onDelete("cascade"),
     index("integration_route_connection_enabled_idx").on(
       table.connectionId,
       table.enabled
@@ -233,10 +229,6 @@ export const integrationDeliveryTable = pgTable(
   },
   (table) => [
     check(
-      "integration_delivery_state_check",
-      sql`${table.state} IN ('pending', 'leased', 'succeeded', 'exhausted', 'canceled')`
-    ),
-    check(
       "integration_delivery_attempt_count_check",
       sql`${table.attemptCount} >= 0`
     ),
@@ -255,7 +247,7 @@ export const integrationDeliveryTable = pgTable(
         integrationConnectionTable.id,
       ],
       name: "integration_delivery_organization_connection_fkey",
-    }).onDelete("restrict"),
+    }).onDelete("cascade"),
     foreignKey({
       columns: [table.organizationId, table.routeId],
       foreignColumns: [
@@ -263,7 +255,7 @@ export const integrationDeliveryTable = pgTable(
         integrationRouteTable.id,
       ],
       name: "integration_delivery_organization_route_fkey",
-    }).onDelete("restrict"),
+    }).onDelete("cascade"),
     foreignKey({
       columns: [table.organizationId, table.eventId],
       foreignColumns: [
@@ -271,7 +263,7 @@ export const integrationDeliveryTable = pgTable(
         integrationEventTable.id,
       ],
       name: "integration_delivery_organization_event_fkey",
-    }).onDelete("restrict"),
+    }).onDelete("cascade"),
     uniqueIndex("integration_delivery_route_event_action_uidx").on(
       table.routeId,
       table.eventId,
@@ -284,6 +276,10 @@ export const integrationDeliveryTable = pgTable(
     ),
     index("integration_delivery_connection_state_idx").on(
       table.connectionId,
+      table.state
+    ),
+    index("integration_delivery_organization_state_idx").on(
+      table.organizationId,
       table.state
     ),
     index("integration_delivery_retention_expires_at_idx").on(
