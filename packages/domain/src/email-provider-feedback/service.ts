@@ -1,5 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { EmailDeliveryState } from "@feeblo/db/validation-schema/email";
+import { EmailDeliveryId } from "@feeblo/id";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -16,7 +17,7 @@ import {
 } from "./schema";
 
 const DeliveryCorrelationRecord = Schema.Struct({
-  id: Schema.String,
+  id: EmailDeliveryId.schema,
   messageId: Schema.String,
   recipientEmail: EmailAddress,
   state: EmailDeliveryState,
@@ -30,13 +31,21 @@ const inputError = (
   operation: string,
   reason: string
 ): EmailProviderFeedbackInputError =>
-  new EmailProviderFeedbackInputError({ operation, reason });
+  new EmailProviderFeedbackInputError({
+    message: `Email provider feedback input failed during ${operation}: ${reason}`,
+    operation,
+    reason,
+  });
 
 const dataError = (
   operation: string,
   reason: string
 ): EmailProviderFeedbackDataError =>
-  new EmailProviderFeedbackDataError({ operation, reason });
+  new EmailProviderFeedbackDataError({
+    message: `Email provider feedback persistence failed during ${operation}: ${reason}`,
+    operation,
+    reason,
+  });
 
 const decodeLifecycleEvent = (
   input: unknown
@@ -182,6 +191,16 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               event.bounceType === "hard"
                 ? yield* suppress("hard_bounce")
                 : false;
+            if (event.bounceType === "hard") {
+              yield* Effect.logWarning(
+                "Email provider hard-bounce alert signal"
+              ).pipe(
+                Effect.annotateLogs({
+                  deliveryId: delivery.id,
+                  providerEventId: event.eventId,
+                })
+              );
+            }
             return { _tag: "Processed" as const, deliveryUpdated, suppressed };
           }
           case "failed": {
@@ -203,6 +222,14 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               deliveryUpdated ? 1 : 0
             );
             const suppressed = yield* suppress("complaint");
+            yield* Effect.logWarning(
+              "Email provider complaint alert signal"
+            ).pipe(
+              Effect.annotateLogs({
+                deliveryId: delivery.id,
+                providerEventId: event.eventId,
+              })
+            );
             return { _tag: "Processed" as const, deliveryUpdated, suppressed };
           }
           default:

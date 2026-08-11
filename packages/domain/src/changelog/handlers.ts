@@ -1,6 +1,7 @@
 import { transaction } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import {
@@ -53,7 +54,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       return;
     }
 
-    const now = new Date();
+    const now = yield* DateTime.nowAsDate;
     const result = yield* emailOutbox
       .recordIntent({
         aggregateId: args.changelogId,
@@ -157,9 +158,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           ),
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
-        if (outboxId) {
-          yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
-        }
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(changelogPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Changelog", "create")
@@ -172,7 +171,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           cleanupOrphanedEditorAssets({
             organizationId: args.organizationId,
           }).pipe(
-            Effect.catchCause((cause) =>
+            Effect.catch((cause) =>
               Effect.logWarning(
                 "Failed to clean up orphaned editor assets",
                 cause
@@ -238,9 +237,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           ),
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
-        if (outboxId) {
-          yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
-        }
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(
           changelogPolicy.canUpdate({
@@ -277,7 +274,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               });
             }
 
-            const now = new Date();
+            const now = yield* DateTime.nowAsDate;
             const result = yield* emailOutbox
               .recordIntent({
                 aggregateId: args.id,
@@ -314,9 +311,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             return result._tag === "Inserted" ? result.intent.id : undefined;
           })
         );
-        if (outboxId) {
-          yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
-        }
+        yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(
           changelogPolicy.canUpdate({

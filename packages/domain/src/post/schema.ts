@@ -1,4 +1,10 @@
-import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
+import {
+  BoardId,
+  PostActivityId,
+  PostId,
+  PostStatusId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const EtaQuarter = S.String.pipe(
@@ -118,6 +124,18 @@ export const PostAdminUpdate = S.Struct({
 });
 
 export type TPostAdminUpdate = S.Schema.Type<typeof PostAdminUpdate>;
+
+/** Administrator-authored update that is intentionally emailed to post subscribers. */
+export const PostOfficialUpdatePublish = S.Struct({
+  body: S.String.pipe(S.check(S.isMinLength(1)), S.check(S.isMaxLength(5000))),
+  organizationId: WorkspaceId.schema,
+  postId: PostId.schema,
+  updateId: PostActivityId.schema,
+});
+
+export type TPostOfficialUpdatePublish = S.Schema.Type<
+  typeof PostOfficialUpdatePublish
+>;
 
 export const PostMerge = S.Struct({
   organizationId: WorkspaceId.schema,

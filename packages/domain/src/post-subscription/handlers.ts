@@ -85,10 +85,10 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
             userId: session.session.userId,
           });
           yield* emailSubscriptions
-            .unsubscribeAuthenticatedPostSubscription({
+            .unsubscribeAuthenticatedSubscription({
               now: new Date(),
               organizationId: args.organizationId,
-              postId: args.postId,
+              topic: { topicId: args.postId, topicType: "post" },
               userId: session.session.userId,
             })
             .pipe(

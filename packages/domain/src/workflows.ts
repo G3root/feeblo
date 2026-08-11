@@ -51,6 +51,7 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
       Layer.provide(makeMailerLayer()),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(EmailOutboxRepository.layer),
+      Layer.provide(EmailSubscriptionRepository.layer),
       Layer.provide(
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
       )

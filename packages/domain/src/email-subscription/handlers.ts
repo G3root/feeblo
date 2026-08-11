@@ -2,7 +2,11 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-
+import {
+  type EmailOutboxDataError,
+  EmailOutboxRepository,
+} from "../email-outbox/repository";
+import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import {
@@ -11,6 +15,7 @@ import {
 } from "../rate-limit";
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { EmailSubscriptionRepository } from "./repository";
 import { EmailSubscriptionRpcs } from "./rpcs";
@@ -19,7 +24,8 @@ import {
   type EmailSubscriptionDataError,
   type EmailSubscriptionInputError,
   type EmailSubscriptionTokenRequest,
-  normalizeEmailAddress,
+  parseEmailAddress,
+  type SubmissionNotificationPreferenceRequest,
 } from "./schema";
 import type { EmailSubscriptionTokenError } from "./tokens";
 
@@ -31,28 +37,29 @@ const verificationExpiration = (now: Date): Date =>
 
 export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
-  const rateLimitService = yield* RateLimitService;
   const repository = yield* EmailSubscriptionRepository;
+  const emailOutbox = yield* EmailOutboxRepository;
 
   const consumeVerificationRequest = (args: {
     readonly email: string;
     readonly organizationId: string;
   }) =>
-    rateLimitService
-      .consume({
+    Effect.gen(function* () {
+      const rateLimitService = yield* RateLimitService;
+      return yield* rateLimitService.consume({
         key: `email-subscription:verification-request:${args.organizationId}:${args.email}`,
         limit: 3,
         window: EMAIL_SUBSCRIPTION_VERIFICATION_WINDOW,
-      })
-      .pipe(
-        Effect.catchTag("RateLimiterError", (error) =>
-          Effect.fail(
-            error.reason._tag === "RateLimitExceeded"
-              ? new RateLimitExceededError()
-              : new RateLimitUnavailableError()
-          )
+      });
+    }).pipe(
+      Effect.catchTag("RateLimiterError", (error) =>
+        Effect.fail(
+          error.reason._tag === "RateLimitExceeded"
+            ? new RateLimitExceededError()
+            : new RateLimitUnavailableError()
         )
-      );
+      )
+    );
 
   /**
    * Creates a manual changelog consent request. Link tokens remain Redacted,
@@ -74,20 +81,47 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
           "Changelog email subscriptions require the Starter plan or higher.",
       });
     }
-    const email = yield* normalizeEmailAddress(
+    const email = yield* parseEmailAddress(
       requestedEmail,
       "requestChangelogSubscription"
     );
     yield* consumeVerificationRequest({ email, organizationId });
     const now = yield* DateTime.nowAsDate;
-    const subscription = yield* repository.requestSubscription({
-      email,
-      now,
-      organizationId,
-      source: "explicit",
-      topic: { topicId: null, topicType: "changelog" },
-      verificationExpiresAt: verificationExpiration(now),
-    });
+    const verificationExpiresAt = verificationExpiration(now);
+    const { outboxId, subscription } = yield* transaction(
+      Effect.gen(function* () {
+        const requested = yield* repository.requestSubscription({
+          email,
+          now,
+          organizationId,
+          source: "explicit",
+          topic: { topicId: null, topicType: "changelog" },
+          verificationExpiresAt,
+        });
+        if (Option.isNone(requested.verificationToken)) {
+          return { outboxId: undefined, subscription: requested };
+        }
+        const recorded = yield* emailOutbox.recordIntent({
+          aggregateId: requested.subscription.id,
+          aggregateType: "email_subscription",
+          deduplicationKey: `subscription.verification_requested:${requested.subscription.id}:${now.getTime()}`,
+          expiresAt: verificationExpiresAt,
+          kind: "subscription.verification_requested",
+          organizationId,
+          payload: {
+            kind: "subscription.verification_requested",
+            subscriptionId: requested.subscription.id,
+          },
+          scheduledAt: now,
+        });
+        return {
+          outboxId:
+            recorded._tag === "Inserted" ? recorded.intent.id : undefined,
+          subscription: requested,
+        };
+      })
+    );
+    yield* wakeEmailOutboxBestEffort(outboxId, organizationId);
     return {
       ...subscription,
       verificationRequired: Option.isSome(subscription.verificationToken),
@@ -122,12 +156,15 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
 /** RPC adapter which deliberately removes redacted link tokens from responses. */
 export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const consent = yield* EmailSubscriptionConsentHandlersEffect;
+  const entitlementPolicy = yield* EntitlementPolicy;
+  const repository = yield* EmailSubscriptionRepository;
 
   const internalConsentFailure = (
     error:
       | EmailSubscriptionDataError
       | EmailSubscriptionInputError
       | EmailSubscriptionTokenError
+      | EmailOutboxDataError
   ) =>
     Effect.logError("Email subscription request failed internally", error).pipe(
       Effect.andThen(
@@ -147,6 +184,7 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       consent.requestChangelogSubscription({ email, organizationId }).pipe(
         Effect.map(({ verificationRequired }) => ({ verificationRequired })),
         Effect.catchTags({
+          EmailOutboxDataError: internalConsentFailure,
           EmailSubscriptionDataError: internalConsentFailure,
           EmailSubscriptionInputError: internalConsentFailure,
           EmailSubscriptionTokenError: internalConsentFailure,
@@ -171,6 +209,59 @@ export const EmailSubscriptionRpcHandlersEffect = Effect.gen(function* () {
         }),
         withRemapDbErrors("EmailSubscription", "update")
       ),
+    EmailSubmissionNotificationPreferenceSet: ({
+      enabled,
+      organizationId,
+    }: SubmissionNotificationPreferenceRequest) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, organizationId);
+        if (
+          membership === undefined ||
+          (membership.role !== "owner" && membership.role !== "admin")
+        ) {
+          return yield* new Policy.PolicyDeniedError({
+            reason:
+              "Only workspace owners and administrators can receive submission notification email.",
+          });
+        }
+        const now = yield* DateTime.nowAsDate;
+        if (enabled) {
+          const recipientLimit =
+            yield* entitlementPolicy.submissionNotificationRecipientLimit(
+              organizationId
+            );
+          yield* transaction(
+            repository.configureSubmissionNotificationRecipient({
+              alreadyVerifiedUser: { userId: session.session.userId },
+              email: session.user.email,
+              now,
+              organizationId,
+              replaceOtherRecipients: recipientLimit === 1,
+              source: "explicit",
+              topic: { topicId: null, topicType: "submission" },
+              verificationExpiresAt: null,
+            })
+          );
+        } else {
+          yield* transaction(
+            repository.unsubscribeAuthenticatedSubscription({
+              now,
+              organizationId,
+              topic: { topicId: null, topicType: "submission" },
+              userId: session.session.userId,
+            })
+          );
+        }
+        return { enabled };
+      }).pipe(
+        Effect.catchTags({
+          EmailSubscriptionDataError: internalConsentFailure,
+          EmailSubscriptionInputError: internalConsentFailure,
+          EmailSubscriptionTokenError: internalConsentFailure,
+        }),
+        withRemapDbErrors("EmailSubscription", "update")
+      ),
   };
 });
 
@@ -178,7 +269,10 @@ export const EmailSubscriptionRpcHandlers = EmailSubscriptionRpcs.toLayer(
   EmailSubscriptionRpcHandlersEffect
 ).pipe(
   Layer.provide(EmailSubscriptionRepository.layer),
+  Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   )
 );
+
+import { transaction } from "@feeblo/db";

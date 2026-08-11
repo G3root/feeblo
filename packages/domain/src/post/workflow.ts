@@ -1,7 +1,7 @@
 import { Database, schema, transaction } from "@feeblo/db";
 import {
-  MailDeliveryError,
   Mailer,
+  MailProviderDeliveryError,
   MailTemplateRenderError,
 } from "@feeblo/transactional/mailer";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
@@ -20,7 +20,7 @@ class SubmissionNotificationDataError extends S.TaggedErrorClass<SubmissionNotif
 
 const WorkflowError = S.Union([
   MailTemplateRenderError,
-  MailDeliveryError,
+  MailProviderDeliveryError,
   SubmissionNotificationDataError,
 ]);
 

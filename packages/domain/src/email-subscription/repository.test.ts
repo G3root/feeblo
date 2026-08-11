@@ -7,9 +7,15 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import { EmailSubscriptionRepository } from "./repository";
+import { EmailSubscriptionTokenService } from "./tokens";
 
 describe("EmailSubscriptionRepository", () => {
-  const TestLayer = EmailSubscriptionRepository.layer.pipe(
+  const TestLayer = EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+    Layer.provide(
+      EmailSubscriptionTokenService.layerTest(
+        "email-subscription-repository-test-signing-secret"
+      )
+    ),
     Layer.provideMerge(Database.PgliteDatabaseLive)
   );
 
@@ -328,21 +334,21 @@ describe("EmailSubscriptionRepository", () => {
             topic: { topicId: "post_b", topicType: "post" },
           });
 
-          const first =
-            yield* repository.unsubscribeAuthenticatedPostSubscription({
-              now: new Date("2026-08-09T00:01:00.000Z"),
-              organizationId,
-              postId: "post_a",
-              userId: "usr_post_subscriber",
-            });
+          const first = yield* repository.unsubscribeAuthenticatedSubscription({
+            now: new Date("2026-08-09T00:01:00.000Z"),
+            organizationId,
+            topic: { topicId: "post_a", topicType: "post" },
+            userId: "usr_post_subscriber",
+          });
           expect(first).toEqual({ _tag: "Unsubscribed" });
-          const second =
-            yield* repository.unsubscribeAuthenticatedPostSubscription({
+          const second = yield* repository.unsubscribeAuthenticatedSubscription(
+            {
               now: new Date("2026-08-09T00:02:00.000Z"),
               organizationId,
-              postId: "post_a",
+              topic: { topicId: "post_a", topicType: "post" },
               userId: "usr_post_subscriber",
-            });
+            }
+          );
           expect(second).toEqual({ _tag: "AlreadyUnsubscribed" });
           const postA = yield* repository.findSubscription({
             email: "usr_post_subscriber@example.com",
@@ -386,10 +392,10 @@ describe("EmailSubscriptionRepository", () => {
           );
 
           expect(
-            yield* repository.unsubscribeAuthenticatedPostSubscription({
+            yield* repository.unsubscribeAuthenticatedSubscription({
               now: new Date("2026-08-09T00:01:00.000Z"),
               organizationId,
-              postId: "post_multi",
+              topic: { topicId: "post_multi", topicType: "post" },
               userId,
             })
           ).toEqual({ _tag: "Unsubscribed" });

@@ -3,12 +3,13 @@ import { Database, schema } from "@feeblo/db";
 import { EmailDeliveryId, EmailOutboxId } from "@feeblo/id";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import {
   type EmailAddress,
-  normalizeEmailAddress,
+  parseEmailAddress,
 } from "../email-subscription/schema";
 import { deliverySourceStatesFor } from "./delivery-state";
 import {
@@ -33,40 +34,39 @@ export class EmailOutboxDataError extends Schema.TaggedErrorClass<EmailOutboxDat
   }
 ) {}
 
-type EmailIntentWriteFields = Pick<
-  EmailIntent,
-  | "aggregateId"
-  | "aggregateType"
-  | "deduplicationKey"
-  | "expiresAt"
-  | "organizationId"
-  | "scheduledAt"
->;
+type EmailIntentWriteFields = {
+  readonly aggregateId: string;
+  readonly aggregateType: string;
+  readonly deduplicationKey: string;
+  readonly expiresAt: Date | null;
+  readonly organizationId: string;
+  readonly scheduledAt: Date;
+};
+
+type EncodedIntentPayload = Schema.Codec.Encoded<typeof EmailIntentPayload>;
 
 export type RecordEmailIntentInput = EmailIntentWriteFields & {
   readonly kind: Exclude<EmailIntent["kind"], "post.status_changed">;
   readonly payload: Exclude<
-    IntentPayload,
+    EncodedIntentPayload,
     { readonly kind: "post.status_changed" }
   >;
 };
 
 export type RecordStatusChangeIntentInput = EmailIntentWriteFields & {
   readonly payload: Extract<
-    IntentPayload,
+    EncodedIntentPayload,
     { readonly kind: "post.status_changed" }
   >;
 };
 
-export type CreateEmailDeliveryInput = Pick<
-  EmailDelivery,
-  | "outboxId"
-  | "recipientEmail"
-  | "template"
-  | "templatePayload"
-  | "templateVersion"
-> & {
-  readonly contactId?: EmailDelivery["contactId"];
+export type CreateEmailDeliveryInput = {
+  readonly contactId?: string | null;
+  readonly outboxId: string;
+  readonly recipientEmail: string;
+  readonly template: EmailDelivery["template"];
+  readonly templatePayload: unknown;
+  readonly templateVersion: number;
 };
 
 export interface FindPendingEmailIntentsInput {
@@ -130,7 +130,7 @@ const decodeEmailDelivery = (
 const normalizeRecipientEmail = (
   recipientEmail: string
 ): Effect.Effect<EmailAddress, EmailOutboxDataError> =>
-  normalizeEmailAddress(recipientEmail, "createDelivery").pipe(
+  parseEmailAddress(recipientEmail, "createDelivery").pipe(
     Effect.mapError(() =>
       dataError("createDelivery", "Recipient email is invalid")
     )
@@ -243,9 +243,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       };
     }
 
+    const updatedAt = yield* DateTime.nowAsDate;
     const [coalesced] = yield* db
       .update(schema.emailOutboxTable)
-      .set({ payload, updatedAt: new Date() })
+      .set({ payload, updatedAt })
       .where(
         and(
           eq(schema.emailOutboxTable.organizationId, input.organizationId),
@@ -386,9 +387,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       readonly id: string;
       readonly state: "materialized" | "paused_by_plan" | "failed" | "expired";
     }) {
+      const updatedAt = yield* DateTime.nowAsDate;
       const rows = yield* db
         .update(schema.emailOutboxTable)
-        .set({ state, updatedAt: new Date() })
+        .set({ state, updatedAt })
         .where(
           and(
             eq(schema.emailOutboxTable.id, id),
@@ -408,11 +410,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   const resumePausedIntent = Effect.fn(
     "EmailOutboxRepository.resumePausedIntent"
   )(function* ({ id }: { readonly id: string }) {
+    const updatedAt = yield* DateTime.nowAsDate;
     const rows = yield* db
       .update(schema.emailOutboxTable)
       .set({
         state: "pending",
-        updatedAt: new Date(),
+        updatedAt,
       })
       .where(
         and(
@@ -610,12 +613,13 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   const recoverStaleSendingDeliveries = Effect.fn(
     "EmailOutboxRepository.recoverStaleSendingDeliveries"
   )(function* ({ before }: { readonly before: Date }) {
+    const updatedAt = yield* DateTime.nowAsDate;
     const rows = yield* db
       .update(schema.emailDeliveryTable)
       .set({
         state: "deferred",
-        nextAttemptAt: new Date(),
-        updatedAt: new Date(),
+        nextAttemptAt: updatedAt,
+        updatedAt,
       })
       .where(
         and(
@@ -640,18 +644,50 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     readonly nextAttemptAt: Date;
     readonly lastError: unknown;
   }) {
+    const updatedAt = yield* DateTime.nowAsDate;
     const rows = yield* db
       .update(schema.emailDeliveryTable)
       .set({
         state: "deferred",
         nextAttemptAt,
         lastError,
-        updatedAt: new Date(),
+        updatedAt,
       })
       .where(
         and(
           eq(schema.emailDeliveryTable.id, id),
           eq(schema.emailDeliveryTable.state, "sending")
+        )
+      )
+      .returning({ id: schema.emailDeliveryTable.id });
+    yield* recordEmailDeliveryTransition("deferred", rows.length);
+    return rows.length === 1;
+  });
+
+  const deferDeliveryForThrottle = Effect.fn(
+    "EmailOutboxRepository.deferDeliveryForThrottle"
+  )(function* ({
+    id,
+    nextAttemptAt,
+    reason,
+  }: {
+    readonly id: string;
+    readonly nextAttemptAt: Date;
+    readonly reason: string;
+  }) {
+    const updatedAt = yield* DateTime.nowAsDate;
+    const rows = yield* db
+      .update(schema.emailDeliveryTable)
+      .set({
+        state: "deferred",
+        nextAttemptAt,
+        lastError: { tag: "EmailDeliveryThrottle", reason },
+        updatedAt,
+      })
+      .where(
+        and(
+          eq(schema.emailDeliveryTable.id, id),
+          inArray(schema.emailDeliveryTable.state, ["queued", "deferred"])
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
@@ -700,12 +736,13 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     readonly state: "failed" | "suppressed" | "expired" | "paused_by_plan";
     readonly lastError?: unknown;
   }) {
+    const updatedAt = yield* DateTime.nowAsDate;
     const rows = yield* db
       .update(schema.emailDeliveryTable)
       .set({
         state,
         ...(lastError === undefined ? {} : { lastError }),
-        updatedAt: new Date(),
+        updatedAt,
       })
       .where(
         and(
@@ -768,6 +805,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     findDueDeliveries,
     recoverStaleSendingDeliveries,
     deferSendingDelivery,
+    deferDeliveryForThrottle,
     claimDeliveryForSending,
     markDeliveryAccepted,
     markDeliveryOutcome,

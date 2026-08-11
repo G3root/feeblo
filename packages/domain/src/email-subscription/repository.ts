@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { EmailContactId, EmailSubscriptionId } from "@feeblo/id";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -13,37 +13,38 @@ import {
   type EmailSubscriptionInputError,
   EmailSubscriptionRecord,
   type EmailSubscriptionTokenRequest,
-  normalizeEmailAddress,
+  parseEmailAddress,
   type EmailSubscriptionRecord as Subscription,
   type EmailSuppressionRecord as Suppression,
-  type EmailSubscriptionTopic as Topic,
 } from "./schema";
 import {
   type EmailSubscriptionToken,
   type EmailSubscriptionTokenError,
-  generateEmailSubscriptionToken,
+  EmailSubscriptionTokenService,
   hashEmailSubscriptionToken,
   redactEmailSubscriptionToken,
 } from "./tokens";
 
-export type RequestEmailSubscriptionInput = Pick<
-  Contact,
-  "email" | "organizationId"
-> &
-  Pick<Subscription, "source"> & {
-    readonly alreadyVerifiedUser?: {
-      readonly userId: NonNullable<Contact["userId"]>;
-    };
-    readonly now: Contact["updatedAt"];
-    readonly topic: Topic;
-    readonly verificationExpiresAt: Subscription["verificationExpiresAt"];
-  };
+export type EmailSubscriptionTopicInput =
+  | { readonly topicId: null; readonly topicType: "submission" | "changelog" }
+  | { readonly topicId: string; readonly topicType: "post" };
 
-export type FindEmailSubscriptionInput = Pick<
-  Contact,
-  "email" | "organizationId"
-> & {
-  readonly topic: Topic;
+export type RequestEmailSubscriptionInput = {
+  readonly email: string;
+  readonly organizationId: string;
+  readonly source: Subscription["source"];
+  readonly alreadyVerifiedUser?: {
+    readonly userId: string;
+  };
+  readonly now: Contact["updatedAt"];
+  readonly topic: EmailSubscriptionTopicInput;
+  readonly verificationExpiresAt: Subscription["verificationExpiresAt"];
+};
+
+export type FindEmailSubscriptionInput = {
+  readonly email: string;
+  readonly organizationId: string;
+  readonly topic: EmailSubscriptionTopicInput;
 };
 
 export interface VerifyEmailSubscriptionInput {
@@ -89,7 +90,7 @@ const decodeSubscription = (
 
 const topicCondition = (
   table: typeof schema.emailSubscriptionTable,
-  topic: Topic
+  topic: EmailSubscriptionTopicInput
 ) =>
   topic.topicId === null
     ? and(eq(table.topicType, topic.topicType), isNull(table.topicId))
@@ -102,6 +103,9 @@ const verifiedStateFor = (
   subscription: Subscription | undefined,
   alreadyVerified: boolean
 ): Subscription["state"] => {
+  if (alreadyVerified) {
+    return "active";
+  }
   if (
     subscription?.state === "paused_by_plan" ||
     subscription?.state === "unsubscribed"
@@ -116,6 +120,7 @@ const verifiedStateFor = (
 
 const makeEmailSubscriptionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+  const tokenService = yield* EmailSubscriptionTokenService;
 
   const findContact = (organizationId: string, email: string) =>
     Effect.gen(function* () {
@@ -134,7 +139,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         : Option.some(yield* decodeContact(row, "findContact"));
     });
 
-  const findSubscriptionForContact = (contactId: string, topic: Topic) =>
+  const findSubscriptionForContact = (
+    contactId: string,
+    topic: EmailSubscriptionTopicInput
+  ) =>
     Effect.gen(function* () {
       const [row] = yield* db
         .select()
@@ -154,10 +162,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   const requestSubscription = Effect.fn(
     "EmailSubscriptionRepository.requestSubscription"
   )(function* (input: RequestEmailSubscriptionInput) {
-    const email = yield* normalizeEmailAddress(
-      input.email,
-      "requestSubscription"
-    );
+    const email = yield* parseEmailAddress(input.email, "requestSubscription");
     const userId = input.alreadyVerifiedUser?.userId;
     const alreadyVerified = userId !== undefined;
 
@@ -234,7 +239,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       input.topic
     );
     const priorSubscription = Option.getOrUndefined(existingSubscription);
-    if (priorSubscription?.state === "unsubscribed") {
+    if (priorSubscription?.state === "unsubscribed" && !alreadyVerified) {
       return {
         contact: persistedContact,
         subscription: priorSubscription,
@@ -243,16 +248,28 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       };
     }
     const state = verifiedStateFor(priorSubscription, alreadyVerified);
+    const subscriptionId =
+      priorSubscription?.id ?? (yield* EmailSubscriptionId.generate);
     const unsubscribeToken =
       priorSubscription === undefined
-        ? Option.some(yield* generateEmailSubscriptionToken)
+        ? Option.some(
+            yield* tokenService.deriveToken({
+              purpose: "unsubscribe",
+              subscriptionId,
+            })
+          )
         : Option.none<EmailSubscriptionToken>();
     const unsubscribeTokenHash = Option.isSome(unsubscribeToken)
       ? yield* hashEmailSubscriptionToken(unsubscribeToken.value)
       : null;
     const verificationToken =
       state === "pending_verification"
-        ? Option.some(yield* generateEmailSubscriptionToken)
+        ? Option.some(
+            yield* tokenService.deriveToken({
+              purpose: "verification",
+              subscriptionId,
+            })
+          )
         : Option.none<EmailSubscriptionToken>();
     const verificationTokenHash = Option.isSome(verificationToken)
       ? yield* hashEmailSubscriptionToken(verificationToken.value)
@@ -291,11 +308,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           );
         })
       : yield* Effect.gen(function* () {
-          const id = yield* EmailSubscriptionId.generate;
           const [created] = yield* db
             .insert(schema.emailSubscriptionTable)
             .values({
-              id,
+              id: subscriptionId,
               organizationId: input.organizationId,
               contactId: persistedContact.id,
               topicType: input.topic.topicType,
@@ -334,10 +350,46 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     };
   });
 
+  const configureSubmissionNotificationRecipient = Effect.fn(
+    "EmailSubscriptionRepository.configureSubmissionNotificationRecipient"
+  )(function* (
+    input: RequestEmailSubscriptionInput & {
+      readonly replaceOtherRecipients: boolean;
+    }
+  ) {
+    const configured = yield* requestSubscription(input);
+    if (input.replaceOtherRecipients) {
+      yield* db
+        .update(schema.emailSubscriptionTable)
+        .set({
+          state: "unsubscribed",
+          unsubscribedAt: input.now,
+          updatedAt: input.now,
+        })
+        .where(
+          and(
+            eq(
+              schema.emailSubscriptionTable.organizationId,
+              input.organizationId
+            ),
+            eq(schema.emailSubscriptionTable.topicType, "submission"),
+            isNull(schema.emailSubscriptionTable.topicId),
+            ne(schema.emailSubscriptionTable.id, configured.subscription.id),
+            inArray(schema.emailSubscriptionTable.state, [
+              "active",
+              "pending_verification",
+              "paused_by_plan",
+            ])
+          )
+        );
+    }
+    return configured;
+  });
+
   const findSubscription = Effect.fn(
     "EmailSubscriptionRepository.findSubscription"
   )(function* (input: FindEmailSubscriptionInput) {
-    const email = yield* normalizeEmailAddress(input.email, "findSubscription");
+    const email = yield* parseEmailAddress(input.email, "findSubscription");
     const contact = yield* findContact(input.organizationId, email);
     return Option.isSome(contact)
       ? yield* findSubscriptionForContact(contact.value.id, input.topic)
@@ -439,18 +491,18 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     }
   );
 
-  /** Authenticated post-topic unsubscribe; it never accepts a bearer token. */
-  const unsubscribeAuthenticatedPostSubscription = Effect.fn(
-    "EmailSubscriptionRepository.unsubscribeAuthenticatedPostSubscription"
+  /** Authenticated topic unsubscribe; it never accepts a bearer token. */
+  const unsubscribeAuthenticatedSubscription = Effect.fn(
+    "EmailSubscriptionRepository.unsubscribeAuthenticatedSubscription"
   )(function* ({
     now,
     organizationId,
-    postId,
+    topic,
     userId,
   }: {
     readonly now: Date;
     readonly organizationId: string;
-    readonly postId: string;
+    readonly topic: EmailSubscriptionTopicInput;
     readonly userId: string;
   }) {
     const rows = yield* db
@@ -466,8 +518,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       .where(
         and(
           eq(schema.emailSubscriptionTable.organizationId, organizationId),
-          eq(schema.emailSubscriptionTable.topicType, "post"),
-          eq(schema.emailSubscriptionTable.topicId, postId),
+          topicCondition(schema.emailSubscriptionTable, topic),
           eq(schema.emailContactTable.organizationId, organizationId),
           eq(schema.emailContactTable.userId, userId)
         )
@@ -569,10 +620,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   const upsertSuppression = Effect.fn(
     "EmailSubscriptionRepository.upsertSuppression"
   )(function* (input: UpsertEmailSuppressionInput) {
-    const email = yield* normalizeEmailAddress(
-      input.email,
-      "upsertSuppression"
-    );
+    const email = yield* parseEmailAddress(input.email, "upsertSuppression");
     if (input.providerEventId !== null) {
       const [inserted] = yield* db
         .insert(schema.emailSuppressionTable)
@@ -612,10 +660,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
 
   const isSuppressed = Effect.fn("EmailSubscriptionRepository.isSuppressed")(
     function* ({ email }: { readonly email: string }) {
-      const normalizedEmail = yield* normalizeEmailAddress(
-        email,
-        "isSuppressed"
-      );
+      const normalizedEmail = yield* parseEmailAddress(email, "isSuppressed");
       const [suppression] = yield* db
         .select({ email: schema.emailSuppressionTable.email })
         .from(schema.emailSuppressionTable)
@@ -625,12 +670,23 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     }
   );
 
+  const deriveLinkToken = Effect.fn(
+    "EmailSubscriptionRepository.deriveLinkToken"
+  )(
+    (input: {
+      readonly purpose: "unsubscribe" | "verification";
+      readonly subscriptionId: Subscription["id"];
+    }) => tokenService.deriveToken(input)
+  );
+
   return {
+    deriveLinkToken,
+    configureSubmissionNotificationRecipient,
     findSubscription,
     isSuppressed,
     requestSubscription,
     unsubscribe,
-    unsubscribeAuthenticatedPostSubscription,
+    unsubscribeAuthenticatedSubscription,
     reconcileSubscriptionPlanStates,
     findPlanStateOrganizationIds,
     upsertSuppression,
@@ -642,7 +698,10 @@ export class EmailSubscriptionRepository extends Context.Service<EmailSubscripti
   "EmailSubscriptionRepository",
   { make: makeEmailSubscriptionRepository }
 ) {
-  static readonly layer = Layer.effect(this, this.make);
+  static readonly layerWithoutDependencies = Layer.effect(this, this.make);
+  static readonly layer = this.layerWithoutDependencies.pipe(
+    Layer.provide(EmailSubscriptionTokenService.layer)
+  );
 }
 
 export type EmailSubscriptionRepositoryError =

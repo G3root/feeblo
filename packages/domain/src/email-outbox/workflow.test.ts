@@ -1,6 +1,12 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { WorkspaceId } from "@feeblo/id";
+import {
+  EmailContactId,
+  EmailSubscriptionId,
+  MemberId,
+  UserId,
+  WorkspaceId,
+} from "@feeblo/id";
 import {
   MailerTestLayer,
   resetTestMailer,
@@ -9,9 +15,12 @@ import {
 import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
 import { TestClock } from "effect/testing";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { WorkspaceRepository } from "../workspace/repository";
 import { EmailOutboxConfig } from "./config";
@@ -20,6 +29,7 @@ import {
   EmailDeliveryWorkflow,
   EmailOutboxDispatcherWorkflow,
   EmailOutboxWorkflowLayer,
+  materializeEmailIntent,
   reconcileEmailOutbox,
 } from "./workflow";
 
@@ -29,7 +39,15 @@ const TestLayer = EmailOutboxWorkflowLayer.pipe(
   ),
   Layer.provideMerge(MailerTestLayer),
   Layer.provideMerge(EmailOutboxRepository.layer),
-  Layer.provideMerge(EmailSubscriptionRepository.layer),
+  Layer.provideMerge(
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "email-outbox-workflow-test-signing-secret"
+        )
+      )
+    )
+  ),
   Layer.provideMerge(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),
@@ -39,13 +57,14 @@ const TestLayer = EmailOutboxWorkflowLayer.pipe(
 
 const fixture = Effect.gen(function* () {
   const db = yield* currentDb;
+  const now = new Date("2026-08-11T00:00:00.000Z");
+  yield* TestClock.setTime(now.getTime());
   const organizationId = yield* WorkspaceId.generate;
   const userId = `usr_${organizationId}`;
   const ownerId = `mem_${organizationId}`;
   const boardId = `brd_${organizationId}`;
   const statusId = `pst_${organizationId}`;
   const postId = `post_${organizationId}`;
-  const now = new Date();
   yield* db.insert(schema.organizationTable).values({
     id: organizationId,
     name: "Outbox",
@@ -152,8 +171,8 @@ const addSubscriptionContact = (args: {
   Effect.gen(function* () {
     const db = yield* currentDb;
     const now = new Date();
-    const contactId = `contact_${args.email.replaceAll(/[^a-z0-9]/g, "_")}`;
-    const subscriptionId = `subscription_${args.email.replaceAll(/[^a-z0-9]/g, "_")}_${args.topicType}`;
+    const contactId = yield* EmailContactId.generate;
+    const subscriptionId = yield* EmailSubscriptionId.generate;
     yield* db
       .insert(schema.emailContactTable)
       .values({
@@ -200,6 +219,8 @@ const waitForDelivery = (
 ) =>
   Effect.gen(function* () {
     const db = yield* Database.Database;
+    let lastObservedState = "missing";
+    let lastObservedAttemptCount = 0;
     for (let poll = 0; poll < 100; poll += 1) {
       const [delivery] = yield* db
         .select()
@@ -208,9 +229,13 @@ const waitForDelivery = (
       if (delivery !== undefined && predicate(delivery)) {
         return delivery;
       }
+      lastObservedState = delivery?.state ?? "missing";
+      lastObservedAttemptCount = delivery?.attemptCount ?? 0;
       yield* Effect.yieldNow;
     }
-    return yield* Effect.die("Email delivery did not reach the expected state");
+    return yield* Effect.die(
+      `Email delivery did not reach the expected state; last state=${lastObservedState}, attempts=${lastObservedAttemptCount}`
+    );
   });
 
 const waitForIntentState = (outboxId: string, state: string) =>
@@ -285,6 +310,53 @@ describe("EmailOutbox workflows", () => {
     );
 
     it.effect(
+      "sends paid submission notifications only to opted-in administrators",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId, organizationId, ownerEmail } = yield* fixture;
+          yield* enableSubscriberEmails(organizationId);
+          const db = yield* Database.Database;
+          const adminUserId = yield* UserId.generate;
+          const adminMemberId = yield* MemberId.generate;
+          const adminEmail = `admin-${organizationId}@example.test`;
+          yield* db.insert(schema.userTable).values({
+            id: adminUserId,
+            email: adminEmail,
+            name: "Opted-in admin",
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: adminMemberId,
+            createdAt: new Date("2026-08-11T00:00:00.000Z"),
+            organizationId,
+            role: "admin",
+            userId: adminUserId,
+          });
+          yield* (yield* EmailSubscriptionRepository).requestSubscription({
+            alreadyVerifiedUser: { userId: adminUserId },
+            email: adminEmail,
+            now: new Date("2026-08-11T00:00:00.000Z"),
+            organizationId,
+            source: "explicit",
+            topic: { topicId: null, topicType: "submission" },
+            verificationExpiresAt: null,
+          });
+
+          const deliveryIds = yield* materializeEmailIntent(intentId);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          const mailbox = yield* testMailerState;
+          expect(mailbox.sentMessages.map((message) => message.to)).toEqual([
+            adminEmail.toLowerCase(),
+          ]);
+          expect(
+            mailbox.sentMessages.map((message) => message.to)
+          ).not.toContain(ownerEmail.toLowerCase());
+        })
+    );
+
+    it.effect(
       "retries one temporary delivery with its stored deterministic message id",
       () =>
         Effect.gen(function* () {
@@ -332,12 +404,24 @@ describe("EmailOutbox workflows", () => {
           const db = yield* Database.Database;
           yield* enableSubscriberEmails(organizationId);
           const changelogId = `changelog_${organizationId}`;
-          const subscriber = yield* addSubscriptionContact({
+          const subscriptions = yield* EmailSubscriptionRepository;
+          const consentNow = new Date("2026-08-11T00:00:00.000Z");
+          const subscriber = yield* subscriptions.requestSubscription({
             email: `changelog-${organizationId}@example.test`,
+            now: consentNow,
             organizationId,
-            state: "active",
-            topicId: null,
-            topicType: "changelog",
+            source: "explicit",
+            topic: { topicId: null, topicType: "changelog" },
+            verificationExpiresAt: new Date(consentNow.getTime() + 86_400_000),
+          });
+          if (Option.isNone(subscriber.verificationToken)) {
+            return yield* Effect.die("Expected a verification token");
+          }
+          yield* subscriptions.verifySubscription({
+            now: consentNow,
+            verificationToken: Redacted.value(
+              subscriber.verificationToken.value
+            ),
           });
           yield* db.insert(schema.changelogTable).values({
             id: changelogId,
@@ -366,9 +450,10 @@ describe("EmailOutbox workflows", () => {
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected changelog intent");
           }
-          yield* EmailOutboxDispatcherWorkflow.execute({
-            outboxId: intent.intent.id,
-          });
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
           yield* waitForDelivery(
             intent.intent.id,
             (delivery) => delivery.state === "accepted"
@@ -379,11 +464,13 @@ describe("EmailOutbox workflows", () => {
             to: `changelog-${organizationId}@example.test`.toLowerCase(),
           });
           expect(
-            state.sentMessages[0]?.headers?.["List-Unsubscribe"]
-          ).toBeUndefined();
+            state.sentMessages[0]?.headers?.["List-Unsubscribe"]?.startsWith(
+              "<https://test.feeblo.example/api/email-subscriptions/unsubscribe?token="
+            )
+          ).toBe(true);
           expect(
             state.sentMessages[0]?.headers?.["List-Unsubscribe-Post"]
-          ).toBeUndefined();
+          ).toBe("List-Unsubscribe=One-Click");
           const [storedSubscription] = yield* db
             .select({
               unsubscribeTokenHash:
@@ -391,20 +478,100 @@ describe("EmailOutbox workflows", () => {
             })
             .from(schema.emailSubscriptionTable)
             .where(
-              eq(schema.emailSubscriptionTable.id, subscriber.subscriptionId)
+              eq(schema.emailSubscriptionTable.id, subscriber.subscription.id)
             );
-          expect(storedSubscription?.unsubscribeTokenHash).toBe(
-            "previous-token-hash"
-          );
+          expect(storedSubscription?.unsubscribeTokenHash).toBeTruthy();
           const [delivery] = yield* db
             .select()
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
-          expect(delivery?.contactId).toBe(subscriber.contactId);
+          expect(delivery?.contactId).toBe(subscriber.contact.id);
           expect(delivery?.templatePayload).toMatchObject({
             title: "New changelog: New release",
-            unsubscribeUrl:
-              "https://test.feeblo.example/settings/notifications",
+            unsubscribe: {
+              kind: "subscription",
+              subscriptionId: subscriber.subscription.id,
+            },
+          });
+          const listUnsubscribe =
+            state.sentMessages[0]?.headers?.["List-Unsubscribe"];
+          if (listUnsubscribe === undefined) {
+            return yield* Effect.die("Expected a List-Unsubscribe URL");
+          }
+          const unsubscribeToken = new URL(
+            listUnsubscribe.slice(1, -1)
+          ).searchParams.get("token");
+          if (unsubscribeToken === null) {
+            return yield* Effect.die("Expected an unsubscribe token");
+          }
+          yield* subscriptions.unsubscribe({
+            now: consentNow,
+            unsubscribeToken,
+          });
+          const [unsubscribed] = yield* db
+            .select({ state: schema.emailSubscriptionTable.state })
+            .from(schema.emailSubscriptionTable)
+            .where(
+              eq(schema.emailSubscriptionTable.id, subscriber.subscription.id)
+            );
+          expect(unsubscribed?.state).toBe("unsubscribed");
+        })
+    );
+
+    it.effect(
+      "delivers a double-opt-in link without persisting its bearer token",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          yield* enableSubscriberEmails(organizationId);
+          const now = new Date("2026-08-11T00:00:00.000Z");
+          const requested =
+            yield* (yield* EmailSubscriptionRepository).requestSubscription({
+              email: `verify-${organizationId}@example.test`,
+              now,
+              organizationId,
+              source: "explicit",
+              topic: { topicId: null, topicType: "changelog" },
+              verificationExpiresAt: new Date(now.getTime() + 86_400_000),
+            });
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: requested.subscription.id,
+            aggregateType: "email_subscription",
+            deduplicationKey: `subscription.verification_requested:${requested.subscription.id}`,
+            expiresAt: new Date(now.getTime() + 86_400_000),
+            kind: "subscription.verification_requested",
+            organizationId,
+            payload: {
+              kind: "subscription.verification_requested",
+              subscriptionId: requested.subscription.id,
+            },
+            scheduledAt: now,
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected verification intent");
+          }
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          yield* waitForDelivery(
+            intent.intent.id,
+            (delivery) => delivery.state === "accepted"
+          );
+          const mailbox = yield* testMailerState;
+          expect(mailbox.renderedMessages[0]?.html).toContain(
+            "https://test.feeblo.example/api/email-subscriptions/verify?token="
+          );
+          const db = yield* Database.Database;
+          const [delivery] = yield* db
+            .select({
+              templatePayload: schema.emailDeliveryTable.templatePayload,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intent.intent.id));
+          expect(delivery?.templatePayload).toEqual({
+            subscriptionId: requested.subscription.id,
           });
         })
     );
@@ -485,9 +652,10 @@ describe("EmailOutbox workflows", () => {
           if (intent._tag !== "Written") {
             return yield* Effect.die("Expected post intent");
           }
-          yield* EmailOutboxDispatcherWorkflow.execute({
-            outboxId: intent.intent.id,
-          });
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
           yield* waitForDelivery(
             intent.intent.id,
             (delivery) => delivery.state === "accepted"
@@ -542,11 +710,11 @@ describe("EmailOutbox workflows", () => {
             aggregateId: postId,
             aggregateType: "post",
             deduplicationKey: `post.closed:${organizationId}:${postId}:consent-race`,
-            expiresAt: new Date(Date.now() + 86_400_000),
+            expiresAt: new Date("2026-08-12T00:00:00.000Z"),
             kind: "post.closed",
             organizationId,
             payload: { kind: "post.closed", postId },
-            scheduledAt: new Date(),
+            scheduledAt: new Date("2026-08-11T00:00:00.000Z"),
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected consent-race intent");
@@ -569,7 +737,10 @@ describe("EmailOutbox workflows", () => {
                 eyebrow: "Feedback",
                 posts: [],
                 title: "Post closed",
-                unsubscribeUrl: "https://app.feeblo.com/settings/notifications",
+                unsubscribe: {
+                  kind: "subscription",
+                  subscriptionId: subscriber.subscriptionId,
+                },
               },
             }
           );
@@ -593,6 +764,51 @@ describe("EmailOutbox workflows", () => {
               delivery.delivery.id
             ))?.state
           ).toBe("suppressed");
+        })
+    );
+
+    it.effect(
+      "sends an official post update immediately to active post subscribers",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { organizationId } = yield* fixture;
+          yield* enableSubscriberEmails(organizationId);
+          const postId = `post_${organizationId}`;
+          yield* addSubscriptionContact({
+            email: `official-${organizationId}@example.test`,
+            organizationId,
+            state: "active",
+            topicId: postId,
+            topicType: "post",
+          });
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: postId,
+            aggregateType: "post",
+            deduplicationKey: `post.official_update_published:${postId}:test`,
+            expiresAt: new Date("2026-08-12T00:00:00.000Z"),
+            kind: "post.official_update_published",
+            organizationId,
+            payload: {
+              body: "The requested export is now available.",
+              kind: "post.official_update_published",
+              postId,
+              updateId: `update_${organizationId}`,
+            },
+            scheduledAt: new Date("2026-08-11T00:00:00.000Z"),
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected official-update intent");
+          }
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          yield* Effect.forEach(deliveryIds, (deliveryId) =>
+            EmailDeliveryWorkflow.execute({ deliveryId })
+          );
+          const mailbox = yield* testMailerState;
+          expect(mailbox.sentMessages).toHaveLength(1);
+          expect(mailbox.renderedMessages[0]?.text).toContain(
+            "The requested export is now available."
+          );
         })
     );
 
@@ -622,18 +838,16 @@ describe("EmailOutbox workflows", () => {
             aggregateId: changelogId,
             aggregateType: "changelog",
             deduplicationKey: `changelog.resume:${organizationId}:${changelogId}`,
-            expiresAt: new Date(Date.now() + 86_400_000),
+            expiresAt: new Date("2026-08-12T00:00:00.000Z"),
             kind: "changelog.published",
             organizationId,
             payload: { kind: "changelog.published", changelogId },
-            scheduledAt: new Date(),
+            scheduledAt: new Date("2026-08-11T00:00:00.000Z"),
           });
           if (intent._tag !== "Inserted") {
             return yield* Effect.die("Expected resumable intent");
           }
-          yield* EmailOutboxDispatcherWorkflow.execute({
-            outboxId: intent.intent.id,
-          });
+          yield* materializeEmailIntent(intent.intent.id);
           expect(
             (yield* (yield* EmailOutboxRepository).findById(intent.intent.id))
               ?.state
@@ -769,7 +983,10 @@ describe("EmailOutbox workflows", () => {
               eyebrow: "Feedback",
               posts: [],
               title: "New submission in your workspace",
-              unsubscribeUrl: "https://app.feeblo.com/settings/notifications",
+              unsubscribe: {
+                kind: "settings",
+                url: "https://app.feeblo.com/settings/notifications",
+              },
             },
           });
           if (delivery._tag !== "Inserted") {
@@ -809,7 +1026,10 @@ describe("EmailOutbox workflows", () => {
               eyebrow: "Feedback",
               posts: [],
               title: "New submission in your workspace",
-              unsubscribeUrl: "https://app.feeblo.com/settings/notifications",
+              unsubscribe: {
+                kind: "settings",
+                url: "https://app.feeblo.com/settings/notifications",
+              },
             },
           });
           if (delivery._tag !== "Inserted") {
@@ -819,7 +1039,9 @@ describe("EmailOutbox workflows", () => {
             .update(schema.emailDeliveryTable)
             .set({
               state: "sending",
-              updatedAt: new Date(Date.now() - 10 * 60 * 1000),
+              updatedAt: new Date(
+                new Date("2026-08-11T00:00:00.000Z").getTime() - 10 * 60 * 1000
+              ),
             })
             .where(eq(schema.emailDeliveryTable.id, delivery.delivery.id));
 

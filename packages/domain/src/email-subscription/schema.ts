@@ -4,7 +4,13 @@ import {
   EmailSubscriptionState,
   EmailSuppressionReason,
 } from "@feeblo/db/validation-schema/email";
-import { WorkspaceId } from "@feeblo/id";
+import {
+  EmailContactId,
+  EmailSubscriptionId,
+  PostId,
+  UserId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -42,7 +48,7 @@ export class EmailSubscriptionDataError extends Schema.TaggedErrorClass<EmailSub
   }
 ) {}
 
-export const normalizeEmailAddress = (
+export const parseEmailAddress = (
   input: string,
   operation: string
 ): Effect.Effect<EmailAddress, EmailSubscriptionInputError> =>
@@ -59,13 +65,17 @@ export const normalizeEmailAddress = (
 export const EmailSubscriptionTopic = Schema.Union([
   Schema.Struct({
     topicId: Schema.Null,
-    topicType: Schema.Literal("changelog"),
+    topicType: Schema.tag("submission"),
   }),
   Schema.Struct({
-    topicId: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
-    topicType: Schema.Literal("post"),
+    topicId: Schema.Null,
+    topicType: Schema.tag("changelog"),
   }),
-]);
+  Schema.Struct({
+    topicId: PostId.schema,
+    topicType: Schema.tag("post"),
+  }),
+]).pipe(Schema.toTaggedUnion("topicType"));
 
 export type EmailSubscriptionTopic = Schema.Schema.Type<
   typeof EmailSubscriptionTopic
@@ -74,10 +84,10 @@ export type EmailSubscriptionTopic = Schema.Schema.Type<
 export const EmailContactRecord = Schema.Struct({
   createdAt: PersistedDate,
   email: EmailAddress,
-  id: Schema.String,
-  organizationId: Schema.String,
+  id: EmailContactId.schema,
+  organizationId: WorkspaceId.schema,
   updatedAt: PersistedDate,
-  userId: Schema.NullOr(Schema.String),
+  userId: Schema.NullOr(UserId.schema),
   verificationState: EmailContactVerificationState,
   verifiedAt: Schema.NullOr(PersistedDate),
 });
@@ -85,14 +95,14 @@ export const EmailContactRecord = Schema.Struct({
 export type EmailContactRecord = Schema.Schema.Type<typeof EmailContactRecord>;
 
 export const EmailSubscriptionRecord = Schema.Struct({
-  contactId: Schema.String,
+  contactId: EmailContactId.schema,
   createdAt: PersistedDate,
-  id: Schema.String,
-  organizationId: Schema.String,
+  id: EmailSubscriptionId.schema,
+  organizationId: WorkspaceId.schema,
   source: EmailSubscriptionSource,
   state: EmailSubscriptionState,
-  topicId: Schema.NullOr(Schema.String),
-  topicType: Schema.Literals(["changelog", "post"]),
+  topicId: Schema.NullOr(PostId.schema),
+  topicType: Schema.Literals(["submission", "changelog", "post"]),
   unsubscribedAt: Schema.NullOr(PersistedDate),
   updatedAt: PersistedDate,
   verificationExpiresAt: Schema.NullOr(PersistedDate),
@@ -147,4 +157,18 @@ export const EmailSubscriptionVerificationAccepted = Schema.Struct({
 
 export const EmailSubscriptionUnsubscribeAccepted = Schema.Struct({
   unsubscribed: Schema.Boolean,
+});
+
+/** Authenticated administrator preference for submission notification email. */
+export const SubmissionNotificationPreferenceRequest = Schema.Struct({
+  enabled: Schema.Boolean,
+  organizationId: WorkspaceId.schema,
+});
+
+export type SubmissionNotificationPreferenceRequest = Schema.Schema.Type<
+  typeof SubmissionNotificationPreferenceRequest
+>;
+
+export const SubmissionNotificationPreferenceAccepted = Schema.Struct({
+  enabled: Schema.Boolean,
 });

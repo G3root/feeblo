@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 import {
   Mailer,
   type MailerTransport,
-  makeMailerLayer,
   MailPermanentDeliveryError,
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
+  makeMailerLayer,
 } from "./mailer";
 
 const messageId = "<delivery_123@notifications.feeblo>";
@@ -85,7 +85,12 @@ describe("Mailer", () => {
         sendWith({
           send: () =>
             Effect.fail(
-              new MailTemporaryDeliveryError({ smtpStatusCode: 451 })
+              new MailTemporaryDeliveryError({
+                message: "SMTP provider temporarily rejected the message",
+                operation: "MailerTransport.send",
+                provider: "smtp",
+                smtpStatusCode: 451,
+              })
             ),
         })
       )
@@ -100,7 +105,12 @@ describe("Mailer", () => {
         sendWith({
           send: () =>
             Effect.fail(
-              new MailPermanentDeliveryError({ smtpStatusCode: 550 })
+              new MailPermanentDeliveryError({
+                message: "SMTP provider permanently rejected the message",
+                operation: "MailerTransport.send",
+                provider: "smtp",
+                smtpStatusCode: 550,
+              })
             ),
         })
       )
@@ -109,11 +119,18 @@ describe("Mailer", () => {
     expect(failure).toBeInstanceOf(MailPermanentDeliveryError);
   });
 
-  it("preserves uncertain transport failures for at-least-once retry", async () => {
+  it("preserves uncertain transport failures for caller-side terminal handling", async () => {
     const failure = await Effect.runPromise(
       Effect.flip(
         sendWith({
-          send: () => Effect.fail(new MailUncertainDeliveryError({})),
+          send: () =>
+            Effect.fail(
+              new MailUncertainDeliveryError({
+                message: "SMTP provider returned an uncertain result",
+                operation: "MailerTransport.send",
+                provider: "smtp",
+              })
+            ),
         })
       )
     );

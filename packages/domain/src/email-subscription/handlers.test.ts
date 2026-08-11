@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -13,10 +14,18 @@ import {
   EmailSubscriptionRpcHandlersEffect,
 } from "./handlers";
 import { EmailSubscriptionRepository } from "./repository";
+import { EmailSubscriptionTokenService } from "./tokens";
 
 describe("EmailSubscriptionConsentHandlers", () => {
   const Repositories = Layer.mergeAll(
-    EmailSubscriptionRepository.layer,
+    EmailOutboxRepository.layer,
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "email-subscription-handler-test-signing-secret"
+        )
+      )
+    ),
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = Layer.mergeAll(

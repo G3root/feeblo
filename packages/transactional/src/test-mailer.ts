@@ -94,11 +94,21 @@ const mailerLayer = Layer.effect(
       send: Effect.fn("TestMailer.send")(function* (message: MailMessage) {
         const html = yield* Effect.tryPromise({
           try: () => render(message.react),
-          catch: () => new MailTemplateRenderError({}),
+          catch: (cause) =>
+            new MailTemplateRenderError({
+              cause,
+              message: "Test email template rendering failed",
+              operation: "TestMailer.renderHtml",
+            }),
         });
         const text = yield* Effect.try({
           try: () => toPlainText(html),
-          catch: () => new MailTemplateRenderError({}),
+          catch: (cause) =>
+            new MailTemplateRenderError({
+              cause,
+              message: "Test email text rendering failed",
+              operation: "TestMailer.renderText",
+            }),
         });
         const attempt = yield* Ref.modify(mailbox, (state) => {
           const [nextOutcome, ...remainingOutcomes] = state.outcomes;
@@ -143,19 +153,29 @@ const mailerLayer = Layer.effect(
 
         switch (attempt.outcome._tag) {
           case "permanentFailure":
-            return yield* new MailPermanentDeliveryError(
-              attempt.outcome.smtpStatusCode === undefined
+            return yield* new MailPermanentDeliveryError({
+              message: "Test SMTP provider rejected the message",
+              operation: "TestMailer.send",
+              provider: "smtp",
+              ...(attempt.outcome.smtpStatusCode === undefined
                 ? {}
-                : { smtpStatusCode: attempt.outcome.smtpStatusCode }
-            );
+                : { smtpStatusCode: attempt.outcome.smtpStatusCode }),
+            });
           case "temporaryFailure":
-            return yield* new MailTemporaryDeliveryError(
-              attempt.outcome.smtpStatusCode === undefined
+            return yield* new MailTemporaryDeliveryError({
+              message: "Test SMTP provider temporarily rejected the message",
+              operation: "TestMailer.send",
+              provider: "smtp",
+              ...(attempt.outcome.smtpStatusCode === undefined
                 ? {}
-                : { smtpStatusCode: attempt.outcome.smtpStatusCode }
-            );
+                : { smtpStatusCode: attempt.outcome.smtpStatusCode }),
+            });
           case "uncertainFailure":
-            return yield* new MailUncertainDeliveryError({});
+            return yield* new MailUncertainDeliveryError({
+              message: "Test SMTP provider returned an uncertain result",
+              operation: "TestMailer.send",
+              provider: "smtp",
+            });
           case "accepted":
             return resultForOutcome(message, attempt.number, attempt.outcome);
           default:

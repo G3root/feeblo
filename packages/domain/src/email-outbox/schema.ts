@@ -3,6 +3,17 @@ import {
   EmailIntentKind,
   EmailOutboxState,
 } from "@feeblo/db/validation-schema/email";
+import {
+  ChangelogId,
+  EmailContactId,
+  EmailDeliveryId,
+  EmailOutboxId,
+  EmailSubscriptionId,
+  PostActivityId,
+  PostId,
+  PostStatusId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as Schema from "effect/Schema";
 
 // The email-outbox lifecycle vocabularies are canonical in
@@ -15,35 +26,48 @@ import * as Schema from "effect/Schema";
 const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
 export const SubmissionCreatedEmailIntentPayload = Schema.Struct({
-  kind: Schema.Literal("submission.created"),
-  postId: Schema.String,
+  kind: Schema.tag("submission.created"),
+  postId: PostId.schema,
 });
 
 export const ChangelogPublishedEmailIntentPayload = Schema.Struct({
-  changelogId: Schema.String,
-  kind: Schema.Literal("changelog.published"),
+  changelogId: ChangelogId.schema,
+  kind: Schema.tag("changelog.published"),
 });
 
 export const ChangelogUpdateRequestedEmailIntentPayload = Schema.Struct({
-  changelogId: Schema.String,
-  kind: Schema.Literal("changelog.update_requested"),
+  changelogId: ChangelogId.schema,
+  kind: Schema.tag("changelog.update_requested"),
+});
+
+export const SubscriptionVerificationRequestedEmailIntentPayload =
+  Schema.Struct({
+    kind: Schema.tag("subscription.verification_requested"),
+    subscriptionId: EmailSubscriptionId.schema,
+  });
+
+export const PostOfficialUpdatePublishedEmailIntentPayload = Schema.Struct({
+  body: Schema.String,
+  kind: Schema.tag("post.official_update_published"),
+  postId: PostId.schema,
+  updateId: PostActivityId.schema,
 });
 
 export const PostStatusChangedEmailIntentPayload = Schema.Struct({
-  kind: Schema.Literal("post.status_changed"),
-  postId: Schema.String,
-  statusId: Schema.String,
+  kind: Schema.tag("post.status_changed"),
+  postId: PostId.schema,
+  statusId: PostStatusId.schema,
 });
 
 export const PostMergedEmailIntentPayload = Schema.Struct({
-  kind: Schema.Literal("post.merged"),
-  postId: Schema.String,
-  targetPostId: Schema.String,
+  kind: Schema.tag("post.merged"),
+  postId: PostId.schema,
+  targetPostId: PostId.schema,
 });
 
 export const PostClosedEmailIntentPayload = Schema.Struct({
-  kind: Schema.Literal("post.closed"),
-  postId: Schema.String,
+  kind: Schema.tag("post.closed"),
+  postId: PostId.schema,
 });
 
 /**
@@ -54,14 +78,27 @@ export const EmailIntentPayload = Schema.Union([
   SubmissionCreatedEmailIntentPayload,
   ChangelogPublishedEmailIntentPayload,
   ChangelogUpdateRequestedEmailIntentPayload,
+  SubscriptionVerificationRequestedEmailIntentPayload,
   PostStatusChangedEmailIntentPayload,
+  PostOfficialUpdatePublishedEmailIntentPayload,
   PostMergedEmailIntentPayload,
   PostClosedEmailIntentPayload,
-]);
+]).pipe(Schema.toTaggedUnion("kind"));
 
 export type EmailIntentPayload = Schema.Schema.Type<typeof EmailIntentPayload>;
 
-/** Immutable, provider-neutral renderer input for version one notifications. */
+export const EmailUnsubscribeTarget = Schema.Union([
+  Schema.Struct({
+    kind: Schema.tag("subscription"),
+    subscriptionId: EmailSubscriptionId.schema,
+  }),
+  Schema.Struct({
+    kind: Schema.tag("settings"),
+    url: Schema.String,
+  }),
+]).pipe(Schema.toTaggedUnion("kind"));
+
+/** Immutable provider-neutral renderer input without a persisted bearer token. */
 export const NotificationTemplatePayload = Schema.Struct({
   actionLabel: Schema.String,
   actionUrl: Schema.String,
@@ -74,20 +111,17 @@ export const NotificationTemplatePayload = Schema.Struct({
     })
   ),
   title: Schema.String,
-  unsubscribeUrl: Schema.String,
+  unsubscribe: EmailUnsubscribeTarget,
 });
 
 export type NotificationTemplatePayload = Schema.Schema.Type<
   typeof NotificationTemplatePayload
 >;
 
-/** Backwards-compatible name for the original submission-only template. */
-export const SubmissionNotificationTemplatePayload =
-  NotificationTemplatePayload;
-
-export type SubmissionNotificationTemplatePayload = Schema.Schema.Type<
-  typeof SubmissionNotificationTemplatePayload
->;
+/** Stored payload for one double-opt-in verification email. */
+export const SubscriptionVerificationTemplatePayload = Schema.Struct({
+  subscriptionId: EmailSubscriptionId.schema,
+});
 
 export const EmailOutboxRecord = Schema.Struct({
   aggregateId: Schema.String,
@@ -95,9 +129,9 @@ export const EmailOutboxRecord = Schema.Struct({
   createdAt: PersistedDate,
   deduplicationKey: Schema.String,
   expiresAt: Schema.NullOr(PersistedDate),
-  id: Schema.String,
+  id: EmailOutboxId.schema,
   kind: EmailIntentKind,
-  organizationId: Schema.String,
+  organizationId: WorkspaceId.schema,
   payload: EmailIntentPayload,
   scheduledAt: PersistedDate,
   state: EmailOutboxState,
@@ -109,14 +143,14 @@ export type EmailOutboxRecord = Schema.Schema.Type<typeof EmailOutboxRecord>;
 export const EmailDeliveryRecord = Schema.Struct({
   acceptedAt: Schema.NullOr(PersistedDate),
   attemptCount: Schema.Number,
-  contactId: Schema.NullOr(Schema.String),
+  contactId: Schema.NullOr(EmailContactId.schema),
   createdAt: PersistedDate,
   deliveredAt: Schema.NullOr(PersistedDate),
-  id: Schema.String,
+  id: EmailDeliveryId.schema,
   lastError: Schema.Unknown,
   messageId: Schema.String,
   nextAttemptAt: Schema.NullOr(PersistedDate),
-  outboxId: Schema.String,
+  outboxId: EmailOutboxId.schema,
   providerMetadata: Schema.Unknown,
   recipientEmail: Schema.String,
   state: EmailDeliveryState,

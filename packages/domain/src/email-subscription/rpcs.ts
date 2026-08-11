@@ -5,12 +5,15 @@ import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 import * as Policy from "../policy";
 import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { InternalServerError } from "../rpc-errors";
+import { AuthMiddleware } from "../session-middleware";
 import {
   ChangelogSubscriptionRequest,
   EmailSubscriptionRequestAccepted,
   EmailSubscriptionTokenRequest,
   EmailSubscriptionUnsubscribeAccepted,
   EmailSubscriptionVerificationAccepted,
+  SubmissionNotificationPreferenceAccepted,
+  SubmissionNotificationPreferenceRequest,
 } from "./schema";
 
 const EmailSubscriptionPublicErrors = Schema.Union([
@@ -35,5 +38,10 @@ export class EmailSubscriptionRpcs extends RpcGroup.make(
     payload: EmailSubscriptionTokenRequest,
     success: EmailSubscriptionUnsubscribeAccepted,
     error: EmailSubscriptionPublicErrors,
-  }).middleware(PublicRpcRateLimitMiddleware)
+  }).middleware(PublicRpcRateLimitMiddleware),
+  Rpc.make("EmailSubmissionNotificationPreferenceSet", {
+    payload: SubmissionNotificationPreferenceRequest,
+    success: SubmissionNotificationPreferenceAccepted,
+    error: EmailSubscriptionPublicErrors,
+  }).middleware(AuthMiddleware)
 ) {}

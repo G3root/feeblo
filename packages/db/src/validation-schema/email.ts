@@ -17,7 +17,9 @@ export const EmailIntentKind = S.Literals([
   "submission.created",
   "changelog.published",
   "changelog.update_requested",
+  "subscription.verification_requested",
   "post.status_changed",
+  "post.official_update_published",
   "post.merged",
   "post.closed",
 ]);
@@ -62,7 +64,11 @@ export type TEmailContactVerificationState = S.Schema.Type<
 >;
 
 /** Canonical `email_subscription.topic_type` vocabulary. */
-export const EmailSubscriptionTopicType = S.Literals(["changelog", "post"]);
+export const EmailSubscriptionTopicType = S.Literals([
+  "submission",
+  "changelog",
+  "post",
+]);
 
 export type TEmailSubscriptionTopicType = S.Schema.Type<
   typeof EmailSubscriptionTopicType

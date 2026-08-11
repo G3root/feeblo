@@ -17,7 +17,11 @@ export type MailMessage = {
   readonly from?: string;
   readonly replyTo?: string;
   readonly headers?: Readonly<Record<string, string>>;
-  /** A caller-supplied RFC Message-ID used for delivery idempotency. */
+  /**
+   * A stable RFC Message-ID used for correlation and provider deduplication
+   * hints. SMTP does not guarantee idempotency: retrying an ambiguous send can
+   * still produce a rare duplicate.
+   */
   readonly messageId?: string;
 };
 
@@ -100,13 +104,22 @@ export interface MailerService {
 /** Rendering failed before a provider request was made. */
 export class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplateRenderError>()(
   "MailTemplateRenderError",
-  {}
+  {
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+    operation: Schema.String,
+  }
 ) {}
 
 /** The provider rejected the message permanently; retrying will not help. */
 export class MailPermanentDeliveryError extends Schema.TaggedErrorClass<MailPermanentDeliveryError>()(
   "MailPermanentDeliveryError",
   {
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+    operation: Schema.String,
+    provider: Schema.Literal("smtp"),
+    providerCode: Schema.optionalKey(Schema.String),
     smtpStatusCode: Schema.optionalKey(SmtpResponseCode),
   }
 ) {}
@@ -115,18 +128,29 @@ export class MailPermanentDeliveryError extends Schema.TaggedErrorClass<MailPerm
 export class MailTemporaryDeliveryError extends Schema.TaggedErrorClass<MailTemporaryDeliveryError>()(
   "MailTemporaryDeliveryError",
   {
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+    operation: Schema.String,
+    provider: Schema.Literal("smtp"),
+    providerCode: Schema.optionalKey(Schema.String),
     smtpStatusCode: Schema.optionalKey(SmtpResponseCode),
   }
 ) {}
 
-/** The submission outcome is unknown, so at-least-once delivery may retry it. */
+/** The submission outcome is unknown, so retrying could create a duplicate. */
 export class MailUncertainDeliveryError extends Schema.TaggedErrorClass<MailUncertainDeliveryError>()(
   "MailUncertainDeliveryError",
-  {}
+  {
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+    operation: Schema.String,
+    provider: Schema.Literal("smtp"),
+    providerCode: Schema.optionalKey(Schema.String),
+  }
 ) {}
 
-/** Backwards-compatible delivery-error schema for workflow definitions. */
-export const MailDeliveryError = Schema.Union([
+/** Delivery failures that can occur after a provider submission is attempted. */
+export const MailProviderDeliveryError = Schema.Union([
   MailPermanentDeliveryError,
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
@@ -147,9 +171,10 @@ const temporaryNodemailerCodes = new Set([
   "ESOCKET",
   "ETIMEDOUT",
 ]);
+const smtpResponseCodePattern = /^(\d{3})\b/;
 
 const smtpResponseCode = (response: string): number | undefined => {
-  const match = /^(\d{3})\b/.exec(response);
+  const match = smtpResponseCodePattern.exec(response);
   if (!match?.[1]) {
     return undefined;
   }
@@ -161,26 +186,36 @@ const smtpResponseCode = (response: string): number | undefined => {
 
 const classifyNodemailerFailure = (
   cause: unknown
-): MailPermanentDeliveryError | MailTemporaryDeliveryError | MailUncertainDeliveryError => {
+):
+  | MailPermanentDeliveryError
+  | MailTemporaryDeliveryError
+  | MailUncertainDeliveryError => {
   const details = Option.getOrUndefined(
     Schema.decodeUnknownOption(NodemailerErrorDetails)(cause)
   );
   const smtpStatusCode = details?.responseCode;
+  const diagnostics = {
+    cause,
+    message: "SMTP provider submission failed",
+    operation: "Mailer.NodemailerTransport.send",
+    provider: "smtp" as const,
+    ...(details?.code ? { providerCode: details.code } : {}),
+  };
 
   if (smtpStatusCode !== undefined) {
     if (smtpStatusCode >= 400 && smtpStatusCode < 500) {
-      return new MailTemporaryDeliveryError({ smtpStatusCode });
+      return new MailTemporaryDeliveryError({ ...diagnostics, smtpStatusCode });
     }
     if (smtpStatusCode >= 500) {
-      return new MailPermanentDeliveryError({ smtpStatusCode });
+      return new MailPermanentDeliveryError({ ...diagnostics, smtpStatusCode });
     }
   }
 
   if (details?.code && temporaryNodemailerCodes.has(details.code)) {
-    return new MailTemporaryDeliveryError({});
+    return new MailTemporaryDeliveryError(diagnostics);
   }
 
-  return new MailUncertainDeliveryError({});
+  return new MailUncertainDeliveryError(diagnostics);
 };
 
 const toMailSendResult = (
@@ -205,30 +240,54 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
   send: Effect.fn("Mailer.send")(function* (message: MailMessage) {
     const html = yield* Effect.tryPromise({
       try: () => render(message.react),
-      catch: () => new MailTemplateRenderError({}),
+      catch: (cause) =>
+        new MailTemplateRenderError({
+          cause,
+          message: "Transactional email template rendering failed",
+          operation: "Mailer.send.renderHtml",
+        }),
     });
     const text = yield* Effect.try({
       try: () => toPlainText(html),
-      catch: () => new MailTemplateRenderError({}),
+      catch: (cause) =>
+        new MailTemplateRenderError({
+          cause,
+          message: "Rendered email plain-text conversion failed",
+          operation: "Mailer.send.renderText",
+        }),
     });
 
-    const receipt = yield* transport.send({
-      ...message,
-      html,
-      text,
-    }).pipe(
-      Effect.flatMap((transportReceipt) =>
-        Schema.decodeUnknownEffect(MailTransportReceipt)(transportReceipt).pipe(
-          Effect.mapError(() => new MailUncertainDeliveryError({}))
+    const receipt = yield* transport
+      .send({
+        ...message,
+        html,
+        text,
+      })
+      .pipe(
+        Effect.flatMap((transportReceipt) =>
+          Schema.decodeUnknownEffect(MailTransportReceipt)(
+            transportReceipt
+          ).pipe(
+            Effect.mapError(
+              (cause) =>
+                new MailUncertainDeliveryError({
+                  cause,
+                  message: "SMTP provider returned an invalid delivery receipt",
+                  operation: "Mailer.send.decodeReceipt",
+                  provider: "smtp",
+                })
+            )
+          )
         )
-      )
-    );
+      );
     return toMailSendResult(receipt, message.messageId);
   }),
 });
 
 /** Builds a Mailer layer from a provider-neutral transport for production and integration tests. */
-export const makeMailerLayer = (transport: MailerTransport): Layer.Layer<Mailer> =>
+export const makeMailerLayer = (
+  transport: MailerTransport
+): Layer.Layer<Mailer> =>
   Layer.succeed(Mailer, Mailer.of(makeMailerService(transport)));
 
 const makeNodemailerTransport = Effect.gen(function* () {
@@ -288,7 +347,15 @@ const makeNodemailerTransport = Effect.gen(function* () {
       }).pipe(
         Effect.flatMap((receipt) =>
           Schema.decodeUnknownEffect(MailTransportReceipt)(receipt).pipe(
-            Effect.mapError(() => new MailUncertainDeliveryError({}))
+            Effect.mapError(
+              (cause) =>
+                new MailUncertainDeliveryError({
+                  cause,
+                  message: "SMTP provider returned an invalid delivery receipt",
+                  operation: "Mailer.NodemailerTransport.decodeReceipt",
+                  provider: "smtp",
+                })
+            )
           )
         )
       )

@@ -15,9 +15,11 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { TestClock } from "effect/testing";
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -205,7 +207,13 @@ describe("PostRpcHandlers", () => {
     PostActivityRepository.layer,
     PostSubscriptionRepository.layer,
     EmailOutboxRepository.layer,
-    EmailSubscriptionRepository.layer,
+    EmailSubscriptionRepository.layerWithoutDependencies.pipe(
+      Layer.provide(
+        EmailSubscriptionTokenService.layerTest(
+          "post-handler-test-signing-secret"
+        )
+      )
+    ),
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
@@ -620,6 +628,10 @@ describe("PostRpcHandlers", () => {
         () =>
           Effect.gen(function* () {
             const db = yield* currentDb;
+            const firstChangeAt = new Date(
+              "2026-08-11T00:00:00.000Z"
+            ).getTime();
+            yield* TestClock.setTime(firstChangeAt);
             const handlers = yield* PostRpcHandlersEffect;
             const fixture = yield* makeFixture();
             yield* activateStarterPlan(fixture.organizationId);
@@ -646,7 +658,6 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
 
-            const firstChangeAt = Date.now();
             for (const statusId of [reviewStatusId, plannedStatusId]) {
               yield* handlers
                 .PostUpdate({
@@ -677,7 +688,7 @@ describe("PostRpcHandlers", () => {
               firstChangeAt + 299_000
             );
             expect(intents[0]?.scheduledAt.getTime()).toBeLessThanOrEqual(
-              Date.now() + 300_000
+              firstChangeAt + 300_000
             );
           })
       );

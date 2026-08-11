@@ -7,27 +7,36 @@ import {
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
 } from "@feeblo/transactional/mailer";
+import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull, sum } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as W from "effect/unstable/workflow";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
-import type { EmailSubscriptionTopic } from "../email-subscription/schema";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { EmailOutboxConfig } from "./config";
+import {
+  emailSubscriptionTopicForIntent,
+  makeSubmissionNotificationPayload,
+  resolveSubscriptionNotificationContent,
+} from "./content";
 import { EmailOutboxDataError, EmailOutboxRepository } from "./repository";
 import {
-  type EmailIntentPayload,
-  type EmailOutboxRecord,
-  type NotificationTemplatePayload as NotificationPayload,
   NotificationTemplatePayload,
+  SubscriptionVerificationTemplatePayload,
 } from "./schema";
 import {
+  recordEmailDeliveryRetry,
+  recordEmailDeliveryThrottle,
   recordEmailIntentTransition,
+  recordEmailOldestQueuedAge,
+  recordEmailProviderSubmission,
   recordEmailReconciliationRecoveries,
 } from "./telemetry";
 
@@ -81,152 +90,19 @@ export const EmailDeliveryWorkflow = W.Workflow.make("EmailDeliveryWorkflow", {
   idempotencyKey: ({ deliveryId }) => deliveryId,
 });
 
-type NotificationContent = {
-  readonly templatePayload: Omit<NotificationPayload, "unsubscribeUrl">;
-  readonly topic: EmailSubscriptionTopic;
-};
-
-const submissionPayload = (
-  appUrl: string,
-  organizationId: string,
-  post: {
-    readonly slug: string;
-    readonly title: string;
-    readonly board: { readonly slug: string } | null;
-  }
-): NotificationPayload => ({
-  actionLabel: "View dashboard",
-  actionUrl: appUrl,
-  body: "A new post has been submitted.",
-  eyebrow: "Feedback",
-  posts: [
-    {
-      label: post.title,
-      url: `${appUrl}/${organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`,
-    },
-  ],
-  title: "New submission in your workspace",
-  // Email-contact subscription management lands in a later slice. The current
-  // workspace settings endpoint is the only safe product URL available here.
-  unsubscribeUrl: `${appUrl}/settings/notifications`,
-});
-
-const titleCase = (value: string): string =>
-  value
-    .toLowerCase()
-    .split("_")
-    .map((part) =>
-      part.length === 0 ? part : `${part[0]?.toUpperCase()}${part.slice(1)}`
-    )
-    .join(" ");
-
-const subscriptionTopicForIntent = (payload: EmailIntentPayload) => {
-  switch (payload.kind) {
-    case "changelog.published":
-    case "changelog.update_requested":
-      return { topicId: null, topicType: "changelog" as const };
-    case "post.status_changed":
-    case "post.merged":
-    case "post.closed":
-      return { topicId: payload.postId, topicType: "post" as const };
-    default:
-      return undefined;
-  }
-};
-
-const subscriptionNotificationContent = (
-  appUrl: string,
-  intent: Pick<EmailOutboxRecord, "organizationId" | "payload">
-) =>
-  Effect.gen(function* () {
-    const db = yield* Database.Database;
-    switch (intent.payload.kind) {
-      case "changelog.published":
-      case "changelog.update_requested": {
-        const changelog = yield* db.query.changelogTable.findFirst({
-          where: {
-            id: intent.payload.changelogId,
-            organizationId: intent.organizationId,
-          },
-          columns: { excerpt: true, slug: true, title: true },
-        });
-        if (!changelog) {
-          return undefined;
-        }
-        const published = intent.payload.kind === "changelog.published";
-        return {
-          topic: { topicType: "changelog" as const, topicId: null },
-          templatePayload: {
-            actionLabel: "View changelog",
-            actionUrl: `${appUrl}/${intent.organizationId}/changelog`,
-            body:
-              changelog.excerpt ||
-              (published
-                ? "A new changelog entry has been published."
-                : "A changelog update is available."),
-            eyebrow: "Changelog",
-            posts: [
-              {
-                label: changelog.title,
-                url: `${appUrl}/${intent.organizationId}/changelog`,
-              },
-            ],
-            title: `${published ? "New changelog" : "Changelog update"}: ${changelog.title}`,
-          },
-        } satisfies NotificationContent;
-      }
-      case "post.status_changed":
-      case "post.merged":
-      case "post.closed": {
-        const post = yield* db.query.postTable.findFirst({
-          where: {
-            id: intent.payload.postId,
-            organizationId: intent.organizationId,
-          },
-          columns: { slug: true, title: true },
-          with: {
-            board: { columns: { slug: true } },
-            postStatus: { columns: { type: true } },
-          },
-        });
-        if (!post) {
-          return undefined;
-        }
-        const url = `${appUrl}/${intent.organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`;
-        let event = `moved to ${titleCase(post.postStatus?.type ?? "updated")}`;
-        if (intent.payload.kind === "post.merged") {
-          event = "merged";
-        } else if (intent.payload.kind === "post.closed") {
-          event = "closed";
-        }
-        return {
-          topic: { topicType: "post" as const, topicId: intent.payload.postId },
-          templatePayload: {
-            actionLabel: "View post",
-            actionUrl: url,
-            body: `A post you follow was ${event}.`,
-            eyebrow: "Feedback",
-            posts: [{ label: post.title, url }],
-            title: `Post ${event}: ${post.title}`,
-          },
-        } satisfies NotificationContent;
-      }
-      default:
-        return undefined;
-    }
-  });
-
-const materializeSubmission = (outboxId: string) =>
+/** Materializes one durable intent into immutable per-recipient deliveries. */
+export const materializeEmailIntent = (outboxId: string) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
     const { appUrl } = yield* EmailOutboxConfig;
     const policy = yield* EntitlementPolicy;
     const db = yield* Database.Database;
+    const now = yield* DateTime.nowAsDate;
     const intent = yield* repository.findById(outboxId);
     if (!intent) {
       return [] as readonly string[];
     }
-    if (intent.expiresAt && intent.expiresAt.getTime() <= Date.now()) {
+    if (intent.expiresAt && intent.expiresAt.getTime() <= now.getTime()) {
       yield* repository.markIntentState({ id: intent.id, state: "expired" });
       yield* recordEmailIntentTransition(intent.kind, "expired");
       return [] as readonly string[];
@@ -253,6 +129,57 @@ const materializeSubmission = (outboxId: string) =>
       return [] as readonly string[];
     }
 
+    if (intent.payload.kind === "subscription.verification_requested") {
+      const [recipient] = yield* db
+        .select({
+          contactId: schema.emailContactTable.id,
+          email: schema.emailContactTable.email,
+          subscriptionId: schema.emailSubscriptionTable.id,
+        })
+        .from(schema.emailSubscriptionTable)
+        .innerJoin(
+          schema.emailContactTable,
+          eq(
+            schema.emailContactTable.id,
+            schema.emailSubscriptionTable.contactId
+          )
+        )
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.id, intent.payload.subscriptionId),
+            eq(
+              schema.emailSubscriptionTable.organizationId,
+              intent.organizationId
+            ),
+            eq(schema.emailSubscriptionTable.state, "pending_verification")
+          )
+        )
+        .limit(1);
+      if (recipient === undefined) {
+        yield* repository.markIntentState({ id: intent.id, state: "expired" });
+        yield* recordEmailIntentTransition(intent.kind, "expired");
+        return [] as readonly string[];
+      }
+      return yield* transaction(
+        Effect.gen(function* () {
+          const created = yield* repository.createDelivery({
+            contactId: recipient.contactId,
+            outboxId: intent.id,
+            recipientEmail: recipient.email,
+            template: "subscription-verification",
+            templatePayload: { subscriptionId: recipient.subscriptionId },
+            templateVersion: 1,
+          });
+          yield* repository.markIntentState({
+            id: intent.id,
+            state: "materialized",
+          });
+          yield* recordEmailIntentTransition(intent.kind, "materialized");
+          return created._tag === "Inserted" ? [created.delivery.id] : [];
+        })
+      );
+    }
+
     if (intent.payload.kind === "submission.created") {
       const post = yield* db.query.postTable.findFirst({
         where: {
@@ -273,21 +200,55 @@ const materializeSubmission = (outboxId: string) =>
       );
       const members = yield* db.query.memberTable.findMany({
         where: { organizationId: intent.organizationId },
-        columns: { role: true },
+        columns: { role: true, userId: true },
         with: { user: { columns: { email: true } } },
       });
-      // There is no configured free-recipient or administrator email opt-in
-      // storage yet. Until slices 5/7 add them, the owner is the free default;
-      // paid workspaces include owner/admin accounts only.
-      const recipients = members
-        .filter((member) =>
-          recipientLimit === 1
-            ? member.role === "owner"
-            : member.role === "owner" || member.role === "admin"
+      const optedInContacts = yield* db
+        .select({
+          email: schema.emailContactTable.email,
+          userId: schema.emailContactTable.userId,
+        })
+        .from(schema.emailSubscriptionTable)
+        .innerJoin(
+          schema.emailContactTable,
+          eq(
+            schema.emailContactTable.id,
+            schema.emailSubscriptionTable.contactId
+          )
         )
-        .flatMap((member) => (member.user?.email ? [member.user.email] : []))
-        .slice(0, recipientLimit ?? undefined);
-      const templatePayload = submissionPayload(
+        .where(
+          and(
+            eq(
+              schema.emailSubscriptionTable.organizationId,
+              intent.organizationId
+            ),
+            eq(schema.emailSubscriptionTable.topicType, "submission"),
+            isNull(schema.emailSubscriptionTable.topicId),
+            eq(schema.emailSubscriptionTable.state, "active"),
+            eq(schema.emailContactTable.verificationState, "verified")
+          )
+        );
+      const privilegedUserIds = new Set(
+        members.flatMap((member) =>
+          member.role === "owner" || member.role === "admin"
+            ? [member.userId]
+            : []
+        )
+      );
+      const ownerEmail = members.find((member) => member.role === "owner")?.user
+        ?.email;
+      const configuredFreeRecipient = optedInContacts[0]?.email;
+      const recipients =
+        recipientLimit === 1
+          ? [configuredFreeRecipient ?? ownerEmail].filter(
+              (email): email is string => email !== undefined
+            )
+          : optedInContacts.flatMap((contact) =>
+              contact.userId !== null && privilegedUserIds.has(contact.userId)
+                ? [contact.email]
+                : []
+            );
+      const templatePayload = makeSubmissionNotificationPayload(
         appUrl,
         intent.organizationId,
         post
@@ -316,7 +277,10 @@ const materializeSubmission = (outboxId: string) =>
       );
     }
 
-    const content = yield* subscriptionNotificationContent(appUrl, intent);
+    const content = yield* resolveSubscriptionNotificationContent(
+      appUrl,
+      intent
+    );
     if (!content) {
       yield* repository.markIntentState({ id: intent.id, state: "expired" });
       yield* recordEmailIntentTransition(intent.kind, "expired");
@@ -369,10 +333,8 @@ const materializeSubmission = (outboxId: string) =>
     return yield* transaction(
       Effect.gen(function* () {
         const created = yield* Effect.forEach(recipients, (recipient) => {
-          // A bearer unsubscribe token cannot be kept in delivery JSON: that
-          // data is retained for retries and would violate hash-only storage.
-          // The existing product has no token-safe one-click endpoint, so use
-          // the settings URL until that lifecycle seam is added.
+          // Persist only the subscription ID. The purpose-bound bearer token
+          // is derived immediately before send and remains hash-only at rest.
           return repository.createDelivery({
             outboxId: intent.id,
             contactId: recipient.contactId,
@@ -381,7 +343,10 @@ const materializeSubmission = (outboxId: string) =>
             templateVersion: 1,
             templatePayload: {
               ...content.templatePayload,
-              unsubscribeUrl: `${appUrl}/settings/notifications`,
+              unsubscribe: {
+                kind: "subscription",
+                subscriptionId: recipient.subscriptionId,
+              },
             },
           });
         });
@@ -402,8 +367,12 @@ const materializeSubmission = (outboxId: string) =>
 const sendDeliveryAttempt = (deliveryId: string) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
+    const subscriptions = yield* EmailSubscriptionRepository;
     const policy = yield* EntitlementPolicy;
     const db = yield* Database.Database;
+    const config = yield* EmailOutboxConfig;
+    const { apiUrl } = config;
+    const now = yield* DateTime.nowAsDate;
     const delivery = yield* repository.findDeliveryById(deliveryId);
     if (
       !(delivery && ["queued", "deferred", "sending"].includes(delivery.state))
@@ -424,13 +393,69 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     const intent = yield* repository.findById(delivery.outboxId);
     if (
       !intent ||
-      (intent.expiresAt && intent.expiresAt.getTime() <= Date.now())
+      (intent.expiresAt && intent.expiresAt.getTime() <= now.getTime())
     ) {
       yield* repository.markDeliveryOutcome({
         id: delivery.id,
         state: "expired",
       });
       return { _tag: "terminal" as const };
+    }
+    if (
+      config.globalDeliveryPaused ||
+      config.pausedWorkspaceIds.has(intent.organizationId)
+    ) {
+      const reason = config.globalDeliveryPaused
+        ? "global_circuit_breaker"
+        : "workspace_circuit_breaker";
+      yield* recordEmailDeliveryThrottle(reason);
+      yield* Effect.logWarning(
+        "Email delivery paused by internal circuit breaker"
+      ).pipe(
+        Effect.annotateLogs({
+          deliveryId,
+          organizationId: intent.organizationId,
+          reason,
+        })
+      );
+      yield* repository.deferDeliveryForThrottle({
+        id: delivery.id,
+        nextAttemptAt: new Date(now.getTime() + 5 * 60_000),
+        reason,
+      });
+      return {
+        _tag: "retry" as const,
+        delayMs: 5 * 60_000,
+        infrastructureFailure: false,
+      };
+    }
+    const monthStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+    );
+    const [monthlyVolume] = yield* db
+      .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
+      .from(schema.emailDeliveryTable)
+      .where(gte(schema.emailDeliveryTable.createdAt, monthStart));
+    if (Number(monthlyVolume?.attempts ?? 0) >= config.monthlySendLimit) {
+      yield* recordEmailDeliveryThrottle("monthly_volume_limit");
+      yield* Effect.logWarning(
+        "Email delivery paused by monthly volume limit"
+      ).pipe(
+        Effect.annotateLogs({
+          deliveryId,
+          organizationId: intent.organizationId,
+        })
+      );
+      yield* repository.deferDeliveryForThrottle({
+        id: delivery.id,
+        nextAttemptAt: new Date(now.getTime() + 60 * 60_000),
+        reason: "monthly_volume_limit",
+      });
+      return {
+        _tag: "retry" as const,
+        delayMs: 60 * 60_000,
+        infrastructureFailure: false,
+      };
     }
     if (
       !(yield* policy.mayMaterializeEmailIntent({
@@ -444,8 +469,11 @@ const sendDeliveryAttempt = (deliveryId: string) =>
       });
       return { _tag: "terminal" as const };
     }
-    if (delivery.contactId !== null) {
-      const topic = subscriptionTopicForIntent(intent.payload);
+    if (
+      delivery.contactId !== null &&
+      intent.kind !== "subscription.verification_requested"
+    ) {
+      const topic = emailSubscriptionTopicForIntent(intent.payload);
       const [activeSubscription] =
         topic === undefined
           ? []
@@ -500,17 +528,73 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     }
     const claimed = yield* repository.claimDeliveryForSending({
       id: delivery.id,
-      now: new Date(),
+      now,
     });
     if (!claimed) {
       return { _tag: "terminal" as const };
     }
-    const payload = yield* Schema.decodeUnknownEffect(
-      NotificationTemplatePayload
-    )(delivery.templatePayload).pipe(
-      Effect.mapError(() => new MailTemplateRenderError({}))
-    );
+    const mailMessage = yield* Effect.gen(function* () {
+      if (delivery.template === "subscription-verification") {
+        const payload = yield* Schema.decodeUnknownEffect(
+          SubscriptionVerificationTemplatePayload
+        )(delivery.templatePayload).pipe(
+          Effect.mapError(
+            (cause) =>
+              new MailTemplateRenderError({
+                cause,
+                message:
+                  "Email template rendering failed: invalid subscription verification payload",
+                operation: "decode verification payload",
+              })
+          )
+        );
+        const token = yield* subscriptions.deriveLinkToken({
+          purpose: "verification",
+          subscriptionId: payload.subscriptionId,
+        });
+        const verificationUrl = `${apiUrl}/api/email-subscriptions/verify?token=${encodeURIComponent(Redacted.value(token))}`;
+        return createEmailSubscriptionVerificationEmail({ verificationUrl });
+      }
+
+      const payload = yield* Schema.decodeUnknownEffect(
+        NotificationTemplatePayload
+      )(delivery.templatePayload).pipe(
+        Effect.mapError(
+          (cause) =>
+            new MailTemplateRenderError({
+              cause,
+              message:
+                "Email template rendering failed: invalid notification payload",
+              operation: "decode notification payload",
+            })
+        )
+      );
+      if (payload.unsubscribe.kind === "settings") {
+        return createNotificationEmail({
+          ...payload,
+          unsubscribeUrl: payload.unsubscribe.url,
+        });
+      }
+      const token = yield* subscriptions.deriveLinkToken({
+        purpose: "unsubscribe",
+        subscriptionId: payload.unsubscribe.subscriptionId,
+      });
+      const unsubscribeUrl = `${apiUrl}/api/email-subscriptions/unsubscribe?token=${encodeURIComponent(Redacted.value(token))}`;
+      return {
+        ...createNotificationEmail({ ...payload, unsubscribeUrl }),
+        headers: {
+          "List-Unsubscribe": `<${unsubscribeUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+      };
+    });
     const mailer = yield* Mailer;
+    const deliveryPlan =
+      (yield* policy.submissionNotificationRecipientLimit(
+        intent.organizationId
+      )) === 1
+        ? "free"
+        : "paid";
     const deferAfterRetryableProviderFailure = (
       error: MailTemporaryDeliveryError | MailUncertainDeliveryError
     ) => {
@@ -525,13 +609,15 @@ const sendDeliveryAttempt = (deliveryId: string) =>
           .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
       }
       const delayMs = retryDelayMs(delivery.id, attempt);
+      const retryMetric = recordEmailDeliveryRetry(error._tag);
       return repository
         .deferSendingDelivery({
           id: delivery.id,
-          nextAttemptAt: new Date(Date.now() + delayMs),
+          nextAttemptAt: new Date(now.getTime() + delayMs),
           lastError: { tag: error._tag },
         })
         .pipe(
+          Effect.tap(() => retryMetric),
           Effect.as<DeliveryAttemptOutcome>({
             _tag: "retry",
             delayMs,
@@ -541,7 +627,7 @@ const sendDeliveryAttempt = (deliveryId: string) =>
     };
     const sent = yield* mailer
       .send({
-        ...createNotificationEmail(payload),
+        ...mailMessage,
         messageId: delivery.messageId,
         to: delivery.recipientEmail,
       })
@@ -569,7 +655,17 @@ const sendDeliveryAttempt = (deliveryId: string) =>
               })
               .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" })),
           MailTemporaryDeliveryError: deferAfterRetryableProviderFailure,
-          MailUncertainDeliveryError: deferAfterRetryableProviderFailure,
+          MailUncertainDeliveryError: (error) =>
+            repository
+              .markDeliveryOutcome({
+                id: delivery.id,
+                state: "failed",
+                lastError: {
+                  tag: error._tag,
+                  reason: "ambiguous_submission_not_retried",
+                },
+              })
+              .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" })),
         }),
         Effect.flatMap((result) => {
           if (result._tag !== "accepted") {
@@ -579,10 +675,21 @@ const sendDeliveryAttempt = (deliveryId: string) =>
             return repository
               .markDeliveryAccepted({
                 id: delivery.id,
-                acceptedAt: new Date(),
+                acceptedAt: now,
                 providerMetadata: result.providerMetadata,
               })
-              .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
+              .pipe(
+                Effect.tap((accepted) =>
+                  accepted
+                    ? recordEmailProviderSubmission(
+                        intent.kind,
+                        config.estimatedSendCostMicros,
+                        deliveryPlan
+                      )
+                    : Effect.void
+                ),
+                Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" })
+              );
           }
           if (result.providerMetadata.rejectedRecipientCount > 0) {
             return repository
@@ -596,9 +703,16 @@ const sendDeliveryAttempt = (deliveryId: string) =>
               })
               .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
           }
-          return deferAfterRetryableProviderFailure(
-            new MailUncertainDeliveryError({})
-          );
+          return repository
+            .markDeliveryOutcome({
+              id: delivery.id,
+              state: "failed",
+              lastError: {
+                tag: "MailUncertainDeliveryError",
+                reason: "ambiguous_submission_not_retried",
+              },
+            })
+            .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
         })
       );
     return sent;
@@ -607,6 +721,7 @@ const sendDeliveryAttempt = (deliveryId: string) =>
 export const EmailOutboxWorkflowLayer = Layer.mergeAll(
   EmailOutboxDispatcherWorkflow.toLayer(
     Effect.fnUntraced(function* ({ outboxId }) {
+      const { maxConcurrentSends } = yield* EmailOutboxConfig;
       let dispatch: (
         attempt: number,
         infrastructureFailures: number
@@ -667,8 +782,9 @@ export const EmailOutboxWorkflowLayer = Layer.mergeAll(
             const intent = yield* (yield* EmailOutboxRepository).findById(
               outboxId
             );
+            const now = yield* DateTime.nowAsDate;
             return intent
-              ? Math.max(0, intent.scheduledAt.getTime() - Date.now())
+              ? Math.max(0, intent.scheduledAt.getTime() - now.getTime())
               : 0;
           }).pipe(
             Effect.mapError(
@@ -701,7 +817,7 @@ export const EmailOutboxWorkflowLayer = Layer.mergeAll(
           name: `MaterializeEmailOutboxIntent-${attempt}`,
           success: Schema.Array(Schema.String),
           error: EmailOutboxDataError,
-          execute: materializeSubmission(outboxId).pipe(
+          execute: materializeEmailIntent(outboxId).pipe(
             Effect.mapError(
               () =>
                 new EmailOutboxDataError({
@@ -726,7 +842,7 @@ export const EmailOutboxWorkflowLayer = Layer.mergeAll(
           deliveryIds,
           (deliveryId) =>
             EmailDeliveryWorkflow.execute({ deliveryId }, { discard: true }),
-          { discard: true }
+          { concurrency: maxConcurrentSends, discard: true }
         );
         const hasMoreRecipients = yield* W.Activity.make({
           name: `CheckEmailOutboxMaterialization-${attempt}`,
@@ -780,6 +896,8 @@ export const EmailOutboxWorkflowLayer = Layer.mergeAll(
         | EntitlementPolicy
         | DatabaseService
         | Mailer
+        | EmailOutboxConfig
+        | EmailSubscriptionRepository
       >;
       run = Effect.fnUntraced(function* (
         attempt: number,
@@ -810,20 +928,33 @@ export const EmailOutboxWorkflowLayer = Layer.mergeAll(
           // completing this deterministic workflow with a cached failure.
           Effect.catch(() => {
             const delayMs = retryDelayMs(deliveryId, attempt);
-            return repository
-              .deferSendingDelivery({
-                id: deliveryId,
-                nextAttemptAt: new Date(Date.now() + delayMs),
-                lastError: { tag: "EmailDeliveryActivityError" },
-              })
-              .pipe(
-                Effect.catch(() => Effect.void),
-                Effect.as({
-                  _tag: "retry" as const,
-                  delayMs,
-                  infrastructureFailure: true,
-                })
-              );
+            const retryOutcome = {
+              _tag: "retry" as const,
+              delayMs,
+              infrastructureFailure: true,
+            };
+            return W.Activity.make({
+              name: `DeferEmailDeliveryInfrastructure-${attempt}`,
+              success: DeliveryAttemptOutcomeSchema,
+              error: EmailOutboxDataError,
+              execute: Effect.gen(function* () {
+                const now = yield* DateTime.nowAsDate;
+                yield* repository.deferSendingDelivery({
+                  id: deliveryId,
+                  nextAttemptAt: new Date(now.getTime() + delayMs),
+                  lastError: { tag: "EmailDeliveryActivityError" },
+                });
+                return retryOutcome;
+              }).pipe(
+                Effect.mapError(
+                  () =>
+                    new EmailOutboxDataError({
+                      operation: "defer delivery after infrastructure failure",
+                      reason: "Could not persist the deferred delivery",
+                    })
+                )
+              ),
+            }).pipe(Effect.catch(() => Effect.succeed(retryOutcome)));
           })
         );
         if (outcome._tag === "terminal") {
@@ -891,21 +1022,18 @@ export const wakeEmailOutbox = (outboxId: string) =>
 
 /** Logs a failed post-commit wake; reconciliation closes the lost-wake window. */
 export const wakeEmailOutboxBestEffort = (
-  outboxId: string,
+  outboxId: string | undefined,
   organizationId: string
 ): Effect.Effect<void> =>
-  wakeEmailOutbox(outboxId).pipe(
-    Effect.catchCause((cause) =>
-      Effect.logWarning(
-        "Failed to wake email outbox; reconciliation will retry",
-        cause
-      ).pipe(Effect.annotateLogs({ organizationId, outboxId }))
-    )
-  );
+  outboxId === undefined
+    ? Effect.void
+    : wakeEmailOutbox(outboxId).pipe(
+        Effect.annotateLogs({ organizationId, outboxId })
+      );
 
 /** Recover database intents and delivery rows whose best-effort workflow wake was lost. */
 export const reconcileEmailOutbox = ({
-  now = new Date(),
+  now,
   staleSendingAfterMs = 5 * 60_000,
 }: {
   readonly now?: Date;
@@ -921,18 +1049,20 @@ export const reconcileEmailOutbox = ({
   | WorkflowEngine.WorkflowEngine
 > =>
   Effect.gen(function* () {
+    const reconciliationNow = now ?? (yield* DateTime.nowAsDate);
     const repository = yield* EmailOutboxRepository;
     const subscriptions = yield* EmailSubscriptionRepository;
     const policy = yield* EntitlementPolicy;
+    const { maxConcurrentSends } = yield* EmailOutboxConfig;
     const pending = yield* repository.findPending({
-      before: now,
+      before: reconciliationNow,
       limit: reconciliationBatchSize,
     });
     const paused = yield* repository.findPausedByPlan({
-      before: now,
+      before: reconciliationNow,
       limit: reconciliationBatchSize,
     });
-    yield* repository.expirePausedDeliveries({ now });
+    yield* repository.expirePausedDeliveries({ now: reconciliationNow });
     const subscriptionOrganizations =
       yield* subscriptions.findPlanStateOrganizationIds();
     const resumedPausedDeliveryIds = yield* Effect.forEach(
@@ -950,35 +1080,46 @@ export const reconcileEmailOutbox = ({
           });
           yield* subscriptions.reconcileSubscriptionPlanStates({
             eligible,
-            now,
+            now: reconciliationNow,
             organizationId,
           });
           return eligible
-            ? yield* repository.resumePausedDeliveries({ now, organizationId })
+            ? yield* repository.resumePausedDeliveries({
+                now: reconciliationNow,
+                organizationId,
+              })
             : ([] as readonly string[]);
         }),
-      { concurrency: 10 }
+      { concurrency: maxConcurrentSends }
     );
     // A previously paused dispatcher may already have completed under its
     // deterministic key. Materialize resumed intents directly so that a plan
     // upgrade never depends on replaying a cached workflow result.
     const resumedDeliveryIds = yield* Effect.forEach(
       paused,
-      (intent) => materializeSubmission(intent.id),
-      { concurrency: 10 }
+      (intent) => materializeEmailIntent(intent.id),
+      { concurrency: maxConcurrentSends }
     );
     yield* recordEmailReconciliationRecoveries(
       resumedDeliveryIds.reduce((count, ids) => count + ids.length, 0) +
         resumedPausedDeliveryIds.reduce((count, ids) => count + ids.length, 0)
     );
     yield* repository.recoverStaleSendingDeliveries({
-      before: new Date(now.getTime() - staleSendingAfterMs),
+      before: new Date(reconciliationNow.getTime() - staleSendingAfterMs),
     });
     const deliveries = yield* repository.findDueDeliveries({
-      before: now,
+      before: reconciliationNow,
       limit: reconciliationBatchSize,
-      staleSendingBefore: new Date(now.getTime() - staleSendingAfterMs),
+      staleSendingBefore: new Date(
+        reconciliationNow.getTime() - staleSendingAfterMs
+      ),
     });
+    const oldestQueuedAt = deliveries[0]?.createdAt;
+    yield* recordEmailOldestQueuedAge(
+      oldestQueuedAt === undefined
+        ? 0
+        : reconciliationNow.getTime() - oldestQueuedAt.getTime()
+    );
     yield* Effect.forEach(pending, (intent) => wakeEmailOutbox(intent.id), {
       discard: true,
     });
@@ -989,19 +1130,19 @@ export const reconcileEmailOutbox = ({
           { deliveryId: delivery.id },
           { discard: true }
         ),
-      { discard: true }
+      { concurrency: maxConcurrentSends, discard: true }
     );
     yield* Effect.forEach(
       resumedDeliveryIds.flat(),
       (deliveryId) =>
         EmailDeliveryWorkflow.execute({ deliveryId }, { discard: true }),
-      { discard: true }
+      { concurrency: maxConcurrentSends, discard: true }
     );
     yield* Effect.forEach(
       resumedPausedDeliveryIds.flat(),
       (deliveryId) =>
         EmailDeliveryWorkflow.execute({ deliveryId }, { discard: true }),
-      { discard: true }
+      { concurrency: maxConcurrentSends, discard: true }
     );
   }).pipe(
     Effect.catch((error) =>
