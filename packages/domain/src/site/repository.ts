@@ -2,6 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { and, eq, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -102,40 +103,46 @@ const makeSiteRepository = Effect.gen(function* () {
       organizationId,
       roadmapVisibility,
     }: updateArgs) =>
-      db
-        .update(schema.siteTable)
-        .set({
-          changelogVisibility,
-          updatedAt: new Date(),
-          roadmapVisibility,
-          noIndex,
-          name,
-        })
-        .where(
-          and(
-            eq(schema.siteTable.id, id),
-            eq(schema.siteTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.siteTable)
+          .set({
+            changelogVisibility,
+            updatedAt: now,
+            roadmapVisibility,
+            noIndex,
+            name,
+          })
+          .where(
+            and(
+              eq(schema.siteTable.id, id),
+              eq(schema.siteTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
     updateHidePoweredByBranding: ({
       hidePoweredBy,
       id,
       organizationId,
     }: updateHidePoweredByBrandingArgs) =>
-      db
-        .update(schema.siteTable)
-        .set({
-          hidePoweredBy,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.siteTable.id, id),
-            eq(schema.siteTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.siteTable)
+          .set({
+            hidePoweredBy,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.siteTable.id, id),
+              eq(schema.siteTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
   };
 });
 

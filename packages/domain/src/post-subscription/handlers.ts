@@ -1,4 +1,5 @@
 import { transaction } from "@feeblo/db";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
@@ -41,7 +42,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
 
-      const now = new Date();
+      const now = yield* DateTime.nowAsDate;
       yield* transaction(
         Effect.gen(function* () {
           yield* repository.subscribe({
@@ -80,13 +81,14 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
 
       yield* transaction(
         Effect.gen(function* () {
+          const now = yield* DateTime.nowAsDate;
           yield* repository.unsubscribe({
             postId: args.postId,
             userId: session.session.userId,
           });
           yield* emailSubscriptions
             .unsubscribeAuthenticatedSubscription({
-              now: new Date(),
+              now,
               organizationId: args.organizationId,
               topic: { topicId: args.postId, topicType: "post" },
               userId: session.session.userId,

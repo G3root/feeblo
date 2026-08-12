@@ -3,6 +3,8 @@ import type { TNotificationEventType } from "@feeblo/db/validation-schema/notifi
 import { NotificationId } from "@feeblo/id";
 import { and, count, desc, eq, isNull, lt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -174,6 +176,8 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, postId)
             )
           );
+        const crypto = yield* Crypto.Crypto;
+        const statusChangedUuid = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
         yield* create({
           ...(actorMemberId === undefined ? {} : { actorMemberId }),
           organizationId,
@@ -187,7 +191,7 @@ const makeNotificationService = Effect.gen(function* () {
           title: "Feedback status updated",
           body: context.title,
           href: `/${organizationId}/post/${context.boardSlug}/${context.slug}`,
-          deduplicationKey: `feedback.status_changed:${postId}:${crypto.randomUUID()}`,
+          deduplicationKey: `feedback.status_changed:${postId}:${statusChangedUuid}`,
         });
       }),
 
@@ -256,17 +260,19 @@ const makeNotificationService = Effect.gen(function* () {
       organizationId: string;
       recipientMemberId: string;
     }) =>
-      db
-        .update(schema.notificationTable)
-        .set({ readAt: new Date() })
-        .where(
-          and(
-            eq(schema.notificationTable.id, id),
-            eq(schema.notificationTable.organizationId, organizationId),
-            eq(schema.notificationTable.recipientMemberId, recipientMemberId)
-          )
-        )
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.notificationTable)
+          .set({ readAt: now })
+          .where(
+            and(
+              eq(schema.notificationTable.id, id),
+              eq(schema.notificationTable.organizationId, organizationId),
+              eq(schema.notificationTable.recipientMemberId, recipientMemberId)
+            )
+          );
+      }),
 
     markAllRead: ({
       organizationId,
@@ -275,17 +281,19 @@ const makeNotificationService = Effect.gen(function* () {
       organizationId: string;
       recipientMemberId: string;
     }) =>
-      db
-        .update(schema.notificationTable)
-        .set({ readAt: new Date() })
-        .where(
-          and(
-            eq(schema.notificationTable.organizationId, organizationId),
-            eq(schema.notificationTable.recipientMemberId, recipientMemberId),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.notificationTable)
+          .set({ readAt: now })
+          .where(
+            and(
+              eq(schema.notificationTable.organizationId, organizationId),
+              eq(schema.notificationTable.recipientMemberId, recipientMemberId),
             isNull(schema.notificationTable.readAt)
           )
-        )
-        .pipe(Effect.asVoid),
+        );
+      }),
   };
 });
 

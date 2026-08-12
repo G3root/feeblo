@@ -6,6 +6,7 @@ import {
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
@@ -91,6 +92,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
     deleteWithPrimaryHandoff: ({ id, organizationId }: TRoadmapDelete) =>
       db.transaction(() =>
         Effect.gen(function* () {
+          const now = yield* DateTime.nowAsDate;
           yield* lockOrganization(organizationId);
 
           const [roadmap] = yield* db
@@ -142,7 +144,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
 
           yield* db
             .update(schema.roadmapTable)
-            .set({ isPrimary: true, updatedAt: new Date() })
+            .set({ isPrimary: true, updatedAt: now })
             .where(eq(schema.roadmapTable.id, next.id))
             .pipe(Effect.asVoid);
         })
@@ -198,24 +200,27 @@ const makeRoadmapRepository = Effect.gen(function* () {
         })
       ),
     update: (input: Omit<TRoadmapUpdate, "isPrimary">) =>
-      db
-        .update(schema.roadmapTable)
-        .set({
-          name: input.name,
-          slug: input.slug,
-          description: input.description,
-          mode: input.mode,
-          visibility: input.visibility,
-          filter: toMutableRoadmapFilter(input.filter),
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.roadmapTable.id, input.id),
-            eq(schema.roadmapTable.organizationId, input.organizationId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.roadmapTable)
+          .set({
+            name: input.name,
+            slug: input.slug,
+            description: input.description,
+            mode: input.mode,
+            visibility: input.visibility,
+            filter: toMutableRoadmapFilter(input.filter),
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.roadmapTable.id, input.id),
+              eq(schema.roadmapTable.organizationId, input.organizationId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
   };
 });
 

@@ -2,6 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { ChangelogCategoryLinkId } from "@feeblo/id";
 import { and, asc, count, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -118,35 +119,41 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
         .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
 
     create: ({ id, name, iconType, icon, organizationId }: TCreate) =>
-      db
-        .insert(schema.changelogCategoryTable)
-        .values({
-          id,
-          name,
-          iconType,
-          icon,
-          organizationId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .insert(schema.changelogCategoryTable)
+          .values({
+            id,
+            name,
+            iconType,
+            icon,
+            organizationId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .pipe(Effect.asVoid);
+      }),
 
     update: ({ id, name, iconType, icon, organizationId }: TUpdate) =>
-      db
-        .update(schema.changelogCategoryTable)
-        .set({
-          name,
-          iconType,
-          icon,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.changelogCategoryTable.id, id),
-            eq(schema.changelogCategoryTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.changelogCategoryTable)
+          .set({
+            name,
+            iconType,
+            icon,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.changelogCategoryTable.id, id),
+              eq(schema.changelogCategoryTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
 
     delete: ({ id, organizationId }: TDelete) =>
       db
@@ -195,6 +202,7 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
       db
         .transaction((tx) =>
           Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
             yield* tx
               .delete(schema.changelogCategoryLinkTable)
               .where(
@@ -221,8 +229,8 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
                   changelogId,
                   categoryId,
                   organizationId,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  createdAt: now,
+                  updatedAt: now,
                 }))
               )
             );
