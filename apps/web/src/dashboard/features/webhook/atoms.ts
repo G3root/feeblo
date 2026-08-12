@@ -42,17 +42,23 @@ export type DeliveryHistoryArgs = {
 };
 
 /**
- * Bumping this counter restarts the delivery-history stream from the newest
- * page. It is read as a dependency inside `deliveriesAtom`'s pull, so any
- * write re-runs the stream from scratch — the same dependency reactivity the
- * reference app gets from reading the query atom. The Refresh button, test
- * deliveries, and retries all bump it.
+ * Bumping this counter restarts the delivery-history stream for one connection
+ * from the newest page. It is read as a dependency inside `deliveriesAtom`'s
+ * pull, so any write re-runs that stream from scratch — the same dependency
+ * reactivity the reference app gets from reading the query atom. The Refresh
+ * button, test deliveries, and retries all bump it.
+ *
+ * The atom is a per-connection family (like `deliveriesAtom`) so a refresh of
+ * one connection never restarts another connection's stream.
  */
-export const deliveryHistoryRefreshAtom = Atom.writable<number, void>(
-  () => 0,
-  (ctx, _) => {
-    ctx.setSelf(ctx.get(deliveryHistoryRefreshAtom) + 1);
-  }
+export const deliveryHistoryRefreshAtom = Atom.family(
+  (args: DeliveryHistoryArgs) =>
+    Atom.writable<number, void>(
+      () => 0,
+      (ctx, _) => {
+        ctx.setSelf(ctx.get(deliveryHistoryRefreshAtom(args)) + 1);
+      }
+    )
 );
 
 /**
@@ -67,7 +73,7 @@ export const deliveryHistoryRefreshAtom = Atom.writable<number, void>(
  */
 export const deliveriesAtom = Atom.family((args: DeliveryHistoryArgs) =>
   Atom.pull((get) => {
-    get(deliveryHistoryRefreshAtom);
+    get(deliveryHistoryRefreshAtom(args));
     return Stream.paginate(undefined as string | undefined, (cursor) =>
       Effect.tryPromise(() =>
         loadDeliveries(args.organizationId, args.connectionId, cursor)

@@ -41,7 +41,7 @@ import {
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useScrollBottom } from "~/hooks/use-scroll-bottom";
 import { fetchRpc } from "~/lib/runtime";
@@ -101,7 +101,9 @@ function WebhookDetailContent({
   const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
   // Mutations that create or change deliveries (test, retry) bump this to
   // restart the history stream so new rows appear without a manual refresh.
-  const refreshDeliveryHistory = useAtomSet(deliveryHistoryRefreshAtom);
+  const refreshDeliveryHistory = useAtomSet(
+    deliveryHistoryRefreshAtom({ connectionId, organizationId })
+  );
 
   const { endpoint, isLoading, loadFailed } = useMemo(() => {
     const findEndpoint = (value: readonly Endpoint[]) =>
@@ -130,6 +132,9 @@ function WebhookDetailContent({
   }, [connectionId, endpointsResult]);
 
   const handleTest = async (endpoint: Endpoint) => {
+    // Clear any previous result up front, so an in-flight or failed test never
+    // shows stale delivery information.
+    setTestResult(null);
     try {
       const result = await fetchRpc((rpc) =>
         rpc.WebhookTestDelivery({
@@ -512,7 +517,7 @@ function DeliveryHistoryTable({
   // stream from the newest page. Both operations are owned by the atoms, so
   // the component no longer tracks cursors or accumulates pages itself.
   const pull = useAtomSet(deliveriesAtom(historyArgs));
-  const refreshHistory = useAtomSet(deliveryHistoryRefreshAtom);
+  const refreshHistory = useAtomSet(deliveryHistoryRefreshAtom(historyArgs));
   useScrollBottom(() => {
     pull();
   });
@@ -581,15 +586,25 @@ function DeliveryHistoryTable({
   });
   // The virtualizer coordinates rows relative to the first body row, so its
   // scroll margin is the table's offset plus the measured header height.
+  // Refs are only attached after commit, so the margin is measured in a
+  // layout effect and stored in state; re-measuring when the row list changes
+  // covers the table mounting after deliveries stream in.
   const headerRef = useRef<HTMLTableSectionElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    if (rows.length === 0) {
+      return;
+    }
+    setScrollMargin(
+      (listRef.current?.offsetTop ?? 0) + (headerRef.current?.offsetHeight ?? 0)
+    );
+  }, [rows.length]);
   const virtualizer = useWindowVirtualizer<HTMLTableRowElement>({
     count: rows.length,
     estimateSize: () => 44,
     getItemKey: (index) => rows[index]?.key ?? index,
     overscan: 6,
-    scrollMargin:
-      (listRef.current?.offsetTop ?? 0) +
-      (headerRef.current?.offsetHeight ?? 0),
+    scrollMargin,
     initialOffset: scrollRestoration?.scrollY,
   });
 
@@ -597,8 +612,6 @@ function DeliveryHistoryTable({
   // and below keep the table's total height (and the window scrollbar)
   // accurate while the page scrolls.
   const virtualItems = virtualizer.getVirtualItems();
-  const scrollMargin =
-    (listRef.current?.offsetTop ?? 0) + (headerRef.current?.offsetHeight ?? 0);
   const topSpacer =
     virtualItems.length > 0 ? virtualItems[0].start - scrollMargin : 0;
   const lastItem = virtualItems.at(-1);
@@ -675,6 +688,13 @@ function DeliveryHistoryTable({
                 ) : null}
                 {virtualItems.map((item) => {
                   const row = rows[item.index];
+                  // The row list can shrink while a refresh is in flight (the
+                  // new page hasn't streamed in yet), leaving stale virtual
+                  // items with no backing row; skip those instead of reading
+                  // `row.kind` off an undefined row.
+                  if (row === undefined) {
+                    return null;
+                  }
                   return row.kind === "delivery" ? (
                     <DeliveryRow
                       dataIndex={item.index}

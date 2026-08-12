@@ -8,6 +8,7 @@ import {
   IntegrationEventRecorderLive,
   IntegrationProviderInvalidConfigurationError,
   type IntegrationProviderRegistryValidationError,
+  IntegrationProviderTemporaryFailure,
   makeIntegrationDeliveryWorkerRepository,
   makeIntegrationManagementRepository,
   makeIntegrationProviderRegistry,
@@ -65,9 +66,12 @@ export const makeIntegrationLayers: Effect.Effect<
           .where(eq(schema.integrationConnectionTable.id, input.connection.id))
           .limit(1)
           .pipe(
+            // A database failure is transient, not a credential problem:
+            // classify it as retryable so the delivery policy keeps retrying
+            // instead of treating it as a permanent configuration error.
             Effect.mapError(
               () =>
-                new IntegrationProviderInvalidConfigurationError({
+                new IntegrationProviderTemporaryFailure({
                   message: "Webhook credentials could not be loaded",
                   provider: webhookProviderKey,
                 })

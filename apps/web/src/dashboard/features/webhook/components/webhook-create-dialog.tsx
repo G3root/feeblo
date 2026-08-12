@@ -32,7 +32,14 @@ export function WebhookCreateDialog({
   const open = useSelector(store, (state) => state.context.open);
 
   return (
-    <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
+    <Sheet
+      onOpenChange={(open) =>
+        // Dispatch the reported open value (not a toggle); the create dialog
+        // carries no data.
+        store.send({ type: "setOpen", open, data: {} })
+      }
+      open={open}
+    >
       <SheetPopup>
         <SheetHeader>
           <SheetTitle>Create webhook endpoint</SheetTitle>
@@ -40,7 +47,9 @@ export function WebhookCreateDialog({
             Feeblo validates the address before saving and signs every request.
           </SheetDescription>
         </SheetHeader>
-        <WebhookCreateForm onCreated={onCreated} />
+        {/* Mount the form only while the sheet is open so it resets to fresh
+        defaults (including the event selection) on every open. */}
+        {open ? <WebhookCreateForm onCreated={onCreated} /> : null}
       </SheetPopup>
     </Sheet>
   );
@@ -107,7 +116,7 @@ function WebhookCreateForm({
           )}
           name="endpointUrl"
         />
-        <WebhookEventSelectionField form={form} />
+        <WebhookEventSelectionField form={form} idPrefix="create-webhook" />
       </SheetPanel>
       <SheetFooter>
         <SheetClose render={<Button variant="ghost" />}>Cancel</SheetClose>

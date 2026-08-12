@@ -39,7 +39,8 @@ export interface WebhookProviderCredentialResolver {
       readonly endpointUrl: Redacted.Redacted<string>;
       readonly signingKeyring: WebhookSigningKeyring;
     },
-    IntegrationProviderInvalidConfigurationError
+    | IntegrationProviderInvalidConfigurationError
+    | IntegrationProviderTemporaryFailure
   >;
 }
 

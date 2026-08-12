@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: the shared schema validates the endpoint URL with Zod's `z.url()` (a `ZodPipe`), while the edit sheet relaxes that field to `z.string().trim()` so a blank URL keeps the current one; the field component's `form` prop is therefore widened to accept any webhook form. It only renders the eventTypes field and never reads the URL validator. */
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { CheckboxGroup } from "@feeblo/ui/checkbox-group";
 import { Field, FieldLabel } from "@feeblo/ui/field";
@@ -45,14 +46,15 @@ export function WebhookEventSelection({
 
 export const WebhookEventSelectionField = withForm({
   ...webhookFormOpts,
-  render: ({ form }) => (
+  props: { idPrefix: "webhook" as string },
+  render: ({ form, idPrefix }) => (
     <form.AppField
       children={(field) => (
         <Field name={field.name}>
           <FieldLabel>Events</FieldLabel>
           <WebhookEventSelection
             eventTypes={field.state.value}
-            idPrefix="create-webhook"
+            idPrefix={idPrefix}
             onChange={(eventTypes) => field.handleChange(eventTypes)}
           />
         </Field>
