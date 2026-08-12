@@ -161,6 +161,8 @@ export const IntegrationRoute = Schema.Struct({
   eventTypes: IntegrationRouteEventSelection,
   id: IntegrationRouteId.schema,
   provider: IntegrationProviderKey,
+  /** Provider-owned versioned configuration; secrets never belong here. */
+  providerConfig: Schema.Json,
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
 export interface IntegrationRoute
@@ -297,13 +299,24 @@ export class IntegrationProviderPermanentRejection extends Schema.TaggedErrorCla
   }
 ) {}
 
+/** Provider operation whose precondition is already satisfied (e.g. joining a channel the bot is already in); the caller may treat it as a no-op success. */
+export class IntegrationProviderChannelAlreadyJoinedError extends Schema.TaggedErrorClass<IntegrationProviderChannelAlreadyJoinedError>()(
+  "IntegrationProviderChannelAlreadyJoinedError",
+  {
+    httpStatus: Schema.optionalKey(Schema.Int),
+    message: Schema.String,
+    provider: IntegrationProviderKey,
+  }
+) {}
+
 /** Typed failure algebra implemented by every outbound provider handler. */
 export type IntegrationProviderDeliveryFailure =
   | IntegrationProviderAuthenticationError
   | IntegrationProviderRateLimitedError
   | IntegrationProviderInvalidConfigurationError
   | IntegrationProviderTemporaryFailure
-  | IntegrationProviderPermanentRejection;
+  | IntegrationProviderPermanentRejection
+  | IntegrationProviderChannelAlreadyJoinedError;
 
 /** Provider handler input is canonical data plus safe connection/route references. */
 export interface IntegrationProviderDeliveryInput {
@@ -329,10 +342,39 @@ export interface IntegrationCapabilityHandler {
   >;
 }
 
+/** Raw inbound request handed to a provider capability; the provider owns wire parsing and signature verification. */
+export interface IntegrationInboundRequest {
+  readonly headers: Readonly<
+    Record<string, string | readonly string[] | undefined>
+  >;
+  readonly rawBody: string;
+}
+
+/** Serializable inbound response returned to the external caller. */
+export interface IntegrationInboundResponse {
+  readonly body: unknown;
+  readonly status?: number;
+}
+
+/** Terminal rejection of an inbound request after verification failed. */
+export class IntegrationInboundRejection extends Schema.TaggedErrorClass<IntegrationInboundRejection>()(
+  "IntegrationInboundRejection",
+  { message: Schema.String, provider: IntegrationProviderKey }
+) {}
+
+/** One provider implementation for one advertised inbound capability. */
+export interface IntegrationInboundCapabilityHandler {
+  readonly capabilityKey: TIntegrationCapabilityKey;
+  readonly handle: (
+    input: IntegrationInboundRequest
+  ) => Effect.Effect<IntegrationInboundResponse, IntegrationInboundRejection>;
+}
+
 /** Static provider contribution validated by the server registry during startup. */
 export interface IntegrationProviderRegistration {
   readonly connectionConfigurationSchema: Schema.Codec<Schema.Json>;
   readonly handlers: readonly IntegrationCapabilityHandler[];
+  readonly inboundHandlers: readonly IntegrationInboundCapabilityHandler[];
   readonly manifest: IntegrationProviderManifest;
   readonly routeConfigurationSchemas: ReadonlyMap<
     string,

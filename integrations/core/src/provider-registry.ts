@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type {
   IntegrationCapabilityHandler,
+  IntegrationInboundCapabilityHandler,
   IntegrationProviderKey,
   IntegrationProviderRegistration,
 } from "./integration-contracts";
@@ -22,6 +23,10 @@ export interface IntegrationProviderRegistry {
     readonly capabilityKey: string;
     readonly provider: IntegrationProviderKey;
   }) => IntegrationCapabilityHandler | undefined;
+  readonly getInboundHandler: (input: {
+    readonly capabilityKey: string;
+    readonly provider: IntegrationProviderKey;
+  }) => IntegrationInboundCapabilityHandler | undefined;
   readonly getRegistration: (
     provider: IntegrationProviderKey
   ) => IntegrationProviderRegistration | undefined;
@@ -82,6 +87,22 @@ export const makeIntegrationProviderRegistry = (
         handlersByCapability.set(handler.capabilityKey, handler);
       }
 
+      const inboundHandlersByCapability = new Map<
+        string,
+        IntegrationInboundCapabilityHandler
+      >();
+      for (const handler of registration.inboundHandlers ?? []) {
+        if (inboundHandlersByCapability.has(handler.capabilityKey)) {
+          return yield* registryValidationFailure({
+            capabilityKey: handler.capabilityKey,
+            message:
+              "Integration provider registry duplicate inbound capability handler",
+            provider,
+          });
+        }
+        inboundHandlersByCapability.set(handler.capabilityKey, handler);
+      }
+
       for (const capability of registration.manifest.capabilities) {
         if (!registration.routeConfigurationSchemas.has(capability.key)) {
           return yield* registryValidationFailure({
@@ -91,18 +112,29 @@ export const makeIntegrationProviderRegistry = (
             provider,
           });
         }
-        if (capability.direction !== "outbound") {
+        if (capability.direction === "outbound") {
+          if (!handlersByCapability.has(capability.key)) {
+            return yield* registryValidationFailure({
+              capabilityKey: capability.key,
+              message:
+                "Integration provider registry missing capability handler",
+              provider,
+            });
+          }
+        } else if (capability.direction === "inbound") {
+          if (!inboundHandlersByCapability.has(capability.key)) {
+            return yield* registryValidationFailure({
+              capabilityKey: capability.key,
+              message:
+                "Integration provider registry missing inbound capability handler",
+              provider,
+            });
+          }
+        } else {
           return yield* registryValidationFailure({
             capabilityKey: capability.key,
             message:
               "Integration provider registry unsupported capability direction in V1",
-            provider,
-          });
-        }
-        if (!handlersByCapability.has(capability.key)) {
-          return yield* registryValidationFailure({
-            capabilityKey: capability.key,
-            message: "Integration provider registry missing capability handler",
             provider,
           });
         }
@@ -121,6 +153,16 @@ export const makeIntegrationProviderRegistry = (
           });
         }
       }
+      for (const handler of registration.inboundHandlers ?? []) {
+        if (!advertisedCapabilities.has(handler.capabilityKey)) {
+          return yield* registryValidationFailure({
+            capabilityKey: handler.capabilityKey,
+            message:
+              "Integration provider registry inbound handler for unadvertised capability",
+            provider,
+          });
+        }
+      }
 
       registrationsByProvider.set(provider, registration);
     }
@@ -130,6 +172,12 @@ export const makeIntegrationProviderRegistry = (
         registrationsByProvider
           .get(provider)
           ?.handlers.find((handler) => handler.capabilityKey === capabilityKey),
+      getInboundHandler: ({ capabilityKey, provider }) =>
+        registrationsByProvider
+          .get(provider)
+          ?.inboundHandlers.find(
+            (handler) => handler.capabilityKey === capabilityKey
+          ),
       getRegistration: (provider) => registrationsByProvider.get(provider),
       manifests: registrations.map((registration) => registration.manifest),
     };

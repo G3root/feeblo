@@ -63,7 +63,7 @@ interface TPostCreate {
   id: string;
   metadata?: Record<string, string>;
   organizationId: string;
-  source?: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "PUBLIC_BOARD";
+  source?: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "PUBLIC_BOARD" | "SLACK";
   statusId: string;
   title: string;
 }
@@ -194,7 +194,13 @@ const makePostRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0]?.statusId)),
 
-    findStatusType: ({ id, organizationId }: { readonly id: string; readonly organizationId: string }) =>
+    findStatusType: ({
+      id,
+      organizationId,
+    }: {
+      readonly id: string;
+      readonly organizationId: string;
+    }) =>
       db
         .select({ type: schema.postStatusTable.type })
         .from(schema.postStatusTable)

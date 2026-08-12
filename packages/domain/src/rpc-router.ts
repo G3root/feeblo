@@ -15,6 +15,7 @@ import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { WebhookManagementRpcHandlers } from "./integration/handlers";
+import { SlackManagementRpcHandlers } from "./integration/slack/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
@@ -47,7 +48,8 @@ export const RpcRoute = RpcServer.layerHttp({
     Layer.mergeAll(
       PostRpcHandlers,
       PostActivityRpcHandlers,
-      WebhookManagementRpcHandlers
+      WebhookManagementRpcHandlers,
+      SlackManagementRpcHandlers
     )
   ),
   Layer.provide(BillingRpcHandlers),

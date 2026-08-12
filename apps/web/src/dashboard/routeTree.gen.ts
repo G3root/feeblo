@@ -43,6 +43,7 @@ import { Route as OrganizationIdDashboardLayoutFeedbackActiveRouteImport } from 
 import { Route as OrganizationIdDashboardLayoutFeedbackBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/feedback/backlog"
 import { Route as OrganizationIdDashboardLayoutRoadmapIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/index"
 import { Route as OrganizationIdDashboardLayoutRoadmapSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/roadmap/$slug"
+import { Route as OrganizationIdSettingsIntegrationsIndexRouteImport } from "./routes/$organizationId/settings/integrations/index"
 import { Route as OrganizationIdSettingsWebhooksIndexRouteImport } from "./routes/$organizationId/settings/webhooks/index"
 import { Route as OrganizationIdSettingsWebhooksConnectionIdRouteImport } from "./routes/$organizationId/settings/webhooks/$connectionId"
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/index"
@@ -50,6 +51,7 @@ import { Route as OrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport }
 import { Route as OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
 import { Route as OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 import { Route as OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
+import { Route as OrganizationIdSettingsIntegrationsSlackIndexRouteImport } from "./routes/$organizationId/settings/integrations/slack/index"
 
 const OrganizationIdRoute = OrganizationIdRouteImport.update({
   id: "/$organizationId",
@@ -246,6 +248,12 @@ const OrganizationIdDashboardLayoutRoadmapSlugRoute =
     path: "/roadmap/$slug",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
+const OrganizationIdSettingsIntegrationsIndexRoute =
+  OrganizationIdSettingsIntegrationsIndexRouteImport.update({
+    id: "/integrations/",
+    path: "/integrations/",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
 const OrganizationIdSettingsWebhooksIndexRoute =
   OrganizationIdSettingsWebhooksIndexRouteImport.update({
     id: "/webhooks/",
@@ -288,6 +296,12 @@ const OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute =
     path: "/post/$boardSlug/$postSlug",
     getParentRoute: () => OrganizationIdDashboardLayoutRoute,
   } as any)
+const OrganizationIdSettingsIntegrationsSlackIndexRoute =
+  OrganizationIdSettingsIntegrationsSlackIndexRouteImport.update({
+    id: "/integrations/slack/",
+    path: "/integrations/slack/",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   "/$organizationId": typeof OrganizationIdRouteWithChildren
@@ -324,12 +338,14 @@ export interface FileRoutesByFullPath {
   "/$organizationId/contact/": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback/": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/roadmap/": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/integrations/": typeof OrganizationIdSettingsIntegrationsIndexRoute
   "/$organizationId/settings/webhooks/": typeof OrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId/settings/integrations/slack/": typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 export interface FileRoutesByTo {
   "/$organizationId": typeof OrganizationIdDashboardLayoutIndexRoute
@@ -364,12 +380,14 @@ export interface FileRoutesByTo {
   "/$organizationId/contact": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/roadmap": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/integrations": typeof OrganizationIdSettingsIntegrationsIndexRoute
   "/$organizationId/settings/webhooks": typeof OrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId/settings/integrations/slack": typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -408,12 +426,14 @@ export interface FileRoutesById {
   "/$organizationId/_dashboard-layout/contact/": typeof OrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/_dashboard-layout/feedback/": typeof OrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/_dashboard-layout/roadmap/": typeof OrganizationIdDashboardLayoutRoadmapIndexRoute
+  "/$organizationId/settings/integrations/": typeof OrganizationIdSettingsIntegrationsIndexRoute
   "/$organizationId/settings/webhooks/": typeof OrganizationIdSettingsWebhooksIndexRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/active": typeof OrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/backlog": typeof OrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug": typeof OrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId/settings/integrations/slack/": typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -452,12 +472,14 @@ export interface FileRouteTypes {
     | "/$organizationId/contact/"
     | "/$organizationId/feedback/"
     | "/$organizationId/roadmap/"
+    | "/$organizationId/settings/integrations/"
     | "/$organizationId/settings/webhooks/"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug/"
+    | "/$organizationId/settings/integrations/slack/"
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/$organizationId"
@@ -492,12 +514,14 @@ export interface FileRouteTypes {
     | "/$organizationId/contact"
     | "/$organizationId/feedback"
     | "/$organizationId/roadmap"
+    | "/$organizationId/settings/integrations"
     | "/$organizationId/settings/webhooks"
     | "/$organizationId/board/$boardSlug/active"
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug"
+    | "/$organizationId/settings/integrations/slack"
   id:
     | "__root__"
     | "/$organizationId"
@@ -535,12 +559,14 @@ export interface FileRouteTypes {
     | "/$organizationId/_dashboard-layout/contact/"
     | "/$organizationId/_dashboard-layout/feedback/"
     | "/$organizationId/_dashboard-layout/roadmap/"
+    | "/$organizationId/settings/integrations/"
     | "/$organizationId/settings/webhooks/"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/active"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
     | "/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
     | "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/"
+    | "/$organizationId/settings/integrations/slack/"
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -793,6 +819,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdDashboardLayoutRoadmapSlugRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
     }
+    "/$organizationId/settings/integrations/": {
+      id: "/$organizationId/settings/integrations/"
+      path: "/integrations"
+      fullPath: "/$organizationId/settings/integrations/"
+      preLoaderRoute: typeof OrganizationIdSettingsIntegrationsIndexRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
     "/$organizationId/settings/webhooks/": {
       id: "/$organizationId/settings/webhooks/"
       path: "/webhooks"
@@ -841,6 +874,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/$organizationId/post/$boardSlug/$postSlug"
       preLoaderRoute: typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport
       parentRoute: typeof OrganizationIdDashboardLayoutRoute
+    }
+    "/$organizationId/settings/integrations/slack/": {
+      id: "/$organizationId/settings/integrations/slack/"
+      path: "/integrations/slack"
+      fullPath: "/$organizationId/settings/integrations/slack/"
+      preLoaderRoute: typeof OrganizationIdSettingsIntegrationsSlackIndexRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
     }
   }
 }
@@ -921,7 +961,9 @@ interface OrganizationIdSettingsRouteChildren {
   OrganizationIdSettingsWorkspaceRoute: typeof OrganizationIdSettingsWorkspaceRoute
   OrganizationIdSettingsIndexRoute: typeof OrganizationIdSettingsIndexRoute
   OrganizationIdSettingsWebhooksConnectionIdRoute: typeof OrganizationIdSettingsWebhooksConnectionIdRoute
+  OrganizationIdSettingsIntegrationsIndexRoute: typeof OrganizationIdSettingsIntegrationsIndexRoute
   OrganizationIdSettingsWebhooksIndexRoute: typeof OrganizationIdSettingsWebhooksIndexRoute
+  OrganizationIdSettingsIntegrationsSlackIndexRoute: typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 
 const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
@@ -948,8 +990,12 @@ const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
     OrganizationIdSettingsIndexRoute: OrganizationIdSettingsIndexRoute,
     OrganizationIdSettingsWebhooksConnectionIdRoute:
       OrganizationIdSettingsWebhooksConnectionIdRoute,
+    OrganizationIdSettingsIntegrationsIndexRoute:
+      OrganizationIdSettingsIntegrationsIndexRoute,
     OrganizationIdSettingsWebhooksIndexRoute:
       OrganizationIdSettingsWebhooksIndexRoute,
+    OrganizationIdSettingsIntegrationsSlackIndexRoute:
+      OrganizationIdSettingsIntegrationsSlackIndexRoute,
   }
 
 const OrganizationIdSettingsRouteWithChildren =

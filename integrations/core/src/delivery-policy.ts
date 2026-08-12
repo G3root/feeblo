@@ -57,6 +57,7 @@ export const classifyIntegrationProviderDeliveryFailure = (
     case "IntegrationProviderAuthenticationError":
     case "IntegrationProviderInvalidConfigurationError":
     case "IntegrationProviderPermanentRejection":
+    case "IntegrationProviderChannelAlreadyJoinedError":
       return { _tag: "Terminal" };
     default:
       return failure satisfies never;
