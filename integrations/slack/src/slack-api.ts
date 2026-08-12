@@ -75,6 +75,7 @@ export const SlackConversation = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   is_member: Schema.optionalKey(Schema.Boolean),
+  is_private: Schema.optionalKey(Schema.Boolean),
   is_archived: Schema.optionalKey(Schema.Boolean),
 });
 export type SlackConversation = Schema.Schema.Type<typeof SlackConversation>;
@@ -83,6 +84,11 @@ export type SlackConversation = Schema.Schema.Type<typeof SlackConversation>;
 export const SlackConversationsListResponse = Schema.Struct({
   ok: Schema.Literal(true),
   channels: Schema.Array(SlackConversation),
+  response_metadata: Schema.optionalKey(
+    Schema.Struct({
+      next_cursor: Schema.optionalKey(Schema.String),
+    })
+  ),
 });
 export type SlackConversationsListResponse = Schema.Schema.Type<
   typeof SlackConversationsListResponse

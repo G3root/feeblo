@@ -34,6 +34,7 @@ import type * as S from "./schema";
 
 const retentionMs = 30 * 24 * 60 * 60 * 1000;
 const CHANNELS_PAGE_SIZE = 200;
+const MAX_CHANNEL_PAGES = 25;
 
 const SlackSafeDisplayMetadata = Schema.Struct({
   teamId: Schema.optionalKey(Schema.String),
@@ -230,50 +231,10 @@ export const makeSlackManagementServiceLive = (
                 })
             )
           );
-          const [connection] = yield* db
-            .select()
-            .from(schema.integrationConnectionTable)
-            .where(
-              and(
-                eq(schema.integrationConnectionTable.id, decoded.connectionId),
-                eq(
-                  schema.integrationConnectionTable.organizationId,
-                  decoded.organizationId
-                ),
-                eq(
-                  schema.integrationConnectionTable.provider,
-                  slackProviderKey
-                ),
-                eq(schema.integrationConnectionTable.lifecycle, "connecting")
-              )
-            )
-            .limit(1);
-          if (connection === undefined) {
-            return yield* new NotFoundError({
-              message: "Slack connection was not found",
-            });
-          }
-          if (connection.credentialsCiphertext === null) {
-            return yield* new NotFoundError({
-              message: "Slack connection was not found",
-            });
-          }
-          const credentials = yield* decryptSlackCredentialMaterial(
-            config.encryptionKey,
-            connection.credentialsCiphertext
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Slack credentials could not be decrypted",
-                })
-            )
-          );
-          if (credentials.oauthState !== decoded.nonce) {
-            return yield* new BadRequestError({
-              message: "Slack OAuth state does not match",
-            });
-          }
+          // OAuth exchange runs before any transaction: the code is single-use,
+          // so Slack itself serializes replays. The guarded connection
+          // transition below is the idempotency boundary for concurrent
+          // callback replays.
           const oauth = yield* apiClient
             .oauthV2Access({
               clientId: config.clientId,
@@ -308,9 +269,42 @@ export const makeSlackManagementServiceLive = (
                 })
             )
           );
-          const now = new Date();
-          yield* db.transaction(() =>
+          return yield* db.transaction(() =>
             Effect.gen(function* () {
+              const [connection] = yield* lockSlackConnection(
+                decoded.connectionId,
+                decoded.organizationId
+              );
+              if (
+                connection === undefined ||
+                connection.lifecycle !== "connecting"
+              ) {
+                return yield* new NotFoundError({
+                  message: "Slack connection was not found",
+                });
+              }
+              if (connection.credentialsCiphertext === null) {
+                return yield* new NotFoundError({
+                  message: "Slack connection was not found",
+                });
+              }
+              const credentials = yield* decryptSlackCredentialMaterial(
+                config.encryptionKey,
+                connection.credentialsCiphertext
+              ).pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Slack credentials could not be decrypted",
+                    })
+                )
+              );
+              if (credentials.oauthState !== decoded.nonce) {
+                return yield* new BadRequestError({
+                  message: "Slack OAuth state does not match",
+                });
+              }
+              const now = new Date();
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({
@@ -329,25 +323,30 @@ export const makeSlackManagementServiceLive = (
                 .where(eq(schema.integrationConnectionTable.id, connection.id));
               // One inbound route per capability; Slack routes requests by team
               // id so a single workspace connection owns both surfaces.
+              // Duplicate replays are ignored via the connection/capability
+              // unique index.
               for (const capabilityKey of [
                 "commands",
                 "message.action",
               ] as const) {
-                yield* db.insert(schema.integrationRouteTable).values({
-                  capabilityKey,
-                  configVersion: 1,
-                  connectionId: connection.id,
-                  enabled: true,
-                  eventTypes: [],
-                  id: yield* IntegrationRouteId.generate,
-                  organizationId: decoded.organizationId,
-                  providerConfig: { version: 1 },
-                  safeDisplayMetadata: {},
-                });
+                yield* db
+                  .insert(schema.integrationRouteTable)
+                  .values({
+                    capabilityKey,
+                    configVersion: 1,
+                    connectionId: connection.id,
+                    enabled: true,
+                    eventTypes: [],
+                    id: yield* IntegrationRouteId.generate,
+                    organizationId: decoded.organizationId,
+                    providerConfig: { version: 1 },
+                    safeDisplayMetadata: {},
+                  })
+                  .onConflictDoNothing();
               }
+              return { organizationId: decoded.organizationId };
             })
           );
-          return { organizationId: decoded.organizationId };
         },
         (effect) => effect.pipe(mapManagementError("connect complete"))
       );
@@ -450,23 +449,38 @@ export const makeSlackManagementServiceLive = (
               )
           );
           const enabledChannels = new Set(notificationChannels);
-          const channels = yield* apiClient
-            .conversationsList({
-              botToken: credentials.botToken,
-              limit: CHANNELS_PAGE_SIZE,
-              types: "public_channel,private_channel",
-            })
-            .pipe(mapSlackApiError("channel listing"));
-          return channels.channels
-            .filter((channel) => channel.is_archived !== true)
-            .map((channel) => ({
-              id: channel.id,
-              isMember: channel.is_member === true,
-              // Slack channel ids: C = public channel, G = private channel.
-              isPrivate: channel.id.startsWith("G"),
-              name: channel.name,
-              notificationsEnabled: enabledChannels.has(channel.id),
-            }));
+          // Follow `response_metadata.next_cursor` until Slack returns an empty
+          // cursor, accumulating channels from every page. A hard page cap
+          // bounds the loop against a misbehaving cursor.
+          let cursor: string | undefined;
+          const channels: S.TSlackChannel[] = [];
+          for (let page = 0; page < MAX_CHANNEL_PAGES; page++) {
+            const pageResult = yield* apiClient
+              .conversationsList({
+                botToken: credentials.botToken,
+                limit: CHANNELS_PAGE_SIZE,
+                types: "public_channel,private_channel",
+                ...(cursor === undefined ? {} : { cursor }),
+              })
+              .pipe(mapSlackApiError("channel listing"));
+            for (const channel of pageResult.channels) {
+              if (channel.is_archived !== true) {
+                channels.push({
+                  id: channel.id,
+                  isMember: channel.is_member === true,
+                  isPrivate: channel.is_private === true,
+                  name: channel.name,
+                  notificationsEnabled: enabledChannels.has(channel.id),
+                });
+              }
+            }
+            const nextCursor = pageResult.response_metadata?.next_cursor;
+            if (nextCursor === undefined || nextCursor === "") {
+              break;
+            }
+            cursor = nextCursor;
+          }
+          return channels;
         },
         (effect) => effect.pipe(mapManagementError("channel list"))
       );

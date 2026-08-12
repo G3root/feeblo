@@ -145,6 +145,15 @@ export const integrationRouteTable = pgTable(
       table.organizationId,
       table.id
     ),
+    // One route per (connection, capability, channel). Inbound capabilities
+    // (commands, message.action) store no channelId and collapse to an empty
+    // string, so a duplicate capability insert conflicts; each
+    // channel.notifications channel keeps its own row via its channelId.
+    uniqueIndex("integration_route_connection_capability_channel_uidx").on(
+      table.connectionId,
+      table.capabilityKey,
+      sql`COALESCE(${table.providerConfig}->>'channelId', '')`
+    ),
   ]
 );
 

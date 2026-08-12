@@ -550,7 +550,12 @@ export const makeSlackInboundServiceLive = (
               )
             )
             .limit(1);
-          const boardSlug = board?.slug ?? "";
+          if (board === undefined) {
+            return yield* new SlackInboundFailure({
+              message: "Slack post board was not found",
+            });
+          }
+          const boardSlug = board.slug;
           let slug = "";
           yield* db.transaction(() =>
             Effect.gen(function* () {

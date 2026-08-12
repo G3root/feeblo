@@ -54,10 +54,13 @@ export const classifyIntegrationProviderDeliveryFailure = (
         : { _tag: "Retry", retryAfterMs: failure.retryAfterMs };
     case "IntegrationProviderTemporaryFailure":
       return { _tag: "Retry" };
+    case "IntegrationProviderChannelAlreadyJoinedError":
+      // "Already joined" is a satisfied precondition (a no-op success), not a
+      // rejection: exhausting the delivery would mark a healthy route failed.
+      return { _tag: "Succeeded" };
     case "IntegrationProviderAuthenticationError":
     case "IntegrationProviderInvalidConfigurationError":
     case "IntegrationProviderPermanentRejection":
-    case "IntegrationProviderChannelAlreadyJoinedError":
       return { _tag: "Terminal" };
     default:
       return failure satisfies never;

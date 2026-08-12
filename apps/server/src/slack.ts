@@ -74,14 +74,14 @@ const handleInbound = (
     const inbound = yield* SlackInboundService;
     if (parsed.value.kind === "slash_command") {
       const result = yield* inbound.handleSlashCommand(parsed.value.payload);
-      return HttpServerResponse.jsonUnsafe(result.body, {
-        status: result.status,
-      });
+      return result.body === undefined
+        ? HttpServerResponse.empty({ status: result.status })
+        : HttpServerResponse.jsonUnsafe(result.body, { status: result.status });
     }
     const result = yield* inbound.handleInteractive(parsed.value.payload);
-    return HttpServerResponse.jsonUnsafe(result.body, {
-      status: result.status,
-    });
+    return result.body === undefined
+      ? HttpServerResponse.empty({ status: result.status })
+      : HttpServerResponse.jsonUnsafe(result.body, { status: result.status });
   });
 
 const settingsRedirect = (

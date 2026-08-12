@@ -30,6 +30,7 @@ import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import { ServerConfig } from "./config";
 
@@ -116,8 +117,12 @@ export const makeIntegrationLayers: Effect.Effect<
     credentialResolver,
     endpointSecurityPolicy,
   });
-  const { encryptionKey: slackEncryptionKey, signingSecret } =
-    yield* SlackIntegrationConfig;
+  const {
+    clientId,
+    clientSecret,
+    encryptionKey: slackEncryptionKey,
+    signingSecret,
+  } = yield* SlackIntegrationConfig;
   const slackCredentialResolver = makeSlackCredentialResolver({
     encryptionKey: slackEncryptionKey,
     loadCiphertext: (input) =>
@@ -145,9 +150,16 @@ export const makeIntegrationLayers: Effect.Effect<
     credentialResolver: slackCredentialResolver,
     signingSecret,
   });
+  // The Slack provider is only exposed when its OAuth client id, client
+  // secret, and request signing secret are all configured; otherwise the
+  // server runs webhook-only.
+  const slackConfigured =
+    clientId !== "" &&
+    Redacted.value(clientSecret) !== "" &&
+    Redacted.value(signingSecret) !== "";
   const registry = yield* makeIntegrationProviderRegistry([
     registration,
-    slackRegistration,
+    ...(slackConfigured ? [slackRegistration] : []),
   ]);
 
   // Deliveries are claimed only for capability keys the startup-validated

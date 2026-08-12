@@ -355,8 +355,9 @@ function FeedbackChannelSelect({
         type: "success",
       });
     } catch {
+      refreshChannels();
       toastManager.add({
-        title: "Could not update the feedback channel",
+        title: "Could not update new post notifications",
         type: "error",
       });
     } finally {

@@ -34,7 +34,7 @@ export const SlackChannel = Schema.Struct({
   id: Schema.String,
   /** True when the bot is already a member; private channels require membership. */
   isMember: Schema.Boolean,
-  /** True for private channels (Slack ids starting with `G`); the bot cannot auto-join them. */
+  /** True for private channels (Slack's `is_private`); the bot cannot auto-join them. */
   isPrivate: Schema.Boolean,
   name: Schema.String,
   /** True when a `channel.notifications` route already exists for this channel. */
