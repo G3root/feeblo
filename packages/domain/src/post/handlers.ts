@@ -1,7 +1,9 @@
-import { transaction } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
+import { type LegidOf, PostStatusId } from "@feeblo/id";
 import * as Permissions from "@feeblo/permissions";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,10 +17,12 @@ import {
   syncPostAssetReferences,
 } from "../asset/service";
 import { BoardRepository } from "../board/repository";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/workflow";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
@@ -62,6 +66,7 @@ const postStatusCoalescingDelayMs = 5 * 60 * 1000;
 
 export const PostRpcHandlersEffect = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
+  const db = yield* currentDb;
   const repository = yield* PostRepository;
   const emailOutbox = yield* EmailOutboxRepository;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
@@ -73,6 +78,62 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   // const sitePolicy = yield* SitePolicy;
 
   // -- Shared effect helpers (no policy applied) --
+
+  // Post-handler adapter over the shared integration event recorder: converts
+  // the session actor facts into the safe actor shape and keeps the handler's
+  // existing failure classification (lookup problems are update failures,
+  // recording problems are internal errors).
+  const recordPostIntegrationEvent = ({
+    actorMemberId,
+    actorName,
+    boardId,
+    eventType,
+    organizationId,
+    postId,
+    postSlug,
+    previousStatusId,
+    statusId,
+    title,
+  }: {
+    actorMemberId: string | null;
+    actorName: string | null | undefined;
+    boardId: LegidOf<"BoardId">;
+    eventType: "feedback.post.created" | "feedback.post.status_changed";
+    organizationId: LegidOf<"WorkspaceId">;
+    postId: LegidOf<"PostId">;
+    postSlug: string;
+    previousStatusId?: LegidOf<"PostStatusId">;
+    statusId: LegidOf<"PostStatusId">;
+    title: string;
+  }) =>
+    recordPostIntegrationEventShared({
+      actor:
+        actorMemberId === null
+          ? { kind: "end_user" }
+          : {
+              ...(actorName === undefined || actorName === null
+                ? {}
+                : { displayName: actorName }),
+              kind: "member",
+              memberId: actorMemberId,
+            },
+      boardId,
+      eventType,
+      organizationId,
+      postId,
+      postSlug,
+      ...(previousStatusId === undefined ? {} : { previousStatusId }),
+      statusId,
+      title,
+    }).pipe(
+      Effect.mapError((error) =>
+        error.kind === "lookup"
+          ? new FailedToUpdatePostError()
+          : new InternalServerError({
+              message: "Could not record integration event.",
+            })
+      )
+    );
 
   const scheduleEmbedding = ({
     content,
@@ -241,6 +302,32 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* activityRepository.createMany(activities);
           let createdOutboxId: string | undefined;
           if (previous.statusId !== args.statusId) {
+            const postRows = yield* db
+              .select({ slug: schema.postTable.slug })
+              .from(schema.postTable)
+              .where(
+                and(
+                  eq(schema.postTable.id, args.id),
+                  eq(schema.postTable.organizationId, args.organizationId)
+                )
+              )
+              .limit(1);
+            const postSlug = postRows[0]?.slug;
+            if (!postSlug) {
+              return yield* new FailedToUpdatePostError();
+            }
+            yield* recordPostIntegrationEvent({
+              actorMemberId: membership?.membershipId ?? null,
+              actorName: membership ? session.user.name : undefined,
+              boardId: args.boardId,
+              eventType: "feedback.post.status_changed",
+              organizationId: args.organizationId,
+              postId: args.id,
+              postSlug,
+              previousStatusId: yield* PostStatusId.parse(previous.statusId),
+              statusId: args.statusId,
+              title: previous.title,
+            });
             const maySend = yield* entitlementPolicy.mayMaterializeEmailIntent({
               organizationId: args.organizationId,
               kind: "post.status_changed",
@@ -546,6 +633,17 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             actorId: session.session.userId,
             actorMemberId: membership?.membershipId ?? null,
             kind: "POST_CREATED",
+          });
+          yield* recordPostIntegrationEvent({
+            actorMemberId: membership?.membershipId ?? null,
+            actorName: membership ? session.user.name : undefined,
+            boardId: args.boardId,
+            eventType: "feedback.post.created",
+            organizationId: args.organizationId,
+            postId: args.id,
+            postSlug: persistedSlug,
+            statusId: args.statusId,
+            title: args.title,
           });
 
           // The creator of a post is automatically subscribed to it.
@@ -1031,6 +1129,7 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(PostSubscriptionRepository.layer),
   Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
+  Layer.provide(EmailOutboxConfig.layer),
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),

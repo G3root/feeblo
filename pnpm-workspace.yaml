@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - integrations/*
   - packages/*
   - e2e
 allowBuilds:
@@ -31,6 +32,7 @@ catalog:
   "@tanstack/react-db": ^0.1.95
   "@tanstack/react-form": ^1.33.3
   "@tanstack/react-router": ^1.170.19
+  "@tanstack/react-virtual": ^3.13.23
   "@types/node": ^24.12.2
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.4

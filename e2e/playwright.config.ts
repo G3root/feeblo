@@ -36,7 +36,11 @@ const e2eEnv = {
   CLOUDFLARE_ADAPTER: "false",
   DATABASE_URL: databaseURL,
   E2E_TEST_MAILER: "true",
+  EMAIL_PROVIDER_WEBHOOK_TOKEN: "playwright-email-provider-token",
   HOST: "127.0.0.1",
+  INTEGRATION_ALLOW_PRIVATE_NETWORK: "true",
+  INTEGRATION_ENCRYPTION_KEY:
+    "b8d5fa3eebc62aead2c54d03abccbfcc2ff84c214a53e4887f63b43f71a5a2d3",
   MEDIA_PUBLIC_BUCKET_NAME: "feeblo-media-public",
   MEDIA_UPLOAD_ACCESS_KEY_ID: "feeblo",
   MEDIA_UPLOAD_ENDPOINT: "http://127.0.0.1:9002",

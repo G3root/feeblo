@@ -16,9 +16,12 @@
     "@feeblo/db-migrator": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/id": "workspace:*",
+    "@feeblo/integration-core": "workspace:*",
+    "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@sentry/effect": "^10.67.0",
+    "drizzle-orm": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {

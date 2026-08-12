@@ -85,6 +85,12 @@ const settingsItems = [
         permission: "workspace.update" as const,
         to: "/$organizationId/settings/security" as const,
       },
+      {
+        label: "Webhooks",
+        icon: Settings05Icon,
+        permission: "webhooks.manage" as const,
+        to: "/$organizationId/settings/webhooks" as const,
+      },
     ],
   },
   {

@@ -6,14 +6,15 @@ import * as RpcServer from "effect/unstable/rpc/RpcServer";
 import { AttributeDefinitionRpcHandlers } from "./attribute-definition/handlers";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
-import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
 import { ChangelogRpcHandlers } from "./changelog/handlers";
+import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
 import { ChangelogPostRpcHandlers } from "./changelog-post/handlers";
 import { CommentReactionRpcHandlers } from "./comment-reaction/handlers";
 import { CommentRpcHandlers } from "./comments/handlers";
 import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
+import { WebhookManagementRpcHandlers } from "./integration/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
@@ -42,7 +43,13 @@ export const RpcRoute = RpcServer.layerHttp({
   protocol: "http",
   group: AllRpcs,
 }).pipe(
-  Layer.provide(Layer.merge(PostRpcHandlers, PostActivityRpcHandlers)),
+  Layer.provide(
+    Layer.mergeAll(
+      PostRpcHandlers,
+      PostActivityRpcHandlers,
+      WebhookManagementRpcHandlers
+    )
+  ),
   Layer.provide(BillingRpcHandlers),
   Layer.provide(Layer.mergeAll(BoardRpcHandlers, ChangelogCategoryRpcHandlers)),
   Layer.provide(Layer.mergeAll(ChangelogRpcHandlers, ChangelogPostRpcHandlers)),

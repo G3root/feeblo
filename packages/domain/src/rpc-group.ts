@@ -9,6 +9,7 @@ import { CommentRpcs } from "./comments/rpcs";
 import { CompanyRpcs } from "./company/rpcs";
 import { ContactRpcs } from "./contact/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
+import { WebhookManagementRpcs } from "./integration/rpcs";
 import { JwtSecretRpcs } from "./jwt-secret/rpcs";
 import { MembershipRpcs } from "./membership/rpcs";
 import { NotificationRpcs } from "./notification/rpcs";
@@ -47,5 +48,6 @@ export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
   RoadmapColumnRpcs,
   WorkspaceRpcs,
   ContactRpcs,
-  EmailSubscriptionRpcs
+  EmailSubscriptionRpcs,
+  WebhookManagementRpcs
 );

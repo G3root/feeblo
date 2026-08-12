@@ -12,7 +12,9 @@ const requiredServerEnvironment = {
   API_URL: "https://api.example.test",
 };
 
-const loadServerConfig = (environment: Record<string, string> = {}) =>
+const loadServerConfig = (
+  environment: Record<string, string | undefined> = {}
+) =>
   ServerConfig.pipe(
     Effect.provide(
       ServerConfig.layer.pipe(
@@ -80,6 +82,51 @@ describe("ServerConfig client IP proxy trust", () => {
       );
 
       expect(Exit.isFailure(exit)).toBe(true);
+    })
+  );
+});
+
+describe("ServerConfig integration worker concurrency", () => {
+  it.effect("defaults to 5 connection and 25 global concurrency", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig();
+
+      expect(config.integrationConnectionConcurrency).toBe(5);
+      expect(config.integrationGlobalConcurrency).toBe(25);
+    })
+  );
+
+  it.effect("accepts valid concurrency overrides", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({
+        INTEGRATION_CONNECTION_CONCURRENCY: "7",
+        INTEGRATION_GLOBAL_CONCURRENCY: "40",
+      });
+
+      expect(config.integrationConnectionConcurrency).toBe(7);
+      expect(config.integrationGlobalConcurrency).toBe(40);
+    })
+  );
+
+  it.effect("rejects zero and non-numeric concurrency values", () =>
+    Effect.gen(function* () {
+      const zero = yield* Effect.exit(
+        loadServerConfig({ INTEGRATION_CONNECTION_CONCURRENCY: "0" })
+      );
+      expect(Exit.isFailure(zero)).toBe(true);
+
+      const globalZero = yield* Effect.exit(
+        loadServerConfig({ INTEGRATION_GLOBAL_CONCURRENCY: "0" })
+      );
+      expect(Exit.isFailure(globalZero)).toBe(true);
+
+      const nonNumeric = yield* Effect.exit(
+        loadServerConfig({
+          INTEGRATION_CONNECTION_CONCURRENCY: "abc",
+          INTEGRATION_GLOBAL_CONCURRENCY: "abc",
+        })
+      );
+      expect(Exit.isFailure(nonNumeric)).toBe(true);
     })
   );
 });

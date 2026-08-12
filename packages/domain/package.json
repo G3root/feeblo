@@ -261,6 +261,39 @@
     },
     "./site/subdomain-validation-service": {
       "default": "./src/site/subdomain/service.ts"
+    },
+    "./integration/schema": {
+      "default": "./src/integration/schema.ts"
+    },
+    "./integration/errors": {
+      "default": "./src/integration/errors.ts"
+    },
+    "./integration/rpcs": {
+      "default": "./src/integration/rpcs.ts"
+    },
+    "./integration/config": {
+      "default": "./src/integration/config.ts"
+    },
+    "./integration/webhook-management-live": {
+      "default": "./src/integration/webhook-management-live.ts"
+    },
+    "./integration/webhook-management-service": {
+      "default": "./src/integration/webhook-management-service.ts"
+    },
+    "./email-outbox/repository": {
+      "default": "./src/email-outbox/repository.ts"
+    },
+    "./email-provider-feedback/config": {
+      "default": "./src/email-provider-feedback/config.ts"
+    },
+    "./email-provider-feedback/service": {
+      "default": "./src/email-provider-feedback/service.ts"
+    },
+    "./email-subscription/repository": {
+      "default": "./src/email-subscription/repository.ts"
+    },
+    "./rpc-errors": {
+      "default": "./src/rpc-errors.ts"
     }
   },
   "dependencies": {
@@ -269,6 +302,8 @@
     "@effect/ai-openai": "4.0.0-beta.66",
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
+    "@feeblo/integration-core": "workspace:*",
+    "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",

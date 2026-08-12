@@ -10,6 +10,8 @@ export class EmailProviderFeedbackConfig extends Context.Service<EmailProviderFe
   {
     make: Effect.gen(function* () {
       return {
+        // Required, independent of AUTH_ENCRYPTION_KEY: the provider delivery
+        // secret must not be derivable from the at-rest auth encryption key.
         webhookToken: yield* Config.redacted("EMAIL_PROVIDER_WEBHOOK_TOKEN"),
       } as const;
     }),

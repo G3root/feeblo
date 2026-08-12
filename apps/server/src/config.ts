@@ -4,6 +4,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
 export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
@@ -15,6 +16,16 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const nodeEnv = yield* Config.string("NODE_ENV").pipe(
         Config.withDefault("development")
       );
+      // Outbound-webhook security configuration (encryption key and egress
+      // policy) is owned by WebhookIntegrationConfig in the domain package.
+      const integrationConnectionConcurrency = yield* Config.schema(
+        Schema.Int.check(Schema.isGreaterThan(0)),
+        "INTEGRATION_CONNECTION_CONCURRENCY"
+      ).pipe(Config.withDefault(5));
+      const integrationGlobalConcurrency = yield* Config.schema(
+        Schema.Int.check(Schema.isGreaterThan(0)),
+        "INTEGRATION_GLOBAL_CONCURRENCY"
+      ).pipe(Config.withDefault(25));
       const redisUrl = yield* Config.string("REDIS_URL").pipe(
         Config.option,
         Effect.map(Option.getOrUndefined)
@@ -57,6 +68,8 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         appUrl,
         appRootDomain,
         clientIpProxyTrust,
+        integrationConnectionConcurrency,
+        integrationGlobalConcurrency,
         nodeEnv,
         redisUrl,
         sentryDsn,

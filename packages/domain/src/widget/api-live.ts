@@ -1,5 +1,5 @@
 import { transaction } from "@feeblo/db";
-import { PostId } from "@feeblo/id";
+import { asLegid, type LegidOf, PostId, PostStatusId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
@@ -17,7 +17,9 @@ import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
+import { EmailOutboxConfig } from "../email-outbox/config";
 import { Api } from "../http/api";
+import { recordPostIntegrationEvent } from "../integration/post-event-recording";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import {
@@ -210,6 +212,31 @@ export const WidgetApiLive = HttpApiBuilder.group(
             yield* AttributeDefinitionRepository;
           const postRepository = yield* PostRepository;
 
+          const recordWidgetPostCreatedEvent = ({
+            postSlug,
+            statusId,
+          }: {
+            postSlug: string;
+            statusId: LegidOf<"PostStatusId">;
+          }) =>
+            recordPostIntegrationEvent({
+              actor: { kind: "end_user" },
+              boardId,
+              eventType: "feedback.post.created",
+              organizationId,
+              postId: id,
+              postSlug,
+              statusId,
+              title,
+            }).pipe(
+              Effect.mapError(
+                () =>
+                  new InternalServerError({
+                    message: "Could not record widget integration event.",
+                  })
+              )
+            );
+
           const board = yield* boardRepository.getById({
             id: boardId,
             organizationId,
@@ -303,22 +330,35 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   metadata: metadata ?? {},
                   source: "WIDGET",
                 });
+                yield* recordWidgetPostCreatedEvent({
+                  postSlug: slug,
+                  statusId: asLegid(PostStatusId)(defaultStatus.id),
+                });
               })
             );
           } else {
             slug = yield* transaction(
-              postRepository.create({
-                id,
-                boardId,
-                organizationId,
-                title,
-                content: sanitizedContent,
-                statusId: defaultStatus.id,
-                excerpt,
-                contactId: null,
-                metadata: metadata ?? {},
-                source: "WIDGET",
-              })
+              postRepository
+                .create({
+                  id,
+                  boardId,
+                  organizationId,
+                  title,
+                  content: sanitizedContent,
+                  statusId: defaultStatus.id,
+                  excerpt,
+                  contactId: null,
+                  metadata: metadata ?? {},
+                  source: "WIDGET",
+                })
+                .pipe(
+                  Effect.tap((postSlug) =>
+                    recordWidgetPostCreatedEvent({
+                      postSlug,
+                      statusId: asLegid(PostStatusId)(defaultStatus.id),
+                    })
+                  )
+                )
             );
           }
 
@@ -357,9 +397,17 @@ export const WidgetApiLive = HttpApiBuilder.group(
             CompanyRepository.layer,
             ContactRepository.layer,
             JwtSecretRepository.layer,
+            EmailOutboxConfig.layer,
             PostRepository.layer,
             PostStatusRepository.layer,
           ]),
+          Effect.catchTag("ConfigError", () =>
+            Effect.fail(
+              new InternalServerError({
+                message: "Missing APP_URL for widget integration events",
+              })
+            )
+          ),
           Effect.catchTag("PostAlreadyExistsError", () =>
             Effect.logWarning(
               "Exhausted post slug candidates while creating widget feedback; post was not stored",
