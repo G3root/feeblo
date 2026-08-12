@@ -5,6 +5,7 @@ import {
   type SlackApiClient,
 } from "@feeblo/integration-slack";
 import { decryptSlackCredentialMaterial } from "@feeblo/integration-slack/credentials";
+import { SlackChannelNotificationRouteConfiguration } from "@feeblo/integration-slack/manifest";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -24,14 +25,8 @@ import {
 const CHANNELS_PAGE_SIZE = 200;
 const MAX_CHANNEL_PAGES = 25;
 
-const SlackChannelNotificationProviderConfig = Schema.Struct({
-  version: Schema.Literal(1),
-  channelId: Schema.String,
-  channelName: Schema.String,
-});
-
 const decodeProviderConfig = (value: unknown) =>
-  Schema.decodeUnknownEffect(SlackChannelNotificationProviderConfig)(
+  Schema.decodeUnknownEffect(SlackChannelNotificationRouteConfiguration)(
     value ?? {}
   ).pipe(
     Effect.mapError(
@@ -228,7 +223,6 @@ export const makeSlackChannelServiceLive = (
                     organizationId: input.organizationId,
                     providerConfig: {
                       channelId: input.channelId,
-                      channelName,
                       version: 1,
                     },
                     routeKey: input.channelId,
@@ -244,7 +238,6 @@ export const makeSlackChannelServiceLive = (
                       eventTypes: ["feedback.post.created"],
                       providerConfig: {
                         channelId: input.channelId,
-                        channelName,
                         version: 1,
                       },
                       updatedAt: now,

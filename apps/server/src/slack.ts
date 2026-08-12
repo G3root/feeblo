@@ -6,13 +6,12 @@ import {
   SlackManagementService,
 } from "@feeblo/domain/integration/slack";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
-import { ParsedSlackInboundRequest } from "@feeblo/integration-slack/inbound-schema";
+import type { ParsedSlackInboundRequest } from "@feeblo/integration-slack/inbound-schema";
 import { slackProviderKey } from "@feeblo/integration-slack/manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
 import * as HttpHeaders from "effect/unstable/http/Headers";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
@@ -30,6 +29,19 @@ const headerValue = (
   name: string
 ): string | undefined =>
   Option.getOrUndefined(HttpHeaders.get(request.headers, name));
+
+/**
+ * Cheap narrow back to the provider's parsed payload. The inbound handler has
+ * already signature-verified and fully decoded the body, so this guard only
+ * discriminates on the `kind` tag instead of re-running the full schema.
+ */
+const isParsedSlackInboundRequest = (
+  value: unknown
+): value is ParsedSlackInboundRequest =>
+  typeof value === "object" &&
+  value !== null &&
+  "kind" in value &&
+  (value.kind === "slash_command" || value.kind === "interactive");
 
 const handleInbound = (
   request: HttpServerRequest.HttpServerRequest,
@@ -60,25 +72,23 @@ const handleInbound = (
         status: response.status,
       });
     }
-    // The inbound handler already signature-verified and parsed the payload;
-    // this decode only narrows the `unknown` body back to the typed union the
-    // provider produced. A malformed body is a client error, not a crash.
-    const parsed = Schema.decodeUnknownOption(ParsedSlackInboundRequest)(
-      response.body
-    );
-    if (parsed._tag === "None") {
+    // The inbound handler already signature-verified and decoded the payload;
+    // its 200 body is always a `ParsedSlackInboundRequest` produced by this
+    // package. A tag-only guard restores the erased type without a second
+    // full decode; a malformed body is still a client error, not a crash.
+    if (!isParsedSlackInboundRequest(response.body)) {
       return HttpServerResponse.text("invalid inbound payload", {
         status: 400,
       });
     }
     const inbound = yield* SlackInboundService;
-    if (parsed.value.kind === "slash_command") {
-      const result = yield* inbound.handleSlashCommand(parsed.value.payload);
+    if (response.body.kind === "slash_command") {
+      const result = yield* inbound.handleSlashCommand(response.body.payload);
       return result.body === undefined
         ? HttpServerResponse.empty({ status: result.status })
         : HttpServerResponse.jsonUnsafe(result.body, { status: result.status });
     }
-    const result = yield* inbound.handleInteractive(parsed.value.payload);
+    const result = yield* inbound.handleInteractive(response.body.payload);
     return result.body === undefined
       ? HttpServerResponse.empty({ status: result.status })
       : HttpServerResponse.jsonUnsafe(result.body, { status: result.status });

@@ -336,9 +336,6 @@
     },
     "./email-outbox/config": {
       "default": "./src/email-outbox/config.ts"
-    },
-    "./upvote/repository": {
-      "default": "./src/upvote/repository.ts"
     }
   },
   "dependencies": {

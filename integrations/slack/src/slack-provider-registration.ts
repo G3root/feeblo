@@ -88,16 +88,6 @@ export const makeSlackCredentialResolver = ({
     }),
 });
 
-const headerValue = (value: string | readonly string[] | undefined): string => {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (value === undefined) {
-    return "";
-  }
-  return value[0] ?? "";
-};
-
 const parseFormBody = (rawBody: string): Record<string, string> => {
   const params = new URLSearchParams(rawBody);
   const result: Record<string, string> = {};
@@ -131,10 +121,8 @@ const makeSlackInboundHandler = ({
         verifySlackRequestSignature({
           rawBody: input.rawBody,
           signingSecret,
-          timestampHeader: headerValue(
-            input.headers["x-slack-request-timestamp"]
-          ),
-          signatureHeader: headerValue(input.headers["x-slack-signature"]),
+          timestampHeader: input.headers["x-slack-request-timestamp"] ?? "",
+          signatureHeader: input.headers["x-slack-signature"] ?? "",
         })
       );
       if (Result.isFailure(verified)) {
@@ -267,7 +255,6 @@ export const makeSlackProviderRegistration = ({
             { label: "Board", value: eventData.board.name },
             { label: "Status", value: eventData.post.status.type },
           ],
-          summary: "",
           title: eventData.post.title,
         });
         // Join the channel before posting so notifications work without a

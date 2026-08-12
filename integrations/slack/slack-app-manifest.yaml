@@ -26,7 +26,7 @@ features:
     always_online: false
   slash_commands:
     - command: /feeblo
-      description: Send feedback to Feeblo or upvote a similar request
+      description: Send feedback to Feeblo
       usage_hint: "[your feedback]"
       # Required by Slack: without a request URL, the slash command needs
       # socket mode. Feeblo serves HTTP, so point this at the server.

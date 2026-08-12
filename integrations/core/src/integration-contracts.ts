@@ -344,9 +344,7 @@ export interface IntegrationCapabilityHandler {
 
 /** Raw inbound request handed to a provider capability; the provider owns wire parsing and signature verification. */
 export interface IntegrationInboundRequest {
-  readonly headers: Readonly<
-    Record<string, string | readonly string[] | undefined>
-  >;
+  readonly headers: Readonly<Record<string, string | undefined>>;
   readonly rawBody: string;
 }
 

@@ -17,14 +17,11 @@ export interface ChannelUpdateMessage {
     readonly label: string;
     readonly value: string;
   }>;
-  /** One-line excerpt of the post content; never contains HTML or markdown. */
-  readonly summary: string;
   /** Post title, truncated for channel display by the renderer. */
   readonly title: string;
 }
 
 const TRUNCATED_TITLE_MAX = 150;
-const TRUNCATED_SUMMARY_MAX = 280;
 
 /**
  * Renders a channel-update message into Slack Block Kit blocks for
@@ -44,15 +41,6 @@ export const renderChannelUpdateMessageBlocks = (
       },
     },
   ];
-  if (message.summary.length > 0) {
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: truncate(message.summary, TRUNCATED_SUMMARY_MAX),
-      },
-    });
-  }
   const factText = message.facts
     .map(({ label, value }) => `*${label}:* ${value}`)
     .join("   ·   ");

@@ -89,7 +89,10 @@ export const makeSlackInboundServiceLive = (
 
       const loadBotToken = (connection: {
         readonly credentialsCiphertext: string | null;
-      }): Effect.Effect<Option.Option<Redacted.Redacted<string>>, Error> =>
+      }): Effect.Effect<
+        Option.Option<Redacted.Redacted<string>>,
+        SlackInboundFailure
+      > =>
         connection.credentialsCiphertext === null
           ? Effect.succeed(Option.none())
           : decryptSlackCredentialMaterial(

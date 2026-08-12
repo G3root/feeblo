@@ -1,14 +1,20 @@
 import { currentDb, Database, schema } from "@feeblo/db";
-import { asLegid, IntegrationEventId, PostId, WorkspaceId } from "@feeblo/id";
+import {
+  asLegid,
+  BoardId,
+  PostId,
+  PostStatusId,
+  WorkspaceId,
+} from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { EmailOutboxConfig } from "../../email-outbox/config";
+import { recordPostIntegrationEvent } from "../../integration/post-event-recording";
 import {
   PostEmbeddingService,
   schedulePostEmbeddingBestEffort,
@@ -73,77 +79,6 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
       const embeddingService =
         yield* Effect.serviceOption(PostEmbeddingService);
 
-      // Inlined variant of the shared post-event recorder: same canonical
-      // event, but every dependency is captured as a value so the service
-      // methods stay requirement-free.
-      const recordSlackPostIntegrationEvent = ({
-        board,
-        organizationId,
-        postId,
-        postSlug,
-        statusId,
-        title,
-      }: {
-        readonly board: {
-          readonly id: string;
-          readonly name: string;
-          readonly slug: string;
-        };
-        readonly organizationId: string;
-        readonly postId: string;
-        readonly postSlug: string;
-        readonly statusId: string;
-        readonly title: string;
-      }) =>
-        Effect.gen(function* () {
-          const statusType = yield* postRepository.findStatusType({
-            id: statusId,
-            organizationId,
-          });
-          if (statusType === undefined) {
-            return yield* new SlackInboundFailure({
-              message: "Slack post status was not found",
-            });
-          }
-          const eventId = yield* IntegrationEventId.generate;
-          const correlationId = yield* IntegrationEventId.generate;
-          const url = new URL(
-            `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(board.slug)}/${encodeURIComponent(postSlug)}`,
-            emailOutboxConfig.appUrl
-          ).href;
-          yield* eventRecorder
-            .recordIntegrationEvent({
-              event: {
-                causalHopCount: 0,
-                correlationId,
-                data: {
-                  actor: { kind: "end_user" },
-                  board,
-                  post: {
-                    id: postId,
-                    status: { id: statusId, type: statusType },
-                    title,
-                    url,
-                  },
-                },
-                id: eventId,
-                occurredAt: yield* DateTime.now,
-                organizationId: asLegid(WorkspaceId)(organizationId),
-                origin: { kind: "feeblo" },
-                type: "feedback.post.created",
-                version: 1,
-              },
-            })
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new SlackInboundFailure({
-                    message: "Could not record post integration event",
-                  })
-              )
-            );
-        });
-
       const createPost = ({
         boardId,
         content,
@@ -166,11 +101,7 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
           const id = yield* PostId.generate;
           const excerpt = htmlToExcerpt(sanitizedHtml);
           const [board] = yield* db
-            .select({
-              id: schema.boardTable.id,
-              name: schema.boardTable.name,
-              slug: schema.boardTable.slug,
-            })
+            .select({ slug: schema.boardTable.slug })
             .from(schema.boardTable)
             .where(
               and(
@@ -199,14 +130,27 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
                 statusId: defaultStatus.id,
                 title,
               });
-              yield* recordSlackPostIntegrationEvent({
-                board,
-                organizationId,
+              yield* recordPostIntegrationEvent({
+                actor: { kind: "end_user" },
+                boardId: asLegid(BoardId)(boardId),
+                eventType: "feedback.post.created",
+                organizationId: asLegid(WorkspaceId)(organizationId),
                 postId: id,
                 postSlug: createdSlug,
-                statusId: defaultStatus.id,
+                statusId: asLegid(PostStatusId)(defaultStatus.id),
                 title,
-              });
+              }).pipe(
+                Effect.provideService(Database.Database, db),
+                Effect.provideService(IntegrationEventRecorder, eventRecorder),
+                Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
+                Effect.provideService(PostRepository, postRepository),
+                Effect.mapError(
+                  () =>
+                    new SlackInboundFailure({
+                      message: "Could not record post integration event",
+                    })
+                )
+              );
               yield* postSubscriptionRepository.subscribe({
                 organizationId,
                 postId: id,

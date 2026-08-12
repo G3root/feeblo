@@ -10,7 +10,6 @@ describe("renderChannelUpdateMessageBlocks", () => {
       { label: "Board", value: "Product ideas" },
       { label: "Status", value: "PENDING" },
     ],
-    summary: "",
     title: "Support dark mode",
   };
 
@@ -54,17 +53,6 @@ describe("renderChannelUpdateMessageBlocks", () => {
     const header = blocks[0] as { text: { text: string } };
     expect(header.text.text.length).toBeLessThanOrEqual(150);
     expect(header.text.text.endsWith("…")).toBe(true);
-  });
-
-  it("renders a summary section when present", () => {
-    const blocks = renderChannelUpdateMessageBlocks({
-      ...message,
-      summary: "Users keep asking for this",
-    });
-    expect(blocks[1]).toEqual({
-      type: "section",
-      text: { type: "mrkdwn", text: "Users keep asking for this" },
-    });
   });
 
   it("omits the actor context when no actor name is known", () => {

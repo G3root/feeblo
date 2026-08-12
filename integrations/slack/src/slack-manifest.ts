@@ -37,7 +37,6 @@ export const SlackConnectionConfiguration = Schema.Struct({});
 export const SlackChannelNotificationRouteConfiguration = Schema.Struct({
   version: Schema.Literal(1),
   channelId: Schema.NonEmptyString,
-  channelName: Schema.NonEmptyString,
 });
 export type SlackChannelNotificationRouteConfiguration = Schema.Schema.Type<
   typeof SlackChannelNotificationRouteConfiguration
