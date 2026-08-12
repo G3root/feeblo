@@ -17,6 +17,7 @@
     "legid": "^0.1.4"
   },
   "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.94",
     "@feeblo/config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

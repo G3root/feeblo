@@ -324,6 +324,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@effect/platform-node": "catalog:",
     "@effect/vitest": "4.0.0-beta.94",
     "@feeblo/config": "workspace:*",
     "@types/react": "catalog:",

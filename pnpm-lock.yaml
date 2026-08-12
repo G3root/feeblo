@@ -619,6 +619,9 @@ importers:
 
   packages/auth:
     dependencies:
+      '@effect/platform-node':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.103(effect@4.0.0-beta.103)(ioredis@5.11.1)
       '@feeblo/config':
         specifier: workspace:*
         version: link:../config
@@ -709,6 +712,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.103)(vitest@4.1.10)
       '@faker-js/faker':
         specifier: ^10.3.0
         version: 10.5.0
@@ -831,6 +837,9 @@ importers:
         specifier: ^2.4.0
         version: 2.5.7(csstype@3.2.3)(preact@10.29.8)(react@19.2.8)
     devDependencies:
+      '@effect/platform-node':
+        specifier: 'catalog:'
+        version: 4.0.0-beta.103(effect@4.0.0-beta.103)(ioredis@5.11.1)
       '@effect/vitest':
         specifier: 4.0.0-beta.94
         version: 4.0.0-beta.94(effect@4.0.0-beta.103)(vitest@4.1.10)
@@ -908,6 +917,9 @@ importers:
         specifier: ^0.1.4
         version: 0.1.4
     devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.103)(vitest@4.1.10)
       '@feeblo/config':
         specifier: workspace:*
         version: link:../config
@@ -1070,6 +1082,9 @@ importers:
         specifier: ^6.9.1
         version: 6.9.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
     devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.103)(vitest@4.1.10)
       '@react-email/preview-server':
         specifier: ^5.2.11
         version: 5.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.62.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
