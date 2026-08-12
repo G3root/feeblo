@@ -22,6 +22,9 @@ export const SLACK_API_BASE_URL = "https://slack.com/api";
 export const SLACK_OAUTH_AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
 export const SLACK_OAUTH_TOKEN_URL = `${SLACK_API_BASE_URL}/oauth.v2.access`;
 
+/** Maximum Slack Web API request duration. */
+export const SLACK_API_REQUEST_TIMEOUT_MS = 10_000;
+
 /** Generic Slack API error envelope (`ok: false`). */
 export const SlackApiErrorEnvelope = Schema.Struct({
   ok: Schema.Literal(false),
@@ -293,6 +296,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
   }) {
     const response = yield* HttpClient.execute(input.httpRequest).pipe(
       Effect.provide(FetchHttpClient.layer),
+      Effect.timeout(SLACK_API_REQUEST_TIMEOUT_MS),
       Effect.mapError(
         () =>
           new IntegrationProviderTemporaryFailure({
@@ -302,6 +306,13 @@ export const makeSlackApiClient = (): SlackApiClient => {
       )
     );
     const status = response.status;
+    // Slack signals rate limiting (429) and transient server errors (5xx)
+    // through the HTTP status even when the body is not JSON; classify those
+    // from the status alone before reading the body so a non-JSON error page
+    // cannot downgrade a retryable failure into a terminal rejection.
+    if (status === 429 || (status >= 500 && status < 600)) {
+      return yield* classifySlackApiError({ status }, input.context);
+    }
     const body = yield* response.json.pipe(
       Effect.mapError(
         () =>
