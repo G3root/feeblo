@@ -1,4 +1,5 @@
 import { assert, describe, expect, layer } from "@effect/vitest";
+import { NodeCrypto } from "@effect/platform-node";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   initialTestMailerState,
@@ -22,7 +23,8 @@ import {
 const TestLayer = SubmissionEmailNotificationWorkflowLayer.pipe(
   Layer.provideMerge(MailerTestLayer),
   Layer.provideMerge(WorkflowEngine.layerMemory),
-  Layer.provideMerge(Database.PgliteDatabaseLive)
+  Layer.provideMerge(Database.PgliteDatabaseLive),
+  Layer.provideMerge(NodeCrypto.layer)
 );
 
 const makeFixture = (titles: readonly string[]) =>

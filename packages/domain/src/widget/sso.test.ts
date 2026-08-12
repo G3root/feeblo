@@ -1,4 +1,5 @@
 import { describe, expect, layer } from "@effect/vitest";
+import { NodeCrypto } from "@effect/platform-node";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
@@ -21,7 +22,8 @@ const pastExp = Math.floor(Date.now() / 1000) - 3600;
 
 const TestLayer = Layer.mergeAll(
   SsoRepositoriesLive,
-  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+  NodeCrypto.layer
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
 describe("createSsoSession", () => {

@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as React from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 
 import {
   Mailer,
@@ -27,9 +27,9 @@ const sendWith = (transport: MailerTransport) =>
   }).pipe(Effect.provide(makeMailerLayer(transport)));
 
 describe("Mailer", () => {
-  it("returns the supplied deterministic message ID with bounded safe metadata", async () => {
-    const sent = await Effect.runPromise(
-      sendWith({
+  it.effect("returns the supplied deterministic message ID with bounded safe metadata", () =>
+    Effect.gen(function* () {
+      const sent = yield* sendWith({
         send: () =>
           Effect.succeed({
             acceptedRecipientCount: 1,
@@ -38,24 +38,24 @@ describe("Mailer", () => {
             rejectedRecipientCount: 0,
             responseCode: 250,
           }),
-      })
-    );
+      });
 
-    expect(sent).toEqual({
-      accepted: true,
-      messageId,
-      providerMetadata: {
-        acceptedRecipientCount: 1,
-        providerMessageId: "cf_123",
-        rejectedRecipientCount: 0,
-        responseCode: 250,
-      },
-    });
-  });
+      expect(sent).toEqual({
+        accepted: true,
+        messageId,
+        providerMetadata: {
+          acceptedRecipientCount: 1,
+          providerMessageId: "cf_123",
+          rejectedRecipientCount: 0,
+          responseCode: 250,
+        },
+      });
+    })
+  );
 
-  it("does not expose transport recipients or raw provider responses", async () => {
-    const sent = await Effect.runPromise(
-      sendWith({
+  it.effect("does not expose transport recipients or raw provider responses", () =>
+    Effect.gen(function* () {
+      const sent = yield* sendWith({
         send: () =>
           Effect.succeed({
             acceptedRecipientCount: 0,
@@ -63,25 +63,25 @@ describe("Mailer", () => {
             rejectedRecipientCount: 1,
             responseCode: 550,
           }),
-      })
-    );
+      });
 
-    expect(sent).toEqual({
-      accepted: false,
-      messageId,
-      providerMetadata: {
-        acceptedRecipientCount: 0,
-        rejectedRecipientCount: 1,
-        responseCode: 550,
-      },
-    });
-    expect(Object.keys(sent.providerMetadata)).not.toContain("response");
-    expect(Object.keys(sent.providerMetadata)).not.toContain("recipient");
-  });
+      expect(sent).toEqual({
+        accepted: false,
+        messageId,
+        providerMetadata: {
+          acceptedRecipientCount: 0,
+          rejectedRecipientCount: 1,
+          responseCode: 550,
+        },
+      });
+      expect(Object.keys(sent.providerMetadata)).not.toContain("response");
+      expect(Object.keys(sent.providerMetadata)).not.toContain("recipient");
+    })
+  );
 
-  it("preserves temporary transport failures as typed retryable failures", async () => {
-    const failure = await Effect.runPromise(
-      Effect.flip(
+  it.effect("preserves temporary transport failures as typed retryable failures", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
         sendWith({
           send: () =>
             Effect.fail(
@@ -93,15 +93,15 @@ describe("Mailer", () => {
               })
             ),
         })
-      )
-    );
+      );
 
-    expect(failure).toBeInstanceOf(MailTemporaryDeliveryError);
-  });
+      expect(failure).toBeInstanceOf(MailTemporaryDeliveryError);
+    })
+  );
 
-  it("preserves permanent transport failures as terminal failures", async () => {
-    const failure = await Effect.runPromise(
-      Effect.flip(
+  it.effect("preserves permanent transport failures as terminal failures", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
         sendWith({
           send: () =>
             Effect.fail(
@@ -113,15 +113,15 @@ describe("Mailer", () => {
               })
             ),
         })
-      )
-    );
+      );
 
-    expect(failure).toBeInstanceOf(MailPermanentDeliveryError);
-  });
+      expect(failure).toBeInstanceOf(MailPermanentDeliveryError);
+    })
+  );
 
-  it("preserves uncertain transport failures for caller-side terminal handling", async () => {
-    const failure = await Effect.runPromise(
-      Effect.flip(
+  it.effect("preserves uncertain transport failures for caller-side terminal handling", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
         sendWith({
           send: () =>
             Effect.fail(
@@ -132,9 +132,9 @@ describe("Mailer", () => {
               })
             ),
         })
-      )
-    );
+      );
 
-    expect(failure).toBeInstanceOf(MailUncertainDeliveryError);
-  });
+      expect(failure).toBeInstanceOf(MailUncertainDeliveryError);
+    })
+  );
 });

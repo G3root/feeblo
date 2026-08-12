@@ -1,5 +1,5 @@
+import { describe, expect, it } from "@effect/vitest";
 import * as S from "effect/Schema";
-import { describe, expect, it } from "vitest";
 import { EtaQuarter } from "./schema";
 
 describe("EtaQuarter", () => {

@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 import {
   isWebhookPrivateOrReservedAddress,
   parseWebhookEndpointUrl,
@@ -12,7 +12,7 @@ const production = {
 } as const;
 
 describe("webhook endpoint security", () => {
-  it.each([
+  it.effect.each([
     "http://example.com/hook",
     "https://user:password@example.com/hook",
     "https://example.com/hook#fragment",
@@ -22,22 +22,31 @@ describe("webhook endpoint security", () => {
     "https://[::1]/hook",
     "https://[fd00::1]/hook",
     "https://[::ffff:169.254.169.254]/hook",
-  ])("rejects unsafe endpoint %s", async (url) => {
-    await expect(
-      Effect.runPromise(parseWebhookEndpointUrl(url, production))
-    ).rejects.toMatchObject({ _tag: "WebhookEndpointSecurityError" });
-  });
+  ])("rejects unsafe endpoint %s", (url) =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        parseWebhookEndpointUrl(url, production)
+      );
 
-  it("permits a local receiver only through the explicit development override", async () => {
-    await expect(
-      Effect.runPromise(
-        parseWebhookEndpointUrl("http://127.0.0.1:8080/hook", {
-          environment: "development",
-          allowPrivateNetworkInDevelopment: true,
-        })
-      )
-    ).resolves.toMatchObject({ hostname: "127.0.0.1" });
-  });
+      expect(error).toMatchObject({ _tag: "WebhookEndpointSecurityError" });
+    })
+  );
+
+  it.effect(
+    "permits a local receiver only through the explicit development override",
+    () =>
+      Effect.gen(function* () {
+        const result = yield* parseWebhookEndpointUrl(
+          "http://127.0.0.1:8080/hook",
+          {
+            environment: "development",
+            allowPrivateNetworkInDevelopment: true,
+          }
+        );
+
+        expect(result).toMatchObject({ hostname: "127.0.0.1" });
+      })
+  );
 
   it("recognizes cloud metadata, documentation, private, and multicast addresses", () => {
     for (const address of [
@@ -76,17 +85,19 @@ describe("webhook endpoint security", () => {
     }
   });
 
-  it("rejects a mixed public/private DNS answer before it can be pinned", async () => {
-    const resolver = () =>
-      Effect.succeed(["8.8.8.8", "169.254.169.254"] as const);
-    await expect(
-      Effect.runPromise(
+  it.effect("rejects a mixed public/private DNS answer before it can be pinned", () =>
+    Effect.gen(function* () {
+      const resolver = () =>
+        Effect.succeed(["8.8.8.8", "169.254.169.254"] as const);
+      const error = yield* Effect.flip(
         resolveAndParseWebhookEndpoint(
           "https://example.com/hook",
           production,
           resolver
         )
-      )
-    ).rejects.toMatchObject({ _tag: "WebhookEndpointSecurityError" });
-  });
+      );
+
+      expect(error).toMatchObject({ _tag: "WebhookEndpointSecurityError" });
+    })
+  );
 });
