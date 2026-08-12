@@ -24,9 +24,17 @@ import { WebhookEventSelectionField } from "./webhook-events-selection";
 export function WebhookEditSheet() {
   const store = useWebhookEditSheetContext();
   const open = useSelector(store, (state) => state.context.open);
+  const endpoint = useSelector(store, (state) => state.context.data.endpoint);
 
   return (
-    <Sheet onOpenChange={() => store.send({ type: "toggle" })} open={open}>
+    <Sheet
+      onOpenChange={(open) =>
+        // Dispatch the reported open value (not a toggle) and keep the
+        // endpoint data so a close never wipes the editing target.
+        store.send({ type: "setOpen", open, data: { endpoint } })
+      }
+      open={open}
+    >
       <SheetPopup>
         <SheetHeader>
           <SheetTitle>Edit webhook endpoint</SheetTitle>
@@ -68,6 +76,7 @@ function WebhookEditForm() {
             ...(value.endpointUrl.trim() === ""
               ? {}
               : { endpointUrl: value.endpointUrl.trim() }),
+            eventTypes: [...value.eventTypes],
             name: value.name.trim(),
             organizationId,
           })
@@ -114,7 +123,7 @@ function WebhookEditForm() {
           )}
           name="endpointUrl"
         />
-        <WebhookEventSelectionField form={form} />
+        <WebhookEventSelectionField form={form} idPrefix="edit-webhook" />
       </SheetPanel>
       <SheetFooter>
         <SheetClose render={<Button variant="ghost" />}>Cancel</SheetClose>

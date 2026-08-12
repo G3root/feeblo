@@ -4,8 +4,11 @@ import { CheckboxGroup } from "@feeblo/ui/checkbox-group";
 import { Field, FieldLabel } from "@feeblo/ui/field";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Label } from "@feeblo/ui/label";
+import type { AppFieldExtendedReactFormApi } from "@tanstack/react-form";
+import type { ComponentType } from "react";
 import {
   type WebhookEventType,
+  type WebhookFormValues,
   webhookEventTypes,
   webhookFormOpts,
 } from "../shared-form";
@@ -44,6 +47,29 @@ export function WebhookEventSelection({
   );
 }
 
+// The shared schema's `z.url()` pipe and the edit sheet's relaxed override
+// produce different validator types, so the exported form prop is widened to
+// accept any webhook form (see the file-level suppression comment).
+type WebhookEventSelectionFieldProps = {
+  readonly form: AppFieldExtendedReactFormApi<
+    WebhookFormValues,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any
+  >;
+  readonly idPrefix: string;
+};
+
 export const WebhookEventSelectionField = withForm({
   ...webhookFormOpts,
   props: { idPrefix: "webhook" as string },
@@ -62,4 +88,4 @@ export const WebhookEventSelectionField = withForm({
       name="eventTypes"
     />
   ),
-});
+}) as ComponentType<WebhookEventSelectionFieldProps>;
