@@ -340,6 +340,7 @@ export const makeSlackManagementServiceLive = (
                     id: yield* IntegrationRouteId.generate,
                     organizationId: decoded.organizationId,
                     providerConfig: { version: 1 },
+                    routeKey: "",
                     safeDisplayMetadata: {},
                   })
                   .onConflictDoNothing();
@@ -558,6 +559,7 @@ export const makeSlackManagementServiceLive = (
                       channelName,
                       version: 1,
                     },
+                    routeKey: input.channelId,
                     safeDisplayMetadata: { channelName },
                     createdAt: now,
                     updatedAt: now,

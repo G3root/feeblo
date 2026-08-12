@@ -1,0 +1,2 @@
+ALTER TABLE "integration_route" ADD COLUMN "route_key" text DEFAULT '' NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "integration_route_connection_capability_key_uidx" ON "integration_route" ("connection_id","capability_key","route_key");
