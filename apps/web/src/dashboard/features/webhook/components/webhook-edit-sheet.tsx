@@ -13,11 +13,12 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
+import { z } from "zod";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { fetchRpc } from "~/lib/runtime";
 import { endpointsAtom } from "../atoms";
 import { useWebhookEditSheetContext } from "../dialog-stores";
-import { webhookFormOpts } from "../shared-form";
+import { webhookFormOpts, webhookFormSchema } from "../shared-form";
 import { WebhookEventSelectionField } from "./webhook-events-selection";
 
 export function WebhookEditSheet() {
@@ -51,6 +52,13 @@ function WebhookEditForm() {
       endpointUrl: "",
       eventTypes: [...endpoint.eventTypes],
       name: endpoint.name,
+    },
+    // Unlike creation, the URL is optional when editing: a blank field keeps
+    // the current URL, so the shared schema's required URL is relaxed here.
+    validators: {
+      onSubmit: webhookFormSchema.extend({
+        endpointUrl: z.string().trim(),
+      }),
     },
     onSubmit: async ({ value }) => {
       try {

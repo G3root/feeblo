@@ -1,25 +1,13 @@
-import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { WebhooksSettings } from "~/features/webhook/components/webhooks-settings";
 import { WebhookCreateDialogProvider } from "~/features/webhook/dialog-stores";
-import { loadEndpoints } from "~/features/webhook/lib/endpoints";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 export const Route = createFileRoute("/$organizationId/settings/webhooks/")({
   component: WebhooksSettingsRoute,
-  beforeLoad: async ({ params }) => {
-    const session = await getAuthSession();
-    if (
-      session !== null &&
-      hasPermission(params.organizationId, "webhooks.manage")(session)
-    ) {
-      await loadEndpoints(params.organizationId);
-    }
-    return null;
-  },
 });
 
 function WebhooksSettingsRoute() {

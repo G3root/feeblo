@@ -23,8 +23,13 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useMemo, useState } from "react";
-import { type Endpoint, endpointsAtom, webhookAtomRegistry } from "../atoms";
+import { useContext, useMemo, useState } from "react";
+import {
+  type Endpoint,
+  endpointsAtom,
+  preloadDeliveryHistoryAtom,
+  webhookAtomRegistry,
+} from "../atoms";
 import { useWebhookCreateDialogContext } from "../dialog-stores";
 import {
   type CreatedWebhookEndpoint,
@@ -214,6 +219,7 @@ function WebhookEndpointCard({
   readonly endpoint: Endpoint;
   readonly organizationId: string;
 }) {
+  const registry = useContext(RegistryContext);
   return (
     <Card render={<article />}>
       <CardHeader>
@@ -240,6 +246,14 @@ function WebhookEndpointCard({
             render={(buttonProps) => (
               <Link
                 {...buttonProps}
+                // Pointer-down starts fetching this connection's delivery
+                // history so the detail page renders it without a wait.
+                onPointerDown={() =>
+                  registry.set(preloadDeliveryHistoryAtom, {
+                    connectionId: endpoint.id,
+                    organizationId,
+                  })
+                }
                 params={{
                   connectionId: endpoint.id,
                   organizationId,

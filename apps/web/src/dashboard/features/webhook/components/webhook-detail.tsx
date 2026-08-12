@@ -1,6 +1,7 @@
 import {
   RegistryContext,
   useAtomRefresh,
+  useAtomSet,
   useAtomValue,
 } from "@effect/atom-react";
 import {
@@ -19,7 +20,6 @@ import {
   Card,
   CardAction,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardPanel,
   CardTitle,
@@ -33,15 +33,23 @@ import {
   TableRow,
 } from "@feeblo/ui/table";
 import { toastManager } from "@feeblo/ui/toast";
-import { Link, useNavigate } from "@tanstack/react-router";
+import {
+  Link,
+  useElementScrollRestoration,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { useScrollBottom } from "~/hooks/use-scroll-bottom";
 import { fetchRpc } from "~/lib/runtime";
 import {
-  type DeliveryPage,
+  type Delivery,
   deliveriesAtom,
+  deliveriesLoadingAtom,
+  deliveryHistoryRefreshAtom,
   type Endpoint,
   endpointsAtom,
   webhookAtomRegistry,
@@ -91,6 +99,9 @@ function WebhookDetailContent({
 
   const endpointsResult = useAtomValue(endpointsAtom(organizationId));
   const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
+  // Mutations that create or change deliveries (test, retry) bump this to
+  // restart the history stream so new rows appear without a manual refresh.
+  const refreshDeliveryHistory = useAtomSet(deliveryHistoryRefreshAtom);
 
   const { endpoint, isLoading, loadFailed } = useMemo(() => {
     const findEndpoint = (value: readonly Endpoint[]) =>
@@ -128,6 +139,7 @@ function WebhookDetailContent({
       );
       setTestResult(`${result.result}: ${result.deliveryId}`);
       toastManager.add({ title: "Test delivery queued", type: "success" });
+      refreshDeliveryHistory();
     } catch {
       toastManager.add({
         title: "Could not queue test delivery",
@@ -467,6 +479,18 @@ const deliveryStateBadge = {
   succeeded: "default",
 } as const;
 
+type HistoryRow =
+  | {
+      readonly kind: "delivery";
+      readonly key: string;
+      readonly delivery: Delivery;
+    }
+  | {
+      readonly kind: "attempts";
+      readonly key: string;
+      readonly delivery: Delivery;
+    };
+
 function DeliveryHistoryTable({
   organizationId,
   connectionId,
@@ -474,53 +498,49 @@ function DeliveryHistoryTable({
   readonly organizationId: string;
   readonly connectionId: string;
 }) {
-  const [deliveries, setDeliveries] = useState<DeliveryPage["items"]>([]);
-  const [deliveryCursor, setDeliveryCursor] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [expanded, setExpanded] = useState<readonly string[]>([]);
+  const listRef = useRef<HTMLTableElement>(null);
 
-  const historyAtom = useMemo(
-    () => deliveriesAtom(organizationId, connectionId, deliveryCursor),
-    [connectionId, deliveryCursor, organizationId]
+  const historyArgs = useMemo(
+    () => ({ organizationId, connectionId }),
+    [connectionId, organizationId]
   );
-  const historyResult = useAtomValue(historyAtom);
-  const refreshHistory = useAtomRefresh(historyAtom);
+  const historyResult = useAtomValue(deliveriesAtom(historyArgs));
+  const isLoading = useAtomValue(deliveriesLoadingAtom(historyArgs));
+  // Writing to the pull atom advances it one page (driven by scrolling to the
+  // bottom, like the reference app); writing to the refresh atom restarts the
+  // stream from the newest page. Both operations are owned by the atoms, so
+  // the component no longer tracks cursors or accumulates pages itself.
+  const pull = useAtomSet(deliveriesAtom(historyArgs));
+  const refreshHistory = useAtomSet(deliveryHistoryRefreshAtom);
+  useScrollBottom(() => {
+    pull();
+  });
 
-  // The first page auto-loads on mount (see `revalidateOnMount` on the atom);
-  // later pages load via the Load more button. Append or replace the visible
-  // list whenever a requested page resolves.
-  useEffect(() => {
-    if (AsyncResult.isSuccess(historyResult)) {
-      const page = historyResult.value;
-      setDeliveries((current) =>
-        deliveryCursor === null ? page.items : [...current, ...page.items]
-      );
-      setDeliveryCursor(page.nextCursor);
-      setIsLoading(false);
-    } else if (AsyncResult.isFailure(historyResult)) {
-      setIsLoading(false);
-      toastManager.add({
-        title: "Could not load delivery history",
-        type: "error",
-      });
-    }
-  }, [deliveryCursor, historyResult]);
+  // Accumulated rows. The pull atom owns pagination, so the visible list is
+  // whatever pages have streamed in so far, keeping the previous rows visible
+  // while the next page (or a refresh) is in flight.
+  const deliveries = AsyncResult.match(historyResult, {
+    onInitial: () => [] as readonly Delivery[],
+    onFailure: ({ previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => [] as readonly Delivery[],
+        onSome: ({ value }) => value.items,
+      }),
+    onSuccess: ({ value }) => value.items,
+  });
 
-  // Reload the newest page: reset the visible list and re-fetch page one.
-  const reloadHistory = () => {
-    setIsLoading(true);
-    setDeliveries([]);
-    if (deliveryCursor === null) {
-      refreshHistory();
-    } else {
-      setDeliveryCursor(null);
-    }
-  };
+  // An empty history surfaces as `NoSuchElementError` (the paging stream ends
+  // without emitting a chunk), so it renders as the empty state; every other
+  // failure renders inline below.
+  const hasLoadError = AsyncResult.matchWithError(historyResult, {
+    onInitial: () => false,
+    onSuccess: () => false,
+    onError: (error) => error._tag !== "NoSuchElementError",
+    onDefect: () => true,
+  });
 
-  const loadMore = () => {
-    setIsLoading(true);
-    refreshHistory();
-  };
+  const loadFailed = hasLoadError && deliveries.length === 0;
 
   const toggleExpanded = (deliveryId: string) =>
     setExpanded((current) =>
@@ -529,95 +549,158 @@ function DeliveryHistoryTable({
         : [...current, deliveryId]
     );
 
-  const handleRetry = async (
-    deliveryId: DeliveryPage["items"][number]["id"]
-  ) => {
+  const handleRetry = async (deliveryId: Delivery["id"]) => {
     try {
       await fetchRpc((rpc) =>
         rpc.WebhookDeliveryRetry({ deliveryId, organizationId })
       );
       toastManager.add({ title: "Delivery retry queued", type: "success" });
-      reloadHistory();
+      refreshHistory();
     } catch {
       toastManager.add({ title: "Could not retry delivery", type: "error" });
     }
   };
 
+  // Flat row list: an expanded delivery becomes two virtualized rows (the
+  // delivery plus its attempts), so both get measured and scrolled together.
+  const rows = useMemo<readonly HistoryRow[]>(
+    () =>
+      deliveries.flatMap((delivery) =>
+        expanded.includes(delivery.id)
+          ? [
+              { kind: "delivery", key: delivery.id, delivery },
+              { kind: "attempts", key: `${delivery.id}-attempts`, delivery },
+            ]
+          : [{ kind: "delivery", key: delivery.id, delivery }]
+      ),
+    [deliveries, expanded]
+  );
+
+  const scrollRestoration = useElementScrollRestoration({
+    getElement: () => window,
+  });
+  // The virtualizer coordinates rows relative to the first body row, so its
+  // scroll margin is the table's offset plus the measured header height.
+  const headerRef = useRef<HTMLTableSectionElement>(null);
+  const virtualizer = useWindowVirtualizer<HTMLTableRowElement>({
+    count: rows.length,
+    estimateSize: () => 44,
+    getItemKey: (index) => rows[index]?.key ?? index,
+    overscan: 6,
+    scrollMargin:
+      (listRef.current?.offsetTop ?? 0) +
+      (headerRef.current?.offsetHeight ?? 0),
+    initialOffset: scrollRestoration?.scrollY,
+  });
+
+  // Only rows inside the viewport are rendered; invisible spacer rows above
+  // and below keep the table's total height (and the window scrollbar)
+  // accurate while the page scrolls.
+  const virtualItems = virtualizer.getVirtualItems();
+  const scrollMargin =
+    (listRef.current?.offsetTop ?? 0) + (headerRef.current?.offsetHeight ?? 0);
+  const topSpacer =
+    virtualItems.length > 0 ? virtualItems[0].start - scrollMargin : 0;
+  const lastItem = virtualItems.at(-1);
+  const bottomSpacer =
+    lastItem === undefined
+      ? 0
+      : virtualizer.getTotalSize() - (lastItem.end - scrollMargin);
+
   return (
     <Card aria-label="Webhook delivery history">
-      {" "}
       <CardHeader>
         <CardTitle>Delivery history</CardTitle>
         <CardDescription>Endpoint {connectionId}</CardDescription>
         <CardAction>
-          <Button onClick={reloadHistory} size="sm" variant="outline">
+          <Button onClick={() => refreshHistory()} size="sm" variant="outline">
             Refresh
           </Button>
         </CardAction>
       </CardHeader>
       <CardPanel>
-        {deliveries.length === 0 && !isLoading ? (
+        {deliveries.length === 0 && isLoading ? (
+          <p className="text-muted-foreground text-sm">
+            Loading delivery history…
+          </p>
+        ) : null}
+        {deliveries.length === 0 && !isLoading && loadFailed ? (
+          <div className="text-sm">
+            Delivery history could not be loaded.{" "}
+            <Button
+              onClick={() => refreshHistory()}
+              size="sm"
+              variant="outline"
+            >
+              Try again
+            </Button>
+          </div>
+        ) : null}
+        {deliveries.length === 0 && !isLoading && !loadFailed ? (
           <p className="text-muted-foreground text-sm">No deliveries yet.</p>
         ) : null}
         {deliveries.length === 0 ? null : (
-          <Table variant="card">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Event</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>Attempts</TableHead>
-                <TableHead>Started at</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {deliveries.flatMap((delivery) => {
-                const isExpanded = expanded.includes(delivery.id);
-                return [
-                  <TableRow
-                    className="cursor-pointer"
-                    data-state={isExpanded ? "selected" : undefined}
-                    key={delivery.id}
-                    onClick={() => toggleExpanded(delivery.id)}
-                  >
-                    <TableCell className="font-medium">
-                      {delivery.eventType}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={deliveryStateBadge[delivery.state]}>
-                        {delivery.state}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{delivery.attemptCount}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {delivery.createdAt.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {delivery.state === "exhausted" ? (
-                        <Button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleRetry(delivery.id);
-                          }}
-                          size="sm"
-                          variant="outline"
-                        >
-                          Retry
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>,
-                  isExpanded ? (
-                    <TableRow key={`${delivery.id}-attempts`}>
+          <>
+            {hasLoadError ? (
+              <p className="pb-2 text-muted-foreground text-sm">
+                Could not load the latest deliveries.{" "}
+                <button
+                  className="underline"
+                  onClick={() => refreshHistory()}
+                  type="button"
+                >
+                  Try again
+                </button>
+              </p>
+            ) : null}
+            <Table ref={listRef} variant="card">
+              <TableHeader ref={headerRef}>
+                <TableRow>
+                  <TableHead>Event</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead>Attempts</TableHead>
+                  <TableHead>Started at</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topSpacer > 0 ? (
+                  <TableRow aria-hidden="true">
+                    <TableCell
+                      aria-hidden="true"
+                      colSpan={5}
+                      style={{ height: topSpacer }}
+                    />
+                  </TableRow>
+                ) : null}
+                {virtualItems.map((item) => {
+                  const row = rows[item.index];
+                  return row.kind === "delivery" ? (
+                    <DeliveryRow
+                      dataIndex={item.index}
+                      delivery={row.delivery}
+                      expanded={expanded.includes(row.delivery.id)}
+                      key={row.key}
+                      measureRef={virtualizer.measureElement}
+                      onRetry={handleRetry}
+                      onToggle={toggleExpanded}
+                    />
+                  ) : (
+                    <TableRow
+                      className="border-b"
+                      data-index={item.index}
+                      key={row.key}
+                      ref={virtualizer.measureElement}
+                    >
                       <TableCell
                         className="whitespace-normal bg-muted/40"
                         colSpan={5}
                       >
                         <ul
-                          aria-label={`Attempts for ${delivery.id}`}
+                          aria-label={`Attempts for ${row.delivery.id}`}
                           className="grid gap-1 text-muted-foreground text-sm"
                         >
-                          {delivery.attempts.map((attempt) => (
+                          {row.delivery.attempts.map((attempt) => (
                             <li key={attempt.id}>
                               {attempt.startedAt.toLocaleString()} ·{" "}
                               {attempt.httpStatus ?? "network"} ·{" "}
@@ -633,26 +716,74 @@ function DeliveryHistoryTable({
                         </ul>
                       </TableCell>
                     </TableRow>
-                  ) : null,
-                ];
-              })}
-            </TableBody>
-          </Table>
+                  );
+                })}
+                {bottomSpacer > 0 ? (
+                  <TableRow aria-hidden="true">
+                    <TableCell
+                      aria-hidden="true"
+                      colSpan={5}
+                      style={{ height: bottomSpacer }}
+                    />
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </>
         )}
       </CardPanel>
-      {deliveryCursor === null ? null : (
-        <CardFooter className="justify-start">
+    </Card>
+  );
+}
+
+function DeliveryRow({
+  dataIndex,
+  delivery,
+  expanded,
+  measureRef,
+  onRetry,
+  onToggle,
+}: {
+  readonly dataIndex: number;
+  readonly delivery: Delivery;
+  readonly expanded: boolean;
+  readonly measureRef: (node: HTMLTableRowElement | null) => void;
+  readonly onRetry: (deliveryId: Delivery["id"]) => void;
+  readonly onToggle: (deliveryId: string) => void;
+}) {
+  return (
+    <TableRow
+      className="cursor-pointer"
+      data-index={dataIndex}
+      data-state={expanded ? "selected" : undefined}
+      onClick={() => onToggle(delivery.id)}
+      ref={measureRef}
+    >
+      <TableCell className="font-medium">{delivery.eventType}</TableCell>
+      <TableCell>
+        <Badge variant={deliveryStateBadge[delivery.state]}>
+          {delivery.state}
+        </Badge>
+      </TableCell>
+      <TableCell>{delivery.attemptCount}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {delivery.createdAt.toLocaleString()}
+      </TableCell>
+      <TableCell className="text-right">
+        {delivery.state === "exhausted" ? (
           <Button
-            disabled={isLoading}
-            onClick={loadMore}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRetry(delivery.id);
+            }}
             size="sm"
             variant="outline"
           >
-            {isLoading ? "Loading…" : "Load more"}
+            Retry
           </Button>
-        </CardFooter>
-      )}
-    </Card>
+        ) : null}
+      </TableCell>
+    </TableRow>
   );
 }
 
