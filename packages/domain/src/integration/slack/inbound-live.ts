@@ -1,15 +1,6 @@
-import { currentDb, Database, schema } from "@feeblo/db";
-import {
-  asLegid,
-  IntegrationEventId,
-  PostId,
-  UserId,
-  WorkspaceId,
-} from "@feeblo/id";
-import { IntegrationEventRecorder } from "@feeblo/integration-core";
+import { currentDb, type Database, schema } from "@feeblo/db";
 import {
   makeSlackApiClient,
-  SLACK_FEEDBACK_MODAL_CALLBACK_ID,
   type SlackApiClient,
 } from "@feeblo/integration-slack";
 import { decryptSlackCredentialMaterial } from "@feeblo/integration-slack/credentials";
@@ -20,59 +11,29 @@ import type {
   SlackViewSubmissionPayload,
 } from "@feeblo/integration-slack/inbound-schema";
 import { slackProviderKey } from "@feeblo/integration-slack/manifest";
-import { htmlToExcerpt } from "@feeblo/utils/html";
-import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
-import { truncate } from "@feeblo/utils/text";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
-import * as Data from "effect/Data";
-import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { BoardRepository } from "../../board/repository";
 import { EmailOutboxConfig } from "../../email-outbox/config";
-import {
-  PostEmbeddingService,
-  schedulePostEmbeddingBestEffort,
-} from "../../post/embedding-service";
-import { PostRepository } from "../../post/repository";
-import { PostStatusRepository } from "../../post-status/repository";
-import { PostSubscriptionRepository } from "../../post-subscription/repository";
 import { SlackIntegrationConfig } from "./config";
+import { SlackInboundFailure } from "./errors";
 import {
   type SlackInboundHttpResponse,
   SlackInboundService,
 } from "./inbound-service";
-
-/** Internal inbound failure; surfaced to Slack as an ephemeral error. */
-export class SlackInboundFailure extends Data.TaggedError(
-  "SlackInboundFailure"
-)<{
-  readonly message: string;
-}> {}
-
-const TITLE_MAX_LENGTH = 200;
-const DETAILS_MAX_LENGTH = 3000;
-const SYNTHETIC_SLACK_EMAIL_SUFFIX = "@slack.invalid";
-
-/** Private metadata embedded in the feedback modal; safe to send to Slack. */
-const FeedbackModalMetadata = Schema.Struct({
-  channelId: Schema.String,
-  channelName: Schema.String,
-  connectionId: Schema.String,
-  messageTs: Schema.optionalKey(Schema.String),
-  organizationId: Schema.String,
-  teamId: Schema.String,
-});
-
-const decodeModalMetadata = (value: string) =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(FeedbackModalMetadata))(
-    value
-  );
+import { SlackFeedbackService } from "./slack-feedback-service";
+import {
+  buildFeedbackModal,
+  buildSuccessModal,
+  decodeModalMetadata,
+  FeedbackModalMetadata,
+} from "./slack-modals";
+import { SlackUserService } from "./slack-user-service";
 
 const ephemeralResponse = (text: string): SlackInboundHttpResponse => ({
   body: { response_type: "ephemeral", text },
@@ -99,10 +60,8 @@ export const makeSlackInboundServiceLive = (
   | SlackIntegrationConfig
   | BoardRepository
   | EmailOutboxConfig
-  | IntegrationEventRecorder
-  | PostRepository
-  | PostStatusRepository
-  | PostSubscriptionRepository
+  | SlackUserService
+  | SlackFeedbackService
 > =>
   Layer.effect(
     SlackInboundService,
@@ -110,99 +69,9 @@ export const makeSlackInboundServiceLive = (
       const db = yield* currentDb;
       const config = yield* SlackIntegrationConfig;
       const boardRepository = yield* BoardRepository;
-      const postRepository = yield* PostRepository;
-      const postStatusRepository = yield* PostStatusRepository;
-      const postSubscriptionRepository = yield* PostSubscriptionRepository;
       const emailOutboxConfig = yield* EmailOutboxConfig;
-      const eventRecorder = yield* IntegrationEventRecorder;
-      const embeddingService =
-        yield* Effect.serviceOption(PostEmbeddingService);
-
-      // Inlined variant of the shared post-event recorder: same canonical
-      // event, but every dependency is captured as a value so the inbound
-      // service methods stay requirement-free.
-      const recordSlackPostIntegrationEvent = ({
-        boardId,
-        organizationId,
-        postId,
-        postSlug,
-        statusId,
-        title,
-      }: {
-        readonly boardId: string;
-        readonly organizationId: string;
-        readonly postId: string;
-        readonly postSlug: string;
-        readonly statusId: string;
-        readonly title: string;
-      }) =>
-        Effect.gen(function* () {
-          const [board] = yield* db
-            .select({
-              id: schema.boardTable.id,
-              name: schema.boardTable.name,
-              slug: schema.boardTable.slug,
-            })
-            .from(schema.boardTable)
-            .where(
-              and(
-                eq(schema.boardTable.id, boardId),
-                eq(schema.boardTable.organizationId, organizationId)
-              )
-            )
-            .limit(1);
-          if (board === undefined) {
-            return yield* new SlackInboundFailure({
-              message: "Slack post board was not found",
-            });
-          }
-          const statusType = yield* postRepository.findStatusType({
-            id: statusId,
-            organizationId,
-          });
-          if (statusType === undefined) {
-            return yield* new SlackInboundFailure({
-              message: "Slack post status was not found",
-            });
-          }
-          const eventId = yield* IntegrationEventId.generate;
-          const correlationId = yield* IntegrationEventId.generate;
-          const url = new URL(
-            `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(board.slug)}/${encodeURIComponent(postSlug)}`,
-            emailOutboxConfig.appUrl
-          ).href;
-          yield* eventRecorder
-            .recordIntegrationEvent({
-              event: {
-                causalHopCount: 0,
-                correlationId,
-                data: {
-                  actor: { kind: "end_user" },
-                  board,
-                  post: {
-                    id: postId,
-                    status: { id: statusId, type: statusType },
-                    title,
-                    url,
-                  },
-                },
-                id: eventId,
-                occurredAt: yield* DateTime.now,
-                organizationId: asLegid(WorkspaceId)(organizationId),
-                origin: { kind: "feeblo" },
-                type: "feedback.post.created",
-                version: 1,
-              },
-            })
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new SlackInboundFailure({
-                    message: "Could not record post integration event",
-                  })
-              )
-            );
-        });
+      const slackUserService = yield* SlackUserService;
+      const slackFeedbackService = yield* SlackFeedbackService;
 
       const findActiveConnection = (teamId: string) =>
         db
@@ -239,121 +108,6 @@ export const makeSlackInboundServiceLive = (
                   : Option.some(credentials.botToken)
               )
             );
-
-      const buildFeedbackModal = ({
-        boards,
-        initialTitle,
-        metadata,
-      }: {
-        readonly boards: readonly {
-          readonly id: string;
-          readonly name: string;
-        }[];
-        readonly initialTitle: string;
-        readonly metadata: string;
-      }): unknown => ({
-        callback_id: SLACK_FEEDBACK_MODAL_CALLBACK_ID,
-        close: { text: "Cancel", type: "plain_text" },
-        private_metadata: metadata,
-        submit: { text: "Send", type: "plain_text" },
-        title: { text: "Send feedback to Feeblo", type: "plain_text" },
-        type: "modal",
-        blocks: [
-          {
-            block_id: "feeblo_title",
-            element: {
-              action_id: "title",
-              initial_value: truncate(initialTitle, TITLE_MAX_LENGTH),
-              max_length: TITLE_MAX_LENGTH,
-              type: "plain_text_input",
-            },
-            label: { emoji: true, text: "Title", type: "plain_text" },
-            type: "input",
-          },
-          {
-            block_id: "feeblo_details",
-            element: {
-              action_id: "details",
-              max_length: DETAILS_MAX_LENGTH,
-              multiline: true,
-              type: "plain_text_input",
-            },
-            label: { emoji: true, text: "Details", type: "plain_text" },
-            optional: true,
-            type: "input",
-          },
-          {
-            block_id: "feeblo_board",
-            element: {
-              action_id: "board",
-              options: boards.map((board) => ({
-                text: {
-                  emoji: true,
-                  text: truncate(board.name, 75),
-                  type: "plain_text",
-                },
-                value: board.id,
-              })),
-              placeholder: {
-                text: "Choose a board",
-                type: "plain_text",
-              },
-              type: "static_select",
-            },
-            label: { emoji: true, text: "Board", type: "plain_text" },
-            type: "input",
-          },
-        ],
-      });
-
-      const buildSuccessModal = ({
-        postTitle,
-        postUrl,
-      }: {
-        readonly postTitle: string;
-        readonly postUrl?: string;
-      }): unknown => ({
-        callback_id: "feeblo_feedback_success",
-        clear_on_close: true,
-        close: { text: "Close", type: "plain_text" },
-        title: { text: "Feedback sent", type: "plain_text" },
-        type: "modal",
-        blocks: [
-          {
-            text: {
-              text: "🎉 Your feedback was sent to Feeblo.",
-              type: "mrkdwn",
-            },
-            type: "section",
-          },
-          {
-            text: {
-              text: `*${truncate(postTitle, 150)}*`,
-              type: "mrkdwn",
-            },
-            type: "section",
-          },
-          ...(postUrl === undefined
-            ? []
-            : [
-                {
-                  elements: [
-                    {
-                      style: "primary",
-                      text: {
-                        emoji: true,
-                        text: "View post",
-                        type: "plain_text",
-                      },
-                      type: "button",
-                      url: postUrl,
-                    },
-                  ],
-                  type: "actions",
-                },
-              ]),
-        ],
-      });
 
       const openFeedbackModal = ({
         botToken,
@@ -421,183 +175,6 @@ export const makeSlackInboundServiceLive = (
           return emptyResponse();
         });
 
-      const resolveSlackUser = ({
-        botToken,
-        organizationId,
-        slackTeamId,
-        slackUserId,
-      }: {
-        readonly botToken: Redacted.Redacted<string>;
-        readonly organizationId: string;
-        readonly slackTeamId: string;
-        readonly slackUserId: string;
-      }) =>
-        Effect.gen(function* () {
-          // Fetch the Slack profile best-effort; fall back to the username
-          // when the profile lookup fails.
-          const profile = yield* Effect.exit(
-            apiClient.usersInfo({ botToken, userId: slackUserId })
-          );
-          const displayName = Exit.isSuccess(profile)
-            ? (profile.value.user.real_name ??
-              profile.value.user.profile?.display_name ??
-              profile.value.user.profile?.real_name ??
-              profile.value.user.name ??
-              slackUserId)
-            : slackUserId;
-          const email = Exit.isSuccess(profile)
-            ? profile.value.user.profile?.email
-            : undefined;
-          // 1. SSO-style linking: a visible email that matches an existing
-          // Feeblo user of this organization reuses that account, so Slack
-          // feedback lands on the person's real profile. Matching is scoped
-          // to users of this organization (SSO users are restricted to it;
-          // members hold a membership row).
-          if (email !== undefined) {
-            const [match] = yield* db
-              .select({ id: schema.userTable.id })
-              .from(schema.userTable)
-              .where(
-                and(
-                  eq(schema.userTable.email, email),
-                  or(
-                    eq(
-                      schema.userTable.restrictedToOrganizationId,
-                      organizationId
-                    ),
-                    sql`EXISTS (
-                      SELECT 1 FROM ${schema.memberTable}
-                      WHERE ${schema.memberTable.userId} = ${schema.userTable.id}
-                        AND ${schema.memberTable.organizationId} = ${organizationId}
-                    )`
-                  )
-                )
-              )
-              .limit(1);
-            if (match !== undefined) {
-              return match.id;
-            }
-          }
-          // 2. Stable anonymous identity: the synthetic email derived from the
-          // team + slack user id maps every future submission back to the same
-          // user, without a dedicated link table. Team-scoped so the same
-          // slack id in two workspaces can never collide.
-          const syntheticEmail = `slack-${slackTeamId.toLowerCase()}-${slackUserId.toLowerCase()}${SYNTHETIC_SLACK_EMAIL_SUFFIX}`;
-          const [existing] = yield* db
-            .select({ id: schema.userTable.id })
-            .from(schema.userTable)
-            .where(eq(schema.userTable.email, syntheticEmail))
-            .limit(1);
-          if (existing !== undefined) {
-            return existing.id;
-          }
-          // 3. Create the anonymous user. These users never receive
-          // transactional email (synthetic address, emailVerified false).
-          const userId = yield* UserId.generate;
-          yield* db
-            .insert(schema.userTable)
-            .values({
-              email: syntheticEmail,
-              emailVerified: false,
-              id: userId,
-              name: truncate(displayName, 100),
-            })
-            .pipe(Effect.ignore);
-          // Concurrent submissions may create the same user; the insert
-          // conflict is ignored and the winner is reused.
-          const [winner] = yield* db
-            .select({ id: schema.userTable.id })
-            .from(schema.userTable)
-            .where(eq(schema.userTable.email, syntheticEmail))
-            .limit(1);
-          return winner?.id ?? userId;
-        });
-
-      const createPostFromSlack = ({
-        boardId,
-        content,
-        organizationId,
-        title,
-        userId,
-      }: {
-        readonly boardId: string;
-        readonly content: string;
-        readonly organizationId: string;
-        readonly title: string;
-        readonly userId: string;
-      }) =>
-        Effect.gen(function* () {
-          const statuses = yield* postStatusRepository.findMany({
-            organizationId,
-          });
-          const defaultStatus = statuses[0];
-          if (defaultStatus === undefined) {
-            return yield* new SlackInboundFailure({
-              message: "Organization has no default post status",
-            });
-          }
-          const { sanitizedMarkdown, sanitizedHtml } =
-            sanitizeMarkdown(content);
-          const id = yield* PostId.generate;
-          const excerpt = htmlToExcerpt(sanitizedHtml);
-          const [board] = yield* db
-            .select({ slug: schema.boardTable.slug })
-            .from(schema.boardTable)
-            .where(
-              and(
-                eq(schema.boardTable.id, boardId),
-                eq(schema.boardTable.organizationId, organizationId)
-              )
-            )
-            .limit(1);
-          if (board === undefined) {
-            return yield* new SlackInboundFailure({
-              message: "Slack post board was not found",
-            });
-          }
-          const boardSlug = board.slug;
-          let slug = "";
-          yield* db.transaction(() =>
-            Effect.gen(function* () {
-              slug = yield* postRepository.create({
-                boardId,
-                content: sanitizedMarkdown,
-                creatorId: userId,
-                creatorMemberId: null,
-                excerpt,
-                id,
-                organizationId,
-                source: "SLACK",
-                statusId: defaultStatus.id,
-                title,
-              });
-              yield* recordSlackPostIntegrationEvent({
-                boardId,
-                organizationId,
-                postId: id,
-                postSlug: slug,
-                statusId: defaultStatus.id,
-                title,
-              });
-              yield* postSubscriptionRepository.subscribe({
-                organizationId,
-                postId: id,
-                userId,
-              });
-            })
-          );
-          yield* schedulePostEmbeddingBestEffort({
-            content: sanitizedMarkdown,
-            postId: id,
-            organizationId,
-            title,
-            ...(embeddingService._tag === "Some"
-              ? { embeddingService: embeddingService.value }
-              : {}),
-          }).pipe(Effect.provideService(Database.Database, db));
-          return { boardId, boardSlug, id, slug, title };
-        });
-
       const handleViewSubmission = (payload: SlackViewSubmissionPayload) =>
         Effect.gen(function* () {
           const metadata = yield* decodeModalMetadata(
@@ -646,13 +223,13 @@ export const makeSlackInboundServiceLive = (
               status: 200,
             };
           }
-          const userId = yield* resolveSlackUser({
+          const userId = yield* slackUserService.resolveUser({
             botToken,
             organizationId: metadata.organizationId,
             slackTeamId: metadata.teamId,
             slackUserId: payload.user.id,
           });
-          const created = yield* createPostFromSlack({
+          const created = yield* slackFeedbackService.createPost({
             boardId,
             content: details,
             organizationId: metadata.organizationId,

@@ -20,9 +20,11 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import {
+  SlackFeedbackServiceLive,
   SlackInboundServiceLive,
   SlackIntegrationConfig,
   SlackManagementServiceLive,
+  SlackUserServiceLive,
 } from "@feeblo/domain/integration/slack";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
@@ -207,12 +209,14 @@ const program = Effect.gen(function* () {
     ),
     SlackInboundServiceLive.pipe(
       Layer.provide(SlackIntegrationConfig.layer),
-      Layer.provide(IntegrationEventRecorderLive),
+      Layer.provide(SlackUserServiceLive),
+      Layer.provide(SlackFeedbackServiceLive),
       Layer.provide(BoardRepository.layer),
+      Layer.provide(EmailOutboxConfig.layer),
+      Layer.provide(IntegrationEventRecorderLive),
       Layer.provide(PostRepository.layer),
       Layer.provide(PostStatusRepository.layer),
       Layer.provide(PostSubscriptionRepository.layer),
-      Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
