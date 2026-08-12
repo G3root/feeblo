@@ -77,14 +77,18 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
       // event, but every dependency is captured as a value so the service
       // methods stay requirement-free.
       const recordSlackPostIntegrationEvent = ({
-        boardId,
+        board,
         organizationId,
         postId,
         postSlug,
         statusId,
         title,
       }: {
-        readonly boardId: string;
+        readonly board: {
+          readonly id: string;
+          readonly name: string;
+          readonly slug: string;
+        };
         readonly organizationId: string;
         readonly postId: string;
         readonly postSlug: string;
@@ -92,25 +96,6 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
         readonly title: string;
       }) =>
         Effect.gen(function* () {
-          const [board] = yield* db
-            .select({
-              id: schema.boardTable.id,
-              name: schema.boardTable.name,
-              slug: schema.boardTable.slug,
-            })
-            .from(schema.boardTable)
-            .where(
-              and(
-                eq(schema.boardTable.id, boardId),
-                eq(schema.boardTable.organizationId, organizationId)
-              )
-            )
-            .limit(1);
-          if (board === undefined) {
-            return yield* new SlackInboundFailure({
-              message: "Slack post board was not found",
-            });
-          }
           const statusType = yield* postRepository.findStatusType({
             id: statusId,
             organizationId,
@@ -181,7 +166,11 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
           const id = yield* PostId.generate;
           const excerpt = htmlToExcerpt(sanitizedHtml);
           const [board] = yield* db
-            .select({ slug: schema.boardTable.slug })
+            .select({
+              id: schema.boardTable.id,
+              name: schema.boardTable.name,
+              slug: schema.boardTable.slug,
+            })
             .from(schema.boardTable)
             .where(
               and(
@@ -196,10 +185,9 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
             });
           }
           const boardSlug = board.slug;
-          let slug = "";
-          yield* db.transaction(() =>
+          const slug = yield* db.transaction(() =>
             Effect.gen(function* () {
-              slug = yield* postRepository.create({
+              const createdSlug = yield* postRepository.create({
                 boardId,
                 content: sanitizedMarkdown,
                 creatorId: userId,
@@ -212,10 +200,10 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
                 title,
               });
               yield* recordSlackPostIntegrationEvent({
-                boardId,
+                board,
                 organizationId,
                 postId: id,
-                postSlug: slug,
+                postSlug: createdSlug,
                 statusId: defaultStatus.id,
                 title,
               });
@@ -224,6 +212,7 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
                 postId: id,
                 userId,
               });
+              return createdSlug;
             })
           );
           yield* schedulePostEmbeddingBestEffort({

@@ -111,16 +111,40 @@ export const makeSlackConnectionServiceLive = (
                 })
             )
           );
-          yield* db.insert(schema.integrationConnectionTable).values({
-            credentialGeneration: 1,
-            credentialsCiphertext: ciphertext,
-            id: connectionId,
-            lifecycle: "connecting",
-            name: "Slack",
-            organizationId,
-            provider: slackProviderKey,
-            safeDisplayMetadata: {},
-          });
+          yield* db.transaction(() =>
+            Effect.gen(function* () {
+              // A new install attempt replaces any abandoned connecting row so
+              // listConnections never accumulates stale in-progress entries.
+              yield* db
+                .delete(schema.integrationConnectionTable)
+                .where(
+                  and(
+                    eq(
+                      schema.integrationConnectionTable.organizationId,
+                      organizationId
+                    ),
+                    eq(
+                      schema.integrationConnectionTable.provider,
+                      slackProviderKey
+                    ),
+                    eq(
+                      schema.integrationConnectionTable.lifecycle,
+                      "connecting"
+                    )
+                  )
+                );
+              yield* db.insert(schema.integrationConnectionTable).values({
+                credentialGeneration: 1,
+                credentialsCiphertext: ciphertext,
+                id: connectionId,
+                lifecycle: "connecting",
+                name: "Slack",
+                organizationId,
+                provider: slackProviderKey,
+                safeDisplayMetadata: {},
+              });
+            })
+          );
           const state = yield* Schema.encodeEffect(
             Schema.fromJsonString(SlackOAuthState)
           )({
@@ -244,6 +268,36 @@ export const makeSlackConnectionServiceLive = (
                 });
               }
               const now = new Date();
+              // A Slack workspace has at most one active connection per
+              // organization: archive any pre-existing active connection for
+              // the same team before activating the current row, so
+              // inbound-live resolves a single credential source.
+              yield* db
+                .update(schema.integrationConnectionTable)
+                .set({
+                  archivedAt: now,
+                  credentialsCiphertext: null,
+                  lifecycle: "archived",
+                  retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    eq(
+                      schema.integrationConnectionTable.organizationId,
+                      decoded.organizationId
+                    ),
+                    eq(
+                      schema.integrationConnectionTable.provider,
+                      slackProviderKey
+                    ),
+                    eq(
+                      schema.integrationConnectionTable.remoteAccountId,
+                      authTest.team_id
+                    ),
+                    eq(schema.integrationConnectionTable.lifecycle, "active")
+                  )
+                );
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({

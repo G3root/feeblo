@@ -67,7 +67,9 @@ export const buildFeedbackModal = ({
       block_id: "feeblo_board",
       element: {
         action_id: "board",
-        options: boards.map((board) => ({
+        // Slack's static_select accepts at most 100 options; cap the board
+        // list so views.open stays valid for organizations with more boards.
+        options: boards.slice(0, 100).map((board) => ({
           text: {
             emoji: true,
             text: truncate(board.name, 75),

@@ -187,10 +187,10 @@ export const makeSlackChannelServiceLive = (
                   message: "Slack connection was not found",
                 });
               }
-              // One route per channel: find the enabled route whose
-              // providerConfig channelId matches the target channel rather
-              // than assuming a single notifications route per connection.
-              const routeRows = yield* db
+              // One route per channel: look the target channel's route up by
+              // its routeKey (the channel id) instead of decoding every
+              // channel.notifications route's providerConfig.
+              const [route] = yield* db
                 .select()
                 .from(schema.integrationRouteTable)
                 .where(
@@ -206,22 +206,11 @@ export const makeSlackChannelServiceLive = (
                     eq(
                       schema.integrationRouteTable.organizationId,
                       input.organizationId
-                    )
+                    ),
+                    eq(schema.integrationRouteTable.routeKey, input.channelId)
                   )
-                );
-              const routesByChannel = yield* Effect.forEach(
-                routeRows,
-                (route) =>
-                  decodeProviderConfig(route.providerConfig).pipe(
-                    Effect.map((config) => ({
-                      channelId: config.channelId,
-                      route,
-                    }))
-                  )
-              );
-              const route = routesByChannel.find(
-                (entry) => entry.channelId === input.channelId
-              )?.route;
+                )
+                .limit(1);
               // The channel display name always comes from the caller; the
               // stale name stored on a previous selection must never leak
               // into the new configuration.
