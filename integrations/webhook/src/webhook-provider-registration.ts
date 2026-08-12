@@ -14,7 +14,7 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 import {
-  resolveAndValidateWebhookEndpoint,
+  resolveAndParseWebhookEndpoint,
   type WebhookEndpointSecurityPolicy,
 } from "./webhook-endpoint-security";
 import {
@@ -106,7 +106,7 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
-          const endpoint = yield* resolveAndValidateWebhookEndpoint(
+          const endpoint = yield* resolveAndParseWebhookEndpoint(
             Redacted.value(credentials.endpointUrl),
             endpointSecurityPolicy
           ).pipe(

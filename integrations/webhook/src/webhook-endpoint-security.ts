@@ -113,7 +113,7 @@ const privateNetworkAllowed = (
   policy.allowPrivateNetworkInDevelopment;
 
 /** Parses an endpoint URL before it is persisted, rejecting credentials, fragments, local hostnames, and production HTTP. */
-export const validateWebhookEndpointUrl = (
+export const parseWebhookEndpointUrl = (
   input: string,
   policy: WebhookEndpointSecurityPolicy
 ): Effect.Effect<URL, WebhookEndpointSecurityError> =>
@@ -173,12 +173,12 @@ export const validateWebhookEndpointUrl = (
   );
 
 /** Resolves every address before use and pins only validated addresses to prevent DNS rebinding after endpoint validation. */
-export const resolveAndValidateWebhookEndpoint = (
+export const resolveAndParseWebhookEndpoint = (
   endpointUrl: string,
   policy: WebhookEndpointSecurityPolicy,
   resolver?: WebhookDnsResolver
 ): Effect.Effect<ValidatedWebhookEndpoint, WebhookEndpointSecurityError> =>
-  Effect.flatMap(validateWebhookEndpointUrl(endpointUrl, policy), (url) =>
+  Effect.flatMap(parseWebhookEndpointUrl(endpointUrl, policy), (url) =>
     (resolver === undefined
       ? Effect.tryPromise({
           try: () => lookup(url.hostname, { all: true, verbatim: true }),

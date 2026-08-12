@@ -7,7 +7,7 @@ import * as Redacted from "effect/Redacted";
 import { TestClock } from "effect/testing";
 import { Webhook } from "standardwebhooks";
 import { startTestServer } from "./test-server";
-import { resolveAndValidateWebhookEndpoint } from "./webhook-endpoint-security";
+import { resolveAndParseWebhookEndpoint } from "./webhook-endpoint-security";
 import { signWebhookDelivery } from "./webhook-signing";
 import {
   makeWebhookPinnedLookup,
@@ -178,7 +178,7 @@ describe("sendWebhookDelivery", () => {
             response.writeHead(204).end();
           });
         });
-        const endpoint = yield* resolveAndValidateWebhookEndpoint(
+        const endpoint = yield* resolveAndParseWebhookEndpoint(
           endpointUrl.toString(),
           {
             environment: "development",
@@ -222,7 +222,7 @@ describe("sendWebhookDelivery", () => {
       const endpointUrl = yield* startTestServer((_request, response) =>
         response.writeHead(302, { location: "http://127.0.0.1/other" }).end()
       );
-      const endpoint = yield* resolveAndValidateWebhookEndpoint(
+      const endpoint = yield* resolveAndParseWebhookEndpoint(
         endpointUrl.toString(),
         {
           environment: "development",
@@ -257,7 +257,7 @@ describe("sendWebhookDelivery", () => {
           response.write("partial");
           response.destroy();
         });
-        const endpoint = yield* resolveAndValidateWebhookEndpoint(
+        const endpoint = yield* resolveAndParseWebhookEndpoint(
           endpointUrl.toString(),
           {
             environment: "development",
@@ -300,7 +300,7 @@ describe("sendWebhookDelivery", () => {
         // Never respond; the delivery must settle via WEBHOOK_REQUEST_TIMEOUT_MS.
         markRequestArrived();
       });
-      const endpoint = yield* resolveAndValidateWebhookEndpoint(
+      const endpoint = yield* resolveAndParseWebhookEndpoint(
         endpointUrl.toString(),
         {
           environment: "development",

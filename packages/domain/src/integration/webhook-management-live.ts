@@ -19,7 +19,7 @@ import {
   decryptWebhookCredentialMaterial,
   encryptWebhookCredentialMaterial,
   generateWebhookSigningSecret,
-  resolveAndValidateWebhookEndpoint,
+  resolveAndParseWebhookEndpoint,
   rotateWebhookSigningKeyring,
   webhookProviderKey,
 } from "@feeblo/integration-webhook";
@@ -229,7 +229,7 @@ export const WebhookManagementServiceLive = Layer.effect(
         readonly name: string;
         readonly organizationId: string;
       }) {
-        const validated = yield* resolveAndValidateWebhookEndpoint(
+        const validated = yield* resolveAndParseWebhookEndpoint(
           input.endpointUrl,
           endpointSecurityPolicy
         ).pipe(
@@ -310,7 +310,7 @@ export const WebhookManagementServiceLive = Layer.effect(
         const validated =
           input.endpointUrl === undefined
             ? undefined
-            : yield* resolveAndValidateWebhookEndpoint(
+            : yield* resolveAndParseWebhookEndpoint(
                 input.endpointUrl,
                 endpointSecurityPolicy
               ).pipe(
@@ -1031,10 +1031,13 @@ export const WebhookManagementServiceLive = Layer.effect(
                 });
               }
               const now = yield* DateTime.nowAsDate;
+              // The delivery ID and its attempt numbering continue across the
+              // manual retry: the worker's next claim creates the next attempt
+              // row, so no duplicate delivery row and no attempt-number
+              // collision with the exhausted attempts.
               yield* db
                 .update(schema.integrationDeliveryTable)
                 .set({
-                  attemptCount: 0,
                   exhaustedAt: null,
                   nextAttemptAt: now,
                   state: "pending",

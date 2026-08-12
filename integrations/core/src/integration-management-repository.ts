@@ -1,7 +1,9 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, type Database, schema } from "@feeblo/db";
 import type { TIntegrationDeliveryState } from "@feeblo/db/validation-schema/integration";
 import { and, eq, inArray, lte } from "drizzle-orm";
+import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core/errors";
 import * as Effect from "effect/Effect";
+import type { SqlError } from "effect/unstable/sql/SqlError";
 
 /**
  * Terminal delivery states (per the schema's terminal timestamp check). Pending
@@ -16,11 +18,19 @@ const purgeableDeliveryStates = [
   "canceled",
 ] as const satisfies readonly TIntegrationDeliveryState[];
 
-/**
- * Management repository for idempotent retention cleanup of expired
- * integration history and archived connection metadata.
- */
-export const makeIntegrationManagementRepository = Effect.gen(function* () {
+/** Management repository for idempotent retention cleanup of expired
+ * integration history and archived connection metadata. */
+export interface IntegrationManagementRepository {
+  readonly cleanupRetention: (input: {
+    readonly before: Date;
+  }) => Effect.Effect<void, SqlError | EffectDrizzleQueryError>;
+}
+
+export const makeIntegrationManagementRepository: Effect.Effect<
+  IntegrationManagementRepository,
+  never,
+  Database.Database
+> = Effect.gen(function* () {
   const db = yield* currentDb;
   const cleanupRetention = Effect.fn(
     "IntegrationManagementRepository.cleanupRetention"

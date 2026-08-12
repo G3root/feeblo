@@ -21,7 +21,13 @@ export function WebhookEventSelection({
   return (
     <CheckboxGroup
       aria-label="Events"
-      onValueChange={(values) => onChange(values as WebhookEventType[])}
+      onValueChange={(values) =>
+        // SAFETY: the only checkbox options rendered below come from
+        // webhookEventTypes, so every checked value is a WebhookEventType;
+        // the group's onChange types them as string[] because CheckboxGroup is
+        // value-agnostic.
+        onChange(values as WebhookEventType[])
+      }
       value={[...eventTypes]}
     >
       {webhookEventTypes.map((eventType) => {

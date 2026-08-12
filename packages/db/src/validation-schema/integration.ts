@@ -89,6 +89,7 @@ export type TIntegrationDeliveryState = S.Schema.Type<
 
 /** Canonical attempt decision stored in `integration_delivery_attempt.retry_decision`. */
 export const IntegrationDeliveryRetryDecision = S.Literals([
+  "succeeded",
   "pending",
   "retry",
   "exhausted",

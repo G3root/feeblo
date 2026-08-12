@@ -2,7 +2,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import { expect, test } from "@playwright/test";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
-import { setPlan } from "../helpers/set-plan";
 
 interface ReceivedWebhook {
   readonly body: string;
@@ -99,8 +98,6 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     if (!organizationId) {
       throw new Error("Workspace URL did not contain an organization id");
     }
-    // Webhooks are a paid-plan feature; exercise them on a paid plan.
-    await setPlan(page.request, { organizationId, plan: "starter" });
 
     await page.goto(`${owner.organizationUrl}/settings/webhooks`);
     await expect(page.getByRole("heading", { name: "Webhooks" })).toBeVisible();

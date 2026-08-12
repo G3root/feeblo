@@ -2,8 +2,8 @@ import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vitest";
 import {
   isWebhookPrivateOrReservedAddress,
-  resolveAndValidateWebhookEndpoint,
-  validateWebhookEndpointUrl,
+  parseWebhookEndpointUrl,
+  resolveAndParseWebhookEndpoint,
 } from "./webhook-endpoint-security";
 
 const production = {
@@ -24,14 +24,14 @@ describe("webhook endpoint security", () => {
     "https://[::ffff:169.254.169.254]/hook",
   ])("rejects unsafe endpoint %s", async (url) => {
     await expect(
-      Effect.runPromise(validateWebhookEndpointUrl(url, production))
+      Effect.runPromise(parseWebhookEndpointUrl(url, production))
     ).rejects.toMatchObject({ _tag: "WebhookEndpointSecurityError" });
   });
 
   it("permits a local receiver only through the explicit development override", async () => {
     await expect(
       Effect.runPromise(
-        validateWebhookEndpointUrl("http://127.0.0.1:8080/hook", {
+        parseWebhookEndpointUrl("http://127.0.0.1:8080/hook", {
           environment: "development",
           allowPrivateNetworkInDevelopment: true,
         })
@@ -81,7 +81,7 @@ describe("webhook endpoint security", () => {
       Effect.succeed(["8.8.8.8", "169.254.169.254"] as const);
     await expect(
       Effect.runPromise(
-        resolveAndValidateWebhookEndpoint(
+        resolveAndParseWebhookEndpoint(
           "https://example.com/hook",
           production,
           resolver

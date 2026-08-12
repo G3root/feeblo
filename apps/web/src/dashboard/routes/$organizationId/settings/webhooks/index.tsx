@@ -1,16 +1,12 @@
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
-import { PaidFeatureGate } from "~/features/billing/components/paid-feature-gate";
-import { isPaidPlan } from "~/features/billing/lib/plans";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { WebhooksSettings } from "~/features/webhook/components/webhooks-settings";
 import { WebhookCreateDialogProvider } from "~/features/webhook/dialog-stores";
 import { loadEndpoints } from "~/features/webhook/lib/endpoints";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { usePlan } from "~/hooks/use-plan";
-import { workspacePlanCollection } from "~/lib/collections";
 
 export const Route = createFileRoute("/$organizationId/settings/webhooks/")({
   component: WebhooksSettingsRoute,
@@ -20,10 +16,7 @@ export const Route = createFileRoute("/$organizationId/settings/webhooks/")({
       session !== null &&
       hasPermission(params.organizationId, "webhooks.manage")(session)
     ) {
-      await Promise.all([
-        loadEndpoints(params.organizationId),
-        workspacePlanCollection.preload(),
-      ]);
+      await loadEndpoints(params.organizationId);
     }
     return null;
   },
@@ -34,9 +27,8 @@ function WebhooksSettingsRoute() {
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "webhooks.manage")
   );
-  const plan = usePlan();
 
-  if (isPending || plan.isLoading) {
+  if (isPending) {
     return null;
   }
   if (!allowed) {
@@ -53,11 +45,7 @@ function WebhooksSettingsRoute() {
           </SettingsLayout.HeaderDescription>
         </SettingsLayout.Header>
         <SettingsLayout.Content>
-          {isPaidPlan(plan.data?.plan) ? (
-            <WebhooksSettings organizationId={organizationId} />
-          ) : (
-            <PaidFeatureGate feature="Webhooks" />
-          )}
+          <WebhooksSettings organizationId={organizationId} />
         </SettingsLayout.Content>
       </SettingsLayout.Root>
     </WebhookCreateDialogProvider>

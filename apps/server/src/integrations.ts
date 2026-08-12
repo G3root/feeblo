@@ -1,10 +1,13 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, type Database, schema } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { WebhookManagementServiceLive } from "@feeblo/domain/integration/webhook-management-live";
+import type { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 import { InternalServerError } from "@feeblo/domain/rpc-errors";
 import {
+  type IntegrationEventRecorder,
   IntegrationEventRecorderLive,
   IntegrationProviderInvalidConfigurationError,
+  type IntegrationProviderRegistryValidationError,
   makeIntegrationDeliveryWorkerRepository,
   makeIntegrationManagementRepository,
   makeIntegrationProviderRegistry,
@@ -22,13 +25,28 @@ import * as Layer from "effect/Layer";
 import * as Schedule from "effect/Schedule";
 import { ServerConfig } from "./config";
 
+/** Static webhook runtime produced by the composition root: the management/recording layers, the hourly retention maintenance loop, and the scoped delivery worker. */
+export interface IntegrationRuntime {
+  readonly layer: Layer.Layer<
+    WebhookManagementService | IntegrationEventRecorder,
+    never,
+    Database.Database | WebhookIntegrationConfig
+  >;
+  readonly maintenance: Effect.Effect<void, never, Database.Database>;
+  readonly worker: Effect.Effect<void, never, Database.Database>;
+}
+
 /**
  * Statically composed webhook kernel: provider registration, startup-validated
  * registry, scoped delivery worker, and the management service layer. The
  * management service implementation and its security config live in the domain
  * integration module; this module only wires concrete layers together.
  */
-export const makeIntegrationLayers = Effect.gen(function* () {
+export const makeIntegrationLayers: Effect.Effect<
+  IntegrationRuntime,
+  IntegrationProviderRegistryValidationError | InternalServerError,
+  ServerConfig | Database.Database | WebhookIntegrationConfig
+> = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const db = yield* currentDb;
   const { encryptionKey, endpointSecurityPolicy } =

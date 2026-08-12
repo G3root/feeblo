@@ -1,9 +1,12 @@
+import { SUBSCRIBABLE_INTEGRATION_EVENT_TYPES } from "@feeblo/db/validation-schema/integration";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
+// Single source of truth: the canonical subscribable event vocabulary owned by
+// the integration persistence schema. The dashboard consumes it directly so a
+// new event type surfaces in the UI without a parallel constant to update.
 export const webhookEventTypes = [
-  "feedback.post.created",
-  "feedback.post.status_changed",
+  ...SUBSCRIBABLE_INTEGRATION_EVENT_TYPES,
 ] as const;
 
 export type WebhookEventType = (typeof webhookEventTypes)[number];

@@ -1,4 +1,4 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, type Database, schema } from "@feeblo/db";
 import type { TIntegrationCapabilityKey } from "@feeblo/db/validation-schema/integration";
 import {
   asLegid,
@@ -48,7 +48,7 @@ const attemptRetryDecision = (
   decision: ReturnType<typeof decideIntegrationDeliveryRetry>
 ) => {
   if (decision._tag === "Succeeded") {
-    return "pending" as const;
+    return "succeeded" as const;
   }
   if (decision._tag === "Retry") {
     return "retry" as const;
@@ -75,7 +75,11 @@ const mapPersistenceError = <A, E, R>(
  */
 export const makeIntegrationDeliveryWorkerRepository = (
   claimableCapabilityKeys: readonly string[]
-) =>
+): Effect.Effect<
+  IntegrationDeliveryWorkerRepository,
+  never,
+  Database.Database
+> =>
   Effect.gen(function* () {
     const db = yield* currentDb;
 

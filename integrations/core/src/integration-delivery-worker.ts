@@ -183,16 +183,18 @@ export const runIntegrationDeliveryWorkerPoll = ({
             )
           )
           .pipe(
-            Effect.catch((error) =>
-              Effect.logError(
-                "Integration delivery skipped after worker persistence failure",
-                {
-                  connectionId: delivery.input.connection.id,
-                  deliveryId: delivery.input.delivery.id,
-                  errorTag: error._tag,
-                  operation: error.operation,
-                }
-              )
+            Effect.catchTag(
+              "IntegrationDeliveryWorkerPersistenceError",
+              (error) =>
+                Effect.logError(
+                  "Integration delivery skipped after worker persistence failure",
+                  {
+                    connectionId: delivery.input.connection.id,
+                    deliveryId: delivery.input.delivery.id,
+                    errorTag: error._tag,
+                    operation: error.operation,
+                  }
+                )
             )
           ),
       { concurrency: globalConcurrency, discard: true }
