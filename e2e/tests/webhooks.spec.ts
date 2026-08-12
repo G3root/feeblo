@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingHttpHeaders } from "node:http";
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, test } from "@playwright/test";
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 
 interface ReceivedWebhook {
@@ -134,11 +134,13 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     const refreshHistory = async () => {
       await history.getByRole("button", { name: "Refresh" }).click();
     };
-    const refreshHistoryUntil = async (expected: string) => {
+    // Polls a specific delivery row instead of the whole card, so unrelated
+    // endpoint/header text or another row's text cannot satisfy the wait.
+    const refreshHistoryUntil = async (expected: string, row: Locator) => {
       await expect
         .poll(async () => {
           await refreshHistory();
-          return (await history.textContent()) ?? "";
+          return (await row.allTextContents()).join(" ");
         })
         .toContain(expected);
     };
@@ -159,24 +161,33 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
       version: 1,
     });
 
-    await refreshHistoryUntil("succeeded");
     const deliveryRow = history
       .getByRole("row")
       .filter({ hasText: "webhook.test" });
+    await refreshHistoryUntil("succeeded", deliveryRow);
 
     receiverStatus = 400;
     await page.getByRole("button", { name: "Test", exact: true }).click();
     const failedWebhook = await waitForWebhook(1);
-    await refreshHistoryUntil("exhausted");
+    // The exhausted row is the second, failing delivery. Capture its unique
+    // "Started at" timestamp as stable text before the retry flips its state
+    // to succeeded, so the row stays addressable once both deliveries read
+    // "succeeded" and "webhook.test" no longer disambiguates them.
     const exhaustedRow = history
       .getByRole("row")
       .filter({ hasText: "exhausted" });
+    await refreshHistoryUntil("exhausted", exhaustedRow);
+    const retriedStartedAt =
+      (await exhaustedRow.getByRole("cell").nth(3).textContent()) ?? "";
+    const retriedRow = history
+      .getByRole("row")
+      .filter({ hasText: retriedStartedAt });
     await expect(
-      exhaustedRow.getByRole("button", { name: "Retry" })
+      retriedRow.getByRole("button", { name: "Retry" })
     ).toBeVisible();
 
     receiverStatus = 204;
-    await exhaustedRow.getByRole("button", { name: "Retry" }).click();
+    await retriedRow.getByRole("button", { name: "Retry" }).click();
     const retriedWebhook = await waitForWebhook(2);
     expect(retriedWebhook.headers["webhook-id"]).toBe(
       failedWebhook.headers["webhook-id"]
@@ -184,11 +195,15 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     await expect
       .poll(async () => {
         await refreshHistory();
-        const attemptsCell = deliveryRow
-          .filter({ hasText: "succeeded" })
-          .getByRole("cell")
-          .nth(2);
-        return (await attemptsCell.textContent()) ?? "";
+        return (await retriedRow.allTextContents()).join(" ");
+      })
+      .toContain("succeeded");
+    await expect
+      .poll(async () => {
+        await refreshHistory();
+        return (
+          await retriedRow.getByRole("cell").nth(2).allTextContents()
+        ).join("");
       })
       .toBe("2");
 

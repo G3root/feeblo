@@ -8,17 +8,25 @@ import { useEffect, useRef } from "react";
  */
 export function useScrollBottom(f: () => void): void {
   const fRef = useRef(f);
-  fRef.current = f;
   const bottomRef = useRef(false);
 
+  // Keep the callback fresh inside an effect rather than during render, so
+  // concurrent rendering never observes a half-updated ref; the stable scroll
+  // listener always invokes whatever `f` is current via the ref.
   useEffect(() => {
-    let scrollHeight = document.body.scrollHeight;
+    fRef.current = f;
+  });
 
-    const onscroll = () => {
+  useEffect(() => {
+    let scrollHeight = readScrollHeight();
+    let frame: number | null = null;
+
+    const check = () => {
+      frame = null;
       const scrolledTo = window.scrollY + window.innerHeight;
       const threshold = window.innerHeight;
 
-      const newScrollHeight = document.body.scrollHeight;
+      const newScrollHeight = readScrollHeight();
       const scrollHeightChanged = scrollHeight !== newScrollHeight;
       scrollHeight = newScrollHeight;
 
@@ -32,9 +40,27 @@ export function useScrollBottom(f: () => void): void {
       }
     };
 
+    // Run once immediately after mounting: content shorter than the viewport
+    // never fires a scroll event, but still needs to trigger `f`.
+    check();
+
+    // Coalesce scroll events into a single measurement per animation frame
+    // instead of reading layout synchronously on every event.
+    const onscroll = () => {
+      if (frame === null) {
+        frame = requestAnimationFrame(check);
+      }
+    };
+
     window.addEventListener("scroll", onscroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onscroll);
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+      }
     };
   }, []);
 }
+
+const readScrollHeight = () =>
+  document.documentElement.scrollHeight || document.body.scrollHeight;
