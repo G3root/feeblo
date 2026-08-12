@@ -23,13 +23,7 @@ import {
   FramePanel,
   FrameTitle,
 } from "@feeblo/ui/frame";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@feeblo/ui/select";
+import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
@@ -46,6 +40,39 @@ import {
   startSlackConnect,
   updateChannelNotifications,
 } from "../lib/connections";
+
+type AsyncListState<T> = {
+  readonly list: readonly T[];
+  readonly isLoading: boolean;
+  readonly loadFailed: boolean;
+};
+
+/** Collapses an atom AsyncResult into the loading/loaded/error trio the settings frames render. */
+function useAsyncList<T>(
+  result: AsyncResult.AsyncResult<readonly T[], unknown>
+): AsyncListState<T> {
+  return useMemo(
+    () =>
+      AsyncResult.match(result, {
+        onInitial: () => ({ list: [], isLoading: true, loadFailed: false }),
+        onFailure: ({ previousSuccess }) =>
+          Option.match(previousSuccess, {
+            onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
+            onSome: ({ value }) => ({
+              list: value,
+              isLoading: false,
+              loadFailed: false,
+            }),
+          }),
+        onSuccess: ({ value }) => ({
+          list: value,
+          isLoading: false,
+          loadFailed: false,
+        }),
+      }),
+    [result]
+  );
+}
 
 export function SlackSettings({
   organizationId,
@@ -67,35 +94,11 @@ function SlackSettingsContent({
   const [connecting, setConnecting] = useState(false);
   const connectionsResult = useAtomValue(connectionsAtom(organizationId));
   const refreshConnections = useAtomRefresh(connectionsAtom(organizationId));
-  const { connections, isLoading, loadFailed } = useMemo(
-    () =>
-      AsyncResult.match(connectionsResult, {
-        onInitial: () => ({
-          connections: [] as SlackConnection[],
-          isLoading: true,
-          loadFailed: false,
-        }),
-        onFailure: ({ previousSuccess }) =>
-          Option.match(previousSuccess, {
-            onNone: () => ({
-              connections: [],
-              isLoading: false,
-              loadFailed: true,
-            }),
-            onSome: ({ value }) => ({
-              connections: value,
-              isLoading: false,
-              loadFailed: false,
-            }),
-          }),
-        onSuccess: ({ value }) => ({
-          connections: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      }),
-    [connectionsResult]
-  );
+  const {
+    list: connections,
+    isLoading,
+    loadFailed,
+  } = useAsyncList<SlackConnection>(connectionsResult);
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -274,9 +277,9 @@ function SlackConnectionFrame({
       </FramePanel>
       {connection.lifecycle === "active" ? (
         <FramePanel>
-          <h2 className="font-semibold text-sm">Feedback channel</h2>
+          <h2 className="font-semibold text-sm">New post notifications</h2>
           <p className="text-muted-foreground text-sm">
-            New requests are posted to this channel. Add the Feeblo bot to a
+            Post new requests to one or more channels. Add the Feeblo bot to a
             channel to make it selectable.
           </p>
           <div className="mt-4">
@@ -327,68 +330,28 @@ function FeedbackChannelSelect({
   const args = { connectionId, organizationId };
   const channelsResult = useAtomValue(channelsAtom(args));
   const refreshChannels = useAtomRefresh(channelsAtom(args));
-  const { channels, isLoading, loadFailed } = useMemo(
-    () =>
-      AsyncResult.match(channelsResult, {
-        onInitial: () => ({
-          channels: [] as SlackChannel[],
-          isLoading: true,
-          loadFailed: false,
-        }),
-        onFailure: ({ previousSuccess }) =>
-          Option.match(previousSuccess, {
-            onNone: () => ({
-              channels: [],
-              isLoading: false,
-              loadFailed: true,
-            }),
-            onSome: ({ value }) => ({
-              channels: value,
-              isLoading: false,
-              loadFailed: false,
-            }),
-          }),
-        onSuccess: ({ value }) => ({
-          channels: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
-      }),
-    [channelsResult]
-  );
+  const {
+    list: channels,
+    isLoading,
+    loadFailed,
+  } = useAsyncList<SlackChannel>(channelsResult);
+  const [pendingChannelId, setPendingChannelId] = useState<string | null>(null);
 
-  const enabledChannel = channels.find(
-    (channel) => channel.notificationsEnabled
-  );
-
-  const handleChange = async (channelId: string) => {
-    if (enabledChannel?.id === channelId) {
-      return;
-    }
+  const handleToggle = async (channel: SlackChannel, enabled: boolean) => {
+    setPendingChannelId(channel.id);
     try {
-      // The feedback channel is exclusive: enabling a new one disables the
-      // previously selected channel so notifications go to exactly one place.
-      if (enabledChannel !== undefined) {
-        await updateChannelNotifications({
-          channelId: enabledChannel.id,
-          channelName: enabledChannel.name,
-          connectionId,
-          enabled: false,
-          organizationId,
-        });
-      }
       await updateChannelNotifications({
-        channelId,
-        channelName:
-          channels.find((channel) => channel.id === channelId)?.name ??
-          channelId,
+        channelId: channel.id,
+        channelName: channel.name,
         connectionId,
-        enabled: true,
+        enabled,
         organizationId,
       });
       refreshChannels();
       toastManager.add({
-        title: "Feedback channel updated",
+        title: enabled
+          ? "New post notifications enabled"
+          : "New post notifications disabled",
         type: "success",
       });
     } catch {
@@ -396,6 +359,8 @@ function FeedbackChannelSelect({
         title: "Could not update the feedback channel",
         type: "error",
       });
+    } finally {
+      setPendingChannelId(null);
     }
   };
 
@@ -421,64 +386,33 @@ function FeedbackChannelSelect({
     );
   }
 
-  const handleToggleOff = async () => {
-    if (enabledChannel === undefined) {
-      return;
-    }
-    try {
-      await updateChannelNotifications({
-        channelId: enabledChannel.id,
-        channelName: enabledChannel.name,
-        connectionId,
-        enabled: false,
-        organizationId,
-      });
-      refreshChannels();
-      toastManager.add({
-        title: "New post notifications disabled",
-        type: "success",
-      });
-    } catch {
-      toastManager.add({
-        title: "Could not disable notifications",
-        type: "error",
-      });
-    }
-  };
-
   return (
-    <>
-      <Select
-        onValueChange={(value) => {
-          if (value !== null) {
-            if (value === "") {
-              handleToggleOff();
-            } else {
-              handleChange(value);
-            }
-          }
-        }}
-        value={enabledChannel?.id ?? ""}
-      >
-        <SelectTrigger className="w-full sm:max-w-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectPopup>
-          <SelectItem value="">Notifications off</SelectItem>
-          {channels.map((channel) => (
-            <SelectItem key={channel.id} value={channel.id}>
-              #{channel.name}
-            </SelectItem>
-          ))}
-        </SelectPopup>
-      </Select>
-      {enabledChannel !== undefined && !enabledChannel.isMember ? (
-        <p className="mt-2 text-muted-foreground text-xs">
-          {enabledChannel.isPrivate
-            ? `#${enabledChannel.name} is private — add the bot once from Slack to enable notifications.`
-            : `The bot will join #${enabledChannel.name} automatically on the first post.`}
-        </p>
-      ) : null}
-    </>
+    <div className="flex flex-col gap-2">
+      {channels.map((channel) => {
+        const pending = pendingChannelId === channel.id;
+        return (
+          <div
+            className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+            key={channel.id}
+          >
+            <div className="min-w-0">
+              <p className="truncate font-medium text-sm">#{channel.name}</p>
+              {channel.notificationsEnabled && !channel.isMember ? (
+                <p className="mt-0.5 text-muted-foreground text-xs">
+                  {channel.isPrivate
+                    ? `#${channel.name} is private — add the bot once from Slack to enable notifications.`
+                    : `The bot will join #${channel.name} automatically on the first post.`}
+                </p>
+              ) : null}
+            </div>
+            <Switch
+              checked={channel.notificationsEnabled}
+              disabled={pending}
+              onCheckedChange={(checked) => handleToggle(channel, checked)}
+            />
+          </div>
+        );
+      })}
+    </div>
   );
 }

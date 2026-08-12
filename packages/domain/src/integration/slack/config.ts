@@ -47,22 +47,18 @@ export class SlackIntegrationConfig extends Context.Service<SlackIntegrationConf
       );
       const apiUrlValue = apiUrl.href.replace(trailingSlashPattern, "");
       const appUrlValue = appUrl.href.replace(trailingSlashPattern, "");
-      const configuredRedirectUrl =
-        oauthRedirectUrl._tag === "Some"
-          ? oauthRedirectUrl.value
-          : `${apiUrlValue}/slack/oauth/callback`;
+      const configuredRedirectUrl = Option.getOrElse(
+        oauthRedirectUrl,
+        () => `${apiUrlValue}/slack/oauth/callback`
+      );
       return {
         appUrl: appUrlValue,
         authorizeScopes: SLACK_OAUTH_SCOPES,
-        clientId: clientId._tag === "Some" ? clientId.value : "",
-        clientSecret:
-          clientSecret._tag === "Some" ? clientSecret.value : Redacted.make(""),
+        clientId: Option.getOrElse(clientId, () => ""),
+        clientSecret: Option.getOrElse(clientSecret, () => Redacted.make("")),
         encryptionKey,
         oauthRedirectUrl: configuredRedirectUrl,
-        signingSecret:
-          signingSecret._tag === "Some"
-            ? signingSecret.value
-            : Redacted.make(""),
+        signingSecret: Option.getOrElse(signingSecret, () => Redacted.make("")),
       } as const;
     }),
   }
@@ -79,7 +75,6 @@ export class SlackIntegrationConfig extends Context.Service<SlackIntegrationConf
     signingSecret = Redacted.make("slack-signing-secret"),
   }: {
     readonly appUrl?: string;
-    readonly apiUrl?: string;
     readonly clientId?: string;
     readonly clientSecret?: Redacted.Redacted<string>;
     readonly encryptionKey?: Redacted.Redacted<string>;

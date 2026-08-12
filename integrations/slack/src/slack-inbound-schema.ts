@@ -130,6 +130,21 @@ export type SlackInteractivePayload = Schema.Schema.Type<
   typeof SlackInteractivePayload
 >;
 
+/** Provider-inbound request parsed into a discriminated payload for the domain inbound service. */
+export const ParsedSlackInboundRequest = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("slash_command"),
+    payload: SlackSlashCommandPayload,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("interactive"),
+    payload: SlackInteractivePayload,
+  }),
+]);
+export type ParsedSlackInboundRequest = Schema.Schema.Type<
+  typeof ParsedSlackInboundRequest
+>;
+
 /**
  * OAuth state token passed through the Slack install flow. It is not a
  * secret; the connection lookup is additionally guarded by the encrypted

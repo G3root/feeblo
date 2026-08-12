@@ -9,10 +9,6 @@ import * as Schema from "effect/Schema";
 /** Provider key owned by the Slack adapter, outside the provider-neutral kernel. */
 export const slackProviderKey = IntegrationProviderKey.make("slack");
 
-/** Browser-safe provider key for the Slack integration provider. */
-export const SlackProviderKey = Schema.Literal("slack");
-
-/** Slack OAuth scopes requested during workspace installation. */
 /** Slack OAuth scopes requested during workspace installation. */
 export const SLACK_OAUTH_SCOPES = [
   "chat:write",

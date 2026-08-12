@@ -6,12 +6,6 @@ import { SlackSignatureVerificationError } from "./slack-errors";
 /** Maximum age of a Slack request before its signature is rejected (Slack recommends 5 minutes). */
 export const SLACK_SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
 
-/** Slack request headers involved in signature verification. */
-export interface SlackRequestHeaders {
-  readonly "x-slack-request-timestamp"?: string | undefined;
-  readonly "x-slack-signature"?: string | undefined;
-}
-
 /**
  * Verifies a Slack request signature (`x-slack-signature` over
  * `v0:{timestamp}:{rawBody}`) and rejects requests older than the freshness

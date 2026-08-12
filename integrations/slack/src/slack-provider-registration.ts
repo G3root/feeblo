@@ -9,8 +9,8 @@ import {
   type IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
 import type * as Redacted from "effect/Redacted";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import { makeSlackApiClient, type SlackApiClient } from "./slack-api";
@@ -19,7 +19,8 @@ import {
   decryptSlackCredentialMaterial,
   type EncryptedSlackCredential,
 } from "./slack-credentials";
-import { SlackSignatureVerificationError } from "./slack-errors";
+import { SlackInboundPayloadError } from "./slack-errors";
+import type { ParsedSlackInboundRequest } from "./slack-inbound-schema";
 import {
   SlackInteractivePayload,
   SlackSlashCommandPayload,
@@ -87,17 +88,6 @@ export const makeSlackCredentialResolver = ({
     }),
 });
 
-/** Slack inbound request parsing result handed to the domain inbound service. */
-export type ParsedSlackInboundRequest =
-  | {
-      readonly kind: "slash_command";
-      readonly payload: SlackSlashCommandPayload;
-    }
-  | {
-      readonly kind: "interactive";
-      readonly payload: Schema.Schema.Type<typeof SlackInteractivePayload>;
-    };
-
 const headerValue = (value: string | readonly string[] | undefined): string => {
   if (typeof value === "string") {
     return value;
@@ -131,16 +121,13 @@ const makeSlackInboundHandler = ({
   readonly capabilityKey: "commands" | "message.action";
   readonly parse: (
     rawBody: string
-  ) => Effect.Effect<
-    ParsedSlackInboundRequest,
-    SlackSignatureVerificationError
-  >;
+  ) => Effect.Effect<ParsedSlackInboundRequest, SlackInboundPayloadError>;
   readonly signingSecret: Redacted.Redacted<string>;
 }): IntegrationInboundCapabilityHandler => ({
   capabilityKey,
   handle: (input: IntegrationInboundRequest) =>
     Effect.gen(function* () {
-      const verified = yield* Effect.exit(
+      const verified = yield* Effect.result(
         verifySlackRequestSignature({
           rawBody: input.rawBody,
           signingSecret,
@@ -150,15 +137,21 @@ const makeSlackInboundHandler = ({
           signatureHeader: headerValue(input.headers["x-slack-signature"]),
         })
       );
-      if (Exit.isFailure(verified)) {
-        return { body: "invalid request signature", status: 401 };
+      if (Result.isFailure(verified)) {
+        return {
+          body: "invalid request signature",
+          status: 401,
+        } satisfies IntegrationInboundResponse;
       }
-      const parsed = yield* Effect.exit(parse(input.rawBody));
-      if (Exit.isFailure(parsed)) {
-        return { body: "invalid request payload", status: 400 };
+      const parsed = yield* Effect.result(parse(input.rawBody));
+      if (Result.isFailure(parsed)) {
+        return {
+          body: "invalid request payload",
+          status: 400,
+        } satisfies IntegrationInboundResponse;
       }
       return {
-        body: parsed.value,
+        body: parsed.success,
         status: 200,
       } satisfies IntegrationInboundResponse;
     }),
@@ -166,7 +159,7 @@ const makeSlackInboundHandler = ({
 
 const parseSlashCommand = (
   rawBody: string
-): Effect.Effect<ParsedSlackInboundRequest, SlackSignatureVerificationError> =>
+): Effect.Effect<ParsedSlackInboundRequest, SlackInboundPayloadError> =>
   Schema.decodeUnknownEffect(SlackSlashCommandPayload)(
     parseFormBody(rawBody)
   ).pipe(
@@ -178,7 +171,7 @@ const parseSlashCommand = (
     ),
     Effect.mapError(
       () =>
-        new SlackSignatureVerificationError({
+        new SlackInboundPayloadError({
           reason: "Slash command payload is invalid",
         })
     )
@@ -186,10 +179,7 @@ const parseSlashCommand = (
 
 const parseInteractive = (
   rawBody: string
-): Effect.Effect<
-  ParsedSlackInboundRequest,
-  SlackSignatureVerificationError
-> => {
+): Effect.Effect<ParsedSlackInboundRequest, SlackInboundPayloadError> => {
   // Slack delivers interactive payloads (view submissions, message actions,
   // block actions) as `application/x-www-form-urlencoded` with a single
   // `payload=<urlencoded JSON>` field. Some clients send the JSON directly;
@@ -199,7 +189,7 @@ const parseInteractive = (
     : new URLSearchParams(rawBody).get("payload");
   if (payloadJson === null) {
     return Effect.fail(
-      new SlackSignatureVerificationError({
+      new SlackInboundPayloadError({
         reason: "Interactive payload is missing",
       })
     );
@@ -215,7 +205,7 @@ const parseInteractive = (
     ),
     Effect.mapError(
       () =>
-        new SlackSignatureVerificationError({
+        new SlackInboundPayloadError({
           reason: "Interactive payload is invalid",
         })
     )

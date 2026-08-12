@@ -126,18 +126,15 @@ export const decryptSlackCredential = (
   encryptionKey: Redacted.Redacted<string>,
   encryptedCredential: EncryptedSlackCredential
 ): Effect.Effect<Redacted.Redacted<string>, SlackCredentialEncryptionError> =>
-  Effect.mapError(
-    Effect.tryPromise({
-      try: () =>
-        symmetricDecrypt({
-          key: Redacted.value(encryptionKey),
-          data: encryptedCredential,
-        }),
-      catch: () =>
-        new SlackCredentialEncryptionError({
-          operation: "decrypt",
-          reason: "Slack credential decryption failed",
-        }),
-    }),
-    (error) => error
-  ).pipe(Effect.map(Redacted.make));
+  Effect.tryPromise({
+    try: () =>
+      symmetricDecrypt({
+        key: Redacted.value(encryptionKey),
+        data: encryptedCredential,
+      }),
+    catch: () =>
+      new SlackCredentialEncryptionError({
+        operation: "decrypt",
+        reason: "Slack credential decryption failed",
+      }),
+  }).pipe(Effect.map(Redacted.make));

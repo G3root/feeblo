@@ -84,14 +84,37 @@ const mapManagementError =
 
 const mapSlackApiError = (operation: string) =>
   Effect.mapError((error: SlackApiFailure) => {
-    if (error._tag === "IntegrationProviderAuthenticationError") {
-      return new InternalServerError({
-        message: `Slack rejected authentication during ${operation}`,
-      });
+    switch (error._tag) {
+      case "IntegrationProviderAuthenticationError":
+        return new InternalServerError({
+          message: `Slack rejected authentication during ${operation}`,
+        });
+      case "IntegrationProviderRateLimitedError":
+        return new InternalServerError({
+          message: `Slack rate limited ${operation}`,
+        });
+      case "IntegrationProviderTemporaryFailure":
+        return new InternalServerError({
+          message: `Slack temporarily failed during ${operation}`,
+        });
+      case "IntegrationProviderInvalidConfigurationError":
+        return new InternalServerError({
+          message: `Slack configuration is invalid during ${operation}`,
+        });
+      case "IntegrationProviderPermanentRejection":
+        return new InternalServerError({
+          message: `Slack rejected ${operation}`,
+        });
+      case "IntegrationProviderChannelAlreadyJoinedError":
+        return new InternalServerError({
+          message: `Slack ${operation} was already applied`,
+        });
+      default:
+        // Defensive arm for a future provider failure tag; the union is closed.
+        return new InternalServerError({
+          message: `Slack ${operation} failed`,
+        });
     }
-    return new InternalServerError({
-      message: `Slack ${operation} failed`,
-    });
   });
 
 /** Live Slack management service backed by the PostgreSQL schema and Slack API. */
@@ -108,7 +131,7 @@ export const makeSlackManagementServiceLive = (
       const db = yield* currentDb;
       const config = yield* SlackIntegrationConfig;
 
-      const lockSlackConnection = (
+      const findSlackConnection = (
         connectionId: string,
         organizationId: string
       ) =>
@@ -125,8 +148,14 @@ export const makeSlackManagementServiceLive = (
               eq(schema.integrationConnectionTable.provider, slackProviderKey)
             )
           )
-          .for("update")
           .limit(1);
+
+      // Row lock for connection updates inside transactions; plain reads use
+      // findSlackConnection instead.
+      const lockSlackConnection = (
+        connectionId: string,
+        organizationId: string
+      ) => findSlackConnection(connectionId, organizationId).for("update");
 
       const connectStart = Effect.fn("SlackManagement.connectStart")(
         function* ({ organizationId }: { readonly organizationId: string }) {
@@ -367,7 +396,7 @@ export const makeSlackManagementServiceLive = (
 
       const listChannels = Effect.fn("SlackManagement.listChannels")(
         function* (input: S.TSlackChannelList) {
-          const [connection] = yield* lockSlackConnection(
+          const [connection] = yield* findSlackConnection(
             input.connectionId,
             input.organizationId
           );
@@ -460,7 +489,10 @@ export const makeSlackManagementServiceLive = (
                   message: "Slack connection was not found",
                 });
               }
-              const [route] = yield* db
+              // One route per channel: find the enabled route whose
+              // providerConfig channelId matches the target channel rather
+              // than assuming a single notifications route per connection.
+              const routeRows = yield* db
                 .select()
                 .from(schema.integrationRouteTable)
                 .where(
@@ -479,6 +511,19 @@ export const makeSlackManagementServiceLive = (
                     )
                   )
                 );
+              const routesByChannel = yield* Effect.forEach(
+                routeRows,
+                (route) =>
+                  decodeProviderConfig(route.providerConfig).pipe(
+                    Effect.map((config) => ({
+                      channelId: config.channelId,
+                      route,
+                    }))
+                  )
+              );
+              const route = routesByChannel.find(
+                (entry) => entry.channelId === input.channelId
+              )?.route;
               // The channel display name always comes from the caller; the
               // stale name stored on a previous selection must never leak
               // into the new configuration.
@@ -503,7 +548,7 @@ export const makeSlackManagementServiceLive = (
                     createdAt: now,
                     updatedAt: now,
                   });
-                } else {
+                } else if (route.enabled !== true) {
                   yield* db
                     .update(schema.integrationRouteTable)
                     .set({
@@ -528,14 +573,7 @@ export const makeSlackManagementServiceLive = (
                   .set({ canceledAt: now, state: "canceled", updatedAt: now })
                   .where(
                     and(
-                      eq(
-                        schema.integrationDeliveryTable.connectionId,
-                        input.connectionId
-                      ),
-                      eq(
-                        schema.integrationDeliveryTable.organizationId,
-                        input.organizationId
-                      ),
+                      eq(schema.integrationDeliveryTable.routeId, route.id),
                       eq(schema.integrationDeliveryTable.state, "pending")
                     )
                   );

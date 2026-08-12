@@ -1,3 +1,5 @@
+import { truncate } from "@feeblo/utils/text";
+
 /**
  * Channel-update message model shared by channel-notification providers
  * (Slack now, Discord later). Providers render this pure model into their own
@@ -23,13 +25,6 @@ export interface ChannelUpdateMessage {
 
 const TRUNCATED_TITLE_MAX = 150;
 const TRUNCATED_SUMMARY_MAX = 280;
-
-const truncate = (value: string, max: number): string => {
-  if (value.length <= max) {
-    return value;
-  }
-  return `${value.slice(0, max - 1).trimEnd()}…`;
-};
 
 /**
  * Renders a channel-update message into Slack Block Kit blocks for

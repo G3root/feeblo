@@ -9,6 +9,9 @@ import {
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import type { SlackApiFailure } from "./slack-errors";
 import { slackProviderKey } from "./slack-manifest";
 
@@ -132,9 +135,6 @@ export const SlackOAuthAccessResponse = Schema.Struct({
 export type SlackOAuthAccessResponse = Schema.Schema.Type<
   typeof SlackOAuthAccessResponse
 >;
-
-/** Slack API method result type: `ok: true` plus the method-specific payload. */
-export type SlackApiSuccess<Payload> = Payload & { readonly ok: true };
 
 /**
  * Classifies a failed Slack API response into the typed provider failure
@@ -279,64 +279,52 @@ export interface SlackApiClient {
   }) => Effect.Effect<SlackApiSuccessEnvelope, SlackApiFailure>;
 }
 
-/** Creates the Slack API client backed by the global fetch. */
-export const makeSlackApiClient = (
-  input: { readonly fetch?: typeof fetch } = {}
-): SlackApiClient => {
-  const fetchImpl = input.fetch ?? fetch;
-  const request = (
-    path: string,
-    init: RequestInit,
-    context: string
-  ): Effect.Effect<unknown, SlackApiFailure> =>
-    Effect.tryPromise({
-      try: () =>
-        fetchImpl(`${SLACK_API_BASE_URL}${path}`, init).then(
-          async (response) => {
-            const status = response.status;
-            const body = await response.json().catch(() => undefined);
-            if (
-              response.ok &&
-              body &&
-              typeof body === "object" &&
-              "ok" in body &&
-              body.ok === true
-            ) {
-              return body;
-            }
-            const failure = new Error(
-              `Slack API request failed with status ${status}`
-            );
-            Object.assign(failure, body ?? {}, { status });
-            throw failure;
-          }
-        ),
-      catch: (error) => {
-        if (
-          error instanceof IntegrationProviderAuthenticationError ||
-          error instanceof IntegrationProviderRateLimitedError ||
-          error instanceof IntegrationProviderInvalidConfigurationError ||
-          error instanceof IntegrationProviderTemporaryFailure ||
-          error instanceof IntegrationProviderPermanentRejection
-        ) {
-          return error;
-        }
-        if (typeof error === "object" && error !== null && "status" in error) {
-          const { status, ...body } = error;
-          return classifySlackApiError(
-            {
-              ...body,
-              ...(typeof status === "number" ? { status } : {}),
-            },
-            context
-          );
-        }
-        return new IntegrationProviderTemporaryFailure({
-          message: `Slack request failed during ${context}`,
-          provider: slackProviderKey,
-        });
+/** Creates the Slack API client backed by Effect's fetch HTTP client. */
+export const makeSlackApiClient = (): SlackApiClient => {
+  const request = Effect.fn("SlackApi.request")(function* (input: {
+    readonly httpRequest: HttpClientRequest.HttpClientRequest;
+    readonly context: string;
+  }) {
+    const response = yield* HttpClient.execute(input.httpRequest).pipe(
+      Effect.provide(FetchHttpClient.layer),
+      Effect.mapError(
+        () =>
+          new IntegrationProviderTemporaryFailure({
+            message: `Slack request failed during ${input.context}`,
+            provider: slackProviderKey,
+          })
+      )
+    );
+    const status = response.status;
+    const body = yield* response.json.pipe(
+      Effect.mapError(
+        () =>
+          new IntegrationProviderPermanentRejection({
+            message: `Slack returned an unexpected response during ${input.context}`,
+            provider: slackProviderKey,
+            httpStatus: status,
+          })
+      )
+    );
+    // The Slack Web API always answers HTTP 200 and signals failure through
+    // the `ok: false` envelope; classify that envelope (and any non-2xx
+    // status) into the typed provider failure algebra.
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "ok" in body &&
+      body.ok === true
+    ) {
+      return body;
+    }
+    return yield* classifySlackApiError(
+      {
+        ...(typeof body === "object" && body !== null ? body : {}),
+        status,
       },
-    });
+      input.context
+    );
+  });
 
   const jsonRequest = (
     path: string,
@@ -349,132 +337,115 @@ export const makeSlackApiClient = (
     },
     context: string
   ): Effect.Effect<unknown, SlackApiFailure> =>
-    request(
-      path,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json; charset=utf-8",
-          ...(botToken === undefined
-            ? {}
-            : { authorization: `Bearer ${Redacted.value(botToken)}` }),
-        },
-        body: JSON.stringify(body),
-      },
-      context
-    );
+    Effect.gen(function* () {
+      let httpRequest = HttpClientRequest.post(`${SLACK_API_BASE_URL}${path}`, {
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+      if (botToken !== undefined) {
+        httpRequest = HttpClientRequest.bearerToken(httpRequest, botToken);
+      }
+      httpRequest = yield* HttpClientRequest.bodyJson(httpRequest, body).pipe(
+        Effect.mapError(
+          () =>
+            new IntegrationProviderPermanentRejection({
+              message: `Slack ${context} request could not be encoded`,
+              provider: slackProviderKey,
+            })
+        )
+      );
+      return yield* request({ httpRequest, context });
+    });
 
   const formRequest = (
     path: string,
     body: Record<string, string>,
     context: string
   ): Effect.Effect<unknown, SlackApiFailure> =>
-    request(
-      path,
-      {
-        method: "POST",
+    request({
+      httpRequest: HttpClientRequest.post(`${SLACK_API_BASE_URL}${path}`, {
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(body).toString(),
-      },
-      context
-    );
+      }).pipe(HttpClientRequest.bodyUrlParams(body)),
+      context,
+    });
+
+  const decodeResponse =
+    <S extends Schema.Constraint>(schema: S, context: string) =>
+    (
+      effect: Effect.Effect<unknown, SlackApiFailure>
+    ): Effect.Effect<S["Type"], SlackApiFailure, S["DecodingServices"]> =>
+      effect.pipe(
+        Effect.flatMap((body) =>
+          Schema.decodeUnknownEffect(schema)(body).pipe(
+            Effect.mapError(
+              () =>
+                new IntegrationProviderPermanentRejection({
+                  message: `Slack ${context} response was invalid`,
+                  provider: slackProviderKey,
+                })
+            )
+          )
+        )
+      );
 
   return {
     authRevoke: ({ botToken }) =>
-      jsonRequest(
-        "/auth.revoke",
-        { body: { token: Redacted.value(botToken) }, botToken },
+      decodeResponse(
+        SlackApiSuccessEnvelope,
         "auth.revoke"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackApiSuccessEnvelope)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack auth.revoke response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/auth.revoke",
+          { body: { token: Redacted.value(botToken) }, botToken },
+          "auth.revoke"
         )
       ),
     authTest: ({ botToken }) =>
-      jsonRequest(
-        "/auth.test",
-        { body: { token: Redacted.value(botToken) }, botToken },
+      decodeResponse(
+        SlackAuthTestResponse,
         "auth.test"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackAuthTestResponse)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack auth.test response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/auth.test",
+          { body: { token: Redacted.value(botToken) }, botToken },
+          "auth.test"
         )
       ),
     chatPostEphemeral: ({ botToken, channelId, text, userId }) =>
-      jsonRequest(
-        "/chat.postEphemeral",
-        { body: { channel: channelId, text, user: userId }, botToken },
+      decodeResponse(
+        SlackApiSuccessEnvelope,
         "chat.postEphemeral"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackApiSuccessEnvelope)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack chat.postEphemeral response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/chat.postEphemeral",
+          { body: { channel: channelId, text, user: userId }, botToken },
+          "chat.postEphemeral"
         )
       ),
     chatPostMessage: ({ botToken, channelId, blocks, text }) =>
-      jsonRequest(
-        "/chat.postMessage",
-        { body: { channel: channelId, blocks, text }, botToken },
+      decodeResponse(
+        SlackApiSuccessEnvelope,
         "chat.postMessage"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackApiSuccessEnvelope)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack chat.postMessage response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/chat.postMessage",
+          { body: { channel: channelId, blocks, text }, botToken },
+          "chat.postMessage"
         )
       ),
     conversationsJoin: ({ botToken, channelId }) =>
-      jsonRequest(
-        "/conversations.join",
-        {
-          body: {
-            token: Redacted.value(botToken),
-            channel: channelId,
-          },
-          botToken,
-        },
+      decodeResponse(
+        SlackApiSuccessEnvelope,
         "conversations.join"
+      )(
+        jsonRequest(
+          "/conversations.join",
+          {
+            body: { token: Redacted.value(botToken), channel: channelId },
+            botToken,
+          },
+          "conversations.join"
+        )
       ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackApiSuccessEnvelope)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack conversations.join response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
-        ),
         // Joining a channel the bot is already a member of is a success for
         // our purposes: the caller only cares that the bot ends up in the
         // channel before posting.
@@ -483,107 +454,72 @@ export const makeSlackApiClient = (
         )
       ),
     conversationsList: ({ botToken, cursor, limit, types }) =>
-      jsonRequest(
-        "/conversations.list",
-        {
-          body: {
-            token: Redacted.value(botToken),
-            exclude_archived: true,
-            types: types ?? "public_channel,private_channel",
-            ...(cursor === undefined ? {} : { cursor }),
-            ...(limit === undefined ? {} : { limit }),
-          },
-          botToken,
-        },
+      decodeResponse(
+        SlackConversationsListResponse,
         "conversations.list"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackConversationsListResponse)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack conversations.list response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/conversations.list",
+          {
+            body: {
+              token: Redacted.value(botToken),
+              exclude_archived: true,
+              types: types ?? "public_channel,private_channel",
+              ...(cursor === undefined ? {} : { cursor }),
+              ...(limit === undefined ? {} : { limit }),
+            },
+            botToken,
+          },
+          "conversations.list"
         )
       ),
     oauthV2Access: ({ clientId, clientSecret, code, redirectUri }) =>
-      formRequest(
-        "/oauth.v2.access",
-        {
-          client_id: clientId,
-          client_secret: Redacted.value(clientSecret),
-          code,
-          redirect_uri: redirectUri,
-        },
+      decodeResponse(
+        SlackOAuthAccessResponse,
         "oauth.v2.access"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackOAuthAccessResponse)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack oauth.v2.access response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        formRequest(
+          "/oauth.v2.access",
+          {
+            client_id: clientId,
+            client_secret: Redacted.value(clientSecret),
+            code,
+            redirect_uri: redirectUri,
+          },
+          "oauth.v2.access"
         )
       ),
     teamInfo: ({ botToken }) =>
-      jsonRequest(
-        "/team.info",
-        { body: { token: Redacted.value(botToken) }, botToken },
+      decodeResponse(
+        SlackTeamInfoResponse,
         "team.info"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackTeamInfoResponse)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack team.info response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/team.info",
+          { body: { token: Redacted.value(botToken) }, botToken },
+          "team.info"
         )
       ),
     usersInfo: ({ botToken, userId }) =>
-      jsonRequest(
-        "/users.info",
-        { body: { token: Redacted.value(botToken), user: userId }, botToken },
+      decodeResponse(
+        SlackUsersInfoResponse,
         "users.info"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackUsersInfoResponse)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack users.info response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/users.info",
+          { body: { token: Redacted.value(botToken), user: userId }, botToken },
+          "users.info"
         )
       ),
     viewsOpen: ({ botToken, triggerId, view }) =>
-      jsonRequest(
-        "/views.open",
-        { body: { trigger_id: triggerId, view }, botToken },
+      decodeResponse(
+        SlackApiSuccessEnvelope,
         "views.open"
-      ).pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(SlackApiSuccessEnvelope)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: "Slack views.open response was invalid",
-                  provider: slackProviderKey,
-                })
-            )
-          )
+      )(
+        jsonRequest(
+          "/views.open",
+          { body: { trigger_id: triggerId, view }, botToken },
+          "views.open"
         )
       ),
   };

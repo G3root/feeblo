@@ -22,6 +22,7 @@ import type {
 import { slackProviderKey } from "@feeblo/integration-slack/manifest";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import { truncate } from "@feeblo/utils/text";
 import { and, eq, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Data from "effect/Data";
@@ -57,13 +58,6 @@ export class SlackInboundFailure extends Data.TaggedError(
 const TITLE_MAX_LENGTH = 200;
 const DETAILS_MAX_LENGTH = 3000;
 const SYNTHETIC_SLACK_EMAIL_SUFFIX = "@slack.invalid";
-
-const truncate = (value: string, max: number): string => {
-  if (value.length <= max) {
-    return value;
-  }
-  return `${value.slice(0, max - 1).trimEnd()}…`;
-};
 
 /** Private metadata embedded in the feedback modal; safe to send to Slack. */
 const FeedbackModalMetadata = Schema.Struct({
@@ -497,20 +491,6 @@ export const makeSlackInboundServiceLive = (
           if (existing !== undefined) {
             return existing.id;
           }
-          // Legacy anonymous emails (pre team-scoping) from earlier versions.
-          const [legacy] = yield* db
-            .select({ id: schema.userTable.id })
-            .from(schema.userTable)
-            .where(
-              eq(
-                schema.userTable.email,
-                `slack-${slackUserId.toLowerCase()}${SYNTHETIC_SLACK_EMAIL_SUFFIX}`
-              )
-            )
-            .limit(1);
-          if (legacy !== undefined) {
-            return legacy.id;
-          }
           // 3. Create the anonymous user. These users never receive
           // transactional email (synthetic address, emailVerified false).
           const userId = yield* UserId.generate;
@@ -771,6 +751,9 @@ export const makeSlackInboundServiceLive = (
               // stray interaction.
               return { body: {}, status: 200 };
             default:
+              // Unknown interactive payloads are acknowledged emptily so Slack
+              // sees a definitive answer; `payload.type` is a closed union, so
+              // this arm is defensive only.
               return { body: {}, status: 200 };
           }
         });

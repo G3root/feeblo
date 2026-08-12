@@ -31,6 +31,12 @@ export class SlackSignatureVerificationError extends Schema.TaggedErrorClass<Sla
   { reason: Schema.String }
 ) {}
 
+/** Failure parsing a verified Slack inbound request body into its typed payload. */
+export class SlackInboundPayloadError extends Schema.TaggedErrorClass<SlackInboundPayloadError>()(
+  "SlackInboundPayloadError",
+  { reason: Schema.String }
+) {}
+
 /** Typed Slack API failure algebra re-exported at the provider boundary. */
 export type SlackApiFailure =
   | IntegrationProviderAuthenticationError
