@@ -22,7 +22,8 @@
     "@feeblo/utils": "workspace:*",
     "@sentry/effect": "^10.67.0",
     "drizzle-orm": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "@feeblo/integration-slack": "workspace:*"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",

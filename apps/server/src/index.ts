@@ -9,10 +9,12 @@ import {
 import { AUTH_CLIENT_IP_HEADER } from "@feeblo/auth/auth-client-ip-header";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
+import { BoardRepository } from "@feeblo/domain/board/repository";
 import {
   ClientIp,
   makeClientIpGlobalMiddleware,
 } from "@feeblo/domain/client-ip";
+import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
 import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
 import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feedback/service";
@@ -21,14 +23,25 @@ import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import {
+  SlackFeedbackServiceLive,
+  SlackInboundServiceLive,
+  SlackIntegrationConfig,
+  SlackManagementServiceLive,
+  SlackUserServiceLive,
+} from "@feeblo/domain/integration/slack";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
+import { PostRepository } from "@feeblo/domain/post/repository";
+import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
+import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { RpcRoute } from "@feeblo/domain/rpc-router";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
+import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
   makeMailerTestLayer,
@@ -56,6 +69,7 @@ import { ServerConfig } from "./config";
 import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
 import { e2eSetPlanRouter } from "./e2e-set-plan";
 import { makeIntegrationLayers } from "./integrations";
+import { makeSlackRouters } from "./slack";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
 
@@ -218,6 +232,7 @@ const program = Effect.gen(function* () {
   const integrationRuntime = yield* makeIntegrationLayers.pipe(
     Effect.provideService(ServerConfig, config)
   );
+  const SlackRouters = makeSlackRouters(integrationRuntime.registry);
   const ServiceLayers = Layer.mergeAll(
     WorkFlowLayer,
     SiteRepository.layer,
@@ -226,6 +241,22 @@ const program = Effect.gen(function* () {
     EmailProviderFeedbackService.layer,
     EmailSubscriptionRepository.layer,
     integrationRuntime.layer,
+    SlackManagementServiceLive.pipe(
+      Layer.provide(SlackIntegrationConfig.layer),
+      Layer.provide(Database.DatabaseContextLive)
+    ),
+    SlackInboundServiceLive.pipe(
+      Layer.provide(SlackIntegrationConfig.layer),
+      Layer.provide(SlackUserServiceLive),
+      Layer.provide(SlackFeedbackServiceLive),
+      Layer.provide(BoardRepository.layer),
+      Layer.provide(EmailOutboxConfig.layer),
+      Layer.provide(IntegrationEventRecorderLive),
+      Layer.provide(PostRepository.layer),
+      Layer.provide(PostStatusRepository.layer),
+      Layer.provide(PostSubscriptionRepository.layer),
+      Layer.provide(Database.DatabaseContextLive)
+    ),
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
@@ -291,7 +322,8 @@ const program = Effect.gen(function* () {
     RpcRoute,
     HttpRoute,
     BetterAuthRouterLive,
-    DocsRoute
+    DocsRoute,
+    SlackRouters
   );
   const AllRoutes = MergedRoutes.pipe(
     Layer.provide(
@@ -347,7 +379,8 @@ program.pipe(
     Layer.mergeAll(
       ServerConfig.layer,
       Database.DatabaseContextLive,
-      WebhookIntegrationConfig.layer
+      WebhookIntegrationConfig.layer,
+      SlackIntegrationConfig.layer
     )
   ),
   NodeRuntime.runMain

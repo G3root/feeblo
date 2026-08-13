@@ -200,6 +200,7 @@ export const makeWebhookProviderRegistration = ({
         }),
     },
   ],
+  inboundHandlers: [],
   manifest: webhookProviderManifest,
   routeConfigurationSchemas: new Map([
     ["events.post", WebhookRouteConfiguration],

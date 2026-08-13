@@ -1,0 +1,59 @@
+# Slack App Manifest for the Feeblo integration
+#
+# Create a Slack app from this manifest (api.slack.com/apps -> Create New App ->
+# From an app manifest), then configure the environment variables:
+#
+#   SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET,
+#   SLACK_OAUTH_REDIRECT_URL (defaults to <API_URL>/slack/oauth/callback)
+#
+# IMPORTANT: replace every http://localhost:3000 request/redirect URL below
+# with your publicly reachable URL before or right after creating the app
+# (Slack must be able to reach the Feeblo server over HTTPS):
+#   - local development: your ngrok/cloudflared tunnel URL, e.g.
+#     https://<tunnel>.ngrok.app
+#   - production: your API_URL, e.g. https://api.feeblo.com
+# The manifest is static, so the app settings UI is the source of truth for
+# URLs once the app exists.
+
+display_information:
+  name: Feeblo
+  description: Send feedback to Feeblo straight from Slack.
+  background_color: "#111827"
+
+features:
+  bot_user:
+    display_name: Feeblo
+    always_online: false
+  slash_commands:
+    - command: /feeblo
+      description: Send feedback to Feeblo
+      usage_hint: "[your feedback]"
+      # Required by Slack: without a request URL, the slash command needs
+      # socket mode. Feeblo serves HTTP, so point this at the server.
+      url: http://localhost:3000/slack/commands/feeblo
+      should_escape: false
+
+oauth_config:
+  redirect_urls:
+    - http://localhost:3000/slack/oauth/callback
+  scopes:
+    bot:
+      - chat:write
+      - commands
+      - users:read
+      - users:read.email
+      - channels:read
+      - groups:read
+      - team:read
+      - channels:join
+
+settings:
+  # Event subscriptions are not used by V1: the bot's channel membership is
+  # discovered via conversations.list. Leave this section disabled in Slack.
+  interactivity:
+    is_enabled: true
+    request_url: http://localhost:3000/slack/interactive
+  org_deploy_enabled: false
+  # Feeblo serves Slack requests over HTTP; socket mode must stay disabled.
+  socket_mode_enabled: false
+  token_rotation_enabled: false

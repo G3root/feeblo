@@ -174,6 +174,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
             eventTypes: row.route.eventTypes,
             id: asLegid(IntegrationRouteId)(row.route.id),
             provider: row.connection.provider,
+            providerConfig: row.route.providerConfig,
             safeMetadata: row.route.safeDisplayMetadata ?? {},
           },
         }).pipe(

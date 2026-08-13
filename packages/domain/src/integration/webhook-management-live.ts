@@ -278,6 +278,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               id: routeId,
               organizationId: input.organizationId,
               providerConfig: {},
+              routeKey: "",
               safeDisplayMetadata: {},
             });
           })

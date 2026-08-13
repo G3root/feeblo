@@ -26,7 +26,7 @@ export function OrganizationIdGate({
   const params = useParams({ strict: false }) as { organizationId?: string };
   const navigate = useNavigate();
   const isNotFound = useRouterState({
-    select: (state) => state.matches.some((match) => match.globalNotFound),
+    select: (state) => state.matches.some((match) => match._notFound),
   });
   const needsCanonicalization =
     params.organizationId !== activeOrganizationId && !isNotFound;
