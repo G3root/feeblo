@@ -31,5 +31,9 @@ export class SlackManagementRpcs extends RpcGroup.make(
     success: Schema.Void,
     payload: S.SlackConnectionDisconnect,
     error: SlackIntegrationErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("SlackIntegrationStatus", {
+    success: S.SlackIntegrationStatus,
+    error: SlackIntegrationErrors,
   }).middleware(AuthMiddleware)
 ) {}

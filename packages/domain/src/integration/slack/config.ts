@@ -51,14 +51,28 @@ export class SlackIntegrationConfig extends Context.Service<SlackIntegrationConf
         oauthRedirectUrl,
         () => `${apiUrlValue}/slack/oauth/callback`
       );
+      const configuredClientId = Option.getOrElse(clientId, () => "");
+      const configuredClientSecret = Option.getOrElse(clientSecret, () =>
+        Redacted.make("")
+      );
+      const configuredSigningSecret = Option.getOrElse(signingSecret, () =>
+        Redacted.make("")
+      );
       return {
         appUrl: appUrlValue,
         authorizeScopes: SLACK_OAUTH_SCOPES,
-        clientId: Option.getOrElse(clientId, () => ""),
-        clientSecret: Option.getOrElse(clientSecret, () => Redacted.make("")),
+        clientId: configuredClientId,
+        clientSecret: configuredClientSecret,
+        // The provider is only exposed when its OAuth client id, client
+        // secret, and request signing secret are all configured; otherwise
+        // the server runs without the Slack integration.
+        configured:
+          configuredClientId !== "" &&
+          Redacted.value(configuredClientSecret) !== "" &&
+          Redacted.value(configuredSigningSecret) !== "",
         encryptionKey,
         oauthRedirectUrl: configuredRedirectUrl,
-        signingSecret: Option.getOrElse(signingSecret, () => Redacted.make("")),
+        signingSecret: configuredSigningSecret,
       } as const;
     }),
   }
@@ -70,6 +84,7 @@ export class SlackIntegrationConfig extends Context.Service<SlackIntegrationConf
     appUrl = "http://localhost:3001",
     clientId = "slack-client-id",
     clientSecret = Redacted.make("slack-client-secret"),
+    configured = true,
     encryptionKey = Redacted.make("0123456789abcdef0123456789abcdef"),
     oauthRedirectUrl = "http://localhost:3000/slack/oauth/callback",
     signingSecret = Redacted.make("slack-signing-secret"),
@@ -77,6 +92,7 @@ export class SlackIntegrationConfig extends Context.Service<SlackIntegrationConf
     readonly appUrl?: string;
     readonly clientId?: string;
     readonly clientSecret?: Redacted.Redacted<string>;
+    readonly configured?: boolean;
     readonly encryptionKey?: Redacted.Redacted<string>;
     readonly oauthRedirectUrl?: string;
     readonly signingSecret?: Redacted.Redacted<string>;
@@ -88,6 +104,7 @@ export class SlackIntegrationConfig extends Context.Service<SlackIntegrationConf
         authorizeScopes: SLACK_OAUTH_SCOPES,
         clientId,
         clientSecret,
+        configured,
         encryptionKey,
         oauthRedirectUrl,
         signingSecret,

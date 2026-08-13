@@ -31,6 +31,7 @@ import { SlackIntegrationConfig } from "./config";
 import type { SlackIntegrationError } from "./errors";
 import type * as S from "./schema";
 import {
+  decryptConnectionCredentials,
   lockSlackConnection,
   mapManagementError,
   mapSlackApiError,
@@ -98,6 +99,11 @@ export const makeSlackConnectionServiceLive = (
 
       const connectStart = Effect.fn("SlackConnection.connectStart")(
         function* ({ organizationId }: { readonly organizationId: string }) {
+          if (!config.configured) {
+            return yield* new InternalServerError({
+              message: "Slack integration is not configured",
+            });
+          }
           const nonce = crypto.randomUUID();
           const connectionId = yield* IntegrationConnectionId.generate;
           const ciphertext = yield* encryptSlackCredentialMaterial(
@@ -251,16 +257,9 @@ export const makeSlackConnectionServiceLive = (
                   message: "Slack connection was not found",
                 });
               }
-              const credentials = yield* decryptSlackCredentialMaterial(
-                config.encryptionKey,
+              const credentials = yield* decryptConnectionCredentials(
+                config,
                 connection.credentialsCiphertext
-              ).pipe(
-                Effect.mapError(
-                  () =>
-                    new InternalServerError({
-                      message: "Slack credentials could not be decrypted",
-                    })
-                )
               );
               if (credentials.oauthState !== decoded.nonce) {
                 return yield* new BadRequestError({

@@ -4,7 +4,6 @@ import {
   makeSlackApiClient,
   type SlackApiClient,
 } from "@feeblo/integration-slack";
-import { decryptSlackCredentialMaterial } from "@feeblo/integration-slack/credentials";
 import { SlackChannelNotificationRouteConfiguration } from "@feeblo/integration-slack/manifest";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
@@ -16,6 +15,7 @@ import { SlackIntegrationConfig } from "./config";
 import type { SlackIntegrationError } from "./errors";
 import type * as S from "./schema";
 import {
+  decryptConnectionCredentials,
   findSlackConnection,
   lockSlackConnection,
   mapManagementError,
@@ -87,16 +87,9 @@ export const makeSlackChannelServiceLive = (
               message: "Slack connection was not found",
             });
           }
-          const credentials = yield* decryptSlackCredentialMaterial(
-            config.encryptionKey,
+          const credentials = yield* decryptConnectionCredentials(
+            config,
             connection.credentialsCiphertext
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Slack credentials could not be decrypted",
-                })
-            )
           );
           if (credentials.botToken === undefined) {
             return yield* new NotFoundError({

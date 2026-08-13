@@ -123,20 +123,22 @@ const makeFakeSlackApiClient = (
   };
 };
 
-const testConfig = () =>
+const testConfig = (configured = true) =>
   SlackIntegrationConfig.layerTest({
     clientId: "client-id",
     clientSecret: Redacted.make("client-secret"),
+    configured,
     oauthRedirectUrl: "http://localhost:3000/slack/oauth/callback",
     signingSecret: Redacted.make("signing-secret"),
   });
 
 const makeTestLayer = (
-  channelPages?: readonly (readonly SlackConversation[])[]
+  channelPages?: readonly (readonly SlackConversation[])[],
+  configured = true
 ) => {
   const apiClient = makeFakeSlackApiClient(channelPages);
   const serviceLayer = makeSlackManagementServiceLive(apiClient).pipe(
-    Layer.provide(testConfig()),
+    Layer.provide(testConfig(configured)),
     Layer.provide(Database.PgliteDatabaseLive)
   );
   return {
@@ -475,6 +477,21 @@ describe("slack management service", () => {
         })
     );
   });
+  layer(makeTestLayer(undefined, false).layer)(
+    "unconfigured deployment",
+    (it) => {
+      it.effect("connectStart fails when Slack is not configured", () =>
+        Effect.gen(function* () {
+          const organizationId = yield* seedOrganization;
+          const service = yield* SlackManagementService;
+          const result = yield* Effect.exit(
+            service.connectStart({ organizationId })
+          );
+          expect(Exit.isFailure(result)).toBe(true);
+        })
+      );
+    }
+  );
 });
 
 import { and } from "drizzle-orm";

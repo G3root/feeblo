@@ -1,9 +1,11 @@
 import { schema } from "@feeblo/db";
 import type { SlackApiFailure } from "@feeblo/integration-slack";
+import { decryptSlackCredentialMaterial } from "@feeblo/integration-slack/credentials";
 import { slackProviderKey } from "@feeblo/integration-slack/manifest";
 import { and, eq } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
 import * as Effect from "effect/Effect";
+import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { InternalServerError } from "../../rpc-errors";
 import { SlackIntegrationErrors } from "./errors";
@@ -29,6 +31,26 @@ export const mapManagementError =
       )
     );
 
+/** Decrypts a connection's stored credentials, mapping decryption failures to an `InternalServerError`. */
+export const decryptConnectionCredentials = (
+  config: { readonly encryptionKey: Redacted.Redacted<string> },
+  ciphertext: string
+): Effect.Effect<
+  {
+    readonly botToken?: Redacted.Redacted<string>;
+    readonly oauthState?: string;
+  },
+  InternalServerError
+> =>
+  decryptSlackCredentialMaterial(config.encryptionKey, ciphertext).pipe(
+    Effect.mapError(
+      () =>
+        new InternalServerError({
+          message: "Slack credentials could not be decrypted",
+        })
+    )
+  );
+
 /** Maps a Slack API failure to an `InternalServerError` for one operation. */
 export const mapSlackApiError = (operation: string) =>
   Effect.mapError((error: SlackApiFailure) => {
@@ -52,10 +74,6 @@ export const mapSlackApiError = (operation: string) =>
       case "IntegrationProviderPermanentRejection":
         return new InternalServerError({
           message: `Slack rejected ${operation}`,
-        });
-      case "IntegrationProviderChannelAlreadyJoinedError":
-        return new InternalServerError({
-          message: `Slack ${operation} was already applied`,
         });
       default:
         // Defensive arm for a future provider failure tag; the union is closed.

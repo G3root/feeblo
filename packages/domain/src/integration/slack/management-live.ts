@@ -5,7 +5,7 @@ import {
 } from "@feeblo/integration-slack";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import type { SlackIntegrationConfig } from "./config";
+import { SlackIntegrationConfig } from "./config";
 import { SlackManagementService } from "./management-service";
 import {
   makeSlackChannelServiceLive,
@@ -31,6 +31,7 @@ export const makeSlackManagementServiceLive = (
   Layer.effect(
     SlackManagementService,
     Effect.gen(function* () {
+      const config = yield* SlackIntegrationConfig;
       const connectionService = yield* SlackConnectionService;
       const channelService = yield* SlackChannelService;
       return SlackManagementService.of({
@@ -40,6 +41,7 @@ export const makeSlackManagementServiceLive = (
         listChannels: channelService.listChannels,
         listConnections: connectionService.listConnections,
         setChannelNotifications: channelService.setChannelNotifications,
+        status: () => Effect.succeed({ configured: config.configured }),
       });
     })
   ).pipe(

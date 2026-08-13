@@ -3,7 +3,6 @@ import * as Schema from "effect/Schema";
 
 export {
   IntegrationProviderAuthenticationError,
-  IntegrationProviderChannelAlreadyJoinedError,
   IntegrationProviderInvalidConfigurationError,
   IntegrationProviderPermanentRejection,
   IntegrationProviderRateLimitedError,
@@ -12,7 +11,6 @@ export {
 
 import type {
   IntegrationProviderAuthenticationError,
-  IntegrationProviderChannelAlreadyJoinedError,
   IntegrationProviderInvalidConfigurationError,
   IntegrationProviderPermanentRejection,
   IntegrationProviderRateLimitedError,
@@ -43,5 +41,4 @@ export type SlackApiFailure =
   | IntegrationProviderRateLimitedError
   | IntegrationProviderInvalidConfigurationError
   | IntegrationProviderTemporaryFailure
-  | IntegrationProviderPermanentRejection
-  | IntegrationProviderChannelAlreadyJoinedError;
+  | IntegrationProviderPermanentRejection;

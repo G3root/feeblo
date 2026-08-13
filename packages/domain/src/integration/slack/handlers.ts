@@ -27,6 +27,7 @@ export const SlackManagementRpcHandlersEffect = Effect.gen(function* () {
     SlackConnectionDisconnect: (
       input: Parameters<typeof service.disconnect>[0]
     ) => service.disconnect(input).pipe(authorize(input.organizationId)),
+    SlackIntegrationStatus: () => service.status(),
   };
 });
 

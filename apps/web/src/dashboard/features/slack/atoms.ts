@@ -1,7 +1,11 @@
 import * as Effect from "effect/Effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
-import { loadChannels, loadConnections } from "./lib/connections";
+import {
+  loadChannels,
+  loadConnections,
+  loadSlackStatus,
+} from "./lib/connections";
 
 export type SlackConnection = Awaited<
   ReturnType<typeof loadConnections>
@@ -48,4 +52,16 @@ export const channelsAtom = Atom.family((args: ChannelListArgs) =>
     }),
     Atom.setIdleTTL("5 minutes")
   )
+);
+
+/** Whether the Slack integration is configured for this deployment (global, not per-org). */
+export const slackStatusAtom = Atom.make(
+  Effect.tryPromise(() => loadSlackStatus())
+).pipe(
+  Atom.swr({
+    staleTime: "30 seconds",
+    revalidateOnFocus: "always",
+    focusSignal: Atom.windowFocusSignal,
+  }),
+  Atom.setIdleTTL("5 minutes")
 );

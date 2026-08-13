@@ -27,13 +27,14 @@ import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   channelsAtom,
   connectionsAtom,
   type SlackChannel,
   type SlackConnection,
   slackAtomRegistry,
+  slackStatusAtom,
 } from "../atoms";
 import {
   disconnectSlackConnection,
@@ -51,27 +52,23 @@ type AsyncListState<T> = {
 function useAsyncList<T>(
   result: AsyncResult.AsyncResult<readonly T[], unknown>
 ): AsyncListState<T> {
-  return useMemo(
-    () =>
-      AsyncResult.match(result, {
-        onInitial: () => ({ list: [], isLoading: true, loadFailed: false }),
-        onFailure: ({ previousSuccess }) =>
-          Option.match(previousSuccess, {
-            onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
-            onSome: ({ value }) => ({
-              list: value,
-              isLoading: false,
-              loadFailed: false,
-            }),
-          }),
-        onSuccess: ({ value }) => ({
+  return AsyncResult.match(result, {
+    onInitial: () => ({ list: [], isLoading: true, loadFailed: false }),
+    onFailure: ({ previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => ({ list: [], isLoading: false, loadFailed: true }),
+        onSome: ({ value }) => ({
           list: value,
           isLoading: false,
           loadFailed: false,
         }),
       }),
-    [result]
-  );
+    onSuccess: ({ value }) => ({
+      list: value,
+      isLoading: false,
+      loadFailed: false,
+    }),
+  });
 }
 
 export function SlackSettings({
@@ -99,6 +96,12 @@ function SlackSettingsContent({
     isLoading,
     loadFailed,
   } = useAsyncList<SlackConnection>(connectionsResult);
+  const statusResult = useAtomValue(slackStatusAtom);
+  const slackConfigured = AsyncResult.match(statusResult, {
+    onInitial: () => null as boolean | null,
+    onFailure: () => false,
+    onSuccess: ({ value }) => value,
+  });
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -121,6 +124,27 @@ function SlackSettingsContent({
       type: "success",
     });
   };
+
+  if (slackConfigured === null) {
+    return (
+      <Card>
+        <CardPanel>
+          <p className="text-muted-foreground text-sm">Loading Slack…</p>
+        </CardPanel>
+      </Card>
+    );
+  }
+  if (!slackConfigured) {
+    return (
+      <Card>
+        <CardPanel>
+          <p className="text-muted-foreground text-sm">
+            Slack is not configured for this deployment.
+          </p>
+        </CardPanel>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (

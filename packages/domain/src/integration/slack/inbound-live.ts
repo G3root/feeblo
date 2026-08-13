@@ -50,6 +50,20 @@ const emptyResponse = (): SlackInboundHttpResponse => ({
   status: 200,
 });
 
+/** Reads a plain-text input value from a submitted Slack modal's `state.values`. */
+const readModalTextValue = (
+  values: SlackViewSubmissionPayload["view"]["state"]["values"],
+  blockId: string,
+  actionId: string
+): string | undefined => values[blockId]?.[actionId]?.value;
+
+/** Reads the selected option value from a submitted Slack modal's `state.values`. */
+const readModalSelectedOption = (
+  values: SlackViewSubmissionPayload["view"]["state"]["values"],
+  blockId: string,
+  actionId: string
+): string | undefined => values[blockId]?.[actionId]?.selected_option?.value;
+
 /** Creates the Slack inbound service with an injectable API client. */
 export const makeSlackInboundServiceLive = (
   apiClient: SlackApiClient = makeSlackApiClient()
@@ -200,8 +214,8 @@ export const makeSlackInboundServiceLive = (
           }
           const botToken = botTokenOption.value;
           const values = payload.view.state.values;
-          const titleInput = values.feeblo_title?.title;
-          const title = titleInput?.value?.trim() ?? "";
+          const title =
+            readModalTextValue(values, "feeblo_title", "title")?.trim() ?? "";
           if (title.length === 0) {
             return {
               body: {
@@ -213,8 +227,14 @@ export const makeSlackInboundServiceLive = (
               status: 200,
             };
           }
-          const details = values.feeblo_details?.details?.value?.trim() ?? "";
-          const boardId = values.feeblo_board?.board?.selected_option?.value;
+          const details =
+            readModalTextValue(values, "feeblo_details", "details")?.trim() ??
+            "";
+          const boardId = readModalSelectedOption(
+            values,
+            "feeblo_board",
+            "board"
+          );
           if (boardId === undefined) {
             return {
               body: {

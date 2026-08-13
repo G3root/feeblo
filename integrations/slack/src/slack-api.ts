@@ -1,6 +1,5 @@
 import {
   IntegrationProviderAuthenticationError,
-  IntegrationProviderChannelAlreadyJoinedError,
   IntegrationProviderInvalidConfigurationError,
   IntegrationProviderPermanentRejection,
   IntegrationProviderRateLimitedError,
@@ -212,13 +211,6 @@ export const classifySlackApiError = (
       return new IntegrationProviderInvalidConfigurationError({
         message: `Slack app is missing a required scope during ${context}`,
         provider: slackProviderKey,
-      });
-    }
-    if (errorName === "already_in_channel") {
-      return new IntegrationProviderChannelAlreadyJoinedError({
-        message: `Slack channel is already joined during ${context}`,
-        provider: slackProviderKey,
-        ...(status === undefined ? {} : { httpStatus: status }),
       });
     }
     return new IntegrationProviderPermanentRejection({
@@ -461,13 +453,6 @@ export const makeSlackApiClient = (): SlackApiClient => {
             botToken,
           },
           "conversations.join"
-        )
-      ).pipe(
-        // Joining a channel the bot is already a member of is a success for
-        // our purposes: the caller only cares that the bot ends up in the
-        // channel before posting.
-        Effect.catchTag("IntegrationProviderChannelAlreadyJoinedError", () =>
-          Effect.succeed({ ok: true as const })
         )
       ),
     conversationsList: ({ botToken, cursor, limit, types }) =>

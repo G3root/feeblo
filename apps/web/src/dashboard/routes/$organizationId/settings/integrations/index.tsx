@@ -8,11 +8,15 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-import { connectionsAtom, slackAtomRegistry } from "~/features/slack/atoms";
+import {
+  connectionsAtom,
+  slackAtomRegistry,
+  slackStatusAtom,
+} from "~/features/slack/atoms";
 import {
   type loadConnections,
   startSlackConnect,
@@ -122,35 +126,40 @@ function SlackIntegrationCard({
   const router = useRouter();
   const [connecting, setConnecting] = useState(false);
   const connectionsResult = useAtomValue(connectionsAtom(organizationId));
+  const statusResult = useAtomValue(slackStatusAtom);
+  const slackConfigured = AsyncResult.match(statusResult, {
+    onInitial: () => null as boolean | null,
+    onFailure: () => false,
+    onSuccess: ({ value }) => value,
+  });
 
-  const { connections, isLoading, loadFailed } = useMemo(
-    () =>
-      AsyncResult.match(connectionsResult, {
-        onInitial: () => ({
-          connections: [] as Awaited<ReturnType<typeof loadConnections>>,
-          isLoading: true,
-          loadFailed: false,
-        }),
-        onFailure: ({ previousSuccess }) =>
-          Option.match(previousSuccess, {
-            onNone: () => ({
-              connections: [],
-              isLoading: false,
-              loadFailed: true,
-            }),
-            onSome: ({ value }) => ({
-              connections: value,
-              isLoading: false,
-              loadFailed: false,
-            }),
-          }),
-        onSuccess: ({ value }) => ({
-          connections: value,
-          isLoading: false,
-          loadFailed: false,
-        }),
+  const { connections, isLoading, loadFailed } = AsyncResult.match(
+    connectionsResult,
+    {
+      onInitial: () => ({
+        connections: [] as Awaited<ReturnType<typeof loadConnections>>,
+        isLoading: true,
+        loadFailed: false,
       }),
-    [connectionsResult]
+      onFailure: ({ previousSuccess }) =>
+        Option.match(previousSuccess, {
+          onNone: () => ({
+            connections: [],
+            isLoading: false,
+            loadFailed: true,
+          }),
+          onSome: ({ value }) => ({
+            connections: value,
+            isLoading: false,
+            loadFailed: false,
+          }),
+        }),
+      onSuccess: ({ value }) => ({
+        connections: value,
+        isLoading: false,
+        loadFailed: false,
+      }),
+    }
   );
 
   const activeConnections = connections.filter(
@@ -172,6 +181,19 @@ function SlackIntegrationCard({
       });
     }
   };
+
+  if (slackConfigured === null) {
+    return (
+      <Card>
+        <CardPanel>
+          <p className="text-muted-foreground text-sm">Loading Slack…</p>
+        </CardPanel>
+      </Card>
+    );
+  }
+  if (!slackConfigured) {
+    return null;
+  }
 
   return (
     <Card>

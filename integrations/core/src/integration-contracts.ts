@@ -299,24 +299,13 @@ export class IntegrationProviderPermanentRejection extends Schema.TaggedErrorCla
   }
 ) {}
 
-/** Provider operation whose precondition is already satisfied (e.g. joining a channel the bot is already in); the caller may treat it as a no-op success. */
-export class IntegrationProviderChannelAlreadyJoinedError extends Schema.TaggedErrorClass<IntegrationProviderChannelAlreadyJoinedError>()(
-  "IntegrationProviderChannelAlreadyJoinedError",
-  {
-    httpStatus: Schema.optionalKey(Schema.Int),
-    message: Schema.String,
-    provider: IntegrationProviderKey,
-  }
-) {}
-
 /** Typed failure algebra implemented by every outbound provider handler. */
 export type IntegrationProviderDeliveryFailure =
   | IntegrationProviderAuthenticationError
   | IntegrationProviderRateLimitedError
   | IntegrationProviderInvalidConfigurationError
   | IntegrationProviderTemporaryFailure
-  | IntegrationProviderPermanentRejection
-  | IntegrationProviderChannelAlreadyJoinedError;
+  | IntegrationProviderPermanentRejection;
 
 /** Provider handler input is canonical data plus safe connection/route references. */
 export interface IntegrationProviderDeliveryInput {

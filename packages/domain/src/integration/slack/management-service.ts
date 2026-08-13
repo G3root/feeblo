@@ -28,6 +28,8 @@ export interface SlackManagementServiceShape {
   readonly setChannelNotifications: (
     input: S.TSlackChannelNotificationsUpdate
   ) => Effect.Effect<void, SlackIntegrationError>;
+  /** Reports whether the Slack integration is configured for this deployment. */
+  readonly status: () => Effect.Effect<S.TSlackIntegrationStatus, never>;
 }
 
 /** Service key implemented by the server composition root for Slack commands. */

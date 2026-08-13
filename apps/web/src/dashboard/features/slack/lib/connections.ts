@@ -1,5 +1,10 @@
 import { fetchRpc } from "~/lib/runtime";
 
+export const loadSlackStatus = () =>
+  fetchRpc((rpc) => rpc.SlackIntegrationStatus()).then(
+    (result) => result.configured
+  );
+
 export const loadConnections = (organizationId: string) =>
   fetchRpc((rpc) => rpc.SlackConnectionList({ organizationId })).then(
     (result) => [...result]

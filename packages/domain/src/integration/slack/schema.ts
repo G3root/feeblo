@@ -29,6 +29,12 @@ export const SlackConnectStarted = Schema.Struct({
 });
 export type TSlackConnectStarted = typeof SlackConnectStarted.Type;
 
+/** Whether the Slack integration is configured for this deployment. */
+export const SlackIntegrationStatus = Schema.Struct({
+  configured: Schema.Boolean,
+});
+export type TSlackIntegrationStatus = typeof SlackIntegrationStatus.Type;
+
 /** One Slack channel the bot can post into, with its notification state. */
 export const SlackChannel = Schema.Struct({
   id: Schema.String,
