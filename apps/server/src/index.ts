@@ -34,13 +34,13 @@ import {
 import * as Sentry from "@sentry/effect/server";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
-import * as Headers from "effect/unstable/http/Headers";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -124,10 +124,9 @@ const RootRouter = HttpRouter.use((router) =>
 const MAX_REQUEST_BODY_BYTES = 1_000_000;
 
 /**
- * Rejects oversized request bodies from the Content-Length header before the
- * body is buffered. Multipart uploads are skipped here — they are already
- * limited while streaming by the multipart limits middleware — but every other
- * body type (JSON, form-encoded, …) gets a tight cap.
+ * Limits every request body while it is read, including chunked requests that
+ * omit Content-Length. Effect applies this reference to JSON, form and
+ * multipart body readers before they buffer the payload.
  */
 const bodySizeLimitMiddleware = <E, R>(
   httpApp: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>
@@ -136,27 +135,11 @@ const bodySizeLimitMiddleware = <E, R>(
   E,
   R | HttpServerRequest.HttpServerRequest
 > =>
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const contentLength = Option.getOrUndefined(
-      Headers.get(request.headers, "content-length")
-    );
-    const contentType =
-      Option.getOrUndefined(Headers.get(request.headers, "content-type")) ?? "";
-
-    if (contentType.startsWith("multipart/form-data")) {
-      return yield* httpApp;
-    }
-
-    if (contentLength !== undefined) {
-      const parsed = Number(contentLength);
-      if (Number.isFinite(parsed) && parsed > MAX_REQUEST_BODY_BYTES) {
-        return HttpServerResponse.text("Payload too large", { status: 413 });
-      }
-    }
-
-    return yield* httpApp;
-  });
+  Effect.provideService(
+    httpApp,
+    HttpServerRequest.MaxBodySize,
+    FileSystem.Size(MAX_REQUEST_BODY_BYTES)
+  );
 
 const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
   HttpRouter.use((router) =>

@@ -160,35 +160,7 @@ export const validateAttributeValueEffect = (
  */
 export const MAX_ATTRIBUTE_PATTERN_LENGTH = 200;
 
-/** Matches a `{n}`, `{n,}`, or `{n,m}` repetition specifier. */
-const REPETITION = /^\{[0-9]+(?:,[0-9]*)?\}/;
-
-/**
- * Whether a repetition specifier can repeat its target an unbounded number of
- * times (the `{n,}` form). Bounded repetitions cannot cause exponential
- * backtracking on their own.
- */
-const isUnboundedRepetition = (specifier: string): boolean => {
-  const body = specifier.slice(1, -1);
-  return body.includes(",") && body.endsWith(",");
-};
-
-/**
- * Whether the character at `index` begins a quantifier that can repeat its
- * target an unbounded number of times: `*`, `+`, or `{n,}`. `?` (at most one
- * match) and bounded `{n}` / `{n,m}` repetitions are not unbounded.
- */
-const isUnboundedQuantifierAt = (pattern: string, index: number): boolean => {
-  const ch = pattern[index];
-  if (ch === "*" || ch === "+") {
-    return true;
-  }
-  if (ch === "{") {
-    const match = REPETITION.exec(pattern.slice(index));
-    return match !== null && isUnboundedRepetition(match[0]);
-  }
-  return false;
-};
+const MAX_ATTRIBUTE_PATTERN_REPETITION = 100;
 
 /**
  * Rejects regular expressions that are prone to catastrophic backtracking
@@ -196,36 +168,28 @@ const isUnboundedQuantifierAt = (pattern: string, index: number): boolean => {
  * can originate from untrusted input (e.g. widget SSO JWT attribute payloads),
  * so a pathological pattern such as `(a+)+$` must never be executed.
  *
- * The check is a conservative heuristic: it rejects patterns longer than
- * {@link MAX_ATTRIBUTE_PATTERN_LENGTH} and any quantified group whose contents
- * already contain a repetition quantifier and that is itself quantified by an
- * unbounded quantifier (`*`, `+`, or `{n,}`) — the classic nested-quantifier
- * shape behind most ReDoS. Bounded (`{n}`, `{n,m}`) and optional (`?`)
- * quantifiers are tolerated because they cannot repeat an unbounded number of
- * times.
+ * Attribute patterns use a deliberately non-backtracking subset of JavaScript
+ * regular expressions: literals, character classes, anchors, escapes, and
+ * bounded repetitions. Groups, alternatives, and unbounded quantifiers are
+ * rejected, which rules out both nested-quantifier and ambiguous-alternative
+ * ReDoS shapes such as `(a+)+` and `(a|aa)+`.
  */
 export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
   if (pattern.length > MAX_ATTRIBUTE_PATTERN_LENGTH) {
     return true;
   }
 
-  // Per open group, whether a repetition quantifier appeared inside it. When
-  // such a group is itself quantified (`(a+)+`, `(a*)*`, `(?:a?)+`, `(a+){2,}`),
-  // matching can exhibit exponential backtracking.
-  const groups: boolean[] = [];
   let inCharClass = false;
-  let escaped = false;
   let i = 0;
   while (i < pattern.length) {
     const ch = pattern[i];
-    if (escaped) {
-      escaped = false;
-      i += 1;
-      continue;
-    }
     if (ch === "\\") {
-      escaped = true;
-      i += 1;
+      // Backreferences make matching non-regular and can introduce expensive
+      // retry paths. Escaped literals and character classes remain safe.
+      if (/^[0-9]$/.test(pattern[i + 1] ?? "")) {
+        return true;
+      }
+      i += 2;
       continue;
     }
     if (inCharClass) {
@@ -240,43 +204,32 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
       i += 1;
       continue;
     }
-    if (ch === "(") {
-      groups.push(false);
-      i += 1;
-      continue;
-    }
-    if (ch === ")") {
-      const containedQuantifier = groups.pop() ?? false;
-      if (containedQuantifier && isUnboundedQuantifierAt(pattern, i + 1)) {
+    if (ch === "{") {
+      const end = pattern.indexOf("}", i + 1);
+      const repetition = pattern.slice(i + 1, end);
+      const repetitionParts = repetition.split(",");
+      if (
+        end === -1 ||
+        repetitionParts.length > 2 ||
+        repetitionParts.some((part) => !/^\d+$/.test(part)) ||
+        repetitionParts.some(
+          (part) => Number(part) > MAX_ATTRIBUTE_PATTERN_REPETITION
+        )
+      ) {
         return true;
       }
-      i += 1;
+      i = end + 1;
       continue;
     }
-    if (ch === "{") {
-      const match = REPETITION.exec(pattern.slice(i));
-      if (match !== null) {
-        if (isUnboundedRepetition(match[0]) && groups.length > 0) {
-          groups[groups.length - 1] = true;
-        }
-        i += match[0].length;
-        continue;
-      }
-      i += 1;
-      continue;
-    }
-    if (ch === "?" || ch === "*" || ch === "+") {
-      // `(?` starts a group modifier (`?:`, `?=`, `?!`, `?<=`, `?<!`), not a
-      // quantifier.
-      if (ch === "?" && pattern[i - 1] === "(") {
-        i += 1;
-        continue;
-      }
-      if (groups.length > 0) {
-        groups[groups.length - 1] = true;
-      }
-      i += 1;
-      continue;
+    if (
+      ch === "(" ||
+      ch === ")" ||
+      ch === "|" ||
+      ch === "*" ||
+      ch === "+" ||
+      ch === "?"
+    ) {
+      return true;
     }
     i += 1;
   }
