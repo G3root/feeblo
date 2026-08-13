@@ -77,6 +77,7 @@ export const ALLOWED_ATTR = [
   "href",
   "title",
   "target",
+  "rel",
 
   // Image attributes
   "src",
@@ -171,6 +172,12 @@ export class HtmlSanitizer {
       if (node.hasAttribute?.("title")) {
         const title = node.getAttribute("title") || "";
         node.setAttribute("title", sanitizeAttributeValue(title));
+      }
+
+      // Prevent reverse tabnabbing: a link opened in a new tab must not give
+      // the target document a `window.opener` handle back to this document.
+      if (node.tagName === "A" && node.getAttribute?.("target") === "_blank") {
+        node.setAttribute("rel", "noopener noreferrer");
       }
     });
 

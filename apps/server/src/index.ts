@@ -40,6 +40,7 @@ import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
+import * as Headers from "effect/unstable/http/Headers";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -119,6 +120,43 @@ const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
 const RootRouter = HttpRouter.use((router) =>
   router.add("GET", "/", HttpServerResponse.text("Hello world"))
 );
+
+const MAX_JSON_BODY_BYTES = 1_000_000;
+
+/**
+ * Rejects oversized request bodies from the Content-Length header before the
+ * body is buffered. Multipart uploads are skipped here — they are already
+ * limited while streaming by the multipart limits middleware — but every other
+ * body type (JSON, form-encoded, …) gets a tight cap.
+ */
+const bodySizeLimitMiddleware = <E, R>(
+  httpApp: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>
+): Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  E,
+  R | HttpServerRequest.HttpServerRequest
+> =>
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const contentLength = Option.getOrUndefined(
+      Headers.get(request.headers, "content-length")
+    );
+    const contentType =
+      Option.getOrUndefined(Headers.get(request.headers, "content-type")) ?? "";
+
+    if (contentType.startsWith("multipart/form-data")) {
+      return yield* httpApp;
+    }
+
+    if (contentLength !== undefined) {
+      const parsed = Number(contentLength);
+      if (Number.isFinite(parsed) && parsed > MAX_JSON_BODY_BYTES) {
+        return HttpServerResponse.text("Payload too large", { status: 413 });
+      }
+    }
+
+    return yield* httpApp;
+  });
 
 const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
   HttpRouter.use((router) =>
@@ -266,6 +304,9 @@ const program = Effect.gen(function* () {
         }),
         { global: true }
       )
+    ),
+    Layer.provide(
+      HttpRouter.middleware(bodySizeLimitMiddleware, { global: true })
     ),
     // Provides the peer-anchored client IP (socket remoteAddress) to every
     // route, including RPC middleware, so public rate limits are keyed on an

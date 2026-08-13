@@ -22,7 +22,11 @@ export function authenticateLink(link: HTMLAnchorElement, token: string): void {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return;
   }
-  url.searchParams.set("ssoToken", token);
+  // Put the SSO token in the URL fragment instead of the query string: the
+  // fragment is never sent to the server and never appears in the Referer
+  // header, so it cannot leak through access logs, proxies, or analytics. The
+  // public board reads and strips it before rendering.
+  url.hash = `ssoToken=${encodeURIComponent(token)}`;
   link.href = url.toString();
 }
 

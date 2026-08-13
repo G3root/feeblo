@@ -25,15 +25,28 @@ import {
 } from "../lib/collections";
 import { NotFoundPage } from "../routes/not-found-page";
 
+/**
+ * Reads the SSO token from the URL fragment. The SDK puts it there (rather
+ * than in the query string) so it is never sent to the server or leaked via
+ * the Referer header. It is removed from history before render below.
+ */
+function getSsoTokenFromHash(hash: string): string | null {
+  if (!hash.startsWith("#")) {
+    return null;
+  }
+  const params = new URLSearchParams(hash.slice(1));
+  return params.get("ssoToken");
+}
+
 const rootRoute = createRootRoute({
   beforeLoad: async () => {
     const url = new URL(window.location.href);
-    const token = url.searchParams.get("ssoToken");
+    const token = getSsoTokenFromHash(url.hash);
     const organizationId = getCurrentOrganizationId();
     let session = await getAuthSession();
 
     if (token && organizationId) {
-      url.searchParams.delete("ssoToken");
+      url.hash = "";
       window.history.replaceState(window.history.state, "", url);
 
       if (session?.user.restrictedToOrganizationId !== organizationId) {

@@ -6,7 +6,7 @@ describe("data-feeblo-link", () => {
     document.body.replaceChildren();
   });
 
-  it("adds the SSO token without dropping existing URL state", () => {
+  it("adds the SSO token in the URL fragment without dropping existing URL state", () => {
     const link = document.createElement("a");
     link.href = "https://feedback.example.com/roadmap?sort=top#planned";
 
@@ -14,8 +14,9 @@ describe("data-feeblo-link", () => {
 
     const url = new URL(link.href);
     expect(url.searchParams.get("sort")).toBe("top");
-    expect(url.searchParams.get("ssoToken")).toBe("signed.jwt.token");
-    expect(url.hash).toBe("#planned");
+    expect(url.search).not.toContain("ssoToken");
+    const hashParams = new URLSearchParams(url.hash.slice(1));
+    expect(hashParams.get("ssoToken")).toBe("signed.jwt.token");
   });
 
   it("authenticates dynamically-added marked links on interaction", () => {
@@ -32,7 +33,8 @@ describe("data-feeblo-link", () => {
     child.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     stop();
 
-    expect(new URL(link.href).searchParams.get("ssoToken")).toBe(
+    const url = new URL(link.href);
+    expect(new URLSearchParams(url.hash.slice(1)).get("ssoToken")).toBe(
       "signed.jwt.token"
     );
   });
