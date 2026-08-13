@@ -17,6 +17,7 @@
     "@feeblo/domain": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
+    "@feeblo/integration-discord": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",

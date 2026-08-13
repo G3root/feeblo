@@ -1,5 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { WebhookManagementServiceLive } from "@feeblo/domain/integration/webhook-management-live";
 import type { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
@@ -16,6 +17,10 @@ import {
   makeIntegrationProviderRegistry,
   runIntegrationDeliveryWorker,
 } from "@feeblo/integration-core";
+import {
+  makeDiscordCredentialResolver,
+  makeDiscordProviderRegistration,
+} from "@feeblo/integration-discord";
 import {
   makeSlackCredentialResolver,
   makeSlackProviderRegistration,
@@ -59,6 +64,7 @@ export const makeIntegrationLayers: Effect.Effect<
   | Database.Database
   | WebhookIntegrationConfig
   | SlackIntegrationConfig
+  | DiscordIntegrationConfig
 > = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const db = yield* currentDb;
@@ -148,12 +154,24 @@ export const makeIntegrationLayers: Effect.Effect<
     credentialResolver: slackCredentialResolver,
     signingSecret,
   });
-  // The Slack provider is only exposed when its OAuth client id, client
-  // secret, and request signing secret are all configured; otherwise the
-  // server runs webhook-only.
+  const {
+    botToken: discordBotToken,
+    configured: discordConfigured,
+    publicKey: discordPublicKey,
+  } = yield* DiscordIntegrationConfig;
+  const discordCredentialResolver = makeDiscordCredentialResolver({
+    botToken: discordBotToken,
+  });
+  const discordRegistration = makeDiscordProviderRegistration({
+    credentialResolver: discordCredentialResolver,
+    publicKey: discordPublicKey,
+  });
+  // Providers are only exposed when their credentials are configured;
+  // otherwise the server runs with the remaining providers only.
   const registry = yield* makeIntegrationProviderRegistry([
     registration,
     ...(slackConfigured ? [slackRegistration] : []),
+    ...(discordConfigured ? [discordRegistration] : []),
   ]);
 
   // Deliveries are claimed only for capability keys the startup-validated

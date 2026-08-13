@@ -206,6 +206,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               eventType: "feedback.post.created",
               organizationId,
               postId: id,
+              ...(metadata === undefined ? {} : { metadata }),
               postSlug,
               statusId,
               title,

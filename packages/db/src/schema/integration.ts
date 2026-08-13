@@ -86,6 +86,13 @@ export const integrationConnectionTable = pgTable(
       table.organizationId,
       table.id
     ),
+    // A Discord guild has one global interaction endpoint, so one active
+    // guild installation must resolve to exactly one Feeblo organization.
+    uniqueIndex("integration_connection_provider_remote_account_active_uidx")
+      .on(table.provider, table.remoteAccountId)
+      .where(
+        sql`${table.provider} = 'discord' and ${table.remoteAccountId} is not null and ${table.lifecycle} = 'active'`
+      ),
   ]
 );
 

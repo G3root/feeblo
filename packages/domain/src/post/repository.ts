@@ -63,7 +63,14 @@ interface TPostCreate {
   id: string;
   metadata?: Record<string, string>;
   organizationId: string;
-  source?: "DASHBOARD" | "WIDGET" | "API" | "IMPORT" | "PUBLIC_BOARD" | "SLACK";
+  source?:
+    | "DASHBOARD"
+    | "WIDGET"
+    | "API"
+    | "IMPORT"
+    | "PUBLIC_BOARD"
+    | "SLACK"
+    | "DISCORD";
   statusId: string;
   title: string;
 }

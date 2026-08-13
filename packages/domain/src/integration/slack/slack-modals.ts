@@ -4,6 +4,63 @@ import * as Schema from "effect/Schema";
 
 const TITLE_MAX_LENGTH = 200;
 const DETAILS_MAX_LENGTH = 3000;
+const SUCCESS_FIELD_TEXT_MAX_LENGTH = 2000;
+const SUCCESS_FIELDS_PER_SECTION = 10;
+
+const formatSlackMetadataLabel = (value: string): string =>
+  value
+    .toLowerCase()
+    .split("_")
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(" ");
+
+const buildSuccessMetadataBlocks = ({
+  boardName,
+  metadata,
+  postId,
+  status,
+  submitterName,
+}: {
+  readonly boardName: string;
+  readonly metadata: Readonly<Record<string, string>>;
+  readonly postId: string;
+  readonly status: string;
+  readonly submitterName: string;
+}): readonly unknown[] => {
+  const postFields: readonly {
+    readonly name: string;
+    readonly value: string;
+  }[] = [
+    { name: "Board", value: boardName },
+    { name: "Status", value: formatSlackMetadataLabel(status) },
+    { name: "Source", value: "Slack" },
+    { name: "Submitted by", value: submitterName || "Slack user" },
+    { name: "Post ID", value: postId },
+    ...Object.entries(metadata)
+      .map(([name, value]) => ({
+        name: formatSlackMetadataLabel(name.trim()),
+        value: value.trim(),
+      }))
+      .filter(({ name, value }) => name.length > 0 && value.length > 0),
+  ];
+  const blocks: unknown[] = [];
+  for (
+    let startIndex = 0;
+    startIndex < postFields.length;
+    startIndex += SUCCESS_FIELDS_PER_SECTION
+  ) {
+    blocks.push({
+      fields: postFields
+        .slice(startIndex, startIndex + SUCCESS_FIELDS_PER_SECTION)
+        .map(({ name, value }) => ({
+          text: truncate(`*${name}:*\n${value}`, SUCCESS_FIELD_TEXT_MAX_LENGTH),
+          type: "mrkdwn",
+        })),
+      type: "section",
+    });
+  }
+  return blocks;
+};
 
 /** Private metadata embedded in the feedback modal; safe to send to Slack. */
 export const FeedbackModalMetadata = Schema.Struct({
@@ -91,11 +148,21 @@ export const buildFeedbackModal = ({
 
 /** Slack Block Kit `modal` view shown after a feedback post is created. */
 export const buildSuccessModal = ({
+  boardName,
+  metadata,
+  postId,
   postTitle,
   postUrl,
+  status,
+  submitterName,
 }: {
+  readonly boardName: string;
+  readonly metadata: Readonly<Record<string, string>>;
+  readonly postId: string;
   readonly postTitle: string;
   readonly postUrl?: string;
+  readonly status: string;
+  readonly submitterName: string;
 }): unknown => ({
   callback_id: "feeblo_feedback_success",
   clear_on_close: true,
@@ -117,6 +184,13 @@ export const buildSuccessModal = ({
       },
       type: "section",
     },
+    ...buildSuccessMetadataBlocks({
+      boardName,
+      metadata,
+      postId,
+      status,
+      submitterName,
+    }),
     ...(postUrl === undefined
       ? []
       : [

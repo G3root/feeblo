@@ -13,7 +13,18 @@
 
 Inbound requests are signature-verified (HMAC-SHA256, 5-minute freshness window) by the provider before any domain work. The server mounts `/slack/oauth/callback`, `/slack/commands/feeblo`, and `/slack/interactive`. The dashboard settings page (`/$organizationId/settings/integrations/slack`, `integrations.manage`) handles workspace connect/disconnect and per-channel notification toggles.
 
-Discord, Linear, HubSpot, inbox processing, bindings, bidirectional synchronization, and in-modal similar-request upvoting are future phases, not packages or capabilities supplied by V1.
+## Discord provider
+
+`integrations/discord` implements the Discord provider (`discord`, OAuth 2.0):
+
+- **`channel.notifications`** (outbound) — one route per channel; the durable delivery worker posts a `ChannelUpdateMessage` rendered into a Discord embed for every `feedback.post.created` event. Unlike Slack there is no join step: the bot's channel access is granted at install time through the OAuth permissions bitfield (View Channels, Send Messages, Embed Links, Read Message History) and may be overridden per channel by the server.
+- **`interactions`** (inbound) — every interaction type arrives at the single `/discord/interactions` endpoint: the `/feeblo` slash command and the “Send to Feeblo” message context menu open the feedback modal (title, details, board select), and `MODAL_SUBMIT` creates a post (source `DISCORD`) and answers with an ephemeral confirmation. Modal metadata travels in the `custom_id` (`feeblo:<org>:<guild>:<channel>[:<message>]`) because Discord caps custom ids at 100 characters. Discord identities resolve against the user table through the stable synthetic email `discord-<guild>-<user>@discord.invalid` (`emailVerified: false`); Discord never exposes the invoking user's email to the integration, so the Slack email-linking step does not apply.
+
+Application-wide credentials differ from Slack: the bot token and interaction public key are shared by every guild install, so they live in configuration (`DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`) like the Slack signing secret. Only the per-install OAuth artifacts (installer user token, OAuth state nonce) are encrypted at rest with `INTEGRATION_ENCRYPTION_KEY` (falling back to `AUTH_ENCRYPTION_KEY`). Connect registers the `/feeblo` and “Send to Feeblo” commands in the guild (`PUT /applications/{app}/guilds/{guild}/commands`), so they appear instantly and are scoped to the connected server.
+
+Inbound requests are signature-verified (Ed25519, `X-Signature-Ed25519` over `X-Signature-Timestamp + body`, 5-minute freshness window) by the provider before any domain work. The server mounts `/discord/oauth/callback` and `/discord/interactions`. The dashboard settings page (`/$organizationId/settings/integrations/discord`, `integrations.manage`) handles server connect/disconnect and per-channel notification toggles.
+
+Linear, HubSpot, inbox processing, bindings, bidirectional synchronization, and in-modal similar-request upvoting are future phases, not packages or capabilities supplied by V1.
 
 ## Operations
 

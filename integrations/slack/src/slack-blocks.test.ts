@@ -9,6 +9,7 @@ describe("renderChannelUpdateMessageBlocks", () => {
     facts: [
       { label: "Board", value: "Product ideas" },
       { label: "Status", value: "PENDING" },
+      { label: "customer_tier", value: "Enterprise" },
     ],
     title: "Support dark mode",
   };
@@ -25,7 +26,7 @@ describe("renderChannelUpdateMessageBlocks", () => {
       elements: [
         {
           type: "mrkdwn",
-          text: "*Board:* Product ideas   ·   *Status:* PENDING",
+          text: "*Board:* Product ideas   ·   *Status:* PENDING   ·   *Customer Tier:* Enterprise",
         },
       ],
     });
