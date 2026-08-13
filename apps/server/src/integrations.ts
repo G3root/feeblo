@@ -1,5 +1,7 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
+import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
+import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { WebhookManagementServiceLive } from "@feeblo/domain/integration/webhook-management-live";
 import type { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 import { InternalServerError } from "@feeblo/domain/rpc-errors";
@@ -7,6 +9,7 @@ import {
   type IntegrationEventRecorder,
   IntegrationEventRecorderLive,
   IntegrationProviderInvalidConfigurationError,
+  type IntegrationProviderRegistry,
   type IntegrationProviderRegistryValidationError,
   IntegrationProviderTemporaryFailure,
   makeIntegrationDeliveryWorkerRepository,
@@ -14,6 +17,15 @@ import {
   makeIntegrationProviderRegistry,
   runIntegrationDeliveryWorker,
 } from "@feeblo/integration-core";
+import {
+  makeDiscordCredentialResolver,
+  makeDiscordProviderRegistration,
+} from "@feeblo/integration-discord";
+import {
+  makeSlackCredentialResolver,
+  makeSlackProviderRegistration,
+} from "@feeblo/integration-slack";
+import { slackProviderKey } from "@feeblo/integration-slack/manifest";
 import {
   decryptWebhookCredentialMaterial,
   makeWebhookProviderRegistration,
@@ -34,7 +46,9 @@ export interface IntegrationRuntime {
     never,
     Database.Database | WebhookIntegrationConfig
   >;
+
   readonly maintenance: Effect.Effect<void, never, Database.Database>;
+  readonly registry: IntegrationProviderRegistry;
   readonly worker: Effect.Effect<void, never, Database.Database>;
 }
 
@@ -47,7 +61,12 @@ export interface IntegrationRuntime {
 export const makeIntegrationLayers: Effect.Effect<
   IntegrationRuntime,
   IntegrationProviderRegistryValidationError | InternalServerError,
-  ServerConfig | Database.Database | WebhookIntegrationConfig | Crypto.Crypto
+  | ServerConfig
+  | Database.Database
+  | WebhookIntegrationConfig
+  | SlackIntegrationConfig
+  | DiscordIntegrationConfig
+  | Crypto.Crypto
 > = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const db = yield* currentDb;
@@ -105,7 +124,57 @@ export const makeIntegrationLayers: Effect.Effect<
     credentialResolver,
     endpointSecurityPolicy,
   });
-  const registry = yield* makeIntegrationProviderRegistry([registration]);
+  const {
+    configured: slackConfigured,
+    encryptionKey: slackEncryptionKey,
+    signingSecret,
+  } = yield* SlackIntegrationConfig;
+  const slackCredentialResolver = makeSlackCredentialResolver({
+    encryptionKey: slackEncryptionKey,
+    loadCiphertext: (input) =>
+      Effect.gen(function* () {
+        const [connection] = yield* db
+          .select({
+            ciphertext: schema.integrationConnectionTable.credentialsCiphertext,
+          })
+          .from(schema.integrationConnectionTable)
+          .where(eq(schema.integrationConnectionTable.id, input.connection.id))
+          .limit(1)
+          .pipe(
+            Effect.mapError(
+              () =>
+                new IntegrationProviderTemporaryFailure({
+                  message: "Slack credentials could not be loaded",
+                  provider: slackProviderKey,
+                })
+            )
+          );
+        return connection?.ciphertext ?? null;
+      }),
+  });
+  const slackRegistration = makeSlackProviderRegistration({
+    credentialResolver: slackCredentialResolver,
+    signingSecret,
+  });
+  const {
+    botToken: discordBotToken,
+    configured: discordConfigured,
+    publicKey: discordPublicKey,
+  } = yield* DiscordIntegrationConfig;
+  const discordCredentialResolver = makeDiscordCredentialResolver({
+    botToken: discordBotToken,
+  });
+  const discordRegistration = makeDiscordProviderRegistration({
+    credentialResolver: discordCredentialResolver,
+    publicKey: discordPublicKey,
+  });
+  // Providers are only exposed when their credentials are configured;
+  // otherwise the server runs with the remaining providers only.
+  const registry = yield* makeIntegrationProviderRegistry([
+    registration,
+    ...(slackConfigured ? [slackRegistration] : []),
+    ...(discordConfigured ? [discordRegistration] : []),
+  ]);
 
   // Deliveries are claimed only for capability keys the startup-validated
   // registry actually exposes; the kernel never hardcodes a provider capability.
@@ -152,6 +221,7 @@ export const makeIntegrationLayers: Effect.Effect<
       ),
       Effect.repeat(Schedule.spaced("1 hour"))
     ),
+    registry,
     worker,
   };
 });

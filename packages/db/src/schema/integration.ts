@@ -86,6 +86,13 @@ export const integrationConnectionTable = pgTable(
       table.organizationId,
       table.id
     ),
+    // A Discord guild has one global interaction endpoint, so one active
+    // guild installation must resolve to exactly one Feeblo organization.
+    uniqueIndex("integration_connection_provider_remote_account_active_uidx")
+      .on(table.provider, table.remoteAccountId)
+      .where(
+        sql`${table.provider} = 'discord' and ${table.remoteAccountId} is not null and ${table.lifecycle} = 'active'`
+      ),
   ]
 );
 
@@ -105,6 +112,8 @@ export const integrationRouteTable = pgTable(
     eventTypes: jsonb("event_types")
       .$type<TIntegrationRouteEventSelection>()
       .notNull(),
+    /** Provider-defined discriminator for routes sharing a (connection, capability); empty when a capability has one route per connection. */
+    routeKey: text("route_key").notNull().default(""),
     configVersion: integer("config_version").notNull(),
     providerConfig: jsonb("provider_config")
       .$type<TIntegrationProviderConfiguration>()
@@ -144,6 +153,16 @@ export const integrationRouteTable = pgTable(
     uniqueIndex("integration_route_organization_id_uidx").on(
       table.organizationId,
       table.id
+    ),
+    // One route per (connection, capability, routeKey). Capabilities with a
+    // single route per connection (webhook events.post, Slack inbound) use an
+    // empty routeKey; providers with multiple routes per capability (Slack
+    // channel.notifications, future Linear projects, Discord channels) store
+    // their own natural discriminator.
+    uniqueIndex("integration_route_connection_capability_key_uidx").on(
+      table.connectionId,
+      table.capabilityKey,
+      table.routeKey
     ),
   ]
 );

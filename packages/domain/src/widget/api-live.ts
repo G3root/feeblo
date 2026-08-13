@@ -13,7 +13,6 @@ import type {
 } from "../attribute-definition/schema";
 import { BoardRepository } from "../board/repository";
 import { ChangelogRepository } from "../changelog/repository";
-import { ClientIp } from "../client-ip";
 import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
@@ -35,7 +34,6 @@ import {
 } from "../post/suggestions";
 import { PostStatusRepository } from "../post-status/repository";
 import * as RateLimit from "../rate-limit";
-import { RateLimitService } from "../rate-limit/service";
 import {
   InternalServerError,
   NotFoundError,
@@ -43,23 +41,6 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { upsertContactFromParsed } from "./sso";
-
-export const withWidgetRateLimit =
-  (options: RateLimit.PublicRpcRateLimitOptions) =>
-  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    Effect.gen(function* () {
-      const clientIp = yield* ClientIp;
-      const rateLimitService = yield* RateLimitService;
-
-      return yield* Effect.provideService(
-        effect.pipe(RateLimit.withPublicRpcRateLimit(options)),
-        RateLimit.PublicRpcRateLimiter,
-        RateLimit.makePublicRpcRateLimiter({
-          clientIp,
-          rateLimitService,
-        })
-      );
-    });
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   organizationId,
@@ -91,7 +72,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
     handlers
       .handle("listUpdates", ({ payload }) =>
         listWidgetUpdates(payload).pipe(
-          withWidgetRateLimit({
+          RateLimit.withPublicHttpRateLimit({
             name: "WidgetListUpdates",
             level: "read",
           }),
@@ -176,7 +157,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               })
           ),
           withRemapDbErrors("Post", "select"),
-          withWidgetRateLimit({
+          RateLimit.withPublicHttpRateLimit({
             name: "WidgetSuggestPosts",
             level: "expensive",
           })
@@ -193,7 +174,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
 
           return boards.map(({ visibility: _visibility, ...board }) => board);
         }).pipe(
-          withWidgetRateLimit({
+          RateLimit.withPublicHttpRateLimit({
             name: "WidgetListBoards",
             level: "read",
           }),
@@ -226,6 +207,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               eventType: "feedback.post.created",
               organizationId,
               postId: id,
+              ...(metadata === undefined ? {} : { metadata }),
               postSlug,
               statusId,
               title,
@@ -388,7 +370,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             createdAt: now,
           };
         }).pipe(
-          withWidgetRateLimit({
+          RateLimit.withPublicHttpRateLimit({
             name: "WidgetCreateFeedback",
             level: "write",
           }),

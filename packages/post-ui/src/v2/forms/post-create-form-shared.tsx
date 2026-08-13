@@ -1,3 +1,7 @@
+import {
+  POST_CONTENT_MAX_LENGTH,
+  POST_TITLE_MAX_LENGTH,
+} from "@feeblo/domain/content-limits";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { EditorProps } from "@feeblo/ui/editor";
 import { Field, FieldError } from "@feeblo/ui/field";
@@ -13,10 +17,23 @@ import { usePostCollections } from "../providers/post-collections-provider";
 
 const Schema = z.object({
   boardId: z.string().trim().min(1, "Board is required"),
-  content: z.string().min(1, "Content is required"),
+  content: z
+    .string()
+    .min(1, "Content is required")
+    .max(
+      POST_CONTENT_MAX_LENGTH,
+      `Content must be at most ${POST_CONTENT_MAX_LENGTH} characters`
+    ),
   createMore: z.boolean(),
   statusId: z.string().trim().min(1, "Status is required"),
-  title: z.string().trim().min(1, "Title is required"),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(
+      POST_TITLE_MAX_LENGTH,
+      `Title must be at most ${POST_TITLE_MAX_LENGTH} characters`
+    ),
 });
 
 export const postCreateFormOpts = formOptions({
@@ -46,6 +63,7 @@ export const PostTitleField = withForm({
             touched={field.state.meta.isTouched}
           >
             <PostTitleInput
+              maxLength={POST_TITLE_MAX_LENGTH}
               name={field.name}
               onBlur={field.handleBlur}
               onChange={(e) => field.handleChange(e.target.value)}

@@ -7,6 +7,9 @@
     "./src/*": {
       "default": "./src/*"
     },
+    "./content-limits": {
+      "default": "./src/content-limits.ts"
+    },
     "./asset/repository": {
       "default": "./src/asset/repository.ts"
     },
@@ -294,6 +297,78 @@
     },
     "./rpc-errors": {
       "default": "./src/rpc-errors.ts"
+    },
+    "./integration/slack": {
+      "default": "./src/integration/slack/index.ts"
+    },
+    "./integration/slack/config": {
+      "default": "./src/integration/slack/config.ts"
+    },
+    "./integration/slack/schema": {
+      "default": "./src/integration/slack/schema.ts"
+    },
+    "./integration/slack/errors": {
+      "default": "./src/integration/slack/errors.ts"
+    },
+    "./integration/slack/management-service": {
+      "default": "./src/integration/slack/management-service.ts"
+    },
+    "./integration/slack/management-live": {
+      "default": "./src/integration/slack/management-live.ts"
+    },
+    "./integration/slack/inbound-service": {
+      "default": "./src/integration/slack/inbound-service.ts"
+    },
+    "./integration/slack/inbound-live": {
+      "default": "./src/integration/slack/inbound-live.ts"
+    },
+    "./integration/slack/rpcs": {
+      "default": "./src/integration/slack/rpcs.ts"
+    },
+    "./integration/slack/handlers": {
+      "default": "./src/integration/slack/handlers.ts"
+    },
+    "./integration/discord": {
+      "default": "./src/integration/discord/index.ts"
+    },
+    "./integration/discord/config": {
+      "default": "./src/integration/discord/config.ts"
+    },
+    "./integration/discord/schema": {
+      "default": "./src/integration/discord/schema.ts"
+    },
+    "./integration/discord/errors": {
+      "default": "./src/integration/discord/errors.ts"
+    },
+    "./integration/discord/management-service": {
+      "default": "./src/integration/discord/management-service.ts"
+    },
+    "./integration/discord/management-live": {
+      "default": "./src/integration/discord/management-live.ts"
+    },
+    "./integration/discord/inbound-service": {
+      "default": "./src/integration/discord/inbound-service.ts"
+    },
+    "./integration/discord/inbound-live": {
+      "default": "./src/integration/discord/inbound-live.ts"
+    },
+    "./integration/discord/rpcs": {
+      "default": "./src/integration/discord/rpcs.ts"
+    },
+    "./integration/discord/handlers": {
+      "default": "./src/integration/discord/handlers.ts"
+    },
+    "./board/repository": {
+      "default": "./src/board/repository.ts"
+    },
+    "./post/repository": {
+      "default": "./src/post/repository.ts"
+    },
+    "./post-subscription/repository": {
+      "default": "./src/post-subscription/repository.ts"
+    },
+    "./email-outbox/config": {
+      "default": "./src/email-outbox/config.ts"
     }
   },
   "dependencies": {
@@ -303,6 +378,8 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
+    "@feeblo/integration-discord": "workspace:*",
+    "@feeblo/integration-slack": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",

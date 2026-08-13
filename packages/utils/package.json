@@ -12,7 +12,8 @@
     "./markdown": "./src/markdown/index.ts",
     "./html-sanitizer": "./src/html-sanitizer.ts",
     "./markdown-sanitizer": "./src/markdown-sanitizer.ts",
-    "./scule": "./src/scule.ts"
+    "./scule": "./src/scule.ts",
+    "./text": "./src/text.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit"

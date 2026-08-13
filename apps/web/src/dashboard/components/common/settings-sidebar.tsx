@@ -14,6 +14,7 @@ import { hasPermission } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
   Building03Icon,
+  Chat01Icon,
   CreditCardIcon,
   Folder01Icon,
   LayoutThreeColumnIcon,
@@ -90,6 +91,12 @@ const settingsItems = [
         icon: Settings05Icon,
         permission: "webhooks.manage" as const,
         to: "/$organizationId/settings/webhooks" as const,
+      },
+      {
+        label: "Integrations",
+        icon: Chat01Icon,
+        permission: "integrations.manage" as const,
+        to: "/$organizationId/settings/integrations" as const,
       },
     ],
   },

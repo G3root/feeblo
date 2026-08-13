@@ -180,10 +180,10 @@ export const initAuthHandler = (
     };
 
     const ssoOptions: JwtAutoLoginOptions = {
-      createSsoUser: async ({ organizationId, token }) => {
+      createSsoUser: async ({ clientIp, organizationId, token }) => {
         try {
           return await callbackRuntime.runPromise(
-            createSsoSession({ organizationId, token })
+            createSsoSession({ clientIp, organizationId, token })
           );
         } catch (error) {
           if (error instanceof SsoError) {

@@ -17,6 +17,9 @@
       "types": "./dist/auth-client.d.ts",
       "default": "./src/auth-client.ts"
     },
+    "./auth-client-ip-header": {
+      "default": "./src/auth-client-ip-header.ts"
+    },
     "./session": {
       "types": "./src/session.ts",
       "default": "./src/session.ts"

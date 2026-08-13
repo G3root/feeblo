@@ -28,8 +28,14 @@ export type TIntegrationConnectionMode = S.Schema.Type<
   typeof IntegrationConnectionMode
 >;
 
-/** V1 capability persisted by custom-webhook routes. */
-export const IntegrationCapabilityKey = S.Literal("events.post");
+/** Capabilities persisted by integration routes. `events.post` is the V1 custom-webhook capability; Slack and Discord own the remaining keys. */
+export const IntegrationCapabilityKey = S.Literals([
+  "events.post",
+  "channel.notifications",
+  "commands",
+  "message.action",
+  "interactions",
+]);
 export type TIntegrationCapabilityKey = S.Schema.Type<
   typeof IntegrationCapabilityKey
 >;

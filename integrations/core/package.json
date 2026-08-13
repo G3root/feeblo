@@ -18,6 +18,7 @@
   "dependencies": {
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
+    "@feeblo/utils": "workspace:*",
     "drizzle-orm": "catalog:",
     "effect": "catalog:"
   },

@@ -131,6 +131,7 @@ export const IntegrationPostEventData = Schema.Struct({
   }),
   post: Schema.Struct({
     id: PostId.schema,
+    metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     status: Schema.Struct({
       id: PostStatusId.schema,
       type: PostStatusType,
@@ -161,6 +162,8 @@ export const IntegrationRoute = Schema.Struct({
   eventTypes: IntegrationRouteEventSelection,
   id: IntegrationRouteId.schema,
   provider: IntegrationProviderKey,
+  /** Provider-owned versioned configuration; secrets never belong here. */
+  providerConfig: Schema.Json,
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
 export interface IntegrationRoute
@@ -329,10 +332,37 @@ export interface IntegrationCapabilityHandler {
   >;
 }
 
+/** Raw inbound request handed to a provider capability; the provider owns wire parsing and signature verification. */
+export interface IntegrationInboundRequest {
+  readonly headers: Readonly<Record<string, string | undefined>>;
+  readonly rawBody: string;
+}
+
+/** Serializable inbound response returned to the external caller. */
+export interface IntegrationInboundResponse {
+  readonly body: unknown;
+  readonly status?: number;
+}
+
+/** Terminal rejection of an inbound request after verification failed. */
+export class IntegrationInboundRejection extends Schema.TaggedErrorClass<IntegrationInboundRejection>()(
+  "IntegrationInboundRejection",
+  { message: Schema.String, provider: IntegrationProviderKey }
+) {}
+
+/** One provider implementation for one advertised inbound capability. */
+export interface IntegrationInboundCapabilityHandler {
+  readonly capabilityKey: TIntegrationCapabilityKey;
+  readonly handle: (
+    input: IntegrationInboundRequest
+  ) => Effect.Effect<IntegrationInboundResponse, IntegrationInboundRejection>;
+}
+
 /** Static provider contribution validated by the server registry during startup. */
 export interface IntegrationProviderRegistration {
   readonly connectionConfigurationSchema: Schema.Codec<Schema.Json>;
   readonly handlers: readonly IntegrationCapabilityHandler[];
+  readonly inboundHandlers: readonly IntegrationInboundCapabilityHandler[];
   readonly manifest: IntegrationProviderManifest;
   readonly routeConfigurationSchemas: ReadonlyMap<
     string,
