@@ -27,13 +27,15 @@ const testChannels: readonly DiscordChannel[] = [
 
 /** Fake Discord API client; captures calls and answers with canned data. */
 const makeFakeDiscordApiClient = (
-  channels: readonly DiscordChannel[] = testChannels
+  channels: readonly DiscordChannel[] = testChannels,
+  guildId: string | ((exchangeNumber: number) => string) = "G123"
 ): DiscordApiClient & {
   readonly calls: { readonly method: string }[];
   readonly registeredCommands: readonly { name: string; type: number }[];
 } => {
   const calls: { readonly method: string }[] = [];
   const registeredCommands: { name: string; type: number }[] = [];
+  let exchangeNumber = 0;
   return {
     calls,
     registeredCommands,
@@ -63,12 +65,19 @@ const makeFakeDiscordApiClient = (
         }))
       );
     },
+    guildsLeave: () => {
+      calls.push({ method: "guilds.leave" });
+      return Effect.void;
+    },
     oauth2TokenExchange: () => {
       calls.push({ method: "oauth2.token" });
+      exchangeNumber += 1;
+      const exchangedGuildId =
+        typeof guildId === "string" ? guildId : guildId(exchangeNumber);
       return Effect.succeed({
         access_token: "discord-user-token",
         expires_in: 604_800,
-        guild: { id: "G123", name: "Acme" },
+        guild: { id: exchangedGuildId, name: "Acme" },
         scope: "identify applications.commands bot",
         token_type: "Bearer",
         user: { id: "U123", username: "alice" },
@@ -93,9 +102,10 @@ const testConfig = (configured = true) =>
 
 const makeTestLayer = (
   channels?: readonly DiscordChannel[],
-  configured = true
+  configured = true,
+  guildId: string | ((exchangeNumber: number) => string) = "G123"
 ) => {
-  const apiClient = makeFakeDiscordApiClient(channels);
+  const apiClient = makeFakeDiscordApiClient(channels, guildId);
   const serviceLayer = makeDiscordManagementServiceLive(apiClient).pipe(
     Layer.provide(testConfig(configured)),
     Layer.provide(Database.PgliteDatabaseLive)
@@ -245,7 +255,48 @@ describe("discord management service", () => {
     );
   });
 
-  layer(makeTestLayer().layer)("channel notifications", (it) => {
+  layer(makeTestLayer(undefined, true, "GUILD_OWNERSHIP").layer)(
+    "guild ownership",
+    (it) => {
+      it.effect("rejects connecting one guild to two organizations", () =>
+        Effect.gen(function* () {
+          const service = yield* DiscordManagementService;
+          const firstOrganizationId = yield* seedOrganization;
+          const first = yield* service.connectStart({
+            organizationId: firstOrganizationId,
+          });
+          yield* service.connectComplete({
+            code: "first-code",
+            state: urlState(first.authorizeUrl),
+          });
+
+          const secondOrganizationId = yield* seedOrganization;
+          const second = yield* service.connectStart({
+            organizationId: secondOrganizationId,
+          });
+          const failure = yield* Effect.flip(
+            service.connectComplete({
+              code: "second-code",
+              state: urlState(second.authorizeUrl),
+            })
+          );
+
+          expect(failure).toMatchObject({
+            _tag: "BadRequestError",
+            message:
+              "Discord server is already connected to another organization",
+          });
+        })
+      );
+    }
+  );
+
+  const channelNotificationsFlow = makeTestLayer(
+    undefined,
+    true,
+    (exchangeNumber) => `GUILD_CHANNELS_${exchangeNumber}`
+  );
+  layer(channelNotificationsFlow.layer)("channel notifications", (it) => {
     it.effect("lists text channels and toggles notifications", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
@@ -293,7 +344,6 @@ describe("discord management service", () => {
 
         yield* service.setChannelNotifications({
           channelId: "C2",
-          channelName: "feedback",
           connectionId,
           enabled: true,
           organizationId,
@@ -311,7 +361,6 @@ describe("discord management service", () => {
 
         yield* service.setChannelNotifications({
           channelId: "C2",
-          channelName: "feedback",
           connectionId,
           enabled: false,
           organizationId,
@@ -323,6 +372,19 @@ describe("discord management service", () => {
         expect(
           disabled.find((channel) => channel.id === "C2")?.notificationsEnabled
         ).toBe(false);
+
+        const unknownChannelFailure = yield* Effect.flip(
+          service.setChannelNotifications({
+            channelId: "CHANNEL_FROM_ANOTHER_GUILD",
+            connectionId,
+            enabled: true,
+            organizationId,
+          })
+        );
+        expect(unknownChannelFailure).toMatchObject({
+          _tag: "NotFoundError",
+          message: "Discord channel was not found in the connected server",
+        });
       })
     );
 
@@ -369,6 +431,11 @@ describe("discord management service", () => {
 
         const listed = yield* service.listConnections({ organizationId });
         expect(listed).toHaveLength(0);
+        expect(
+          channelNotificationsFlow.apiClient.calls.some(
+            (call) => call.method === "guilds.leave"
+          )
+        ).toBe(true);
       })
     );
   });

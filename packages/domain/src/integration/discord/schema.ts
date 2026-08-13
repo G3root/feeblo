@@ -54,8 +54,6 @@ export type TDiscordChannelList = typeof DiscordChannelList.Type;
 /** Toggles new-post notifications for one channel of one connection. */
 export const DiscordChannelNotificationsUpdate = Schema.Struct({
   channelId: Schema.String,
-  /** Display name of the channel, stored on the notification route. */
-  channelName: Schema.String,
   connectionId: IntegrationConnectionId.schema,
   enabled: Schema.Boolean,
   organizationId: WorkspaceId.schema,

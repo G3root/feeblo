@@ -20,7 +20,6 @@ export const startDiscordConnect = (organizationId: string) =>
 
 export const updateChannelNotifications = (input: {
   readonly channelId: string;
-  readonly channelName: string;
   readonly connectionId: string;
   readonly enabled: boolean;
   readonly organizationId: string;
@@ -28,7 +27,6 @@ export const updateChannelNotifications = (input: {
   fetchRpc((rpc) =>
     rpc.DiscordChannelNotificationsUpdate({
       channelId: input.channelId,
-      channelName: input.channelName,
       connectionId: input.connectionId,
       enabled: input.enabled,
       organizationId: input.organizationId,

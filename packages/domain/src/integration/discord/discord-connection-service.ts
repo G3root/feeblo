@@ -15,7 +15,7 @@ import {
 } from "@feeblo/integration-discord";
 import { encryptDiscordCredentialMaterial } from "@feeblo/integration-discord/credentials";
 import { discordProviderKey } from "@feeblo/integration-discord/manifest";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -29,6 +29,7 @@ import {
 import { DiscordIntegrationConfig } from "./config";
 import {
   decryptConnectionCredentials,
+  findDiscordConnection,
   lockDiscordConnection,
   mapDiscordApiError,
   mapManagementError,
@@ -215,6 +216,29 @@ export const makeDiscordConnectionServiceLive = (
             )
           );
           const organizationId = asLegid(WorkspaceId)(decodedOrganizationId);
+          const [pendingConnection] = yield* findDiscordConnection(
+            db,
+            decoded.connectionId,
+            organizationId
+          );
+          if (
+            pendingConnection === undefined ||
+            pendingConnection.lifecycle !== "connecting" ||
+            pendingConnection.credentialsCiphertext === null
+          ) {
+            return yield* new NotFoundError({
+              message: "Discord connection was not found",
+            });
+          }
+          const pendingCredentials = yield* decryptConnectionCredentials(
+            config,
+            pendingConnection.credentialsCiphertext
+          );
+          if (pendingCredentials.oauthState !== decoded.nonce) {
+            return yield* new BadRequestError({
+              message: "Discord OAuth state does not match",
+            });
+          }
           // OAuth exchange runs before any transaction: the code is single-use,
           // so Discord itself serializes replays. The guarded connection
           // transition below is the idempotency boundary for concurrent
@@ -235,6 +259,30 @@ export const makeDiscordConnectionServiceLive = (
             });
           }
           const guild = oauth.guild;
+          const [connectionForAnotherOrganization] = yield* db
+            .select({ id: schema.integrationConnectionTable.id })
+            .from(schema.integrationConnectionTable)
+            .where(
+              and(
+                eq(
+                  schema.integrationConnectionTable.provider,
+                  discordProviderKey
+                ),
+                eq(schema.integrationConnectionTable.remoteAccountId, guild.id),
+                eq(schema.integrationConnectionTable.lifecycle, "active"),
+                ne(
+                  schema.integrationConnectionTable.organizationId,
+                  organizationId
+                )
+              )
+            )
+            .limit(1);
+          if (connectionForAnotherOrganization !== undefined) {
+            return yield* new BadRequestError({
+              message:
+                "Discord server is already connected to another organization",
+            });
+          }
           // Register the guild-scoped commands up front; a failure here aborts
           // the install so the connection never activates without its surface.
           const application = yield* apiClient
@@ -410,7 +458,7 @@ export const makeDiscordConnectionServiceLive = (
         input: S.TDiscordConnectionDisconnect
       ) {
         const { connectionId, organizationId } = input;
-        const credentialsCiphertext = yield* db
+        const disconnectingConnection = yield* db
           .transaction(() =>
             Effect.gen(function* () {
               const [connection] = yield* lockDiscordConnection(
@@ -459,47 +507,79 @@ export const makeDiscordConnectionServiceLive = (
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
-              yield* db
-                .update(schema.integrationConnectionTable)
-                .set({
-                  archivedAt: now,
-                  credentialsCiphertext: null,
-                  lifecycle: "archived",
-                  retentionExpiresAt: new Date(now.getTime() + retentionMs),
-                  updatedAt: now,
-                })
-                .where(eq(schema.integrationConnectionTable.id, connectionId));
-              return connection.credentialsCiphertext ?? undefined;
+              return {
+                credentialsCiphertext:
+                  connection.credentialsCiphertext ?? undefined,
+                guildId: connection.remoteAccountId ?? undefined,
+              };
             })
           )
           .pipe(mapManagementError("disconnect"));
+        if (disconnectingConnection === undefined) {
+          return;
+        }
+        if (disconnectingConnection.guildId !== undefined) {
+          const leftGuild = yield* Effect.exit(
+            apiClient.guildsLeave({
+              botToken: config.botToken,
+              guildId: disconnectingConnection.guildId,
+            })
+          );
+          if (Exit.isFailure(leftGuild)) {
+            yield* db
+              .update(schema.integrationConnectionTable)
+              .set({
+                lifecycle: "revocation_unconfirmed",
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.integrationConnectionTable.id, connectionId))
+              .pipe(mapManagementError("disconnect state update"));
+            return yield* Effect.failCause(leftGuild.cause).pipe(
+              mapDiscordApiError("guild disconnect")
+            );
+          }
+        }
+        const credentialsCiphertext =
+          disconnectingConnection.credentialsCiphertext;
         if (credentialsCiphertext === undefined) {
-          return;
-        }
-        const credentials = yield* Effect.exit(
-          decryptConnectionCredentials(config, credentialsCiphertext)
-        );
-        if (Exit.isFailure(credentials)) {
           yield* Effect.logWarning(
-            "Could not decrypt Discord credentials for token revocation"
+            "Discord disconnect had no installer credential to revoke"
           );
-          return;
+        } else {
+          const credentials = yield* Effect.exit(
+            decryptConnectionCredentials(config, credentialsCiphertext)
+          );
+          if (Exit.isFailure(credentials)) {
+            yield* Effect.logWarning(
+              "Could not decrypt Discord credentials for token revocation"
+            );
+          } else if (credentials.value.userToken !== undefined) {
+            const revoked = yield* Effect.exit(
+              apiClient.oauth2TokenRevoke({
+                clientId: config.clientId,
+                clientSecret: config.clientSecret,
+                userToken: credentials.value.userToken,
+              })
+            );
+            if (Exit.isFailure(revoked)) {
+              yield* Effect.logWarning(
+                "Discord token revocation failed after guild disconnect"
+              );
+            }
+          }
         }
-        if (credentials.value.userToken === undefined) {
-          return;
-        }
-        const revoked = yield* Effect.exit(
-          apiClient.oauth2TokenRevoke({
-            clientId: config.clientId,
-            clientSecret: config.clientSecret,
-            userToken: credentials.value.userToken,
+        const now = new Date();
+        yield* db
+          .update(schema.integrationConnectionTable)
+          .set({
+            archivedAt: now,
+            credentialsCiphertext: null,
+            lifecycle: "archived",
+            retentionExpiresAt: new Date(now.getTime() + retentionMs),
+            updatedAt: now,
           })
-        );
-        if (Exit.isFailure(revoked)) {
-          yield* Effect.logWarning(
-            "Discord token revocation failed after disconnect"
-          );
-        }
+          .where(eq(schema.integrationConnectionTable.id, connectionId))
+          .pipe(mapManagementError("disconnect archive"));
       });
 
       return DiscordConnectionService.of({

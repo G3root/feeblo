@@ -365,7 +365,6 @@ function FeedbackChannelSelect({
     try {
       await updateChannelNotifications({
         channelId: channel.id,
-        channelName: channel.name,
         connectionId,
         enabled,
         organizationId,

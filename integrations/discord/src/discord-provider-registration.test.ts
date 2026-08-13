@@ -139,6 +139,7 @@ const makePostMessageSpy = () => {
     },
     guildsChannels: () => Effect.succeed([]),
     guildsCommandsBulkOverwrite: () => Effect.succeed([]),
+    guildsLeave: () => Effect.void,
     oauth2TokenExchange: () =>
       Effect.succeed({
         access_token: "user-token",

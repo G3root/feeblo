@@ -133,105 +133,141 @@ export const makeDiscordChannelServiceLive = (
 
       const setChannelNotifications = Effect.fn(
         "DiscordChannel.setChannelNotifications"
-      )(function* (input: S.TDiscordChannelNotificationsUpdate) {
-        return yield* db
-          .transaction(() =>
-            Effect.gen(function* () {
-              const [connection] = yield* lockDiscordConnection(
-                db,
-                input.connectionId,
-                input.organizationId
-              );
-              if (
-                connection === undefined ||
-                connection.lifecycle !== "active"
-              ) {
-                return yield* new NotFoundError({
-                  message: "Discord connection was not found",
-                });
-              }
-              // One route per channel: look the target channel's route up by
-              // its routeKey (the channel id) instead of decoding every
-              // channel.notifications route's providerConfig.
-              const [route] = yield* db
-                .select()
-                .from(schema.integrationRouteTable)
-                .where(
-                  and(
-                    eq(
-                      schema.integrationRouteTable.connectionId,
-                      input.connectionId
-                    ),
-                    eq(
-                      schema.integrationRouteTable.capabilityKey,
-                      "channel.notifications"
-                    ),
-                    eq(
-                      schema.integrationRouteTable.organizationId,
-                      input.organizationId
-                    ),
-                    eq(schema.integrationRouteTable.routeKey, input.channelId)
-                  )
-                )
-                .limit(1);
-              // The channel display name always comes from the caller; the
-              // stale name stored on a previous selection must never leak
-              // into the new configuration.
-              const channelName = input.channelName;
-              const now = new Date();
-              if (input.enabled) {
-                if (route === undefined) {
-                  yield* db.insert(schema.integrationRouteTable).values({
-                    capabilityKey: "channel.notifications",
-                    configVersion: 1,
-                    connectionId: input.connectionId,
-                    enabled: true,
-                    eventTypes: ["feedback.post.created"],
-                    id: yield* IntegrationRouteId.generate,
-                    organizationId: input.organizationId,
-                    providerConfig: {
-                      channelId: input.channelId,
-                      version: 1,
-                    },
-                    routeKey: input.channelId,
-                    safeDisplayMetadata: { channelName },
-                    createdAt: now,
-                    updatedAt: now,
+      )(
+        function* (input: S.TDiscordChannelNotificationsUpdate) {
+          const [connection] = yield* findDiscordConnection(
+            db,
+            input.connectionId,
+            input.organizationId
+          );
+          if (
+            connection === undefined ||
+            connection.lifecycle !== "active" ||
+            connection.remoteAccountId === null
+          ) {
+            return yield* new NotFoundError({
+              message: "Discord connection was not found",
+            });
+          }
+          // Discord owns channel membership and names. Resolve the requested
+          // channel against the connection's guild before persisting a route so
+          // a caller cannot route deliveries into another installed guild.
+          const discordChannels = yield* apiClient
+            .guildsChannels({
+              botToken: config.botToken,
+              guildId: connection.remoteAccountId,
+            })
+            .pipe(mapDiscordApiError("channel validation"));
+          const selectedChannel = discordChannels.find(
+            (channel) =>
+              channel.id === input.channelId &&
+              DISCORD_NOTIFICATION_CHANNEL_TYPES.includes(
+                channel.type as (typeof DISCORD_NOTIFICATION_CHANNEL_TYPES)[number]
+              )
+          );
+          if (selectedChannel === undefined) {
+            return yield* new NotFoundError({
+              message: "Discord channel was not found in the connected server",
+            });
+          }
+          return yield* db
+            .transaction(() =>
+              Effect.gen(function* () {
+                const [connection] = yield* lockDiscordConnection(
+                  db,
+                  input.connectionId,
+                  input.organizationId
+                );
+                if (
+                  connection === undefined ||
+                  connection.lifecycle !== "active"
+                ) {
+                  return yield* new NotFoundError({
+                    message: "Discord connection was not found",
                   });
-                } else if (route.enabled !== true) {
-                  yield* db
-                    .update(schema.integrationRouteTable)
-                    .set({
+                }
+                // One route per channel: look the target channel's route up by
+                // its routeKey (the channel id) instead of decoding every
+                // channel.notifications route's providerConfig.
+                const [route] = yield* db
+                  .select()
+                  .from(schema.integrationRouteTable)
+                  .where(
+                    and(
+                      eq(
+                        schema.integrationRouteTable.connectionId,
+                        input.connectionId
+                      ),
+                      eq(
+                        schema.integrationRouteTable.capabilityKey,
+                        "channel.notifications"
+                      ),
+                      eq(
+                        schema.integrationRouteTable.organizationId,
+                        input.organizationId
+                      ),
+                      eq(schema.integrationRouteTable.routeKey, input.channelId)
+                    )
+                  )
+                  .limit(1);
+                const channelName = selectedChannel.name;
+                const now = new Date();
+                if (input.enabled) {
+                  if (route === undefined) {
+                    yield* db.insert(schema.integrationRouteTable).values({
+                      capabilityKey: "channel.notifications",
+                      configVersion: 1,
+                      connectionId: input.connectionId,
                       enabled: true,
                       eventTypes: ["feedback.post.created"],
+                      id: yield* IntegrationRouteId.generate,
+                      organizationId: input.organizationId,
                       providerConfig: {
                         channelId: input.channelId,
                         version: 1,
                       },
+                      routeKey: input.channelId,
                       safeDisplayMetadata: { channelName },
+                      createdAt: now,
                       updatedAt: now,
-                    })
+                    });
+                  } else if (route.enabled !== true) {
+                    yield* db
+                      .update(schema.integrationRouteTable)
+                      .set({
+                        enabled: true,
+                        eventTypes: ["feedback.post.created"],
+                        providerConfig: {
+                          channelId: input.channelId,
+                          version: 1,
+                        },
+                        safeDisplayMetadata: { channelName },
+                        updatedAt: now,
+                      })
+                      .where(eq(schema.integrationRouteTable.id, route.id));
+                  }
+                } else if (route?.enabled === true) {
+                  yield* db
+                    .update(schema.integrationRouteTable)
+                    .set({ enabled: false, updatedAt: now })
                     .where(eq(schema.integrationRouteTable.id, route.id));
+                  yield* db
+                    .update(schema.integrationDeliveryTable)
+                    .set({ canceledAt: now, state: "canceled", updatedAt: now })
+                    .where(
+                      and(
+                        eq(schema.integrationDeliveryTable.routeId, route.id),
+                        eq(schema.integrationDeliveryTable.state, "pending")
+                      )
+                    );
                 }
-              } else if (route?.enabled === true) {
-                yield* db
-                  .update(schema.integrationRouteTable)
-                  .set({ enabled: false, updatedAt: now })
-                  .where(eq(schema.integrationRouteTable.id, route.id));
-                yield* db
-                  .update(schema.integrationDeliveryTable)
-                  .set({ canceledAt: now, state: "canceled", updatedAt: now })
-                  .where(
-                    and(
-                      eq(schema.integrationDeliveryTable.routeId, route.id),
-                      eq(schema.integrationDeliveryTable.state, "pending")
-                    )
-                  );
-              }
-            })
-          )
-          .pipe(mapManagementError("channel notifications update"));
-      });
+              })
+            )
+            .pipe(mapManagementError("channel notifications update"));
+        },
+        (effect) =>
+          effect.pipe(mapManagementError("channel notifications update"))
+      );
 
       return DiscordChannelService.of({
         listChannels,

@@ -217,6 +217,11 @@ export interface DiscordApiClient {
     readonly commands: readonly unknown[];
     readonly guildId: string;
   }) => Effect.Effect<readonly DiscordGuildCommand[], DiscordApiFailure>;
+  /** Removes the application bot from one Discord guild. */
+  readonly guildsLeave: (input: {
+    readonly botToken: Redacted.Redacted<string>;
+    readonly guildId: string;
+  }) => Effect.Effect<void, DiscordApiFailure>;
   readonly oauth2TokenExchange: (input: {
     readonly clientId: string;
     readonly clientSecret: Redacted.Redacted<string>;
@@ -238,6 +243,7 @@ export const makeDiscordApiClient = (
     (input: {
       readonly httpRequest: HttpClientRequest.HttpClientRequest;
       readonly context: string;
+      readonly responseBody?: "empty" | "json";
     }) =>
       Effect.gen(function* () {
         const execute = HttpClient.execute(input.httpRequest);
@@ -269,6 +275,9 @@ export const makeDiscordApiClient = (
             input.context
           );
         }
+        if (input.responseBody === "empty") {
+          return undefined;
+        }
         return yield* response.json.pipe(
           Effect.mapError(
             () =>
@@ -293,7 +302,7 @@ export const makeDiscordApiClient = (
   );
 
   const jsonRequest = (
-    method: "GET" | "POST" | "PUT",
+    method: "DELETE" | "GET" | "POST" | "PUT",
     path: string,
     {
       body,
@@ -419,6 +428,19 @@ export const makeDiscordApiClient = (
           "guilds.commands.bulkOverwrite"
         )
       ),
+    guildsLeave: ({ botToken, guildId }) =>
+      request({
+        httpRequest: HttpClientRequest.make("DELETE")(
+          `${DISCORD_API_BASE_URL}/users/@me/guilds/${guildId}`
+        ).pipe(
+          HttpClientRequest.setHeader(
+            "authorization",
+            `Bot ${Redacted.value(botToken)}`
+          )
+        ),
+        context: "guilds.leave",
+        responseBody: "empty",
+      }).pipe(Effect.as(undefined)),
     oauth2TokenExchange: ({ clientId, clientSecret, code, redirectUri }) =>
       decodeResponse(
         DiscordOAuthTokenResponse,
@@ -451,6 +473,7 @@ export const makeDiscordApiClient = (
           })
         ),
         context: "oauth2.token.revoke",
+        responseBody: "empty",
       }).pipe(Effect.as(undefined)),
   };
 };
