@@ -1,27 +1,18 @@
+import type { ChannelUpdateMessage } from "@feeblo/integration-core";
+
+export type { ChannelUpdateMessage } from "@feeblo/integration-core";
+
 import { truncate } from "@feeblo/utils/text";
 
-/**
- * Channel-update message model shared by channel-notification providers
- * (Slack now, Discord later). Providers render this pure model into their own
- * wire format; no provider-specific types leak into the model.
- */
-export interface ChannelUpdateMessage {
-  /** Absolute URL to open the post. */
-  readonly actionUrl: string;
-  /** Display name of the actor, when known. */
-  readonly actorName?: string;
-  /** Event type that produced the update. */
-  readonly eventType: string;
-  /** Facts rendered as key/value rows, e.g. board and status. */
-  readonly facts: ReadonlyArray<{
-    readonly label: string;
-    readonly value: string;
-  }>;
-  /** Post title, truncated for channel display by the renderer. */
-  readonly title: string;
-}
-
 const TRUNCATED_TITLE_MAX = 150;
+const TRUNCATED_CONTEXT_MAX = 3000;
+
+const formatSlackFactLabel = (value: string): string =>
+  value
+    .toLowerCase()
+    .split("_")
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(" ");
 
 /**
  * Renders a channel-update message into Slack Block Kit blocks for
@@ -42,7 +33,13 @@ export const renderChannelUpdateMessageBlocks = (
     },
   ];
   const factText = message.facts
-    .map(({ label, value }) => `*${label}:* ${value}`)
+    .filter(
+      ({ label, value }) => label.trim().length > 0 && value.trim().length > 0
+    )
+    .map(
+      ({ label, value }) =>
+        `*${formatSlackFactLabel(label.trim())}:* ${value.trim()}`
+    )
     .join("   ·   ");
   if (factText.length > 0) {
     blocks.push({
@@ -50,7 +47,7 @@ export const renderChannelUpdateMessageBlocks = (
       elements: [
         {
           type: "mrkdwn",
-          text: factText,
+          text: truncate(factText, TRUNCATED_CONTEXT_MAX),
         },
       ],
     });

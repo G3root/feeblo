@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "integration_connection_provider_remote_account_active_uidx" ON "integration_connection" ("provider","remote_account_id") WHERE "provider" = 'discord' and "remote_account_id" is not null and "lifecycle" = 'active';

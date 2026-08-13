@@ -27,15 +27,19 @@ import { SlackInboundFailure } from "./errors";
 /** A feedback post created from an inbound Slack submission. */
 export interface SlackPost {
   readonly boardId: string;
+  readonly boardName: string;
   readonly boardSlug: string;
   readonly id: string;
+  readonly metadata: Readonly<Record<string, string>>;
   readonly slug: string;
+  readonly status: string;
   readonly title: string;
 }
 
 export interface SlackPostInput {
   readonly boardId: string;
   readonly content: string;
+  readonly metadata?: Readonly<Record<string, string>>;
   readonly organizationId: string;
   readonly title: string;
   readonly userId: string;
@@ -82,6 +86,7 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
       const createPost = ({
         boardId,
         content,
+        metadata = {},
         organizationId,
         title,
         userId,
@@ -101,7 +106,10 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
           const id = yield* PostId.generate;
           const excerpt = htmlToExcerpt(sanitizedHtml);
           const [board] = yield* db
-            .select({ slug: schema.boardTable.slug })
+            .select({
+              name: schema.boardTable.name,
+              slug: schema.boardTable.slug,
+            })
             .from(schema.boardTable)
             .where(
               and(
@@ -125,6 +133,7 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
                 creatorMemberId: null,
                 excerpt,
                 id,
+                metadata: { ...metadata },
                 organizationId,
                 source: "SLACK",
                 statusId: defaultStatus.id,
@@ -136,6 +145,7 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
                 eventType: "feedback.post.created",
                 organizationId: asLegid(WorkspaceId)(organizationId),
                 postId: id,
+                ...(Object.keys(metadata).length === 0 ? {} : { metadata }),
                 postSlug: createdSlug,
                 statusId: asLegid(PostStatusId)(defaultStatus.id),
                 title,
@@ -168,7 +178,16 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
               ? { embeddingService: embeddingService.value }
               : {}),
           }).pipe(Effect.provideService(Database.Database, db));
-          return { boardId, boardSlug, id, slug, title };
+          return {
+            boardId,
+            boardName: board.name,
+            boardSlug,
+            id,
+            metadata,
+            slug,
+            status: defaultStatus.type,
+            title,
+          };
         }).pipe(
           Effect.mapError((error) =>
             error instanceof SlackInboundFailure

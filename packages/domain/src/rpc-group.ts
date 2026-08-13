@@ -9,6 +9,7 @@ import { CommentRpcs } from "./comments/rpcs";
 import { CompanyRpcs } from "./company/rpcs";
 import { ContactRpcs } from "./contact/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
+import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { WebhookManagementRpcs } from "./integration/rpcs";
 import { SlackManagementRpcs } from "./integration/slack/rpcs";
 import { JwtSecretRpcs } from "./jwt-secret/rpcs";
@@ -51,5 +52,6 @@ export const AllRpcs = PostRpcs.merge(PostActivityRpcs).merge(
   ContactRpcs,
   EmailSubscriptionRpcs,
   WebhookManagementRpcs,
-  SlackManagementRpcs
+  SlackManagementRpcs,
+  DiscordManagementRpcs
 );

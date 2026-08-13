@@ -20,6 +20,13 @@ import { Api } from "@feeblo/domain/http/api";
 import { HttpRoute } from "@feeblo/domain/http/router";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import {
+  DiscordFeedbackServiceLive,
+  DiscordInboundServiceLive,
+  DiscordIntegrationConfig,
+  DiscordManagementServiceLive,
+  DiscordUserServiceLive,
+} from "@feeblo/domain/integration/discord";
+import {
   SlackFeedbackServiceLive,
   SlackInboundServiceLive,
   SlackIntegrationConfig,
@@ -61,6 +68,7 @@ import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as HttpApiScalar from "effect/unstable/httpapi/HttpApiScalar";
 import * as RateLimiter from "effect/unstable/persistence/RateLimiter";
 import { ServerConfig } from "./config";
+import { makeDiscordRouters } from "./discord";
 import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
 import { e2eSetPlanRouter } from "./e2e-set-plan";
 import { makeIntegrationLayers } from "./integrations";
@@ -195,6 +203,7 @@ const program = Effect.gen(function* () {
     Effect.provideService(ServerConfig, config)
   );
   const SlackRouters = makeSlackRouters(integrationRuntime.registry);
+  const DiscordRouters = makeDiscordRouters(integrationRuntime.registry);
   const ServiceLayers = Layer.mergeAll(
     WorkFlowLayer,
     SiteRepository.layer,
@@ -211,6 +220,21 @@ const program = Effect.gen(function* () {
       Layer.provide(SlackIntegrationConfig.layer),
       Layer.provide(SlackUserServiceLive),
       Layer.provide(SlackFeedbackServiceLive),
+      Layer.provide(BoardRepository.layer),
+      Layer.provide(EmailOutboxConfig.layer),
+      Layer.provide(IntegrationEventRecorderLive),
+      Layer.provide(PostRepository.layer),
+      Layer.provide(PostStatusRepository.layer),
+      Layer.provide(PostSubscriptionRepository.layer),
+      Layer.provide(Database.DatabaseContextLive)
+    ),
+    DiscordManagementServiceLive.pipe(
+      Layer.provide(DiscordIntegrationConfig.layer),
+      Layer.provide(Database.DatabaseContextLive)
+    ),
+    DiscordInboundServiceLive.pipe(
+      Layer.provide(DiscordUserServiceLive),
+      Layer.provide(DiscordFeedbackServiceLive),
       Layer.provide(BoardRepository.layer),
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(IntegrationEventRecorderLive),
@@ -285,7 +309,8 @@ const program = Effect.gen(function* () {
     HttpRoute,
     BetterAuthRouterLive,
     DocsRoute,
-    SlackRouters
+    SlackRouters,
+    DiscordRouters
   );
   const AllRoutes = MergedRoutes.pipe(
     Layer.provide(
@@ -339,7 +364,8 @@ program.pipe(
       ServerConfig.layer,
       Database.DatabaseContextLive,
       WebhookIntegrationConfig.layer,
-      SlackIntegrationConfig.layer
+      SlackIntegrationConfig.layer,
+      DiscordIntegrationConfig.layer
     )
   ),
   NodeRuntime.runMain

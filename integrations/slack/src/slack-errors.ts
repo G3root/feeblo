@@ -2,11 +2,13 @@
 import * as Schema from "effect/Schema";
 
 export {
+  IntegrationCredentialEncryptionError as SlackCredentialEncryptionError,
   IntegrationProviderAuthenticationError,
   IntegrationProviderInvalidConfigurationError,
   IntegrationProviderPermanentRejection,
   IntegrationProviderRateLimitedError,
   IntegrationProviderTemporaryFailure,
+  IntegrationRequestSignatureError as SlackSignatureVerificationError,
 } from "@feeblo/integration-core";
 
 import type {
@@ -16,18 +18,6 @@ import type {
   IntegrationProviderRateLimitedError,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
-
-/** Failure encrypting or decrypting Slack credentials at rest. */
-export class SlackCredentialEncryptionError extends Schema.TaggedErrorClass<SlackCredentialEncryptionError>()(
-  "SlackCredentialEncryptionError",
-  { operation: Schema.Literals(["encrypt", "decrypt"]), reason: Schema.String }
-) {}
-
-/** Failure verifying a Slack request signature. */
-export class SlackSignatureVerificationError extends Schema.TaggedErrorClass<SlackSignatureVerificationError>()(
-  "SlackSignatureVerificationError",
-  { reason: Schema.String }
-) {}
 
 /** Failure parsing a verified Slack inbound request body into its typed payload. */
 export class SlackInboundPayloadError extends Schema.TaggedErrorClass<SlackInboundPayloadError>()(

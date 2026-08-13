@@ -270,8 +270,13 @@ export const makeSlackInboundServiceLive = (
             body: {
               response_action: "update",
               view: buildSuccessModal({
+                boardName: created.boardName,
+                metadata: created.metadata,
+                postId: created.id,
                 postTitle: created.title,
                 ...(postUrl === undefined ? {} : { postUrl }),
+                status: created.status,
+                submitterName: payload.user.name,
               }),
             },
             status: 200,

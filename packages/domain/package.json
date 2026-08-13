@@ -325,6 +325,36 @@
     "./integration/slack/handlers": {
       "default": "./src/integration/slack/handlers.ts"
     },
+    "./integration/discord": {
+      "default": "./src/integration/discord/index.ts"
+    },
+    "./integration/discord/config": {
+      "default": "./src/integration/discord/config.ts"
+    },
+    "./integration/discord/schema": {
+      "default": "./src/integration/discord/schema.ts"
+    },
+    "./integration/discord/errors": {
+      "default": "./src/integration/discord/errors.ts"
+    },
+    "./integration/discord/management-service": {
+      "default": "./src/integration/discord/management-service.ts"
+    },
+    "./integration/discord/management-live": {
+      "default": "./src/integration/discord/management-live.ts"
+    },
+    "./integration/discord/inbound-service": {
+      "default": "./src/integration/discord/inbound-service.ts"
+    },
+    "./integration/discord/inbound-live": {
+      "default": "./src/integration/discord/inbound-live.ts"
+    },
+    "./integration/discord/rpcs": {
+      "default": "./src/integration/discord/rpcs.ts"
+    },
+    "./integration/discord/handlers": {
+      "default": "./src/integration/discord/handlers.ts"
+    },
     "./board/repository": {
       "default": "./src/board/repository.ts"
     },
@@ -345,6 +375,7 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
+    "@feeblo/integration-discord": "workspace:*",
     "@feeblo/integration-slack": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",

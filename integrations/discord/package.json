@@ -1,0 +1,32 @@
+{
+  "name": "@feeblo/integration-discord",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/discord-manifest.ts",
+    "./signature": "./src/discord-signature.ts",
+    "./credentials": "./src/discord-credentials.ts",
+    "./embeds": "./src/discord-embeds.ts",
+    "./inbound-schema": "./src/discord-inbound-schema.ts",
+    "./provider-registration": "./src/discord-provider-registration.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@feeblo/integration-core": "workspace:*",
+    "@feeblo/utils": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.94",
+    "@feeblo/config": "workspace:*",
+    "@feeblo/id": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
