@@ -200,6 +200,7 @@ const makeExternalResourceService = Effect.gen(function* () {
           .insert(schema.externalResourceCreateRequestTable)
           .values({
             id,
+            organizationId: input.organizationId,
             connectionId: input.connectionId,
             postId: input.postId,
             idempotencyKey: input.idempotencyKey,
@@ -208,11 +209,70 @@ const makeExternalResourceService = Effect.gen(function* () {
           .onConflictDoNothing()
           .returning({ id: schema.externalResourceCreateRequestTable.id })
           .pipe(Effect.mapError(databaseError("creation reservation")));
+        const inserted = created[0];
+        if (inserted !== undefined) {
+          return {
+            id: asLegid(ExternalResourceCreateRequestId)(inserted.id),
+            reserved: true,
+            postExternalResourceLinkId: null,
+          };
+        }
+        const [existing] = yield* db
+          .select({
+            id: schema.externalResourceCreateRequestTable.id,
+            postId: schema.externalResourceCreateRequestTable.postId,
+            postExternalResourceLinkId:
+              schema.externalResourceCreateRequestTable
+                .postExternalResourceLinkId,
+          })
+          .from(schema.externalResourceCreateRequestTable)
+          .where(
+            and(
+              eq(
+                schema.externalResourceCreateRequestTable.connectionId,
+                input.connectionId
+              ),
+              eq(
+                schema.externalResourceCreateRequestTable.organizationId,
+                input.organizationId
+              ),
+              eq(
+                schema.externalResourceCreateRequestTable.idempotencyKey,
+                input.idempotencyKey
+              )
+            )
+          )
+          .limit(1)
+          .pipe(Effect.mapError(databaseError("creation reservation lookup")));
+        if (existing === undefined || existing.postId !== input.postId) {
+          return yield* new InternalServerError({
+            message: "External resource creation reservation was not found.",
+          });
+        }
         return {
-          id: asLegid(ExternalResourceCreateRequestId)(created[0]?.id ?? id),
-          reserved: created.length === 1,
+          id: asLegid(ExternalResourceCreateRequestId)(existing.id),
+          reserved: false,
+          postExternalResourceLinkId:
+            existing.postExternalResourceLinkId === null
+              ? null
+              : asLegid(PostExternalResourceLinkId)(
+                  existing.postExternalResourceLinkId
+                ),
         };
       }),
+    failCreation: (input) =>
+      db
+        .delete(schema.externalResourceCreateRequestTable)
+        .where(
+          and(
+            eq(schema.externalResourceCreateRequestTable.id, input.requestId),
+            eq(schema.externalResourceCreateRequestTable.state, "pending")
+          )
+        )
+        .pipe(
+          Effect.mapError(databaseError("creation release")),
+          Effect.asVoid
+        ),
     completeCreation: (input) =>
       db
         .update(schema.externalResourceCreateRequestTable)

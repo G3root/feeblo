@@ -12,6 +12,13 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type {
+  TGitHubInstallationAccountType,
+  TGitHubIssueMatchMode,
+  TGitHubIssueState,
+  TGitHubUpvoterNotificationPolicy,
+} from "../validation-schema/github-integration";
+import type {
+  TExternalResourceCreateRequestState,
   TIntegrationCapabilityKey,
   TIntegrationConnectionLifecycleStatus,
   TIntegrationDeliveryAttemptDiagnostics,
@@ -19,22 +26,15 @@ import type {
   TIntegrationDeliveryRetryDecision,
   TIntegrationDeliveryState,
   TIntegrationEventType,
+  TIntegrationExternalResourceSafeMetadata,
+  TIntegrationExternalResourceType,
   TIntegrationProviderConfiguration,
   TIntegrationProviderKey,
   TIntegrationRouteEventSelection,
   TIntegrationSafeDisplayMetadata,
-  TIntegrationExternalResourceSafeMetadata,
-  TIntegrationExternalResourceType,
-  TExternalResourceCreateRequestState,
   TStoredIntegrationEventOrigin,
   TStoredIntegrationEventPayload,
 } from "../validation-schema/integration";
-import type {
-  TGitHubInstallationAccountType,
-  TGitHubIssueMatchMode,
-  TGitHubIssueState,
-  TGitHubUpvoterNotificationPolicy,
-} from "../validation-schema/github-integration";
 import { organizationTable } from "./auth";
 import { postStatusTable, postTable } from "./feedback";
 
@@ -432,6 +432,18 @@ export const integrationExternalResourceTable = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("integration_external_resource_organization_id_uidx").on(
+      table.organizationId,
+      table.id
+    ),
+    foreignKey({
+      columns: [table.organizationId, table.connectionId],
+      foreignColumns: [
+        integrationConnectionTable.organizationId,
+        integrationConnectionTable.id,
+      ],
+      name: "integration_external_resource_organization_connection_fkey",
+    }).onDelete("cascade"),
     uniqueIndex("integration_external_resource_connection_type_remote_uidx").on(
       table.connectionId,
       table.resourceType,
@@ -465,6 +477,23 @@ export const postExternalResourceLinkTable = pgTable(
       .notNull(),
   },
   (table) => [
+    uniqueIndex("post_external_resource_link_organization_id_uidx").on(
+      table.organizationId,
+      table.id
+    ),
+    foreignKey({
+      columns: [table.postId, table.organizationId],
+      foreignColumns: [postTable.id, postTable.organizationId],
+      name: "post_external_resource_link_post_organization_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.externalResourceId],
+      foreignColumns: [
+        integrationExternalResourceTable.organizationId,
+        integrationExternalResourceTable.id,
+      ],
+      name: "post_external_resource_link_organization_resource_fkey",
+    }).onDelete("cascade"),
     uniqueIndex("post_external_resource_link_post_resource_uidx").on(
       table.postId,
       table.externalResourceId
@@ -507,6 +536,19 @@ export const githubSyncRuleTable = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.organizationId, table.connectionId],
+      foreignColumns: [
+        integrationConnectionTable.organizationId,
+        integrationConnectionTable.id,
+      ],
+      name: "github_sync_rule_organization_connection_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.postStatusId],
+      foreignColumns: [postStatusTable.organizationId, postStatusTable.id],
+      name: "github_sync_rule_organization_status_fkey",
+    }).onDelete("cascade"),
     index("github_sync_rule_connection_enabled_idx").on(
       table.connectionId,
       table.enabled
@@ -542,6 +584,9 @@ export const externalResourceCreateRequestTable = pgTable(
   "external_resource_create_request",
   {
     id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
     connectionId: text("connection_id")
       .notNull()
       .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
@@ -568,6 +613,35 @@ export const externalResourceCreateRequestTable = pgTable(
       .notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.organizationId, table.connectionId],
+      foreignColumns: [
+        integrationConnectionTable.organizationId,
+        integrationConnectionTable.id,
+      ],
+      name: "external_resource_create_request_organization_connection_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.postId, table.organizationId],
+      foreignColumns: [postTable.id, postTable.organizationId],
+      name: "external_resource_create_request_post_organization_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.externalResourceId],
+      foreignColumns: [
+        integrationExternalResourceTable.organizationId,
+        integrationExternalResourceTable.id,
+      ],
+      name: "external_resource_create_request_organization_resource_fkey",
+    }),
+    foreignKey({
+      columns: [table.organizationId, table.postExternalResourceLinkId],
+      foreignColumns: [
+        postExternalResourceLinkTable.organizationId,
+        postExternalResourceLinkTable.id,
+      ],
+      name: "external_resource_create_request_organization_link_fkey",
+    }),
     uniqueIndex("external_resource_create_request_connection_key_uidx").on(
       table.connectionId,
       table.idempotencyKey

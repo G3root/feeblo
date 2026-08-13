@@ -129,6 +129,7 @@ function GitHubPostIssueDialog({
   const [repositoryFullName, setRepositoryFullName] = useState("");
   const [issueNumber, setIssueNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
   const submit = async () => {
     const [repositoryOwner, repositoryName] = repositoryFullName.split("/");
     const parsedIssueNumber = Number(issueNumber);
@@ -155,7 +156,7 @@ function GitHubPostIssueDialog({
         connectionId: selectedConnectionId,
         repositoryOwner,
         repositoryName,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey,
       };
       if (action === "create") {
         await createGitHubPostIssue(input);

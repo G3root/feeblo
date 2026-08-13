@@ -74,6 +74,7 @@ export type RecordedPostExternalResourceLink = Schema.Schema.Type<
 >;
 
 export const ExternalResourceCreationReservation = Schema.Struct({
+  organizationId: WorkspaceId.schema,
   connectionId: IntegrationConnectionId.schema,
   postId: PostId.schema,
   idempotencyKey: Schema.NonEmptyString,
@@ -85,6 +86,7 @@ export type ExternalResourceCreationReservation = Schema.Schema.Type<
 export const ExternalResourceCreationReservationResult = Schema.Struct({
   id: ExternalResourceCreateRequestId.schema,
   reserved: Schema.Boolean,
+  postExternalResourceLinkId: Schema.NullOr(PostExternalResourceLinkId.schema),
 });
 export type ExternalResourceCreationReservationResult = Schema.Schema.Type<
   typeof ExternalResourceCreationReservationResult
@@ -97,4 +99,11 @@ export const ExternalResourceCreationCompletion = Schema.Struct({
 });
 export type ExternalResourceCreationCompletion = Schema.Schema.Type<
   typeof ExternalResourceCreationCompletion
+>;
+
+export const ExternalResourceCreationFailure = Schema.Struct({
+  requestId: ExternalResourceCreateRequestId.schema,
+});
+export type ExternalResourceCreationFailure = Schema.Schema.Type<
+  typeof ExternalResourceCreationFailure
 >;

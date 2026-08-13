@@ -1,9 +1,13 @@
+import { timingSafeEqual } from "node:crypto";
 import { currentDb, schema } from "@feeblo/db";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { GitHubProvider } from "@feeblo/domain/integration/github/github-provider";
 import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
 import { IntegrationConnectionId } from "@feeblo/id";
-import { IntegrationOAuthState } from "@feeblo/integration-core";
+import {
+  IntegrationOAuthState,
+  IntegrationProviderInvalidConfigurationError,
+} from "@feeblo/integration-core";
 import {
   createGitHubAppJwt,
   decryptGitHubCredentialMaterial,
@@ -14,7 +18,7 @@ import {
   renderGitHubIssueBody,
 } from "@feeblo/integration-github";
 import { githubProviderKey } from "@feeblo/integration-github/manifest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -37,6 +41,12 @@ export const GitHubProviderLive = Layer.effect(
     const integrationKey = config.githubEncryptionKey;
     const providerFailure = (operation: string) =>
       new InternalServerError({ message: `GitHub App ${operation} failed.` });
+    const issueFailure = (operation: string) => (failure: unknown) =>
+      Schema.is(NotFoundError)(failure) ||
+      (Schema.is(IntegrationProviderInvalidConfigurationError)(failure) &&
+        failure.httpStatus === 404)
+        ? new NotFoundError({ message: "GitHub issue was not found." })
+        : providerFailure(operation);
     const installationIdForConnection = (connectionId: string) =>
       Effect.gen(function* () {
         const [installation] = yield* db
@@ -171,7 +181,35 @@ export const GitHubProviderLive = Layer.effect(
               providerFailure("installation state decryption")
             )
           );
-          if (pending.installationState !== parsed.nonce) {
+          const expectedState = Buffer.from(pending.installationState ?? "");
+          const receivedState = Buffer.from(parsed.nonce);
+          if (
+            expectedState.length === 0 ||
+            expectedState.length !== receivedState.length ||
+            !timingSafeEqual(expectedState, receivedState)
+          ) {
+            return yield* providerFailure("installation state validation");
+          }
+          const consumed = yield* db
+            .update(schema.integrationConnectionTable)
+            .set({ credentialsCiphertext: null })
+            .where(
+              and(
+                eq(schema.integrationConnectionTable.id, connection.id),
+                eq(schema.integrationConnectionTable.lifecycle, "connecting"),
+                eq(
+                  schema.integrationConnectionTable.credentialsCiphertext,
+                  connection.credentialsCiphertext
+                )
+              )
+            )
+            .returning({ id: schema.integrationConnectionTable.id })
+            .pipe(
+              Effect.mapError(() =>
+                providerFailure("installation state consumption")
+              )
+            );
+          if (consumed.length === 0) {
             return yield* providerFailure("installation state validation");
           }
           const userToken = yield* api
@@ -277,7 +315,8 @@ export const GitHubProviderLive = Layer.effect(
             readonly owner: string;
             readonly private: boolean;
           }> = [];
-          for (let page = 1; ; page += 1) {
+          const maximumRepositoryPages = 100;
+          for (let page = 1; page <= maximumRepositoryPages; page += 1) {
             const result = yield* api
               .listInstallationRepositories({ accessToken, page })
               .pipe(
@@ -291,6 +330,9 @@ export const GitHubProviderLive = Layer.effect(
                 private: repository.private,
               }))
             );
+            if (result.repositories.length === 0) {
+              return repositories;
+            }
             if (
               repositories.length >= result.total_count ||
               result.repositories.length < 100
@@ -298,6 +340,7 @@ export const GitHubProviderLive = Layer.effect(
               return repositories;
             }
           }
+          return repositories;
         }),
       uninstallInstallation: ({ connectionId }) =>
         Effect.gen(function* () {
@@ -321,7 +364,7 @@ export const GitHubProviderLive = Layer.effect(
               accessToken,
               repositoryOwner: input.repositoryOwner,
               repositoryName: input.repositoryName,
-              title: "Feeblo feedback",
+              title: input.postTitle?.trim() || "Feeblo feedback",
               body: renderGitHubIssueBody({ postUrl: input.postUrl }),
             })
           ),
@@ -334,7 +377,7 @@ export const GitHubProviderLive = Layer.effect(
             issueUrl: issue.html_url,
             issueState: issue.state,
           })),
-          Effect.mapError(() => providerFailure("issue creation"))
+          Effect.mapError(issueFailure("issue creation"))
         ),
       resolveIssue: (input) =>
         installationTokenForConnection(input.connectionId).pipe(
@@ -346,13 +389,44 @@ export const GitHubProviderLive = Layer.effect(
                 repositoryName: input.repositoryName,
                 issueNumber: input.issueNumber,
               });
-              yield* api.createIssueBacklinkComment({
-                accessToken,
-                backlinkUrl: input.postUrl,
-                repositoryOwner: input.repositoryOwner,
-                repositoryName: input.repositoryName,
-                issueNumber: input.issueNumber,
-              });
+              const existingLink = yield* db
+                .select({ id: schema.postExternalResourceLinkTable.id })
+                .from(schema.postExternalResourceLinkTable)
+                .innerJoin(
+                  schema.integrationExternalResourceTable,
+                  eq(
+                    schema.integrationExternalResourceTable.id,
+                    schema.postExternalResourceLinkTable.externalResourceId
+                  )
+                )
+                .where(
+                  and(
+                    eq(
+                      schema.postExternalResourceLinkTable.postId,
+                      input.postId
+                    ),
+                    eq(
+                      schema.integrationExternalResourceTable.connectionId,
+                      input.connectionId
+                    ),
+                    sql`${schema.integrationExternalResourceTable.safeMetadata}->>'repositoryOwner' = ${input.repositoryOwner}`,
+                    sql`${schema.integrationExternalResourceTable.safeMetadata}->>'repositoryName' = ${input.repositoryName}`,
+                    sql`(${schema.integrationExternalResourceTable.safeMetadata}->>'issueNumber')::integer = ${input.issueNumber}`
+                  )
+                )
+                .limit(1)
+                .pipe(
+                  Effect.mapError(() => providerFailure("issue link lookup"))
+                );
+              if (existingLink.length === 0) {
+                yield* api.createIssueBacklinkComment({
+                  accessToken,
+                  backlinkUrl: input.postUrl,
+                  repositoryOwner: input.repositoryOwner,
+                  repositoryName: input.repositoryName,
+                  issueNumber: input.issueNumber,
+                });
+              }
               return issue;
             })
           ),
@@ -365,7 +439,7 @@ export const GitHubProviderLive = Layer.effect(
             issueUrl: issue.html_url,
             issueState: issue.state,
           })),
-          Effect.mapError(() => providerFailure("issue linking"))
+          Effect.mapError(issueFailure("issue linking"))
         ),
     });
     return provider;

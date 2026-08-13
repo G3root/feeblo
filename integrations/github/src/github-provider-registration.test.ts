@@ -118,25 +118,8 @@ describe("GitHub provider registration", () => {
         if (handler === undefined) {
           return;
         }
-        const rawBody = JSON.stringify({
-          action: "closed",
-          installation: { id: 42 },
-          issue: {
-            html_url: "https://github.com/acme/feedback/issues/7",
-            id: 7,
-            node_id: "I_7",
-            number: 7,
-            state: "closed",
-            title: "Dark mode",
-          },
-          repository: {
-            full_name: "acme/feedback",
-            id: 1,
-            name: "feedback",
-            owner: { login: "acme" },
-          },
-          sender: { id: 2, login: "octocat" },
-        });
+        const rawBody =
+          '{"action":"closed","installation":{"id":42},"issue":{"html_url":"https://github.com/acme/feedback/issues/7","id":7,"node_id":"I_7","number":7,"state":"closed","title":"Dark mode"},"repository":{"full_name":"acme/feedback","id":1,"name":"feedback","owner":{"login":"acme"}},"sender":{"id":2,"login":"octocat"}}';
         const signature = `sha256=${createHmac("sha256", Redacted.value(secret)).update(rawBody).digest("hex")}`;
         const response = yield* handler.handle({
           headers: {
@@ -196,7 +179,7 @@ describe("GitHub provider registration", () => {
   );
 
   it.effect(
-    "accepts a globally delivered signed installation lifecycle webhook",
+    "accepts a globally delivered signed installation-created webhook",
     () =>
       Effect.gen(function* () {
         const secret = Redacted.make("webhook-secret");
@@ -212,7 +195,7 @@ describe("GitHub provider registration", () => {
         if (handler === undefined) {
           return;
         }
-        const rawBody = '{"action":"suspend","installation":{"id":42}}';
+        const rawBody = '{"action":"created","installation":{"id":42}}';
         const signature = `sha256=${createHmac("sha256", Redacted.value(secret)).update(rawBody).digest("hex")}`;
         const response = yield* handler.handle({
           headers: {

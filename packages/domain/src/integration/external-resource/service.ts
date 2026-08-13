@@ -8,6 +8,9 @@ export interface ExternalResourceServiceShape {
   readonly completeCreation: (
     input: S.ExternalResourceCreationCompletion
   ) => Effect.Effect<void, InternalServerError>;
+  readonly failCreation: (
+    input: S.ExternalResourceCreationFailure
+  ) => Effect.Effect<void, InternalServerError>;
   readonly listPostLinks: (
     input: S.PostExternalResourceLinkList
   ) => Effect.Effect<

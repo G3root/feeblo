@@ -34,6 +34,9 @@
     "./notifications/batches": {
       "default": "./src/notifications/batches.ts"
     },
+    "./notification/service": {
+      "default": "./src/notification/service.ts"
+    },
     "./widget/schema": {
       "default": "./src/widget/schema.ts"
     },

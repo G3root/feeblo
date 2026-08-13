@@ -1,21 +1,28 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, Database, schema } from "@feeblo/db";
 import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
 } from "@feeblo/db/validation-schema/integration";
 import {
   asLegid,
+  BoardId,
   GitHubSyncRuleId,
   GitHubWebhookDeliveryId,
   IntegrationConnectionId,
+  PostId,
   PostStatusId,
+  WorkspaceId,
 } from "@feeblo/id";
-import { and, eq, sql } from "drizzle-orm";
+import { IntegrationEventRecorder } from "@feeblo/integration-core";
+import { and, asc, eq, sql } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
+import { EmailOutboxConfig } from "../../email-outbox/config";
 import { NotificationService } from "../../notification/service";
+import { PostRepository } from "../../post/repository";
 import { InternalServerError, NotFoundError } from "../../rpc-errors";
+import { recordPostIntegrationEvent } from "../post-event-recording";
 import { GitHubInboundService } from "./inbound-service";
 import { findMatchingGitHubSyncRules } from "./rule-evaluation";
 
@@ -27,7 +34,10 @@ const gitHubIssueResourceType = IntegrationExternalResourceType.make("issue");
 /** Applies verified GitHub issue webhooks through a transactional inbox before changing a linked Feeblo post. */
 const makeGitHubInboundService = Effect.gen(function* () {
   const db = yield* currentDb;
-  const notifications = yield* Effect.serviceOption(NotificationService);
+  const notifications = yield* NotificationService;
+  const integrationEventRecorder = yield* IntegrationEventRecorder;
+  const emailOutboxConfig = yield* EmailOutboxConfig;
+  const postRepository = yield* PostRepository;
   const activeConnectionForInstallation = (installationId: string) =>
     db
       .select({
@@ -173,6 +183,10 @@ const makeGitHubInboundService = Effect.gen(function* () {
                     eq(schema.githubSyncRuleTable.enabled, true)
                   )
                 )
+                .orderBy(
+                  asc(schema.githubSyncRuleTable.createdAt),
+                  asc(schema.githubSyncRuleTable.id)
+                )
                 .pipe(
                   Effect.mapError(
                     inboundDatabaseError("synchronization rule lookup")
@@ -201,7 +215,12 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 continue;
               }
               const post = yield* db
-                .select({ statusId: schema.postTable.statusId })
+                .select({
+                  boardId: schema.postTable.boardId,
+                  slug: schema.postTable.slug,
+                  statusId: schema.postTable.statusId,
+                  title: schema.postTable.title,
+                })
                 .from(schema.postTable)
                 .where(
                   and(
@@ -227,21 +246,51 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 .pipe(
                   Effect.mapError(inboundDatabaseError("post status update"))
                 );
+              yield* recordPostIntegrationEvent({
+                actor: { kind: "end_user" },
+                boardId: asLegid(BoardId)(post[0].boardId),
+                eventType: "feedback.post.status_changed",
+                organizationId: asLegid(WorkspaceId)(
+                  activeConnection.organizationId
+                ),
+                postId: asLegid(PostId)(link.postId),
+                postSlug: post[0].slug,
+                previousStatusId: asLegid(PostStatusId)(post[0].statusId),
+                statusId: match.postStatusId,
+                title: post[0].title,
+              }).pipe(
+                Effect.provideService(
+                  IntegrationEventRecorder,
+                  integrationEventRecorder
+                ),
+                Effect.provideService(EmailOutboxConfig, emailOutboxConfig),
+                Effect.provideService(PostRepository, postRepository),
+                Effect.provideService(Database.Database, db),
+                Effect.mapError(inboundDatabaseError("status event recording"))
+              );
               if (match.upvoterNotificationPolicy === "notify_upvoters") {
-                yield* Option.match(notifications, {
-                  onNone: () => Effect.void,
-                  onSome: (service) =>
-                    service.notifyPostStatusChangedUpvoters({
-                      organizationId: activeConnection.organizationId,
-                      postId: link.postId,
-                      deduplicationKey: `github.issue.status:${webhook.deliveryId}:${link.postId}:${match.id}`,
-                    }),
-                });
+                yield* notifications
+                  .notifyPostStatusChangedUpvoters({
+                    organizationId: activeConnection.organizationId,
+                    postId: link.postId,
+                    deduplicationKey: `github.issue.status:${webhook.deliveryId}:${link.postId}:${match.id}`,
+                  })
+                  .pipe(
+                    Effect.mapError(
+                      inboundDatabaseError("upvoter notification")
+                    )
+                  );
               }
             }
           })
         )
-        .pipe(Effect.mapError(inboundDatabaseError("transaction"))),
+        .pipe(
+          Effect.mapError((error) =>
+            Schema.is(NotFoundError)(error)
+              ? error
+              : inboundDatabaseError("transaction")()
+          )
+        ),
     applyInstallationLifecycleWebhook: (webhook) =>
       db
         .transaction(() =>
@@ -279,6 +328,23 @@ const makeGitHubInboundService = Effect.gen(function* () {
               );
             const installation = installations[0];
             if (installation === undefined) {
+              return;
+            }
+            const inboxId = yield* GitHubWebhookDeliveryId.generate;
+            const inserted = yield* db
+              .insert(schema.githubWebhookDeliveryTable)
+              .values({
+                id: inboxId,
+                connectionId: installation.connectionId,
+                deliveryId: webhook.deliveryId,
+                eventName: "installation",
+              })
+              .onConflictDoNothing()
+              .returning({ id: schema.githubWebhookDeliveryTable.id })
+              .pipe(
+                Effect.mapError(inboundDatabaseError("lifecycle inbox record"))
+              );
+            if (inserted.length === 0) {
               return;
             }
             if (webhook.action === "deleted") {
@@ -358,8 +424,10 @@ const makeGitHubInboundService = Effect.gen(function* () {
           })
         )
         .pipe(
-          Effect.mapError(
-            inboundDatabaseError("installation lifecycle transaction")
+          Effect.mapError((error) =>
+            Schema.is(NotFoundError)(error)
+              ? error
+              : inboundDatabaseError("installation lifecycle transaction")()
           )
         ),
   });

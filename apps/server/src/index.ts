@@ -41,6 +41,7 @@ import {
   SlackManagementServiceLive,
   SlackUserServiceLive,
 } from "@feeblo/domain/integration/slack";
+import { NotificationService } from "@feeblo/domain/notification/service";
 import { handleOgImage } from "@feeblo/domain/og-image/handler";
 import { OgImageService } from "@feeblo/domain/og-image/service";
 import { PostRepository } from "@feeblo/domain/post/repository";
@@ -376,7 +377,13 @@ const program = Effect.gen(function* () {
       Layer.provide(EmailOutboxConfig.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
-    GitHubInboundServiceLive.pipe(Layer.provide(Database.DatabaseContextLive)),
+    GitHubInboundServiceLive.pipe(
+      Layer.provide(NotificationService.layer),
+      Layer.provide(IntegrationEventRecorderLive),
+      Layer.provide(PostRepository.layer),
+      Layer.provide(EmailOutboxConfig.layer),
+      Layer.provide(Database.DatabaseContextLive)
+    ),
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =

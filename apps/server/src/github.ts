@@ -48,6 +48,7 @@ export const makeGitHubAppInstallationCallbackRouter = () =>
             parseGitHubAppInstallationCallbackUrl(request.url)
           );
           if (Exit.isFailure(parsed)) {
+            yield* Effect.logError(parsed.cause);
             return HttpServerResponse.redirect(
               settingsRedirect(
                 config.appUrl,
@@ -61,6 +62,7 @@ export const makeGitHubAppInstallationCallbackRouter = () =>
             management.connectComplete(parsed.value)
           );
           if (Exit.isFailure(completed)) {
+            yield* Effect.logError(completed.cause);
             return HttpServerResponse.redirect(
               settingsRedirect(
                 config.appUrl,
@@ -126,6 +128,13 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
           switch (parsed.value.kind) {
             case "issue": {
               const payload = parsed.value.payload;
+              if (
+                payload.action !== "opened" &&
+                payload.action !== "reopened" &&
+                payload.action !== "closed"
+              ) {
+                break;
+              }
               yield* inbound.applyIssueWebhook({
                 deliveryId: parsed.value.deliveryId,
                 eventName: "issues",
@@ -138,8 +147,12 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
               break;
             }
             case "installation":
+              if (parsed.value.payload.action === "created") {
+                break;
+              }
               yield* inbound.applyInstallationLifecycleWebhook({
                 action: parsed.value.payload.action,
+                deliveryId: parsed.value.deliveryId,
                 installationId: String(parsed.value.payload.installation.id),
               });
               break;
@@ -154,11 +167,14 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
           }
           return HttpServerResponse.empty({ status: 202 });
         }).pipe(
-          Effect.catch(() =>
-            Effect.succeed(
-              HttpServerResponse.text("GitHub App webhook processing failed", {
-                status: 500,
-              })
+          Effect.catch((cause) =>
+            Effect.logError(cause).pipe(
+              Effect.as(
+                HttpServerResponse.text(
+                  "GitHub App webhook processing failed",
+                  { status: 500 }
+                )
+              )
             )
           )
         )

@@ -74,6 +74,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
     db
       .select({
         postSlug: schema.postTable.slug,
+        postTitle: schema.postTable.title,
         boardSlug: schema.boardTable.slug,
       })
       .from(schema.postTable)
@@ -95,12 +96,13 @@ const makeGitHubManagementService = Effect.gen(function* () {
             ? new NotFoundError({
                 message: "Feeblo post for GitHub issue link was not found.",
               })
-            : Effect.succeed(
-                new URL(
-                  `${encodeURIComponent(organizationId)}/post/${encodeURIComponent(rows[0].boardSlug)}/${encodeURIComponent(rows[0].postSlug)}`,
+            : Effect.succeed({
+                postUrl: new URL(
+                  `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(rows[0].boardSlug)}/${encodeURIComponent(rows[0].postSlug)}`,
                   emailConfig.appUrl
-                )
-              )
+                ),
+                postTitle: rows[0].postTitle,
+              })
         )
       );
   const recordGitHubIssueExternalResource = (input: {
@@ -408,13 +410,15 @@ const makeGitHubManagementService = Effect.gen(function* () {
     createRule: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);
-        const id = yield* GitHubSyncRuleId.generate;
+        const id = yield* GitHubSyncRuleId.generate.pipe(
+          Effect.mapError(databaseError("rule identifier generation"))
+        );
         yield* db
           .insert(schema.githubSyncRuleTable)
           .values({ ...input, id })
           .pipe(Effect.mapError(databaseError("rule creation")));
         return { ...input, id };
-      }).pipe(Effect.mapError(databaseError("rule creation"))),
+      }),
     updateRule: (input) =>
       db
         .update(schema.githubSyncRuleTable)
@@ -459,45 +463,70 @@ const makeGitHubManagementService = Effect.gen(function* () {
         const request = yield* externalResources.reserveCreation({
           connectionId: input.connectionId,
           idempotencyKey: input.idempotencyKey,
-          postId: input.postId,
-        });
-        if (!request.reserved) {
-          return yield* new InternalServerError({
-            message:
-              "GitHub issue creation is already pending or completed for this request.",
-          });
-        }
-        const postUrl = yield* loadCanonicalPostUrl(
-          input.organizationId,
-          input.postId
-        );
-        const issue = yield* provider.createIssue({ ...input, postUrl });
-        const recorded = yield* recordGitHubIssueExternalResource({
-          issue,
           organizationId: input.organizationId,
           postId: input.postId,
         });
-        yield* externalResources.completeCreation({
-          externalResourceId: recorded.externalResourceId,
-          postExternalResourceLinkId: recorded.link.id,
-          requestId: request.id,
-        });
-        return recorded.link;
+        if (!request.reserved) {
+          const links = yield* externalResources.listPostLinks({
+            organizationId: input.organizationId,
+            postId: input.postId,
+          });
+          const completed = links.find(
+            (link) => link.id === request.postExternalResourceLinkId
+          );
+          if (completed !== undefined) {
+            return completed;
+          }
+          return yield* new InternalServerError({
+            message: "GitHub issue creation is already pending.",
+          });
+        }
+        return yield* Effect.gen(function* () {
+          const post = yield* loadCanonicalPostUrl(
+            input.organizationId,
+            input.postId
+          );
+          const issue = yield* provider.createIssue({
+            ...input,
+            postTitle: post.postTitle,
+            postUrl: post.postUrl,
+          });
+          const recorded = yield* recordGitHubIssueExternalResource({
+            issue,
+            organizationId: input.organizationId,
+            postId: input.postId,
+          });
+          yield* externalResources.completeCreation({
+            externalResourceId: recorded.externalResourceId,
+            postExternalResourceLinkId: recorded.link.id,
+            requestId: request.id,
+          });
+          return recorded.link;
+        }).pipe(
+          Effect.onError(() =>
+            externalResources
+              .failCreation({ requestId: request.id })
+              .pipe(Effect.catch((cause) => Effect.logError(cause)))
+          )
+        );
       }),
     linkPostIssue: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);
-        const postUrl = yield* loadCanonicalPostUrl(
+        const post = yield* loadCanonicalPostUrl(
           input.organizationId,
           input.postId
         );
-        const issue = yield* provider.resolveIssue({ ...input, postUrl });
+        const issue = yield* provider.resolveIssue({
+          ...input,
+          postUrl: post.postUrl,
+        });
         return (yield* recordGitHubIssueExternalResource({
           issue,
           organizationId: input.organizationId,
           postId: input.postId,
         })).link;
-      }).pipe(Effect.mapError(databaseError("issue linking"))),
+      }),
   };
   return GitHubManagementService.of(service);
 });

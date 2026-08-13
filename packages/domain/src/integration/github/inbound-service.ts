@@ -17,6 +17,7 @@ export interface GitHubIssueWebhook {
 /** GitHub App installation lifecycle fact decoded after signature verification. */
 export interface GitHubInstallationLifecycleWebhook {
   readonly action: "deleted" | "suspend" | "unsuspend";
+  readonly deliveryId: string;
   readonly installationId: string;
 }
 

@@ -14,14 +14,26 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { EmailOutboxConfig } from "../../email-outbox/config";
+import { NotificationService } from "../../notification/service";
+import { PostRepository } from "../../post/repository";
 import { GitHubInboundServiceLive } from "./inbound-live";
 import { GitHubInboundService } from "./inbound-service";
 
 const TestLayer = Layer.mergeAll(
-  GitHubInboundServiceLive.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+  GitHubInboundServiceLive.pipe(
+    Layer.provide(NotificationService.layer),
+    Layer.provide(IntegrationEventRecorderLive),
+    Layer.provide(PostRepository.layer),
+    Layer.provide(
+      EmailOutboxConfig.layerTest(new URL("https://feeblo.example"))
+    ),
+    Layer.provide(Database.PgliteDatabaseLive)
+  ),
   Database.PgliteDatabaseLive
 );
 

@@ -1,8 +1,10 @@
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
+import * as Headers from "effect/unstable/http/Headers";
 import { describe, expect, it } from "vitest";
 import {
+  classifyGitHubApiError,
   GitHubInstallationAccessToken,
   GitHubInstallationRepositories,
   GitHubIssue,
@@ -53,6 +55,26 @@ describe("GitHub App API response schemas", () => {
       })
     );
     expect(Exit.isFailure(result)).toBe(true);
+  });
+});
+
+describe("GitHub API failure classification", () => {
+  it("only treats a 403 as rate limited when GitHub reports rate limiting", () => {
+    expect(
+      classifyGitHubApiError(
+        { status: 403, headers: Headers.fromInput({}) },
+        "repository listing"
+      )._tag
+    ).toBe("IntegrationProviderPermanentRejection");
+    expect(
+      classifyGitHubApiError(
+        {
+          status: 403,
+          headers: Headers.fromInput({ "x-ratelimit-remaining": "0" }),
+        },
+        "repository listing"
+      )._tag
+    ).toBe("IntegrationProviderRateLimitedError");
   });
 });
 

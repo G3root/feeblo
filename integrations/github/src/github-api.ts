@@ -6,9 +6,11 @@ import {
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
+import * as Headers from "effect/unstable/http/Headers";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import type { GitHubApiFailure } from "./github-errors";
@@ -105,7 +107,10 @@ export const renderGitHubIssueBacklinkComment = ({
 
 /** Maps GitHub transport statuses into integration kernel failures. */
 export const classifyGitHubApiError = (
-  response: { readonly status?: number },
+  response: {
+    readonly status?: number;
+    readonly headers?: Headers.Headers;
+  },
   context: string
 ): GitHubApiFailure => {
   const status = response.status;
@@ -116,7 +121,14 @@ export const classifyGitHubApiError = (
       httpStatus: status,
     });
   }
-  if (status === 403 || status === 429) {
+  const isRateLimited403 =
+    status === 403 &&
+    response.headers !== undefined &&
+    (Headers.get(response.headers, "x-ratelimit-remaining").pipe(
+      Option.getOrUndefined
+    ) === "0" ||
+      Headers.has(response.headers, "retry-after"));
+  if (isRateLimited403 || status === 429) {
     return new IntegrationProviderRateLimitedError({
       message: `GitHub rate limited ${context}`,
       provider: githubProviderKey,
@@ -199,32 +211,36 @@ export interface GitHubApiClient {
 
 /** Creates a direct Effect HttpClient adapter; every untrusted response is decoded before leaving this module. */
 export const makeGitHubApiClient = (): GitHubApiClient => {
+  const execute = (httpRequest: HttpClientRequest.HttpClientRequest) =>
+    HttpClient.execute(httpRequest).pipe(Effect.provide(FetchHttpClient.layer));
+  const executeResponse = Effect.fn("GitHubApi.executeResponse")(
+    (input: {
+      readonly context: string;
+      readonly httpRequest: HttpClientRequest.HttpClientRequest;
+    }) =>
+      execute(input.httpRequest).pipe(
+        Effect.mapError(
+          () =>
+            new IntegrationProviderTemporaryFailure({
+              message: `GitHub request failed during ${input.context}`,
+              provider: githubProviderKey,
+            })
+        )
+      )
+  );
   const request = Effect.fn("GitHubApi.request")(
     (input: {
       readonly context: string;
       readonly httpRequest: HttpClientRequest.HttpClientRequest;
     }) =>
       Effect.gen(function* () {
-        const response = yield* HttpClient.execute(input.httpRequest).pipe(
-          Effect.provide(FetchHttpClient.layer),
-          Effect.timeoutOrElse({
-            duration: GITHUB_API_REQUEST_TIMEOUT_MS,
-            orElse: () =>
-              Effect.fail(
-                new IntegrationProviderTemporaryFailure({
-                  message: `GitHub request timed out during ${input.context}`,
-                  provider: githubProviderKey,
-                })
-              ),
-          }),
-          Effect.mapError(
-            () =>
-              new IntegrationProviderTemporaryFailure({
-                message: `GitHub request failed during ${input.context}`,
-                provider: githubProviderKey,
-              })
-          )
-        );
+        const response = yield* executeResponse(input);
+        if (response.status < 200 || response.status >= 300) {
+          return yield* classifyGitHubApiError(
+            { headers: response.headers, status: response.status },
+            input.context
+          );
+        }
         const body = yield* response.json.pipe(
           Effect.mapError(
             () =>
@@ -235,14 +251,19 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
               })
           )
         );
-        if (response.status < 200 || response.status >= 300) {
-          return yield* classifyGitHubApiError(
-            { status: response.status },
-            input.context
-          );
-        }
         return body;
-      })
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: GITHUB_API_REQUEST_TIMEOUT_MS,
+          orElse: () =>
+            Effect.fail(
+              new IntegrationProviderTemporaryFailure({
+                message: `GitHub request timed out during ${input.context}`,
+                provider: githubProviderKey,
+              })
+            ),
+        })
+      )
   );
   const authenticatedJson = (
     path: string,
@@ -296,8 +317,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
         }),
         accessToken
       );
-      const response = yield* HttpClient.execute(httpRequest).pipe(
-        Effect.provide(FetchHttpClient.layer),
+      const response = yield* executeResponse({ context, httpRequest }).pipe(
         Effect.timeoutOrElse({
           duration: GITHUB_API_REQUEST_TIMEOUT_MS,
           orElse: () =>
@@ -307,21 +327,14 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
                 provider: githubProviderKey,
               })
             ),
-        }),
-        Effect.mapError(
-          () =>
-            new IntegrationProviderTemporaryFailure({
-              message: `GitHub request failed during ${context}`,
-              provider: githubProviderKey,
-            })
-        )
+        })
       );
       if (response.status === 404 || response.status === 410) {
         return;
       }
       if (response.status < 200 || response.status >= 300) {
         return yield* classifyGitHubApiError(
-          { status: response.status },
+          { headers: response.headers, status: response.status },
           context
         );
       }

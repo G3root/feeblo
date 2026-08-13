@@ -185,16 +185,27 @@ describe("external resource service", () => {
 
           const reserved = yield* service.reserveCreation({
             connectionId: github,
+            organizationId: first.organizationId,
             postId: first.postId,
             idempotencyKey: "create-github-issue",
           });
           const duplicate = yield* service.reserveCreation({
             connectionId: github,
+            organizationId: first.organizationId,
             postId: first.postId,
             idempotencyKey: "create-github-issue",
           });
           expect(reserved.reserved).toBe(true);
           expect(duplicate.reserved).toBe(false);
+          expect(duplicate.id).toBe(reserved.id);
+          yield* service.failCreation({ requestId: reserved.id });
+          const retried = yield* service.reserveCreation({
+            connectionId: github,
+            organizationId: first.organizationId,
+            postId: first.postId,
+            idempotencyKey: "create-github-issue",
+          });
+          expect(retried.reserved).toBe(true);
         })
     );
   });

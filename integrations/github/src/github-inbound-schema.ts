@@ -8,10 +8,18 @@ export type GitHubInstallationId = Schema.Schema.Type<
 
 /** Issue actions that can change Feeblo's linked-resource status. */
 export const GitHubWebhookIssueAction = Schema.Literals([
+  "assigned",
   "closed",
   "edited",
+  "labeled",
+  "locked",
+  "milestoned",
   "opened",
   "reopened",
+  "unassigned",
+  "unlabeled",
+  "unlocked",
+  "demilestoned",
 ]);
 export type GitHubWebhookIssueAction = Schema.Schema.Type<
   typeof GitHubWebhookIssueAction
@@ -46,6 +54,7 @@ export type GitHubIssueWebhookPayload = Schema.Schema.Type<
 
 /** GitHub App lifecycle actions Feeblo persists for an installation. */
 export const GitHubInstallationWebhookAction = Schema.Literals([
+  "created",
   "deleted",
   "suspend",
   "unsuspend",
