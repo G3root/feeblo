@@ -5,6 +5,14 @@ export type { ChannelUpdateMessage } from "@feeblo/integration-core";
 import { truncate } from "@feeblo/utils/text";
 
 const TRUNCATED_TITLE_MAX = 150;
+const TRUNCATED_CONTEXT_MAX = 3000;
+
+const formatSlackFactLabel = (value: string): string =>
+  value
+    .toLowerCase()
+    .split("_")
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+    .join(" ");
 
 /**
  * Renders a channel-update message into Slack Block Kit blocks for
@@ -25,7 +33,13 @@ export const renderChannelUpdateMessageBlocks = (
     },
   ];
   const factText = message.facts
-    .map(({ label, value }) => `*${label}:* ${value}`)
+    .filter(
+      ({ label, value }) => label.trim().length > 0 && value.trim().length > 0
+    )
+    .map(
+      ({ label, value }) =>
+        `*${formatSlackFactLabel(label.trim())}:* ${value.trim()}`
+    )
     .join("   ·   ");
   if (factText.length > 0) {
     blocks.push({
@@ -33,7 +47,7 @@ export const renderChannelUpdateMessageBlocks = (
       elements: [
         {
           type: "mrkdwn",
-          text: factText,
+          text: truncate(factText, TRUNCATED_CONTEXT_MAX),
         },
       ],
     });

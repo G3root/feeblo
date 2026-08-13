@@ -54,6 +54,7 @@ const deliveryInput = (
       board: { id: "brd_1", name: "Ideas", slug: "ideas" },
       post: {
         id: "pst_1",
+        metadata: { customer_tier: "Enterprise" },
         status: { id: "pss_1", type: "PENDING" },
         title: "Dark mode please",
         url: "https://feeblo.example/org/post/ideas/dark-mode",
@@ -154,6 +155,15 @@ describe("slack provider registration", () => {
     expect(call?.text).toBe("Dark mode please");
     const header = call?.blocks[0] as { text: { text: string } };
     expect(header.text.text).toBe("Dark mode please");
+    expect(call?.blocks[1]).toMatchObject({
+      elements: [
+        {
+          text: expect.stringContaining("*Customer Tier:* Enterprise"),
+          type: "mrkdwn",
+        },
+      ],
+      type: "context",
+    });
   });
 
   it("rejects unsupported event types as invalid configuration", async () => {

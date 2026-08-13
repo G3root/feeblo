@@ -89,6 +89,7 @@ const deliveryInput = (
       board: { id: "brd_1", name: "Ideas", slug: "ideas" },
       post: {
         id: "pst_1",
+        metadata: { customer_tier: "Enterprise" },
         status: { id: "pss_1", type: "PENDING" },
         title: "Dark mode please",
         url: "https://feeblo.example/org/post/ideas/dark-mode",
@@ -177,8 +178,13 @@ describe("discord provider registration", () => {
 
         const call = spy.getLastCall();
         expect(call?.channelId).toBe("123456789012345678");
-        const embed = call?.embeds[0] as { title: string; url: string };
+        const embed = call?.embeds[0] as {
+          description: string;
+          title: string;
+          url: string;
+        };
         expect(embed.title).toBe("Dark mode please");
+        expect(embed.description).toContain("**Customer Tier:** Enterprise");
         expect(embed.url).toBe(
           "https://feeblo.example/org/post/ideas/dark-mode"
         );

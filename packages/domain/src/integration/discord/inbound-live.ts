@@ -1,4 +1,8 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import {
+  type DiscordEmbed,
+  renderDiscordFeedbackConfirmationEmbed,
+} from "@feeblo/integration-discord/embeds";
 import type {
   DiscordApplicationCommandPayload,
   DiscordInteraction,
@@ -32,9 +36,10 @@ const TITLE_INPUT_MAX = 200;
 
 /** Slack-style ephemeral response; the only content Discord users see for errors. */
 const ephemeralMessageResponse = (
-  text: string
+  text: string,
+  embeds: readonly DiscordEmbed[] = []
 ): DiscordInboundHttpResponse => ({
-  body: buildEphemeralMessage(text),
+  body: buildEphemeralMessage(text, embeds),
   status: 200,
 });
 
@@ -222,8 +227,23 @@ export const makeDiscordInboundServiceLive = (): Layer.Layer<
             created.boardSlug.length > 0
               ? `${emailOutboxConfig.appUrl}/${encodeURIComponent(metadata.organizationId)}/post/${encodeURIComponent(created.boardSlug)}/${encodeURIComponent(created.slug)}`
               : undefined;
+          if (postUrl === undefined) {
+            return ephemeralMessageResponse(
+              `✅ Feedback sent: ${created.title}`
+            );
+          }
+          const confirmationEmbed = renderDiscordFeedbackConfirmationEmbed({
+            actionUrl: postUrl,
+            boardName: created.boardName,
+            metadata: created.metadata,
+            postId: created.id,
+            status: created.status,
+            submitterName: interactionDisplayName(payload),
+            title: created.title,
+          });
           return ephemeralMessageResponse(
-            `✅ Feedback sent: ${created.title}${postUrl === undefined ? "" : ` — ${postUrl}`}`
+            "✅ Feedback sent to Feeblo. Select the title below to view it.",
+            [confirmationEmbed]
           );
         });
 

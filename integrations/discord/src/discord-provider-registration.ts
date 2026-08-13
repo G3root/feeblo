@@ -196,6 +196,9 @@ export const makeDiscordProviderRegistration = ({
           facts: [
             { label: "Board", value: eventData.board.name },
             { label: "Status", value: eventData.post.status.type },
+            ...Object.entries(eventData.post.metadata ?? {}).map(
+              ([label, value]) => ({ label, value })
+            ),
           ],
           title: eventData.post.title,
         });

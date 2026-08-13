@@ -1,3 +1,4 @@
+import type { DiscordEmbed } from "@feeblo/integration-discord/embeds";
 import { truncate } from "@feeblo/utils/text";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -176,9 +177,16 @@ export const buildFeedbackModal = ({
 });
 
 /** Discord `CHANNEL_MESSAGE_WITH_SOURCE` response with the ephemeral flag (callback type 4, flags 64). */
-export const buildEphemeralMessage = (content: string): unknown => ({
+export const buildEphemeralMessage = (
+  content: string,
+  embeds: readonly DiscordEmbed[] = []
+): unknown => ({
   type: 4,
-  data: { flags: 64, content },
+  data: {
+    flags: 64,
+    content,
+    ...(embeds.length === 0 ? {} : { embeds }),
+  },
 });
 
 /** Discord `PONG` response to a `PING` interaction (callback type 1). */

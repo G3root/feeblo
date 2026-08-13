@@ -31,6 +31,7 @@ export interface PostIntegrationEventInput {
   readonly actor: PostIntegrationEventActor;
   readonly boardId: LegidOf<"BoardId">;
   readonly eventType: "feedback.post.created" | "feedback.post.status_changed";
+  readonly metadata?: Readonly<Record<string, string>>;
   readonly organizationId: LegidOf<"WorkspaceId">;
   readonly postId: LegidOf<"PostId">;
   readonly postSlug: string;
@@ -113,6 +114,10 @@ export const recordPostIntegrationEvent = Effect.fn(
             board,
             post: {
               id: input.postId,
+              ...(input.metadata !== undefined &&
+              Object.keys(input.metadata).length > 0
+                ? { metadata: { ...input.metadata } }
+                : {}),
               status: { id: input.statusId, type: statusType },
               title: input.title,
               url,

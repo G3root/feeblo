@@ -131,6 +131,7 @@ export const IntegrationPostEventData = Schema.Struct({
   }),
   post: Schema.Struct({
     id: PostId.schema,
+    metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     status: Schema.Struct({
       id: PostStatusId.schema,
       type: PostStatusType,
