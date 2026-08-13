@@ -262,7 +262,11 @@ test(
         ).toBeTruthy();
 
         await expect(visitorPage).toHaveURL((url) => {
-          return url.origin === boardUrl && !url.searchParams.has("ssoToken");
+          return (
+            url.origin === boardUrl &&
+            !url.searchParams.has("ssoToken") &&
+            !url.hash.includes("ssoToken")
+          );
         });
 
         const cookies = await visitorContext.cookies(apiURL);

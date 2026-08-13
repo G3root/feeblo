@@ -4,18 +4,23 @@ const SECURE_SESSION_COOKIE_NAME = `__Secure-${DEFAULT_SESSION_COOKIE_NAME}`;
 /**
  * Returns the session cookie name better-auth actually sets.
  *
- * Better-auth applies the `__Secure-` prefix when `useSecureCookies` is
- * enabled, which defaults to `NODE_ENV === "production"`. `packages/auth` does
- * not override `useSecureCookies`, so deciding from `APP_URL` instead would
- * diverge from the cookie better-auth emits (e.g. an https APP_URL outside
- * production, or an http APP_URL inside production), silently breaking
- * authentication in those environments.
+ * Better-auth applies the `__Secure-` prefix from its `secureCookiePrefix`
+ * resolution: `useSecureCookies` when set, otherwise the base URL protocol,
+ * falling back to `NODE_ENV === "production"` only when no base URL is
+ * configured. `packages/auth` passes `baseURL: apiUrl` (a string) and does not
+ * override `useSecureCookies`, so better-auth prefixes the cookie exactly when
+ * the API base URL is https.
  *
- * If `packages/auth` ever overrides `useSecureCookies` or the cookie name,
- * this predicate must be updated in lockstep.
+ * If `packages/auth` ever overrides `useSecureCookies`, stops passing a string
+ * base URL, or renames the cookie, this predicate must be updated in lockstep.
  */
 export const getSessionCookieName = (): string => {
-  const isProduction = process.env.NODE_ENV === "production";
+  const apiUrl = process.env.API_URL;
+  const useSecurePrefix = apiUrl
+    ? apiUrl.startsWith("https://")
+    : process.env.NODE_ENV === "production";
 
-  return isProduction ? SECURE_SESSION_COOKIE_NAME : DEFAULT_SESSION_COOKIE_NAME;
+  return useSecurePrefix
+    ? SECURE_SESSION_COOKIE_NAME
+    : DEFAULT_SESSION_COOKIE_NAME;
 };

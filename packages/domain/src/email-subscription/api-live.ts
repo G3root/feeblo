@@ -1,3 +1,4 @@
+import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
@@ -9,6 +10,11 @@ import { BadRequestError, InternalServerError } from "../rpc-errors";
 import { WorkspaceRepository } from "../workspace/repository";
 import { EmailSubscriptionConsentHandlersEffect } from "./handlers";
 import { EmailSubscriptionRepository } from "./repository";
+import type {
+  EmailSubscriptionDataError,
+  EmailSubscriptionInputError,
+} from "./schema";
+import type { EmailSubscriptionTokenError } from "./tokens";
 
 type LinkFailureError =
   | BadRequestError
@@ -16,21 +22,34 @@ type LinkFailureError =
   | RateLimit.RateLimitExceededError
   | RateLimit.RateLimitUnavailableError;
 
+type LinkError =
+  | EmailSubscriptionInputError
+  | EmailSubscriptionTokenError
+  | EmailSubscriptionDataError
+  | EffectDrizzleQueryError
+  | RateLimit.RateLimitExceededError
+  | RateLimit.RateLimitUnavailableError;
+
 const linkFailure = (
   operation: "unsubscribe" | "verify",
-  error: { readonly _tag: string }
+  error: LinkError
 ): LinkFailureError => {
   switch (error._tag) {
     // Rate-limit failures pass through unchanged so clients get 429/503.
     case "RateLimitExceededError":
-      return error as RateLimit.RateLimitExceededError;
     case "RateLimitUnavailableError":
-      return error as RateLimit.RateLimitUnavailableError;
+      return error;
     case "EmailSubscriptionTokenError":
     case "EmailSubscriptionInputError":
       return new BadRequestError({
         message: `Email subscription ${operation} link is invalid or expired`,
       });
+    case "EmailSubscriptionDataError":
+    case "EffectDrizzleQueryError":
+      return new InternalServerError({
+        message: `Email subscription ${operation} failed`,
+      });
+
     default:
       return new InternalServerError({
         message: `Email subscription ${operation} failed`,

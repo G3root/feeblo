@@ -41,10 +41,14 @@ const validateType = (
   }
 };
 
+type ConfigValidationResult =
+  | { readonly valid: true }
+  | { readonly valid: false; readonly error: string };
+
 const validateConfig = (
   definition: AttributeDefinition,
   value: AttributeValue
-): { readonly valid: boolean; readonly error?: string } => {
+): ConfigValidationResult => {
   if (value === null || value === undefined) {
     return { valid: true };
   }
@@ -56,7 +60,10 @@ const validateConfig = (
   switch (definition.type) {
     case "TEXT": {
       if (typeof value !== "string") {
-        return { valid: false };
+        return {
+          valid: false,
+          error: `Expected text value for "${definition.name}"`,
+        };
       }
       if (config.pattern === undefined) {
         return { valid: true };
@@ -72,7 +79,10 @@ const validateConfig = (
       try {
         return new RegExp(config.pattern).test(value)
           ? { valid: true }
-          : { valid: false, error: `Value for "${definition.name}" does not match configured rules` };
+          : {
+              valid: false,
+              error: `Value for "${definition.name}" does not match configured rules`,
+            };
       } catch {
         return {
           valid: false,
@@ -83,12 +93,24 @@ const validateConfig = (
     case "INTEGER":
     case "DECIMAL": {
       if (typeof value !== "number") {
-        return { valid: false };
+        return {
+          valid: false,
+          error: `Expected numeric value for "${definition.name}"`,
+        };
       }
       if (config.min !== undefined && value < config.min) {
-        return { valid: false };
+        return {
+          valid: false,
+          error: `Value for "${definition.name}" is below the configured minimum`,
+        };
       }
-      return { valid: !(config.max !== undefined && value > config.max) };
+      if (config.max !== undefined && value > config.max) {
+        return {
+          valid: false,
+          error: `Value for "${definition.name}" exceeds the configured maximum`,
+        };
+      }
+      return { valid: true };
     }
     default:
       return { valid: true };
@@ -110,7 +132,7 @@ export const validateAttributeValue = (
   if (!configResult.valid) {
     return {
       valid: false,
-      error: configResult.error ?? `Value for ${definition.name} does not match configured rules`,
+      error: configResult.error,
     };
   }
 
@@ -138,8 +160,35 @@ export const validateAttributeValueEffect = (
  */
 export const MAX_ATTRIBUTE_PATTERN_LENGTH = 200;
 
-const isQuantifierChar = (ch: string | undefined): boolean =>
-  ch === "*" || ch === "+" || ch === "?" || ch === "{";
+/** Matches a `{n}`, `{n,}`, or `{n,m}` repetition specifier. */
+const REPETITION = /^\{[0-9]+(?:,[0-9]*)?\}/;
+
+/**
+ * Whether a repetition specifier can repeat its target an unbounded number of
+ * times (the `{n,}` form). Bounded repetitions cannot cause exponential
+ * backtracking on their own.
+ */
+const isUnboundedRepetition = (specifier: string): boolean => {
+  const body = specifier.slice(1, -1);
+  return body.includes(",") && body.endsWith(",");
+};
+
+/**
+ * Whether the character at `index` begins a quantifier that can repeat its
+ * target an unbounded number of times: `*`, `+`, or `{n,}`. `?` (at most one
+ * match) and bounded `{n}` / `{n,m}` repetitions are not unbounded.
+ */
+const isUnboundedQuantifierAt = (pattern: string, index: number): boolean => {
+  const ch = pattern[index];
+  if (ch === "*" || ch === "+") {
+    return true;
+  }
+  if (ch === "{") {
+    const match = REPETITION.exec(pattern.slice(index));
+    return match !== null && isUnboundedRepetition(match[0]);
+  }
+  return false;
+};
 
 /**
  * Rejects regular expressions that are prone to catastrophic backtracking
@@ -149,9 +198,11 @@ const isQuantifierChar = (ch: string | undefined): boolean =>
  *
  * The check is a conservative heuristic: it rejects patterns longer than
  * {@link MAX_ATTRIBUTE_PATTERN_LENGTH} and any quantified group whose contents
- * already contain a repetition quantifier (the classic nested-quantifier shape
- * behind most ReDoS). Bounded repetitions (`{n}`, `{n,m}`) and lazy/atomic
- * modifiers are tolerated.
+ * already contain a repetition quantifier and that is itself quantified by an
+ * unbounded quantifier (`*`, `+`, or `{n,}`) — the classic nested-quantifier
+ * shape behind most ReDoS. Bounded (`{n}`, `{n,m}`) and optional (`?`)
+ * quantifiers are tolerated because they cannot repeat an unbounded number of
+ * times.
  */
 export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
   if (pattern.length > MAX_ATTRIBUTE_PATTERN_LENGTH) {
@@ -159,8 +210,8 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
   }
 
   // Per open group, whether a repetition quantifier appeared inside it. When
-  // such a group is itself quantified (`(a+)+`, `(a*)*`, `(?:a?)+`), matching
-  // can exhibit exponential backtracking.
+  // such a group is itself quantified (`(a+)+`, `(a*)*`, `(?:a?)+`, `(a+){2,}`),
+  // matching can exhibit exponential backtracking.
   const groups: boolean[] = [];
   let inCharClass = false;
   let escaped = false;
@@ -196,20 +247,16 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
     }
     if (ch === ")") {
       const containedQuantifier = groups.pop() ?? false;
-      // A repetition quantifier directly after a quantified group is the
-      // classic ReDoS shape (`(a+)+`).
-      if (containedQuantifier && isQuantifierChar(pattern[i + 1])) {
+      if (containedQuantifier && isUnboundedQuantifierAt(pattern, i + 1)) {
         return true;
       }
       i += 1;
       continue;
     }
     if (ch === "{") {
-      // Repetition `{n}`, `{n,}`, `{n,m}`; only unbounded forms count.
-      const match = /^\{[0-9]+(?:,[0-9]*)?\}/.exec(pattern.slice(i));
-      if (match) {
-        const unbounded = !match[0].endsWith("}") || pattern[i + match[0].length - 2] === ",";
-        if (unbounded && groups.length > 0) {
+      const match = REPETITION.exec(pattern.slice(i));
+      if (match !== null) {
+        if (isUnboundedRepetition(match[0]) && groups.length > 0) {
           groups[groups.length - 1] = true;
         }
         i += match[0].length;

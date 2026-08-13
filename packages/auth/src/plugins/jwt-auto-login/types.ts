@@ -31,7 +31,8 @@ export interface SsoUserError {
     | "FAILED_TO_CREATE_SSO_USER"
     | "FAILED_TO_CREATE_SSO_CONTACT"
     | "WIDGET_SSO_NOT_ENTITLED"
-    | "SSO_RATE_LIMITED";
+    | "SSO_RATE_LIMITED"
+    | "SSO_RATE_LIMIT_UNAVAILABLE";
   message?: string;
 }
 

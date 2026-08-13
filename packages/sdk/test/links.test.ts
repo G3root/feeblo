@@ -15,6 +15,7 @@ describe("data-feeblo-link", () => {
     const url = new URL(link.href);
     expect(url.searchParams.get("sort")).toBe("top");
     expect(url.search).not.toContain("ssoToken");
+    expect(url.hash.startsWith("#planned&ssoToken=")).toBe(true);
     const hashParams = new URLSearchParams(url.hash.slice(1));
     expect(hashParams.get("ssoToken")).toBe("signed.jwt.token");
   });

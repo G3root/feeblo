@@ -97,6 +97,8 @@ plugin (`packages/auth/src/plugins/jwt-auto-login`):
 | `INVALID_JWT` | Signature invalid, wrong `aud`, an expired `exp` (when present), or wrong/leaked secret. |
 | `SSO_TOKEN_MISSING_EMAIL_OR_NAME` | Required `email`/`name` (or `userId`) missing. |
 | `FAILED_TO_CREATE_SSO_USER` / `FAILED_TO_CREATE_SSO_CONTACT` | Persistence failure while upserting the user/contact. |
+| `SSO_RATE_LIMITED` | Too many SSO sign-in attempts for the workspace within the rate-limit window (429). |
+| `SSO_RATE_LIMIT_UNAVAILABLE` | The SSO rate limiter is unavailable (503). |
 
 ## Security notes
 

@@ -176,8 +176,14 @@ export class HtmlSanitizer {
 
       // Prevent reverse tabnabbing: a link opened in a new tab must not give
       // the target document a `window.opener` handle back to this document.
+      // Existing rel tokens (e.g. `nofollow`) are preserved alongside the
+      // added security tokens.
       if (node.tagName === "A" && node.getAttribute?.("target") === "_blank") {
-        node.setAttribute("rel", "noopener noreferrer");
+        const existingRel = node.getAttribute("rel") ?? "";
+        const relTokens = new Set(existingRel.split(/\s+/).filter(Boolean));
+        relTokens.add("noopener");
+        relTokens.add("noreferrer");
+        node.setAttribute("rel", [...relTokens].join(" "));
       }
     });
 

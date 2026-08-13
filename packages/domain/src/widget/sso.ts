@@ -40,6 +40,7 @@ export class SsoError extends S.TaggedErrorClass<SsoError>()("SsoError", {
     "FAILED_TO_CREATE_SSO_CONTACT",
     "WIDGET_SSO_NOT_ENTITLED",
     "SSO_RATE_LIMITED",
+    "SSO_RATE_LIMIT_UNAVAILABLE",
   ]),
   message: S.optional(S.String),
 }) {}
@@ -170,7 +171,7 @@ export const createSsoSession = ({
           Effect.mapError((error) =>
             error.reason._tag === "RateLimitExceeded"
               ? new SsoError({ code: "SSO_RATE_LIMITED" })
-              : new SsoError({ code: "FAILED_TO_CREATE_SSO_USER" })
+              : new SsoError({ code: "SSO_RATE_LIMIT_UNAVAILABLE" })
           )
         )
     );

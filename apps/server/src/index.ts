@@ -121,7 +121,7 @@ const RootRouter = HttpRouter.use((router) =>
   router.add("GET", "/", HttpServerResponse.text("Hello world"))
 );
 
-const MAX_JSON_BODY_BYTES = 1_000_000;
+const MAX_REQUEST_BODY_BYTES = 1_000_000;
 
 /**
  * Rejects oversized request bodies from the Content-Length header before the
@@ -150,7 +150,7 @@ const bodySizeLimitMiddleware = <E, R>(
 
     if (contentLength !== undefined) {
       const parsed = Number(contentLength);
-      if (Number.isFinite(parsed) && parsed > MAX_JSON_BODY_BYTES) {
+      if (Number.isFinite(parsed) && parsed > MAX_REQUEST_BODY_BYTES) {
         return HttpServerResponse.text("Payload too large", { status: 413 });
       }
     }
