@@ -155,8 +155,19 @@ const valueSchemaForDefinition = (
             })
           );
         } else {
+          let expression: RegExp;
+          try {
+            expression = new RegExp(pattern);
+          } catch {
+            schema = schema.check(
+              S.isPattern(UNSAFE_PATTERN_NEVER_MATCHES, {
+                message: `configured validation pattern "${pattern}" is invalid`,
+              })
+            );
+            return schema as unknown as S.Codec<AttributeValue>;
+          }
           schema = schema.check(
-            S.isPattern(new RegExp(pattern), {
+            S.isPattern(expression, {
               message: `must match pattern "${pattern}"`,
             })
           );

@@ -20,6 +20,19 @@ describe("data-feeblo-link", () => {
     expect(hashParams.get("ssoToken")).toBe("signed.jwt.token");
   });
 
+  it("replaces stale query and fragment SSO tokens", () => {
+    const link = document.createElement("a");
+    link.href =
+      "https://feedback.example.com/roadmap?ssoToken=query-old&sort=top#planned&ssoToken=fragment-old&view=compact";
+
+    authenticateLink(link, "current token");
+
+    const url = new URL(link.href);
+    expect(url.searchParams.has("ssoToken")).toBe(false);
+    expect(url.searchParams.get("sort")).toBe("top");
+    expect(url.hash).toBe("#planned&view=compact&ssoToken=current%20token");
+  });
+
   it("authenticates dynamically-added marked links on interaction", () => {
     const link = document.createElement("a");
     link.href = "https://feedback.example.com/";

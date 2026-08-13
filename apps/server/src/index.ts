@@ -80,6 +80,63 @@ import { makeIntegrationLayers } from "./integrations";
 import { makeSlackRouters } from "./slack";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
+const MAX_REQUEST_BODY_BYTES = 1_000_000;
+
+const requestBodyTooLargeResponse = (): Response =>
+  new Response("Request body too large", { status: 413 });
+
+const handleBetterAuthRequest = async ({
+  handler,
+  headers,
+  request,
+}: {
+  readonly handler: (request: Request) => Promise<Response> | Response;
+  readonly headers: Headers;
+  readonly request: Request;
+}): Promise<Response> => {
+  const declaredLength = Number(headers.get("content-length"));
+  if (
+    Number.isFinite(declaredLength) &&
+    declaredLength > MAX_REQUEST_BODY_BYTES
+  ) {
+    return requestBodyTooLargeResponse();
+  }
+
+  let bodyLimitExceeded = false;
+  let bytesRead = 0;
+  const body = request.body?.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        if (bodyLimitExceeded) {
+          return;
+        }
+        bytesRead += chunk.byteLength;
+        if (bytesRead > MAX_REQUEST_BODY_BYTES) {
+          bodyLimitExceeded = true;
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    })
+  );
+  let limitedRequest: Request;
+  if (body) {
+    const requestInit = { body, duplex: "half" as const, headers };
+    limitedRequest = new Request(request, requestInit);
+  } else {
+    limitedRequest = new Request(request, { headers });
+  }
+
+  try {
+    const response = await handler(limitedRequest);
+    return bodyLimitExceeded ? requestBodyTooLargeResponse() : response;
+  } catch (error) {
+    if (bodyLimitExceeded) {
+      return requestBodyTooLargeResponse();
+    }
+    throw error;
+  }
+};
 
 const redisOptions = (redisUrl: string) => {
   const url = new URL(redisUrl);
@@ -110,9 +167,11 @@ const BetterAuthRouterLive = HttpRouter.use((router) =>
             AUTH_CLIENT_IP_HEADER,
             clientIp._tag === "ClientIpAddress" ? clientIp.address : "unknown"
           );
-          return Promise.resolve(
-            auth.handler(new Request(webRequest, { headers }))
-          );
+          return handleBetterAuthRequest({
+            handler: auth.handler,
+            headers,
+            request: webRequest,
+          });
         });
 
         return yield* Effect.provideService(
@@ -159,8 +218,6 @@ const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
 const RootRouter = HttpRouter.use((router) =>
   router.add("GET", "/", HttpServerResponse.text("Hello world"))
 );
-
-const MAX_REQUEST_BODY_BYTES = 1_000_000;
 
 /**
  * Limits every request body while it is read, including chunked requests that

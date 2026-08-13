@@ -24,29 +24,33 @@ import {
   publicUpvoteCollection,
 } from "../lib/collections";
 import { NotFoundPage } from "../routes/not-found-page";
-import { getSsoTokenFromHash } from "./sso-token";
+import { getSsoTokenFromHash, removeSsoTokenFromHash } from "./sso-token";
 
 const rootRoute = createRootRoute({
   beforeLoad: async () => {
     const url = new URL(window.location.href);
     const token = getSsoTokenFromHash(url.hash);
+    if (token !== null) {
+      url.hash = removeSsoTokenFromHash(url.hash);
+      window.history.replaceState(window.history.state, "", url);
+    }
+
     const organizationId = getCurrentOrganizationId();
     let session = await getAuthSession();
 
-    if (token && organizationId) {
-      url.hash = "";
-      window.history.replaceState(window.history.state, "", url);
-
-      if (session?.user.restrictedToOrganizationId !== organizationId) {
-        const result = await authClient.signIn.jwtAutoLogin({
-          organizationId,
-          token,
-        });
-        if (result.error) {
-          throw new Error(result.error.message ?? "Feeblo auto-login failed");
-        }
-        session = await refreshAuthSession();
+    if (
+      token &&
+      organizationId &&
+      session?.user.restrictedToOrganizationId !== organizationId
+    ) {
+      const result = await authClient.signIn.jwtAutoLogin({
+        organizationId,
+        token,
+      });
+      if (result.error) {
+        throw new Error(result.error.message ?? "Feeblo auto-login failed");
       }
+      session = await refreshAuthSession();
     }
 
     const restrictedToOrganizationId =

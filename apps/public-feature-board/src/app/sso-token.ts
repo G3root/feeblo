@@ -11,3 +11,17 @@ export const getSsoTokenFromHash = (hash: string): string | null => {
   const params = new URLSearchParams(hash.slice(1));
   return params.get("ssoToken");
 };
+
+/** Removes SSO token entries while preserving unrelated fragment content. */
+export const removeSsoTokenFromHash = (hash: string): string => {
+  if (!hash.startsWith("#")) {
+    return hash;
+  }
+
+  const entries = hash
+    .slice(1)
+    .split("&")
+    .filter((entry) => !new URLSearchParams(entry).has("ssoToken"));
+
+  return entries.length > 0 ? `#${entries.join("&")}` : "";
+};

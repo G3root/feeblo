@@ -28,12 +28,13 @@ export function authenticateLink(link: HTMLAnchorElement, token: string): void {
   // public board reads and strips it before rendering. Any fragment already
   // present on the link (e.g. a deep-link anchor) is preserved alongside the
   // token.
-  const tokenParam = `ssoToken=${encodeURIComponent(token)}`;
-  const existingHash = url.hash;
-  url.hash =
-    existingHash === "" || existingHash === "#"
-      ? tokenParam
-      : `${existingHash}&${tokenParam}`;
+  url.searchParams.delete("ssoToken");
+  const hashEntries = url.hash
+    .slice(1)
+    .split("&")
+    .filter((entry) => entry && !new URLSearchParams(entry).has("ssoToken"));
+  hashEntries.push(`ssoToken=${encodeURIComponent(token)}`);
+  url.hash = hashEntries.join("&");
   link.href = url.toString();
 }
 
