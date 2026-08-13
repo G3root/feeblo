@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
+import { RateLimitErrors } from "../rate-limit";
 import { BadRequestError, InternalServerError } from "../rpc-errors";
 import {
   EmailSubscriptionTokenRequest,
@@ -11,6 +12,7 @@ import {
 const EmailSubscriptionLinkErrors = Schema.Union([
   BadRequestError,
   InternalServerError,
+  RateLimitErrors,
 ]);
 
 /** Public HTTP links embedded in verification and one-click unsubscribe email. */

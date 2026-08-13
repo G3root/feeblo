@@ -6,8 +6,13 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as jose from "jose";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { RateLimitService } from "../rate-limit/service";
 import { WorkspaceRepository } from "../workspace/repository";
-import { createSsoSession, SsoRepositoriesLive } from "./sso";
+import {
+  createSsoSession,
+  SsoRepositoriesLive,
+  WIDGET_SSO_SIGN_IN_RATE_LIMIT,
+} from "./sso";
 
 const signToken = (payload: jose.JWTPayload, secret: string) =>
   Effect.promise(() =>
@@ -21,7 +26,8 @@ const pastExp = Math.floor(Date.now() / 1000) - 3600;
 
 const TestLayer = Layer.mergeAll(
   SsoRepositoriesLive,
-  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+  RateLimitService.layerMemory
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
 describe("createSsoSession", () => {
@@ -164,15 +170,8 @@ describe("createSsoSession", () => {
     it.effect("rejects a token without an aud claim", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture(true);
-        const token = yield* signToken(
-          {
-            exp: futureExp,
-            userId: "external_user_1",
-            email: "ada@example.com",
-            name: "Ada Lovelace",
-          },
-          fixture.secret
-        );
+        const { aud: _aud, ...payloadWithoutAud } = validPayload(fixture);
+        const token = yield* signToken(payloadWithoutAud, fixture.secret);
 
         const error = yield* Effect.flip(
           createSsoSession({
@@ -235,6 +234,28 @@ describe("createSsoSession", () => {
           })
         );
         expect(error.code).toBe("INVALID_JWT");
+      })
+    );
+
+    it.effect("rate limits repeated SSO sign-ins per organization", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture(true);
+        const token = yield* signToken(validPayload(fixture), fixture.secret);
+
+        for (let i = 0; i < WIDGET_SSO_SIGN_IN_RATE_LIMIT.limit; i++) {
+          yield* createSsoSession({
+            organizationId: fixture.organizationId,
+            token,
+          });
+        }
+
+        const error = yield* Effect.flip(
+          createSsoSession({
+            organizationId: fixture.organizationId,
+            token,
+          })
+        );
+        expect(error.code).toBe("SSO_RATE_LIMITED");
       })
     );
 

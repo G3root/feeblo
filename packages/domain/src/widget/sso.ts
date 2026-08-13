@@ -23,6 +23,7 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import { PolicyDeniedError } from "../policy";
+import { RateLimitService } from "../rate-limit/service";
 import { UserRepository } from "../user/repository";
 
 /**
@@ -38,6 +39,7 @@ export class SsoError extends S.TaggedErrorClass<SsoError>()("SsoError", {
     "FAILED_TO_CREATE_SSO_USER",
     "FAILED_TO_CREATE_SSO_CONTACT",
     "WIDGET_SSO_NOT_ENTITLED",
+    "SSO_RATE_LIMITED",
   ]),
   message: S.optional(S.String),
 }) {}
@@ -122,6 +124,18 @@ export function upsertContactFromParsed(
 }
 
 /**
+ * Per-organization bound on widget SSO sign-ins, applied before the
+ * entitlement check so the endpoint cannot be spammed even for organizations
+ * that are not entitled to widget SSO. Exported so tests and callers share
+ * the same values instead of duplicating magic numbers.
+ */
+export const WIDGET_SSO_SIGN_IN_RATE_LIMIT = {
+  keyPrefix: "widget-sso-sign-in",
+  limit: 30,
+  window: "1 minute",
+} as const;
+
+/**
  * Verifies the organization JWT, parses the contact identity, upserts the
  * restricted widget user and linked contact. Returns the user id + display
  * name so the jwt-auto-login plugin can mint a better-auth session.
@@ -141,6 +155,25 @@ export const createSsoSession = ({
     const jwtSecretRepository = yield* JwtSecretRepository;
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const userRepository = yield* UserRepository;
+
+    // Bound the rate at which the SSO endpoint provisions users/contacts. This
+    // runs before the entitlement check so the endpoint cannot be spammed even
+    // for organizations that are not entitled to widget SSO.
+    yield* RateLimitService.use((rateLimiter) =>
+      rateLimiter
+        .consume({
+          key: `${WIDGET_SSO_SIGN_IN_RATE_LIMIT.keyPrefix}:${organizationId}`,
+          limit: WIDGET_SSO_SIGN_IN_RATE_LIMIT.limit,
+          window: WIDGET_SSO_SIGN_IN_RATE_LIMIT.window,
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            error.reason._tag === "RateLimitExceeded"
+              ? new SsoError({ code: "SSO_RATE_LIMITED" })
+              : new SsoError({ code: "FAILED_TO_CREATE_SSO_USER" })
+          )
+        )
+    );
 
     yield* entitlementPolicy
       .canUseWidgetSso(organizationId)

@@ -159,3 +159,26 @@ export const PublicRpcRateLimitMiddlewareLive = Layer.effect(
     );
   })
 );
+
+/**
+ * Per-client-IP rate limit for public HTTP (non-RPC) handlers, e.g. the
+ * public email-subscription verify/unsubscribe links. Requires the global
+ * {@link ClientIp} middleware and a {@link RateLimitService} to be installed
+ * (both are provided by the server composition root).
+ */
+export const withPublicHttpRateLimit =
+  (options: PublicRpcRateLimitOptions) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    Effect.gen(function* () {
+      const clientIp = yield* ClientIp;
+      const rateLimitService = yield* RateLimitService;
+
+      return yield* Effect.provideService(
+        effect.pipe(withPublicRpcRateLimit(options)),
+        PublicRpcRateLimiter,
+        makePublicRpcRateLimiter({
+          clientIp,
+          rateLimitService,
+        })
+      );
+    });

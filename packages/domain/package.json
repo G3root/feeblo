@@ -7,6 +7,9 @@
     "./src/*": {
       "default": "./src/*"
     },
+    "./content-limits": {
+      "default": "./src/content-limits.ts"
+    },
     "./asset/repository": {
       "default": "./src/asset/repository.ts"
     },

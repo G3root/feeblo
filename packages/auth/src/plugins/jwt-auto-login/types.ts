@@ -30,7 +30,8 @@ export interface SsoUserError {
     | "SSO_TOKEN_MISSING_EMAIL_OR_NAME"
     | "FAILED_TO_CREATE_SSO_USER"
     | "FAILED_TO_CREATE_SSO_CONTACT"
-    | "WIDGET_SSO_NOT_ENTITLED";
+    | "WIDGET_SSO_NOT_ENTITLED"
+    | "SSO_RATE_LIMITED";
   message?: string;
 }
 

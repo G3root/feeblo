@@ -6,9 +6,10 @@ import * as Layer from "effect/Layer";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import { ChangelogRepository } from "../changelog/repository";
 import { ClientIp } from "../client-ip";
+import { withPublicHttpRateLimit } from "../rate-limit";
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError } from "../rpc-errors";
-import { listWidgetUpdates, withWidgetRateLimit } from "./api-live";
+import { listWidgetUpdates } from "./api-live";
 
 const TestLayer = Layer.mergeAll(
   Database.PgliteDatabaseLive,
@@ -120,7 +121,7 @@ layer(TestLayer)("widget updates", (it) => {
               message: "Failed to find similar posts",
             })
         ),
-        withWidgetRateLimit({
+        withPublicHttpRateLimit({
           name: "WidgetSuggestPostsTest",
           level: "expensive",
           limit: 1,

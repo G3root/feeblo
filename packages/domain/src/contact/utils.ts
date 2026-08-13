@@ -5,6 +5,7 @@ import type {
   TContactAttributeDefinition,
 } from "../attribute-definition/schema";
 import { AttributeConfig } from "../attribute-definition/schema";
+import { isPotentiallyUnsafeRegex } from "../attribute-definition/validation";
 import type { TCommonCompanyFields } from "../company/schema";
 import { CommonCompanyFields } from "../company/schema";
 import { DataValidationError } from "./errors";
@@ -121,6 +122,9 @@ const KNOWN_CONTACT_FIELDS = new Set([
   "customFields",
 ]);
 
+/** A regex that never matches, used to reject values when a configured pattern is unsafe. */
+const UNSAFE_PATTERN_NEVER_MATCHES = /.^/;
+
 const KNOWN_COMPANY_FIELDS = new Set([
   "id",
   "name",
@@ -141,11 +145,22 @@ const valueSchemaForDefinition = (
       let schema: S.Codec<string> = S.String;
       const pattern = definition.config?.pattern;
       if (pattern !== undefined) {
-        schema = schema.check(
-          S.isPattern(new RegExp(pattern), {
-            message: `must match pattern "${pattern}"`,
-          })
-        );
+        if (isPotentiallyUnsafeRegex(pattern)) {
+          // A catastrophic pattern must never be executed against values that
+          // can originate from untrusted JWT payloads. Reject values with a
+          // clear error instead so the misconfiguration surfaces.
+          schema = schema.check(
+            S.isPattern(UNSAFE_PATTERN_NEVER_MATCHES, {
+              message: "configured validation pattern is unsafe",
+            })
+          );
+        } else {
+          schema = schema.check(
+            S.isPattern(new RegExp(pattern), {
+              message: `must match pattern "${pattern}"`,
+            })
+          );
+        }
       }
       return schema as unknown as S.Codec<AttributeValue>;
     }

@@ -849,6 +849,9 @@ importers:
 
   packages/feedback-widget:
     dependencies:
+      '@feeblo/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../utils

@@ -44,9 +44,9 @@ const validateType = (
 const validateConfig = (
   definition: AttributeDefinition,
   value: AttributeValue
-): boolean => {
+): { readonly valid: boolean; readonly error?: string } => {
   if (value === null || value === undefined) {
-    return true;
+    return { valid: true };
   }
 
   const config = S.decodeUnknownSync(AttributeConfig)(definition.config ?? {}, {
@@ -56,29 +56,42 @@ const validateConfig = (
   switch (definition.type) {
     case "TEXT": {
       if (typeof value !== "string") {
-        return false;
+        return { valid: false };
       }
       if (config.pattern === undefined) {
-        return true;
+        return { valid: true };
+      }
+      if (isPotentiallyUnsafeRegex(config.pattern)) {
+        // Never execute a pattern that can backtrack catastrophically;
+        // fail loudly so the misconfiguration surfaces instead.
+        return {
+          valid: false,
+          error: `Configured validation pattern for "${definition.name}" is unsafe and was not applied`,
+        };
       }
       try {
-        return new RegExp(config.pattern).test(value);
+        return new RegExp(config.pattern).test(value)
+          ? { valid: true }
+          : { valid: false, error: `Value for "${definition.name}" does not match configured rules` };
       } catch {
-        return false;
+        return {
+          valid: false,
+          error: `Configured validation pattern for "${definition.name}" is invalid`,
+        };
       }
     }
     case "INTEGER":
     case "DECIMAL": {
       if (typeof value !== "number") {
-        return false;
+        return { valid: false };
       }
       if (config.min !== undefined && value < config.min) {
-        return false;
+        return { valid: false };
       }
-      return !(config.max !== undefined && value > config.max);
+      return { valid: !(config.max !== undefined && value > config.max) };
     }
     default:
-      return true;
+      return { valid: true };
   }
 };
 
@@ -93,10 +106,11 @@ export const validateAttributeValue = (
     };
   }
 
-  if (!validateConfig(definition, value)) {
+  const configResult = validateConfig(definition, value);
+  if (!configResult.valid) {
     return {
       valid: false,
-      error: `Value for ${definition.name} does not match configured rules`,
+      error: configResult.error ?? `Value for ${definition.name} does not match configured rules`,
     };
   }
 
@@ -118,6 +132,110 @@ export const validateAttributeValueEffect = (
       return yield* new BadRequestError({ message: result.error });
     }
   });
+/**
+ * Maximum length of an attribute validation pattern. Long patterns are never
+ * needed for field validation and keep the compiled-regex surface small.
+ */
+export const MAX_ATTRIBUTE_PATTERN_LENGTH = 200;
+
+const isQuantifierChar = (ch: string | undefined): boolean =>
+  ch === "*" || ch === "+" || ch === "?" || ch === "{";
+
+/**
+ * Rejects regular expressions that are prone to catastrophic backtracking
+ * (ReDoS). Attribute patterns are compiled and executed against values that
+ * can originate from untrusted input (e.g. widget SSO JWT attribute payloads),
+ * so a pathological pattern such as `(a+)+$` must never be executed.
+ *
+ * The check is a conservative heuristic: it rejects patterns longer than
+ * {@link MAX_ATTRIBUTE_PATTERN_LENGTH} and any quantified group whose contents
+ * already contain a repetition quantifier (the classic nested-quantifier shape
+ * behind most ReDoS). Bounded repetitions (`{n}`, `{n,m}`) and lazy/atomic
+ * modifiers are tolerated.
+ */
+export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
+  if (pattern.length > MAX_ATTRIBUTE_PATTERN_LENGTH) {
+    return true;
+  }
+
+  // Per open group, whether a repetition quantifier appeared inside it. When
+  // such a group is itself quantified (`(a+)+`, `(a*)*`, `(?:a?)+`), matching
+  // can exhibit exponential backtracking.
+  const groups: boolean[] = [];
+  let inCharClass = false;
+  let escaped = false;
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    if (escaped) {
+      escaped = false;
+      i += 1;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      i += 1;
+      continue;
+    }
+    if (inCharClass) {
+      if (ch === "]") {
+        inCharClass = false;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch === "[") {
+      inCharClass = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "(") {
+      groups.push(false);
+      i += 1;
+      continue;
+    }
+    if (ch === ")") {
+      const containedQuantifier = groups.pop() ?? false;
+      // A repetition quantifier directly after a quantified group is the
+      // classic ReDoS shape (`(a+)+`).
+      if (containedQuantifier && isQuantifierChar(pattern[i + 1])) {
+        return true;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch === "{") {
+      // Repetition `{n}`, `{n,}`, `{n,m}`; only unbounded forms count.
+      const match = /^\{[0-9]+(?:,[0-9]*)?\}/.exec(pattern.slice(i));
+      if (match) {
+        const unbounded = !match[0].endsWith("}") || pattern[i + match[0].length - 2] === ",";
+        if (unbounded && groups.length > 0) {
+          groups[groups.length - 1] = true;
+        }
+        i += match[0].length;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch === "?" || ch === "*" || ch === "+") {
+      // `(?` starts a group modifier (`?:`, `?=`, `?!`, `?<=`, `?<!`), not a
+      // quantifier.
+      if (ch === "?" && pattern[i - 1] === "(") {
+        i += 1;
+        continue;
+      }
+      if (groups.length > 0) {
+        groups[groups.length - 1] = true;
+      }
+      i += 1;
+      continue;
+    }
+    i += 1;
+  }
+  return false;
+};
+
 export const noDuplicateAttributeIds = S.makeFilter<
   readonly { readonly attributeId: string }[]
 >((attributeValues) => {

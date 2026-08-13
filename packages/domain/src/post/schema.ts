@@ -7,6 +7,15 @@ import {
 } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+import {
+  POST_CONTENT_MAX_LENGTH,
+  POST_OFFICIAL_UPDATE_BODY_MAX_LENGTH,
+  POST_SUGGESTIONS_LIMIT_MAX,
+  POST_SUGGESTIONS_LIMIT_MIN,
+  POST_TITLE_MAX_LENGTH,
+  POST_TITLE_MIN_LENGTH,
+} from "../content-limits";
+
 export const EtaQuarter = S.String.pipe(
   S.check(S.isPattern(/^[0-9]{4}-Q[1-4]$/))
 );
@@ -50,7 +59,14 @@ export type TPostList = S.Schema.Type<typeof PostList>;
 export const PostSuggestions = S.Struct({
   boardId: S.optional(BoardId.schema),
   content: S.String,
-  limit: S.optional(S.Int.check(S.isBetween({ minimum: 1, maximum: 20 }))),
+  limit: S.optional(
+    S.Int.check(
+      S.isBetween({
+        minimum: POST_SUGGESTIONS_LIMIT_MIN,
+        maximum: POST_SUGGESTIONS_LIMIT_MAX,
+      })
+    )
+  ),
   organizationId: WorkspaceId.schema,
   title: S.String,
 });
@@ -95,7 +111,7 @@ export type TPostUpdateEta = S.Schema.Type<typeof PostUpdateEta>;
 export const PostUpdateContent = S.Struct({
   assetIds: S.Array(S.String),
   id: PostId.schema,
-  content: S.String,
+  content: S.String.check(S.isMaxLength(POST_CONTENT_MAX_LENGTH)),
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
 });
@@ -103,8 +119,8 @@ export const PostUpdateContent = S.Struct({
 export type TPostUpdateContent = S.Schema.Type<typeof PostUpdateContent>;
 
 export const PostTitle = S.Trim.pipe(
-  S.check(S.isMinLength(1)),
-  S.check(S.isMaxLength(200))
+  S.check(S.isMinLength(POST_TITLE_MIN_LENGTH)),
+  S.check(S.isMaxLength(POST_TITLE_MAX_LENGTH))
 );
 
 export const PostUpdateTitle = S.Struct({
@@ -127,7 +143,10 @@ export type TPostAdminUpdate = S.Schema.Type<typeof PostAdminUpdate>;
 
 /** Administrator-authored update that is intentionally emailed to post subscribers. */
 export const PostOfficialUpdatePublish = S.Struct({
-  body: S.String.pipe(S.check(S.isMinLength(1)), S.check(S.isMaxLength(5000))),
+  body: S.String.pipe(
+    S.check(S.isMinLength(1)),
+    S.check(S.isMaxLength(POST_OFFICIAL_UPDATE_BODY_MAX_LENGTH))
+  ),
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
   updateId: PostActivityId.schema,
@@ -149,8 +168,10 @@ export const PostCreate = S.Struct({
   assetIds: S.Array(S.String),
   id: PostId.schema,
   boardId: BoardId.schema,
-  title: S.String,
-  content: S.String,
+  title: PostTitle,
+  // Content is sanitized and then stored, embedded, emailed and webhook-
+  // delivered; cap it so a single post cannot carry unbounded payloads.
+  content: S.String.check(S.isMaxLength(POST_CONTENT_MAX_LENGTH)),
   statusId: PostStatusId.schema,
   organizationId: WorkspaceId.schema,
   etaQuarter: S.optional(S.NullOr(EtaQuarter)),
