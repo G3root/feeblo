@@ -11,6 +11,7 @@ import { WorkspaceRepository } from "../workspace/repository";
 import {
   createSsoSession,
   SsoRepositoriesLive,
+  WIDGET_SSO_ATTEMPT_RATE_LIMIT,
   WIDGET_SSO_SIGN_IN_RATE_LIMIT,
 } from "./sso";
 
@@ -32,6 +33,7 @@ const TestLayer = Layer.mergeAll(
 
 describe("createSsoSession", () => {
   type Fixture = {
+    clientIp: string;
     organizationId: string;
     secret: string;
   };
@@ -89,6 +91,7 @@ describe("createSsoSession", () => {
       }
 
       return {
+        clientIp: organizationId,
         organizationId,
         secret: `secret-${organizationId}`,
       } satisfies Fixture;
@@ -109,6 +112,7 @@ describe("createSsoSession", () => {
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 
         const result = yield* createSsoSession({
+          clientIp: fixture.clientIp,
           organizationId: fixture.organizationId,
           token,
         });
@@ -140,7 +144,11 @@ describe("createSsoSession", () => {
         const token = yield* signToken(validPayload(fixture), fixture.secret);
 
         const error = yield* Effect.flip(
-          createSsoSession({ organizationId: fixture.organizationId, token })
+          createSsoSession({
+            clientIp: fixture.clientIp,
+            organizationId: fixture.organizationId,
+            token,
+          })
         );
         expect(error.code).toBe("WIDGET_SSO_NOT_ENTITLED");
       })
@@ -159,6 +167,7 @@ describe("createSsoSession", () => {
 
         const error = yield* Effect.flip(
           createSsoSession({
+            clientIp: fixture.clientIp,
             organizationId: fixture.organizationId,
             token,
           })
@@ -175,6 +184,7 @@ describe("createSsoSession", () => {
 
         const error = yield* Effect.flip(
           createSsoSession({
+            clientIp: fixture.clientIp,
             organizationId: fixture.organizationId,
             token,
           })
@@ -190,6 +200,7 @@ describe("createSsoSession", () => {
         const token = yield* signToken(payloadWithoutExp, fixture.secret);
 
         const result = yield* createSsoSession({
+          clientIp: fixture.clientIp,
           organizationId: fixture.organizationId,
           token,
         });
@@ -211,6 +222,7 @@ describe("createSsoSession", () => {
 
         const error = yield* Effect.flip(
           createSsoSession({
+            clientIp: fixture.clientIp,
             organizationId: fixture.organizationId,
             token,
           })
@@ -229,6 +241,7 @@ describe("createSsoSession", () => {
 
         const error = yield* Effect.flip(
           createSsoSession({
+            clientIp: fixture.clientIp,
             organizationId: fixture.organizationId,
             token,
           })
@@ -244,6 +257,7 @@ describe("createSsoSession", () => {
 
         for (let i = 0; i < WIDGET_SSO_SIGN_IN_RATE_LIMIT.limit; i++) {
           yield* createSsoSession({
+            clientIp: `${fixture.clientIp}-${i}`,
             organizationId: fixture.organizationId,
             token,
           });
@@ -251,12 +265,52 @@ describe("createSsoSession", () => {
 
         const error = yield* Effect.flip(
           createSsoSession({
+            clientIp: `${fixture.clientIp}-final`,
             organizationId: fixture.organizationId,
             token,
           })
         );
         expect(error.code).toBe("SSO_RATE_LIMITED");
       })
+    );
+
+    it.effect(
+      "limits invalid tokens by client without spending an organization limit",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* makeFixture(true);
+          const validToken = yield* signToken(
+            validPayload(fixture),
+            fixture.secret
+          );
+
+          for (let i = 0; i < WIDGET_SSO_ATTEMPT_RATE_LIMIT.limit; i++) {
+            const error = yield* Effect.flip(
+              createSsoSession({
+                organizationId: fixture.organizationId,
+                token: "not-a-jwt",
+                clientIp: "198.51.100.24",
+              })
+            );
+            expect(error.code).toBe("INVALID_JWT");
+          }
+
+          const limitedError = yield* Effect.flip(
+            createSsoSession({
+              organizationId: fixture.organizationId,
+              token: "not-a-jwt",
+              clientIp: "198.51.100.24",
+            })
+          );
+          expect(limitedError.code).toBe("SSO_RATE_LIMITED");
+
+          const result = yield* createSsoSession({
+            clientIp: "198.51.100.25",
+            organizationId: fixture.organizationId,
+            token: validToken,
+          });
+          expect(result.name).toBe("Ada Lovelace");
+        })
     );
 
     it.effect("fails when no secret has been generated yet", () =>
@@ -266,6 +320,7 @@ describe("createSsoSession", () => {
 
         const error = yield* Effect.flip(
           createSsoSession({
+            clientIp: fixture.clientIp,
             organizationId: fixture.organizationId,
             token,
           })

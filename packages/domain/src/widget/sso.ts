@@ -125,14 +125,20 @@ export function upsertContactFromParsed(
 }
 
 /**
- * Per-organization bound on widget SSO sign-ins, applied before the
- * entitlement check so the endpoint cannot be spammed even for organizations
- * that are not entitled to widget SSO. Exported so tests and callers share
- * the same values instead of duplicating magic numbers.
+ * Per-organization bound on verified widget SSO sign-ins. It is consumed only
+ * after the JWT proves the caller holds this organization's secret, so an
+ * unauthenticated request cannot lock out the organization's users.
  */
 export const WIDGET_SSO_SIGN_IN_RATE_LIMIT = {
   keyPrefix: "widget-sso-sign-in",
   limit: 30,
+  window: "1 minute",
+} as const;
+
+/** Per-client bound for unverified widget SSO attempts. */
+export const WIDGET_SSO_ATTEMPT_RATE_LIMIT = {
+  keyPrefix: "widget-sso-attempt",
+  limit: 10,
   window: "1 minute",
 } as const;
 
@@ -145,9 +151,11 @@ export const WIDGET_SSO_SIGN_IN_RATE_LIMIT = {
  * the correct better-auth error code.
  */
 export const createSsoSession = ({
+  clientIp,
   organizationId,
   token,
 }: {
+  clientIp: string;
   organizationId: string;
   token: string;
 }) =>
@@ -157,15 +165,15 @@ export const createSsoSession = ({
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const userRepository = yield* UserRepository;
 
-    // Bound the rate at which the SSO endpoint provisions users/contacts. This
-    // runs before the entitlement check so the endpoint cannot be spammed even
-    // for organizations that are not entitled to widget SSO.
+    // Reject a flood of unauthenticated JWT guesses before any organization
+    // lookup or signature verification. The server supplies this peer-anchored
+    // identity and overwrites any value sent by the client.
     yield* RateLimitService.use((rateLimiter) =>
       rateLimiter
         .consume({
-          key: `${WIDGET_SSO_SIGN_IN_RATE_LIMIT.keyPrefix}:${organizationId}`,
-          limit: WIDGET_SSO_SIGN_IN_RATE_LIMIT.limit,
-          window: WIDGET_SSO_SIGN_IN_RATE_LIMIT.window,
+          key: `${WIDGET_SSO_ATTEMPT_RATE_LIMIT.keyPrefix}:${clientIp}`,
+          limit: WIDGET_SSO_ATTEMPT_RATE_LIMIT.limit,
+          window: WIDGET_SSO_ATTEMPT_RATE_LIMIT.window,
         })
         .pipe(
           Effect.mapError((error) =>
@@ -201,6 +209,24 @@ export const createSsoSession = ({
       secrets.map((s) => s.secret),
       organizationId
     ).pipe(Effect.mapError(() => new SsoError({ code: "INVALID_JWT" })));
+
+    // Bound contact and user provisioning only after a JWT has proved that
+    // this request is authorized for the organization.
+    yield* RateLimitService.use((rateLimiter) =>
+      rateLimiter
+        .consume({
+          key: `${WIDGET_SSO_SIGN_IN_RATE_LIMIT.keyPrefix}:${organizationId}`,
+          limit: WIDGET_SSO_SIGN_IN_RATE_LIMIT.limit,
+          window: WIDGET_SSO_SIGN_IN_RATE_LIMIT.window,
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            error.reason._tag === "RateLimitExceeded"
+              ? new SsoError({ code: "SSO_RATE_LIMITED" })
+              : new SsoError({ code: "SSO_RATE_LIMIT_UNAVAILABLE" })
+          )
+        )
+    );
 
     const contactDefs =
       (yield* attributeDefinitionRepository.findContactAttributeDefinitions(

@@ -6,9 +6,13 @@ import {
   NodeRedis,
   NodeRuntime,
 } from "@effect/platform-node";
+import { AUTH_CLIENT_IP_HEADER } from "@feeblo/auth/auth-client-ip-header";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
-import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
+import {
+  ClientIp,
+  makeClientIpGlobalMiddleware,
+} from "@feeblo/domain/client-ip";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
 import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
 import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feedback/service";
@@ -72,16 +76,29 @@ const redisOptions = (redisUrl: string) => {
 const BetterAuthRouterLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const auth = yield* Auth;
-    const authApp = HttpEffect.fromWebHandler((request) =>
-      Promise.resolve(auth.handler(request))
-    );
-
     return yield* router.add("*", "/api/auth/*", (request) =>
-      Effect.provideService(
-        authApp,
-        HttpServerRequest.HttpServerRequest,
-        request
-      ).pipe(Effect.orDie)
+      Effect.gen(function* () {
+        const clientIp = yield* ClientIp;
+        const authApp = HttpEffect.fromWebHandler((webRequest) => {
+          // Overwrite this internal header at the HTTP boundary. Better Auth
+          // cannot access the peer socket, so this is the only client-IP value
+          // it may use for SSO attempt rate limiting.
+          const headers = new Headers(webRequest.headers);
+          headers.set(
+            AUTH_CLIENT_IP_HEADER,
+            clientIp._tag === "ClientIpAddress" ? clientIp.address : "unknown"
+          );
+          return Promise.resolve(
+            auth.handler(new Request(webRequest, { headers }))
+          );
+        });
+
+        return yield* Effect.provideService(
+          authApp,
+          HttpServerRequest.HttpServerRequest,
+          request
+        );
+      }).pipe(Effect.orDie)
     );
   })
 );

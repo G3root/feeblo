@@ -44,6 +44,8 @@ export interface JwtAutoLoginOptions {
    * so the plugin can surface the correct error code.
    */
   createSsoUser: (input: {
+    /** Peer-validated client IP injected by the server auth boundary. */
+    clientIp: string;
     organizationId: string;
     token: string;
   }) => Promise<SsoUserResult | SsoUserError>;

@@ -16,6 +16,7 @@ import {
 import { parseSetCookieHeader, setSessionCookie } from "better-auth/cookies";
 import { parseUserOutput } from "better-auth/db";
 import * as z from "zod";
+import { AUTH_CLIENT_IP_HEADER } from "../../auth-client-ip-header";
 import { JWT_AUTO_LOGIN_ERROR_CODES } from "./error-codes";
 import { schema } from "./schema";
 import type {
@@ -102,6 +103,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
         SIGN_IN_PATH,
         {
           method: "POST",
+          requireHeaders: true,
           body: z.object({
             organizationId: z.string(),
             token: z.string(),
@@ -154,6 +156,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
           // package and is injected via `options.createSsoUser` so this plugin
           // stays better-auth-only.
           const result = await options.createSsoUser({
+            clientIp: ctx.headers.get(AUTH_CLIENT_IP_HEADER) ?? "unknown",
             organizationId: ctx.body.organizationId,
             token: ctx.body.token,
           });
