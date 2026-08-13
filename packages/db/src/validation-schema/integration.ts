@@ -8,6 +8,33 @@ export type TIntegrationProviderKey = S.Schema.Type<
   typeof IntegrationProviderKey
 >;
 
+/** Provider-owned external resource kind, such as `issue`, `task`, or `ticket`. */
+export const IntegrationExternalResourceType = S.NonEmptyString.pipe(
+  S.brand("IntegrationExternalResourceType")
+);
+export type TIntegrationExternalResourceType = S.Schema.Type<
+  typeof IntegrationExternalResourceType
+>;
+
+/** Safe, provider-defined data used to render an external resource link. */
+export const IntegrationExternalResourceSafeMetadata = S.Record(
+  S.String,
+  S.Json
+);
+export type TIntegrationExternalResourceSafeMetadata = S.Schema.Type<
+  typeof IntegrationExternalResourceSafeMetadata
+>;
+
+/** Durable external resource creation lifecycle. */
+export const ExternalResourceCreateRequestState = S.Literals([
+  "pending",
+  "succeeded",
+  "failed",
+]);
+export type TExternalResourceCreateRequestState = S.Schema.Type<
+  typeof ExternalResourceCreateRequestState
+>;
+
 /** Canonical provider capability directions used by static manifests. */
 export const IntegrationCapabilityDirection = S.Literals([
   "outbound",
@@ -23,6 +50,7 @@ export const IntegrationConnectionMode = S.Literals([
   "none",
   "oauth2",
   "api_key",
+  "github_app",
 ]);
 export type TIntegrationConnectionMode = S.Schema.Type<
   typeof IntegrationConnectionMode
@@ -35,6 +63,8 @@ export const IntegrationCapabilityKey = S.Literals([
   "commands",
   "message.action",
   "interactions",
+  "github.issue.create",
+  "github.issue.webhook",
 ]);
 export type TIntegrationCapabilityKey = S.Schema.Type<
   typeof IntegrationCapabilityKey
@@ -63,6 +93,7 @@ export const IntegrationEventType = S.Literals([
   "feedback.post.created",
   "feedback.post.status_changed",
   "webhook.test",
+  "github.issue.sync_requested",
 ]);
 export type TIntegrationEventType = S.Schema.Type<typeof IntegrationEventType>;
 

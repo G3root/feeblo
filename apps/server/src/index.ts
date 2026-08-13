@@ -30,6 +30,10 @@ import {
   DiscordManagementServiceLive,
   DiscordUserServiceLive,
 } from "@feeblo/domain/integration/discord";
+import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
+import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
+import { GitHubInboundServiceLive } from "@feeblo/domain/integration/github/inbound-live";
+import { GitHubManagementServiceLive } from "@feeblo/domain/integration/github/management-live";
 import {
   SlackFeedbackServiceLive,
   SlackInboundServiceLive,
@@ -62,6 +66,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
@@ -76,6 +81,8 @@ import { ServerConfig } from "./config";
 import { makeDiscordRouters } from "./discord";
 import { e2eRoadmapSeedRouter } from "./e2e-roadmap-seed";
 import { e2eSetPlanRouter } from "./e2e-set-plan";
+import { makeGitHubRouters } from "./github";
+import { GitHubProviderLive } from "./github-provider";
 import { makeIntegrationLayers } from "./integrations";
 import { makeSlackRouters } from "./slack";
 
@@ -295,10 +302,27 @@ const program = Effect.gen(function* () {
     initAuthHandler(makeMailerLayer, RateLimitLayer)
   );
   const integrationRuntime = yield* makeIntegrationLayers.pipe(
-    Effect.provideService(ServerConfig, config)
+    Effect.provideService(ServerConfig, config),
+    Effect.provide(ExternalResourceServiceLive)
   );
   const SlackRouters = makeSlackRouters(integrationRuntime.registry);
   const DiscordRouters = makeDiscordRouters(integrationRuntime.registry);
+  const GitHubRouters = makeGitHubRouters(integrationRuntime.registry);
+  const GitHubConfigLayer = Layer.succeed(
+    GitHubIntegrationConfig,
+    GitHubIntegrationConfig.of({
+      clientId: config.githubClientId ?? "",
+      configured:
+        config.githubAppId !== undefined &&
+        config.githubAppSlug !== undefined &&
+        config.githubClientId !== undefined &&
+        Redacted.value(config.githubClientSecret) !== "" &&
+        Redacted.value(config.githubPrivateKey) !== "" &&
+        Redacted.value(config.githubWebhookSecret) !== "",
+      oauthRedirectUrl: config.githubOAuthCallbackUrl,
+      webhookUrl: config.githubWebhookUrl,
+    })
+  );
   const ServiceLayers = Layer.mergeAll(
     WorkFlowLayer,
     SiteRepository.layer,
@@ -307,6 +331,7 @@ const program = Effect.gen(function* () {
     EmailProviderFeedbackService.layer,
     EmailSubscriptionRepository.layer,
     integrationRuntime.layer,
+    ExternalResourceServiceLive,
     SlackManagementServiceLive.pipe(
       Layer.provide(SlackIntegrationConfig.layer),
       Layer.provide(Database.DatabaseContextLive)
@@ -338,6 +363,20 @@ const program = Effect.gen(function* () {
       Layer.provide(PostSubscriptionRepository.layer),
       Layer.provide(Database.DatabaseContextLive)
     ),
+    GitHubManagementServiceLive.pipe(
+      Layer.provide(ExternalResourceServiceLive),
+      Layer.provide(
+        GitHubProviderLive.pipe(
+          Layer.provide(GitHubConfigLayer),
+          Layer.provide(Layer.succeed(ServerConfig, config)),
+          Layer.provide(Database.DatabaseContextLive)
+        )
+      ),
+      Layer.provide(GitHubConfigLayer),
+      Layer.provide(EmailOutboxConfig.layer),
+      Layer.provide(Database.DatabaseContextLive)
+    ),
+    GitHubInboundServiceLive.pipe(Layer.provide(Database.DatabaseContextLive)),
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
   const RootRouterLive: Layer.Layer<never, never, HttpRouter.HttpRouter> =
@@ -405,7 +444,8 @@ const program = Effect.gen(function* () {
     BetterAuthRouterLive,
     DocsRoute,
     SlackRouters,
-    DiscordRouters
+    DiscordRouters,
+    GitHubRouters
   );
   const AllRoutes = MergedRoutes.pipe(
     Layer.provide(

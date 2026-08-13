@@ -23,10 +23,20 @@ import type {
   TIntegrationProviderKey,
   TIntegrationRouteEventSelection,
   TIntegrationSafeDisplayMetadata,
+  TIntegrationExternalResourceSafeMetadata,
+  TIntegrationExternalResourceType,
+  TExternalResourceCreateRequestState,
   TStoredIntegrationEventOrigin,
   TStoredIntegrationEventPayload,
 } from "../validation-schema/integration";
+import type {
+  TGitHubInstallationAccountType,
+  TGitHubIssueMatchMode,
+  TGitHubIssueState,
+  TGitHubUpvoterNotificationPolicy,
+} from "../validation-schema/github-integration";
 import { organizationTable } from "./auth";
+import { postStatusTable, postTable } from "./feedback";
 
 /** Durable organization-owned provider connection with credentials stored separately from safe metadata. */
 export const integrationConnectionTable = pgTable(
@@ -93,6 +103,38 @@ export const integrationConnectionTable = pgTable(
       .where(
         sql`${table.provider} = 'discord' and ${table.remoteAccountId} is not null and ${table.lifecycle} = 'active'`
       ),
+  ]
+);
+
+/** GitHub App installation identity bound one-to-one with an integration connection. */
+export const githubInstallationTable = pgTable(
+  "github_installation",
+  {
+    connectionId: text("connection_id")
+      .primaryKey()
+      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
+    /** GitHub's durable installation identifier; installation access tokens are never stored. */
+    installationId: text("installation_id").notNull(),
+    accountId: text("account_id").notNull(),
+    accountLogin: text("account_login").notNull(),
+    accountType: text("account_type")
+      .$type<TGitHubInstallationAccountType>()
+      .notNull(),
+    /** Present while GitHub has suspended the App installation. */
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("github_installation_installation_id_uidx").on(
+      table.installationId
+    ),
+    index("github_installation_account_idx").on(table.accountId),
   ]
 );
 
@@ -355,6 +397,180 @@ export const integrationDeliveryAttemptTable = pgTable(
     ),
     index("integration_delivery_attempt_retention_expires_at_idx").on(
       table.retentionExpiresAt
+    ),
+  ]
+);
+
+/** One provider-owned resource which can be linked to many Feeblo posts. */
+export const integrationExternalResourceTable = pgTable(
+  "integration_external_resource",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
+    resourceType: text("resource_type")
+      .$type<TIntegrationExternalResourceType>()
+      .notNull(),
+    remoteId: text("remote_id").notNull(),
+    remoteUrl: text("remote_url").notNull(),
+    displayKey: text("display_key"),
+    title: text("title"),
+    stateKey: text("state_key"),
+    safeMetadata: jsonb("safe_metadata")
+      .$type<TIntegrationExternalResourceSafeMetadata>()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("integration_external_resource_connection_type_remote_uidx").on(
+      table.connectionId,
+      table.resourceType,
+      table.remoteId
+    ),
+    index("integration_external_resource_organization_connection_idx").on(
+      table.organizationId,
+      table.connectionId
+    ),
+  ]
+);
+
+/** A normalized many-to-many link from a Feeblo post to an external resource. */
+export const postExternalResourceLinkTable = pgTable(
+  "post_external_resource_link",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    externalResourceId: text("external_resource_id")
+      .notNull()
+      .references(() => integrationExternalResourceTable.id, {
+        onDelete: "cascade",
+      }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("post_external_resource_link_post_resource_uidx").on(
+      table.postId,
+      table.externalResourceId
+    ),
+    index("post_external_resource_link_organization_post_idx").on(
+      table.organizationId,
+      table.postId
+    ),
+  ]
+);
+
+/** Organization-owned rule that maps aggregate linked GitHub issue state to a Feeblo status. */
+export const githubSyncRuleTable = pgTable(
+  "github_sync_rule",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
+    issueMatchMode: text("issue_match_mode")
+      .$type<TGitHubIssueMatchMode>()
+      .notNull(),
+    issueState: text("issue_state").$type<TGitHubIssueState>().notNull(),
+    postStatusId: text("post_status_id")
+      .notNull()
+      .references(() => postStatusTable.id, { onDelete: "cascade" }),
+    upvoterNotificationPolicy: text("upvoter_notification_policy")
+      .$type<TGitHubUpvoterNotificationPolicy>()
+      .notNull(),
+    enabled: boolean("enabled").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("github_sync_rule_connection_enabled_idx").on(
+      table.connectionId,
+      table.enabled
+    ),
+    index("github_sync_rule_organization_idx").on(table.organizationId),
+  ]
+);
+
+/** Durable inbox record preventing a redelivered GitHub webhook from applying twice. */
+export const githubWebhookDeliveryTable = pgTable(
+  "github_webhook_delivery",
+  {
+    id: text("id").primaryKey(),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
+    deliveryId: text("delivery_id").notNull(),
+    eventName: text("event_name").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("github_webhook_delivery_connection_delivery_uidx").on(
+      table.connectionId,
+      table.deliveryId
+    ),
+  ]
+);
+
+/** Idempotency reservation for one user-requested external-resource creation; external I/O occurs after pending is committed. */
+export const externalResourceCreateRequestTable = pgTable(
+  "external_resource_create_request",
+  {
+    id: text("id").primaryKey(),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
+    postId: text("post_id")
+      .notNull()
+      .references(() => postTable.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    state: text("state").$type<TExternalResourceCreateRequestState>().notNull(),
+    externalResourceId: text("external_resource_id").references(
+      () => integrationExternalResourceTable.id,
+      { onDelete: "set null" }
+    ),
+    postExternalResourceLinkId: text(
+      "post_external_resource_link_id"
+    ).references(() => postExternalResourceLinkTable.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("external_resource_create_request_connection_key_uidx").on(
+      table.connectionId,
+      table.idempotencyKey
     ),
   ]
 );

@@ -52,6 +52,7 @@ import { Route as OrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport 
 import { Route as OrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 import { Route as OrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 import { Route as OrganizationIdSettingsIntegrationsDiscordIndexRouteImport } from "./routes/$organizationId/settings/integrations/discord/index"
+import { Route as OrganizationIdSettingsIntegrationsGithubIndexRouteImport } from "./routes/$organizationId/settings/integrations/github/index"
 import { Route as OrganizationIdSettingsIntegrationsSlackIndexRouteImport } from "./routes/$organizationId/settings/integrations/slack/index"
 
 const OrganizationIdRoute = OrganizationIdRouteImport.update({
@@ -303,6 +304,12 @@ const OrganizationIdSettingsIntegrationsDiscordIndexRoute =
     path: "/integrations/discord/",
     getParentRoute: () => OrganizationIdSettingsRoute,
   } as any)
+const OrganizationIdSettingsIntegrationsGithubIndexRoute =
+  OrganizationIdSettingsIntegrationsGithubIndexRouteImport.update({
+    id: "/integrations/github/",
+    path: "/integrations/github/",
+    getParentRoute: () => OrganizationIdSettingsRoute,
+  } as any)
 const OrganizationIdSettingsIntegrationsSlackIndexRoute =
   OrganizationIdSettingsIntegrationsSlackIndexRouteImport.update({
     id: "/integrations/slack/",
@@ -353,6 +360,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
   "/$organizationId/settings/integrations/discord/": typeof OrganizationIdSettingsIntegrationsDiscordIndexRoute
+  "/$organizationId/settings/integrations/github/": typeof OrganizationIdSettingsIntegrationsGithubIndexRoute
   "/$organizationId/settings/integrations/slack/": typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 export interface FileRoutesByTo {
@@ -396,6 +404,7 @@ export interface FileRoutesByTo {
   "/$organizationId/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/board/$boardSlug": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
   "/$organizationId/settings/integrations/discord": typeof OrganizationIdSettingsIntegrationsDiscordIndexRoute
+  "/$organizationId/settings/integrations/github": typeof OrganizationIdSettingsIntegrationsGithubIndexRoute
   "/$organizationId/settings/integrations/slack": typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 export interface FileRoutesById {
@@ -443,6 +452,7 @@ export interface FileRoutesById {
   "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": typeof OrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/_dashboard-layout/board/$boardSlug/": typeof OrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
   "/$organizationId/settings/integrations/discord/": typeof OrganizationIdSettingsIntegrationsDiscordIndexRoute
+  "/$organizationId/settings/integrations/github/": typeof OrganizationIdSettingsIntegrationsGithubIndexRoute
   "/$organizationId/settings/integrations/slack/": typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 export interface FileRouteTypes {
@@ -490,6 +500,7 @@ export interface FileRouteTypes {
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug/"
     | "/$organizationId/settings/integrations/discord/"
+    | "/$organizationId/settings/integrations/github/"
     | "/$organizationId/settings/integrations/slack/"
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -533,6 +544,7 @@ export interface FileRouteTypes {
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/board/$boardSlug"
     | "/$organizationId/settings/integrations/discord"
+    | "/$organizationId/settings/integrations/github"
     | "/$organizationId/settings/integrations/slack"
   id:
     | "__root__"
@@ -579,6 +591,7 @@ export interface FileRouteTypes {
     | "/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
     | "/$organizationId/_dashboard-layout/board/$boardSlug/"
     | "/$organizationId/settings/integrations/discord/"
+    | "/$organizationId/settings/integrations/github/"
     | "/$organizationId/settings/integrations/slack/"
   fileRoutesById: FileRoutesById
 }
@@ -895,6 +908,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof OrganizationIdSettingsIntegrationsDiscordIndexRouteImport
       parentRoute: typeof OrganizationIdSettingsRoute
     }
+    "/$organizationId/settings/integrations/github/": {
+      id: "/$organizationId/settings/integrations/github/"
+      path: "/integrations/github"
+      fullPath: "/$organizationId/settings/integrations/github/"
+      preLoaderRoute: typeof OrganizationIdSettingsIntegrationsGithubIndexRouteImport
+      parentRoute: typeof OrganizationIdSettingsRoute
+    }
     "/$organizationId/settings/integrations/slack/": {
       id: "/$organizationId/settings/integrations/slack/"
       path: "/integrations/slack"
@@ -984,6 +1004,7 @@ interface OrganizationIdSettingsRouteChildren {
   OrganizationIdSettingsIntegrationsIndexRoute: typeof OrganizationIdSettingsIntegrationsIndexRoute
   OrganizationIdSettingsWebhooksIndexRoute: typeof OrganizationIdSettingsWebhooksIndexRoute
   OrganizationIdSettingsIntegrationsDiscordIndexRoute: typeof OrganizationIdSettingsIntegrationsDiscordIndexRoute
+  OrganizationIdSettingsIntegrationsGithubIndexRoute: typeof OrganizationIdSettingsIntegrationsGithubIndexRoute
   OrganizationIdSettingsIntegrationsSlackIndexRoute: typeof OrganizationIdSettingsIntegrationsSlackIndexRoute
 }
 
@@ -1017,6 +1038,8 @@ const OrganizationIdSettingsRouteChildren: OrganizationIdSettingsRouteChildren =
       OrganizationIdSettingsWebhooksIndexRoute,
     OrganizationIdSettingsIntegrationsDiscordIndexRoute:
       OrganizationIdSettingsIntegrationsDiscordIndexRoute,
+    OrganizationIdSettingsIntegrationsGithubIndexRoute:
+      OrganizationIdSettingsIntegrationsGithubIndexRoute,
     OrganizationIdSettingsIntegrationsSlackIndexRoute:
       OrganizationIdSettingsIntegrationsSlackIndexRoute,
   }

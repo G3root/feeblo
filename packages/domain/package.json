@@ -283,6 +283,21 @@
     "./integration/webhook-management-service": {
       "default": "./src/integration/webhook-management-service.ts"
     },
+    "./integration/external-resource/schema": {
+      "default": "./src/integration/external-resource/schema.ts"
+    },
+    "./integration/external-resource/service": {
+      "default": "./src/integration/external-resource/service.ts"
+    },
+    "./integration/external-resource/live": {
+      "default": "./src/integration/external-resource/live.ts"
+    },
+    "./integration/external-resource/rpcs": {
+      "default": "./src/integration/external-resource/rpcs.ts"
+    },
+    "./integration/external-resource/handlers": {
+      "default": "./src/integration/external-resource/handlers.ts"
+    },
     "./email-outbox/repository": {
       "default": "./src/email-outbox/repository.ts"
     },
@@ -357,6 +372,33 @@
     },
     "./integration/discord/handlers": {
       "default": "./src/integration/discord/handlers.ts"
+    },
+    "./integration/github": {
+      "default": "./src/integration/github/index.ts"
+    },
+    "./integration/github/config": {
+      "default": "./src/integration/github/config.ts"
+    },
+    "./integration/github/github-provider": {
+      "default": "./src/integration/github/github-provider.ts"
+    },
+    "./integration/github/inbound-service": {
+      "default": "./src/integration/github/inbound-service.ts"
+    },
+    "./integration/github/inbound-live": {
+      "default": "./src/integration/github/inbound-live.ts"
+    },
+    "./integration/github/management-live": {
+      "default": "./src/integration/github/management-live.ts"
+    },
+    "./integration/github/management-service": {
+      "default": "./src/integration/github/management-service.ts"
+    },
+    "./integration/github/oauth-callback": {
+      "default": "./src/integration/github/oauth-callback.ts"
+    },
+    "./integration/github/schema": {
+      "default": "./src/integration/github/schema.ts"
     },
     "./board/repository": {
       "default": "./src/board/repository.ts"

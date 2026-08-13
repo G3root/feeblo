@@ -9,7 +9,10 @@ import {
   type IntegrationDeliveryOutcome,
 } from "./delivery-policy";
 import { integrationDeliveryWorkerDefaults } from "./delivery-worker-defaults";
-import type { IntegrationProviderDeliveryInput } from "./integration-contracts";
+import type {
+  IntegrationExternalResourceDraft,
+  IntegrationProviderDeliveryInput,
+} from "./integration-contracts";
 import {
   recordIntegrationClaimedBacklog,
   recordIntegrationDeliveryOutcome,
@@ -49,6 +52,8 @@ export interface IntegrationDeliveryWorkerRepository {
   readonly persistDeliveryResult: (input: {
     readonly claimed: ClaimedIntegrationDelivery;
     readonly errorTag?: string;
+    /** Provider-normalized resources persisted only with a successful delivery. */
+    readonly externalResourceDrafts?: readonly IntegrationExternalResourceDraft[];
     readonly httpStatus?: number;
     readonly outcome: IntegrationDeliveryOutcome;
   }) => Effect.Effect<void, IntegrationDeliveryWorkerPersistenceError>;
@@ -120,6 +125,7 @@ export const runIntegrationDeliveryWorkerPoll = ({
                   });
                   const result: {
                     readonly errorTag?: string;
+                    readonly externalResourceDrafts?: readonly IntegrationExternalResourceDraft[];
                     readonly httpStatus?: number;
                     readonly outcome: IntegrationDeliveryOutcome;
                   } =
@@ -155,10 +161,16 @@ export const runIntegrationDeliveryWorkerPoll = ({
                                 ),
                             }),
                             onSuccess: (response) => ({
-                              ...(response.httpStatus === undefined
-                                ? {}
-                                : { httpStatus: response.httpStatus }),
-                              outcome: { _tag: "Succeeded" } as const,
+                            ...(response.httpStatus === undefined
+                              ? {}
+                              : { httpStatus: response.httpStatus }),
+                            ...(response.externalResourceDrafts === undefined
+                              ? {}
+                              : {
+                                  externalResourceDrafts:
+                                    response.externalResourceDrafts,
+                                }),
+                            outcome: { _tag: "Succeeded" } as const,
                             }),
                           })
                         );
@@ -167,6 +179,12 @@ export const runIntegrationDeliveryWorkerPoll = ({
                     ...(result.errorTag === undefined
                       ? {}
                       : { errorTag: result.errorTag }),
+                    ...(result.externalResourceDrafts === undefined
+                      ? {}
+                      : {
+                          externalResourceDrafts:
+                            result.externalResourceDrafts,
+                        }),
                     ...(result.httpStatus === undefined
                       ? {}
                       : { httpStatus: result.httpStatus }),

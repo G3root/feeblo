@@ -9,6 +9,7 @@ import { ServerConfig } from "./config";
 const requiredServerEnvironment = {
   APP_ROOT_DOMAIN: "example.test",
   APP_URL: "https://example.test",
+  AUTH_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
   API_URL: "https://api.example.test",
 };
 
@@ -127,6 +128,39 @@ describe("ServerConfig integration worker concurrency", () => {
         })
       );
       expect(Exit.isFailure(nonNumeric)).toBe(true);
+    })
+  );
+});
+
+describe("ServerConfig GitHub App public URLs", () => {
+  it.effect(
+    "derives GitHub App callback and global webhook URLs from API_URL",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* loadServerConfig();
+        expect(config.githubOAuthCallbackUrl).toBe(
+          "https://api.example.test/github/app/installations/callback"
+        );
+        expect(config.githubWebhookUrl).toBe(
+          "https://api.example.test/github/app/webhooks"
+        );
+      })
+  );
+
+  it.effect("accepts explicit public GitHub App URLs", () =>
+    Effect.gen(function* () {
+      const config = yield* loadServerConfig({
+        GITHUB_INTEGRATION_APP_INSTALLATION_CALLBACK_URL:
+          "https://public.example.test/github/app/installations/callback",
+        GITHUB_INTEGRATION_APP_WEBHOOK_URL:
+          "https://public.example.test/github/webhook",
+      });
+      expect(config.githubOAuthCallbackUrl).toBe(
+        "https://public.example.test/github/app/installations/callback"
+      );
+      expect(config.githubWebhookUrl).toBe(
+        "https://public.example.test/github/webhook"
+      );
     })
   );
 });

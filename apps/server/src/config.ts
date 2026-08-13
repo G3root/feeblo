@@ -4,7 +4,10 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+
+const trailingSlashPattern = /\/$/;
 
 export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
@@ -15,6 +18,68 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
       const appRootDomain = yield* Config.string("APP_ROOT_DOMAIN");
       const nodeEnv = yield* Config.string("NODE_ENV").pipe(
         Config.withDefault("development")
+      );
+      const githubAppId = yield* Config.string(
+        "GITHUB_INTEGRATION_APP_ID"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const githubAppSlug = yield* Config.string(
+        "GITHUB_INTEGRATION_APP_SLUG"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const githubClientId = yield* Config.string(
+        "GITHUB_INTEGRATION_CLIENT_ID"
+      ).pipe(Config.option, Effect.map(Option.getOrUndefined));
+      const githubClientSecret = yield* Config.redacted(
+        "GITHUB_INTEGRATION_CLIENT_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const githubWebhookSecret = yield* Config.redacted(
+        "GITHUB_INTEGRATION_WEBHOOK_SECRET"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const githubPrivateKey = yield* Config.redacted(
+        "GITHUB_INTEGRATION_PRIVATE_KEY"
+      ).pipe(
+        Config.option,
+        Effect.map((value) => Option.getOrElse(value, () => Redacted.make("")))
+      );
+      const githubEncryptionKey = yield* Config.redacted(
+        "INTEGRATION_ENCRYPTION_KEY"
+      ).pipe(
+        Config.option,
+        Effect.flatMap(
+          Option.match({
+            onNone: () => Config.redacted("AUTH_ENCRYPTION_KEY"),
+            onSome: Effect.succeed,
+          })
+        )
+      );
+      const githubOAuthCallbackUrl = yield* Config.string(
+        "GITHUB_INTEGRATION_APP_INSTALLATION_CALLBACK_URL"
+      ).pipe(
+        Config.option,
+        Effect.map((value) =>
+          Option.getOrElse(
+            value,
+            () =>
+              `${apiUrl.replace(trailingSlashPattern, "")}/github/app/installations/callback`
+          )
+        )
+      );
+      const githubWebhookUrl = yield* Config.string(
+        "GITHUB_INTEGRATION_APP_WEBHOOK_URL"
+      ).pipe(
+        Config.option,
+        Effect.map((value) =>
+          Option.getOrElse(
+            value,
+            () =>
+              `${apiUrl.replace(trailingSlashPattern, "")}/github/app/webhooks`
+          )
+        )
       );
       // Outbound-webhook security configuration (encryption key and egress
       // policy) is owned by WebhookIntegrationConfig in the domain package.
@@ -68,6 +133,15 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         appUrl,
         appRootDomain,
         clientIpProxyTrust,
+        githubAppId,
+        githubAppSlug,
+        githubClientId,
+        githubClientSecret,
+        githubEncryptionKey,
+        githubOAuthCallbackUrl,
+        githubPrivateKey,
+        githubWebhookUrl,
+        githubWebhookSecret,
         integrationConnectionConcurrency,
         integrationGlobalConcurrency,
         nodeEnv,

@@ -5,6 +5,7 @@ import {
   IntegrationConnectionMode as DbIntegrationConnectionMode,
   IntegrationDeliveryRetryDecision as DbIntegrationDeliveryRetryDecision,
   IntegrationDeliveryState as DbIntegrationDeliveryState,
+  IntegrationExternalResourceType as DbIntegrationExternalResourceType,
   IntegrationEventType as DbIntegrationEventType,
   IntegrationProviderKey as DbIntegrationProviderKey,
   IntegrationRouteEventSelection as DbIntegrationRouteEventSelection,
@@ -15,6 +16,7 @@ import {
   type TIntegrationConnectionLifecycleStatus,
   type TIntegrationConnectionMode,
   type TIntegrationDeliveryState,
+  type TIntegrationExternalResourceType,
   type TIntegrationEventType,
   type TIntegrationProviderKey,
   type TSubscribableIntegrationEventType,
@@ -44,6 +46,8 @@ export const IntegrationConnectionMode = DbIntegrationConnectionMode;
 export const IntegrationDeliveryRetryDecision =
   DbIntegrationDeliveryRetryDecision;
 export const IntegrationDeliveryState = DbIntegrationDeliveryState;
+export const IntegrationExternalResourceType =
+  DbIntegrationExternalResourceType;
 export const IntegrationEventType = DbIntegrationEventType;
 export const IntegrationProviderKey = DbIntegrationProviderKey;
 export const IntegrationRouteEventSelection = DbIntegrationRouteEventSelection;
@@ -152,6 +156,7 @@ export type IntegrationConnectionLifecycleStatus =
 
 /** Durable delivery lifecycle; a lease is never an external request by itself. */
 export type IntegrationDeliveryState = TIntegrationDeliveryState;
+export type IntegrationExternalResourceType = TIntegrationExternalResourceType;
 
 /** Immutable route record fields needed for matching and delivery persistence. */
 export const IntegrationRoute = Schema.Struct({
@@ -316,8 +321,28 @@ export interface IntegrationProviderDeliveryInput {
   readonly route: IntegrationRoute;
 }
 
+/**
+ * A provider-normalized external resource produced by one successful delivery.
+ * Provider credentials and addressing details belong only in safe metadata.
+ */
+export const IntegrationExternalResourceDraft = Schema.Struct({
+  displayKey: Schema.optionalKey(Schema.NonEmptyString),
+  /** Feeblo post that owns this external resource link. */
+  postId: PostId.schema,
+  remoteId: Schema.NonEmptyString,
+  stateKey: Schema.optionalKey(Schema.NonEmptyString),
+  remoteUrl: Schema.URLFromString,
+  resourceType: IntegrationExternalResourceType,
+  safeMetadata: IntegrationSafeDisplayMetadata,
+  title: Schema.optionalKey(Schema.String),
+});
+export interface IntegrationExternalResourceDraft
+  extends Schema.Schema.Type<typeof IntegrationExternalResourceDraft> {}
+
 /** Provider handler reports only safe outcome metadata to the delivery kernel. */
 export interface IntegrationProviderDeliveryResult {
+  /** Resource links to persist with delivery success, guarded by the delivery lease. */
+  readonly externalResourceDrafts?: readonly IntegrationExternalResourceDraft[];
   readonly httpStatus?: number;
 }
 

@@ -3,7 +3,7 @@ import { Button } from "@feeblo/ui/button";
 import { Card, CardPanel } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { Chat01Icon, ChatBotIcon } from "@hugeicons/core-free-icons";
+import { Chat01Icon, ChatBotIcon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import * as Option from "effect/Option";
@@ -31,6 +31,15 @@ import {
   startSlackConnect,
 } from "~/features/slack/lib/connections";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import {
+  gitHubAtomRegistry,
+  gitHubConnectionsAtom,
+  gitHubIntegrationStatusAtom,
+} from "~/features/github/atoms";
+import {
+  type loadGitHubConnections,
+  startGitHubConnect,
+} from "~/features/github/lib/github-connections";
 
 export const Route = createFileRoute("/$organizationId/settings/integrations/")(
   {
@@ -38,6 +47,7 @@ export const Route = createFileRoute("/$organizationId/settings/integrations/")(
       z
         .object({
           discord: z.enum(["connected", "error"]).optional(),
+          github: z.enum(["connected", "error"]).optional(),
           slack: z.enum(["connected", "error"]).optional(),
           message: z.string().min(1).optional(),
         })
@@ -54,9 +64,8 @@ function IntegrationsSettingsRoute() {
   const search = Route.useSearch();
   const router = useRouter();
 
-  // Surface the result of the Slack and Discord OAuth install flows the
-  // server redirected back with, then strip the query params so the notice
-  // shows only once.
+  // Surface the result of provider connection flows the server redirected back
+  // with, then strip the query params so the notice shows only once.
   useEffect(() => {
     if (search.slack !== undefined) {
       if (search.slack === "connected") {
@@ -76,6 +85,19 @@ function IntegrationsSettingsRoute() {
           type: "error",
         });
       }
+    } else if (search.github !== undefined) {
+      if (search.github === "connected") {
+        toastManager.add({
+          title: "GitHub App installed",
+          description: "Feeblo can now create issues and comments as its bot.",
+          type: "success",
+        });
+      } else {
+        toastManager.add({
+          title: search.message ?? "Could not connect GitHub",
+          type: "error",
+        });
+      }
     } else {
       return;
     }
@@ -85,7 +107,7 @@ function IntegrationsSettingsRoute() {
       search: {},
       replace: true,
     });
-  }, [organizationId, router, search.discord, search.message, search.slack]);
+  }, [organizationId, router, search.discord, search.github, search.message, search.slack]);
 
   if (isPending) {
     return null;
@@ -110,10 +132,39 @@ function IntegrationsSettingsRoute() {
           <RegistryContext.Provider value={discordAtomRegistry}>
             <DiscordIntegrationCard organizationId={organizationId} />
           </RegistryContext.Provider>
+          <RegistryContext.Provider value={gitHubAtomRegistry}>
+            <GitHubIntegrationCard organizationId={organizationId} />
+          </RegistryContext.Provider>
         </div>
       </SettingsLayout.Content>
     </SettingsLayout.Root>
   );
+}
+
+function GitHubIntegrationCard({ organizationId }: { readonly organizationId: string }) {
+  const router = useRouter();
+  const [connecting, setConnecting] = useState(false);
+  const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
+  const statusResult = useAtomValue(gitHubIntegrationStatusAtom);
+  const configured = AsyncResult.match(statusResult, {
+    onInitial: () => null as boolean | null,
+    onFailure: () => false,
+    onSuccess: ({ value }) => value,
+  });
+  const { connections, isLoading, loadFailed } = AsyncResult.match(connectionsResult, {
+    onInitial: () => ({ connections: [] as Awaited<ReturnType<typeof loadGitHubConnections>>, isLoading: true, loadFailed: false }),
+    onFailure: ({ previousSuccess }) => Option.match(previousSuccess, { onNone: () => ({ connections: [], isLoading: false, loadFailed: true }), onSome: ({ value }) => ({ connections: value, isLoading: false, loadFailed: false }) }),
+    onSuccess: ({ value }) => ({ connections: value, isLoading: false, loadFailed: false }),
+  });
+  const connected = connections.some((connection) => connection.lifecycle === "active" || connection.lifecycle === "connecting");
+  const connect = async () => {
+    setConnecting(true);
+    try { const { authorizeUrl } = await startGitHubConnect(organizationId); window.location.assign(authorizeUrl.toString()); }
+    catch { setConnecting(false); toastManager.add({ title: "Could not start GitHub App installation", type: "error" }); }
+  };
+  if (configured === null) return <Card><CardPanel><p className="text-muted-foreground text-sm">Loading GitHub…</p></CardPanel></Card>;
+  if (!configured) return null;
+  return <Card><CardPanel><div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-3"><div className="mt-0.5 shrink-0 rounded-lg border bg-muted p-2"><HugeiconsIcon className="size-5" icon={LinkSquare02Icon} /></div><div className="min-w-0"><div className="flex items-center gap-2"><p className="font-medium">GitHub</p>{connectionStatusBadge({ connected, isLoading, loadFailed })}</div><p className="mt-1 text-muted-foreground text-sm">Choose repositories for the Feeblo bot to publish feedback as GitHub issues and comments.</p></div></div><div className="shrink-0">{connected ? <Button onClick={() => router.navigate({ to: "/$organizationId/settings/integrations/github", params: { organizationId } })}>Configure</Button> : <Button disabled={connecting} onClick={connect} variant="outline">{connecting ? "Opening GitHub…" : "Install GitHub App"}</Button>}</div></div></CardPanel></Card>;
 }
 
 function connectionStatusBadge({

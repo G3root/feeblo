@@ -1,0 +1,373 @@
+import { currentDb, schema } from "@feeblo/db";
+import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
+import { GitHubProvider } from "@feeblo/domain/integration/github/github-provider";
+import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
+import { IntegrationConnectionId } from "@feeblo/id";
+import { IntegrationOAuthState } from "@feeblo/integration-core";
+import {
+  createGitHubAppJwt,
+  decryptGitHubCredentialMaterial,
+  encryptGitHubCredentialMaterial,
+  type GitHubUserInstallation,
+  makeGitHubApiClient,
+  makeGitHubInstallationTokenResolver,
+  renderGitHubIssueBody,
+} from "@feeblo/integration-github";
+import { githubProviderKey } from "@feeblo/integration-github/manifest";
+import { and, eq } from "drizzle-orm";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import { ServerConfig } from "./config";
+
+/** Server-owned GitHub App adapter. Durable state is installation identity only; all bearer tokens are ephemeral. */
+export const GitHubProviderLive = Layer.effect(
+  GitHubProvider,
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const config = yield* ServerConfig;
+    const domainConfig = yield* GitHubIntegrationConfig;
+    const api = makeGitHubApiClient();
+    const installationTokens = yield* makeGitHubInstallationTokenResolver({
+      apiClient: api,
+      appId: config.githubAppId ?? "",
+      privateKey: config.githubPrivateKey,
+    });
+    const integrationKey = config.githubEncryptionKey;
+    const providerFailure = (operation: string) =>
+      new InternalServerError({ message: `GitHub App ${operation} failed.` });
+    const installationIdForConnection = (connectionId: string) =>
+      Effect.gen(function* () {
+        const [installation] = yield* db
+          .select({
+            installationId: schema.githubInstallationTable.installationId,
+          })
+          .from(schema.githubInstallationTable)
+          .where(eq(schema.githubInstallationTable.connectionId, connectionId))
+          .limit(1)
+          .pipe(Effect.mapError(() => providerFailure("installation lookup")));
+        if (installation === undefined) {
+          return yield* new NotFoundError({
+            message: "GitHub App installation was not found.",
+          });
+        }
+        return installation.installationId;
+      });
+    const installationTokenForConnection = (connectionId: string) =>
+      Effect.gen(function* () {
+        const installationId = yield* installationIdForConnection(connectionId);
+        return yield* installationTokens
+          .getInstallationAccessToken({
+            installationId,
+          })
+          .pipe(
+            Effect.mapError(() =>
+              providerFailure("installation token creation")
+            )
+          );
+      });
+    const provider = GitHubProvider.of({
+      startInstallation: (organizationId) =>
+        Effect.gen(function* () {
+          if (!domainConfig.configured || config.githubAppSlug === undefined) {
+            return yield* new InternalServerError({
+              message: "GitHub App integration is not configured.",
+            });
+          }
+          const id = yield* IntegrationConnectionId.generate.pipe(
+            Effect.mapError(() => providerFailure("connection id generation"))
+          );
+          const nonce = yield* Effect.try({
+            try: () => crypto.randomUUID(),
+            catch: () => providerFailure("installation state generation"),
+          });
+          const state = yield* Schema.encodeEffect(
+            Schema.fromJsonString(IntegrationOAuthState)
+          )({ connectionId: id, organizationId, nonce }).pipe(
+            Effect.mapError(() =>
+              providerFailure("installation state encoding")
+            )
+          );
+          const ciphertext = yield* encryptGitHubCredentialMaterial(
+            integrationKey,
+            {
+              installationState: nonce,
+            }
+          ).pipe(
+            Effect.mapError(() =>
+              providerFailure("installation state encryption")
+            )
+          );
+          yield* db
+            .insert(schema.integrationConnectionTable)
+            .values({
+              id,
+              organizationId,
+              provider: githubProviderKey,
+              name: "GitHub",
+              lifecycle: "connecting",
+              credentialGeneration: 1,
+              credentialsCiphertext: ciphertext,
+              safeDisplayMetadata: {},
+            })
+            .pipe(
+              Effect.mapError(() => providerFailure("connection creation"))
+            );
+          const installUrl = new URL(
+            `https://github.com/apps/${encodeURIComponent(config.githubAppSlug)}/installations/new`
+          );
+          installUrl.searchParams.set("state", state);
+          return { authorizeUrl: installUrl };
+        }),
+      completeInstallation: (input) =>
+        Effect.gen(function* () {
+          if (config.githubClientId === undefined || !domainConfig.configured) {
+            return yield* new InternalServerError({
+              message: "GitHub App integration is not configured.",
+            });
+          }
+          const parsed = yield* Schema.decodeUnknownEffect(
+            Schema.fromJsonString(IntegrationOAuthState)
+          )(input.state).pipe(
+            Effect.mapError(() =>
+              providerFailure("installation state validation")
+            )
+          );
+          const [connection] = yield* db
+            .select()
+            .from(schema.integrationConnectionTable)
+            .where(
+              and(
+                eq(schema.integrationConnectionTable.id, parsed.connectionId),
+                eq(
+                  schema.integrationConnectionTable.organizationId,
+                  parsed.organizationId
+                ),
+                eq(
+                  schema.integrationConnectionTable.provider,
+                  githubProviderKey
+                ),
+                eq(schema.integrationConnectionTable.lifecycle, "connecting")
+              )
+            )
+            .limit(1)
+            .pipe(
+              Effect.mapError(() =>
+                providerFailure("installation connection lookup")
+              )
+            );
+          if (
+            connection?.credentialsCiphertext === null ||
+            connection?.credentialsCiphertext === undefined
+          ) {
+            return yield* providerFailure("installation connection lookup");
+          }
+          const pending = yield* decryptGitHubCredentialMaterial(
+            integrationKey,
+            connection.credentialsCiphertext
+          ).pipe(
+            Effect.mapError(() =>
+              providerFailure("installation state decryption")
+            )
+          );
+          if (pending.installationState !== parsed.nonce) {
+            return yield* providerFailure("installation state validation");
+          }
+          const userToken = yield* api
+            .exchangeUserAccessToken({
+              clientId: config.githubClientId,
+              clientSecret: config.githubClientSecret,
+              code: input.code,
+            })
+            .pipe(
+              Effect.mapError(() => providerFailure("installer token exchange"))
+            );
+          const installerAccessToken = Redacted.make(userToken.access_token);
+          let installation: GitHubUserInstallation | undefined;
+          for (let page = 1; installation === undefined; page += 1) {
+            const accessible = yield* api
+              .listUserInstallations({
+                accessToken: installerAccessToken,
+                page,
+              })
+              .pipe(
+                Effect.mapError(() =>
+                  providerFailure("installer installation verification")
+                )
+              );
+            installation = accessible.installations.find(
+              (candidate) => String(candidate.id) === input.installationId
+            );
+            if (
+              installation !== undefined ||
+              accessible.installations.length < 100 ||
+              page * 100 >= accessible.total_count
+            ) {
+              break;
+            }
+          }
+          if (installation === undefined) {
+            return yield* new NotFoundError({
+              message:
+                "GitHub App installation is not accessible to the installer.",
+            });
+          }
+          yield* db
+            .transaction(() =>
+              Effect.gen(function* () {
+                yield* db
+                  .update(schema.integrationConnectionTable)
+                  .set({
+                    credentialsCiphertext: null,
+                    lifecycle:
+                      installation.suspended_at === null ? "active" : "paused",
+                    remoteAccountId: installation.account.login,
+                    safeDisplayMetadata: { login: installation.account.login },
+                  })
+                  .where(
+                    eq(schema.integrationConnectionTable.id, connection.id)
+                  )
+                  .pipe(
+                    Effect.mapError(() =>
+                      providerFailure("connection activation")
+                    )
+                  );
+                yield* db
+                  .insert(schema.githubInstallationTable)
+                  .values({
+                    connectionId: connection.id,
+                    installationId: input.installationId,
+                    accountId: String(installation.account.id),
+                    accountLogin: installation.account.login,
+                    accountType: installation.account.type,
+                    suspendedAt: installation.suspended_at,
+                  })
+                  .onConflictDoUpdate({
+                    target: schema.githubInstallationTable.connectionId,
+                    set: {
+                      installationId: input.installationId,
+                      accountId: String(installation.account.id),
+                      accountLogin: installation.account.login,
+                      accountType: installation.account.type,
+                      suspendedAt: installation.suspended_at,
+                    },
+                  })
+                  .pipe(
+                    Effect.mapError(() =>
+                      providerFailure("installation persistence")
+                    )
+                  );
+              })
+            )
+            .pipe(
+              Effect.mapError(() =>
+                providerFailure("installation activation transaction")
+              )
+            );
+          return { organizationId: connection.organizationId };
+        }),
+      listRepositories: ({ connectionId }) =>
+        Effect.gen(function* () {
+          const accessToken =
+            yield* installationTokenForConnection(connectionId);
+          const repositories: Array<{
+            readonly fullName: string;
+            readonly name: string;
+            readonly owner: string;
+            readonly private: boolean;
+          }> = [];
+          for (let page = 1; ; page += 1) {
+            const result = yield* api
+              .listInstallationRepositories({ accessToken, page })
+              .pipe(
+                Effect.mapError(() => providerFailure("repository listing"))
+              );
+            repositories.push(
+              ...result.repositories.map((repository) => ({
+                fullName: repository.full_name,
+                name: repository.name,
+                owner: repository.owner.login,
+                private: repository.private,
+              }))
+            );
+            if (
+              repositories.length >= result.total_count ||
+              result.repositories.length < 100
+            ) {
+              return repositories;
+            }
+          }
+        }),
+      uninstallInstallation: ({ connectionId }) =>
+        Effect.gen(function* () {
+          const installationId =
+            yield* installationIdForConnection(connectionId);
+          const appJwt = yield* createGitHubAppJwt({
+            appId: config.githubAppId ?? "",
+            now: new Date(),
+            privateKey: config.githubPrivateKey,
+          }).pipe(Effect.mapError(() => providerFailure("App authentication")));
+          yield* api
+            .deleteInstallation({ appJwt, installationId })
+            .pipe(
+              Effect.mapError(() => providerFailure("installation removal"))
+            );
+        }),
+      createIssue: (input) =>
+        installationTokenForConnection(input.connectionId).pipe(
+          Effect.flatMap((accessToken) =>
+            api.createIssue({
+              accessToken,
+              repositoryOwner: input.repositoryOwner,
+              repositoryName: input.repositoryName,
+              title: "Feeblo feedback",
+              body: renderGitHubIssueBody({ postUrl: input.postUrl }),
+            })
+          ),
+          Effect.map((issue) => ({
+            connectionId: input.connectionId,
+            remoteId: issue.node_id,
+            repositoryOwner: input.repositoryOwner,
+            repositoryName: input.repositoryName,
+            issueNumber: issue.number,
+            issueUrl: issue.html_url,
+            issueState: issue.state,
+          })),
+          Effect.mapError(() => providerFailure("issue creation"))
+        ),
+      resolveIssue: (input) =>
+        installationTokenForConnection(input.connectionId).pipe(
+          Effect.flatMap((accessToken) =>
+            Effect.gen(function* () {
+              const issue = yield* api.getIssue({
+                accessToken,
+                repositoryOwner: input.repositoryOwner,
+                repositoryName: input.repositoryName,
+                issueNumber: input.issueNumber,
+              });
+              yield* api.createIssueBacklinkComment({
+                accessToken,
+                backlinkUrl: input.postUrl,
+                repositoryOwner: input.repositoryOwner,
+                repositoryName: input.repositoryName,
+                issueNumber: input.issueNumber,
+              });
+              return issue;
+            })
+          ),
+          Effect.map((issue) => ({
+            connectionId: input.connectionId,
+            remoteId: issue.node_id,
+            repositoryOwner: input.repositoryOwner,
+            repositoryName: input.repositoryName,
+            issueNumber: issue.number,
+            issueUrl: issue.html_url,
+            issueState: issue.state,
+          })),
+          Effect.mapError(() => providerFailure("issue linking"))
+        ),
+    });
+    return provider;
+  })
+);

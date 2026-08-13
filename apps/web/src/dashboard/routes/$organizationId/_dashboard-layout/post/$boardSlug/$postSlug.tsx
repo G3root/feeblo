@@ -25,6 +25,8 @@ import { formatPostDate } from "~/features/board/components/board-surface/utils"
 import { PostActivityList } from "~/features/post/components/post-activity-list";
 import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostEtaField } from "~/features/post/components/post-eta-field";
+import { GitHubPostResourceActions } from "~/features/github/components/post-github-actions";
+import { PostExternalResources } from "~/features/integrations/components/post-external-resources";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
@@ -180,6 +182,17 @@ function RouteComponent() {
         <aside className="px-6 py-6">
           <div className="space-y-4 lg:sticky lg:top-0">
             <PostSidebarActions />
+
+            <PostExternalResources
+              actions={
+                <GitHubPostResourceActions
+                  organizationId={organizationId}
+                  postId={post.id}
+                />
+              }
+              organizationId={organizationId}
+              postId={post.id}
+            />
 
             {/* Each field self-gates with the permission the backend enforces
                 (PostPolicy.canUpdateProperties): status → posts.status,

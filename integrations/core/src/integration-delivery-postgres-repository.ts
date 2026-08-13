@@ -19,6 +19,7 @@ import { integrationDeliveryWorkerDefaults } from "./delivery-worker-defaults";
 import {
   IntegrationConnection,
   IntegrationDelivery,
+  type IntegrationExternalResourceDraft,
   IntegrationEventEnvelopeV1,
   IntegrationRoute,
 } from "./integration-contracts";
@@ -74,7 +75,12 @@ const mapPersistenceError = <A, E, R>(
  * capability keys, which the startup-validated provider registry owns.
  */
 export const makeIntegrationDeliveryWorkerRepository = (
-  claimableCapabilityKeys: readonly string[]
+  claimableCapabilityKeys: readonly string[],
+  recordExternalResourceDrafts?: (input: {
+    readonly connection: IntegrationConnection;
+    readonly drafts: readonly IntegrationExternalResourceDraft[];
+    readonly event: IntegrationEventEnvelopeV1;
+  }) => Effect.Effect<void, IntegrationDeliveryWorkerPersistenceError>
 ): Effect.Effect<
   IntegrationDeliveryWorkerRepository,
   never,
@@ -349,7 +355,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
         );
 
     const persistDeliveryResult: IntegrationDeliveryWorkerRepository["persistDeliveryResult"] =
-      ({ claimed, errorTag, httpStatus, outcome }) =>
+      ({ claimed, errorTag, externalResourceDrafts, httpStatus, outcome }) =>
         mapPersistenceError(
           "persist_delivery_result",
           db.transaction(() =>
@@ -424,6 +430,21 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   );
               }
               if (decision._tag === "Succeeded") {
+                if (
+                  externalResourceDrafts !== undefined &&
+                  externalResourceDrafts.length > 0
+                ) {
+                  if (recordExternalResourceDrafts === undefined) {
+                    return yield* persistenceError(
+                      "record_external_resource_drafts"
+                    );
+                  }
+                  yield* recordExternalResourceDrafts({
+                    connection: claimed.input.connection,
+                    drafts: externalResourceDrafts,
+                    event: claimed.input.event,
+                  });
+                }
                 yield* db
                   .update(schema.integrationDeliveryTable)
                   .set({

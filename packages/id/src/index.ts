@@ -181,3 +181,40 @@ export const IntegrationDeliveryAttemptId = makeId(
   "ida",
   { approximateLength }
 );
+
+/** Identifies one provider-owned external resource. */
+export const IntegrationExternalResourceId = makeId(
+  "integration_external_resource",
+  "ier",
+  {
+    approximateLength,
+  }
+);
+
+/** Identifies one many-to-many relationship between a Feeblo post and an external resource. */
+export const PostExternalResourceLinkId = makeId(
+  "post_external_resource_link",
+  "erl",
+  {
+    approximateLength,
+  }
+);
+
+/** Identifies one organization-owned GitHub issue status rule. */
+export const GitHubSyncRuleId = makeId("github_sync_rule", "gsr", {
+  approximateLength,
+});
+
+/** Identifies one deduplicated GitHub webhook delivery. */
+export const GitHubWebhookDeliveryId = makeId(
+  "github_webhook_delivery",
+  "gwd",
+  { approximateLength }
+);
+
+/** Identifies a durable manually requested external-resource creation. */
+export const ExternalResourceCreateRequestId = makeId(
+  "external_resource_create_request",
+  "erc",
+  { approximateLength }
+);
