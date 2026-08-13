@@ -6,10 +6,14 @@ import {
   NodeRedis,
   NodeRuntime,
 } from "@effect/platform-node";
+import { AUTH_CLIENT_IP_HEADER } from "@feeblo/auth/auth-client-ip-header";
 import { initAuthHandler } from "@feeblo/auth/server";
 import { Database } from "@feeblo/db";
 import { BoardRepository } from "@feeblo/domain/board/repository";
-import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
+import {
+  ClientIp,
+  makeClientIpGlobalMiddleware,
+} from "@feeblo/domain/client-ip";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
 import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
@@ -54,6 +58,7 @@ import {
 import * as Sentry from "@sentry/effect/server";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import * as Option from "effect/Option";
@@ -75,6 +80,63 @@ import { makeIntegrationLayers } from "./integrations";
 import { makeSlackRouters } from "./slack";
 
 const useTestMailer = process.env.E2E_TEST_MAILER === "true";
+const MAX_REQUEST_BODY_BYTES = 1_000_000;
+
+const requestBodyTooLargeResponse = (): Response =>
+  new Response("Request body too large", { status: 413 });
+
+const handleBetterAuthRequest = async ({
+  handler,
+  headers,
+  request,
+}: {
+  readonly handler: (request: Request) => Promise<Response> | Response;
+  readonly headers: Headers;
+  readonly request: Request;
+}): Promise<Response> => {
+  const declaredLength = Number(headers.get("content-length"));
+  if (
+    Number.isFinite(declaredLength) &&
+    declaredLength > MAX_REQUEST_BODY_BYTES
+  ) {
+    return requestBodyTooLargeResponse();
+  }
+
+  let bodyLimitExceeded = false;
+  let bytesRead = 0;
+  const body = request.body?.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        if (bodyLimitExceeded) {
+          return;
+        }
+        bytesRead += chunk.byteLength;
+        if (bytesRead > MAX_REQUEST_BODY_BYTES) {
+          bodyLimitExceeded = true;
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    })
+  );
+  let limitedRequest: Request;
+  if (body) {
+    const requestInit = { body, duplex: "half" as const, headers };
+    limitedRequest = new Request(request, requestInit);
+  } else {
+    limitedRequest = new Request(request, { headers });
+  }
+
+  try {
+    const response = await handler(limitedRequest);
+    return bodyLimitExceeded ? requestBodyTooLargeResponse() : response;
+  } catch (error) {
+    if (bodyLimitExceeded) {
+      return requestBodyTooLargeResponse();
+    }
+    throw error;
+  }
+};
 
 const redisOptions = (redisUrl: string) => {
   const url = new URL(redisUrl);
@@ -93,16 +155,31 @@ const redisOptions = (redisUrl: string) => {
 const BetterAuthRouterLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const auth = yield* Auth;
-    const authApp = HttpEffect.fromWebHandler((request) =>
-      Promise.resolve(auth.handler(request))
-    );
-
     return yield* router.add("*", "/api/auth/*", (request) =>
-      Effect.provideService(
-        authApp,
-        HttpServerRequest.HttpServerRequest,
-        request
-      ).pipe(Effect.orDie)
+      Effect.gen(function* () {
+        const clientIp = yield* ClientIp;
+        const authApp = HttpEffect.fromWebHandler((webRequest) => {
+          // Overwrite this internal header at the HTTP boundary. Better Auth
+          // cannot access the peer socket, so this is the only client-IP value
+          // it may use for SSO attempt rate limiting.
+          const headers = new Headers(webRequest.headers);
+          headers.set(
+            AUTH_CLIENT_IP_HEADER,
+            clientIp._tag === "ClientIpAddress" ? clientIp.address : "unknown"
+          );
+          return handleBetterAuthRequest({
+            handler: auth.handler,
+            headers,
+            request: webRequest,
+          });
+        });
+
+        return yield* Effect.provideService(
+          authApp,
+          HttpServerRequest.HttpServerRequest,
+          request
+        );
+      }).pipe(Effect.orDie)
     );
   })
 );
@@ -141,6 +218,24 @@ const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
 const RootRouter = HttpRouter.use((router) =>
   router.add("GET", "/", HttpServerResponse.text("Hello world"))
 );
+
+/**
+ * Limits every request body while it is read, including chunked requests that
+ * omit Content-Length. Effect applies this reference to JSON, form and
+ * multipart body readers before they buffer the payload.
+ */
+const bodySizeLimitMiddleware = <E, R>(
+  httpApp: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>
+): Effect.Effect<
+  HttpServerResponse.HttpServerResponse,
+  E,
+  R | HttpServerRequest.HttpServerRequest
+> =>
+  Effect.provideService(
+    httpApp,
+    HttpServerRequest.MaxBodySize,
+    FileSystem.Size(MAX_REQUEST_BODY_BYTES)
+  );
 
 const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
   HttpRouter.use((router) =>
@@ -323,6 +418,9 @@ const program = Effect.gen(function* () {
         }),
         { global: true }
       )
+    ),
+    Layer.provide(
+      HttpRouter.middleware(bodySizeLimitMiddleware, { global: true })
     ),
     // Provides the peer-anchored client IP (socket remoteAddress) to every
     // route, including RPC middleware, so public rate limits are keyed on an

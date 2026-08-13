@@ -2,6 +2,27 @@ import DOMPurify from "dompurify";
 import { Window } from "happy-dom";
 
 const domWindow = new Window();
+const REL_TOKEN_SEPARATOR = /\s+/;
+
+/** Adds safe opener isolation to links targeting a new browsing context. */
+export const secureBlankTarget = (node: {
+  readonly tagName: string;
+  readonly getAttribute: (name: string) => string | null;
+  readonly setAttribute: (name: string, value: string) => void;
+}): void => {
+  const target = node.getAttribute("target")?.trim().toLowerCase();
+  if (node.tagName !== "A" || target !== "_blank") {
+    return;
+  }
+
+  const existingRel = node.getAttribute("rel") ?? "";
+  const relTokens = new Set(
+    existingRel.split(REL_TOKEN_SEPARATOR).filter(Boolean)
+  );
+  relTokens.add("noopener");
+  relTokens.add("noreferrer");
+  node.setAttribute("rel", [...relTokens].join(" "));
+};
 
 // Configure DOMPurify allow-lists
 export const ALLOWED_TAGS = [
@@ -77,6 +98,7 @@ export const ALLOWED_ATTR = [
   "href",
   "title",
   "target",
+  "rel",
 
   // Image attributes
   "src",
@@ -172,6 +194,12 @@ export class HtmlSanitizer {
         const title = node.getAttribute("title") || "";
         node.setAttribute("title", sanitizeAttributeValue(title));
       }
+
+      // Prevent reverse tabnabbing: a link opened in a new tab must not give
+      // the target document a `window.opener` handle back to this document.
+      // Existing rel tokens (e.g. `nofollow`) are preserved alongside the
+      // added security tokens.
+      secureBlankTarget(node);
     });
 
     // Remove all hooks after sanitization to avoid leaking

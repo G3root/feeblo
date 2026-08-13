@@ -21,6 +21,9 @@ export const JWT_AUTO_LOGIN_ERROR_CODES = defineErrorCodes({
   SSO_TOKEN_MISSING_EMAIL_OR_NAME: "SSO token must include email and name",
   FAILED_TO_CREATE_SSO_CONTACT: "Failed to create contact for SSO session",
   FAILED_TO_CREATE_SSO_USER: "Failed to create SSO user",
+  SSO_RATE_LIMITED: "Too many SSO sign-in attempts. Please try again later.",
+  SSO_RATE_LIMIT_UNAVAILABLE:
+    "SSO sign-in is temporarily unavailable. Please try again later.",
 });
 
 export type JwtAutoLoginErrorCode = keyof typeof JWT_AUTO_LOGIN_ERROR_CODES;

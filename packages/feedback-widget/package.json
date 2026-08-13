@@ -21,6 +21,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@feeblo/domain": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@feeblo/web-shared": "workspace:*",
     "@solidjs/router": "catalog:",

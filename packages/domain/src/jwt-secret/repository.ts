@@ -122,16 +122,12 @@ const makeJwtSecretRepository = Effect.gen(function* () {
                 createdAt: now,
                 revokedAt: null,
               });
-            } else {
-              yield* tx
-                .delete(schema.jwtSecretTable)
-                .where(
-                  and(
-                    eq(schema.jwtSecretTable.id, secretId),
-                    eq(schema.jwtSecretTable.organizationId, organizationId)
-                  )
-                );
             }
+            // Already-revoked secrets are left untouched: the row stays in
+            // its 24h grace window so tokens minted before the rotation keep
+            // verifying, and getSecretsForOrg prunes it once revokedAt
+            // passes. Deleting it here (the previous behavior) permanently
+            // invalidated those grace-period tokens on a double-click/retry.
           })
         )
         .pipe(Effect.asVoid),

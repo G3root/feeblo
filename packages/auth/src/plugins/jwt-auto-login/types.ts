@@ -30,7 +30,9 @@ export interface SsoUserError {
     | "SSO_TOKEN_MISSING_EMAIL_OR_NAME"
     | "FAILED_TO_CREATE_SSO_USER"
     | "FAILED_TO_CREATE_SSO_CONTACT"
-    | "WIDGET_SSO_NOT_ENTITLED";
+    | "WIDGET_SSO_NOT_ENTITLED"
+    | "SSO_RATE_LIMITED"
+    | "SSO_RATE_LIMIT_UNAVAILABLE";
   message?: string;
 }
 
@@ -42,6 +44,8 @@ export interface JwtAutoLoginOptions {
    * so the plugin can surface the correct error code.
    */
   createSsoUser: (input: {
+    /** Peer-validated client IP injected by the server auth boundary. */
+    clientIp: string;
     organizationId: string;
     token: string;
   }) => Promise<SsoUserResult | SsoUserError>;

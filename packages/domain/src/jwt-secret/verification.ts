@@ -4,6 +4,14 @@ import * as jose from "jose";
 import { UnauthorizedError } from "../rpc-errors";
 
 /**
+ * Rejects oversized tokens before jose parses them. `verifyJwt` runs on
+ * unauthenticated paths (widget SSO / feedback identity), so a multi-megabyte
+ * base64url token must not be base64-decoded and JSON-parsed per request.
+ * A 16 KiB cap is far beyond any legitimate org identity-token payload.
+ */
+const MAX_JWT_LENGTH = 16 * 1024;
+
+/**
  * Verifies an HS256-signed org JWT and binds it to the organization.
  *
  * The token must carry the workspace id in its `aud` claim. (Widget SSO /
@@ -23,6 +31,10 @@ export const verifyJwt = (
   expectedOrganizationId: string
 ): Effect.Effect<jose.JWTPayload, UnauthorizedError> =>
   Effect.gen(function* () {
+    if (token.length > MAX_JWT_LENGTH) {
+      return yield* new UnauthorizedError({ message: "Invalid JWT" });
+    }
+
     for (const secret of secrets) {
       const key = new TextEncoder().encode(secret);
 

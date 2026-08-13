@@ -1,3 +1,4 @@
+import { COMMENT_CONTENT_MAX_LENGTH } from "@feeblo/domain/content-limits";
 import { CommentId } from "@feeblo/id";
 import { useAppForm, withForm } from "@feeblo/ui/hooks/form";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
@@ -16,7 +17,13 @@ const CommentVisibilitySchema = z.enum(["PUBLIC", "INTERNAL"]);
 type TVisibilitySchema = z.infer<typeof CommentVisibilitySchema>;
 
 const Schema = z.object({
-  content: z.string().min(1, "this field is required"),
+  content: z
+    .string()
+    .min(1, "this field is required")
+    .max(
+      COMMENT_CONTENT_MAX_LENGTH,
+      `Comments must be at most ${COMMENT_CONTENT_MAX_LENGTH} characters`
+    ),
   visibility: CommentVisibilitySchema,
 });
 

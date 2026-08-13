@@ -443,6 +443,20 @@ describe("parseContactCustomAttributes", () => {
       expect(error).toBeInstanceOf(DataValidationError);
     }
   });
+
+  it("reports invalid TEXT pattern syntax as a validation failure", async () => {
+    const def = makeContactDef({
+      key: "code",
+      type: "TEXT",
+      config: { pattern: "[" },
+    });
+
+    await expect(
+      Effect.runPromise(
+        parseContactCustomAttributes({ customFields: { code: "ABC" } }, [def])
+      )
+    ).rejects.toThrow("configured validation pattern");
+  });
 });
 
 describe("parseCompanyCustomAttributes", () => {

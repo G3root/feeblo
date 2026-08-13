@@ -23,6 +23,7 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
 import { PolicyDeniedError } from "../policy";
+import { RateLimitService } from "../rate-limit/service";
 import { UserRepository } from "../user/repository";
 
 /**
@@ -38,6 +39,8 @@ export class SsoError extends S.TaggedErrorClass<SsoError>()("SsoError", {
     "FAILED_TO_CREATE_SSO_USER",
     "FAILED_TO_CREATE_SSO_CONTACT",
     "WIDGET_SSO_NOT_ENTITLED",
+    "SSO_RATE_LIMITED",
+    "SSO_RATE_LIMIT_UNAVAILABLE",
   ]),
   message: S.optional(S.String),
 }) {}
@@ -122,6 +125,24 @@ export function upsertContactFromParsed(
 }
 
 /**
+ * Per-organization bound on verified widget SSO sign-ins. It is consumed only
+ * after the JWT proves the caller holds this organization's secret, so an
+ * unauthenticated request cannot lock out the organization's users.
+ */
+export const WIDGET_SSO_SIGN_IN_RATE_LIMIT = {
+  keyPrefix: "widget-sso-sign-in",
+  limit: 30,
+  window: "1 minute",
+} as const;
+
+/** Per-client bound for unverified widget SSO attempts. */
+export const WIDGET_SSO_ATTEMPT_RATE_LIMIT = {
+  keyPrefix: "widget-sso-attempt",
+  limit: 10,
+  window: "1 minute",
+} as const;
+
+/**
  * Verifies the organization JWT, parses the contact identity, upserts the
  * restricted widget user and linked contact. Returns the user id + display
  * name so the jwt-auto-login plugin can mint a better-auth session.
@@ -130,9 +151,11 @@ export function upsertContactFromParsed(
  * the correct better-auth error code.
  */
 export const createSsoSession = ({
+  clientIp,
   organizationId,
   token,
 }: {
+  clientIp: string;
   organizationId: string;
   token: string;
 }) =>
@@ -141,6 +164,25 @@ export const createSsoSession = ({
     const jwtSecretRepository = yield* JwtSecretRepository;
     const attributeDefinitionRepository = yield* AttributeDefinitionRepository;
     const userRepository = yield* UserRepository;
+
+    // Reject a flood of unauthenticated JWT guesses before any organization
+    // lookup or signature verification. The server supplies this peer-anchored
+    // identity and overwrites any value sent by the client.
+    yield* RateLimitService.use((rateLimiter) =>
+      rateLimiter
+        .consume({
+          key: `${WIDGET_SSO_ATTEMPT_RATE_LIMIT.keyPrefix}:${clientIp}`,
+          limit: WIDGET_SSO_ATTEMPT_RATE_LIMIT.limit,
+          window: WIDGET_SSO_ATTEMPT_RATE_LIMIT.window,
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            error.reason._tag === "RateLimitExceeded"
+              ? new SsoError({ code: "SSO_RATE_LIMITED" })
+              : new SsoError({ code: "SSO_RATE_LIMIT_UNAVAILABLE" })
+          )
+        )
+    );
 
     yield* entitlementPolicy
       .canUseWidgetSso(organizationId)
@@ -167,6 +209,24 @@ export const createSsoSession = ({
       secrets.map((s) => s.secret),
       organizationId
     ).pipe(Effect.mapError(() => new SsoError({ code: "INVALID_JWT" })));
+
+    // Bound contact and user provisioning only after a JWT has proved that
+    // this request is authorized for the organization.
+    yield* RateLimitService.use((rateLimiter) =>
+      rateLimiter
+        .consume({
+          key: `${WIDGET_SSO_SIGN_IN_RATE_LIMIT.keyPrefix}:${organizationId}`,
+          limit: WIDGET_SSO_SIGN_IN_RATE_LIMIT.limit,
+          window: WIDGET_SSO_SIGN_IN_RATE_LIMIT.window,
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            error.reason._tag === "RateLimitExceeded"
+              ? new SsoError({ code: "SSO_RATE_LIMITED" })
+              : new SsoError({ code: "SSO_RATE_LIMIT_UNAVAILABLE" })
+          )
+        )
+    );
 
     const contactDefs =
       (yield* attributeDefinitionRepository.findContactAttributeDefinitions(

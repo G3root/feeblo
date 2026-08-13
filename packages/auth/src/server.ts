@@ -175,10 +175,10 @@ export const initAuthHandler = (
     };
 
     const ssoOptions: JwtAutoLoginOptions = {
-      createSsoUser: async ({ organizationId, token }) => {
+      createSsoUser: async ({ clientIp, organizationId, token }) => {
         try {
           return await callbackRuntime.runPromise(
-            createSsoSession({ organizationId, token })
+            createSsoSession({ clientIp, organizationId, token })
           );
         } catch (error) {
           if (error instanceof SsoError) {
@@ -384,9 +384,7 @@ export const initAuthHandler = (
                 error.reason._tag === "RateLimitExceeded"
                   ? {
                       "Retry-After": String(
-                        Math.ceil(
-                          Duration.toSeconds(error.reason.retryAfter)
-                        )
+                        Math.ceil(Duration.toSeconds(error.reason.retryAfter))
                       ),
                     }
                   : undefined
@@ -699,7 +697,7 @@ export const initAuthHandler = (
             // dispatching the email-OTP endpoint, so hooks.before does not run.
             // Keep those sends rate limited, while avoiding a second consume
             // for paths already handled by the request hook.
-            if (!ctx || !verificationOtpRateLimitedPaths.has(ctx.path)) {
+            if (!(ctx && verificationOtpRateLimitedPaths.has(ctx.path))) {
               await consumeVerificationOtpRateLimitForFlow(
                 type === "forget-password"
                   ? "password-reset"
@@ -736,7 +734,6 @@ export const initAuthHandler = (
       ],
 
       hooks: {
-        // biome-ignore lint/suspicious/useAwait: middleware callback must remain async
         before: createAuthMiddleware(async (ctx) => {
           if (
             (ctx.path.startsWith("/sign-in") ||

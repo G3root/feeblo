@@ -1,6 +1,8 @@
 import { CommentId, PostId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+import { COMMENT_CONTENT_MAX_LENGTH } from "../content-limits";
+
 export const Comment = S.Struct({
   id: S.String,
   content: S.String,
@@ -33,7 +35,7 @@ export const CommentCreate = S.Struct({
   id: CommentId.schema,
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
-  content: S.String,
+  content: S.String.check(S.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
   parentCommentId: S.Union([CommentId.schema, S.Null]),
 });
@@ -52,7 +54,7 @@ export const CommentUpdate = S.Struct({
   id: CommentId.schema,
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
-  content: S.String,
+  content: S.String.check(S.isMaxLength(COMMENT_CONTENT_MAX_LENGTH)),
   visibility: S.Literals(["PUBLIC", "INTERNAL"]),
 });
 

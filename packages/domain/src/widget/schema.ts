@@ -1,6 +1,15 @@
 import { BoardId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+import {
+  WIDGET_CONTENT_MAX_LENGTH,
+  WIDGET_METADATA_KEY_MAX_LENGTH,
+  WIDGET_METADATA_MAX_PROPERTIES,
+  WIDGET_METADATA_VALUE_MAX_LENGTH,
+  WIDGET_TITLE_MAX_LENGTH,
+  WIDGET_TOKEN_MAX_LENGTH,
+} from "../content-limits";
+
 export const WidgetBoard = S.Struct({
   id: S.String,
   name: S.String,
@@ -21,15 +30,20 @@ export type TWidgetBoardList = S.Schema.Type<typeof WidgetBoardList>;
 export const WidgetFeedbackCreate = S.Struct({
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
-  title: S.String,
-  content: S.String,
+  title: S.String.pipe(S.check(S.isMaxLength(WIDGET_TITLE_MAX_LENGTH))),
+  // Same bound as WidgetSuggestionRequest. The endpoint is public and the
+  // content flows into storage, embeddings, subscriber emails and webhook
+  // payloads, so keep it aligned with the suggestions cap instead of 100k.
+  content: S.String.pipe(S.check(S.isMaxLength(WIDGET_CONTENT_MAX_LENGTH))),
   metadata: S.optional(
     S.Record(
-      S.String.pipe(S.check(S.isMaxLength(64))),
-      S.String.check(S.isMaxLength(500))
-    ).check(S.isMaxProperties(20))
+      S.String.pipe(S.check(S.isMaxLength(WIDGET_METADATA_KEY_MAX_LENGTH))),
+      S.String.check(S.isMaxLength(WIDGET_METADATA_VALUE_MAX_LENGTH))
+    ).check(S.isMaxProperties(WIDGET_METADATA_MAX_PROPERTIES))
   ),
-  token: S.optional(S.String),
+  token: S.optional(
+    S.String.pipe(S.check(S.isMaxLength(WIDGET_TOKEN_MAX_LENGTH)))
+  ),
 });
 
 export type TWidgetFeedbackCreate = S.Schema.Type<typeof WidgetFeedbackCreate>;
@@ -50,8 +64,8 @@ export type TWidgetFeedbackResponse = S.Schema.Type<
 export const WidgetSuggestionRequest = S.Struct({
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
-  title: S.String.check(S.isMaxLength(200)),
-  content: S.String.check(S.isMaxLength(20_000)),
+  title: S.String.check(S.isMaxLength(WIDGET_TITLE_MAX_LENGTH)),
+  content: S.String.check(S.isMaxLength(WIDGET_CONTENT_MAX_LENGTH)),
 });
 
 export const WidgetSuggestion = S.Struct({
