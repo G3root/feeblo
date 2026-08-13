@@ -1,4 +1,5 @@
 import { describe, expect, layer } from "@effect/vitest";
+import { NodeCrypto } from "@effect/platform-node";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   BoardId,
@@ -228,6 +229,7 @@ describe("PostRpcHandlers", () => {
   const TestLayer = Layer.mergeAll(
     HandlerTest,
     Database.PgliteDatabaseLive,
+    NodeCrypto.layer,
     S3Test,
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
     Layer.succeed(

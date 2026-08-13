@@ -14,6 +14,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, desc, eq, gt, inArray, or } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -63,6 +64,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
     createWorkspace: (args: CreateWorkspaceArgs) =>
       db.transaction((tx) =>
         Effect.gen(function* () {
+          const now = yield* DateTime.nowAsDate;
           const workspaceId = yield* WorkspaceId.generate;
           const organization = yield* tx
             .insert(schema.organizationTable)
@@ -70,7 +72,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               id: workspaceId,
               name: args.workspaceName,
               slug: args.subdomain,
-              createdAt: new Date(),
+              createdAt: now,
             })
             .returning()
             .pipe(Effect.map(EffectArray.get(0)));
@@ -88,7 +90,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             id: memberId,
             organizationId,
             role: "owner",
-            createdAt: new Date(),
+            createdAt: now,
             userId: args.userId,
           });
 
@@ -102,8 +104,8 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               organizationId,
               creatorId: args.userId,
               creatorMemberId: memberId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: now,
+              updatedAt: now,
             });
           }
 
@@ -119,8 +121,8 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               organizationId,
               type: postStatus.type,
               orderIndex: postStatus.orderIndex,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: now,
+              updatedAt: now,
             });
             statusIdByType.set(postStatus.type, postStatusId);
           }
@@ -133,8 +135,8 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               name: category.name,
               iconType: category.iconType,
               icon: category.icon,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: now,
+              updatedAt: now,
             });
           }
 
@@ -149,8 +151,8 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             mode: "status",
             visibility: "public",
             filter: { version: 1, operator: "and", conditions: [] },
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
           });
 
           const defaultRoadmapStatuses = [
@@ -174,8 +176,8 @@ const makeWorkspaceRepository = Effect.gen(function* () {
                   : type[0] + type.slice(1).toLowerCase(),
               position,
               config: { type: "status", statusId },
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: now,
+              updatedAt: now,
             });
           }
 
@@ -189,16 +191,16 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               slug: slugify(boardName),
               visibility: "PUBLIC",
               organizationId,
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: now,
+              updatedAt: now,
             });
           }
           const siteId = yield* SiteId.generate;
           yield* tx.insert(schema.siteTable).values({
             id: siteId,
             organizationId,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: now,
+            updatedAt: now,
             name: args.workspaceName,
             subdomain: args.subdomain,
             hidePoweredBy: false,
@@ -231,46 +233,49 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         .where(eq(schema.productTable.isArchived, false)),
 
     findPlanByOrganizationId: (args: FindPlanByOrganizationIdArgs) =>
-      db
-        .select({
-          organizationId: schema.subscriptionTable.organizationId,
-          plan: schema.productTable.metadata,
-        })
-        .from(schema.subscriptionTable)
-        .innerJoin(
-          schema.productTable,
-          eq(schema.productTable.id, schema.subscriptionTable.productId)
-        )
-        .where(
-          and(
-            eq(schema.subscriptionTable.organizationId, args.organizationId),
-            or(
-              inArray(schema.subscriptionTable.status, ["active", "trialing"]),
-              and(
-                eq(schema.subscriptionTable.status, "past_due"),
-                gt(schema.subscriptionTable.currentPeriodEnd, new Date())
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        return yield* db
+          .select({
+            organizationId: schema.subscriptionTable.organizationId,
+            plan: schema.productTable.metadata,
+          })
+          .from(schema.subscriptionTable)
+          .innerJoin(
+            schema.productTable,
+            eq(schema.productTable.id, schema.subscriptionTable.productId)
+          )
+          .where(
+            and(
+              eq(schema.subscriptionTable.organizationId, args.organizationId),
+              or(
+                inArray(schema.subscriptionTable.status, ["active", "trialing"]),
+                and(
+                  eq(schema.subscriptionTable.status, "past_due"),
+                  gt(schema.subscriptionTable.currentPeriodEnd, now)
+                )
               )
             )
           )
-        )
-        .orderBy(
-          desc(schema.subscriptionTable.currentPeriodEnd),
-          desc(schema.subscriptionTable.createdAt)
-        )
-        .limit(1)
-        .pipe(
-          Effect.map(EffectArray.get(0)),
-          Effect.map(
-            Option.match({
-              onNone: () => "free" as const,
-              onSome: (subscription) => subscription.plan?.plan ?? "free",
-            })
-          ),
-          Effect.map((plan) => ({
-            organizationId: args.organizationId,
-            plan,
-          }))
-        ),
+          .orderBy(
+            desc(schema.subscriptionTable.currentPeriodEnd),
+            desc(schema.subscriptionTable.createdAt)
+          )
+          .limit(1)
+          .pipe(
+            Effect.map(EffectArray.get(0)),
+            Effect.map(
+              Option.match({
+                onNone: () => "free" as const,
+                onSome: (subscription) => subscription.plan?.plan ?? "free",
+              })
+            ),
+            Effect.map((plan) => ({
+              organizationId: args.organizationId,
+              plan,
+            }))
+          );
+      }),
   };
 });
 

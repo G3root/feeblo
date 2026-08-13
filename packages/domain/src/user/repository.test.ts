@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
@@ -6,9 +7,10 @@ import * as Layer from "effect/Layer";
 import { UserRepository } from "./repository";
 
 describe("UserRepository", () => {
-  const TestLayer = Layer.merge(
+  const TestLayer = Layer.mergeAll(
     UserRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
-    Database.PgliteDatabaseLive
+    Database.PgliteDatabaseLive,
+    NodeCrypto.layer
   );
 
   layer(TestLayer)("upsertSsoUser", (it) => {

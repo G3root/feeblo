@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/style/noNestedTernary: provider option construction is clearer inline */
 
+import { NodeCrypto } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
@@ -40,6 +41,7 @@ import {
   genericOAuth,
 } from "better-auth/plugins/generic-oauth";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -124,7 +126,8 @@ export const initAuthHandler = (
         makeMailerLayer(),
         WorkspaceRepository.layer,
         Layer.succeed(RateLimitService, yield* RateLimitService),
-        SsoRepositoriesLive
+        SsoRepositoriesLive,
+        NodeCrypto.layer
       ).pipe(Layer.provideMerge(dbLayer))
     );
 
@@ -160,17 +163,19 @@ export const initAuthHandler = (
         return Promise.resolve();
       }
       return callbackRuntime.runPromise(
-        db
-          .update(schema.userTable)
-          .set({ timezone: timeZone, updatedAt: new Date() })
-          .where(eq(schema.userTable.id, userId))
-          .pipe(
-            Effect.catchCause((cause) =>
-              Effect.logWarning("Failed to update user timezone", cause).pipe(
-                Effect.annotateLogs({ userId, timeZone })
-              )
+        Effect.gen(function* () {
+          const now = yield* DateTime.nowAsDate;
+          yield* db
+            .update(schema.userTable)
+            .set({ timezone: timeZone, updatedAt: now })
+            .where(eq(schema.userTable.id, userId));
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Effect.logWarning("Failed to update user timezone", cause).pipe(
+              Effect.annotateLogs({ userId, timeZone })
             )
           )
+        )
       );
     };
 

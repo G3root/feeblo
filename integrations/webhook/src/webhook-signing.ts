@@ -1,5 +1,4 @@
-import { randomBytes } from "node:crypto";
-
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -31,20 +30,23 @@ const signingSecretPrefix = "whsec_";
 /** Generates a Standard Webhooks-compatible base64 signing secret. */
 export const generateWebhookSigningSecret = (): Effect.Effect<
   WebhookSigningSecret,
-  WebhookSigningError
+  WebhookSigningError,
+  Crypto.Crypto
 > =>
-  Effect.try({
-    try: () =>
-      Redacted.make(
-        `${signingSecretPrefix}${randomBytes(32).toString("base64")}`
-      ),
-    catch: () => new WebhookSigningError({ operation: "generate" }),
-  });
+  Effect.gen(function* () {
+    const crypto = yield* Crypto.Crypto;
+    const bytes = yield* crypto.randomBytes(32);
+    return Redacted.make(
+      `${signingSecretPrefix}${Buffer.from(bytes).toString("base64")}`
+    );
+  }).pipe(
+    Effect.mapError(() => new WebhookSigningError({ operation: "generate" }))
+  );
 
 /** Replaces the active signing key and retains it for the required 24-hour rotation grace period; the clock (and thus TestClock) drives expiry. */
 export const rotateWebhookSigningKeyring = (
   keyring: WebhookSigningKeyring
-): Effect.Effect<WebhookSigningKeyring, WebhookSigningError> =>
+): Effect.Effect<WebhookSigningKeyring, WebhookSigningError, Crypto.Crypto> =>
   Effect.gen(function* () {
     const rotationTime = yield* DateTime.now;
     const current = yield* generateWebhookSigningSecret();

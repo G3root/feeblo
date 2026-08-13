@@ -2,6 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { ContactId } from "@feeblo/id";
 import { and, eq, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -26,7 +27,7 @@ const makeContactRepository = Effect.gen(function* () {
     create: (args: TContactCreate) =>
       Effect.gen(function* () {
         const id = args.id ?? (yield* ContactId.generate);
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const [created] = yield* db
           .insert(schema.contactTable)
           .values({
@@ -60,6 +61,7 @@ const makeContactRepository = Effect.gen(function* () {
 
     update: (args: TContactUpdate) =>
       Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
         const [updated] = yield* db
           .update(schema.contactTable)
           .set({
@@ -72,7 +74,7 @@ const makeContactRepository = Effect.gen(function* () {
             ...(args.avatar !== undefined && { avatar: args.avatar }),
             ...(args.companyId !== undefined && { companyId: args.companyId }),
             ...(args.userId !== undefined && { userId: args.userId }),
-            updatedAt: new Date(),
+            updatedAt: now,
           })
           .where(
             and(
@@ -191,6 +193,7 @@ const makeContactRepository = Effect.gen(function* () {
           .pipe(Effect.map((rows) => rows[0]));
 
         if (existing) {
+          const now = yield* DateTime.nowAsDate;
           const [updated = null] = yield* db
             .update(schema.contactTable)
             .set({
@@ -202,7 +205,7 @@ const makeContactRepository = Effect.gen(function* () {
                 companyId: args.companyId,
               }),
               ...(args.userId !== undefined && { userId: args.userId }),
-              updatedAt: new Date(),
+              updatedAt: now,
             })
             .where(eq(schema.contactTable.id, existing.id))
             .returning();
@@ -213,7 +216,7 @@ const makeContactRepository = Effect.gen(function* () {
         }
 
         const id = yield* ContactId.generate;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const [created = null] = yield* db
           .insert(schema.contactTable)
           .values({

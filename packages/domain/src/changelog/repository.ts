@@ -3,6 +3,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, desc, eq, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -185,24 +186,27 @@ const makeChangelogRepository = Effect.gen(function* () {
       creatorId,
       creatorMemberId,
     }: TChangelogCreateInternal) =>
-      db
-        .insert(schema.changelogTable)
-        .values({
-          id,
-          title,
-          slug: slug || slugify(title),
-          content,
-          excerpt,
-          status,
-          scheduledAt,
-          publishedAt,
-          organizationId,
-          creatorId,
-          ...(creatorMemberId ? { creatorMemberId } : {}),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .insert(schema.changelogTable)
+          .values({
+            id,
+            title,
+            slug: slug || slugify(title),
+            content,
+            excerpt,
+            status,
+            scheduledAt,
+            publishedAt,
+            organizationId,
+            creatorId,
+            ...(creatorMemberId ? { creatorMemberId } : {}),
+            createdAt: now,
+            updatedAt: now,
+          })
+          .pipe(Effect.asVoid);
+      }),
 
     update: ({
       id,
@@ -215,25 +219,28 @@ const makeChangelogRepository = Effect.gen(function* () {
       publishedAt,
       organizationId,
     }: TChangelogUpdateInternal) =>
-      db
-        .update(schema.changelogTable)
-        .set({
-          title,
-          slug: slug || slugify(title),
-          content,
-          excerpt,
-          status,
-          scheduledAt,
-          publishedAt,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.changelogTable.id, id),
-            eq(schema.changelogTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.changelogTable)
+          .set({
+            title,
+            slug: slug || slugify(title),
+            content,
+            excerpt,
+            status,
+            scheduledAt,
+            publishedAt,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.changelogTable.id, id),
+              eq(schema.changelogTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
 
     delete: ({ id, organizationId }: TChangelogDelete) =>
       db

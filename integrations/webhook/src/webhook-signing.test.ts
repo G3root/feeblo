@@ -1,10 +1,10 @@
-import { it } from "@effect/vitest";
+import { describe, expect, it } from "@effect/vitest";
+import { NodeCrypto } from "@effect/platform-node";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
 import { Webhook } from "standardwebhooks";
-import { describe, expect } from "vitest";
 
 import {
   rotateWebhookSigningKeyring,
@@ -74,6 +74,6 @@ describe("signWebhookDelivery", () => {
           )
         );
         expect(afterGrace["webhook-signature"].split(" ")).toHaveLength(1);
-      })
+      }).pipe(Effect.provide(NodeCrypto.layer))
   );
 });

@@ -1,4 +1,5 @@
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import type * as Effect from "effect/Effect";
 import type { WebhookManagementError } from "./errors";
 import type * as S from "./schema";
@@ -7,7 +8,11 @@ import type * as S from "./schema";
 export interface WebhookManagementServiceShape {
   readonly createEndpoint: (
     input: S.TWebhookEndpointCreate
-  ) => Effect.Effect<S.TWebhookEndpointCreated, WebhookManagementError>;
+  ) => Effect.Effect<
+    S.TWebhookEndpointCreated,
+    WebhookManagementError,
+    Crypto.Crypto
+  >;
   readonly getDeliveryHistory: (
     input: S.TWebhookDeliveryHistory
   ) => Effect.Effect<S.TWebhookDeliveryHistoryPage, WebhookManagementError>;
@@ -28,7 +33,11 @@ export interface WebhookManagementServiceShape {
   ) => Effect.Effect<void, WebhookManagementError>;
   readonly rotateSecret: (
     input: S.TWebhookConnectionAction
-  ) => Effect.Effect<S.TWebhookSecretRotated, WebhookManagementError>;
+  ) => Effect.Effect<
+    S.TWebhookSecretRotated,
+    WebhookManagementError,
+    Crypto.Crypto
+  >;
   readonly sendTestDelivery: (
     input: S.TWebhookTestDelivery
   ) => Effect.Effect<S.TWebhookTestDeliveryResult, WebhookManagementError>;

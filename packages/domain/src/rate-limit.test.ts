@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 
 import * as RateLimit from "./rate-limit";
 import { RateLimitService } from "./rate-limit/service";
@@ -10,8 +10,8 @@ const clientIpAddress = (address: string) => ({
 });
 
 describe("publicRpc", () => {
-  it("limits each client and RPC independently", async () => {
-    const program = Effect.gen(function* () {
+  it.effect("limits each client and RPC independently", () =>
+    Effect.gen(function* () {
       yield* Effect.all(
         Array.from({ length: 60 }, () =>
           RateLimit.publicRpc({
@@ -56,60 +56,54 @@ describe("publicRpc", () => {
         Effect.as(true)
       );
 
-      return { error, secondClientSucceeded };
-    });
-
-    const { error, secondClientSucceeded } = await Effect.runPromise(
-      program.pipe(
-        Effect.provideServiceEffect(
-          RateLimit.PublicRpcRateLimiter,
-          RateLimitService.use((rateLimitService) =>
-            Effect.succeed(
-              RateLimit.makePublicRpcRateLimiter({
-                clientIp: clientIpAddress("203.0.113.1"),
-                rateLimitService,
-              })
-            )
+      expect(error._tag).toBe("RateLimitExceededError");
+      expect(secondClientSucceeded).toBe(true);
+    }).pipe(
+      Effect.provideServiceEffect(
+        RateLimit.PublicRpcRateLimiter,
+        RateLimitService.use((rateLimitService) =>
+          Effect.succeed(
+            RateLimit.makePublicRpcRateLimiter({
+              clientIp: clientIpAddress("203.0.113.1"),
+              rateLimitService,
+            })
           )
-        ),
-        Effect.provide(RateLimitService.layerMemory)
-      )
-    );
+        )
+      ),
+      Effect.provide(RateLimitService.layerMemory)
+    )
+  );
 
-    expect(error._tag).toBe("RateLimitExceededError");
-    expect(secondClientSucceeded).toBe(true);
-  });
+  it.effect("uses named level defaults when no override is supplied", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.gen(function* () {
+        const rateLimitService = yield* RateLimitService;
+        const limiter = RateLimit.makePublicRpcRateLimiter({
+          clientIp: clientIpAddress("198.51.100.1"),
+          rateLimitService,
+        });
 
-  it("uses named level defaults when no override is supplied", async () => {
-    const program = Effect.gen(function* () {
-      const rateLimitService = yield* RateLimitService;
-      const limiter = RateLimit.makePublicRpcRateLimiter({
-        clientIp: clientIpAddress("198.51.100.1"),
-        rateLimitService,
-      });
+        return yield* Effect.gen(function* () {
+          yield* Effect.all(
+            Array.from({ length: 5 }, () =>
+              RateLimit.publicRpc({
+                name: "PostCreatePublic",
+                level: "expensive",
+              })
+            ),
+            { concurrency: 1, discard: true }
+          );
 
-      return yield* Effect.gen(function* () {
-        yield* Effect.all(
-          Array.from({ length: 5 }, () =>
+          return yield* Effect.flip(
             RateLimit.publicRpc({
               name: "PostCreatePublic",
               level: "expensive",
             })
-          ),
-          { concurrency: 1, discard: true }
-        );
+          );
+        }).pipe(Effect.provideService(RateLimit.PublicRpcRateLimiter, limiter));
+      }).pipe(Effect.provide(RateLimitService.layerMemory));
 
-        return yield* Effect.flip(
-          RateLimit.publicRpc({
-            name: "PostCreatePublic",
-            level: "expensive",
-          })
-        );
-      }).pipe(Effect.provideService(RateLimit.PublicRpcRateLimiter, limiter));
-    }).pipe(Effect.provide(RateLimitService.layerMemory));
-
-    const error = await Effect.runPromise(program);
-
-    expect(error._tag).toBe("RateLimitExceededError");
-  });
+      expect(error._tag).toBe("RateLimitExceededError");
+    })
+  );
 });

@@ -1,8 +1,9 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -13,10 +14,12 @@ function hashEmail(email: string): string {
   return createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
 }
 
-function generateRandomEmail(): string {
-  const suffix = randomBytes(8).toString("hex");
-  return `sso-${suffix}@feeblo.com`;
-}
+const generateRandomEmail = () =>
+  Effect.gen(function* () {
+    const crypto = yield* Crypto.Crypto;
+    const suffix = Buffer.from(yield* crypto.randomBytes(8)).toString("hex");
+    return `sso-${suffix}@feeblo.com`;
+  }).pipe(Effect.orDie);
 
 interface UpsertSsoUserInput {
   email: string;
@@ -104,7 +107,7 @@ const makeUserRepository = Effect.gen(function* () {
           .values({
             id,
             name: args.name,
-            email: generateRandomEmail(),
+            email: yield* generateRandomEmail(),
             emailVerified: true,
             emailHash,
             jwtAutoLoginAt: now,

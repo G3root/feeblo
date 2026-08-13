@@ -3,6 +3,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -75,15 +76,18 @@ const makeBoardRepository = Effect.gen(function* () {
         )
         .pipe(Effect.map(EffectArray.get(0))),
     create: (args: TBoardCreate) =>
-      db
-        .insert(schema.boardTable)
-        .values({
-          ...args,
-          slug: slugify(args.name),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning(),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        return yield* db
+          .insert(schema.boardTable)
+          .values({
+            ...args,
+            slug: slugify(args.name),
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning();
+      }),
     findMany: ({ organizationId, visibility }: TBoardFindMany) =>
       Effect.gen(function* () {
         const where: SQL[] = [];
@@ -132,13 +136,14 @@ const makeBoardRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const { id, organizationId, ...rest } = args;
         const input = { id, organizationId, ...rest };
+        const now = yield* DateTime.nowAsDate;
 
         return yield* db
           .update(schema.boardTable)
           .set({
             ...input,
             ...(input.name && { slug: slugify(input.name) }),
-            updatedAt: new Date(),
+            updatedAt: now,
           })
           .where(
             and(

@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "@effect/vitest";
 
 import * as Policy from "./policy";
 import { CurrentSession, type Session } from "./session-middleware";
@@ -17,21 +17,19 @@ const session: Session = {
 };
 
 describe("hasRestrictedOrganizationScope", () => {
-  it("denies mutations outside a restricted user's organization", async () => {
-    const error = await Effect.runPromise(
-      Effect.flip(Policy.hasRestrictedOrganizationScope("org_other")).pipe(
-        Effect.provideService(CurrentSession, session)
-      )
-    );
+  it.effect("denies mutations outside a restricted user's organization", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        Policy.hasRestrictedOrganizationScope("org_other")
+      ).pipe(Effect.provideService(CurrentSession, session));
 
-    expect(error._tag).toBe("PolicyDenied");
-  });
+      expect(error._tag).toBe("PolicyDenied");
+    })
+  );
 
-  it("allows mutations in the restricted user's organization", async () => {
-    await Effect.runPromise(
-      Policy.hasRestrictedOrganizationScope("org_allowed").pipe(
-        Effect.provideService(CurrentSession, session)
-      )
-    );
-  });
+  it.effect("allows mutations in the restricted user's organization", () =>
+    Policy.hasRestrictedOrganizationScope("org_allowed").pipe(
+      Effect.provideService(CurrentSession, session)
+    )
+  );
 });

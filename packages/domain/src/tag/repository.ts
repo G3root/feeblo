@@ -4,6 +4,7 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, exists, inArray, or } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -168,37 +169,43 @@ const makeTagRepository = Effect.gen(function* () {
       creatorId,
       creatorMemberId,
     }: TTagCreate) =>
-      db
-        .insert(schema.tagTable)
-        .values({
-          id,
-          name,
-          slug: slugify(name),
-          type,
-          organizationId,
-          creatorId,
-          ...(creatorMemberId ? { creatorMemberId } : {}),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .insert(schema.tagTable)
+          .values({
+            id,
+            name,
+            slug: slugify(name),
+            type,
+            organizationId,
+            creatorId,
+            ...(creatorMemberId ? { creatorMemberId } : {}),
+            createdAt: now,
+            updatedAt: now,
+          })
+          .pipe(Effect.asVoid);
+      }),
 
     update: ({ id, name, type, organizationId }: TTagUpdate) =>
-      db
-        .update(schema.tagTable)
-        .set({
-          name,
-          slug: slugify(name),
-          type,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.tagTable.id, id),
-            eq(schema.tagTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.tagTable)
+          .set({
+            name,
+            slug: slugify(name),
+            type,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.tagTable.id, id),
+              eq(schema.tagTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
 
     delete: ({ id, organizationId }: TTagDelete) =>
       db
@@ -273,6 +280,7 @@ const makeTagRepository = Effect.gen(function* () {
       db
         .transaction((tx) =>
           Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
             yield* tx
               .delete(schema.postTagTable)
               .where(
@@ -293,8 +301,8 @@ const makeTagRepository = Effect.gen(function* () {
                   postId,
                   tagId,
                   organizationId,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  createdAt: now,
+                  updatedAt: now,
                 }))
               )
             );
@@ -315,6 +323,7 @@ const makeTagRepository = Effect.gen(function* () {
       db
         .transaction((tx) =>
           Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
             yield* tx
               .delete(schema.changelogTagTable)
               .where(
@@ -335,8 +344,8 @@ const makeTagRepository = Effect.gen(function* () {
                   changelogId,
                   tagId,
                   organizationId,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  createdAt: now,
+                  updatedAt: now,
                 }))
               )
             );

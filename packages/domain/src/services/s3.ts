@@ -1,6 +1,8 @@
 import { S3 } from "@effect-aws/client-s3";
 import { S3FileSystem } from "@effect-aws/s3";
 import * as Context from "effect/Context";
+import * as Crypto from "effect/Crypto";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -70,7 +72,9 @@ const makeS3UploadService = Effect.gen(function* () {
       userId: string;
     }) =>
       Effect.gen(function* () {
-        const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const crypto = yield* Crypto.Crypto;
+        const now = yield* DateTime.now;
+        const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
         yield* fileSystem.writeFile(fileKey, bytes);
         return resolvePublicUrl(fileKey);
       }),
@@ -84,7 +88,9 @@ const makeS3UploadService = Effect.gen(function* () {
       organizationId: string;
     }) =>
       Effect.gen(function* () {
-        const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const crypto = yield* Crypto.Crypto;
+        const now = yield* DateTime.now;
+        const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
         yield* fileSystem.writeFile(fileKey, bytes);
         return resolvePublicUrl(fileKey);
       }),
@@ -100,7 +106,9 @@ const makeS3UploadService = Effect.gen(function* () {
       userId: string;
     }) =>
       Effect.gen(function* () {
-        const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const crypto = yield* Crypto.Crypto;
+        const now = yield* DateTime.now;
+        const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
         yield* fileSystem.writeFile(fileKey, bytes);
         return resolvePublicUrl(fileKey);
       }),

@@ -3,6 +3,7 @@ import { CompanyAttributeValueId, ContactAttributeValueId } from "@feeblo/id";
 import { toCamelCaseAttributeKey } from "@feeblo/utils/scule";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -73,40 +74,46 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     createContactAttributeDefinition: (
       args: TContactAttributeDefinitionCreate
     ) =>
-      db
-        .insert(schema.contactAttributeDefinitionTable)
-        .values({
-          ...args,
-          key: toCamelCaseAttributeKey(args.name),
-          description: args.description ?? null,
-          config: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .insert(schema.contactAttributeDefinitionTable)
+          .values({
+            ...args,
+            key: toCamelCaseAttributeKey(args.name),
+            description: args.description ?? null,
+            config: null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .pipe(Effect.asVoid);
+      }),
 
     updateContactAttributeDefinition: (
       args: TContactAttributeDefinitionUpdate
     ) =>
-      db
-        .update(schema.contactAttributeDefinitionTable)
-        .set({
-          name: args.name,
-          key: toCamelCaseAttributeKey(args.name),
-          description: args.description,
-          isRequired: args.isRequired,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.contactAttributeDefinitionTable.id, args.id),
-            eq(
-              schema.contactAttributeDefinitionTable.organizationId,
-              args.organizationId
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.contactAttributeDefinitionTable)
+          .set({
+            name: args.name,
+            key: toCamelCaseAttributeKey(args.name),
+            description: args.description,
+            isRequired: args.isRequired,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.contactAttributeDefinitionTable.id, args.id),
+              eq(
+                schema.contactAttributeDefinitionTable.organizationId,
+                args.organizationId
+              )
             )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
 
     deleteContactAttributeDefinition: (
       args: TContactAttributeDefinitionDelete
@@ -174,40 +181,46 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     createCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionCreate
     ) =>
-      db
-        .insert(schema.companyAttributeDefinitionTable)
-        .values({
-          ...args,
-          key: toCamelCaseAttributeKey(args.name),
-          description: args.description ?? null,
-          config: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .insert(schema.companyAttributeDefinitionTable)
+          .values({
+            ...args,
+            key: toCamelCaseAttributeKey(args.name),
+            description: args.description ?? null,
+            config: null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .pipe(Effect.asVoid);
+      }),
 
     updateCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionUpdate
     ) =>
-      db
-        .update(schema.companyAttributeDefinitionTable)
-        .set({
-          name: args.name,
-          key: toCamelCaseAttributeKey(args.name),
-          description: args.description,
-          isRequired: args.isRequired,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.companyAttributeDefinitionTable.id, args.id),
-            eq(
-              schema.companyAttributeDefinitionTable.organizationId,
-              args.organizationId
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.companyAttributeDefinitionTable)
+          .set({
+            name: args.name,
+            key: toCamelCaseAttributeKey(args.name),
+            description: args.description,
+            isRequired: args.isRequired,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.companyAttributeDefinitionTable.id, args.id),
+              eq(
+                schema.companyAttributeDefinitionTable.organizationId,
+                args.organizationId
+              )
             )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
 
     deleteCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionDelete
@@ -285,74 +298,88 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     updateContactAttributeValue: (args: TContactAttributeValueUpdate) =>
       upsertAttributeValue(args, {
         update: (id, valueMap) =>
-          db
-            .update(schema.contactAttributeValueTable)
-            .set({ ...valueMap, updatedAt: new Date() })
-            .where(
-              and(
-                eq(schema.contactAttributeValueTable.id, id),
-                eq(schema.contactAttributeValueTable.contactId, args.contactId),
-                eq(
-                  schema.contactAttributeValueTable.organizationId,
-                  args.organizationId
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .update(schema.contactAttributeValueTable)
+              .set({ ...valueMap, updatedAt: now })
+              .where(
+                and(
+                  eq(schema.contactAttributeValueTable.id, id),
+                  eq(
+                    schema.contactAttributeValueTable.contactId,
+                    args.contactId
+                  ),
+                  eq(
+                    schema.contactAttributeValueTable.organizationId,
+                    args.organizationId
+                  )
                 )
               )
-            )
-            .returning()
-            .pipe(Effect.map(([updated]) => updated)),
-        create: (id, valueMap) => {
-          const now = new Date();
-          return db
-            .insert(schema.contactAttributeValueTable)
-            .values({
-              id,
-              organizationId: args.organizationId,
-              contactId: args.contactId,
-              attributeId: args.attributeId,
-              ...valueMap,
-              createdAt: now,
-              updatedAt: now,
-            })
-            .returning()
-            .pipe(Effect.map(([created]) => created));
-        },
+              .returning()
+              .pipe(Effect.map(([updated]) => updated));
+          }),
+        create: (id, valueMap) =>
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .insert(schema.contactAttributeValueTable)
+              .values({
+                id,
+                organizationId: args.organizationId,
+                contactId: args.contactId,
+                attributeId: args.attributeId,
+                ...valueMap,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .returning()
+              .pipe(Effect.map(([created]) => created));
+          }),
         generateId: ContactAttributeValueId.generate,
       }).pipe(Effect.asVoid),
 
     upsertContactAttributeValue: (args: TContactAttributeValueUpsert) =>
       upsertAttributeValue(args, {
         update: (id, valueMap) =>
-          db
-            .update(schema.contactAttributeValueTable)
-            .set({ ...valueMap, updatedAt: new Date() })
-            .where(
-              and(
-                eq(schema.contactAttributeValueTable.id, id),
-                eq(schema.contactAttributeValueTable.contactId, args.contactId),
-                eq(
-                  schema.contactAttributeValueTable.organizationId,
-                  args.organizationId
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .update(schema.contactAttributeValueTable)
+              .set({ ...valueMap, updatedAt: now })
+              .where(
+                and(
+                  eq(schema.contactAttributeValueTable.id, id),
+                  eq(
+                    schema.contactAttributeValueTable.contactId,
+                    args.contactId
+                  ),
+                  eq(
+                    schema.contactAttributeValueTable.organizationId,
+                    args.organizationId
+                  )
                 )
               )
-            )
-            .returning()
-            .pipe(Effect.map(([updated]) => updated)),
-        create: (id, valueMap) => {
-          const now = new Date();
-          return db
-            .insert(schema.contactAttributeValueTable)
-            .values({
-              id,
-              organizationId: args.organizationId,
-              contactId: args.contactId,
-              attributeId: args.attributeId,
-              ...valueMap,
-              createdAt: now,
-              updatedAt: now,
-            })
-            .returning()
-            .pipe(Effect.map(([created]) => created));
-        },
+              .returning()
+              .pipe(Effect.map(([updated]) => updated));
+          }),
+        create: (id, valueMap) =>
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .insert(schema.contactAttributeValueTable)
+              .values({
+                id,
+                organizationId: args.organizationId,
+                contactId: args.contactId,
+                attributeId: args.attributeId,
+                ...valueMap,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .returning()
+              .pipe(Effect.map(([created]) => created));
+          }),
         generateId: ContactAttributeValueId.generate,
       }),
 
@@ -380,74 +407,88 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     updateCompanyAttributeValue: (args: TCompanyAttributeValueUpdate) =>
       upsertAttributeValue(args, {
         update: (id, valueMap) =>
-          db
-            .update(schema.companyAttributeValueTable)
-            .set({ ...valueMap, updatedAt: new Date() })
-            .where(
-              and(
-                eq(schema.companyAttributeValueTable.id, id),
-                eq(schema.companyAttributeValueTable.companyId, args.companyId),
-                eq(
-                  schema.companyAttributeValueTable.organizationId,
-                  args.organizationId
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .update(schema.companyAttributeValueTable)
+              .set({ ...valueMap, updatedAt: now })
+              .where(
+                and(
+                  eq(schema.companyAttributeValueTable.id, id),
+                  eq(
+                    schema.companyAttributeValueTable.companyId,
+                    args.companyId
+                  ),
+                  eq(
+                    schema.companyAttributeValueTable.organizationId,
+                    args.organizationId
+                  )
                 )
               )
-            )
-            .returning()
-            .pipe(Effect.map(([updated]) => updated)),
-        create: (id, valueMap) => {
-          const now = new Date();
-          return db
-            .insert(schema.companyAttributeValueTable)
-            .values({
-              id,
-              organizationId: args.organizationId,
-              companyId: args.companyId,
-              attributeId: args.attributeId,
-              ...valueMap,
-              createdAt: now,
-              updatedAt: now,
-            })
-            .returning()
-            .pipe(Effect.map(([created]) => created));
-        },
+              .returning()
+              .pipe(Effect.map(([updated]) => updated));
+          }),
+        create: (id, valueMap) =>
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .insert(schema.companyAttributeValueTable)
+              .values({
+                id,
+                organizationId: args.organizationId,
+                companyId: args.companyId,
+                attributeId: args.attributeId,
+                ...valueMap,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .returning()
+              .pipe(Effect.map(([created]) => created));
+          }),
         generateId: CompanyAttributeValueId.generate,
       }).pipe(Effect.asVoid),
 
     upsertCompanyAttributeValue: (args: TCompanyAttributeValueUpsert) =>
       upsertAttributeValue(args, {
         update: (id, valueMap) =>
-          db
-            .update(schema.companyAttributeValueTable)
-            .set({ ...valueMap, updatedAt: new Date() })
-            .where(
-              and(
-                eq(schema.companyAttributeValueTable.id, id),
-                eq(schema.companyAttributeValueTable.companyId, args.companyId),
-                eq(
-                  schema.companyAttributeValueTable.organizationId,
-                  args.organizationId
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .update(schema.companyAttributeValueTable)
+              .set({ ...valueMap, updatedAt: now })
+              .where(
+                and(
+                  eq(schema.companyAttributeValueTable.id, id),
+                  eq(
+                    schema.companyAttributeValueTable.companyId,
+                    args.companyId
+                  ),
+                  eq(
+                    schema.companyAttributeValueTable.organizationId,
+                    args.organizationId
+                  )
                 )
               )
-            )
-            .returning()
-            .pipe(Effect.map(([updated]) => updated)),
-        create: (id, valueMap) => {
-          const now = new Date();
-          return db
-            .insert(schema.companyAttributeValueTable)
-            .values({
-              id,
-              organizationId: args.organizationId,
-              companyId: args.companyId,
-              attributeId: args.attributeId,
-              ...valueMap,
-              createdAt: now,
-              updatedAt: now,
-            })
-            .returning()
-            .pipe(Effect.map(([created]) => created));
-        },
+              .returning()
+              .pipe(Effect.map(([updated]) => updated));
+          }),
+        create: (id, valueMap) =>
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            return yield* db
+              .insert(schema.companyAttributeValueTable)
+              .values({
+                id,
+                organizationId: args.organizationId,
+                companyId: args.companyId,
+                attributeId: args.attributeId,
+                ...valueMap,
+                createdAt: now,
+                updatedAt: now,
+              })
+              .returning()
+              .pipe(Effect.map(([created]) => created));
+          }),
         generateId: CompanyAttributeValueId.generate,
       }),
   };
