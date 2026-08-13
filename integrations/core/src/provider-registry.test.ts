@@ -17,11 +17,14 @@ const webhookRegistration = ({
       deliver: () => Effect.succeed({}),
     },
   ],
+  inboundHandlers = [],
+  manifest,
   routeConfigurationSchemas = new Map([["events.post", Schema.Json]]),
 }: Partial<IntegrationProviderRegistration> = {}): IntegrationProviderRegistration => ({
   connectionConfigurationSchema: Schema.Json,
   handlers,
-  manifest: {
+  inboundHandlers,
+  manifest: manifest ?? {
     capabilities: [
       { configVersion: 1, direction: "outbound", key: "events.post" },
     ],
@@ -82,6 +85,60 @@ describe("makeIntegrationProviderRegistry", () => {
             ...registration.manifest,
             capabilities: [],
           },
+        },
+      ])
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
+  it("provides an inbound capability handler after startup validation", () => {
+    const registration = webhookRegistration({
+      inboundHandlers: [
+        {
+          capabilityKey: "commands",
+          handle: () => Effect.succeed({ body: {}, status: 200 }),
+        },
+      ],
+      manifest: {
+        capabilities: [
+          { configVersion: 1, direction: "outbound", key: "events.post" },
+          { configVersion: 1, direction: "inbound", key: "commands" },
+        ],
+        connectionMode: "none",
+        displayName: "Webhook",
+        provider: testProviderKey,
+      },
+      routeConfigurationSchemas: new Map([
+        ["events.post", Schema.Json],
+        ["commands", Schema.Json],
+      ]),
+    });
+    const registry = Effect.runSync(
+      makeIntegrationProviderRegistry([registration])
+    );
+
+    expect(
+      registry.getInboundHandler({
+        capabilityKey: "commands",
+        provider: testProviderKey,
+      })
+    ).toBeDefined();
+  });
+
+  it("rejects an advertised inbound capability without an inbound handler", () => {
+    const registration = webhookRegistration();
+    const exit = Effect.runSyncExit(
+      makeIntegrationProviderRegistry([
+        {
+          ...registration,
+          manifest: {
+            ...registration.manifest,
+            capabilities: [
+              { configVersion: 1, direction: "inbound", key: "commands" },
+            ],
+          },
+          routeConfigurationSchemas: new Map([["commands", Schema.Json]]),
         },
       ])
     );

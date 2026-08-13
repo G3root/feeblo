@@ -109,6 +109,7 @@ const makeDeliveryFixture = () =>
         eventTypes: ["feedback.post.created"],
         id: routeId,
         provider: webhookProviderKey,
+        providerConfig: {},
         safeMetadata: {},
       },
     };

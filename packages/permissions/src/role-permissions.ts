@@ -44,6 +44,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "contacts.*",
     "companies.*",
     "webhooks.manage",
+    "integrations.manage",
   ],
   // Owner is retained for legacy workspaces. It intentionally adds no grants:
   // owner and admin have the same effective permissions.
