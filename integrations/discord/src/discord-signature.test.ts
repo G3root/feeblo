@@ -1,7 +1,7 @@
 import { createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
+import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import { describe, expect, it } from "vitest";
 import {
   DISCORD_SIGNATURE_MAX_AGE_MS,
   verifyDiscordRequestSignature,
@@ -32,24 +32,32 @@ const signBody = (timestamp: string, rawBody: string) =>
     })
   ).toString("hex");
 
+const expectFailure = <A, E>(effect: Effect.Effect<A, E>) =>
+  effect.pipe(
+    Effect.exit,
+    Effect.tap((result) =>
+      Effect.sync(() => expect(Exit.isFailure(result)).toBe(true))
+    )
+  );
+
 describe("verifyDiscordRequestSignature", () => {
-  it("accepts a valid signature", async () => {
-    const rawBody = JSON.stringify({ type: 1 });
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const result = await Effect.runPromise(
-      verifyDiscordRequestSignature({
+  it.effect("accepts a valid signature", () =>
+    Effect.gen(function* () {
+      const rawBody = JSON.stringify({ type: 1 });
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const result = yield* verifyDiscordRequestSignature({
         now: Date.now(),
         publicKey: publicKeyHex,
         rawBody,
         signatureHeader: signBody(timestamp, rawBody),
         timestampHeader: timestamp,
-      })
-    );
-    expect(result).toBeUndefined();
-  });
+      });
+      expect(result).toBeUndefined();
+    })
+  );
 
-  it("rejects a missing header", async () => {
-    const result = await Effect.runPromiseExit(
+  it.effect("rejects a missing header", () =>
+    expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
         publicKey: publicKeyHex,
@@ -57,16 +65,15 @@ describe("verifyDiscordRequestSignature", () => {
         signatureHeader: undefined,
         timestampHeader: undefined,
       })
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+    )
+  );
 
-  it("rejects a stale timestamp outside the freshness window", async () => {
+  it.effect("rejects a stale timestamp outside the freshness window", () => {
     const rawBody = "{}";
     const stale = String(
       Math.floor((Date.now() - DISCORD_SIGNATURE_MAX_AGE_MS - 60_000) / 1000)
     );
-    const result = await Effect.runPromiseExit(
+    return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
         publicKey: publicKeyHex,
@@ -75,12 +82,28 @@ describe("verifyDiscordRequestSignature", () => {
         timestampHeader: stale,
       })
     );
-    expect(Exit.isFailure(result)).toBe(true);
   });
 
-  it("rejects a tampered body", async () => {
+  it.effect("rejects a future timestamp outside the freshness window", () => {
+    const rawBody = "{}";
+    const now = Date.now();
+    const future = String(
+      Math.floor((now + DISCORD_SIGNATURE_MAX_AGE_MS + 60_000) / 1000)
+    );
+    return expectFailure(
+      verifyDiscordRequestSignature({
+        now,
+        publicKey: publicKeyHex,
+        rawBody,
+        signatureHeader: signBody(future, rawBody),
+        timestampHeader: future,
+      })
+    );
+  });
+
+  it.effect("rejects a tampered body", () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
-    const result = await Effect.runPromiseExit(
+    return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
         publicKey: publicKeyHex,
@@ -89,12 +112,11 @@ describe("verifyDiscordRequestSignature", () => {
         timestampHeader: timestamp,
       })
     );
-    expect(Exit.isFailure(result)).toBe(true);
   });
 
-  it("rejects a non-hex signature", async () => {
+  it.effect("rejects a non-hex signature", () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
-    const result = await Effect.runPromiseExit(
+    return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
         publicKey: publicKeyHex,
@@ -103,12 +125,11 @@ describe("verifyDiscordRequestSignature", () => {
         timestampHeader: timestamp,
       })
     );
-    expect(Exit.isFailure(result)).toBe(true);
   });
 
-  it("rejects an invalid public key", async () => {
+  it.effect("rejects an invalid public key", () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
-    const result = await Effect.runPromiseExit(
+    return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
         publicKey: "zz",
@@ -117,6 +138,5 @@ describe("verifyDiscordRequestSignature", () => {
         timestampHeader: timestamp,
       })
     );
-    expect(Exit.isFailure(result)).toBe(true);
   });
 });

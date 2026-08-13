@@ -3,6 +3,8 @@ import {
   asLegid,
   IntegrationConnectionId,
   IntegrationRouteId,
+  type LegidFrom,
+  WorkspaceId,
 } from "@feeblo/id";
 import {
   DISCORD_GUILD_COMMANDS,
@@ -11,10 +13,7 @@ import {
   DiscordOAuthState,
   makeDiscordApiClient,
 } from "@feeblo/integration-discord";
-import {
-  decryptDiscordCredentialMaterial,
-  encryptDiscordCredentialMaterial,
-} from "@feeblo/integration-discord/credentials";
+import { encryptDiscordCredentialMaterial } from "@feeblo/integration-discord/credentials";
 import { discordProviderKey } from "@feeblo/integration-discord/manifest";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
@@ -65,7 +64,7 @@ export interface DiscordConnectionServiceShape {
     readonly code: string;
     readonly state: string;
   }) => Effect.Effect<
-    { readonly organizationId: string },
+    { readonly organizationId: LegidFrom<typeof WorkspaceId> },
     DiscordIntegrationError
   >;
   readonly connectStart: (
@@ -205,6 +204,17 @@ export const makeDiscordConnectionServiceLive = (
                 })
             )
           );
+          const decodedOrganizationId = yield* Schema.decodeUnknownEffect(
+            WorkspaceId.schema
+          )(decoded.organizationId).pipe(
+            Effect.mapError(
+              () =>
+                new BadRequestError({
+                  message: "Discord OAuth state is invalid",
+                })
+            )
+          );
+          const organizationId = asLegid(WorkspaceId)(decodedOrganizationId);
           // OAuth exchange runs before any transaction: the code is single-use,
           // so Discord itself serializes replays. The guarded connection
           // transition below is the idempotency boundary for concurrent
@@ -254,7 +264,7 @@ export const makeDiscordConnectionServiceLive = (
               const [connection] = yield* lockDiscordConnection(
                 db,
                 decoded.connectionId,
-                decoded.organizationId
+                organizationId
               );
               if (
                 connection === undefined ||
@@ -296,7 +306,7 @@ export const makeDiscordConnectionServiceLive = (
                   and(
                     eq(
                       schema.integrationConnectionTable.organizationId,
-                      decoded.organizationId
+                      organizationId
                     ),
                     eq(
                       schema.integrationConnectionTable.provider,
@@ -341,13 +351,13 @@ export const makeDiscordConnectionServiceLive = (
                   enabled: true,
                   eventTypes: [],
                   id: yield* IntegrationRouteId.generate,
-                  organizationId: decoded.organizationId,
+                  organizationId,
                   providerConfig: { version: 1 },
                   routeKey: "",
                   safeDisplayMetadata: {},
                 })
                 .onConflictDoNothing();
-              return { organizationId: decoded.organizationId };
+              return { organizationId };
             })
           );
         },
@@ -400,7 +410,7 @@ export const makeDiscordConnectionServiceLive = (
         input: S.TDiscordConnectionDisconnect
       ) {
         const { connectionId, organizationId } = input;
-        return yield* db
+        const credentialsCiphertext = yield* db
           .transaction(() =>
             Effect.gen(function* () {
               const [connection] = yield* lockDiscordConnection(
@@ -414,7 +424,7 @@ export const makeDiscordConnectionServiceLive = (
                 });
               }
               if (connection.lifecycle === "archived") {
-                return;
+                return undefined;
               }
               const now = new Date();
               yield* db
@@ -449,62 +459,47 @@ export const makeDiscordConnectionServiceLive = (
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
+              yield* db
+                .update(schema.integrationConnectionTable)
+                .set({
+                  archivedAt: now,
+                  credentialsCiphertext: null,
+                  lifecycle: "archived",
+                  retentionExpiresAt: new Date(now.getTime() + retentionMs),
+                  updatedAt: now,
+                })
+                .where(eq(schema.integrationConnectionTable.id, connectionId));
+              return connection.credentialsCiphertext ?? undefined;
             })
           )
-          .pipe(
-            Effect.flatMap(() =>
-              Effect.gen(function* () {
-                // Best-effort remote revocation of the installer's user token:
-                // never fails the local disconnect when Discord is unreachable.
-                const [connection] = yield* db
-                  .select({
-                    credentialsCiphertext:
-                      schema.integrationConnectionTable.credentialsCiphertext,
-                  })
-                  .from(schema.integrationConnectionTable)
-                  .where(
-                    eq(schema.integrationConnectionTable.id, connectionId)
-                  );
-                if (
-                  connection?.credentialsCiphertext !== null &&
-                  connection?.credentialsCiphertext !== undefined
-                ) {
-                  const credentials = yield* Effect.exit(
-                    decryptDiscordCredentialMaterial(
-                      config.encryptionKey,
-                      connection.credentialsCiphertext
-                    )
-                  );
-                  if (
-                    Exit.isSuccess(credentials) &&
-                    credentials.value.userToken !== undefined
-                  ) {
-                    yield* Effect.exit(
-                      apiClient.oauth2TokenRevoke({
-                        clientId: config.clientId,
-                        clientSecret: config.clientSecret,
-                        userToken: credentials.value.userToken,
-                      })
-                    );
-                  }
-                }
-                const now = new Date();
-                yield* db
-                  .update(schema.integrationConnectionTable)
-                  .set({
-                    archivedAt: now,
-                    credentialsCiphertext: null,
-                    lifecycle: "archived",
-                    retentionExpiresAt: new Date(now.getTime() + retentionMs),
-                    updatedAt: now,
-                  })
-                  .where(
-                    eq(schema.integrationConnectionTable.id, connectionId)
-                  );
-              })
-            ),
-            mapManagementError("disconnect")
+          .pipe(mapManagementError("disconnect"));
+        if (credentialsCiphertext === undefined) {
+          return;
+        }
+        const credentials = yield* Effect.exit(
+          decryptConnectionCredentials(config, credentialsCiphertext)
+        );
+        if (Exit.isFailure(credentials)) {
+          yield* Effect.logWarning(
+            "Could not decrypt Discord credentials for token revocation"
           );
+          return;
+        }
+        if (credentials.value.userToken === undefined) {
+          return;
+        }
+        const revoked = yield* Effect.exit(
+          apiClient.oauth2TokenRevoke({
+            clientId: config.clientId,
+            clientSecret: config.clientSecret,
+            userToken: credentials.value.userToken,
+          })
+        );
+        if (Exit.isFailure(revoked)) {
+          yield* Effect.logWarning(
+            "Discord token revocation failed after disconnect"
+          );
+        }
       });
 
       return DiscordConnectionService.of({

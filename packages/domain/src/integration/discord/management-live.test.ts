@@ -225,18 +225,22 @@ describe("discord management service", () => {
       Effect.gen(function* () {
         const organizationId = yield* seedOrganization;
         const service = yield* DiscordManagementService;
-        yield* service.connectStart({ organizationId });
+        const started = yield* service.connectStart({ organizationId });
+        const startedState = decodeState(started.authorizeUrl);
         const bogus = yield* Schema.encodeEffect(
           Schema.fromJsonString(DiscordOAuthState)
         )({
-          connectionId: yield* IntegrationConnectionId.generate,
+          connectionId: startedState.connectionId,
           nonce: "wrong",
           organizationId,
         });
-        const result = yield* Effect.exit(
+        const failure = yield* Effect.flip(
           service.connectComplete({ code: "code", state: bogus })
         );
-        expect(Exit.isFailure(result)).toBe(true);
+        expect(failure).toMatchObject({
+          _tag: "BadRequestError",
+          message: "Discord OAuth state does not match",
+        });
       })
     );
   });

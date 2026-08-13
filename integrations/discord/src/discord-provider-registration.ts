@@ -22,6 +22,7 @@ import {
 } from "./discord-inbound-schema";
 import {
   DiscordChannelNotificationRouteConfiguration,
+  DiscordConnectionConfiguration,
   DiscordInboundRouteConfiguration,
   discordProviderKey,
   discordProviderManifest,
@@ -116,6 +117,9 @@ const makeDiscordInteractionsHandler = ({
         })
       );
       if (Result.isFailure(verified)) {
+        yield* Effect.logWarning(
+          "Discord interaction signature validation failed"
+        ).pipe(Effect.annotateLogs("reason", verified.failure.reason));
         return {
           body: "invalid request signature",
           status: 401,
@@ -123,6 +127,9 @@ const makeDiscordInteractionsHandler = ({
       }
       const parsed = yield* Effect.result(parseInteraction(input.rawBody));
       if (Result.isFailure(parsed)) {
+        yield* Effect.logWarning(
+          "Discord interaction payload validation failed"
+        ).pipe(Effect.annotateLogs("reason", parsed.failure.reason));
         return {
           body: "invalid request payload",
           status: 400,
@@ -207,7 +214,7 @@ export const makeDiscordProviderRegistration = ({
   };
 
   return {
-    connectionConfigurationSchema: Schema.Struct({}),
+    connectionConfigurationSchema: DiscordConnectionConfiguration,
     handlers: [channelNotificationsHandler],
     inboundHandlers: [makeDiscordInteractionsHandler({ publicKey })],
     manifest: discordProviderManifest,

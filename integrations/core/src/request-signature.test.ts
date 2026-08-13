@@ -1,6 +1,5 @@
+import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import { describe, expect, it } from "vitest";
 import {
   IntegrationRequestSignatureError,
   verifyRequestSignature,
@@ -15,62 +14,76 @@ const okVerify = () =>
   });
 
 describe("verifyRequestSignature", () => {
-  it("accepts a fresh request and delegates to the provider check", async () => {
-    const result = await Effect.runPromise(okVerify());
-    expect(result).toBeUndefined();
-  });
+  it.effect("accepts a fresh request and delegates to the provider check", () =>
+    okVerify().pipe(
+      Effect.tap((result) => Effect.sync(() => expect(result).toBeUndefined()))
+    )
+  );
 
-  it("rejects a missing header", async () => {
-    const result = await Effect.runPromiseExit(
-      verifyRequestSignature({
-        maxAgeMs: 60_000,
-        signatureHeader: undefined,
-        timestampHeader: undefined,
-        verify: () => Effect.void,
-      })
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("rejects a missing header", () =>
+    Effect.gen(function* () {
+      let verified = false;
+      const failure = yield* Effect.flip(
+        verifyRequestSignature({
+          maxAgeMs: 60_000,
+          signatureHeader: undefined,
+          timestampHeader: undefined,
+          verify: () =>
+            Effect.sync(() => {
+              verified = true;
+            }),
+        })
+      );
+      expect(failure.reason).toBe("Request signature headers are missing");
+      expect(verified).toBe(false);
+    })
+  );
 
-  it("rejects a stale timestamp outside the freshness window", async () => {
-    const stale = String(Math.floor((Date.now() - 120_000) / 1000));
-    const result = await Effect.runPromiseExit(
-      verifyRequestSignature({
-        maxAgeMs: 60_000,
-        signatureHeader: "sig",
-        timestampHeader: stale,
-        verify: () => Effect.void,
-      })
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("rejects a stale timestamp outside the freshness window", () =>
+    Effect.gen(function* () {
+      const stale = String(Math.floor((Date.now() - 120_000) / 1000));
+      const failure = yield* Effect.flip(
+        verifyRequestSignature({
+          maxAgeMs: 60_000,
+          signatureHeader: "sig",
+          timestampHeader: stale,
+          verify: () => Effect.void,
+        })
+      );
+      expect(failure.reason).toBe("Request timestamp is stale");
+    })
+  );
 
-  it("rejects a non-numeric timestamp", async () => {
-    const result = await Effect.runPromiseExit(
-      verifyRequestSignature({
-        maxAgeMs: 60_000,
-        signatureHeader: "sig",
-        timestampHeader: "not-a-timestamp",
-        verify: () => Effect.void,
-      })
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("rejects a non-numeric timestamp", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        verifyRequestSignature({
+          maxAgeMs: 60_000,
+          signatureHeader: "sig",
+          timestampHeader: "not-a-timestamp",
+          verify: () => Effect.void,
+        })
+      );
+      expect(failure.reason).toBe("Request timestamp is invalid");
+    })
+  );
 
-  it("surfaces the provider check failure", async () => {
-    const result = await Effect.runPromiseExit(
-      verifyRequestSignature({
-        maxAgeMs: 60_000,
-        signatureHeader: "sig",
-        timestampHeader: String(Math.floor(Date.now() / 1000)),
-        verify: () =>
-          Effect.fail(
-            new IntegrationRequestSignatureError({
-              reason: "cryptographic check failed",
-            })
-          ),
-      })
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("surfaces the provider check failure", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        verifyRequestSignature({
+          maxAgeMs: 60_000,
+          signatureHeader: "sig",
+          timestampHeader: String(Math.floor(Date.now() / 1000)),
+          verify: () =>
+            Effect.fail(
+              new IntegrationRequestSignatureError({
+                reason: "cryptographic check failed",
+              })
+            ),
+        })
+      );
+      expect(failure.reason).toBe("cryptographic check failed");
+    })
+  );
 });

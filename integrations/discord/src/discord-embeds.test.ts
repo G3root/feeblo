@@ -14,21 +14,14 @@ describe("renderChannelUpdateMessageEmbed", () => {
   };
 
   it("renders a rich embed with title, url, facts, and actor footer", () => {
-    const embed = renderChannelUpdateMessageEmbed(message) as {
-      type: string;
-      title: string;
-      url: string;
-      description: string;
-      color: number;
-      footer: { text: string };
-    };
+    const embed = renderChannelUpdateMessageEmbed(message);
     expect(embed.type).toBe("rich");
     expect(embed.title).toBe("Support dark mode");
     expect(embed.url).toBe(message.actionUrl);
     expect(embed.description).toBe(
       "**Board:** Product ideas\n**Status:** PENDING"
     );
-    expect(embed.footer.text).toBe("Posted by Ada Lovelace");
+    expect(embed.footer?.text).toBe("Posted by Ada Lovelace");
     expect(embed.color).toBe(0x11_18_27);
   });
 
@@ -36,9 +29,23 @@ describe("renderChannelUpdateMessageEmbed", () => {
     const embed = renderChannelUpdateMessageEmbed({
       ...message,
       title: "x".repeat(300),
-    }) as { title: string };
+    });
     expect(embed.title.length).toBeLessThanOrEqual(256);
     expect(embed.title.endsWith("…")).toBe(true);
+  });
+
+  it("truncates the complete description and footer to Discord limits", () => {
+    const embed = renderChannelUpdateMessageEmbed({
+      ...message,
+      actorName: "a".repeat(3000),
+      facts: Array.from({ length: 10 }, (_, index) => ({
+        label: `Fact ${index}`,
+        value: "v".repeat(1024),
+      })),
+    });
+    expect(embed.description?.length).toBeLessThanOrEqual(4096);
+    expect(embed.footer?.text.length).toBeLessThanOrEqual(2048);
+    expect(embed.footer?.text.startsWith("Posted by ")).toBe(true);
   });
 
   it("omits the actor footer when no actor name is known", () => {

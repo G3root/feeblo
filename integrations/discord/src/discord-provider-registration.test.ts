@@ -1,4 +1,5 @@
 import { createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
+import { describe, expect, it } from "@effect/vitest";
 import {
   asLegid,
   IntegrationConnectionId,
@@ -15,7 +16,6 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
-import { describe, expect, it } from "vitest";
 import type { DiscordApiClient } from "./discord-api";
 import { discordProviderKey } from "./discord-manifest";
 import { makeDiscordProviderRegistration } from "./discord-provider-registration";
@@ -153,194 +153,219 @@ const makePostMessageSpy = () => {
 };
 
 describe("discord provider registration", () => {
-  it("posts a channel-update embed for feedback.post.created deliveries", async () => {
-    const spy = makePostMessageSpy();
-    const registration = makeDiscordProviderRegistration({
-      apiClient: spy.apiClient,
-      credentialResolver,
-      publicKey: publicKeyHex,
-    });
-    const handler = registration.handlers.find(
-      (candidate) => candidate.capabilityKey === "channel.notifications"
-    );
-    expect(handler).toBeDefined();
+  it.effect(
+    "posts a channel-update embed for feedback.post.created deliveries",
+    () =>
+      Effect.gen(function* () {
+        const spy = makePostMessageSpy();
+        const registration = makeDiscordProviderRegistration({
+          apiClient: spy.apiClient,
+          credentialResolver,
+          publicKey: publicKeyHex,
+        });
+        const handler = registration.handlers.find(
+          (candidate) => candidate.capabilityKey === "channel.notifications"
+        );
+        expect(handler).toBeDefined();
+        if (handler === undefined) {
+          return;
+        }
 
-    const result = await Effect.runPromiseExit(
-      handler?.deliver(deliveryInput()) ?? Effect.never
-    );
-    expect(Exit.isSuccess(result)).toBe(true);
+        const result = yield* Effect.exit(handler.deliver(deliveryInput()));
+        expect(Exit.isSuccess(result)).toBe(true);
 
-    const call = spy.getLastCall();
-    expect(call?.channelId).toBe("123456789012345678");
-    const embed = call?.embeds[0] as { title: string; url: string };
-    expect(embed.title).toBe("Dark mode please");
-    expect(embed.url).toBe("https://feeblo.example/org/post/ideas/dark-mode");
-  });
+        const call = spy.getLastCall();
+        expect(call?.channelId).toBe("123456789012345678");
+        const embed = call?.embeds[0] as { title: string; url: string };
+        expect(embed.title).toBe("Dark mode please");
+        expect(embed.url).toBe(
+          "https://feeblo.example/org/post/ideas/dark-mode"
+        );
+      })
+  );
 
-  it("rejects unsupported event types as invalid configuration", async () => {
-    const spy = makePostMessageSpy();
-    const registration = makeDiscordProviderRegistration({
-      apiClient: spy.apiClient,
-      credentialResolver,
-      publicKey: publicKeyHex,
-    });
-    const handler = registration.handlers[0];
-    const result = await Effect.runPromiseExit(
-      handler?.deliver(
-        deliveryInput({
-          event: {
-            ...deliveryInput().event,
-            type: "feedback.post.status_changed",
-          },
-        })
-      ) ?? Effect.never
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("rejects unsupported event types as invalid configuration", () =>
+    Effect.gen(function* () {
+      const spy = makePostMessageSpy();
+      const registration = makeDiscordProviderRegistration({
+        apiClient: spy.apiClient,
+        credentialResolver,
+        publicKey: publicKeyHex,
+      });
+      const handler = registration.handlers[0];
+      expect(handler).toBeDefined();
+      if (handler === undefined) {
+        return;
+      }
+      const failure = yield* Effect.flip(
+        handler.deliver(
+          deliveryInput({
+            event: {
+              ...deliveryInput().event,
+              type: "feedback.post.status_changed",
+            },
+          })
+        )
+      );
+      expect(failure._tag).toBe("IntegrationProviderInvalidConfigurationError");
+    })
+  );
 
-  it("classifies a missing bot token as invalid configuration", async () => {
-    const spy = makePostMessageSpy();
-    const registration = makeDiscordProviderRegistration({
-      apiClient: spy.apiClient,
-      credentialResolver: {
-        loadDiscordCredentials: () =>
-          Effect.fail(
-            new IntegrationProviderInvalidConfigurationError({
-              message: "no credentials",
-              provider: discordProviderKey,
-            })
-          ),
-      },
-      publicKey: publicKeyHex,
-    });
-    const handler = registration.handlers[0];
-    const result = await Effect.runPromiseExit(
-      handler?.deliver(deliveryInput()) ?? Effect.never
-    );
-    expect(Exit.isFailure(result)).toBe(true);
-  });
+  it.effect("classifies a missing bot token as invalid configuration", () =>
+    Effect.gen(function* () {
+      const spy = makePostMessageSpy();
+      const registration = makeDiscordProviderRegistration({
+        apiClient: spy.apiClient,
+        credentialResolver: {
+          loadDiscordCredentials: () =>
+            Effect.fail(
+              new IntegrationProviderInvalidConfigurationError({
+                message: "no credentials",
+                provider: discordProviderKey,
+              })
+            ),
+        },
+        publicKey: publicKeyHex,
+      });
+      const handler = registration.handlers[0];
+      expect(handler).toBeDefined();
+      if (handler === undefined) {
+        return;
+      }
+      const failure = yield* Effect.flip(handler.deliver(deliveryInput()));
+      expect(failure._tag).toBe("IntegrationProviderInvalidConfigurationError");
+    })
+  );
 
-  it("verifies inbound signatures and parses application commands", async () => {
-    const registration = makeDiscordProviderRegistration({
-      credentialResolver,
-      publicKey: publicKeyHex,
-    });
-    const interactions = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "interactions"
-    );
-    expect(interactions).toBeDefined();
+  it.effect("verifies inbound signatures and parses application commands", () =>
+    Effect.gen(function* () {
+      const registration = makeDiscordProviderRegistration({
+        credentialResolver,
+        publicKey: publicKeyHex,
+      });
+      const interactions = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "interactions"
+      );
+      expect(interactions).toBeDefined();
 
-    const rawBody = JSON.stringify({
-      id: "interaction_1",
-      application_id: "app_1",
-      type: 2,
-      data: {
-        id: "command_1",
-        name: "feeblo",
-        type: 1,
-        options: [{ name: "text", type: 3, value: "Dark mode please" }],
-      },
-      guild_id: "guild_1",
-      channel_id: "channel_1",
-      member: { user: { id: "user_1", username: "alice" } },
-      token: "token_1",
-    });
+      const rawBody = JSON.stringify({
+        id: "interaction_1",
+        application_id: "app_1",
+        type: 2,
+        data: {
+          id: "command_1",
+          name: "feeblo",
+          type: 1,
+          options: [{ name: "text", type: 3, value: "Dark mode please" }],
+        },
+        guild_id: "guild_1",
+        channel_id: "channel_1",
+        member: { user: { id: "user_1", username: "alice" } },
+        token: "token_1",
+      });
 
-    const response = await Effect.runPromise(
-      interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
-    );
-    expect(response.status).toBe(200);
-    const parsed = response.body as {
-      kind: string;
-      payload: { data: { name: string } };
-    };
-    expect(parsed.kind).toBe("application_command");
-    expect(parsed.payload.data.name).toBe("feeblo");
-  });
+      const response = yield* interactions?.handle(signedHeaders(rawBody)) ??
+        Effect.never;
+      expect(response.status).toBe(200);
+      const parsed = response.body as {
+        kind: string;
+        payload: { data: { name: string } };
+      };
+      expect(parsed.kind).toBe("application_command");
+      expect(parsed.payload.data.name).toBe("feeblo");
+    })
+  );
 
-  it("parses ping interactions", async () => {
-    const registration = makeDiscordProviderRegistration({
-      credentialResolver,
-      publicKey: publicKeyHex,
-    });
-    const interactions = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "interactions"
-    );
-    const rawBody = JSON.stringify({ id: "ping_1", type: 1 });
-    const response = await Effect.runPromise(
-      interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
-    );
-    expect(response.status).toBe(200);
-    const parsed = response.body as { kind: string };
-    expect(parsed.kind).toBe("ping");
-  });
+  it.effect("parses ping interactions", () =>
+    Effect.gen(function* () {
+      const registration = makeDiscordProviderRegistration({
+        credentialResolver,
+        publicKey: publicKeyHex,
+      });
+      const interactions = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "interactions"
+      );
+      const rawBody = JSON.stringify({ id: "ping_1", type: 1 });
+      const response = yield* interactions?.handle(signedHeaders(rawBody)) ??
+        Effect.never;
+      expect(response.status).toBe(200);
+      const parsed = response.body as { kind: string };
+      expect(parsed.kind).toBe("ping");
+    })
+  );
 
-  it("parses modal submissions", async () => {
-    const registration = makeDiscordProviderRegistration({
-      credentialResolver,
-      publicKey: publicKeyHex,
-    });
-    const interactions = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "interactions"
-    );
-    const rawBody = JSON.stringify({
-      id: "interaction_2",
-      application_id: "app_1",
-      type: 5,
-      data: {
-        custom_id: "feeblo:org_1:guild_1:channel_1",
-        components: [
-          {
-            type: 1,
-            components: [
-              { type: 4, custom_id: "title", value: "Dark mode" },
-              { type: 4, custom_id: "details", value: "Please" },
-              { type: 4, custom_id: "board", value: "brd_1" },
-            ],
-          },
-        ],
-      },
-      guild_id: "guild_1",
-      channel_id: "channel_1",
-      member: { user: { id: "user_1", username: "alice" } },
-      token: "token_2",
-    });
-    const response = await Effect.runPromise(
-      interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
-    );
-    expect(response.status).toBe(200);
-    const parsed = response.body as { kind: string };
-    expect(parsed.kind).toBe("modal_submit");
-  });
+  it.effect("parses modal submissions", () =>
+    Effect.gen(function* () {
+      const registration = makeDiscordProviderRegistration({
+        credentialResolver,
+        publicKey: publicKeyHex,
+      });
+      const interactions = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "interactions"
+      );
+      const rawBody = JSON.stringify({
+        id: "interaction_2",
+        application_id: "app_1",
+        type: 5,
+        data: {
+          custom_id: "feeblo:org_1:guild_1:channel_1",
+          components: [
+            {
+              type: 18,
+              component: { type: 4, custom_id: "title", value: "Dark mode" },
+            },
+            {
+              type: 18,
+              component: { type: 4, custom_id: "details", value: "Please" },
+            },
+            {
+              type: 18,
+              component: { type: 3, custom_id: "board", values: ["brd_1"] },
+            },
+          ],
+        },
+        guild_id: "guild_1",
+        channel_id: "channel_1",
+        member: { user: { id: "user_1", username: "alice" } },
+        token: "token_2",
+      });
+      const response = yield* interactions?.handle(signedHeaders(rawBody)) ??
+        Effect.never;
+      expect(response.status).toBe(200);
+      const parsed = response.body as { kind: string };
+      expect(parsed.kind).toBe("modal_submit");
+    })
+  );
 
-  it("rejects unsigned inbound requests", async () => {
-    const registration = makeDiscordProviderRegistration({
-      credentialResolver,
-      publicKey: publicKeyHex,
-    });
-    const interactions = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "interactions"
-    );
-    const response = await Effect.runPromise(
-      interactions?.handle({
+  it.effect("rejects unsigned inbound requests", () =>
+    Effect.gen(function* () {
+      const registration = makeDiscordProviderRegistration({
+        credentialResolver,
+        publicKey: publicKeyHex,
+      });
+      const interactions = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "interactions"
+      );
+      const response = yield* interactions?.handle({
         headers: {},
         rawBody: JSON.stringify({ type: 1 }),
-      }) ?? Effect.never
-    );
-    expect(response.status).toBe(401);
-  });
+      }) ?? Effect.never;
+      expect(response.status).toBe(401);
+    })
+  );
 
-  it("rejects malformed JSON inbound requests", async () => {
-    const registration = makeDiscordProviderRegistration({
-      credentialResolver,
-      publicKey: publicKeyHex,
-    });
-    const interactions = registration.inboundHandlers.find(
-      (candidate) => candidate.capabilityKey === "interactions"
-    );
-    const response = await Effect.runPromise(
-      interactions?.handle(signedHeaders("not-json")) ?? Effect.never
-    );
-    expect(response.status).toBe(400);
-  });
+  it.effect("rejects malformed JSON inbound requests", () =>
+    Effect.gen(function* () {
+      const registration = makeDiscordProviderRegistration({
+        credentialResolver,
+        publicKey: publicKeyHex,
+      });
+      const interactions = registration.inboundHandlers.find(
+        (candidate) => candidate.capabilityKey === "interactions"
+      );
+      const response = yield* interactions?.handle(signedHeaders("not-json")) ??
+        Effect.never;
+      expect(response.status).toBe(400);
+    })
+  );
 });

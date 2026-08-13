@@ -81,23 +81,30 @@ export type DiscordApplicationCommandPayload = Schema.Schema.Type<
   typeof DiscordApplicationCommandPayload
 >;
 
-/** One text input / select value submitted inside a modal. */
-export const DiscordModalComponentValue = Schema.Struct({
-  type: Schema.Literal(4),
-  custom_id: Schema.String,
-  value: Schema.String,
-});
+/** One text input or string-select value submitted inside a modal label. */
+export const DiscordModalComponentValue = Schema.Union([
+  Schema.Struct({
+    type: Schema.Literal(4),
+    custom_id: Schema.String,
+    value: Schema.String,
+  }),
+  Schema.Struct({
+    type: Schema.Literal(3),
+    custom_id: Schema.String,
+    values: Schema.Array(Schema.String),
+  }),
+]);
 export type DiscordModalComponentValue = Schema.Schema.Type<
   typeof DiscordModalComponentValue
 >;
 
-/** Modal submit data; `components[].components[]` carries the submitted values. */
+/** Modal submit data; each type-18 label wraps one submitted component. */
 export const DiscordModalSubmitData = Schema.Struct({
   custom_id: Schema.String,
   components: Schema.Array(
     Schema.Struct({
-      type: Schema.Literal(1),
-      components: Schema.Array(DiscordModalComponentValue),
+      type: Schema.Literal(18),
+      component: DiscordModalComponentValue,
     })
   ),
 });

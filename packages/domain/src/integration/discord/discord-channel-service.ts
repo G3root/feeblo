@@ -104,7 +104,7 @@ export const makeDiscordChannelServiceLive = (
             routeRows,
             (route) =>
               decodeProviderConfig(route.providerConfig).pipe(
-                Effect.map((config) => config.channelId)
+                Effect.map((routeConfig) => routeConfig.channelId)
               )
           );
           const enabledChannels = new Set(notificationChannels);
@@ -208,6 +208,7 @@ export const makeDiscordChannelServiceLive = (
                         channelId: input.channelId,
                         version: 1,
                       },
+                      safeDisplayMetadata: { channelName },
                       updatedAt: now,
                     })
                     .where(eq(schema.integrationRouteTable.id, route.id));

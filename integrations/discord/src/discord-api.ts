@@ -230,57 +230,67 @@ export interface DiscordApiClient {
   }) => Effect.Effect<void, DiscordApiFailure>;
 }
 
-/** Creates the Discord API client backed by Effect's fetch HTTP client. */
-export const makeDiscordApiClient = (): DiscordApiClient => {
-  const request = Effect.fn("DiscordApi.request")(function* (input: {
-    readonly httpRequest: HttpClientRequest.HttpClientRequest;
-    readonly context: string;
-  }) {
-    const response = yield* HttpClient.execute(input.httpRequest).pipe(
-      Effect.provide(FetchHttpClient.layer),
-      Effect.timeout(DISCORD_API_REQUEST_TIMEOUT_MS),
-      Effect.mapError(
-        () =>
-          new IntegrationProviderTemporaryFailure({
-            message: `Discord request failed during ${input.context}`,
-            provider: discordProviderKey,
-          })
+/** Creates a Discord API client, using the supplied HTTP client or fetch by default. */
+export const makeDiscordApiClient = (
+  httpClient?: HttpClient.HttpClient
+): DiscordApiClient => {
+  const request = Effect.fn("DiscordApi.request")(
+    (input: {
+      readonly httpRequest: HttpClientRequest.HttpClientRequest;
+      readonly context: string;
+    }) =>
+      Effect.gen(function* () {
+        const execute = HttpClient.execute(input.httpRequest);
+        const response = yield* (
+          httpClient === undefined
+            ? execute.pipe(Effect.provide(FetchHttpClient.layer))
+            : execute.pipe(
+                Effect.provideService(HttpClient.HttpClient, httpClient)
+              )
+        ).pipe(
+          Effect.mapError(
+            () =>
+              new IntegrationProviderTemporaryFailure({
+                message: `Discord request failed during ${input.context}`,
+                provider: discordProviderKey,
+              })
+          )
+        );
+        const status = response.status;
+        if (status < 200 || status >= 300) {
+          // Read every error response best-effort so status and Discord's error
+          // code participate in the same classification path.
+          const bodyResult = yield* Effect.result(response.json);
+          const body = Result.isSuccess(bodyResult)
+            ? bodyResult.success
+            : undefined;
+          return yield* classifyDiscordApiError(
+            { body, status },
+            input.context
+          );
+        }
+        return yield* response.json.pipe(
+          Effect.mapError(
+            () =>
+              new IntegrationProviderPermanentRejection({
+                message: `Discord returned an unexpected response during ${input.context}`,
+                provider: discordProviderKey,
+                httpStatus: status,
+              })
+          )
+        );
+      }).pipe(
+        Effect.timeout(DISCORD_API_REQUEST_TIMEOUT_MS),
+        Effect.catchTag(
+          "TimeoutError",
+          () =>
+            new IntegrationProviderTemporaryFailure({
+              message: `Discord request failed during ${input.context}`,
+              provider: discordProviderKey,
+            })
+        )
       )
-    );
-    const status = response.status;
-    // Discord signals rate limiting (429) and transient server errors (5xx)
-    // through the HTTP status even when the body is not JSON; classify those
-    // from the status alone before reading the body so a non-JSON error page
-    // cannot downgrade a retryable failure into a terminal rejection.
-    if (status === 429 || (status >= 500 && status < 600)) {
-      const bodyResult = yield* Effect.result(response.json);
-      const body = Result.isSuccess(bodyResult)
-        ? bodyResult.success
-        : undefined;
-      return yield* classifyDiscordApiError({ body, status }, input.context);
-    }
-    if (status < 200 || status >= 300) {
-      // Failed requests carry an error body with an application error code;
-      // read it best-effort so the classification can distinguish missing
-      // access from bad requests.
-      const bodyResult = yield* Effect.result(response.json);
-      const body = Result.isSuccess(bodyResult)
-        ? bodyResult.success
-        : undefined;
-      return yield* classifyDiscordApiError({ body, status }, input.context);
-    }
-    const body = yield* response.json.pipe(
-      Effect.mapError(
-        () =>
-          new IntegrationProviderPermanentRejection({
-            message: `Discord returned an unexpected response during ${input.context}`,
-            provider: discordProviderKey,
-            httpStatus: status,
-          })
-      )
-    );
-    return body;
-  });
+  );
 
   const jsonRequest = (
     method: "GET" | "POST" | "PUT",

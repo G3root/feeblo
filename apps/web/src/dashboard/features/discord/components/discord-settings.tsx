@@ -232,6 +232,7 @@ function DiscordConnectionFrame({
         connectionId: connection.id,
         organizationId,
       });
+      setDisconnecting(false);
       setDialogOpen(false);
       onDisconnected();
     } catch {

@@ -1,3 +1,4 @@
+import type { LegidFrom, WorkspaceId } from "@feeblo/id";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type { DiscordIntegrationError } from "./errors";
@@ -10,7 +11,7 @@ export interface DiscordManagementServiceShape {
     readonly code: string;
     readonly state: string;
   }) => Effect.Effect<
-    { readonly organizationId: string },
+    { readonly organizationId: LegidFrom<typeof WorkspaceId> },
     DiscordIntegrationError
   >;
   readonly connectStart: (

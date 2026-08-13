@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { isUniqueViolation } from "../../rpc-errors";
 import { DiscordInboundFailure } from "./errors";
 
 const SYNTHETIC_DISCORD_EMAIL_SUFFIX = "@discord.invalid";
@@ -76,7 +77,7 @@ export const makeDiscordUserServiceLive = (): Layer.Layer<
               id: createdUserId,
               name: truncate(displayName, 100),
             })
-            .pipe(Effect.ignore);
+            .pipe(Effect.catchIf(isUniqueViolation, () => Effect.void));
           // Concurrent submissions may create the same user; the insert
           // conflict is ignored and the winner is reused.
           const [winner] = yield* db
@@ -84,7 +85,12 @@ export const makeDiscordUserServiceLive = (): Layer.Layer<
             .from(schema.userTable)
             .where(eq(schema.userTable.email, syntheticEmail))
             .limit(1);
-          return winner?.id ?? createdUserId;
+          if (winner === undefined) {
+            return yield* new DiscordInboundFailure({
+              message: "Could not resolve the created Discord user",
+            });
+          }
+          return winner.id;
         }).pipe(
           Effect.mapError((error) =>
             error instanceof DiscordInboundFailure

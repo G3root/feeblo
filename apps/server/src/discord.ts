@@ -6,12 +6,14 @@ import {
   parseDiscordOAuthCallbackUrl,
 } from "@feeblo/domain/integration/discord";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
+import { DiscordOAuthState } from "@feeblo/integration-discord";
 import type { ParsedDiscordInboundRequest } from "@feeblo/integration-discord/inbound-schema";
 import { discordProviderKey } from "@feeblo/integration-discord/manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 import * as HttpHeaders from "effect/unstable/http/Headers";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
 import type * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
@@ -101,6 +103,15 @@ const settingsRedirect = (
   return `${base}?discord=${status}&message=${encodeURIComponent(message)}`;
 };
 
+const organizationIdFromOAuthState = (state: string | null) =>
+  state === null
+    ? undefined
+    : Option.getOrUndefined(
+        Schema.decodeUnknownOption(Schema.fromJsonString(DiscordOAuthState))(
+          state
+        ).pipe(Option.map(({ organizationId }) => organizationId))
+      );
+
 /** OAuth callback router; completes the install and redirects to the dashboard settings page. */
 export const makeDiscordOAuthCallbackRouter = () =>
   HttpRouter.use((router) =>
@@ -120,7 +131,8 @@ export const makeDiscordOAuthCallbackRouter = () =>
               settingsRedirect(
                 config.appUrl,
                 "error",
-                "Discord installation was cancelled or denied."
+                "Discord installation was cancelled or denied.",
+                organizationIdFromOAuthState(state)
               )
             );
           }
@@ -129,7 +141,8 @@ export const makeDiscordOAuthCallbackRouter = () =>
               settingsRedirect(
                 config.appUrl,
                 "error",
-                "Discord installation failed."
+                "Discord installation failed.",
+                organizationIdFromOAuthState(state)
               )
             );
           }

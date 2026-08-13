@@ -17,8 +17,8 @@ const DISCORD_SIGNATURE_PATTERN = /^[0-9a-f]{128}$/;
 /**
  * Verifies a Discord interaction request signature (`x-signature-ed25519`
  * over `x-signature-timestamp + rawBody`) against the application public key
- * and rejects requests older than the freshness window. Returns the verified
- * timestamp on success.
+ * and rejects requests older than the freshness window. Successful verification
+ * completes without a value.
  */
 export const verifyDiscordRequestSignature = ({
   rawBody,

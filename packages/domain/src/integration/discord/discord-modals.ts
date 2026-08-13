@@ -91,18 +91,22 @@ export const decodeModalMetadata = (
 /** Reads a submitted value from the modal submit payload by `custom_id`. */
 export const readModalValue = (
   components: readonly {
-    readonly type: 1;
-    readonly components: readonly {
-      readonly type: 4;
-      readonly custom_id: string;
-      readonly value: string;
-    }[];
+    readonly type: 18;
+    readonly component:
+      | { readonly type: 4; readonly custom_id: string; readonly value: string }
+      | {
+          readonly type: 3;
+          readonly custom_id: string;
+          readonly values: readonly string[];
+        };
   }[],
   customId: string
-): string | undefined =>
-  components[0]?.components.find(
-    (component) => component.custom_id === customId
-  )?.value;
+): string | undefined => {
+  const value = components
+    .map(({ component }) => component)
+    .find((component) => component.custom_id === customId);
+  return value?.type === 4 ? value.value : value?.values[0];
+};
 
 /**
  * Discord `MODAL` interaction response (callback type 9) that collects a
@@ -127,40 +131,45 @@ export const buildFeedbackModal = ({
     title: FEEDBACK_MODAL_TITLE,
     components: [
       {
-        type: 1,
-        components: [
-          {
-            type: 4,
-            custom_id: "title",
-            label: "Title",
-            style: 1,
-            required: true,
-            max_length: TITLE_MAX_LENGTH,
-            ...(initialTitle.length > 0
-              ? { value: truncate(initialTitle, TITLE_MAX_LENGTH) }
-              : {}),
-          },
-          {
-            type: 4,
-            custom_id: "details",
-            label: "Details",
-            style: 2,
-            required: false,
-            max_length: DETAILS_MAX_LENGTH,
-          },
-          {
-            type: 3,
-            custom_id: "board",
-            placeholder: "Choose a board",
-            required: true,
-            // Discord's string select accepts at most 25 options; cap the
-            // board list so the modal stays valid for large organizations.
-            options: boards.slice(0, BOARD_SELECT_MAX_OPTIONS).map((board) => ({
-              label: truncate(board.name, 75),
-              value: board.id,
-            })),
-          },
-        ],
+        type: 18,
+        label: "Title",
+        component: {
+          type: 4,
+          custom_id: "title",
+          style: 1,
+          required: true,
+          max_length: TITLE_MAX_LENGTH,
+          ...(initialTitle.length > 0
+            ? { value: truncate(initialTitle, TITLE_MAX_LENGTH) }
+            : {}),
+        },
+      },
+      {
+        type: 18,
+        label: "Details",
+        component: {
+          type: 4,
+          custom_id: "details",
+          style: 2,
+          required: false,
+          max_length: DETAILS_MAX_LENGTH,
+        },
+      },
+      {
+        type: 18,
+        label: "Board",
+        component: {
+          type: 3,
+          custom_id: "board",
+          placeholder: "Choose a board",
+          required: true,
+          // Discord's string select accepts at most 25 options; cap the
+          // board list so the modal stays valid for large organizations.
+          options: boards.slice(0, BOARD_SELECT_MAX_OPTIONS).map((board) => ({
+            label: truncate(board.name, 75),
+            value: board.id,
+          })),
+        },
       },
     ],
   },
