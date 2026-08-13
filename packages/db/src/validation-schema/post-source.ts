@@ -13,6 +13,7 @@ export const PostSource = S.Literals([
   "IMPORT",
   "PUBLIC_BOARD",
   "SLACK",
+  "DISCORD",
 ]);
 
 export type TPostSource = S.Schema.Type<typeof PostSource>;

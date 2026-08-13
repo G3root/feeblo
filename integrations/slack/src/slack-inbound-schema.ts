@@ -1,3 +1,4 @@
+import { IntegrationOAuthState } from "@feeblo/integration-core";
 import * as Schema from "effect/Schema";
 
 /** Slack slash-command payload (`application/x-www-form-urlencoded` decoded). */
@@ -145,16 +146,7 @@ export type ParsedSlackInboundRequest = Schema.Schema.Type<
   typeof ParsedSlackInboundRequest
 >;
 
-/**
- * OAuth state token passed through the Slack install flow. It is not a
- * secret; the connection lookup is additionally guarded by the encrypted
- * nonce stored on the pending connection row.
- */
-export const SlackOAuthState = Schema.Struct({
-  connectionId: Schema.String,
-  organizationId: Schema.String,
-  nonce: Schema.String,
-});
+export const SlackOAuthState = IntegrationOAuthState;
 export type SlackOAuthState = Schema.Schema.Type<typeof SlackOAuthState>;
 
 /** Canonical Slack interactive callback ids owned by Feeblo. */

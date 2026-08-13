@@ -282,6 +282,9 @@ importers:
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../../integrations/core
+      '@feeblo/integration-discord':
+        specifier: workspace:*
+        version: link:../../integrations/discord
       '@feeblo/integration-slack':
         specifier: workspace:*
         version: link:../../integrations/slack
@@ -563,6 +566,9 @@ importers:
       '@feeblo/id':
         specifier: workspace:*
         version: link:../../packages/id
+      '@feeblo/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0-beta.103(effect@4.0.0-beta.103))(@effect/sql-pglite@4.0.0-beta.103(effect@4.0.0-beta.103))(@electric-sql/pglite@0.5.4)(@opentelemetry/api@1.9.1)(@types/pg@8.20.4)(effect@4.0.0-beta.103)(pg@8.22.0)(postgres@3.4.9)(zod@4.4.3)
@@ -582,6 +588,37 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.2)(@vitest/browser-playwright@4.1.10)(happy-dom@20.11.1)(msw@2.15.0(@types/node@26.1.2)(typescript@6.0.3))(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.6)(yaml@2.9.0))
+
+  integrations/discord:
+    dependencies:
+      '@feeblo/integration-core':
+        specifier: workspace:*
+        version: link:../core
+      '@feeblo/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      effect:
+        specifier: 'catalog:'
+        version: 4.0.0-beta.103
+    devDependencies:
+      '@effect/vitest':
+        specifier: 4.0.0-beta.94
+        version: 4.0.0-beta.94(effect@4.0.0-beta.103)(vitest@4.1.10)
+      '@feeblo/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@feeblo/id':
+        specifier: workspace:*
+        version: link:../../packages/id
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(happy-dom@20.11.1)(msw@2.15.0(@types/node@24.13.3)(typescript@6.0.3))(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.6)(yaml@2.9.0))
 
   integrations/slack:
     dependencies:
@@ -822,6 +859,9 @@ importers:
       '@feeblo/integration-core':
         specifier: workspace:*
         version: link:../../integrations/core
+      '@feeblo/integration-discord':
+        specifier: workspace:*
+        version: link:../../integrations/discord
       '@feeblo/integration-slack':
         specifier: workspace:*
         version: link:../../integrations/slack
