@@ -1,0 +1,32 @@
+{
+  "name": "@feeblo/integration-github",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/github-manifest.ts",
+    "./credentials": "./src/github-credentials.ts",
+    "./signature": "./src/github-signature.ts",
+    "./inbound-schema": "./src/github-inbound-schema.ts",
+    "./provider-registration": "./src/github-provider-registration.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@distilled.cloud/github": "1.0.0-rc.4",
+    "@feeblo/integration-core": "workspace:*",
+    "effect": "catalog:",
+    "jose": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@feeblo/config": "workspace:*",
+    "@feeblo/id": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

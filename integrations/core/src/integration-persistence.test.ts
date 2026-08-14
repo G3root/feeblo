@@ -14,6 +14,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import {
+  IntegrationCapabilityKey,
   IntegrationEventRecorder,
   IntegrationProviderKey,
 } from "./integration-contracts";
@@ -24,40 +25,45 @@ const TestLayer = IntegrationEventRecorderLive.pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive)
 );
 
-const seedRoute = Effect.gen(function* () {
-  const db = yield* currentDb;
-  const organizationId = yield* WorkspaceId.generate;
-  const connectionId = yield* IntegrationConnectionId.generate;
-  const routeId = yield* IntegrationRouteId.generate;
-  yield* db.insert(schema.organizationTable).values({
-    createdAt: new Date(),
-    id: organizationId,
-    name: "Integration persistence test",
-    slug: organizationId,
+const seedRoute = ({
+  capabilityKey = "events.post",
+}: {
+  readonly capabilityKey?: string;
+} = {}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const organizationId = yield* WorkspaceId.generate;
+    const connectionId = yield* IntegrationConnectionId.generate;
+    const routeId = yield* IntegrationRouteId.generate;
+    yield* db.insert(schema.organizationTable).values({
+      createdAt: new Date(),
+      id: organizationId,
+      name: "Integration persistence test",
+      slug: organizationId,
+    });
+    yield* db.insert(schema.integrationConnectionTable).values({
+      credentialGeneration: 1,
+      credentialsCiphertext: "encrypted-test-value",
+      id: connectionId,
+      lifecycle: "active",
+      name: "Test endpoint",
+      organizationId,
+      provider: IntegrationProviderKey.make("webhook"),
+      safeDisplayMetadata: { hostname: "example.com" },
+    });
+    yield* db.insert(schema.integrationRouteTable).values({
+      capabilityKey: IntegrationCapabilityKey.make(capabilityKey),
+      configVersion: 1,
+      connectionId,
+      enabled: true,
+      eventTypes: ["feedback.post.created"],
+      id: routeId,
+      organizationId,
+      providerConfig: {},
+      safeDisplayMetadata: {},
+    });
+    return { connectionId, organizationId, routeId };
   });
-  yield* db.insert(schema.integrationConnectionTable).values({
-    credentialGeneration: 1,
-    credentialsCiphertext: "encrypted-test-value",
-    id: connectionId,
-    lifecycle: "active",
-    name: "Test endpoint",
-    organizationId,
-    provider: IntegrationProviderKey.make("webhook"),
-    safeDisplayMetadata: { hostname: "example.com" },
-  });
-  yield* db.insert(schema.integrationRouteTable).values({
-    capabilityKey: "events.post",
-    configVersion: 1,
-    connectionId,
-    enabled: true,
-    eventTypes: ["feedback.post.created"],
-    id: routeId,
-    organizationId,
-    providerConfig: {},
-    safeDisplayMetadata: {},
-  });
-  return { connectionId, organizationId, routeId };
-});
 
 const makePostCreatedEvent = Effect.gen(function* () {
   const id = yield* IntegrationEventId.generate;
@@ -97,7 +103,7 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const route = yield* seedRoute;
+          const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           const event = {
             ...input.event,
@@ -135,10 +141,10 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository([
-            "events.post",
-          ]);
-          const route = yield* seedRoute;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["events.post"]]])
+          );
+          const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           const event = {
             ...input.event,
@@ -196,7 +202,7 @@ describe("integration persistence", () => {
       () =>
         Effect.gen(function* () {
           const recorder = yield* IntegrationEventRecorder;
-          const route = yield* seedRoute;
+          const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           yield* transaction(
             recorder.recordIntegrationEvent({
@@ -204,9 +210,9 @@ describe("integration persistence", () => {
             })
           );
 
-          const kernel = yield* makeIntegrationDeliveryWorkerRepository([
-            "other.capability",
-          ]);
+          const kernel = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["other.capability"]]])
+          );
           const unclaimed = yield* kernel.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "kernel-only",
@@ -214,9 +220,9 @@ describe("integration persistence", () => {
           });
           expect(unclaimed).toHaveLength(0);
 
-          const webhookKernel = yield* makeIntegrationDeliveryWorkerRepository([
-            "events.post",
-          ]);
+          const webhookKernel = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["events.post"]]])
+          );
           const claimed = yield* webhookKernel.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "webhook-kernel",
@@ -227,15 +233,70 @@ describe("integration persistence", () => {
     );
 
     it.effect(
+      "claims only provider-owned capability keys and rejects unknown or cross-provider keys",
+      () =>
+        Effect.gen(function* () {
+          const recorder = yield* IntegrationEventRecorder;
+          const valid = yield* seedRoute();
+          const crossProvider = yield* seedRoute({ capabilityKey: "commands" });
+          const unknown = yield* seedRoute({
+            capabilityKey: "unknown.capability",
+          });
+          const validEvent = yield* makePostCreatedEvent;
+          const crossProviderEvent = yield* makePostCreatedEvent;
+          const unknownEvent = yield* makePostCreatedEvent;
+          yield* transaction(
+            recorder.recordIntegrationEvent({
+              event: {
+                ...validEvent.event,
+                organizationId: valid.organizationId,
+              },
+            })
+          );
+          yield* transaction(
+            recorder.recordIntegrationEvent({
+              event: {
+                ...crossProviderEvent.event,
+                organizationId: crossProvider.organizationId,
+              },
+            })
+          );
+          yield* transaction(
+            recorder.recordIntegrationEvent({
+              event: {
+                ...unknownEvent.event,
+                organizationId: unknown.organizationId,
+              },
+            })
+          );
+
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([
+              ["webhook", ["events.post"]],
+              ["slack", ["commands"]],
+            ])
+          );
+          const claimed = yield* repository.claimDueDeliveries({
+            leaseDurationMs: 60_000,
+            leaseOwner: "provider-aware",
+            limit: 10,
+          });
+
+          expect(claimed).toHaveLength(1);
+          expect(claimed[0]?.input.route.id).toBe(valid.routeId);
+        })
+    );
+
+    it.effect(
       "requeues expired leases and preserves the stable delivery ID",
       () =>
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository([
-            "events.post",
-          ]);
-          const route = yield* seedRoute;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["events.post"]]])
+          );
+          const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           const event = {
             ...input.event,
@@ -316,10 +377,10 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository([
-            "events.post",
-          ]);
-          const route = yield* seedRoute;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["events.post"]]])
+          );
+          const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           yield* transaction(
             recorder.recordIntegrationEvent({
@@ -366,10 +427,10 @@ describe("integration persistence", () => {
       () =>
         Effect.gen(function* () {
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository([
-            "events.post",
-          ]);
-          const route = yield* seedRoute;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["events.post"]]])
+          );
+          const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           yield* transaction(
             recorder.recordIntegrationEvent({
@@ -401,10 +462,10 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository([
-            "events.post",
-          ]);
-          const route = yield* seedRoute;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["events.post"]]])
+          );
+          const route = yield* seedRoute();
           for (let count = 0; count < 11; count++) {
             const input = yield* makePostCreatedEvent;
             yield* transaction(
@@ -461,10 +522,10 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
-          const repository = yield* makeIntegrationDeliveryWorkerRepository([
-            "events.post",
-          ]);
-          const route = yield* seedRoute;
+          const repository = yield* makeIntegrationDeliveryWorkerRepository(
+            new Map([["webhook", ["events.post"]]])
+          );
+          const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           const event = {
             ...input.event,

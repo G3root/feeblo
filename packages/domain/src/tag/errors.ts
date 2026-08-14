@@ -7,25 +7,25 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class FailedToCreateTagError extends Schema.TaggedErrorClass<FailedToCreateTagError>()(
+export class FailedToCreateTagError extends Schema.TaggedError<FailedToCreateTagError>()(
   "FailedToCreateTagError",
   {},
   { httpApiStatus: 500, identifier: "FailedToCreateTagError" }
 ) {}
 
-export class FailedToUpdateTagError extends Schema.TaggedErrorClass<FailedToUpdateTagError>()(
+export class FailedToUpdateTagError extends Schema.TaggedError<FailedToUpdateTagError>()(
   "FailedToUpdateTagError",
   {},
   { httpApiStatus: 500, identifier: "FailedToUpdateTagError" }
 ) {}
 
-export class FailedToDeleteTagError extends Schema.TaggedErrorClass<FailedToDeleteTagError>()(
+export class FailedToDeleteTagError extends Schema.TaggedError<FailedToDeleteTagError>()(
   "FailedToDeleteTagError",
   {},
   { httpApiStatus: 500, identifier: "FailedToDeleteTagError" }
 ) {}
 
-export class FailedToSetTagAssignmentsError extends Schema.TaggedErrorClass<FailedToSetTagAssignmentsError>()(
+export class FailedToSetTagAssignmentsError extends Schema.TaggedError<FailedToSetTagAssignmentsError>()(
   "FailedToSetTagAssignmentsError",
   {},
   { httpApiStatus: 500, identifier: "FailedToSetTagAssignmentsError" }

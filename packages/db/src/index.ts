@@ -9,3 +9,4 @@ export {
   DEFAULT_POST_EMBEDDING_DIMENSIONS,
   ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
 } from "./schema/feedback";
+export { gitHubIssueSafeMetadataConditions } from "./schema/integration";

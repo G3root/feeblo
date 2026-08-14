@@ -8,7 +8,7 @@ import type {
 } from "./integration-contracts";
 
 /** Startup failure when a statically registered provider does not meet its manifest contract. */
-export class IntegrationProviderRegistryValidationError extends Schema.TaggedErrorClass<IntegrationProviderRegistryValidationError>()(
+export class IntegrationProviderRegistryValidationError extends Schema.TaggedError<IntegrationProviderRegistryValidationError>()(
   "IntegrationProviderRegistryValidationError",
   {
     capabilityKey: Schema.optionalKey(Schema.String),

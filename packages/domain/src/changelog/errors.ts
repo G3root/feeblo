@@ -3,19 +3,19 @@ import * as Schema from "effect/Schema";
 import { PolicyDeniedError } from "../policy";
 import { InternalServerError, UnauthorizedError } from "../rpc-errors";
 
-export class FailedToCreateChangelogError extends Schema.TaggedErrorClass<FailedToCreateChangelogError>()(
+export class FailedToCreateChangelogError extends Schema.TaggedError<FailedToCreateChangelogError>()(
   "FailedToCreateChangelogError",
   {},
   { httpApiStatus: 500, identifier: "FailedToCreateChangelogError" }
 ) {}
 
-export class FailedToDeleteChangelogError extends Schema.TaggedErrorClass<FailedToDeleteChangelogError>()(
+export class FailedToDeleteChangelogError extends Schema.TaggedError<FailedToDeleteChangelogError>()(
   "FailedToDeleteChangelogError",
   {},
   { httpApiStatus: 500, identifier: "FailedToDeleteChangelogError" }
 ) {}
 
-export class FailedToUpdateChangelogError extends Schema.TaggedErrorClass<FailedToUpdateChangelogError>()(
+export class FailedToUpdateChangelogError extends Schema.TaggedError<FailedToUpdateChangelogError>()(
   "FailedToUpdateChangelogError",
   {},
   { httpApiStatus: 500, identifier: "FailedToUpdateChangelogError" }

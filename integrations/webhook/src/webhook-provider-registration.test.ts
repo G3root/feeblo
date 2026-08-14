@@ -20,7 +20,7 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { Webhook } from "standardwebhooks";
 import { startTestServer } from "./test-server";
-import { webhookProviderKey } from "./webhook-manifest";
+import { webhookEventsPostCapabilityKey, webhookProviderKey } from "./webhook-manifest";
 import { WebhookExternalPayload } from "./webhook-payload";
 import { makeWebhookProviderRegistration } from "./webhook-provider-registration";
 
@@ -102,7 +102,7 @@ const makeDeliveryFixture = () =>
         version: 1,
       },
       route: {
-        capabilityKey: "events.post",
+        capabilityKey: webhookEventsPostCapabilityKey,
         configVersion: 1,
         connectionId,
         enabled: true,
@@ -148,7 +148,7 @@ describe("webhook provider registration", () => {
     expect(
       registry.getHandler({
         provider: webhookProviderKey,
-        capabilityKey: "events.post",
+        capabilityKey: webhookEventsPostCapabilityKey,
       })
     ).toBeDefined();
   });

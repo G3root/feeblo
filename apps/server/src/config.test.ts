@@ -9,6 +9,7 @@ import { ServerConfig } from "./config";
 const requiredServerEnvironment = {
   APP_ROOT_DOMAIN: "example.test",
   APP_URL: "https://example.test",
+  AUTH_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
   API_URL: "https://api.example.test",
 };
 

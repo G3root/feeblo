@@ -12,4 +12,4 @@ The transaction ends before any provider request. This yields at-least-once deli
 
 ## Consequences
 
-V1 has only signed outbound custom webhooks. Inbox events, bindings, and bidirectional synchronization remain future concepts and are not represented as implemented behavior here.
+V1 initially shipped only signed outbound custom webhooks. Inbox events and post-to-external-resource bindings arrived with the GitHub provider: a signature-verified, delivery-deduplicated issue webhook feeds organization-owned sync rules, and provider-owned issues are recorded as external-resource links on posts. Bidirectional synchronization (field ownership and conflict handling) remains a future concept.

@@ -142,6 +142,7 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
               yield* recordPostIntegrationEvent({
                 actor: { kind: "end_user" },
                 boardId: asLegid(BoardId)(boardId),
+                description: sanitizedMarkdown,
                 eventType: "feedback.post.created",
                 organizationId: asLegid(WorkspaceId)(organizationId),
                 postId: id,

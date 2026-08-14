@@ -17,11 +17,14 @@ catalog:
   "@better-auth/utils": ^0.4.0
   "@cloudflare/workers-types": ^4.20260702.1
   "@dotenvx/dotenvx": ^1.75.1
-  "@effect-aws/client-s3": ^2.0.0-beta.4
-  "@effect-aws/s3": ^1.0.0-beta.4
-  "@effect/platform-node": ^4.0.0-beta.66
-  "@effect/sql-pg": ^4.0.0-beta.66
-  "@effect/sql-pglite": ^4.0.0-beta.66
+  "@effect-aws/client-s3": 2.0.0-beta.6
+  "@effect-aws/s3": 1.0.0-beta.5
+  "@effect/ai-openai": 4.0.0-beta.107
+  "@effect/atom-react": 4.0.0-beta.107
+  "@effect/platform-node": 4.0.0-beta.107
+  "@effect/sql-pg": 4.0.0-beta.107
+  "@effect/sql-pglite": 4.0.0-beta.107
+  "@effect/vitest": 4.0.0-beta.107
   "@floating-ui/dom": ^1.8.0
   "@polar-sh/better-auth": ^1.8.3
   "@polar-sh/sdk": ^0.47.1
@@ -42,9 +45,9 @@ catalog:
   clsx: ^2.1.1
   dotenv: ^17.2.2
   drizzle-kit: 1.0.0-rc.4
-  drizzle-orm: 1.0.0-rc.4
+  drizzle-orm: 1.0.0-rc.5-169397b
   drizzle-seed: 1.0.0-rc.4
-  effect: ^4.0.0-beta.66
+  effect: 4.0.0-beta.107
   jose: ^6.2.3
   postgres: ^3.4.7
   react: ^19.2.8
@@ -65,4 +68,5 @@ catalog:
 nodeLinker: hoisted
 overrides:
   prosemirror-model: ^1.25.9
+  "@effect/platform-node-shared": 4.0.0-beta.107
 

@@ -1,5 +1,8 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
-import type { TIntegrationCapabilityKey } from "@feeblo/db/validation-schema/integration";
+import type {
+  TIntegrationCapabilityKey,
+  TIntegrationProviderKey,
+} from "@feeblo/db/validation-schema/integration";
 import {
   asLegid,
   IntegrationConnectionId,
@@ -9,7 +12,7 @@ import {
   IntegrationRouteId,
   WorkspaceId,
 } from "@feeblo/id";
-import { and, eq, gt, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Random from "effect/Random";
@@ -20,6 +23,7 @@ import {
   IntegrationConnection,
   IntegrationDelivery,
   IntegrationEventEnvelopeV1,
+  type IntegrationExternalResourceDraft,
   IntegrationRoute,
 } from "./integration-contracts";
 import {
@@ -70,11 +74,16 @@ const mapPersistenceError = <A, E, R>(
 
 /**
  * PostgreSQL persistence boundary for lease ownership; it never performs
- * provider I/O. Deliveries are claimed only for the supplied outbound
- * capability keys, which the startup-validated provider registry owns.
+ * provider I/O. Deliveries are claimed only for capabilities owned by the
+ * matching provider, which the startup-validated provider registry supplies.
  */
 export const makeIntegrationDeliveryWorkerRepository = (
-  claimableCapabilityKeys: readonly string[]
+  claimableCapabilityKeysByProvider: ReadonlyMap<string, readonly string[]>,
+  recordExternalResourceDrafts?: (input: {
+    readonly connection: IntegrationConnection;
+    readonly drafts: readonly IntegrationExternalResourceDraft[];
+    readonly event: IntegrationEventEnvelopeV1;
+  }) => Effect.Effect<void, IntegrationDeliveryWorkerPersistenceError>
 ): Effect.Effect<
   IntegrationDeliveryWorkerRepository,
   never,
@@ -189,6 +198,24 @@ export const makeIntegrationDeliveryWorkerRepository = (
           "claim_due_deliveries",
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+            const providerCapabilityConditions = Array.from(
+              claimableCapabilityKeysByProvider.entries()
+            ).map(([provider, keys]) =>
+              and(
+                eq(
+                  schema.integrationConnectionTable.provider,
+                  provider as TIntegrationProviderKey
+                ),
+                inArray(
+                  schema.integrationRouteTable.capabilityKey,
+                  // SAFETY: the claimable keys come from the
+                  // startup-validated provider registry, which constrains
+                  // them to the canonical capability vocabulary; unknown or
+                  // cross-provider keys simply never match a stored route.
+                  keys as readonly TIntegrationCapabilityKey[]
+                )
+              )
+            );
             const [backlog] = yield* db
               .select({ count: sql<number>`count(*)` })
               .from(schema.integrationDeliveryTable)
@@ -226,14 +253,9 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       lte(schema.integrationDeliveryTable.nextAttemptAt, now),
                       eq(schema.integrationConnectionTable.lifecycle, "active"),
                       eq(schema.integrationRouteTable.enabled, true),
-                      inArray(
-                        schema.integrationRouteTable.capabilityKey,
-                        // SAFETY: the claimable keys come from the
-                        // startup-validated provider registry, which constrains
-                        // them to the canonical capability vocabulary; unknown
-                        // keys simply never match a stored route capability.
-                        claimableCapabilityKeys as readonly TIntegrationCapabilityKey[]
-                      )
+                      providerCapabilityConditions.length === 0
+                        ? sql`false`
+                        : or(...providerCapabilityConditions)
                     )
                   )
                   .orderBy(schema.integrationDeliveryTable.nextAttemptAt)
@@ -349,7 +371,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
         );
 
     const persistDeliveryResult: IntegrationDeliveryWorkerRepository["persistDeliveryResult"] =
-      ({ claimed, errorTag, httpStatus, outcome }) =>
+      ({ claimed, errorTag, externalResourceDrafts, httpStatus, outcome }) =>
         mapPersistenceError(
           "persist_delivery_result",
           db.transaction(() =>
@@ -424,6 +446,21 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   );
               }
               if (decision._tag === "Succeeded") {
+                if (
+                  externalResourceDrafts !== undefined &&
+                  externalResourceDrafts.length > 0
+                ) {
+                  if (recordExternalResourceDrafts === undefined) {
+                    return yield* persistenceError(
+                      "record_external_resource_drafts"
+                    );
+                  }
+                  yield* recordExternalResourceDrafts({
+                    connection: claimed.input.connection,
+                    drafts: externalResourceDrafts,
+                    event: claimed.input.event,
+                  });
+                }
                 yield* db
                   .update(schema.integrationDeliveryTable)
                   .set({

@@ -51,7 +51,7 @@ export type ProviderLifecycleEvent = Schema.Schema.Type<
   typeof ProviderLifecycleEvent
 >;
 
-export class EmailProviderFeedbackInputError extends Schema.TaggedErrorClass<EmailProviderFeedbackInputError>()(
+export class EmailProviderFeedbackInputError extends Schema.TaggedError<EmailProviderFeedbackInputError>()(
   "EmailProviderFeedbackInputError",
   {
     message: Schema.String,
@@ -60,7 +60,7 @@ export class EmailProviderFeedbackInputError extends Schema.TaggedErrorClass<Ema
   }
 ) {}
 
-export class EmailProviderFeedbackDataError extends Schema.TaggedErrorClass<EmailProviderFeedbackDataError>()(
+export class EmailProviderFeedbackDataError extends Schema.TaggedError<EmailProviderFeedbackDataError>()(
   "EmailProviderFeedbackDataError",
   {
     cause: Schema.optionalKey(Schema.Defect()),

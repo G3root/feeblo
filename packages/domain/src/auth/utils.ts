@@ -16,21 +16,21 @@ const VerificationOTPStateFromJson = Schema.fromJsonString(
   VerificationOTPStateSchema
 );
 
-class VerificationOTPEncryptionError extends Schema.TaggedErrorClass<VerificationOTPEncryptionError>()(
+class VerificationOTPEncryptionError extends Schema.TaggedError<VerificationOTPEncryptionError>()(
   "VerificationOTPEncryptionError",
   {
     cause: Schema.Defect(),
   }
 ) {}
 
-class VerificationOTPDecryptionError extends Schema.TaggedErrorClass<VerificationOTPDecryptionError>()(
+class VerificationOTPDecryptionError extends Schema.TaggedError<VerificationOTPDecryptionError>()(
   "VerificationOTPDecryptionError",
   {
     cause: Schema.Defect(),
   }
 ) {}
 
-class InvalidVerificationOTPStateError extends Schema.TaggedErrorClass<InvalidVerificationOTPStateError>()(
+class InvalidVerificationOTPStateError extends Schema.TaggedError<InvalidVerificationOTPStateError>()(
   "InvalidVerificationOTPStateError",
   {
     cause: Schema.optional(Schema.Defect()),

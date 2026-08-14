@@ -24,6 +24,8 @@ import {
   DiscordChannelNotificationRouteConfiguration,
   DiscordConnectionConfiguration,
   DiscordInboundRouteConfiguration,
+  discordChannelNotificationsCapabilityKey,
+  discordInteractionsCapabilityKey,
   discordProviderKey,
   discordProviderManifest,
 } from "./discord-manifest";
@@ -105,7 +107,7 @@ const makeDiscordInteractionsHandler = ({
 }: {
   readonly publicKey: string;
 }): IntegrationInboundCapabilityHandler => ({
-  capabilityKey: "interactions",
+  capabilityKey: discordInteractionsCapabilityKey,
   handle: (input: IntegrationInboundRequest) =>
     Effect.gen(function* () {
       const verified = yield* Effect.result(
@@ -153,7 +155,7 @@ export const makeDiscordProviderRegistration = ({
   readonly publicKey: string;
 }): IntegrationProviderRegistration => {
   const channelNotificationsHandler = {
-    capabilityKey: "channel.notifications" as const,
+    capabilityKey: discordChannelNotificationsCapabilityKey,
     deliver: (input: IntegrationProviderDeliveryInput) =>
       Effect.gen(function* () {
         if (input.event.type !== "feedback.post.created") {
@@ -222,8 +224,8 @@ export const makeDiscordProviderRegistration = ({
     inboundHandlers: [makeDiscordInteractionsHandler({ publicKey })],
     manifest: discordProviderManifest,
     routeConfigurationSchemas: new Map([
-      ["channel.notifications", DiscordChannelNotificationRouteConfiguration],
-      ["interactions", DiscordInboundRouteConfiguration],
+      [discordChannelNotificationsCapabilityKey, DiscordChannelNotificationRouteConfiguration],
+      [discordInteractionsCapabilityKey, DiscordInboundRouteConfiguration],
     ]),
   };
 };

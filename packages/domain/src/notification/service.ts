@@ -195,6 +195,41 @@ const makeNotificationService = Effect.gen(function* () {
         });
       }),
 
+    /** Notifies only members who upvoted a post; upvoting intentionally does not imply subscription. */
+    notifyPostStatusChangedUpvoters: ({
+      actorMemberId,
+      organizationId,
+      postId,
+      deduplicationKey,
+    }: PostNotificationInput & { readonly deduplicationKey: string }) =>
+      Effect.gen(function* () {
+        const context = yield* getPostContext({ organizationId, postId });
+        if (!context) {
+          return;
+        }
+        const upvoters = yield* db
+          .select({ memberId: schema.upvoteTable.memberId })
+          .from(schema.upvoteTable)
+          .where(
+            and(
+              eq(schema.upvoteTable.organizationId, organizationId),
+              eq(schema.upvoteTable.postId, postId)
+            )
+          );
+        yield* create({
+          ...(actorMemberId === undefined ? {} : { actorMemberId }),
+          organizationId,
+          recipientMemberIds: upvoters.map((upvoter) => upvoter.memberId),
+          kind: "feedback.status_changed",
+          resourceType: "post",
+          resourceId: postId,
+          title: "Feedback status updated",
+          body: context.title,
+          href: `/${organizationId}/post/${context.boardSlug}/${context.slug}`,
+          deduplicationKey,
+        });
+      }),
+
     list: ({
       organizationId,
       recipientMemberId,

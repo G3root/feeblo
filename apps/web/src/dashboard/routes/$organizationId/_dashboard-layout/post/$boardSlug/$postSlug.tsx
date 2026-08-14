@@ -11,6 +11,7 @@ import {
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   Activity01Icon,
   Calendar03Icon,
@@ -22,6 +23,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
+import { GitHubPostResourceActions } from "~/features/github/components/post-github-actions";
+import { PostExternalResources } from "~/features/integrations/components/post-external-resources";
 import { PostActivityList } from "~/features/post/components/post-activity-list";
 import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostEtaField } from "~/features/post/components/post-eta-field";
@@ -63,6 +66,12 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
+  // The linked-resources panel and its GitHub actions are read/written through
+  // RPCs that require integrations.manage, so gate them the same way the
+  // settings route does instead of rendering actions that will 403.
+  const githubResourcesPolicy = usePolicy(
+    hasPermission(organizationId, "integrations.manage")
+  );
 
   const { data: postRow, isLoading: isPostLoading } = useLiveQuery(
     (q) => {
@@ -180,6 +189,20 @@ function RouteComponent() {
         <aside className="px-6 py-6">
           <div className="space-y-4 lg:sticky lg:top-0">
             <PostSidebarActions />
+
+            {githubResourcesPolicy.isPending ||
+            !githubResourcesPolicy.allowed ? null : (
+              <PostExternalResources
+                actions={
+                  <GitHubPostResourceActions
+                    organizationId={organizationId}
+                    postId={post.id}
+                  />
+                }
+                organizationId={organizationId}
+                postId={post.id}
+              />
+            )}
 
             {/* Each field self-gates with the permission the backend enforces
                 (PostPolicy.canUpdateProperties): status → posts.status,

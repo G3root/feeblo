@@ -8,7 +8,10 @@ import {
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
 import { DiscordOAuthState } from "@feeblo/integration-discord";
 import type { ParsedDiscordInboundRequest } from "@feeblo/integration-discord/inbound-schema";
-import { discordProviderKey } from "@feeblo/integration-discord/manifest";
+import {
+  discordInteractionsCapabilityKey,
+  discordProviderKey,
+} from "@feeblo/integration-discord/manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -55,7 +58,7 @@ const handleInteraction = (
 ) =>
   Effect.gen(function* () {
     const inboundHandler = registry.getInboundHandler({
-      capabilityKey: "interactions",
+      capabilityKey: discordInteractionsCapabilityKey,
       provider: discordProviderKey,
     });
     if (inboundHandler === undefined) {

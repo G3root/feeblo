@@ -32,7 +32,7 @@ export const EmailAddress = EmailAddressValue;
 
 export type EmailAddress = Schema.Schema.Type<typeof EmailAddress>;
 
-export class EmailSubscriptionInputError extends Schema.TaggedErrorClass<EmailSubscriptionInputError>()(
+export class EmailSubscriptionInputError extends Schema.TaggedError<EmailSubscriptionInputError>()(
   "EmailSubscriptionInputError",
   {
     operation: Schema.String,
@@ -40,7 +40,7 @@ export class EmailSubscriptionInputError extends Schema.TaggedErrorClass<EmailSu
   }
 ) {}
 
-export class EmailSubscriptionDataError extends Schema.TaggedErrorClass<EmailSubscriptionDataError>()(
+export class EmailSubscriptionDataError extends Schema.TaggedError<EmailSubscriptionDataError>()(
   "EmailSubscriptionDataError",
   {
     operation: Schema.String,

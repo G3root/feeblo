@@ -26,7 +26,7 @@ import {
   recordEmailReconciliationRecoveries,
 } from "./telemetry";
 
-export class EmailOutboxDataError extends Schema.TaggedErrorClass<EmailOutboxDataError>()(
+export class EmailOutboxDataError extends Schema.TaggedError<EmailOutboxDataError>()(
   "EmailOutboxDataError",
   {
     operation: Schema.String,

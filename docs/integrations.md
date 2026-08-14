@@ -24,7 +24,16 @@ Application-wide credentials differ from Slack: the bot token and interaction pu
 
 Inbound requests are signature-verified (Ed25519, `X-Signature-Ed25519` over `X-Signature-Timestamp + body`, 5-minute freshness window) by the provider before any domain work. The server mounts `/discord/oauth/callback` and `/discord/interactions`. The dashboard settings page (`/$organizationId/settings/integrations/discord`, `integrations.manage`) handles server connect/disconnect and per-channel notification toggles.
 
-Linear, HubSpot, inbox processing, bindings, bidirectional synchronization, and in-modal similar-request upvoting are future phases, not packages or capabilities supplied by V1.
+## GitHub provider
+
+`integrations/github` implements the GitHub provider (`github`, GitHub App, `github_app` connection mode) — the first provider to supply inbound and binding behavior:
+
+- **`github.issue.create`** (outbound) — creating and linking GitHub issues from Feeblo posts; a created issue carries the post's title and description, and the bot comments a Feeblo backlink ("The issue is linked to our feedback platform. For feedback and updates, please visit [this link](…)") on both created and linked issues. Issues produced by a delivery are recorded as provider-neutral external-resource links on the post.
+- **`github.issue.webhook`** (inbound) — the global App webhook (`/github/app/webhooks`) is signature-verified and deduplicated by GitHub delivery ID before any domain work; issue state changes map to Feeblo post statuses through organization-owned sync rules and may notify the post's upvoters.
+
+External resources are the V1 form of bindings: `integration_external_resource` / `post_external_resource_link` (and `packages/domain`'s provider-neutral `external-resource` service) hold one-to-many links from a Feeblo post to provider-owned resources. The server mounts `/github/app/installations/callback` and `/github/app/webhooks`; installation access tokens are never stored, and the App credentials (ID, client ID/secret, private key, webhook secret) live in configuration. The dashboard settings page (`/$organizationId/settings/integrations/github`, `integrations.manage`) handles App installation and issue-sync rules; the per-post create/link actions and linked-resource panel are gated on the same `integrations.manage` permission. Sync rules are hard-wired to two shapes per connection — (any, open) sets a status when any linked issue is open, (all, closed) sets one when every linked issue is closed — at most one rule per shape and each individually disableable. The two shapes can never match the same issue aggregate, so rule application is deterministic.
+
+Linear and HubSpot providers, bidirectional synchronization (field ownership, conflict handling, and reconciliation), and in-modal similar-request upvoting remain future phases.
 
 ## Operations
 

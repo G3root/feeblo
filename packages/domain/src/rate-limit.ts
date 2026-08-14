@@ -32,13 +32,13 @@ export interface PublicRpcRateLimitOptions {
   readonly window?: Duration.Input;
 }
 
-export class RateLimitExceededError extends Schema.TaggedErrorClass<RateLimitExceededError>()(
+export class RateLimitExceededError extends Schema.TaggedError<RateLimitExceededError>()(
   "RateLimitExceededError",
   {},
   { httpApiStatus: 429, identifier: "RateLimitExceededError" }
 ) {}
 
-export class RateLimitUnavailableError extends Schema.TaggedErrorClass<RateLimitUnavailableError>()(
+export class RateLimitUnavailableError extends Schema.TaggedError<RateLimitUnavailableError>()(
   "RateLimitUnavailableError",
   {},
   { httpApiStatus: 503, identifier: "RateLimitUnavailableError" }

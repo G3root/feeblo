@@ -22,10 +22,15 @@ import {
   emailOutboxTable,
   emailProviderEventTable,
   emailSubscriptionTable,
+  externalResourceCreateRequestTable,
+  githubInstallationTable,
+  githubSyncRuleTable,
+  githubWebhookDeliveryTable,
   integrationConnectionTable,
   integrationDeliveryAttemptTable,
   integrationDeliveryTable,
   integrationEventTable,
+  integrationExternalResourceTable,
   integrationRouteTable,
   invitationTable,
   jwtSecretTable,
@@ -33,6 +38,7 @@ import {
   organizationTable,
   postActivityTable,
   postAssetTable,
+  postExternalResourceLinkTable,
   postReactionTable,
   postStatusTable,
   postSubscriptionTable,
@@ -66,10 +72,16 @@ export const relations = defineRelations(
     memberTable,
     invitationTable,
     integrationConnectionTable,
+    githubInstallationTable,
     integrationRouteTable,
     integrationEventTable,
     integrationDeliveryTable,
     integrationDeliveryAttemptTable,
+    integrationExternalResourceTable,
+    postExternalResourceLinkTable,
+    githubSyncRuleTable,
+    githubWebhookDeliveryTable,
+    externalResourceCreateRequestTable,
     subscriptionTable,
     productTable,
     boardTable,
@@ -845,6 +857,16 @@ export const relations = defineRelations(
         from: r.integrationConnectionTable.id,
         to: r.integrationDeliveryTable.connectionId,
       }),
+      githubInstallation: r.one.githubInstallationTable({
+        from: r.integrationConnectionTable.id,
+        to: r.githubInstallationTable.connectionId,
+      }),
+    },
+    githubInstallationTable: {
+      connection: r.one.integrationConnectionTable({
+        from: r.githubInstallationTable.connectionId,
+        to: r.integrationConnectionTable.id,
+      }),
     },
     integrationRouteTable: {
       organization: r.one.organizationTable({
@@ -896,6 +918,42 @@ export const relations = defineRelations(
       delivery: r.one.integrationDeliveryTable({
         from: r.integrationDeliveryAttemptTable.deliveryId,
         to: r.integrationDeliveryTable.id,
+      }),
+    },
+    integrationExternalResourceTable: {
+      connection: r.one.integrationConnectionTable({
+        from: r.integrationExternalResourceTable.connectionId,
+        to: r.integrationConnectionTable.id,
+      }),
+      links: r.many.postExternalResourceLinkTable({
+        from: r.integrationExternalResourceTable.id,
+        to: r.postExternalResourceLinkTable.externalResourceId,
+      }),
+    },
+    postExternalResourceLinkTable: {
+      post: r.one.postTable({
+        from: r.postExternalResourceLinkTable.postId,
+        to: r.postTable.id,
+      }),
+      externalResource: r.one.integrationExternalResourceTable({
+        from: r.postExternalResourceLinkTable.externalResourceId,
+        to: r.integrationExternalResourceTable.id,
+      }),
+    },
+    githubSyncRuleTable: {
+      connection: r.one.integrationConnectionTable({
+        from: r.githubSyncRuleTable.connectionId,
+        to: r.integrationConnectionTable.id,
+      }),
+      postStatus: r.one.postStatusTable({
+        from: r.githubSyncRuleTable.postStatusId,
+        to: r.postStatusTable.id,
+      }),
+    },
+    githubWebhookDeliveryTable: {
+      connection: r.one.integrationConnectionTable({
+        from: r.githubWebhookDeliveryTable.connectionId,
+        to: r.integrationConnectionTable.id,
       }),
     },
   })

@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 /** Failure verifying a provider request signature (freshness window, scheme, or cryptographic match). */
-export class IntegrationRequestSignatureError extends Schema.TaggedErrorClass<IntegrationRequestSignatureError>()(
+export class IntegrationRequestSignatureError extends Schema.TaggedError<IntegrationRequestSignatureError>()(
   "IntegrationRequestSignatureError",
   { reason: Schema.String }
 ) {}

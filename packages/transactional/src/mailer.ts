@@ -102,7 +102,7 @@ export interface MailerService {
 }
 
 /** Rendering failed before a provider request was made. */
-export class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplateRenderError>()(
+export class MailTemplateRenderError extends Schema.TaggedError<MailTemplateRenderError>()(
   "MailTemplateRenderError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
@@ -112,7 +112,7 @@ export class MailTemplateRenderError extends Schema.TaggedErrorClass<MailTemplat
 ) {}
 
 /** The provider rejected the message permanently; retrying will not help. */
-export class MailPermanentDeliveryError extends Schema.TaggedErrorClass<MailPermanentDeliveryError>()(
+export class MailPermanentDeliveryError extends Schema.TaggedError<MailPermanentDeliveryError>()(
   "MailPermanentDeliveryError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
@@ -125,7 +125,7 @@ export class MailPermanentDeliveryError extends Schema.TaggedErrorClass<MailPerm
 ) {}
 
 /** The provider reported a temporary failure that may succeed on retry. */
-export class MailTemporaryDeliveryError extends Schema.TaggedErrorClass<MailTemporaryDeliveryError>()(
+export class MailTemporaryDeliveryError extends Schema.TaggedError<MailTemporaryDeliveryError>()(
   "MailTemporaryDeliveryError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
@@ -138,7 +138,7 @@ export class MailTemporaryDeliveryError extends Schema.TaggedErrorClass<MailTemp
 ) {}
 
 /** The submission outcome is unknown, so retrying could create a duplicate. */
-export class MailUncertainDeliveryError extends Schema.TaggedErrorClass<MailUncertainDeliveryError>()(
+export class MailUncertainDeliveryError extends Schema.TaggedError<MailUncertainDeliveryError>()(
   "MailUncertainDeliveryError",
   {
     cause: Schema.optionalKey(Schema.Defect()),

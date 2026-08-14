@@ -1,8 +1,9 @@
-import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
+import { describe, expect, it } from "vitest";
 import {
+  IntegrationCapabilityKey,
   IntegrationProviderKey,
   type IntegrationProviderRegistration,
   makeIntegrationProviderRegistry,
@@ -13,7 +14,7 @@ const testProviderKey = IntegrationProviderKey.make("test-provider");
 const webhookRegistration = ({
   handlers = [
     {
-      capabilityKey: "events.post",
+      capabilityKey: IntegrationCapabilityKey.make("events.post"),
       deliver: () => Effect.succeed({}),
     },
   ],
@@ -26,7 +27,7 @@ const webhookRegistration = ({
   inboundHandlers,
   manifest: manifest ?? {
     capabilities: [
-      { configVersion: 1, direction: "outbound", key: "events.post" },
+      { configVersion: 1, direction: "outbound", key: IntegrationCapabilityKey.make("events.post") },
     ],
     connectionMode: "none",
     displayName: "Webhook",
@@ -36,88 +37,74 @@ const webhookRegistration = ({
 });
 
 describe("makeIntegrationProviderRegistry", () => {
-  it.effect(
-    "provides an advertised capability handler after startup validation",
-    () =>
-      Effect.gen(function* () {
-        const registry = yield* makeIntegrationProviderRegistry([
-          webhookRegistration(),
-        ]);
+  it("provides an advertised capability handler after startup validation", () => {
+    const registry = Effect.runSync(
+      makeIntegrationProviderRegistry([webhookRegistration()])
+    );
 
-        expect(
-          registry.getHandler({
-            capabilityKey: "events.post",
-            provider: testProviderKey,
-          })
-        ).toBeDefined();
-        expect(registry.manifests).toHaveLength(1);
+    expect(
+      registry.getHandler({
+        capabilityKey: "events.post",
+        provider: testProviderKey,
       })
-  );
+    ).toBeDefined();
+    expect(registry.manifests).toHaveLength(1);
+  });
 
-  it.effect(
-    "rejects an advertised capability without a configuration schema",
-    () =>
-      Effect.gen(function* () {
-        const exit = yield* Effect.exit(
-          makeIntegrationProviderRegistry([
-            webhookRegistration({ routeConfigurationSchemas: new Map() }),
-          ])
-        );
+  it("rejects an advertised capability without a configuration schema", () => {
+    const exit = Effect.runSyncExit(
+      makeIntegrationProviderRegistry([
+        webhookRegistration({ routeConfigurationSchemas: new Map() }),
+      ])
+    );
 
-        expect(Exit.isFailure(exit)).toBe(true);
-      })
-  );
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
 
-  it.effect("rejects duplicate static provider registrations", () =>
-    Effect.gen(function* () {
-      const registration = webhookRegistration();
-      const exit = yield* Effect.exit(
-        makeIntegrationProviderRegistry([registration, registration])
-      );
+  it("rejects duplicate static provider registrations", () => {
+    const registration = webhookRegistration();
+    const exit = Effect.runSyncExit(
+      makeIntegrationProviderRegistry([registration, registration])
+    );
 
-      expect(Exit.isFailure(exit)).toBe(true);
-    })
-  );
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
 
-  it.effect(
-    "rejects a handler for a capability not advertised in the manifest",
-    () =>
-      Effect.gen(function* () {
-        const registration = webhookRegistration();
-        const exit = yield* Effect.exit(
-          makeIntegrationProviderRegistry([
+  it("rejects a handler for a capability not advertised in the manifest", () => {
+    const registration = webhookRegistration();
+    const exit = Effect.runSyncExit(
+      makeIntegrationProviderRegistry([
+        {
+          ...registration,
+          handlers: [
             {
-              ...registration,
-              handlers: [
-                {
-                  capabilityKey: "events.post",
-                  deliver: () => Effect.succeed({}),
-                },
-              ],
-              manifest: {
-                ...registration.manifest,
-                capabilities: [],
-              },
+              capabilityKey: IntegrationCapabilityKey.make("events.post"),
+              deliver: () => Effect.succeed({}),
             },
-          ])
-        );
+          ],
+          manifest: {
+            ...registration.manifest,
+            capabilities: [],
+          },
+        },
+      ])
+    );
 
-        expect(Exit.isFailure(exit)).toBe(true);
-      })
-  );
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
 
   it("provides an inbound capability handler after startup validation", () => {
     const registration = webhookRegistration({
       inboundHandlers: [
         {
-          capabilityKey: "commands",
+          capabilityKey: IntegrationCapabilityKey.make("commands"),
           handle: () => Effect.succeed({ body: {}, status: 200 }),
         },
       ],
       manifest: {
         capabilities: [
-          { configVersion: 1, direction: "outbound", key: "events.post" },
-          { configVersion: 1, direction: "inbound", key: "commands" },
+          { configVersion: 1, direction: "outbound", key: IntegrationCapabilityKey.make("events.post") },
+          { configVersion: 1, direction: "inbound", key: IntegrationCapabilityKey.make("commands") },
         ],
         connectionMode: "none",
         displayName: "Webhook",
@@ -149,7 +136,7 @@ describe("makeIntegrationProviderRegistry", () => {
           manifest: {
             ...registration.manifest,
             capabilities: [
-              { configVersion: 1, direction: "inbound", key: "commands" },
+              { configVersion: 1, direction: "inbound", key: IntegrationCapabilityKey.make("commands") },
             ],
           },
           routeConfigurationSchemas: new Map([["commands", Schema.Json]]),

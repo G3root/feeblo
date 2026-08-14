@@ -17,7 +17,7 @@ import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import { describe, expect, it } from "vitest";
 import type { SlackApiClient } from "./slack-api";
-import { slackProviderKey } from "./slack-manifest";
+import { slackChannelNotificationsCapabilityKey, slackProviderKey } from "./slack-manifest";
 import { makeSlackProviderRegistration } from "./slack-provider-registration";
 
 const signingSecret = Redacted.make("signing-secret");
@@ -68,7 +68,7 @@ const deliveryInput = (
     version: 1,
   },
   route: {
-    capabilityKey: "channel.notifications",
+    capabilityKey: slackChannelNotificationsCapabilityKey,
     configVersion: 1,
     connectionId: asLegid(IntegrationConnectionId)("conn_1"),
     enabled: true,

@@ -8,6 +8,10 @@ import * as Schema from "effect/Schema";
 
 /** Provider key owned by the Discord adapter, outside the provider-neutral kernel. */
 export const discordProviderKey = IntegrationProviderKey.make("discord");
+export const discordChannelNotificationsCapabilityKey =
+  IntegrationCapabilityKey.make("channel.notifications");
+export const discordInteractionsCapabilityKey =
+  IntegrationCapabilityKey.make("interactions");
 
 /** Discord OAuth scopes requested during server installation. */
 export const DISCORD_OAUTH_SCOPES = [
@@ -92,12 +96,12 @@ export const discordProviderManifest = IntegrationProviderManifest.make({
   connectionMode: "oauth2",
   capabilities: [
     {
-      key: IntegrationCapabilityKey.make("channel.notifications"),
+      key: discordChannelNotificationsCapabilityKey,
       direction: "outbound",
       configVersion: 1,
     },
     {
-      key: IntegrationCapabilityKey.make("interactions"),
+      key: discordInteractionsCapabilityKey,
       direction: "inbound",
       configVersion: 1,
     },

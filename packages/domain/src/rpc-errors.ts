@@ -94,7 +94,7 @@ type RemappedDbEffect<R, E, A, UniqueViolationError> = Effect.Effect<
   A
 >;
 
-export class BadRequestError extends Schema.TaggedErrorClass<BadRequestError>()(
+export class BadRequestError extends Schema.TaggedError<BadRequestError>()(
   "BadRequestError",
   {
     message: Schema.optional(Schema.String),
@@ -102,7 +102,7 @@ export class BadRequestError extends Schema.TaggedErrorClass<BadRequestError>()(
   { httpApiStatus: 400, identifier: "BadRequestError" }
 ) {}
 
-export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
+export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
   "NotFoundError",
   {
     message: Schema.optional(Schema.String),
@@ -110,7 +110,7 @@ export class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
   { httpApiStatus: 404, identifier: "NotFoundError" }
 ) {}
 
-export class UnauthorizedError extends Schema.TaggedErrorClass<UnauthorizedError>()(
+export class UnauthorizedError extends Schema.TaggedError<UnauthorizedError>()(
   "UnauthorizedError",
   {
     message: Schema.optional(Schema.String),
@@ -118,7 +118,7 @@ export class UnauthorizedError extends Schema.TaggedErrorClass<UnauthorizedError
   { httpApiStatus: 401, identifier: "UnauthorizedError" }
 ) {}
 
-export class InternalServerError extends Schema.TaggedErrorClass<InternalServerError>()(
+export class InternalServerError extends Schema.TaggedError<InternalServerError>()(
   "InternalServerError",
   {
     message: Schema.String,

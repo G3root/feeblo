@@ -8,6 +8,24 @@ export type TIntegrationProviderKey = S.Schema.Type<
   typeof IntegrationProviderKey
 >;
 
+/** Provider-owned external resource kind, such as `issue`, `task`, or `ticket`. */
+export const IntegrationExternalResourceType = S.NonEmptyString.pipe(
+  S.brand("IntegrationExternalResourceType")
+);
+export type TIntegrationExternalResourceType = S.Schema.Type<
+  typeof IntegrationExternalResourceType
+>;
+
+/** Durable external resource creation lifecycle. */
+export const ExternalResourceCreateRequestState = S.Literals([
+  "pending",
+  "succeeded",
+  "failed",
+]);
+export type TExternalResourceCreateRequestState = S.Schema.Type<
+  typeof ExternalResourceCreateRequestState
+>;
+
 /** Canonical provider capability directions used by static manifests. */
 export const IntegrationCapabilityDirection = S.Literals([
   "outbound",
@@ -23,19 +41,16 @@ export const IntegrationConnectionMode = S.Literals([
   "none",
   "oauth2",
   "api_key",
+  "github_app",
 ]);
 export type TIntegrationConnectionMode = S.Schema.Type<
   typeof IntegrationConnectionMode
 >;
 
-/** Capabilities persisted by integration routes. `events.post` is the V1 custom-webhook capability; Slack and Discord own the remaining keys. */
-export const IntegrationCapabilityKey = S.Literals([
-  "events.post",
-  "channel.notifications",
-  "commands",
-  "message.action",
-  "interactions",
-]);
+/** Provider capability key persisted by integration routes; providers own their keys and the startup registry validates them. */
+export const IntegrationCapabilityKey = S.NonEmptyString.pipe(
+  S.brand("IntegrationCapabilityKey")
+);
 export type TIntegrationCapabilityKey = S.Schema.Type<
   typeof IntegrationCapabilityKey
 >;

@@ -204,6 +204,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             recordPostIntegrationEvent({
               actor: { kind: "end_user" },
               boardId,
+              description: sanitizedContent,
               eventType: "feedback.post.created",
               organizationId,
               postId: id,

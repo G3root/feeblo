@@ -1,11 +1,13 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
+import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { WebhookManagementServiceLive } from "@feeblo/domain/integration/webhook-management-live";
 import type { WebhookManagementService } from "@feeblo/domain/integration/webhook-management-service";
 import { InternalServerError } from "@feeblo/domain/rpc-errors";
 import {
+  IntegrationDeliveryWorkerPersistenceError,
   type IntegrationEventRecorder,
   IntegrationEventRecorderLive,
   IntegrationProviderInvalidConfigurationError,
@@ -22,6 +24,13 @@ import {
   makeDiscordProviderRegistration,
 } from "@feeblo/integration-discord";
 import {
+  makeGitHubApiClient,
+  makeGitHubCredentialResolver,
+  makeGitHubInstallationTokenResolver,
+  makeGitHubProviderRegistration,
+} from "@feeblo/integration-github";
+import { githubProviderKey } from "@feeblo/integration-github/manifest";
+import {
   makeSlackCredentialResolver,
   makeSlackProviderRegistration,
 } from "@feeblo/integration-slack";
@@ -36,6 +45,7 @@ import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import { ServerConfig } from "./config";
 
@@ -63,6 +73,7 @@ export const makeIntegrationLayers: Effect.Effect<
   IntegrationProviderRegistryValidationError | InternalServerError,
   | ServerConfig
   | Database.Database
+  | ExternalResourceService
   | WebhookIntegrationConfig
   | SlackIntegrationConfig
   | DiscordIntegrationConfig
@@ -70,6 +81,7 @@ export const makeIntegrationLayers: Effect.Effect<
 > = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const db = yield* currentDb;
+  const externalResources = yield* ExternalResourceService;
   const { encryptionKey, endpointSecurityPolicy } =
     yield* WebhookIntegrationConfig;
 
@@ -168,23 +180,97 @@ export const makeIntegrationLayers: Effect.Effect<
     credentialResolver: discordCredentialResolver,
     publicKey: discordPublicKey,
   });
+  const githubConfigured =
+    config.githubAppId !== undefined &&
+    Redacted.value(config.githubPrivateKey) !== "" &&
+    Redacted.value(config.githubWebhookSecret) !== "";
+  const githubApi = makeGitHubApiClient();
+  const githubInstallationTokens = yield* makeGitHubInstallationTokenResolver({
+    apiClient: githubApi,
+    appId: config.githubAppId ?? "",
+    privateKey: config.githubPrivateKey,
+  });
+  const githubCredentialResolver = makeGitHubCredentialResolver({
+    installationTokenResolver: githubInstallationTokens,
+    loadInstallationId: (input) =>
+      Effect.gen(function* () {
+        const [connection] = yield* db
+          .select({
+            installationId: schema.githubInstallationTable.installationId,
+          })
+          .from(schema.githubInstallationTable)
+          .where(
+            eq(schema.githubInstallationTable.connectionId, input.connection.id)
+          )
+          .limit(1)
+          .pipe(
+            Effect.mapError(
+              () =>
+                new IntegrationProviderTemporaryFailure({
+                  message: "GitHub credentials could not be loaded",
+                  provider: githubProviderKey,
+                })
+            )
+          );
+        return connection?.installationId ?? null;
+      }),
+  });
+  const githubRegistration = makeGitHubProviderRegistration({
+    apiClient: githubApi,
+    credentialResolver: githubCredentialResolver,
+    webhookSecret: config.githubWebhookSecret,
+  });
   // Providers are only exposed when their credentials are configured;
   // otherwise the server runs with the remaining providers only.
   const registry = yield* makeIntegrationProviderRegistry([
     registration,
     ...(slackConfigured ? [slackRegistration] : []),
     ...(discordConfigured ? [discordRegistration] : []),
+    ...(githubConfigured ? [githubRegistration] : []),
   ]);
 
-  // Deliveries are claimed only for capability keys the startup-validated
-  // registry actually exposes; the kernel never hardcodes a provider capability.
-  const claimableCapabilityKeys = registry.manifests.flatMap((manifest) =>
-    manifest.capabilities
-      .filter((capability) => capability.direction === "outbound")
-      .map((capability) => capability.key)
-  );
+  // Deliveries are claimed only for capability keys owned by the matching
+  // provider; the startup-validated registry supplies each provider's outbound
+  // capabilities, so cross-provider or unknown keys are never claimable.
+  const claimableCapabilityKeysByProvider = new Map<
+    string,
+    readonly string[]
+  >();
+  for (const manifest of registry.manifests) {
+    claimableCapabilityKeysByProvider.set(
+      manifest.provider,
+      manifest.capabilities
+        .filter((capability) => capability.direction === "outbound")
+        .map((capability) => capability.key)
+    );
+  }
   const workerRepository = yield* makeIntegrationDeliveryWorkerRepository(
-    claimableCapabilityKeys
+    claimableCapabilityKeysByProvider,
+    ({ connection, drafts, event }) =>
+      Effect.forEach(drafts, (draft) =>
+        externalResources.recordPostLink({
+          postId: draft.postId,
+          resource: {
+            connectionId: connection.id,
+            displayKey: draft.displayKey ?? null,
+            organizationId: event.organizationId,
+            remoteId: draft.remoteId,
+            remoteUrl: draft.remoteUrl,
+            resourceType: draft.resourceType,
+            safeMetadata: draft.safeMetadata,
+            stateKey: draft.stateKey ?? null,
+            title: draft.title ?? null,
+          },
+        })
+      ).pipe(
+        Effect.asVoid,
+        Effect.mapError(
+          () =>
+            new IntegrationDeliveryWorkerPersistenceError({
+              operation: "record_external_resource_drafts",
+            })
+        )
+      )
   );
   const lifecycleRepository = yield* makeIntegrationManagementRepository;
   const crypto = yield* Crypto.Crypto;

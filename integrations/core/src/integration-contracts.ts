@@ -6,6 +6,7 @@ import {
   IntegrationDeliveryRetryDecision as DbIntegrationDeliveryRetryDecision,
   IntegrationDeliveryState as DbIntegrationDeliveryState,
   IntegrationEventType as DbIntegrationEventType,
+  IntegrationExternalResourceType as DbIntegrationExternalResourceType,
   IntegrationProviderKey as DbIntegrationProviderKey,
   IntegrationRouteEventSelection as DbIntegrationRouteEventSelection,
   IntegrationSafeDisplayMetadata as DbIntegrationSafeDisplayMetadata,
@@ -16,6 +17,7 @@ import {
   type TIntegrationConnectionMode,
   type TIntegrationDeliveryState,
   type TIntegrationEventType,
+  type TIntegrationExternalResourceType,
   type TIntegrationProviderKey,
   type TSubscribableIntegrationEventType,
 } from "@feeblo/db/validation-schema/integration";
@@ -44,6 +46,8 @@ export const IntegrationConnectionMode = DbIntegrationConnectionMode;
 export const IntegrationDeliveryRetryDecision =
   DbIntegrationDeliveryRetryDecision;
 export const IntegrationDeliveryState = DbIntegrationDeliveryState;
+export const IntegrationExternalResourceType =
+  DbIntegrationExternalResourceType;
 export const IntegrationEventType = DbIntegrationEventType;
 export const IntegrationProviderKey = DbIntegrationProviderKey;
 export const IntegrationRouteEventSelection = DbIntegrationRouteEventSelection;
@@ -131,6 +135,8 @@ export const IntegrationPostEventData = Schema.Struct({
   }),
   post: Schema.Struct({
     id: PostId.schema,
+    /** Post body (sanitized markdown) used as the provider issue body; absent for status-change events. */
+    description: Schema.optionalKey(Schema.String),
     metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     status: Schema.Struct({
       id: PostStatusId.schema,
@@ -152,6 +158,7 @@ export type IntegrationConnectionLifecycleStatus =
 
 /** Durable delivery lifecycle; a lease is never an external request by itself. */
 export type IntegrationDeliveryState = TIntegrationDeliveryState;
+export type IntegrationExternalResourceType = TIntegrationExternalResourceType;
 
 /** Immutable route record fields needed for matching and delivery persistence. */
 export const IntegrationRoute = Schema.Struct({
@@ -216,7 +223,7 @@ export interface IntegrationDeliveryAttempt
   extends Schema.Schema.Type<typeof IntegrationDeliveryAttempt> {}
 
 /** Persistence failure while atomically recording an event and its matched deliveries. */
-export class IntegrationEventRecordingError extends Schema.TaggedErrorClass<IntegrationEventRecordingError>()(
+export class IntegrationEventRecordingError extends Schema.TaggedError<IntegrationEventRecordingError>()(
   "IntegrationEventRecordingError",
   { message: Schema.String }
 ) {}
@@ -248,7 +255,7 @@ export class IntegrationEventRecorder extends Context.Service<
 >()("@feeblo/IntegrationEventRecorder") {}
 
 /** Provider-side authentication failure requiring reconnection or remediation. */
-export class IntegrationProviderAuthenticationError extends Schema.TaggedErrorClass<IntegrationProviderAuthenticationError>()(
+export class IntegrationProviderAuthenticationError extends Schema.TaggedError<IntegrationProviderAuthenticationError>()(
   "IntegrationProviderAuthenticationError",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -258,7 +265,7 @@ export class IntegrationProviderAuthenticationError extends Schema.TaggedErrorCl
 ) {}
 
 /** Provider-side rate limiting; retryAfterMs is validated before retry scheduling. */
-export class IntegrationProviderRateLimitedError extends Schema.TaggedErrorClass<IntegrationProviderRateLimitedError>()(
+export class IntegrationProviderRateLimitedError extends Schema.TaggedError<IntegrationProviderRateLimitedError>()(
   "IntegrationProviderRateLimitedError",
   {
     message: Schema.String,
@@ -271,7 +278,7 @@ export class IntegrationProviderRateLimitedError extends Schema.TaggedErrorClass
 ) {}
 
 /** Provider configuration rejected before an outbound request can be made. */
-export class IntegrationProviderInvalidConfigurationError extends Schema.TaggedErrorClass<IntegrationProviderInvalidConfigurationError>()(
+export class IntegrationProviderInvalidConfigurationError extends Schema.TaggedError<IntegrationProviderInvalidConfigurationError>()(
   "IntegrationProviderInvalidConfigurationError",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -281,7 +288,7 @@ export class IntegrationProviderInvalidConfigurationError extends Schema.TaggedE
 ) {}
 
 /** Retryable provider or transport failure; secrets and raw response bodies stay private. */
-export class IntegrationProviderTemporaryFailure extends Schema.TaggedErrorClass<IntegrationProviderTemporaryFailure>()(
+export class IntegrationProviderTemporaryFailure extends Schema.TaggedError<IntegrationProviderTemporaryFailure>()(
   "IntegrationProviderTemporaryFailure",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -291,7 +298,7 @@ export class IntegrationProviderTemporaryFailure extends Schema.TaggedErrorClass
 ) {}
 
 /** Terminal provider rejection; retrying the same request cannot fix it. */
-export class IntegrationProviderPermanentRejection extends Schema.TaggedErrorClass<IntegrationProviderPermanentRejection>()(
+export class IntegrationProviderPermanentRejection extends Schema.TaggedError<IntegrationProviderPermanentRejection>()(
   "IntegrationProviderPermanentRejection",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -316,8 +323,28 @@ export interface IntegrationProviderDeliveryInput {
   readonly route: IntegrationRoute;
 }
 
+/**
+ * A provider-normalized external resource produced by one successful delivery.
+ * Provider credentials and addressing details belong only in safe metadata.
+ */
+export const IntegrationExternalResourceDraft = Schema.Struct({
+  displayKey: Schema.optionalKey(Schema.NonEmptyString),
+  /** Feeblo post that owns this external resource link. */
+  postId: PostId.schema,
+  remoteId: Schema.NonEmptyString,
+  stateKey: Schema.optionalKey(Schema.NonEmptyString),
+  remoteUrl: Schema.URLFromString,
+  resourceType: IntegrationExternalResourceType,
+  safeMetadata: IntegrationSafeDisplayMetadata,
+  title: Schema.optionalKey(Schema.String),
+});
+export interface IntegrationExternalResourceDraft
+  extends Schema.Schema.Type<typeof IntegrationExternalResourceDraft> {}
+
 /** Provider handler reports only safe outcome metadata to the delivery kernel. */
 export interface IntegrationProviderDeliveryResult {
+  /** Resource links to persist with delivery success, guarded by the delivery lease. */
+  readonly externalResourceDrafts?: readonly IntegrationExternalResourceDraft[];
   readonly httpStatus?: number;
 }
 
@@ -345,7 +372,7 @@ export interface IntegrationInboundResponse {
 }
 
 /** Terminal rejection of an inbound request after verification failed. */
-export class IntegrationInboundRejection extends Schema.TaggedErrorClass<IntegrationInboundRejection>()(
+export class IntegrationInboundRejection extends Schema.TaggedError<IntegrationInboundRejection>()(
   "IntegrationInboundRejection",
   { message: Schema.String, provider: IntegrationProviderKey }
 ) {}

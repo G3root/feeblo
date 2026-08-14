@@ -208,6 +208,10 @@ export const postStatusTable = pgTable(
   },
   (table) => [
     index("post_status_organizationId_idx").on(table.organizationId),
+    uniqueIndex("post_status_organizationId_id_uidx").on(
+      table.organizationId,
+      table.id
+    ),
     uniqueIndex("post_status_organizationId_type_uidx").on(
       table.organizationId,
       table.type

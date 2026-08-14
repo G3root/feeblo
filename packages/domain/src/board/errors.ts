@@ -7,7 +7,7 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class BoardNotFoundError extends Schema.TaggedErrorClass<BoardNotFoundError>()(
+export class BoardNotFoundError extends Schema.TaggedError<BoardNotFoundError>()(
   "BoardNotFoundError",
   {
     message: Schema.optional(Schema.String),
@@ -15,19 +15,19 @@ export class BoardNotFoundError extends Schema.TaggedErrorClass<BoardNotFoundErr
   { httpApiStatus: 404, identifier: "BoardNotFoundError" }
 ) {}
 
-export class FailedToCreateBoardError extends Schema.TaggedErrorClass<FailedToCreateBoardError>()(
+export class FailedToCreateBoardError extends Schema.TaggedError<FailedToCreateBoardError>()(
   "FailedToCreateBoardError",
   {},
   { httpApiStatus: 500, identifier: "FailedToCreateBoardError" }
 ) {}
 
-export class FailedToUpdateBoardError extends Schema.TaggedErrorClass<FailedToUpdateBoardError>()(
+export class FailedToUpdateBoardError extends Schema.TaggedError<FailedToUpdateBoardError>()(
   "FailedToUpdateBoardError",
   {},
   { httpApiStatus: 500, identifier: "FailedToUpdateBoardError" }
 ) {}
 
-export class FailedToDeleteBoardError extends Schema.TaggedErrorClass<FailedToDeleteBoardError>()(
+export class FailedToDeleteBoardError extends Schema.TaggedError<FailedToDeleteBoardError>()(
   "FailedToDeleteBoardError",
   {},
   { httpApiStatus: 500, identifier: "FailedToDeleteBoardError" }

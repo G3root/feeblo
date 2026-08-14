@@ -11,7 +11,7 @@ import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 import * as W from "effect/unstable/workflow";
 
-class SubmissionNotificationDataError extends S.TaggedErrorClass<SubmissionNotificationDataError>()(
+class SubmissionNotificationDataError extends S.TaggedError<SubmissionNotificationDataError>()(
   "SubmissionNotificationDataError",
   {
     operation: S.String,

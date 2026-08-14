@@ -8,6 +8,12 @@ import * as Schema from "effect/Schema";
 
 /** Provider key owned by the Slack adapter, outside the provider-neutral kernel. */
 export const slackProviderKey = IntegrationProviderKey.make("slack");
+export const slackChannelNotificationsCapabilityKey =
+  IntegrationCapabilityKey.make("channel.notifications");
+export const slackCommandsCapabilityKey =
+  IntegrationCapabilityKey.make("commands");
+export const slackMessageActionCapabilityKey =
+  IntegrationCapabilityKey.make("message.action");
 
 /** Slack OAuth scopes requested during workspace installation. */
 export const SLACK_OAUTH_SCOPES = [
@@ -54,17 +60,17 @@ export const slackProviderManifest = IntegrationProviderManifest.make({
   connectionMode: "oauth2",
   capabilities: [
     {
-      key: IntegrationCapabilityKey.make("channel.notifications"),
+      key: slackChannelNotificationsCapabilityKey,
       direction: "outbound",
       configVersion: 1,
     },
     {
-      key: IntegrationCapabilityKey.make("commands"),
+      key: slackCommandsCapabilityKey,
       direction: "inbound",
       configVersion: 1,
     },
     {
-      key: IntegrationCapabilityKey.make("message.action"),
+      key: slackMessageActionCapabilityKey,
       direction: "inbound",
       configVersion: 1,
     },
