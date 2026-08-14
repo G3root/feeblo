@@ -1,3 +1,4 @@
+import * as GitHub from "@distilled.cloud/github";
 import {
   IntegrationProviderAuthenticationError,
   IntegrationProviderInvalidConfigurationError,
@@ -5,13 +6,17 @@ import {
   IntegrationProviderRateLimitedError,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as Headers from "effect/unstable/http/Headers";
 import * as HttpClient from "effect/unstable/http/HttpClient";
+import * as HttpClientError from "effect/unstable/http/HttpClientError";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import type { GitHubApiFailure } from "./github-errors";
 import { githubProviderKey } from "./github-manifest";
@@ -209,154 +214,239 @@ export interface GitHubApiClient {
   }) => Effect.Effect<GitHubUserInstallations, GitHubApiFailure>;
 }
 
-/** Creates a direct Effect HttpClient adapter; every untrusted response is decoded before leaving this module. */
+/** Extracts the stable `_tag` of a tagged SDK error, if present. */
+const sdkErrorTag = (error: unknown): string | undefined =>
+  Predicate.isObject(error) && "_tag" in error && typeof error._tag === "string"
+    ? error._tag
+    : undefined;
+
+/** Extracts a human-readable message from an SDK error, if present. */
+const sdkErrorMessage = (error: unknown): string | undefined =>
+  Predicate.isObject(error) &&
+  "message" in error &&
+  typeof error.message === "string"
+    ? error.message
+    : undefined;
+
+/** Extracts a server-provided retry hint from an SDK error, if present. */
+const sdkRetryAfterMs = (error: unknown): number | undefined =>
+  Predicate.isObject(error) &&
+  "retryAfter" in error &&
+  Duration.isDuration(error.retryAfter)
+    ? Duration.toMillis(error.retryAfter)
+    : undefined;
+
+/** Maps the Effect-native SDK's typed errors onto the integration kernel failure algebra. */
+const mapSdkError =
+  (context: string) =>
+  (error: unknown): GitHubApiFailure => {
+    if (HttpClientError.isHttpClientError(error)) {
+      return new IntegrationProviderTemporaryFailure({
+        message: `GitHub request failed during ${context}`,
+        provider: githubProviderKey,
+      });
+    }
+    const detail = sdkErrorMessage(error) ?? `GitHub rejected ${context}`;
+    switch (sdkErrorTag(error)) {
+      case "Unauthorized":
+        return new IntegrationProviderAuthenticationError({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 401,
+        });
+      case "Forbidden":
+        return new IntegrationProviderAuthenticationError({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 403,
+        });
+      case "TooManyRequests": {
+        const retryAfterMs = sdkRetryAfterMs(error);
+        return new IntegrationProviderRateLimitedError({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 429,
+          ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+        });
+      }
+      case "NotFound":
+        return new IntegrationProviderInvalidConfigurationError({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 404,
+        });
+      case "Gone":
+        return new IntegrationProviderInvalidConfigurationError({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 410,
+        });
+      case "InternalServerError":
+        return new IntegrationProviderTemporaryFailure({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 500,
+        });
+      case "BadGateway":
+        return new IntegrationProviderTemporaryFailure({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 502,
+        });
+      case "ServiceUnavailable":
+        return new IntegrationProviderTemporaryFailure({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 503,
+        });
+      case "GatewayTimeout":
+        return new IntegrationProviderTemporaryFailure({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 504,
+        });
+      case "ConfigError":
+        return new IntegrationProviderInvalidConfigurationError({
+          message: detail,
+          provider: githubProviderKey,
+        });
+      default:
+        return new IntegrationProviderPermanentRejection({
+          message: detail,
+          provider: githubProviderKey,
+        });
+    }
+  };
+
+/** Provides the SDK's per-request bearer credentials from one redacted token. */
+const credentialsLayer = (
+  token: Redacted.Redacted<string>
+): Layer.Layer<GitHub.Credentials> =>
+  Layer.succeed(
+    GitHub.Credentials,
+    Effect.succeed({
+      token,
+      apiBaseUrl: GITHUB_API_BASE_URL,
+      userAgent: GitHub.DEFAULT_USER_AGENT,
+    })
+  );
+
+/**
+ * Runs one generated SDK operation with bearer credentials, no SDK-level
+ * retries (the durable delivery scheduler owns retry policy), the repository's
+ * request timeout, and the SDK's typed errors mapped onto the kernel algebra.
+ */
+const withSdk = <A, E>(
+  token: Redacted.Redacted<string>,
+  effect: Effect.Effect<A, E, GitHub.Credentials | HttpClient.HttpClient>,
+  context: string
+): Effect.Effect<A, GitHubApiFailure> =>
+  effect.pipe(
+    Effect.provide(
+      Layer.mergeAll(credentialsLayer(token), FetchHttpClient.layer)
+    ),
+    Effect.mapError(mapSdkError(context)),
+    Effect.timeoutOrElse({
+      duration: GITHUB_API_REQUEST_TIMEOUT_MS,
+      orElse: () =>
+        Effect.fail(
+          new IntegrationProviderTemporaryFailure({
+            message: `GitHub request timed out during ${context}`,
+            provider: githubProviderKey,
+          })
+        ),
+    })
+  );
+
+/** Decodes an SDK response back through one of the repository's stricter schemas. */
+const decodeSdkResponse =
+  <S extends Schema.Constraint>(schema: S, context: string) =>
+  (
+    value: unknown
+  ): Effect.Effect<S["Type"], GitHubApiFailure, S["DecodingServices"]> =>
+    Schema.decodeUnknownEffect(schema)(value).pipe(
+      Effect.mapError(
+        () =>
+          new IntegrationProviderPermanentRejection({
+            message: `GitHub ${context} response was invalid`,
+            provider: githubProviderKey,
+          })
+      )
+    );
+
+/** Creates a GitHub adapter backed by the Effect-native @distilled.cloud/github SDK. */
 export const makeGitHubApiClient = (): GitHubApiClient => {
-  const execute = (httpRequest: HttpClientRequest.HttpClientRequest) =>
-    HttpClient.execute(httpRequest).pipe(Effect.provide(FetchHttpClient.layer));
-  const executeResponse = Effect.fn("GitHubApi.executeResponse")(
-    (input: {
-      readonly context: string;
-      readonly httpRequest: HttpClientRequest.HttpClientRequest;
-    }) =>
-      execute(input.httpRequest).pipe(
+  const exchangeUserAccessToken = ({
+    clientId,
+    clientSecret,
+    code,
+  }: {
+    readonly clientId: string;
+    readonly clientSecret: Redacted.Redacted<string>;
+    readonly code: string;
+  }): Effect.Effect<GitHubUserAccessToken, GitHubApiFailure> =>
+    Effect.gen(function* () {
+      const httpRequest = yield* HttpClientRequest.bodyJson(
+        HttpClientRequest.post(GITHUB_OAUTH_TOKEN_URL, {
+          headers: { accept: "application/json" },
+        }),
+        {
+          client_id: clientId,
+          client_secret: Redacted.value(clientSecret),
+          code,
+        }
+      ).pipe(
         Effect.mapError(
           () =>
-            new IntegrationProviderTemporaryFailure({
-              message: `GitHub request failed during ${input.context}`,
+            new IntegrationProviderPermanentRejection({
+              message: "GitHub setup user-token request could not be encoded",
               provider: githubProviderKey,
             })
         )
-      )
-  );
-  const request = Effect.fn("GitHubApi.request")(
-    (input: {
-      readonly context: string;
-      readonly httpRequest: HttpClientRequest.HttpClientRequest;
-    }) =>
-      Effect.gen(function* () {
-        const response = yield* executeResponse(input);
-        if (response.status < 200 || response.status >= 300) {
-          return yield* classifyGitHubApiError(
-            { headers: response.headers, status: response.status },
-            input.context
-          );
-        }
-        const body = yield* response.json.pipe(
-          Effect.mapError(
-            () =>
-              new IntegrationProviderPermanentRejection({
-                message: `GitHub returned an invalid response during ${input.context}`,
-                provider: githubProviderKey,
-                httpStatus: response.status,
-              })
-          )
-        );
-        return body;
-      }).pipe(
+      );
+      const response = yield* HttpClient.execute(httpRequest).pipe(
+        Effect.provide(FetchHttpClient.layer),
+        Effect.mapError(
+          () =>
+            new IntegrationProviderTemporaryFailure({
+              message: "GitHub request failed during setup user-token exchange",
+              provider: githubProviderKey,
+            })
+        ),
         Effect.timeoutOrElse({
           duration: GITHUB_API_REQUEST_TIMEOUT_MS,
           orElse: () =>
             Effect.fail(
               new IntegrationProviderTemporaryFailure({
-                message: `GitHub request timed out during ${input.context}`,
-                provider: githubProviderKey,
-              })
-            ),
-        })
-      )
-  );
-  const authenticatedJson = (
-    path: string,
-    input: {
-      readonly accessToken: Redacted.Redacted<string>;
-      readonly body?: unknown;
-      readonly method: "GET" | "POST";
-    },
-    context: string
-  ): Effect.Effect<unknown, GitHubApiFailure> =>
-    Effect.gen(function* () {
-      let httpRequest = HttpClientRequest.make(input.method)(
-        `${GITHUB_API_BASE_URL}${path}`
-      );
-      httpRequest = HttpClientRequest.setHeaders(httpRequest, {
-        accept: "application/vnd.github+json",
-        "x-github-api-version": "2022-11-28",
-      });
-      httpRequest = HttpClientRequest.bearerToken(
-        httpRequest,
-        input.accessToken
-      );
-      if (input.body !== undefined) {
-        httpRequest = yield* HttpClientRequest.bodyJson(
-          httpRequest,
-          input.body
-        ).pipe(
-          Effect.mapError(
-            () =>
-              new IntegrationProviderPermanentRejection({
-                message: `GitHub ${context} request could not be encoded`,
-                provider: githubProviderKey,
-              })
-          )
-        );
-      }
-      return yield* request({ context, httpRequest });
-    });
-  const authenticatedNoContent = (
-    path: string,
-    accessToken: Redacted.Redacted<string>,
-    context: string
-  ): Effect.Effect<void, GitHubApiFailure> =>
-    Effect.gen(function* () {
-      const httpRequest = HttpClientRequest.bearerToken(
-        HttpClientRequest.make("DELETE")(`${GITHUB_API_BASE_URL}${path}`, {
-          headers: {
-            accept: "application/vnd.github+json",
-            "x-github-api-version": "2022-11-28",
-          },
-        }),
-        accessToken
-      );
-      const response = yield* executeResponse({ context, httpRequest }).pipe(
-        Effect.timeoutOrElse({
-          duration: GITHUB_API_REQUEST_TIMEOUT_MS,
-          orElse: () =>
-            Effect.fail(
-              new IntegrationProviderTemporaryFailure({
-                message: `GitHub request timed out during ${context}`,
+                message:
+                  "GitHub request timed out during setup user-token exchange",
                 provider: githubProviderKey,
               })
             ),
         })
       );
-      if (response.status === 404 || response.status === 410) {
-        return;
-      }
       if (response.status < 200 || response.status >= 300) {
         return yield* classifyGitHubApiError(
           { headers: response.headers, status: response.status },
-          context
+          "setup user-token exchange"
         );
       }
-    });
-  const decodeResponse =
-    <S extends Schema.Constraint>(schema: S, context: string) =>
-    (
-      effect: Effect.Effect<unknown, GitHubApiFailure>
-    ): Effect.Effect<S["Type"], GitHubApiFailure, S["DecodingServices"]> =>
-      effect.pipe(
-        Effect.flatMap((body) =>
-          Schema.decodeUnknownEffect(schema)(body).pipe(
-            Effect.mapError(
-              () =>
-                new IntegrationProviderPermanentRejection({
-                  message: `GitHub ${context} response was invalid`,
-                  provider: githubProviderKey,
-                })
-            )
-          )
+      const body = yield* response.json.pipe(
+        Effect.mapError(
+          () =>
+            new IntegrationProviderPermanentRejection({
+              message:
+                "GitHub returned an invalid response during setup user-token exchange",
+              provider: githubProviderKey,
+              httpStatus: response.status,
+            })
         )
       );
+      return yield* decodeSdkResponse(
+        GitHubUserAccessToken,
+        "setup user-token exchange"
+      )(body);
+    });
 
   return {
     createIssueBacklinkComment: ({
@@ -366,19 +456,17 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       repositoryName,
       repositoryOwner,
     }) =>
-      decodeResponse(
-        Schema.Struct({ id: Schema.Number }),
+      withSdk(
+        accessToken,
+        GitHub.Retry.none(
+          GitHub.Services.issues.createComment({
+            owner: repositoryOwner,
+            repo: repositoryName,
+            issue_number: issueNumber,
+            body: renderGitHubIssueBacklinkComment({ backlinkUrl }),
+          })
+        ),
         "issue backlink comment"
-      )(
-        authenticatedJson(
-          `/repos/${encodeURIComponent(repositoryOwner)}/${encodeURIComponent(repositoryName)}/issues/${issueNumber}/comments`,
-          {
-            accessToken,
-            body: { body: renderGitHubIssueBacklinkComment({ backlinkUrl }) },
-            method: "POST",
-          },
-          "issue backlink comment"
-        )
       ).pipe(Effect.asVoid),
     createIssue: ({
       accessToken,
@@ -387,89 +475,143 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       repositoryOwner,
       title,
     }) =>
-      decodeResponse(
-        GitHubIssue,
+      withSdk(
+        accessToken,
+        GitHub.Retry.none(
+          GitHub.Services.issues.create({
+            owner: repositoryOwner,
+            repo: repositoryName,
+            title,
+            body,
+          })
+        ),
         "issue creation"
-      )(
-        authenticatedJson(
-          `/repos/${encodeURIComponent(repositoryOwner)}/${encodeURIComponent(repositoryName)}/issues`,
-          { accessToken, body: { body, title }, method: "POST" },
-          "issue creation"
+      ).pipe(
+        Effect.flatMap((issue) =>
+          decodeSdkResponse(GitHubIssue, "issue creation")(issue)
         )
       ),
     createInstallationAccessToken: ({ appJwt, installationId }) =>
-      decodeResponse(
-        GitHubInstallationAccessToken,
+      withSdk(
+        appJwt,
+        GitHub.Retry.none(
+          GitHub.Services.apps.createInstallationAccessToken({
+            installation_id: Number(installationId),
+          })
+        ),
         "installation token creation"
-      )(
-        authenticatedJson(
-          `/app/installations/${encodeURIComponent(installationId)}/access_tokens`,
-          { accessToken: appJwt, method: "POST" },
-          "installation token creation"
+      ).pipe(
+        Effect.flatMap((token) =>
+          decodeSdkResponse(
+            GitHubInstallationAccessToken,
+            "installation token creation"
+          )({
+            expires_at: token.expires_at,
+            token: token.token,
+          })
         )
       ),
     deleteInstallation: ({ appJwt, installationId }) =>
-      authenticatedNoContent(
-        `/app/installations/${encodeURIComponent(installationId)}`,
+      withSdk(
         appJwt,
+        GitHub.Retry.none(
+          GitHub.Services.apps.deleteInstallation({
+            installation_id: Number(installationId),
+          })
+        ),
         "installation removal"
+      ).pipe(
+        Effect.catchIf(
+          (error) =>
+            Schema.is(IntegrationProviderInvalidConfigurationError)(error) &&
+            (error.httpStatus === 404 || error.httpStatus === 410),
+          () => Effect.void
+        )
       ),
-    exchangeUserAccessToken: ({ clientId, clientSecret, code }) =>
-      Effect.gen(function* () {
-        const httpRequest = yield* HttpClientRequest.bodyJson(
-          HttpClientRequest.post(GITHUB_OAUTH_TOKEN_URL, {
-            headers: { accept: "application/json" },
-          }),
-          {
-            client_id: clientId,
-            client_secret: Redacted.value(clientSecret),
-            code,
-          }
-        ).pipe(
-          Effect.mapError(
-            () =>
-              new IntegrationProviderPermanentRejection({
-                message: "GitHub setup user-token request could not be encoded",
-                provider: githubProviderKey,
-              })
-          )
-        );
-        return yield* decodeResponse(
-          GitHubUserAccessToken,
-          "setup user-token exchange"
-        )(request({ context: "setup user-token exchange", httpRequest }));
-      }),
+    exchangeUserAccessToken,
     getIssue: ({ accessToken, issueNumber, repositoryName, repositoryOwner }) =>
-      decodeResponse(
-        GitHubIssue,
+      withSdk(
+        accessToken,
+        GitHub.Retry.none(
+          GitHub.Services.issues.get({
+            owner: repositoryOwner,
+            repo: repositoryName,
+            issue_number: issueNumber,
+          })
+        ),
         "issue lookup"
-      )(
-        authenticatedJson(
-          `/repos/${encodeURIComponent(repositoryOwner)}/${encodeURIComponent(repositoryName)}/issues/${issueNumber}`,
-          { accessToken, method: "GET" },
-          "issue lookup"
+      ).pipe(
+        Effect.flatMap((issue) =>
+          decodeSdkResponse(GitHubIssue, "issue lookup")(issue)
         )
       ),
     listInstallationRepositories: ({ accessToken, page }) =>
-      decodeResponse(
-        GitHubInstallationRepositories,
+      withSdk(
+        accessToken,
+        GitHub.Retry.none(
+          GitHub.Services.apps.listReposAccessibleToInstallation({
+            per_page: 100,
+            page,
+          })
+        ),
         "installation repository listing"
-      )(
-        authenticatedJson(
-          `/installation/repositories?per_page=100&page=${page}`,
-          { accessToken, method: "GET" },
-          "installation repository listing"
+      ).pipe(
+        Effect.flatMap((response) =>
+          decodeSdkResponse(
+            GitHubInstallationRepositories,
+            "installation repository listing"
+          )({
+            repositories: response.repositories.map((repository) => ({
+              full_name: repository.full_name,
+              id: repository.id,
+              name: repository.name,
+              owner: { login: repository.owner.login },
+              private: repository.private,
+            })),
+            total_count: response.total_count,
+          })
         )
       ),
     listUserInstallations: ({ accessToken, page }) =>
-      decodeResponse(
-        GitHubUserInstallations,
+      withSdk(
+        accessToken,
+        GitHub.Retry.none(
+          GitHub.Services.apps.listInstallationsForAuthenticatedUser({
+            per_page: 100,
+            page,
+          })
+        ),
         "setup user installation listing"
-      )(
-        authenticatedJson(
-          `/user/installations?per_page=100&page=${page}`,
-          { accessToken, method: "GET" },
-          "setup user installation listing"
+      ).pipe(
+        Effect.flatMap((response) =>
+          decodeSdkResponse(
+            GitHubUserInstallations,
+            "setup user installation listing"
+          )({
+            installations: response.installations.map((installation) => {
+              const account = installation.account;
+              if (account === null) {
+                return {
+                  account: null,
+                  id: installation.id,
+                  repository_selection: installation.repository_selection,
+                  suspended_at: installation.suspended_at,
+                };
+              }
+              const isUserAccount = "login" in account;
+              return {
+                account: {
+                  id: account.id,
+                  login: isUserAccount ? account.login : account.slug,
+                  type: isUserAccount ? account.type : "Organization",
+                },
+                id: installation.id,
+                repository_selection: installation.repository_selection,
+                suspended_at: installation.suspended_at,
+              };
+            }),
+            total_count: response.total_count,
+          })
         )
       ),
   };
