@@ -73,12 +73,13 @@ export const makeGitHubCredentialResolver = ({
           installationId,
         })
         .pipe(
-          Effect.mapError(
-            () =>
-              new IntegrationProviderTemporaryFailure({
-                message: "GitHub installation token could not be minted",
-                provider: githubProviderKey,
-              })
+          Effect.mapError((error) =>
+            Schema.is(IntegrationProviderInvalidConfigurationError)(error)
+              ? error
+              : new IntegrationProviderTemporaryFailure({
+                  message: "GitHub installation token could not be minted",
+                  provider: githubProviderKey,
+                })
           )
         );
       return { accessToken };

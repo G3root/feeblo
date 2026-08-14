@@ -12,6 +12,7 @@ import {
 import {
   type IntegrationExternalResourceDraft,
   type IntegrationProviderDeliveryInput,
+  IntegrationProviderInvalidConfigurationError,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
 import * as DateTime from "effect/DateTime";
@@ -322,6 +323,32 @@ describe("GitHub provider credential resolver", () => {
       );
 
       expect(tag).toBe("IntegrationProviderTemporaryFailure");
+    })
+  );
+
+  it.effect("retains invalid configuration failures from token minting", () =>
+    Effect.gen(function* () {
+      const resolver = makeGitHubCredentialResolver({
+        installationTokenResolver: {
+          getInstallationAccessToken: () =>
+            Effect.fail(
+              new IntegrationProviderInvalidConfigurationError({
+                message: "mint configuration invalid",
+                provider: githubProviderKey,
+              })
+            ),
+        },
+        loadInstallationId: () => Effect.succeed("12345"),
+      });
+
+      const tag = yield* resolver.loadGitHubCredentials(deliveryInput).pipe(
+        Effect.match({
+          onFailure: (error) => error._tag,
+          onSuccess: () => "success",
+        })
+      );
+
+      expect(tag).toBe("IntegrationProviderInvalidConfigurationError");
     })
   );
 });
