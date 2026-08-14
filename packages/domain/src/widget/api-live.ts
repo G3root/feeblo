@@ -2,6 +2,7 @@ import { transaction } from "@feeblo/db";
 import { asLegid, type LegidOf, PostId, PostStatusId } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
@@ -248,7 +249,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           const { sanitizedMarkdown: sanitizedContent, sanitizedHtml } =
             sanitizeMarkdown(content);
           const id = yield* PostId.generate;
-          const now = new Date();
+          const now = yield* DateTime.nowAsDate;
           const excerpt = htmlToExcerpt(sanitizedHtml);
 
           let contactId: string | undefined;

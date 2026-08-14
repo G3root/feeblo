@@ -17,6 +17,7 @@ import {
 } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -547,40 +548,46 @@ const makePostRepository = Effect.gen(function* () {
       model: string;
       organizationId: string;
     }) =>
-      db
-        .update(schema.postTable)
-        .set({
-          embeddedAt: new Date(),
-          embedding: [...embedding],
-          embeddingModel: model,
-        })
-        .where(
-          and(
-            eq(schema.postTable.id, id),
-            eq(schema.postTable.organizationId, organizationId),
-            eq(schema.postTable.title, expectedTitle),
-            eq(schema.postTable.content, expectedContent)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.postTable)
+          .set({
+            embeddedAt: now,
+            embedding: [...embedding],
+            embeddingModel: model,
+          })
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId),
+              eq(schema.postTable.title, expectedTitle),
+              eq(schema.postTable.content, expectedContent)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
 
     adminUpdate: ({ id, organizationId, archived, locked }: TPostAdminUpdate) =>
-      db
-        .update(schema.postTable)
-        .set({
-          archivedAt:
-            archived === undefined ? undefined : archived ? new Date() : null,
-          lockedAt:
-            locked === undefined ? undefined : locked ? new Date() : null,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.postTable.id, id),
-            eq(schema.postTable.organizationId, organizationId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.postTable)
+          .set({
+            archivedAt:
+              archived === undefined ? undefined : archived ? now : null,
+            lockedAt:
+              locked === undefined ? undefined : locked ? now : null,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(schema.postTable.id, id),
+              eq(schema.postTable.organizationId, organizationId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid);
+      }),
 
     delete: ({
       id,
@@ -681,45 +688,48 @@ const makePostRepository = Effect.gen(function* () {
         // effect is rebuilt lazily per attempt via Effect.suspend. Effect.retry
         // re-executes it, incrementing the counter on each retry.
         let attemptIndex = 0;
-        const tryCreate = Effect.suspend(() => {
-          const slug =
-            attemptIndex === 0 ? baseSlug : `${baseSlug}-${attemptIndex + 1}`;
-          attemptIndex += 1;
+        const tryCreate = Effect.suspend(() =>
+          Effect.gen(function* () {
+            const slug =
+              attemptIndex === 0 ? baseSlug : `${baseSlug}-${attemptIndex + 1}`;
+            attemptIndex += 1;
+            const now = yield* DateTime.nowAsDate;
 
-          return db
-            .transaction(() =>
-              db
-                .insert(schema.postTable)
-                .values({
-                  id,
-                  boardId,
-                  organizationId,
-                  title,
-                  content,
-                  excerpt,
-                  statusId,
-                  creatorId: creatorId ?? null,
-                  creatorMemberId: creatorMemberId ?? null,
-                  contactId: contactId ?? null,
-                  source: source ?? "DASHBOARD",
-                  metadata: metadata ?? {},
-                  createdAt: new Date(),
-                  slug,
-                  updatedAt: new Date(),
-                  etaQuarter: etaQuarter ?? null,
-                })
-                .pipe(Effect.as(slug))
-            )
-            .pipe(
-              Effect.catchIf(
-                (error) =>
-                  isUniqueViolation(error) &&
-                  getUniqueViolationConstraint(error) ===
-                    "post_organizationId_slug_uidx",
-                () => Effect.fail(slugCollision)
+            return yield* db
+              .transaction(() =>
+                db
+                  .insert(schema.postTable)
+                  .values({
+                    id,
+                    boardId,
+                    organizationId,
+                    title,
+                    content,
+                    excerpt,
+                    statusId,
+                    creatorId: creatorId ?? null,
+                    creatorMemberId: creatorMemberId ?? null,
+                    contactId: contactId ?? null,
+                    source: source ?? "DASHBOARD",
+                    metadata: metadata ?? {},
+                    createdAt: now,
+                    slug,
+                    updatedAt: now,
+                    etaQuarter: etaQuarter ?? null,
+                  })
+                  .pipe(Effect.as(slug))
               )
-            );
-        });
+              .pipe(
+                Effect.catchIf(
+                  (error) =>
+                    isUniqueViolation(error) &&
+                    getUniqueViolationConstraint(error) ===
+                      "post_organizationId_slug_uidx",
+                  () => Effect.fail(slugCollision)
+                )
+              );
+          })
+        );
 
         return yield* Effect.retry(tryCreate, {
           // Initial attempt plus MAX_SLUG_ATTEMPTS - 1 retries.
@@ -739,6 +749,7 @@ const makePostRepository = Effect.gen(function* () {
     merge: ({ organizationId, sourcePostId, targetPostId }: TPostMerge) =>
       db.transaction((tx) =>
         Effect.gen(function* () {
+          const now = yield* DateTime.nowAsDate;
           const posts = yield* tx
             .select({
               id: schema.postTable.id,
@@ -899,10 +910,10 @@ const makePostRepository = Effect.gen(function* () {
           yield* tx
             .update(schema.postTable)
             .set({
-              archivedAt: new Date(),
-              mergedAt: new Date(),
+              archivedAt: now,
+              mergedAt: now,
               mergedIntoPostId: targetPostId,
-              updatedAt: new Date(),
+              updatedAt: now,
             })
             .where(
               and(

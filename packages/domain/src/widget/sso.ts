@@ -5,6 +5,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -321,15 +322,16 @@ export const linkAnonymousAccount = ({
     yield* transaction(
       Effect.gen(function* () {
         const db = yield* currentDb;
+        const now = yield* DateTime.nowAsDate;
 
         yield* db
           .update(schema.contactTable)
-          .set({ userId: newUserId, updatedAt: new Date() })
+          .set({ userId: newUserId, updatedAt: now })
           .where(eq(schema.contactTable.userId, anonymousUserId));
 
         yield* db
           .update(schema.postTable)
-          .set({ creatorId: newUserId, updatedAt: new Date() })
+          .set({ creatorId: newUserId, updatedAt: now })
           .where(eq(schema.postTable.creatorId, anonymousUserId));
       })
     );

@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { NodeCrypto } from "@effect/platform-node";
 import type { Role } from "@feeblo/permissions";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -61,8 +62,11 @@ describe("JwtSecretRpcHandlers", () => {
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
-  const TestLayer = JwtSecretRepository.layer.pipe(
-    Layer.provideMerge(Database.PgliteDatabaseLive)
+  const TestLayer = Layer.merge(
+    JwtSecretRepository.layer.pipe(
+      Layer.provideMerge(Database.PgliteDatabaseLive)
+    ),
+    NodeCrypto.layer
   );
 
   layer(TestLayer)("handlers", (it) => {

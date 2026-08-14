@@ -1,4 +1,5 @@
 import { describe, expect, layer } from "@effect/vitest";
+import { NodeCrypto } from "@effect/platform-node";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   IntegrationDeliveryId,
@@ -34,7 +35,8 @@ const TestLayer = Layer.mergeAll(
     ),
     Layer.provide(Database.PgliteDatabaseLive)
   ),
-  Database.PgliteDatabaseLive
+  Database.PgliteDatabaseLive,
+  NodeCrypto.layer
 );
 
 const ProductionPolicyTestLayer = Layer.mergeAll(
@@ -48,7 +50,8 @@ const ProductionPolicyTestLayer = Layer.mergeAll(
     ),
     Layer.provide(Database.PgliteDatabaseLive)
   ),
-  Database.PgliteDatabaseLive
+  Database.PgliteDatabaseLive,
+  NodeCrypto.layer
 );
 
 const seedOrganization = Effect.gen(function* () {

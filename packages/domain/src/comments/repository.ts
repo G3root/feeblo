@@ -3,6 +3,7 @@ import type { InsertComment } from "@feeblo/db/schema/feedback";
 import { and, eq, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -120,15 +121,18 @@ const makeCommentRepository = Effect.gen(function* () {
           )
         ),
     create: (args: InsertComment) =>
-      db
-        .insert(schema.commentTable)
-        .values({
-          ...args,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .returning()
-        .pipe(Effect.map(EffectArray.get(0))),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        return yield* db
+          .insert(schema.commentTable)
+          .values({
+            ...args,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning()
+          .pipe(Effect.map(EffectArray.get(0)));
+      }),
     delete: (args: DeleteComment) =>
       db
         .delete(schema.commentTable)
@@ -144,27 +148,30 @@ const makeCommentRepository = Effect.gen(function* () {
         })
         .pipe(Effect.map(EffectArray.get(0))),
     update: (args: UpdateComment) =>
-      db
-        .update(schema.commentTable)
-        .set({
-          content: args.content,
-          updatedAt: new Date(),
-          ...(args.visibility
-            ? {
-                visibility: args.visibility,
-              }
-            : {}),
-        })
-        .where(
-          and(
-            eq(schema.commentTable.id, args.id),
-            eq(schema.commentTable.organizationId, args.organizationId),
-            eq(schema.commentTable.postId, args.postId),
-            eq(schema.commentTable.userId, args.userId)
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        return yield* db
+          .update(schema.commentTable)
+          .set({
+            content: args.content,
+            updatedAt: now,
+            ...(args.visibility
+              ? {
+                  visibility: args.visibility,
+                }
+              : {}),
+          })
+          .where(
+            and(
+              eq(schema.commentTable.id, args.id),
+              eq(schema.commentTable.organizationId, args.organizationId),
+              eq(schema.commentTable.postId, args.postId),
+              eq(schema.commentTable.userId, args.userId)
+            )
           )
-        )
-        .returning()
-        .pipe(Effect.map(EffectArray.get(0))),
+          .returning()
+          .pipe(Effect.map(EffectArray.get(0)));
+      }),
     findById: (args: FindByIdComment) =>
       db
         .select({

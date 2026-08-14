@@ -6,6 +6,7 @@ import {
 } from "@feeblo/transactional/mailer";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
 import { and, eq, inArray } from "drizzle-orm";
+import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 import * as W from "effect/unstable/workflow";
@@ -78,7 +79,8 @@ export const scheduleSubmissionNotificationBatch = (organizationId: string) =>
       return;
     }
 
-    const batchId = crypto.randomUUID();
+    const crypto = yield* Crypto.Crypto;
+    const batchId = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
     const inserted = yield* db
       .insert(schema.submissionNotificationBatchTable)
       .values({ id: batchId, organizationId })

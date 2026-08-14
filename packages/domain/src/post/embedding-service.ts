@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -150,10 +151,11 @@ const generatePostEmbedding = Effect.fn("PostEmbedding.generate")(function* (
     return;
   }
 
+  const now = yield* DateTime.nowAsDate;
   yield* db
     .update(schema.postTable)
     .set({
-      embeddedAt: new Date(),
+      embeddedAt: now,
       embedding: [...embedding.value.vector],
       embeddingModel: embedding.value.model,
     })

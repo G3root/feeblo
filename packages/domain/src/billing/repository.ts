@@ -5,6 +5,7 @@ import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/com
 import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -27,12 +28,12 @@ interface TFindCheckoutProduct {
   productId: string;
 }
 
-const currentlyEntitledSubscription = () =>
+const currentlyEntitledSubscription = (now: Date) =>
   or(
     inArray(schema.subscriptionTable.status, ["active", "trialing"]),
     and(
       eq(schema.subscriptionTable.status, "past_due"),
-      gt(schema.subscriptionTable.currentPeriodEnd, new Date())
+      gt(schema.subscriptionTable.currentPeriodEnd, now)
     )
   );
 
@@ -124,7 +125,10 @@ const toSubscriptionValues = (
   seats: payload.seats,
 });
 
-const toProductValues = (payload: ProductPayload): ProductInsert => ({
+const toProductValues = (
+  payload: ProductPayload,
+  now: Date
+): ProductInsert => ({
   id: payload.id,
   name: payload.name,
   description: payload.description,
@@ -137,7 +141,7 @@ const toProductValues = (payload: ProductPayload): ProductInsert => ({
   externalOrganizationId: payload.organizationId,
   visibility: payload.visibility,
   createdAt: payload.createdAt,
-  updatedAt: payload.modifiedAt ?? new Date(),
+  updatedAt: payload.modifiedAt ?? now,
   metadata: decodeProductMetadata(payload.metadata),
   prices: payload.prices,
 });
@@ -157,6 +161,7 @@ const makeBillingRepository = Effect.gen(function* () {
     upsertSubscription: (payload: SubscriptionPayload) =>
       Effect.gen(function* () {
         const id = yield* SubscriptionId.generate;
+        const now = yield* DateTime.nowAsDate;
         const values = toSubscriptionValues(payload, id);
         const { id: _id, ...updateValues } = values;
         yield* db
@@ -166,28 +171,34 @@ const makeBillingRepository = Effect.gen(function* () {
             target: schema.subscriptionTable.externalId,
             set: {
               ...updateValues,
-              updatedAt: new Date(),
+              updatedAt: now,
             },
           });
       }),
     createProduct: (payload: ProductPayload) =>
-      db
-        .insert(schema.productTable)
-        .values(toProductValues(payload))
-        .onConflictDoNothing()
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .insert(schema.productTable)
+          .values(toProductValues(payload, now))
+          .onConflictDoNothing()
+          .pipe(Effect.asVoid);
+      }),
     upsertProduct: (payload: ProductPayload) =>
-      db
-        .insert(schema.productTable)
-        .values(toProductValues(payload))
-        .onConflictDoUpdate({
-          target: schema.productTable.id,
-          set: {
-            ...toProductValues(payload),
-            updatedAt: payload.modifiedAt ?? new Date(),
-          },
-        })
-        .pipe(Effect.asVoid),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .insert(schema.productTable)
+          .values(toProductValues(payload, now))
+          .onConflictDoUpdate({
+            target: schema.productTable.id,
+            set: {
+              ...toProductValues(payload, now),
+              updatedAt: payload.modifiedAt ?? now,
+            },
+          })
+          .pipe(Effect.asVoid);
+      }),
     findCheckoutProduct: ({ productId }: TFindCheckoutProduct) =>
       db
         .select({
@@ -221,25 +232,28 @@ const makeBillingRepository = Effect.gen(function* () {
     findCurrentSubscriptionByOrganizationId: ({
       organizationId,
     }: TFindSubscriptionByOrganizationId) =>
-      db
-        .select({
-          id: schema.subscriptionTable.id,
-          customerId: schema.subscriptionTable.customerId,
-          organizationId: schema.subscriptionTable.organizationId,
-        })
-        .from(schema.subscriptionTable)
-        .where(
-          and(
-            eq(schema.subscriptionTable.organizationId, organizationId),
-            currentlyEntitledSubscription()
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        return yield* db
+          .select({
+            id: schema.subscriptionTable.id,
+            customerId: schema.subscriptionTable.customerId,
+            organizationId: schema.subscriptionTable.organizationId,
+          })
+          .from(schema.subscriptionTable)
+          .where(
+            and(
+              eq(schema.subscriptionTable.organizationId, organizationId),
+              currentlyEntitledSubscription(now)
+            )
           )
-        )
-        .orderBy(
-          desc(schema.subscriptionTable.currentPeriodEnd),
-          desc(schema.subscriptionTable.createdAt)
-        )
-        .limit(1)
-        .pipe(Effect.map(EffectArray.get(0))),
+          .orderBy(
+            desc(schema.subscriptionTable.currentPeriodEnd),
+            desc(schema.subscriptionTable.createdAt)
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+      }),
     findSubscriptionByOrganizationId: ({
       organizationId,
     }: TFindSubscriptionByOrganizationId) =>

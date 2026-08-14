@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
@@ -28,6 +29,7 @@ const pastExp = Math.floor(Date.now() / 1000) - 3600;
 const TestLayer = Layer.mergeAll(
   SsoRepositoriesLive,
   EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
+  NodeCrypto.layer,
   RateLimitService.layerMemory
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 

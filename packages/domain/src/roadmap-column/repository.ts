@@ -2,6 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { and, asc, eq, exists } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -98,13 +99,14 @@ const makeRoadmapColumnRepository = Effect.gen(function* () {
         .pipe(Effect.asVoid),
     update: ({ organizationId, ...input }: TRoadmapColumnUpdate) =>
       Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
         const [updated] = yield* db
           .update(schema.roadmapColumnTable)
           .set({
             name: input.name,
             position: input.position,
             config: toMutableColumnConfig(input.config),
-            updatedAt: new Date(),
+            updatedAt: now,
           })
           .where(
             and(

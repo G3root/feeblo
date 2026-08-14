@@ -3,7 +3,7 @@ import { integer, pgTable } from "drizzle-orm/pg-core";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { expect, it } from "vitest";
+import { expect, it } from "@effect/vitest";
 import {
   currentDb,
   Database,
@@ -23,9 +23,9 @@ const transactionTestTable = pgTable("transaction_test", {
   id: integer("id").primaryKey(),
 });
 
-it("rolls back captured database queries and nested savepoints", async () => {
-  const rows = await Effect.runPromise(
-    Effect.gen(function* () {
+it.effect("rolls back captured database queries and nested savepoints", () =>
+  Effect.gen(function* () {
+    const rows = yield* Effect.gen(function* () {
       // This deliberately captures the root database before either transaction,
       // matching how repository layers are constructed in the domain package.
       const capturedDb = yield* currentDb;
@@ -60,8 +60,8 @@ it("rolls back captured database queries and nested savepoints", async () => {
         .select({ id: transactionTestTable.id })
         .from(transactionTestTable)
         .orderBy(transactionTestTable.id);
-    }).pipe(Effect.provide(TestDatabaseLive))
-  );
+    }).pipe(Effect.provide(TestDatabaseLive));
 
-  expect(rows).toEqual([{ id: 1 }, { id: 3 }]);
-});
+    expect(rows).toEqual([{ id: 1 }, { id: 3 }]);
+  })
+);

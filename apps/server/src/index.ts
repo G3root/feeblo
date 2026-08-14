@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import {
+  NodeCrypto,
   NodeFileSystem,
   NodeHttpServer,
   NodePath,
@@ -87,7 +88,6 @@ import { GitHubProviderLive } from "./github-provider";
 import { makeIntegrationLayers } from "./integrations";
 import { makeSlackRouters } from "./slack";
 
-const useTestMailer = process.env.E2E_TEST_MAILER === "true";
 const MAX_REQUEST_BODY_BYTES = 1_000_000;
 
 const requestBodyTooLargeResponse = (): Response =>
@@ -216,10 +216,12 @@ const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
     router.add(
       "GET",
       "/health",
-      HttpServerResponse.jsonUnsafe({
-        status: "ok",
-        release: process.env.APP_RELEASE ?? "dev",
-      })
+      Effect.gen(function* () {
+        const release = yield* Config.string("APP_RELEASE").pipe(
+          Config.withDefault("dev")
+        );
+        return yield* HttpServerResponse.json({ status: "ok", release });
+      }).pipe(Effect.orDie)
     )
   );
 
@@ -274,6 +276,9 @@ const program = Effect.gen(function* () {
         Sentry.SentryEffectMetricsLayer
       )
     : Layer.empty;
+  const useTestMailer = yield* Config.boolean("E2E_TEST_MAILER").pipe(
+    Config.withDefault(false)
+  );
   const mailbox = useTestMailer ? yield* TestMailer.make : undefined;
   const makeMailerLayer = (): Layer.Layer<
     Mailer,
@@ -509,6 +514,7 @@ program.pipe(
       ServerConfig.layer,
       Database.DatabaseContextLive,
       WebhookIntegrationConfig.layer,
+      NodeCrypto.layer,
       SlackIntegrationConfig.layer,
       DiscordIntegrationConfig.layer
     )

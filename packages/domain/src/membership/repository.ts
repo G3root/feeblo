@@ -3,6 +3,7 @@ import { PRIVILEGED_ROLES, type Role } from "@feeblo/permissions";
 import { and, eq, inArray } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -126,28 +127,31 @@ const makeMembershipRepository = Effect.gen(function* () {
       inviterId,
       expiresAt,
     }: TCreateInvitation) =>
-      db
-        .insert(schema.invitationTable)
-        .values({
-          id,
-          organizationId,
-          email,
-          role,
-          inviterId,
-          expiresAt,
-          status: "pending",
-          createdAt: new Date(),
-        })
-        .returning({
-          id: schema.invitationTable.id,
-          organizationId: schema.invitationTable.organizationId,
-          email: schema.invitationTable.email,
-          role: schema.invitationTable.role,
-          status: schema.invitationTable.status,
-          expiresAt: schema.invitationTable.expiresAt,
-          inviterId: schema.invitationTable.inviterId,
-          createdAt: schema.invitationTable.createdAt,
-        }),
+      Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        return yield* db
+          .insert(schema.invitationTable)
+          .values({
+            id,
+            organizationId,
+            email,
+            role,
+            inviterId,
+            expiresAt,
+            status: "pending",
+            createdAt: now,
+          })
+          .returning({
+            id: schema.invitationTable.id,
+            organizationId: schema.invitationTable.organizationId,
+            email: schema.invitationTable.email,
+            role: schema.invitationTable.role,
+            status: schema.invitationTable.status,
+            expiresAt: schema.invitationTable.expiresAt,
+            inviterId: schema.invitationTable.inviterId,
+            createdAt: schema.invitationTable.createdAt,
+          });
+      }),
     updateMemberRole: ({ memberId, organizationId, role }: TUpdateMemberRole) =>
       db
         .update(schema.memberTable)

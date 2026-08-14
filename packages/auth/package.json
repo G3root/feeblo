@@ -30,6 +30,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@effect/platform-node": "catalog:",
     "@feeblo/config": "workspace:*",
     "@feeblo/domain": "workspace:*",
     "@feeblo/db": "workspace:*",

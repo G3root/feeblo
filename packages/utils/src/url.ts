@@ -88,8 +88,7 @@ const DEFAULT_RESERVED_SUBDOMAINS = [
   "changelog",
 ];
 
-export function getReservedSubdomains(): string[] {
-  const envValue = process.env.RESERVED_SUBDOMAINS;
+export function getReservedSubdomains(envValue?: string): string[] {
   const envSubdomains = envValue
     ? envValue
         .split(",")

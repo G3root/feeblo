@@ -1,4 +1,5 @@
 import { getReservedSubdomains } from "@feeblo/utils/url";
+import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -36,7 +37,10 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
   {
     make: Effect.gen(function* () {
       const { extraWords } = yield* ProfanityConfig;
-      const reservedSubdomains = getReservedSubdomains();
+      const reservedSubdomainsEnv = yield* Config.string(
+        "RESERVED_SUBDOMAINS"
+      ).pipe(Config.withDefault(""));
+      const reservedSubdomains = getReservedSubdomains(reservedSubdomainsEnv);
 
       const extraTokenSet = new Set(extraWords);
 

@@ -2,6 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { CompanyId } from "@feeblo/id";
 import { and, eq, or } from "drizzle-orm";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -28,7 +29,7 @@ const makeCompanyRepository = Effect.gen(function* () {
     create: (args: TCompanyCreate) =>
       Effect.gen(function* () {
         const id = args.id ?? (yield* CompanyId.generate);
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const [created] = yield* db
           .insert(schema.companyTable)
           .values({
@@ -59,6 +60,7 @@ const makeCompanyRepository = Effect.gen(function* () {
 
     update: (args: TCompanyUpdate) =>
       Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
         const [updated] = yield* db
           .update(schema.companyTable)
           .set({
@@ -70,7 +72,7 @@ const makeCompanyRepository = Effect.gen(function* () {
             ...(args.externalCreatedAt !== undefined && {
               externalCreatedAt: args.externalCreatedAt,
             }),
-            updatedAt: new Date(),
+            updatedAt: now,
           })
           .where(
             and(
@@ -133,6 +135,7 @@ const makeCompanyRepository = Effect.gen(function* () {
           .pipe(Effect.map((rows) => rows[0]));
 
         if (existing) {
+          const now = yield* DateTime.nowAsDate;
           const [updated = null] = yield* db
             .update(schema.companyTable)
             .set({
@@ -141,7 +144,7 @@ const makeCompanyRepository = Effect.gen(function* () {
               ...(args.externalCreatedAt !== undefined && {
                 externalCreatedAt: args.externalCreatedAt,
               }),
-              updatedAt: new Date(),
+              updatedAt: now,
             })
             .where(eq(schema.companyTable.id, existing.id))
             .returning();
@@ -152,7 +155,7 @@ const makeCompanyRepository = Effect.gen(function* () {
         }
 
         const id = yield* CompanyId.generate;
-        const now = new Date();
+        const now = yield* DateTime.nowAsDate;
         const [created = null] = yield* db
           .insert(schema.companyTable)
           .values({
