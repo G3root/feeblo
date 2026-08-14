@@ -3,14 +3,16 @@ import {
   IntegrationCapabilityKey,
   IntegrationProviderKey,
   IntegrationProviderManifest,
-} from "@feeblo/integration-core";
+} from "@feeblo/integration-core/contracts";
 import * as Schema from "effect/Schema";
 
 export const githubProviderKey = IntegrationProviderKey.make("github");
-export const githubIssueCreateCapabilityKey =
-  IntegrationCapabilityKey.make("github.issue.create");
-export const githubIssueWebhookCapabilityKey =
-  IntegrationCapabilityKey.make("github.issue.webhook");
+export const githubIssueCreateCapabilityKey = IntegrationCapabilityKey.make(
+  "github.issue.create"
+);
+export const githubIssueWebhookCapabilityKey = IntegrationCapabilityKey.make(
+  "github.issue.webhook"
+);
 
 /** GitHub App permissions required by Feeblo's bot integration. */
 export const GITHUB_APP_PERMISSIONS = {
