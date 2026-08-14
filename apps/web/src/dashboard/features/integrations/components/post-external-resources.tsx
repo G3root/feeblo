@@ -177,11 +177,7 @@ function PostExternalResourceCard({
       )}
     </>
   );
-  return resource.remoteUrl === null ? (
-    <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-      {content}
-    </div>
-  ) : (
+  return (
     <a
       className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted"
       href={resource.remoteUrl.toString()}

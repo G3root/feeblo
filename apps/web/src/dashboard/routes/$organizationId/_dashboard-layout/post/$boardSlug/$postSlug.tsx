@@ -11,6 +11,7 @@ import {
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   Activity01Icon,
   Calendar03Icon,
@@ -65,6 +66,12 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
+  // The linked-resources panel and its GitHub actions are read/written through
+  // RPCs that require integrations.manage, so gate them the same way the
+  // settings route does instead of rendering actions that will 403.
+  const githubResourcesPolicy = usePolicy(
+    hasPermission(organizationId, "integrations.manage")
+  );
 
   const { data: postRow, isLoading: isPostLoading } = useLiveQuery(
     (q) => {
@@ -183,16 +190,19 @@ function RouteComponent() {
           <div className="space-y-4 lg:sticky lg:top-0">
             <PostSidebarActions />
 
-            <PostExternalResources
-              actions={
-                <GitHubPostResourceActions
-                  organizationId={organizationId}
-                  postId={post.id}
-                />
-              }
-              organizationId={organizationId}
-              postId={post.id}
-            />
+            {githubResourcesPolicy.isPending ||
+            !githubResourcesPolicy.allowed ? null : (
+              <PostExternalResources
+                actions={
+                  <GitHubPostResourceActions
+                    organizationId={organizationId}
+                    postId={post.id}
+                  />
+                }
+                organizationId={organizationId}
+                postId={post.id}
+              />
+            )}
 
             {/* Each field self-gates with the permission the backend enforces
                 (PostPolicy.canUpdateProperties): status → posts.status,
