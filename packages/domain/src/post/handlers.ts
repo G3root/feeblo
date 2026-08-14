@@ -87,6 +87,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     actorMemberId,
     actorName,
     boardId,
+    description,
     eventType,
     organizationId,
     postId,
@@ -98,6 +99,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     actorMemberId: string | null;
     actorName: string | null | undefined;
     boardId: LegidOf<"BoardId">;
+    description?: string;
     eventType: "feedback.post.created" | "feedback.post.status_changed";
     organizationId: LegidOf<"WorkspaceId">;
     postId: LegidOf<"PostId">;
@@ -118,6 +120,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               memberId: actorMemberId,
             },
       boardId,
+      ...(description === undefined ? {} : { description }),
       eventType,
       organizationId,
       postId,
@@ -638,6 +641,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             actorMemberId: membership?.membershipId ?? null,
             actorName: membership ? session.user.name : undefined,
             boardId: args.boardId,
+            description: prepared.content,
             eventType: "feedback.post.created",
             organizationId: args.organizationId,
             postId: args.id,
