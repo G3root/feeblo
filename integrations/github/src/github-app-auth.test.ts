@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "@effect/vitest";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as jose from "jose";
@@ -96,5 +97,64 @@ describe("GitHub App authentication", () => {
       expect(Redacted.value(second)).toBe("ghs_token_1");
       expect(minted).toBe(1);
     })
+  );
+
+  it.effect(
+    "mints a fresh installation token after the cached one expires",
+    () => {
+      let currentTime = new Date("2030-01-01T00:00:00Z");
+      let minted = 0;
+      const fakeClock: Clock.Clock = {
+        currentTimeMillis: Effect.sync(() => currentTime.getTime()),
+        currentTimeMillisUnsafe: () => currentTime.getTime(),
+        currentTimeNanos: Effect.sync(
+          () => BigInt(currentTime.getTime()) * 1_000_000n
+        ),
+        currentTimeNanosUnsafe: () =>
+          BigInt(currentTime.getTime()) * 1_000_000n,
+        monotonicTimeNanos: Effect.sync(
+          () => BigInt(currentTime.getTime()) * 1_000_000n
+        ),
+        monotonicTimeNanosUnsafe: () =>
+          BigInt(currentTime.getTime()) * 1_000_000n,
+        sleep: () => Effect.void,
+      };
+      const apiClient: GitHubApiClient = {
+        createInstallationAccessToken: () => {
+          minted += 1;
+          return Effect.succeed({
+            expires_at: new Date(currentTime.getTime() + 60 * 60 * 1000),
+            token: `ghs_token_${minted}`,
+          });
+        },
+        createIssue: () => Effect.die("unused"),
+        createIssueBacklinkComment: () => Effect.die("unused"),
+        deleteInstallation: () => Effect.die("unused"),
+        exchangeUserAccessToken: () => Effect.die("unused"),
+        getIssue: () => Effect.die("unused"),
+        listInstallationRepositories: () => Effect.die("unused"),
+        listUserInstallations: () => Effect.die("unused"),
+      };
+      return Effect.gen(function* () {
+        const privateKey = yield* makePrivateKey();
+        const resolver = yield* makeGitHubInstallationTokenResolver({
+          apiClient,
+          appId: "1234",
+          now: () => currentTime,
+          privateKey: Redacted.make(privateKey),
+        });
+        const first = yield* resolver.getInstallationAccessToken({
+          installationId: "9",
+        });
+        currentTime = new Date(currentTime.getTime() + 61 * 60 * 1000);
+        const second = yield* resolver.getInstallationAccessToken({
+          installationId: "9",
+        });
+
+        expect(Redacted.value(first)).toBe("ghs_token_1");
+        expect(Redacted.value(second)).toBe("ghs_token_2");
+        expect(minted).toBe(2);
+      }).pipe(Effect.provideService(Clock.Clock, fakeClock));
+    }
   );
 });

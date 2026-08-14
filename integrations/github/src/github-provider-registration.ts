@@ -1,6 +1,4 @@
 import {
-  type IntegrationExternalResourceDraft,
-  IntegrationExternalResourceType,
   type IntegrationInboundCapabilityHandler,
   type IntegrationInboundRequest,
   type IntegrationInboundResponse,
@@ -14,13 +12,10 @@ import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import {
-  type GitHubApiClient,
-  type GitHubIssue,
-  makeGitHubApiClient,
-} from "./github-api";
+import { type GitHubApiClient, makeGitHubApiClient } from "./github-api";
 import type { GitHubInstallationTokenResolver } from "./github-app-auth";
 import { GitHubInboundPayloadError } from "./github-errors";
+import { makeGitHubIssueExternalResourceDraft } from "./github-external-resource";
 import {
   GitHubInstallationRepositoriesWebhookPayload,
   GitHubInstallationWebhookPayload,
@@ -160,31 +155,7 @@ const parseGitHubAppWebhook = ({
   }
 };
 
-/** Converts GitHub's issue identity into the provider-neutral resource draft. */
-export const makeGitHubIssueExternalResourceDraft = ({
-  issue,
-  postId,
-  repositoryName,
-  repositoryOwner,
-}: {
-  readonly issue: GitHubIssue;
-  readonly postId: IntegrationExternalResourceDraft["postId"];
-  readonly repositoryName: string;
-  readonly repositoryOwner: string;
-}): IntegrationExternalResourceDraft => ({
-  displayKey: `${repositoryOwner}/${repositoryName}#${issue.number}`,
-  postId,
-  remoteId: issue.node_id,
-  stateKey: issue.state,
-  remoteUrl: issue.html_url,
-  resourceType: IntegrationExternalResourceType.make("issue"),
-  safeMetadata: {
-    issueNumber: issue.number,
-    repositoryName,
-    repositoryOwner,
-  },
-  title: issue.title,
-});
+/** Converts a GitHub issue into the provider-neutral resource draft; both delivery and user-requested paths share this mapping. */
 
 /** Provider-owned raw GitHub App webhook authentication and decoding, before any domain service runs. */
 const makeGitHubAppWebhookHandler = ({
@@ -288,18 +259,33 @@ export const makeGitHubProviderRegistration = ({
           yield* credentialResolver.loadGitHubCredentials(input);
         const issue = yield* apiClient.createIssue({
           accessToken: credentials.accessToken,
-          body: renderGitHubIssueBody({ postUrl: eventData.post.url }),
+          body: renderGitHubIssueBody({
+            description: eventData.post.description ?? null,
+          }),
           repositoryName: routeConfig.repositoryName,
           repositoryOwner: routeConfig.repositoryOwner,
           title: eventData.post.title,
         });
+        // The bot backlink comment is part of the delivery so a retry after a
+        // crash before acknowledgement re-runs both calls (at-least-once).
+        yield* apiClient.createIssueBacklinkComment({
+          accessToken: credentials.accessToken,
+          backlinkUrl: eventData.post.url,
+          issueNumber: issue.number,
+          repositoryName: routeConfig.repositoryName,
+          repositoryOwner: routeConfig.repositoryOwner,
+        });
         return {
           externalResourceDrafts: [
             makeGitHubIssueExternalResourceDraft({
-              issue,
+              issueNumber: issue.number,
               postId: eventData.post.id,
               repositoryName: routeConfig.repositoryName,
               repositoryOwner: routeConfig.repositoryOwner,
+              remoteId: issue.node_id,
+              remoteUrl: issue.html_url,
+              state: issue.state,
+              title: issue.title,
             }),
           ],
           httpStatus: 201,

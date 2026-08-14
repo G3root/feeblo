@@ -21,6 +21,7 @@ import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import type { GitHubApiClient, GitHubIssue } from "./github-api";
+import { makeGitHubIssueExternalResourceDraft } from "./github-external-resource";
 import { ParsedGitHubInboundRequest } from "./github-inbound-schema";
 import {
   githubIssueCreateCapabilityKey,
@@ -28,7 +29,6 @@ import {
 } from "./github-manifest";
 import {
   makeGitHubCredentialResolver,
-  makeGitHubIssueExternalResourceDraft,
   makeGitHubProviderRegistration,
 } from "./github-provider-registration";
 
@@ -62,6 +62,7 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
       board: { id: "brd_1", name: "Ideas", slug: "ideas" },
       post: {
         id: "pst_1",
+        description: "Dark mode hurts my eyes at night.",
         status: { id: "pss_1", type: "PENDING" },
         title: "Dark mode",
         url: "https://feeblo.example/org/post/ideas/dark-mode",
@@ -148,44 +149,53 @@ describe("GitHub provider registration", () => {
       })
   );
 
-  it.effect("creates an issue whose body points back to Feeblo", () =>
-    Effect.gen(function* () {
-      let issueBody = "";
-      let externalResourceDrafts:
-        | readonly IntegrationExternalResourceDraft[]
-        | undefined;
-      const registration = makeGitHubProviderRegistration({
-        apiClient: {
-          ...apiClient,
-          createIssue: (input) => {
-            issueBody = input.body;
-            return apiClient.createIssue(input);
+  it.effect(
+    "creates an issue from the post description and comments the Feeblo backlink",
+    () =>
+      Effect.gen(function* () {
+        let issueBody = "";
+        let commentedBacklinkUrl: URL | undefined;
+        let externalResourceDrafts:
+          | readonly IntegrationExternalResourceDraft[]
+          | undefined;
+        const registration = makeGitHubProviderRegistration({
+          apiClient: {
+            ...apiClient,
+            createIssue: (input) => {
+              issueBody = input.body;
+              return apiClient.createIssue(input);
+            },
+            createIssueBacklinkComment: (input) => {
+              commentedBacklinkUrl = input.backlinkUrl;
+              return Effect.void;
+            },
           },
-        },
-        credentialResolver: {
-          loadGitHubCredentials: () =>
-            Effect.succeed({ accessToken: Redacted.make("token") }),
-        },
-        webhookSecret: Redacted.make("webhook-secret"),
-      });
-      const handler = registration.handlers[0];
-      if (handler === undefined) {
-        return;
-      }
-      const result = yield* Effect.exit(handler.deliver(deliveryInput));
-      expect(Exit.isSuccess(result)).toBe(true);
-      if (Exit.isSuccess(result)) {
-        externalResourceDrafts = result.value.externalResourceDrafts;
-      }
-      expect(issueBody).toContain(
-        "https://feeblo.example/org/post/ideas/dark-mode"
-      );
-      expect(externalResourceDrafts?.[0]?.remoteId).toBe("I_7");
-      expect(externalResourceDrafts?.[0]?.stateKey).toBe("open");
-      expect(externalResourceDrafts?.[0]?.remoteUrl.href).toBe(
-        "https://github.com/acme/feedback/issues/7"
-      );
-    })
+          credentialResolver: {
+            loadGitHubCredentials: () =>
+              Effect.succeed({ accessToken: Redacted.make("token") }),
+          },
+          webhookSecret: Redacted.make("webhook-secret"),
+        });
+        const handler = registration.handlers[0];
+        if (handler === undefined) {
+          return;
+        }
+        const result = yield* Effect.exit(handler.deliver(deliveryInput));
+        expect(Exit.isSuccess(result)).toBe(true);
+        if (Exit.isSuccess(result)) {
+          externalResourceDrafts = result.value.externalResourceDrafts;
+        }
+        expect(issueBody).toBe("Dark mode hurts my eyes at night.");
+        expect(commentedBacklinkUrl?.href).toBe(
+          "https://feeblo.example/org/post/ideas/dark-mode"
+        );
+        expect(externalResourceDrafts?.[0]?.remoteId).toBe("I_7");
+        expect(externalResourceDrafts?.[0]?.stateKey).toBe("open");
+        expect(externalResourceDrafts?.[0]?.title).toBe("Dark mode");
+        expect(externalResourceDrafts?.[0]?.remoteUrl.href).toBe(
+          "https://github.com/acme/feedback/issues/7"
+        );
+      })
   );
 
   it.effect(
@@ -238,10 +248,14 @@ describe("makeGitHubIssueExternalResourceDraft", () => {
       title: "Dark mode",
     };
     const draft = makeGitHubIssueExternalResourceDraft({
-      issue,
+      issueNumber: issue.number,
       postId: asLegid(PostId)("pst_1"),
       repositoryName: "feedback",
       repositoryOwner: "acme",
+      remoteId: issue.node_id,
+      remoteUrl: issue.html_url,
+      state: issue.state,
+      title: issue.title,
     });
 
     expect(draft.displayKey).toBe("acme/feedback#7");

@@ -2,11 +2,23 @@ import { describe, expect, it } from "@effect/vitest";
 import { renderGitHubIssueBody } from "./github-issue-body";
 
 describe("renderGitHubIssueBody", () => {
-  it("keeps the canonical Feeblo feedback URL in the issue body", () => {
-    const postUrl = new URL("https://feeblo.example/org/post/ideas/dark-mode");
-    const body = renderGitHubIssueBody({ postUrl });
+  it("uses the post description as the issue body", () => {
+    const body = renderGitHubIssueBody({
+      description: "Dark mode hurts my eyes at night.",
+    });
 
-    expect(body).toContain(postUrl.href);
-    expect(body).toContain("Feeblo feedback");
+    expect(body).toBe("Dark mode hurts my eyes at night.");
+  });
+
+  it("falls back to a generic body when the description is empty", () => {
+    const body = renderGitHubIssueBody({ description: "   " });
+
+    expect(body).toBe("This issue was created from Feeblo feedback.");
+  });
+
+  it("falls back to a generic body without a description", () => {
+    const body = renderGitHubIssueBody({});
+
+    expect(body).toBe("This issue was created from Feeblo feedback.");
   });
 });

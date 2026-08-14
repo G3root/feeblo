@@ -1,11 +1,11 @@
-/** Renders the issue body while retaining the canonical Feeblo feedback URL. */
+/** Renders the issue body from the Feeblo post description; the Feeblo backlink lives in the bot comment, not the body. */
 export const renderGitHubIssueBody = ({
-  postUrl,
+  description,
 }: {
-  readonly postUrl: URL;
-}): string =>
-  [
-    "This issue was created from Feeblo feedback.",
-    "",
-    `Continue the feedback discussion in Feeblo: ${postUrl.href}`,
-  ].join("\n");
+  readonly description?: string | null;
+}): string => {
+  const body = description?.trim();
+  return body !== undefined && body.length > 0
+    ? body
+    : "This issue was created from Feeblo feedback.";
+};

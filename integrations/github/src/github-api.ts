@@ -104,13 +104,13 @@ export const GitHubIssue = Schema.Struct({
 });
 export interface GitHubIssue extends Schema.Schema.Type<typeof GitHubIssue> {}
 
-/** Formats the bot-authored comment linking an existing GitHub issue back to Feeblo. */
+/** Formats the bot-authored comment linking a GitHub issue back to its Feeblo post. */
 export const renderGitHubIssueBacklinkComment = ({
   backlinkUrl,
 }: {
   readonly backlinkUrl: URL;
 }): string =>
-  `This issue is linked to feedback in Feeblo.\n\nContinue the feedback discussion: ${backlinkUrl.href}`;
+  `The issue is linked to our feedback platform. For feedback and updates, please visit [this link](${backlinkUrl.href})`;
 
 /** Maps GitHub transport statuses into integration kernel failures. */
 export const classifyGitHubApiError = (

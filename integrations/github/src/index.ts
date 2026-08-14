@@ -4,6 +4,7 @@ export * from "./github-api";
 export * from "./github-app-auth";
 export * from "./github-credentials";
 export * from "./github-errors";
+export * from "./github-external-resource";
 export * from "./github-inbound-schema";
 export * from "./github-issue-body";
 export * from "./github-manifest";

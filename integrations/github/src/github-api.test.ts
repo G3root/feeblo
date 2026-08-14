@@ -125,10 +125,10 @@ describe("GitHub App installation id validation", () => {
 });
 
 describe("GitHub bot backlink comments", () => {
-  it("renders a bot-authored Feeblo backlink without editing the issue body", () => {
+  it("renders the feedback-platform backlink as a markdown link", () => {
     const backlinkUrl = new URL("https://feeblo.example/post/one");
-    expect(renderGitHubIssueBacklinkComment({ backlinkUrl })).toContain(
-      backlinkUrl.href
+    expect(renderGitHubIssueBacklinkComment({ backlinkUrl })).toBe(
+      "The issue is linked to our feedback platform. For feedback and updates, please visit [this link](https://feeblo.example/post/one)"
     );
   });
 });
