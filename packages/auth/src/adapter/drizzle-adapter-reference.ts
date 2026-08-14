@@ -187,13 +187,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
   let mysqlNoIdWarned = false;
   const createCustomAdapter =
     (db: DB, inTransaction = false): AdapterFactoryCustomizeAdapterCreator =>
-    ({
-      getFieldName,
-      getDefaultFieldName,
-      getDefaultModelName,
-      options,
-      schema: baSchema,
-    }) => {
+    ({ getFieldName, getDefaultModelName, options, schema: baSchema }) => {
       if (
         config.provider === "mysql" &&
         options.advanced?.database?.generateId === false &&
