@@ -135,6 +135,8 @@ export const IntegrationPostEventData = Schema.Struct({
   }),
   post: Schema.Struct({
     id: PostId.schema,
+    /** Post body (sanitized markdown) used as the provider issue body; absent for status-change events. */
+    description: Schema.optionalKey(Schema.String),
     metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     status: Schema.Struct({
       id: PostStatusId.schema,
