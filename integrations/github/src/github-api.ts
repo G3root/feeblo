@@ -28,6 +28,8 @@ export const GITHUB_OAUTH_TOKEN_URL =
   "https://github.com/login/oauth/access_token";
 /** Per-request upper bound for GitHub REST API calls. */
 export const GITHUB_API_REQUEST_TIMEOUT_MS = 10_000;
+/** GitHub App installation ids are positive decimal integers. */
+const GITHUB_INSTALLATION_ID_PATTERN = /^[1-9]\d*$/;
 
 /** A short-lived token minted for one GitHub App installation. */
 export const GitHubInstallationAccessToken = Schema.Struct({
@@ -269,6 +271,30 @@ const mapSdkError =
           ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
         });
       }
+      case "BadRequest":
+        return new IntegrationProviderPermanentRejection({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 400,
+        });
+      case "Conflict":
+        return new IntegrationProviderPermanentRejection({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 409,
+        });
+      case "UnprocessableEntity":
+        return new IntegrationProviderPermanentRejection({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 422,
+        });
+      case "Locked":
+        return new IntegrationProviderTemporaryFailure({
+          message: detail,
+          provider: githubProviderKey,
+          httpStatus: 423,
+        });
       case "NotFound":
         return new IntegrationProviderInvalidConfigurationError({
           message: detail,
@@ -321,7 +347,7 @@ const mapSdkError =
           provider: githubProviderKey,
         });
       default:
-        return new IntegrationProviderPermanentRejection({
+        return new IntegrationProviderTemporaryFailure({
           message: detail,
           provider: githubProviderKey,
         });
@@ -383,6 +409,19 @@ const decodeSdkResponse =
           })
       )
     );
+
+/** Validates a GitHub App installation id before it is converted for the SDK. */
+const installationIdToNumber = (
+  installationId: string
+): Effect.Effect<number, IntegrationProviderInvalidConfigurationError> =>
+  GITHUB_INSTALLATION_ID_PATTERN.test(installationId)
+    ? Effect.succeed(Number(installationId))
+    : Effect.fail(
+        new IntegrationProviderInvalidConfigurationError({
+          message: "GitHub App installation id is invalid",
+          provider: githubProviderKey,
+        })
+      );
 
 /** Creates a GitHub adapter backed by the Effect-native @distilled.cloud/github SDK. */
 export const makeGitHubApiClient = (): GitHubApiClient => {
@@ -502,40 +541,50 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
         )
       ),
     createInstallationAccessToken: ({ appJwt, installationId }) =>
-      withSdk(
-        appJwt,
-        GitHub.Retry.none(
-          GitHub.Services.apps.createInstallationAccessToken({
-            installation_id: Number(installationId),
-          })
-        ),
-        "installation token creation"
-      ).pipe(
-        Effect.flatMap((token) =>
-          decodeSdkResponse(
-            GitHubInstallationAccessToken,
+      installationIdToNumber(installationId).pipe(
+        Effect.flatMap((installation_id) =>
+          withSdk(
+            appJwt,
+            GitHub.Retry.none(
+              GitHub.Services.apps.createInstallationAccessToken({
+                installation_id,
+              })
+            ),
             "installation token creation"
-          )({
-            expires_at: token.expires_at,
-            token: token.token,
-          })
+          ).pipe(
+            Effect.flatMap((token) =>
+              decodeSdkResponse(
+                GitHubInstallationAccessToken,
+                "installation token creation"
+              )({
+                expires_at: token.expires_at,
+                token: token.token,
+              })
+            )
+          )
         )
       ),
     deleteInstallation: ({ appJwt, installationId }) =>
-      withSdk(
-        appJwt,
-        GitHub.Retry.none(
-          GitHub.Services.apps.deleteInstallation({
-            installation_id: Number(installationId),
-          })
-        ),
-        "installation removal"
-      ).pipe(
-        Effect.catchIf(
-          (error) =>
-            Schema.is(IntegrationProviderInvalidConfigurationError)(error) &&
-            (error.httpStatus === 404 || error.httpStatus === 410),
-          () => Effect.void
+      installationIdToNumber(installationId).pipe(
+        Effect.flatMap((installation_id) =>
+          withSdk(
+            appJwt,
+            GitHub.Retry.none(
+              GitHub.Services.apps.deleteInstallation({
+                installation_id,
+              })
+            ),
+            "installation removal"
+          ).pipe(
+            Effect.catchIf(
+              (error) =>
+                Schema.is(IntegrationProviderInvalidConfigurationError)(
+                  error
+                ) &&
+                (error.httpStatus === 404 || error.httpStatus === 410),
+              () => Effect.void
+            )
+          )
         )
       ),
     exchangeUserAccessToken,

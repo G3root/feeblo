@@ -37,6 +37,149 @@ const TestLayer = Layer.mergeAll(
   Database.PgliteDatabaseLive
 );
 
+const seedRuleScenario = ({
+  linkedIssueStates,
+  rules,
+}: {
+  readonly linkedIssueStates: readonly ("open" | "closed")[];
+  readonly rules: readonly {
+    readonly issueMatchMode: "all" | "any";
+    readonly issueState: "open" | "closed";
+    readonly targetStatus: "completed" | "closed";
+    readonly enabled?: boolean;
+    readonly createdAt?: Date;
+  }[];
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const now = new Date();
+    const organizationId = yield* WorkspaceId.generate;
+    const boardId = yield* BoardId.generate;
+    const openStatusId = yield* PostStatusId.generate;
+    const completedStatusId = yield* PostStatusId.generate;
+    const closedStatusId = yield* PostStatusId.generate;
+    const postId = yield* PostId.generate;
+    const connectionId = yield* IntegrationConnectionId.generate;
+    const installationId = `gh-installation-${organizationId}`;
+
+    yield* db.insert(schema.organizationTable).values({
+      id: organizationId,
+      name: "GitHub rule test",
+      slug: `github-rule-${organizationId}`,
+      createdAt: now,
+    });
+    yield* db.insert(schema.boardTable).values({
+      id: boardId,
+      organizationId,
+      name: "Feedback",
+      slug: "feedback",
+      visibility: "PRIVATE",
+      createdAt: now,
+      updatedAt: now,
+    });
+    yield* db.insert(schema.postStatusTable).values([
+      {
+        id: openStatusId,
+        organizationId,
+        type: "PENDING",
+        orderIndex: 0,
+      },
+      {
+        id: completedStatusId,
+        organizationId,
+        type: "COMPLETED",
+        orderIndex: 1,
+      },
+      {
+        id: closedStatusId,
+        organizationId,
+        type: "CLOSED",
+        orderIndex: 2,
+      },
+    ]);
+    yield* db.insert(schema.postTable).values({
+      id: postId,
+      organizationId,
+      boardId,
+      statusId: openStatusId,
+      title: "Close this post",
+      slug: "close-this-post",
+      content: "Content",
+      createdAt: now,
+      updatedAt: now,
+    });
+    yield* db.insert(schema.integrationConnectionTable).values({
+      id: connectionId,
+      organizationId,
+      provider: IntegrationProviderKey.make("github"),
+      name: "GitHub installation",
+      lifecycle: "active",
+    });
+    yield* db.insert(schema.githubInstallationTable).values({
+      connectionId,
+      installationId,
+      accountId: "67890",
+      accountLogin: "feeblo-test",
+      accountType: "Organization",
+    });
+
+    for (const [index, stateKey] of linkedIssueStates.entries()) {
+      const externalResourceId = yield* IntegrationExternalResourceId.generate;
+      const linkId = yield* PostExternalResourceLinkId.generate;
+      const issueNumber = index + 10;
+      yield* db.insert(schema.integrationExternalResourceTable).values({
+        id: externalResourceId,
+        organizationId,
+        connectionId,
+        resourceType: IntegrationExternalResourceType.make("issue"),
+        remoteId: `I_test_${issueNumber}`,
+        remoteUrl: `https://github.com/feeblo/test/issues/${issueNumber}`,
+        displayKey: `feeblo/test#${issueNumber}`,
+        title: "Linked issue",
+        stateKey,
+        safeMetadata: {
+          issueNumber,
+          repositoryName: "test",
+          repositoryOwner: "feeblo",
+        },
+      });
+      yield* db.insert(schema.postExternalResourceLinkTable).values({
+        id: linkId,
+        organizationId,
+        postId,
+        externalResourceId,
+      });
+    }
+
+    const targetStatusIds = {
+      completed: completedStatusId,
+      closed: closedStatusId,
+    } as const;
+
+    for (const rule of rules) {
+      const ruleId = yield* GitHubSyncRuleId.generate;
+      yield* db.insert(schema.githubSyncRuleTable).values({
+        id: ruleId,
+        organizationId,
+        connectionId,
+        issueMatchMode: rule.issueMatchMode,
+        issueState: rule.issueState,
+        postStatusId: targetStatusIds[rule.targetStatus],
+        upvoterNotificationPolicy: "do_not_notify_upvoters",
+        enabled: rule.enabled ?? true,
+        ...(rule.createdAt === undefined ? {} : { createdAt: rule.createdAt }),
+      });
+    }
+
+    return {
+      closedStatusId,
+      completedStatusId,
+      installationId,
+      openStatusId,
+      postId,
+    };
+  });
+
 describe("GitHub inbound synchronization", () => {
   layer(TestLayer)("issue status rules", (it) => {
     it.effect(
@@ -160,6 +303,178 @@ describe("GitHub inbound synchronization", () => {
             .where(eq(schema.postTable.id, postId));
           expect(post?.statusId).toBe(closedStatusId);
         })
+    );
+
+    it.effect(
+      "sets the Feeblo status only once all linked issues match an all rule",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const inbound = yield* GitHubInboundService;
+          const seeded = yield* seedRuleScenario({
+            linkedIssueStates: ["open", "open"],
+            rules: [
+              {
+                issueMatchMode: "all",
+                issueState: "closed",
+                targetStatus: "closed",
+              },
+            ],
+          });
+
+          yield* inbound.applyIssueWebhook({
+            deliveryId: "delivery-close-first",
+            eventName: "issues",
+            installationId: seeded.installationId,
+            issueNumber: 10,
+            issueState: "closed",
+            repositoryName: "test",
+            repositoryOwner: "feeblo",
+          });
+          const [afterFirst] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, seeded.postId));
+          expect(afterFirst?.statusId).toBe(seeded.openStatusId);
+
+          yield* inbound.applyIssueWebhook({
+            deliveryId: "delivery-close-second",
+            eventName: "issues",
+            installationId: seeded.installationId,
+            issueNumber: 11,
+            issueState: "closed",
+            repositoryName: "test",
+            repositoryOwner: "feeblo",
+          });
+          const [afterSecond] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, seeded.postId));
+          expect(afterSecond?.statusId).toBe(seeded.closedStatusId);
+        })
+    );
+
+    it.effect(
+      "applies the earliest matching rule when several rules match",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const inbound = yield* GitHubInboundService;
+          const seeded = yield* seedRuleScenario({
+            linkedIssueStates: ["open"],
+            rules: [
+              {
+                issueMatchMode: "any",
+                issueState: "closed",
+                targetStatus: "completed",
+                createdAt: new Date("2025-01-01T00:00:00Z"),
+              },
+              {
+                issueMatchMode: "any",
+                issueState: "closed",
+                targetStatus: "closed",
+                createdAt: new Date("2025-01-02T00:00:00Z"),
+              },
+            ],
+          });
+
+          yield* inbound.applyIssueWebhook({
+            deliveryId: "delivery-multi-rule-precedence",
+            eventName: "issues",
+            installationId: seeded.installationId,
+            issueNumber: 10,
+            issueState: "closed",
+            repositoryName: "test",
+            repositoryOwner: "feeblo",
+          });
+          const [post] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, seeded.postId));
+          expect(post?.statusId).toBe(seeded.completedStatusId);
+        })
+    );
+
+    it.effect(
+      "skips a disabled rule and applies the next matching enabled rule",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const inbound = yield* GitHubInboundService;
+          const seeded = yield* seedRuleScenario({
+            linkedIssueStates: ["open"],
+            rules: [
+              {
+                issueMatchMode: "any",
+                issueState: "closed",
+                targetStatus: "completed",
+                enabled: false,
+                createdAt: new Date("2025-01-01T00:00:00Z"),
+              },
+              {
+                issueMatchMode: "any",
+                issueState: "closed",
+                targetStatus: "closed",
+                enabled: true,
+                createdAt: new Date("2025-01-02T00:00:00Z"),
+              },
+            ],
+          });
+
+          yield* inbound.applyIssueWebhook({
+            deliveryId: "delivery-multi-rule-disabled",
+            eventName: "issues",
+            installationId: seeded.installationId,
+            issueNumber: 10,
+            issueState: "closed",
+            repositoryName: "test",
+            repositoryOwner: "feeblo",
+          });
+          const [post] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, seeded.postId));
+          expect(post?.statusId).toBe(seeded.closedStatusId);
+        })
+    );
+
+    it.effect("ignores a non-matching rule and applies the matching rule", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const inbound = yield* GitHubInboundService;
+        const seeded = yield* seedRuleScenario({
+          linkedIssueStates: ["open"],
+          rules: [
+            {
+              issueMatchMode: "any",
+              issueState: "closed",
+              targetStatus: "closed",
+              createdAt: new Date("2025-01-01T00:00:00Z"),
+            },
+            {
+              issueMatchMode: "any",
+              issueState: "open",
+              targetStatus: "completed",
+              createdAt: new Date("2025-01-02T00:00:00Z"),
+            },
+          ],
+        });
+
+        yield* inbound.applyIssueWebhook({
+          deliveryId: "delivery-multi-rule-nonmatching",
+          eventName: "issues",
+          installationId: seeded.installationId,
+          issueNumber: 10,
+          issueState: "open",
+          repositoryName: "test",
+          repositoryOwner: "feeblo",
+        });
+        const [post] = yield* db
+          .select({ statusId: schema.postTable.statusId })
+          .from(schema.postTable)
+          .where(eq(schema.postTable.id, seeded.postId));
+        expect(post?.statusId).toBe(seeded.completedStatusId);
+      })
     );
   });
 });

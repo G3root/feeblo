@@ -49,7 +49,9 @@ const isParsedSlackInboundRequest = (
 
 const handleInbound = (
   request: HttpServerRequest.HttpServerRequest,
-  capabilityKey: string,
+  capabilityKey:
+    | typeof slackCommandsCapabilityKey
+    | typeof slackMessageActionCapabilityKey,
   registry: IntegrationProviderRegistry
 ) =>
   Effect.gen(function* () {
@@ -175,7 +177,9 @@ const makeSlackCommandRouter = (registry: IntegrationProviderRegistry) =>
       "POST",
       "/slack/commands/feeblo",
       (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(request, slackCommandsCapabilityKey, registry).pipe(Effect.orDie)
+        handleInbound(request, slackCommandsCapabilityKey, registry).pipe(
+          Effect.orDie
+        )
     )
   );
 
@@ -186,7 +190,9 @@ const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
       "POST",
       "/slack/interactive",
       (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(request, slackMessageActionCapabilityKey, registry).pipe(Effect.orDie)
+        handleInbound(request, slackMessageActionCapabilityKey, registry).pipe(
+          Effect.orDie
+        )
     )
   );
 

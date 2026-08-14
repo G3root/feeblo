@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Headers from "effect/unstable/http/Headers";
 import {
@@ -9,6 +10,7 @@ import {
   GitHubInstallationRepositories,
   GitHubIssue,
   GitHubUserInstallations,
+  makeGitHubApiClient,
   renderGitHubIssueBacklinkComment,
 } from "./github-api";
 
@@ -80,6 +82,46 @@ describe("GitHub API failure classification", () => {
       )._tag
     ).toBe("IntegrationProviderRateLimitedError");
   });
+});
+
+describe("GitHub App installation id validation", () => {
+  it.effect(
+    "rejects a non-numeric installation id before minting a token",
+    () =>
+      Effect.gen(function* () {
+        const client = makeGitHubApiClient();
+        const tag = yield* client
+          .createInstallationAccessToken({
+            appJwt: Redacted.make("app-jwt"),
+            installationId: "not-a-number",
+          })
+          .pipe(
+            Effect.match({
+              onFailure: (error) => error._tag,
+              onSuccess: () => "success",
+            })
+          );
+        expect(tag).toBe("IntegrationProviderInvalidConfigurationError");
+      })
+  );
+
+  it.effect("rejects a non-numeric installation id before removal", () =>
+    Effect.gen(function* () {
+      const client = makeGitHubApiClient();
+      const tag = yield* client
+        .deleteInstallation({
+          appJwt: Redacted.make("app-jwt"),
+          installationId: "not-a-number",
+        })
+        .pipe(
+          Effect.match({
+            onFailure: (error) => error._tag,
+            onSuccess: () => "success",
+          })
+        );
+      expect(tag).toBe("IntegrationProviderInvalidConfigurationError");
+    })
+  );
 });
 
 describe("GitHub bot backlink comments", () => {

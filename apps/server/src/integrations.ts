@@ -227,15 +227,23 @@ export const makeIntegrationLayers: Effect.Effect<
     ...(githubConfigured ? [githubRegistration] : []),
   ]);
 
-  // Deliveries are claimed only for capability keys the startup-validated
-  // registry actually exposes; the kernel never hardcodes a provider capability.
-  const claimableCapabilityKeys = registry.manifests.flatMap((manifest) =>
-    manifest.capabilities
-      .filter((capability) => capability.direction === "outbound")
-      .map((capability) => capability.key)
-  );
+  // Deliveries are claimed only for capability keys owned by the matching
+  // provider; the startup-validated registry supplies each provider's outbound
+  // capabilities, so cross-provider or unknown keys are never claimable.
+  const claimableCapabilityKeysByProvider = new Map<
+    string,
+    readonly string[]
+  >();
+  for (const manifest of registry.manifests) {
+    claimableCapabilityKeysByProvider.set(
+      manifest.provider,
+      manifest.capabilities
+        .filter((capability) => capability.direction === "outbound")
+        .map((capability) => capability.key)
+    );
+  }
   const workerRepository = yield* makeIntegrationDeliveryWorkerRepository(
-    claimableCapabilityKeys,
+    claimableCapabilityKeysByProvider,
     ({ connection, drafts, event }) =>
       Effect.forEach(drafts, (draft) =>
         externalResources.recordPostLink({
