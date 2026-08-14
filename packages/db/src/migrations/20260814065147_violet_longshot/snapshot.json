@@ -1,9 +1,9 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "11f1daae-da60-4270-bff1-11405c04fc5e",
+  "id": "37e90224-c05a-4123-8f52-b7ae7d895915",
   "prevIds": [
-    "dd2d5a15-1ae7-4651-bcb3-48ab5ad28b19"
+    "36ae8855-0542-4b1e-b9ad-1112e7da0a63"
   ],
   "ddl": [
     {
@@ -12672,74 +12672,6 @@
       "table": "external_resource_create_request"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "connection_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "integration_connection",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "external_resource_create_request_kVu61GuzZeV6_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "external_resource_create_request"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "post_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "post",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "external_resource_create_request_post_id_post_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "external_resource_create_request"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "external_resource_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "integration_external_resource",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "name": "external_resource_create_request_HHTh5tZimd1K_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "external_resource_create_request"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "post_external_resource_link_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "post_external_resource_link",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "name": "external_resource_create_request_x0kKOaj5rB9z_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "external_resource_create_request"
-    },
-    {
       "nameExplicit": true,
       "columns": [
         "organization_id",
@@ -12790,7 +12722,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
+      "onDelete": "SET NULL",
       "name": "external_resource_create_request_organization_resource_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -12809,7 +12741,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
+      "onDelete": "SET NULL",
       "name": "external_resource_create_request_organization_link_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -12845,40 +12777,6 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "github_sync_rule_organization_id_organization_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "github_sync_rule"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "connection_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "integration_connection",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "github_sync_rule_connection_id_integration_connection_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "github_sync_rule"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "post_status_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "post_status",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "github_sync_rule_post_status_id_post_status_id_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "github_sync_rule"
@@ -13081,23 +12979,6 @@
       "table": "integration_external_resource"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "connection_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "integration_connection",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "integration_external_resource_3KwJiobDABBu_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "integration_external_resource"
-    },
-    {
       "nameExplicit": true,
       "columns": [
         "organization_id",
@@ -13165,40 +13046,6 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "post_external_resource_link_ywAvLx23F2Vs_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "post_external_resource_link"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "post_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "post",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "post_external_resource_link_post_id_post_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "post_external_resource_link"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "external_resource_id"
-      ],
-      "schemaTo": "public",
-      "tableTo": "integration_external_resource",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "post_external_resource_link_McVwj657uC1B_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "post_external_resource_link"

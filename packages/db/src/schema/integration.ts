@@ -408,9 +408,7 @@ export const integrationExternalResourceTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    connectionId: text("connection_id")
-      .notNull()
-      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id").notNull(),
     resourceType: text("resource_type")
       .$type<TIntegrationExternalResourceType>()
       .notNull(),
@@ -463,14 +461,8 @@ export const postExternalResourceLinkTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    postId: text("post_id")
-      .notNull()
-      .references(() => postTable.id, { onDelete: "cascade" }),
-    externalResourceId: text("external_resource_id")
-      .notNull()
-      .references(() => integrationExternalResourceTable.id, {
-        onDelete: "cascade",
-      }),
+    postId: text("post_id").notNull(),
+    externalResourceId: text("external_resource_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -512,16 +504,12 @@ export const githubSyncRuleTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    connectionId: text("connection_id")
-      .notNull()
-      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id").notNull(),
     issueMatchMode: text("issue_match_mode")
       .$type<TGitHubIssueMatchMode>()
       .notNull(),
     issueState: text("issue_state").$type<TGitHubIssueState>().notNull(),
-    postStatusId: text("post_status_id")
-      .notNull()
-      .references(() => postStatusTable.id, { onDelete: "cascade" }),
+    postStatusId: text("post_status_id").notNull(),
     upvoterNotificationPolicy: text("upvoter_notification_policy")
       .$type<TGitHubUpvoterNotificationPolicy>()
       .notNull(),
@@ -586,23 +574,12 @@ export const externalResourceCreateRequestTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    connectionId: text("connection_id")
-      .notNull()
-      .references(() => integrationConnectionTable.id, { onDelete: "cascade" }),
-    postId: text("post_id")
-      .notNull()
-      .references(() => postTable.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id").notNull(),
+    postId: text("post_id").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     state: text("state").$type<TExternalResourceCreateRequestState>().notNull(),
-    externalResourceId: text("external_resource_id").references(
-      () => integrationExternalResourceTable.id,
-      { onDelete: "set null" }
-    ),
-    postExternalResourceLinkId: text(
-      "post_external_resource_link_id"
-    ).references(() => postExternalResourceLinkTable.id, {
-      onDelete: "set null",
-    }),
+    externalResourceId: text("external_resource_id"),
+    postExternalResourceLinkId: text("post_external_resource_link_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -632,7 +609,7 @@ export const externalResourceCreateRequestTable = pgTable(
         integrationExternalResourceTable.id,
       ],
       name: "external_resource_create_request_organization_resource_fkey",
-    }),
+    }).onDelete("set null"),
     foreignKey({
       columns: [table.organizationId, table.postExternalResourceLinkId],
       foreignColumns: [
@@ -640,7 +617,7 @@ export const externalResourceCreateRequestTable = pgTable(
         postExternalResourceLinkTable.id,
       ],
       name: "external_resource_create_request_organization_link_fkey",
-    }),
+    }).onDelete("set null"),
     uniqueIndex("external_resource_create_request_connection_key_uidx").on(
       table.connectionId,
       table.idempotencyKey
