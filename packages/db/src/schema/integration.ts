@@ -508,7 +508,7 @@ export const postExternalResourceLinkTable = pgTable(
   ]
 );
 
-/** Organization-owned rule that maps aggregate linked GitHub issue state to a Feeblo status. */
+/** Organization-owned rule mapping aggregate linked GitHub issue state to a Feeblo status. Only the (any, open) and (all, closed) shapes exist, at most one per connection. */
 export const githubSyncRuleTable = pgTable(
   "github_sync_rule",
   {
@@ -548,6 +548,24 @@ export const githubSyncRuleTable = pgTable(
       foreignColumns: [postStatusTable.organizationId, postStatusTable.id],
       name: "github_sync_rule_organization_status_fkey",
     }).onDelete("cascade"),
+    // Only the hard-wired (any, open) and (all, closed) shapes are valid; they
+    // can never match the same issue aggregate, keeping rule application
+    // deterministic without an in-app conflict check.
+    check(
+      "github_sync_rule_combo_ck",
+      sql`(${table.issueMatchMode} = 'any' AND ${table.issueState} = 'open') OR (${table.issueMatchMode} = 'all' AND ${table.issueState} = 'closed')`
+    ),
+    // Each connection owns at most one rule per shape.
+    uniqueIndex("github_sync_rule_open_connection_uq")
+      .on(table.connectionId)
+      .where(
+        sql`${table.issueMatchMode} = 'any' AND ${table.issueState} = 'open'`
+      ),
+    uniqueIndex("github_sync_rule_closed_connection_uq")
+      .on(table.connectionId)
+      .where(
+        sql`${table.issueMatchMode} = 'all' AND ${table.issueState} = 'closed'`
+      ),
     index("github_sync_rule_connection_enabled_idx").on(
       table.connectionId,
       table.enabled
@@ -614,6 +632,26 @@ export const externalResourceCreateRequestTable = pgTable(
       foreignColumns: [postTable.id, postTable.organizationId],
       name: "external_resource_create_request_post_organization_fkey",
     }).onDelete("cascade"),
+    // Column-specific ON DELETE SET NULL so deleting the referenced resource or
+    // link nulls only the nullable id column and never the NOT NULL
+    // organization_id (a composite SET NULL would try to null both and fail).
+    // Declared before the composite integrity FKs below so the generated DDL
+    // creates them first: Postgres fires FK triggers in constraint creation
+    // order, so the SET NULL action must run before the composite NO ACTION
+    // check.
+    foreignKey({
+      columns: [table.externalResourceId],
+      foreignColumns: [integrationExternalResourceTable.id],
+      name: "external_resource_create_request_resource_fkey",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.postExternalResourceLinkId],
+      foreignColumns: [postExternalResourceLinkTable.id],
+      name: "external_resource_create_request_link_fkey",
+    }).onDelete("set null"),
+    // Composite (organization_id, id) integrity constraints keep resources and
+    // links organization-scoped. NO ACTION (default) leaves the delete behavior
+    // to the column-specific SET NULL constraints above.
     foreignKey({
       columns: [table.organizationId, table.externalResourceId],
       foreignColumns: [
@@ -621,7 +659,7 @@ export const externalResourceCreateRequestTable = pgTable(
         integrationExternalResourceTable.id,
       ],
       name: "external_resource_create_request_organization_resource_fkey",
-    }).onDelete("set null"),
+    }),
     foreignKey({
       columns: [table.organizationId, table.postExternalResourceLinkId],
       foreignColumns: [
@@ -629,7 +667,7 @@ export const externalResourceCreateRequestTable = pgTable(
         postExternalResourceLinkTable.id,
       ],
       name: "external_resource_create_request_organization_link_fkey",
-    }).onDelete("set null"),
+    }),
     uniqueIndex("external_resource_create_request_connection_key_uidx").on(
       table.connectionId,
       table.idempotencyKey

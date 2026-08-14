@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "73e0981b-a5be-4445-942c-97187117ddf9",
+  "id": "28ee586a-4359-4fc1-b522-aee29614a7c7",
   "prevIds": [
     "36ae8855-0542-4b1e-b9ad-1112e7da0a63"
   ],
@@ -10152,6 +10152,48 @@
           "asc": true,
           "nullsFirst": false,
           "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"issue_match_mode\" = 'any' AND \"issue_state\" = 'open'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "github_sync_rule_open_connection_uq",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "github_sync_rule"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "connection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": "\"issue_match_mode\" = 'all' AND \"issue_state\" = 'closed'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "github_sync_rule_closed_connection_uq",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "github_sync_rule"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "connection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
         },
         {
           "value": "enabled",
@@ -12740,6 +12782,40 @@
     {
       "nameExplicit": true,
       "columns": [
+        "external_resource_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "integration_external_resource",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "external_resource_create_request_resource_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "external_resource_create_request"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "post_external_resource_link_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "post_external_resource_link",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "name": "external_resource_create_request_link_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "external_resource_create_request"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
         "organization_id",
         "external_resource_id"
       ],
@@ -12750,7 +12826,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
+      "onDelete": "NO ACTION",
       "name": "external_resource_create_request_organization_resource_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -12769,7 +12845,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
+      "onDelete": "NO ACTION",
       "name": "external_resource_create_request_organization_link_fkey",
       "entityType": "fks",
       "schema": "public",
@@ -13945,6 +14021,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "post"
+    },
+    {
+      "value": "(\"issue_match_mode\" = 'any' AND \"issue_state\" = 'open') OR (\"issue_match_mode\" = 'all' AND \"issue_state\" = 'closed')",
+      "name": "github_sync_rule_combo_ck",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "github_sync_rule"
     },
     {
       "value": "\"credential_generation\" > 0",

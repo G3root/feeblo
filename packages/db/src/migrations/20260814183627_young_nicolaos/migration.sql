@@ -32,7 +32,8 @@ CREATE TABLE "github_sync_rule" (
 	"upvoter_notification_policy" text NOT NULL,
 	"enabled" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "github_sync_rule_combo_ck" CHECK (("issue_match_mode" = 'any' AND "issue_state" = 'open') OR ("issue_match_mode" = 'all' AND "issue_state" = 'closed'))
 );
 --> statement-breakpoint
 CREATE TABLE "github_webhook_delivery" (
@@ -70,6 +71,8 @@ CREATE UNIQUE INDEX "post_status_organizationId_id_uidx" ON "post_status" ("orga
 CREATE UNIQUE INDEX "external_resource_create_request_connection_key_uidx" ON "external_resource_create_request" ("connection_id","idempotency_key");--> statement-breakpoint
 CREATE UNIQUE INDEX "github_installation_installation_id_uidx" ON "github_installation" ("installation_id");--> statement-breakpoint
 CREATE INDEX "github_installation_account_idx" ON "github_installation" ("account_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "github_sync_rule_open_connection_uq" ON "github_sync_rule" ("connection_id") WHERE "issue_match_mode" = 'any' AND "issue_state" = 'open';--> statement-breakpoint
+CREATE UNIQUE INDEX "github_sync_rule_closed_connection_uq" ON "github_sync_rule" ("connection_id") WHERE "issue_match_mode" = 'all' AND "issue_state" = 'closed';--> statement-breakpoint
 CREATE INDEX "github_sync_rule_connection_enabled_idx" ON "github_sync_rule" ("connection_id","enabled");--> statement-breakpoint
 CREATE INDEX "github_sync_rule_organization_idx" ON "github_sync_rule" ("organization_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "github_webhook_delivery_connection_delivery_uidx" ON "github_webhook_delivery" ("connection_id","delivery_id");--> statement-breakpoint
@@ -83,8 +86,10 @@ CREATE INDEX "post_external_resource_link_organization_post_idx" ON "post_extern
 ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_eU77wOAyFsGn_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_post_organization_fkey" FOREIGN KEY ("post_id","organization_id") REFERENCES "post"("id","organization_id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_organization_resource_fkey" FOREIGN KEY ("organization_id","external_resource_id") REFERENCES "integration_external_resource"("organization_id","id") ON DELETE SET NULL;--> statement-breakpoint
-ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_organization_link_fkey" FOREIGN KEY ("organization_id","post_external_resource_link_id") REFERENCES "post_external_resource_link"("organization_id","id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_resource_fkey" FOREIGN KEY ("external_resource_id") REFERENCES "integration_external_resource"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_link_fkey" FOREIGN KEY ("post_external_resource_link_id") REFERENCES "post_external_resource_link"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_organization_resource_fkey" FOREIGN KEY ("organization_id","external_resource_id") REFERENCES "integration_external_resource"("organization_id","id");--> statement-breakpoint
+ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_organization_link_fkey" FOREIGN KEY ("organization_id","post_external_resource_link_id") REFERENCES "post_external_resource_link"("organization_id","id");--> statement-breakpoint
 ALTER TABLE "github_installation" ADD CONSTRAINT "github_installation_hxjCxRRkLkaP_fkey" FOREIGN KEY ("connection_id") REFERENCES "integration_connection"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "github_sync_rule" ADD CONSTRAINT "github_sync_rule_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "github_sync_rule" ADD CONSTRAINT "github_sync_rule_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
