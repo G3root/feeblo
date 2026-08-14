@@ -1,3 +1,4 @@
+import type { LegidOf } from "@feeblo/id";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
 import type { GitHubIntegrationError } from "./errors";
@@ -35,7 +36,7 @@ export interface GitHubProviderShape {
   ) => Effect.Effect<GitHubResolvedIssue, GitHubIntegrationError>;
   /** Starts an installation of the Feeblo GitHub App for one organization. */
   readonly startInstallation: (
-    organizationId: string
+    organizationId: LegidOf<"WorkspaceId">
   ) => Effect.Effect<GitHubConnectStarted, GitHubIntegrationError>;
   /** Uninstalls the App from GitHub before Feeblo archives the connection. */
   readonly uninstallInstallation: (input: {

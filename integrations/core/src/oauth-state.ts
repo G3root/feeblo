@@ -1,3 +1,4 @@
+import { IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
 import * as Schema from "effect/Schema";
 
 /**
@@ -6,8 +7,8 @@ import * as Schema from "effect/Schema";
  * by the encrypted nonce stored on the pending connection row.
  */
 export const IntegrationOAuthState = Schema.Struct({
-  connectionId: Schema.String,
-  organizationId: Schema.String,
+  connectionId: IntegrationConnectionId.schema,
+  organizationId: WorkspaceId.schema,
   nonce: Schema.String,
 });
 export type IntegrationOAuthState = Schema.Schema.Type<
