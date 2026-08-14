@@ -1,7 +1,7 @@
 import {
-  IntegrationExternalResourceSafeMetadata,
   IntegrationExternalResourceType,
   IntegrationProviderKey,
+  IntegrationSafeDisplayMetadata,
 } from "@feeblo/db/validation-schema/integration";
 import {
   ExternalResourceCreateRequestId,
@@ -24,7 +24,7 @@ export const PostExternalResourceLink = Schema.Struct({
   displayKey: Schema.NullOr(Schema.String),
   title: Schema.NullOr(Schema.String),
   stateKey: Schema.NullOr(Schema.String),
-  safeMetadata: IntegrationExternalResourceSafeMetadata,
+  safeMetadata: IntegrationSafeDisplayMetadata,
 });
 export type PostExternalResourceLink = Schema.Schema.Type<
   typeof PostExternalResourceLink
@@ -49,7 +49,7 @@ export const ExternalResourceRecord = Schema.Struct({
   displayKey: Schema.NullOr(Schema.String),
   title: Schema.NullOr(Schema.String),
   stateKey: Schema.NullOr(Schema.String),
-  safeMetadata: IntegrationExternalResourceSafeMetadata,
+  safeMetadata: IntegrationSafeDisplayMetadata,
 });
 export type ExternalResourceRecord = Schema.Schema.Type<
   typeof ExternalResourceRecord

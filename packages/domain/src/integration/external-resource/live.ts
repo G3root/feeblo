@@ -21,27 +21,8 @@ const databaseError = (operation: string) => () =>
     message: `External resource ${operation} failed.`,
   });
 
-const StoredPostExternalResourceLink = Schema.Struct({
-  id: Schema.String,
-  connectionId: Schema.String,
-  provider: Schema.String,
-  providerDisplayName: Schema.String,
-  resourceType: Schema.String,
-  remoteUrl: Schema.String,
-  displayKey: Schema.NullOr(Schema.String),
-  title: Schema.NullOr(Schema.String),
-  stateKey: Schema.NullOr(Schema.String),
-  safeMetadata: Schema.Record(Schema.String, Schema.Json),
-});
-
 const decodePostLink = (value: unknown) =>
-  Schema.decodeUnknownEffect(StoredPostExternalResourceLink)(value).pipe(
-    Effect.flatMap((row) =>
-      Schema.decodeUnknownEffect(PostExternalResourceLink)({
-        ...row,
-        id: asLegid(PostExternalResourceLinkId)(row.id),
-      })
-    ),
+  Schema.decodeUnknownEffect(PostExternalResourceLink)(value).pipe(
     Effect.mapError(databaseError("row decoding"))
   );
 
@@ -282,7 +263,10 @@ const makeExternalResourceService = Effect.gen(function* () {
           postExternalResourceLinkId: input.postExternalResourceLinkId,
         })
         .where(
-          eq(schema.externalResourceCreateRequestTable.id, input.requestId)
+          and(
+            eq(schema.externalResourceCreateRequestTable.id, input.requestId),
+            eq(schema.externalResourceCreateRequestTable.state, "pending")
+          )
         )
         .pipe(
           Effect.mapError(databaseError("creation completion")),

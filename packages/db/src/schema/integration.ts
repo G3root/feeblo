@@ -26,7 +26,6 @@ import type {
   TIntegrationDeliveryRetryDecision,
   TIntegrationDeliveryState,
   TIntegrationEventType,
-  TIntegrationExternalResourceSafeMetadata,
   TIntegrationExternalResourceType,
   TIntegrationProviderConfiguration,
   TIntegrationProviderKey,
@@ -421,7 +420,7 @@ export const integrationExternalResourceTable = pgTable(
     title: text("title"),
     stateKey: text("state_key"),
     safeMetadata: jsonb("safe_metadata")
-      .$type<TIntegrationExternalResourceSafeMetadata>()
+      .$type<TIntegrationSafeDisplayMetadata>()
       .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
