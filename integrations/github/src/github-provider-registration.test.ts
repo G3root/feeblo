@@ -19,7 +19,10 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import type { GitHubApiClient } from "./github-api";
 import { ParsedGitHubInboundRequest } from "./github-inbound-schema";
-import { githubProviderKey } from "./github-manifest";
+import {
+  githubIssueCreateCapabilityKey,
+  githubProviderKey,
+} from "./github-manifest";
 import { makeGitHubProviderRegistration } from "./github-provider-registration";
 
 const deliveryInput: IntegrationProviderDeliveryInput = {
@@ -65,7 +68,7 @@ const deliveryInput: IntegrationProviderDeliveryInput = {
     version: 1,
   },
   route: {
-    capabilityKey: "github.issue.create",
+    capabilityKey: githubIssueCreateCapabilityKey,
     configVersion: 1,
     connectionId: asLegid(IntegrationConnectionId)("conn_1"),
     enabled: true,

@@ -32,6 +32,8 @@ import {
   GitHubConnectionConfiguration,
   GitHubIssueCreateRouteConfiguration,
   GitHubIssueWebhookRouteConfiguration,
+  githubIssueCreateCapabilityKey,
+  githubIssueWebhookCapabilityKey,
   githubProviderKey,
   githubProviderManifest,
 } from "./github-manifest";
@@ -189,7 +191,7 @@ const makeGitHubAppWebhookHandler = ({
 }: {
   readonly webhookSecret: Redacted.Redacted<string>;
 }): IntegrationInboundCapabilityHandler => ({
-  capabilityKey: "github.issue.webhook",
+  capabilityKey: githubIssueWebhookCapabilityKey,
   handle: (input: IntegrationInboundRequest) =>
     Effect.gen(function* () {
       const verified = yield* Effect.result(
@@ -242,7 +244,7 @@ export const makeGitHubProviderRegistration = ({
   readonly webhookSecret: Redacted.Redacted<string>;
 }): IntegrationProviderRegistration => {
   const issueCreateHandler = {
-    capabilityKey: "github.issue.create" as const,
+    capabilityKey: githubIssueCreateCapabilityKey,
     deliver: (input: IntegrationProviderDeliveryInput) =>
       Effect.gen(function* () {
         if (input.event.type !== "feedback.post.created") {
@@ -309,8 +311,8 @@ export const makeGitHubProviderRegistration = ({
     inboundHandlers: [makeGitHubAppWebhookHandler({ webhookSecret })],
     manifest: githubProviderManifest,
     routeConfigurationSchemas: new Map([
-      ["github.issue.create", GitHubIssueCreateRouteConfiguration],
-      ["github.issue.webhook", GitHubIssueWebhookRouteConfiguration],
+      [githubIssueCreateCapabilityKey, GitHubIssueCreateRouteConfiguration],
+      [githubIssueWebhookCapabilityKey, GitHubIssueWebhookRouteConfiguration],
     ]),
   };
 };

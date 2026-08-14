@@ -14,6 +14,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import {
+  IntegrationCapabilityKey,
   IntegrationEventRecorder,
   IntegrationProviderKey,
 } from "./integration-contracts";
@@ -46,7 +47,7 @@ const seedRoute = Effect.gen(function* () {
     safeDisplayMetadata: { hostname: "example.com" },
   });
   yield* db.insert(schema.integrationRouteTable).values({
-    capabilityKey: "events.post",
+    capabilityKey: IntegrationCapabilityKey.make("events.post"),
     configVersion: 1,
     connectionId,
     enabled: true,

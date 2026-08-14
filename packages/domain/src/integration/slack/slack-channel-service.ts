@@ -4,7 +4,10 @@ import {
   makeSlackApiClient,
   type SlackApiClient,
 } from "@feeblo/integration-slack";
-import { SlackChannelNotificationRouteConfiguration } from "@feeblo/integration-slack/manifest";
+import {
+  SlackChannelNotificationRouteConfiguration,
+  slackChannelNotificationsCapabilityKey,
+} from "@feeblo/integration-slack/manifest";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -107,7 +110,7 @@ export const makeSlackChannelServiceLive = (
                 ),
                 eq(
                   schema.integrationRouteTable.capabilityKey,
-                  "channel.notifications"
+                  slackChannelNotificationsCapabilityKey
                 ),
                 eq(schema.integrationRouteTable.enabled, true)
               )
@@ -189,7 +192,7 @@ export const makeSlackChannelServiceLive = (
                     ),
                     eq(
                       schema.integrationRouteTable.capabilityKey,
-                      "channel.notifications"
+                      slackChannelNotificationsCapabilityKey
                     ),
                     eq(
                       schema.integrationRouteTable.organizationId,
@@ -207,7 +210,7 @@ export const makeSlackChannelServiceLive = (
               if (input.enabled) {
                 if (route === undefined) {
                   yield* db.insert(schema.integrationRouteTable).values({
-                    capabilityKey: "channel.notifications",
+                    capabilityKey: slackChannelNotificationsCapabilityKey,
                     configVersion: 1,
                     connectionId: input.connectionId,
                     enabled: true,

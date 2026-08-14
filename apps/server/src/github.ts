@@ -4,7 +4,10 @@ import { GitHubManagementService } from "@feeblo/domain/integration/github/manag
 import { parseGitHubAppInstallationCallbackUrl } from "@feeblo/domain/integration/github/oauth-callback";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
 import { ParsedGitHubInboundRequest } from "@feeblo/integration-github/inbound-schema";
-import { githubProviderKey } from "@feeblo/integration-github/manifest";
+import {
+  githubIssueWebhookCapabilityKey,
+  githubProviderKey,
+} from "@feeblo/integration-github/manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -92,7 +95,7 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
       (request: HttpServerRequest.HttpServerRequest) =>
         Effect.gen(function* () {
           const inboundHandler = registry.getInboundHandler({
-            capabilityKey: "github.issue.webhook",
+            capabilityKey: githubIssueWebhookCapabilityKey,
             provider: githubProviderKey,
           });
           if (inboundHandler === undefined) {

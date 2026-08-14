@@ -36,14 +36,21 @@ export type TIntegrationCapabilityDirection = S.Schema.Type<
   typeof IntegrationCapabilityDirection
 >;
 
-/** Provider connection mode declared by static manifests; providers own their auth modes and the startup registry validates them. */
-export const IntegrationConnectionMode = S.NonEmptyString;
+/** Canonical provider connection modes used by static manifests. */
+export const IntegrationConnectionMode = S.Literals([
+  "none",
+  "oauth2",
+  "api_key",
+  "github_app",
+]);
 export type TIntegrationConnectionMode = S.Schema.Type<
   typeof IntegrationConnectionMode
 >;
 
 /** Provider capability key persisted by integration routes; providers own their keys and the startup registry validates them. */
-export const IntegrationCapabilityKey = S.NonEmptyString;
+export const IntegrationCapabilityKey = S.NonEmptyString.pipe(
+  S.brand("IntegrationCapabilityKey")
+);
 export type TIntegrationCapabilityKey = S.Schema.Type<
   typeof IntegrationCapabilityKey
 >;
@@ -66,8 +73,12 @@ export type TIntegrationRouteEventSelection = S.Schema.Type<
   typeof IntegrationRouteEventSelection
 >;
 
-/** Event type stored in `integration_event.type`; domain and provider events share one open vocabulary. */
-export const IntegrationEventType = S.NonEmptyString;
+/** Canonical event vocabulary stored in `integration_event.type`. */
+export const IntegrationEventType = S.Literals([
+  "feedback.post.created",
+  "feedback.post.status_changed",
+  "webhook.test",
+]);
 export type TIntegrationEventType = S.Schema.Type<typeof IntegrationEventType>;
 
 /** Canonical connection lifecycle stored in `integration_connection.lifecycle`. */

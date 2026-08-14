@@ -21,6 +21,7 @@ import {
   generateWebhookSigningSecret,
   resolveAndParseWebhookEndpoint,
   rotateWebhookSigningKeyring,
+  webhookEventsPostCapabilityKey,
   webhookProviderKey,
 } from "@feeblo/integration-webhook";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
@@ -270,7 +271,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               safeDisplayMetadata: { hostname: validated.hostname },
             });
             yield* db.insert(schema.integrationRouteTable).values({
-              capabilityKey: "events.post",
+              capabilityKey: webhookEventsPostCapabilityKey,
               configVersion: 1,
               connectionId,
               enabled: true,

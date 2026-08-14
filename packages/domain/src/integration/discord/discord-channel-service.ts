@@ -5,7 +5,10 @@ import {
   type DiscordApiClient,
   makeDiscordApiClient,
 } from "@feeblo/integration-discord";
-import { DiscordChannelNotificationRouteConfiguration } from "@feeblo/integration-discord/manifest";
+import {
+  DiscordChannelNotificationRouteConfiguration,
+  discordChannelNotificationsCapabilityKey,
+} from "@feeblo/integration-discord/manifest";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -95,7 +98,7 @@ export const makeDiscordChannelServiceLive = (
                 ),
                 eq(
                   schema.integrationRouteTable.capabilityKey,
-                  "channel.notifications"
+                  discordChannelNotificationsCapabilityKey
                 ),
                 eq(schema.integrationRouteTable.enabled, true)
               )
@@ -200,7 +203,7 @@ export const makeDiscordChannelServiceLive = (
                       ),
                       eq(
                         schema.integrationRouteTable.capabilityKey,
-                        "channel.notifications"
+                        discordChannelNotificationsCapabilityKey
                       ),
                       eq(
                         schema.integrationRouteTable.organizationId,
@@ -215,7 +218,7 @@ export const makeDiscordChannelServiceLive = (
                 if (input.enabled) {
                   if (route === undefined) {
                     yield* db.insert(schema.integrationRouteTable).values({
-                      capabilityKey: "channel.notifications",
+                      capabilityKey: discordChannelNotificationsCapabilityKey,
                       configVersion: 1,
                       connectionId: input.connectionId,
                       enabled: true,

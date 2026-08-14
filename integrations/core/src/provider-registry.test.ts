@@ -3,6 +3,7 @@ import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 import {
+  IntegrationCapabilityKey,
   IntegrationProviderKey,
   type IntegrationProviderRegistration,
   makeIntegrationProviderRegistry,
@@ -13,7 +14,7 @@ const testProviderKey = IntegrationProviderKey.make("test-provider");
 const webhookRegistration = ({
   handlers = [
     {
-      capabilityKey: "events.post",
+      capabilityKey: IntegrationCapabilityKey.make("events.post"),
       deliver: () => Effect.succeed({}),
     },
   ],
@@ -26,7 +27,7 @@ const webhookRegistration = ({
   inboundHandlers,
   manifest: manifest ?? {
     capabilities: [
-      { configVersion: 1, direction: "outbound", key: "events.post" },
+      { configVersion: 1, direction: "outbound", key: IntegrationCapabilityKey.make("events.post") },
     ],
     connectionMode: "none",
     displayName: "Webhook",
@@ -77,7 +78,7 @@ describe("makeIntegrationProviderRegistry", () => {
           ...registration,
           handlers: [
             {
-              capabilityKey: "events.post",
+              capabilityKey: IntegrationCapabilityKey.make("events.post"),
               deliver: () => Effect.succeed({}),
             },
           ],
@@ -96,14 +97,14 @@ describe("makeIntegrationProviderRegistry", () => {
     const registration = webhookRegistration({
       inboundHandlers: [
         {
-          capabilityKey: "commands",
+          capabilityKey: IntegrationCapabilityKey.make("commands"),
           handle: () => Effect.succeed({ body: {}, status: 200 }),
         },
       ],
       manifest: {
         capabilities: [
-          { configVersion: 1, direction: "outbound", key: "events.post" },
-          { configVersion: 1, direction: "inbound", key: "commands" },
+          { configVersion: 1, direction: "outbound", key: IntegrationCapabilityKey.make("events.post") },
+          { configVersion: 1, direction: "inbound", key: IntegrationCapabilityKey.make("commands") },
         ],
         connectionMode: "none",
         displayName: "Webhook",
@@ -135,7 +136,7 @@ describe("makeIntegrationProviderRegistry", () => {
           manifest: {
             ...registration.manifest,
             capabilities: [
-              { configVersion: 1, direction: "inbound", key: "commands" },
+              { configVersion: 1, direction: "inbound", key: IntegrationCapabilityKey.make("commands") },
             ],
           },
           routeConfigurationSchemas: new Map([["commands", Schema.Json]]),

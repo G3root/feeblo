@@ -14,7 +14,10 @@ import {
   makeDiscordApiClient,
 } from "@feeblo/integration-discord";
 import { encryptDiscordCredentialMaterial } from "@feeblo/integration-discord/credentials";
-import { discordProviderKey } from "@feeblo/integration-discord/manifest";
+import {
+  discordInteractionsCapabilityKey,
+  discordProviderKey,
+} from "@feeblo/integration-discord/manifest";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -99,7 +102,7 @@ export const makeDiscordConnectionServiceLive = (
       const config = yield* DiscordIntegrationConfig;
 
       const connectStart = Effect.fn("DiscordConnection.connectStart")(
-        function* ({ organizationId }: { readonly organizationId: string }) {
+        function* ({ organizationId }: S.TDiscordConnectStart) {
           if (!config.configured) {
             return yield* new InternalServerError({
               message: "Discord integration is not configured",
@@ -393,7 +396,7 @@ export const makeDiscordConnectionServiceLive = (
               yield* db
                 .insert(schema.integrationRouteTable)
                 .values({
-                  capabilityKey: "interactions",
+                  capabilityKey: discordInteractionsCapabilityKey,
                   configVersion: 1,
                   connectionId: connection.id,
                   enabled: true,

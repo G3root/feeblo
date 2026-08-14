@@ -28,6 +28,9 @@ import {
 import {
   SlackChannelNotificationRouteConfiguration,
   SlackInboundRouteConfiguration,
+  slackChannelNotificationsCapabilityKey,
+  slackCommandsCapabilityKey,
+  slackMessageActionCapabilityKey,
   slackProviderKey,
   slackProviderManifest,
 } from "./slack-manifest";
@@ -108,7 +111,7 @@ const makeSlackInboundHandler = ({
   parse,
   signingSecret,
 }: {
-  readonly capabilityKey: "commands" | "message.action";
+  readonly capabilityKey: IntegrationInboundCapabilityHandler["capabilityKey"];
   readonly parse: (
     rawBody: string
   ) => Effect.Effect<ParsedSlackInboundRequest, SlackInboundPayloadError>;
@@ -211,7 +214,7 @@ export const makeSlackProviderRegistration = ({
   readonly signingSecret: Redacted.Redacted<string>;
 }): IntegrationProviderRegistration => {
   const channelNotificationsHandler = {
-    capabilityKey: "channel.notifications" as const,
+    capabilityKey: slackChannelNotificationsCapabilityKey,
     deliver: (input: IntegrationProviderDeliveryInput) =>
       Effect.gen(function* () {
         if (input.event.type !== "feedback.post.created") {
@@ -288,21 +291,21 @@ export const makeSlackProviderRegistration = ({
     handlers: [channelNotificationsHandler],
     inboundHandlers: [
       makeSlackInboundHandler({
-        capabilityKey: "commands",
+        capabilityKey: slackCommandsCapabilityKey,
         parse: parseSlashCommand,
         signingSecret,
       }),
       makeSlackInboundHandler({
-        capabilityKey: "message.action",
+        capabilityKey: slackMessageActionCapabilityKey,
         parse: parseInteractive,
         signingSecret,
       }),
     ],
     manifest: slackProviderManifest,
     routeConfigurationSchemas: new Map([
-      ["channel.notifications", SlackChannelNotificationRouteConfiguration],
-      ["commands", SlackInboundRouteConfiguration],
-      ["message.action", SlackInboundRouteConfiguration],
+      [slackChannelNotificationsCapabilityKey, SlackChannelNotificationRouteConfiguration],
+      [slackCommandsCapabilityKey, SlackInboundRouteConfiguration],
+      [slackMessageActionCapabilityKey, SlackInboundRouteConfiguration],
     ]),
   };
 };

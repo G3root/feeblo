@@ -424,6 +424,7 @@
     "@feeblo/id": "workspace:*",
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/integration-discord": "workspace:*",
+    "@feeblo/integration-github": "workspace:*",
     "@feeblo/integration-slack": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/permissions": "workspace:*",

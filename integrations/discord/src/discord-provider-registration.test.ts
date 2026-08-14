@@ -17,7 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import type { DiscordApiClient } from "./discord-api";
-import { discordProviderKey } from "./discord-manifest";
+import { discordChannelNotificationsCapabilityKey, discordProviderKey } from "./discord-manifest";
 import { makeDiscordProviderRegistration } from "./discord-provider-registration";
 
 // Discord interaction signatures are Ed25519; the test keypair is generated
@@ -103,7 +103,7 @@ const deliveryInput = (
     version: 1,
   },
   route: {
-    capabilityKey: "channel.notifications",
+    capabilityKey: discordChannelNotificationsCapabilityKey,
     configVersion: 1,
     connectionId: asLegid(IntegrationConnectionId)("conn_1"),
     enabled: true,

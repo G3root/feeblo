@@ -1,4 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
+import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manifest";
 import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
@@ -268,7 +269,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 ),
                 eq(
                   schema.integrationRouteTable.capabilityKey,
-                  "github.issue.create"
+                  githubIssueCreateCapabilityKey
                 )
               )
             )
@@ -353,7 +354,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             id: routeId,
             organizationId: input.organizationId,
             connectionId: input.connectionId,
-            capabilityKey: "github.issue.create",
+            capabilityKey: githubIssueCreateCapabilityKey,
             routeKey: "",
             configVersion: 1,
             enabled: input.enabled,

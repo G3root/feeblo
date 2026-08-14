@@ -7,6 +7,10 @@ import {
 import * as Schema from "effect/Schema";
 
 export const githubProviderKey = IntegrationProviderKey.make("github");
+export const githubIssueCreateCapabilityKey =
+  IntegrationCapabilityKey.make("github.issue.create");
+export const githubIssueWebhookCapabilityKey =
+  IntegrationCapabilityKey.make("github.issue.webhook");
 
 /** GitHub App permissions required by Feeblo's bot integration. */
 export const GITHUB_APP_PERMISSIONS = {
@@ -40,12 +44,12 @@ export const githubProviderManifest = IntegrationProviderManifest.make({
   connectionMode: "github_app",
   capabilities: [
     {
-      key: IntegrationCapabilityKey.make("github.issue.create"),
+      key: githubIssueCreateCapabilityKey,
       direction: "outbound",
       configVersion: 1,
     },
     {
-      key: IntegrationCapabilityKey.make("github.issue.webhook"),
+      key: githubIssueWebhookCapabilityKey,
       direction: "inbound",
       configVersion: 1,
     },

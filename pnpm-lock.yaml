@@ -912,6 +912,9 @@ importers:
       '@feeblo/integration-discord':
         specifier: workspace:*
         version: link:../../integrations/discord
+      '@feeblo/integration-github':
+        specifier: workspace:*
+        version: link:../../integrations/github
       '@feeblo/integration-slack':
         specifier: workspace:*
         version: link:../../integrations/slack

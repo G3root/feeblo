@@ -14,7 +14,11 @@ import {
   decryptSlackCredentialMaterial,
   encryptSlackCredentialMaterial,
 } from "@feeblo/integration-slack/credentials";
-import { slackProviderKey } from "@feeblo/integration-slack/manifest";
+import {
+  slackCommandsCapabilityKey,
+  slackMessageActionCapabilityKey,
+  slackProviderKey,
+} from "@feeblo/integration-slack/manifest";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -98,7 +102,7 @@ export const makeSlackConnectionServiceLive = (
       const config = yield* SlackIntegrationConfig;
 
       const connectStart = Effect.fn("SlackConnection.connectStart")(
-        function* ({ organizationId }: { readonly organizationId: string }) {
+        function* ({ organizationId }: S.TSlackConnectStart) {
           if (!config.configured) {
             return yield* new InternalServerError({
               message: "Slack integration is not configured",
@@ -318,9 +322,9 @@ export const makeSlackConnectionServiceLive = (
               // Duplicate replays are ignored via the connection/capability
               // unique index.
               for (const capabilityKey of [
-                "commands",
-                "message.action",
-              ] as const) {
+                slackCommandsCapabilityKey,
+                slackMessageActionCapabilityKey,
+              ]) {
                 yield* db
                   .insert(schema.integrationRouteTable)
                   .values({

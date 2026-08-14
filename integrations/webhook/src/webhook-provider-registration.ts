@@ -20,6 +20,7 @@ import {
 import {
   WebhookConnectionConfiguration,
   WebhookRouteConfiguration,
+  webhookEventsPostCapabilityKey,
   webhookProviderKey,
   webhookProviderManifest,
 } from "./webhook-manifest";
@@ -55,7 +56,7 @@ export const makeWebhookProviderRegistration = ({
   connectionConfigurationSchema: WebhookConnectionConfiguration,
   handlers: [
     {
-      capabilityKey: "events.post",
+      capabilityKey: webhookEventsPostCapabilityKey,
       deliver: (input) =>
         Effect.gen(function* () {
           const credentials =
@@ -203,6 +204,6 @@ export const makeWebhookProviderRegistration = ({
   inboundHandlers: [],
   manifest: webhookProviderManifest,
   routeConfigurationSchemas: new Map([
-    ["events.post", WebhookRouteConfiguration],
+    [webhookEventsPostCapabilityKey, WebhookRouteConfiguration],
   ]),
 });

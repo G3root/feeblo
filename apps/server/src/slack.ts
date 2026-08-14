@@ -7,7 +7,11 @@ import {
 } from "@feeblo/domain/integration/slack";
 import type { IntegrationProviderRegistry } from "@feeblo/integration-core";
 import type { ParsedSlackInboundRequest } from "@feeblo/integration-slack/inbound-schema";
-import { slackProviderKey } from "@feeblo/integration-slack/manifest";
+import {
+  slackCommandsCapabilityKey,
+  slackMessageActionCapabilityKey,
+  slackProviderKey,
+} from "@feeblo/integration-slack/manifest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -45,7 +49,7 @@ const isParsedSlackInboundRequest = (
 
 const handleInbound = (
   request: HttpServerRequest.HttpServerRequest,
-  capabilityKey: "commands" | "message.action",
+  capabilityKey: string,
   registry: IntegrationProviderRegistry
 ) =>
   Effect.gen(function* () {
@@ -171,7 +175,7 @@ const makeSlackCommandRouter = (registry: IntegrationProviderRegistry) =>
       "POST",
       "/slack/commands/feeblo",
       (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(request, "commands", registry).pipe(Effect.orDie)
+        handleInbound(request, slackCommandsCapabilityKey, registry).pipe(Effect.orDie)
     )
   );
 
@@ -182,7 +186,7 @@ const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
       "POST",
       "/slack/interactive",
       (request: HttpServerRequest.HttpServerRequest) =>
-        handleInbound(request, "message.action", registry).pipe(Effect.orDie)
+        handleInbound(request, slackMessageActionCapabilityKey, registry).pipe(Effect.orDie)
     )
   );
 
