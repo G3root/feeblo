@@ -10,16 +10,22 @@ export type GitHubInstallationId = Schema.Schema.Type<
 export const GitHubWebhookIssueAction = Schema.Literals([
   "assigned",
   "closed",
+  "deleted",
+  "demilestoned",
   "edited",
   "labeled",
   "locked",
   "milestoned",
   "opened",
+  "pinned",
   "reopened",
+  "transferred",
+  "typed",
   "unassigned",
   "unlabeled",
   "unlocked",
-  "demilestoned",
+  "unpinned",
+  "untyped",
 ]);
 export type GitHubWebhookIssueAction = Schema.Schema.Type<
   typeof GitHubWebhookIssueAction

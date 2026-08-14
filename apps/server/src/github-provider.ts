@@ -173,6 +173,7 @@ export const GitHubProviderLive = Layer.effect(
           ) {
             return yield* providerFailure("installation connection lookup");
           }
+          const credentialsCiphertext = connection.credentialsCiphertext;
           const pending = yield* decryptGitHubCredentialMaterial(
             integrationKey,
             connection.credentialsCiphertext
@@ -188,28 +189,6 @@ export const GitHubProviderLive = Layer.effect(
             expectedState.length !== receivedState.length ||
             !timingSafeEqual(expectedState, receivedState)
           ) {
-            return yield* providerFailure("installation state validation");
-          }
-          const consumed = yield* db
-            .update(schema.integrationConnectionTable)
-            .set({ credentialsCiphertext: null })
-            .where(
-              and(
-                eq(schema.integrationConnectionTable.id, connection.id),
-                eq(schema.integrationConnectionTable.lifecycle, "connecting"),
-                eq(
-                  schema.integrationConnectionTable.credentialsCiphertext,
-                  connection.credentialsCiphertext
-                )
-              )
-            )
-            .returning({ id: schema.integrationConnectionTable.id })
-            .pipe(
-              Effect.mapError(() =>
-                providerFailure("installation state consumption")
-              )
-            );
-          if (consumed.length === 0) {
             return yield* providerFailure("installation state validation");
           }
           const userToken = yield* api
@@ -254,7 +233,7 @@ export const GitHubProviderLive = Layer.effect(
           yield* db
             .transaction(() =>
               Effect.gen(function* () {
-                yield* db
+                const activated = yield* db
                   .update(schema.integrationConnectionTable)
                   .set({
                     credentialsCiphertext: null,
@@ -264,13 +243,29 @@ export const GitHubProviderLive = Layer.effect(
                     safeDisplayMetadata: { login: installation.account.login },
                   })
                   .where(
-                    eq(schema.integrationConnectionTable.id, connection.id)
+                    and(
+                      eq(schema.integrationConnectionTable.id, connection.id),
+                      eq(
+                        schema.integrationConnectionTable.lifecycle,
+                        "connecting"
+                      ),
+                      eq(
+                        schema.integrationConnectionTable.credentialsCiphertext,
+                        credentialsCiphertext
+                      )
+                    )
                   )
+                  .returning({ id: schema.integrationConnectionTable.id })
                   .pipe(
                     Effect.mapError(() =>
                       providerFailure("connection activation")
                     )
                   );
+                if (activated.length === 0) {
+                  return yield* providerFailure(
+                    "installation state validation"
+                  );
+                }
                 yield* db
                   .insert(schema.githubInstallationTable)
                   .values({
