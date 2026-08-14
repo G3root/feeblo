@@ -1,9 +1,7 @@
-/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
-
 import type { TPost } from "@feeblo/domain/post/schema";
 import { PostId } from "@feeblo/id";
-import { FieldRow } from "@feeblo/post-ui/post-properties";
 import { Button } from "@feeblo/ui/button";
+import { DialogFooter, DialogPanel } from "@feeblo/ui/dialog";
 import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
@@ -303,7 +301,7 @@ export function PostCreateForm() {
 
   return (
     <form
-      className="flex h-full flex-col gap-4 md:flex-row md:items-start"
+      className="contents"
       id="post-create-form"
       onSubmit={(event) => {
         event.preventDefault();
@@ -311,46 +309,43 @@ export function PostCreateForm() {
         form.handleSubmit();
       }}
     >
-      <div className="flex h-full flex-1 flex-col gap-2">
-        <PostTitleField form={form} />
-        <PostContentField
-          assetOwner={member ? "organization" : "user"}
-          editorScope={editorScope}
-          form={form}
-          key={contentEditorKey}
-        />
-        <form.Subscribe
-          selector={(state) =>
-            [
-              state.values.boardId,
-              state.values.content,
-              state.values.title,
-            ] as const
-          }
-        >
-          {([boardId, content, title]) => (
-            <SimilarPosts boardId={boardId} content={content} title={title} />
-          )}
-        </form.Subscribe>
-      </div>
+      <DialogPanel>
+        <div className="space-y-4">
+          <PostTitleField form={form} />
+          <PostContentField
+            assetOwner={member ? "organization" : "user"}
+            editorScope={editorScope}
+            form={form}
+            key={contentEditorKey}
+          />
+          <form.Subscribe
+            selector={(state) =>
+              [
+                state.values.boardId,
+                state.values.content,
+                state.values.title,
+              ] as const
+            }
+          >
+            {([boardId, content, title]) => (
+              <SimilarPosts boardId={boardId} content={content} title={title} />
+            )}
+          </form.Subscribe>
+        </div>
+      </DialogPanel>
 
-      <aside className="flex h-full w-full flex-col rounded-xl border bg-muted/40 p-3 text-sm md:min-h-150 md:w-sm md:p-4">
-        <div className="flex flex-1 flex-col gap-4">
-          <div className="flex-1 space-y-1.5">
-            <FieldRow label="Board">
-              <PostBoardField boards={boards} form={form} />
-            </FieldRow>
-
-            <FieldRow label="Status">
-              <PostStatusField form={form} statuses={postStatuses} />
-            </FieldRow>
+      <DialogFooter className="grid grid-cols-2 items-center">
+        <div className="flex justify-start">
+          <div className="flex gap-2">
+            <PostBoardField boards={boards} form={form} />
+            <PostStatusField form={form} statuses={postStatuses} />
           </div>
         </div>
-        <div className="mt-auto flex items-center justify-between pt-4">
+        <div className="flex items-center justify-end gap-3">
           <PostCreateMoreField form={form} />
           <Button type="submit">Create Post</Button>
         </div>
-      </aside>
+      </DialogFooter>
     </form>
   );
 }
