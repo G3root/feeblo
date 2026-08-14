@@ -85,6 +85,7 @@ export const updateGitHubSyncRule = (input: {
 /** Removes a GitHub issue synchronization rule. */
 export const deleteGitHubSyncRule = (input: {
   readonly organizationId: string;
+  readonly connectionId: string;
   readonly id: string;
 }) => fetchRpc((rpc) => rpc.GitHubRuleDelete(input));
 

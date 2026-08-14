@@ -255,6 +255,127 @@ export const GitHubProviderLive = Layer.effect(
           yield* db
             .transaction(() =>
               Effect.gen(function* () {
+                const [existingInstallation] = yield* db
+                  .select({
+                    connectionId: schema.githubInstallationTable.connectionId,
+                  })
+                  .from(schema.githubInstallationTable)
+                  .where(
+                    eq(
+                      schema.githubInstallationTable.installationId,
+                      input.installationId
+                    )
+                  )
+                  .limit(1)
+                  .pipe(
+                    Effect.mapError(() =>
+                      providerFailure("installation lookup")
+                    )
+                  );
+                const reusedConnectionId =
+                  existingInstallation === undefined ||
+                  existingInstallation.connectionId === connection.id
+                    ? undefined
+                    : existingInstallation.connectionId;
+                if (reusedConnectionId !== undefined) {
+                  const [reusedConnection] = yield* db
+                    .select()
+                    .from(schema.integrationConnectionTable)
+                    .where(
+                      and(
+                        eq(
+                          schema.integrationConnectionTable.id,
+                          reusedConnectionId
+                        ),
+                        eq(
+                          schema.integrationConnectionTable.organizationId,
+                          parsed.organizationId
+                        ),
+                        eq(
+                          schema.integrationConnectionTable.provider,
+                          githubProviderKey
+                        )
+                      )
+                    )
+                    .limit(1)
+                    .for("update")
+                    .pipe(
+                      Effect.mapError(() =>
+                        providerFailure("installation connection lookup")
+                      )
+                    );
+                  if (
+                    reusedConnection === undefined ||
+                    reusedConnection.lifecycle === "connecting"
+                  ) {
+                    return yield* providerFailure(
+                      "installation state validation"
+                    );
+                  }
+                  yield* db
+                    .update(schema.integrationConnectionTable)
+                    .set({
+                      archivedAt: null,
+                      credentialsCiphertext: null,
+                      lifecycle:
+                        installation.suspended_at === null
+                          ? "active"
+                          : "paused",
+                      remoteAccountId: installation.account.login,
+                      retentionExpiresAt: null,
+                      safeDisplayMetadata: {
+                        login: installation.account.login,
+                      },
+                      updatedAt: new Date(),
+                    })
+                    .where(
+                      eq(
+                        schema.integrationConnectionTable.id,
+                        reusedConnection.id
+                      )
+                    )
+                    .pipe(
+                      Effect.mapError(() =>
+                        providerFailure("connection reactivation")
+                      )
+                    );
+                  yield* db
+                    .delete(schema.integrationConnectionTable)
+                    .where(
+                      eq(schema.integrationConnectionTable.id, connection.id)
+                    )
+                    .pipe(
+                      Effect.mapError(() =>
+                        providerFailure("installation connection cleanup")
+                      )
+                    );
+                  yield* db
+                    .insert(schema.githubInstallationTable)
+                    .values({
+                      connectionId: reusedConnection.id,
+                      installationId: input.installationId,
+                      accountId: String(installation.account.id),
+                      accountLogin: installation.account.login,
+                      accountType: installation.account.type,
+                      suspendedAt: installation.suspended_at,
+                    })
+                    .onConflictDoUpdate({
+                      target: schema.githubInstallationTable.connectionId,
+                      set: {
+                        installationId: input.installationId,
+                        accountId: String(installation.account.id),
+                        accountLogin: installation.account.login,
+                        accountType: installation.account.type,
+                        suspendedAt: installation.suspended_at,
+                      },
+                    })
+                    .pipe(
+                      Effect.mapError(() =>
+                        providerFailure("installation persistence")
+                      )
+                    );
+                  return;
+                }
                 const activated = yield* db
                   .update(schema.integrationConnectionTable)
                   .set({

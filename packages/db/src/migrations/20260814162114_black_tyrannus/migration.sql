@@ -76,6 +76,7 @@ CREATE UNIQUE INDEX "github_webhook_delivery_connection_delivery_uidx" ON "githu
 CREATE UNIQUE INDEX "integration_external_resource_organization_id_uidx" ON "integration_external_resource" ("organization_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "integration_external_resource_connection_type_remote_uidx" ON "integration_external_resource" ("connection_id","resource_type","remote_id");--> statement-breakpoint
 CREATE INDEX "integration_external_resource_organization_connection_idx" ON "integration_external_resource" ("organization_id","connection_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "integration_route_connection_id_uidx" ON "integration_route" ("connection_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "post_external_resource_link_organization_id_uidx" ON "post_external_resource_link" ("organization_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "post_external_resource_link_post_resource_uidx" ON "post_external_resource_link" ("post_id","external_resource_id");--> statement-breakpoint
 CREATE INDEX "post_external_resource_link_organization_post_idx" ON "post_external_resource_link" ("organization_id","post_id");--> statement-breakpoint
@@ -89,6 +90,7 @@ ALTER TABLE "github_sync_rule" ADD CONSTRAINT "github_sync_rule_organization_id_
 ALTER TABLE "github_sync_rule" ADD CONSTRAINT "github_sync_rule_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "github_sync_rule" ADD CONSTRAINT "github_sync_rule_organization_status_fkey" FOREIGN KEY ("organization_id","post_status_id") REFERENCES "post_status"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "github_webhook_delivery" ADD CONSTRAINT "github_webhook_delivery_XC1Ae9VBXiU3_fkey" FOREIGN KEY ("connection_id") REFERENCES "integration_connection"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "integration_delivery" ADD CONSTRAINT "integration_delivery_connection_route_fkey" FOREIGN KEY ("connection_id","route_id") REFERENCES "integration_route"("connection_id","id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "integration_external_resource" ADD CONSTRAINT "integration_external_resource_DDcoUtAHSqcr_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "integration_external_resource" ADD CONSTRAINT "integration_external_resource_organization_connection_fkey" FOREIGN KEY ("organization_id","connection_id") REFERENCES "integration_connection"("organization_id","id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "post_external_resource_link" ADD CONSTRAINT "post_external_resource_link_ywAvLx23F2Vs_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint

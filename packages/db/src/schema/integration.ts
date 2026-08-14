@@ -195,6 +195,10 @@ export const integrationRouteTable = pgTable(
       table.organizationId,
       table.id
     ),
+    uniqueIndex("integration_route_connection_id_uidx").on(
+      table.connectionId,
+      table.id
+    ),
     // One route per (connection, capability, routeKey). Capabilities with a
     // single route per connection (webhook events.post, Slack inbound) use an
     // empty routeKey; providers with multiple routes per capability (Slack
@@ -315,6 +319,14 @@ export const integrationDeliveryTable = pgTable(
         integrationRouteTable.id,
       ],
       name: "integration_delivery_organization_route_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.connectionId, table.routeId],
+      foreignColumns: [
+        integrationRouteTable.connectionId,
+        integrationRouteTable.id,
+      ],
+      name: "integration_delivery_connection_route_fkey",
     }).onDelete("cascade"),
     foreignKey({
       columns: [table.organizationId, table.eventId],

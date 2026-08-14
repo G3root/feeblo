@@ -14,6 +14,7 @@ import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manif
 import { and, eq, ne } from "drizzle-orm";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -89,6 +90,22 @@ const makeGitHubManagementService = Effect.gen(function* () {
             : Effect.succeed(rows[0])
         )
       );
+  const lockConnection = (organizationId: string, connectionId: string) =>
+    db
+      .select()
+      .from(schema.integrationConnectionTable)
+      .where(
+        and(
+          eq(schema.integrationConnectionTable.organizationId, organizationId),
+          eq(schema.integrationConnectionTable.id, connectionId),
+          eq(
+            schema.integrationConnectionTable.provider,
+            IntegrationProviderKey.make("github")
+          )
+        )
+      )
+      .limit(1)
+      .for("update");
   const loadCanonicalPostUrl = (organizationId: string, postId: string) =>
     db
       .select({
@@ -176,22 +193,30 @@ const makeGitHubManagementService = Effect.gen(function* () {
     connectComplete: (input) => provider.completeInstallation(input),
     disconnect: (input) =>
       Effect.gen(function* () {
-        yield* requireConnection(input.organizationId, input.connectionId);
-        yield* provider.uninstallInstallation({
-          connectionId: input.connectionId,
-        });
-        yield* db
+        const disconnecting = yield* db
           .transaction(() =>
             Effect.gen(function* () {
-              const archivedAt = new Date();
+              const [connection] = yield* lockConnection(
+                input.organizationId,
+                input.connectionId
+              ).pipe(Effect.mapError(databaseError("connection lookup")));
+              if (connection === undefined) {
+                return yield* new NotFoundError({
+                  message: "GitHub integration connection was not found.",
+                });
+              }
+              if (connection.lifecycle === "archived") {
+                return undefined;
+              }
+              if (connection.lifecycle === "connecting") {
+                return yield* new NotFoundError({
+                  message: "GitHub integration connection was not found.",
+                });
+              }
+              const now = new Date();
               yield* db
                 .update(schema.integrationConnectionTable)
-                .set({
-                  archivedAt,
-                  credentialsCiphertext: null,
-                  lifecycle: "archived",
-                  updatedAt: archivedAt,
-                })
+                .set({ lifecycle: "disconnecting", updatedAt: now })
                 .where(
                   and(
                     eq(
@@ -205,26 +230,93 @@ const makeGitHubManagementService = Effect.gen(function* () {
                     eq(
                       schema.integrationConnectionTable.provider,
                       IntegrationProviderKey.make("github")
-                    ),
-                    ne(schema.integrationConnectionTable.lifecycle, "archived")
+                    )
                   )
                 )
-                .pipe(Effect.mapError(databaseError("connection removal")));
+                .pipe(
+                  Effect.mapError(
+                    databaseError("connection disconnecting update")
+                  )
+                );
               yield* db
                 .update(schema.integrationRouteTable)
-                .set({ enabled: false, updatedAt: archivedAt })
+                .set({ enabled: false, updatedAt: now })
                 .where(
-                  eq(
-                    schema.integrationRouteTable.connectionId,
-                    input.connectionId
+                  and(
+                    eq(
+                      schema.integrationRouteTable.connectionId,
+                      input.connectionId
+                    ),
+                    eq(
+                      schema.integrationRouteTable.organizationId,
+                      input.organizationId
+                    )
                   )
                 )
                 .pipe(Effect.mapError(databaseError("route disable")));
+              yield* db
+                .update(schema.integrationDeliveryTable)
+                .set({ canceledAt: now, state: "canceled", updatedAt: now })
+                .where(
+                  and(
+                    eq(
+                      schema.integrationDeliveryTable.connectionId,
+                      input.connectionId
+                    ),
+                    eq(
+                      schema.integrationDeliveryTable.organizationId,
+                      input.organizationId
+                    ),
+                    eq(schema.integrationDeliveryTable.state, "pending")
+                  )
+                )
+                .pipe(Effect.mapError(databaseError("delivery cancellation")));
+              return connection;
             })
           )
-          .pipe(
-            Effect.mapError(databaseError("connection removal transaction"))
-          );
+          .pipe(Effect.mapError(databaseError("disconnect transaction")));
+
+        if (disconnecting === undefined) {
+          return;
+        }
+
+        const uninstall = yield* Effect.exit(
+          provider.uninstallInstallation({
+            connectionId: input.connectionId,
+          })
+        );
+        if (Exit.isFailure(uninstall)) {
+          yield* db
+            .update(schema.integrationConnectionTable)
+            .set({ lifecycle: "revocation_unconfirmed", updatedAt: new Date() })
+            .where(eq(schema.integrationConnectionTable.id, input.connectionId))
+            .pipe(Effect.mapError(databaseError("disconnect state update")));
+          return yield* Effect.failCause(uninstall.cause);
+        }
+
+        const archivedAt = new Date();
+        yield* db
+          .update(schema.integrationConnectionTable)
+          .set({
+            archivedAt,
+            credentialsCiphertext: null,
+            lifecycle: "archived",
+            updatedAt: archivedAt,
+          })
+          .where(
+            and(
+              eq(schema.integrationConnectionTable.id, input.connectionId),
+              eq(
+                schema.integrationConnectionTable.organizationId,
+                input.organizationId
+              ),
+              eq(
+                schema.integrationConnectionTable.provider,
+                IntegrationProviderKey.make("github")
+              )
+            )
+          )
+          .pipe(Effect.mapError(databaseError("connection removal")));
       }),
     listConnections: ({ organizationId }) =>
       db
@@ -451,20 +543,30 @@ const makeGitHubManagementService = Effect.gen(function* () {
         .where(
           and(
             eq(schema.githubSyncRuleTable.id, input.id),
-            eq(schema.githubSyncRuleTable.organizationId, input.organizationId)
+            eq(schema.githubSyncRuleTable.organizationId, input.organizationId),
+            eq(schema.githubSyncRuleTable.connectionId, input.connectionId)
           )
         )
+        .returning({ connectionId: schema.githubSyncRuleTable.connectionId })
         .pipe(
           Effect.mapError(databaseError("rule update")),
-          Effect.as({
-            id: input.id,
-            connectionId: input.connectionId,
-            issueMatchMode: input.issueMatchMode,
-            issueState: input.issueState,
-            postStatusId: input.postStatusId,
-            upvoterNotificationPolicy: input.upvoterNotificationPolicy,
-            enabled: input.enabled,
-          })
+          Effect.flatMap((rows) =>
+            rows[0] === undefined
+              ? new NotFoundError({
+                  message: "GitHub synchronization rule was not found.",
+                })
+              : Effect.succeed({
+                  id: input.id,
+                  connectionId: asLegid(IntegrationConnectionId)(
+                    rows[0].connectionId
+                  ),
+                  issueMatchMode: input.issueMatchMode,
+                  issueState: input.issueState,
+                  postStatusId: input.postStatusId,
+                  upvoterNotificationPolicy: input.upvoterNotificationPolicy,
+                  enabled: input.enabled,
+                })
+          )
         ),
     deleteRule: (input) =>
       db
@@ -472,10 +574,21 @@ const makeGitHubManagementService = Effect.gen(function* () {
         .where(
           and(
             eq(schema.githubSyncRuleTable.id, input.id),
-            eq(schema.githubSyncRuleTable.organizationId, input.organizationId)
+            eq(schema.githubSyncRuleTable.organizationId, input.organizationId),
+            eq(schema.githubSyncRuleTable.connectionId, input.connectionId)
           )
         )
-        .pipe(Effect.mapError(databaseError("rule deletion")), Effect.asVoid),
+        .returning({ id: schema.githubSyncRuleTable.id })
+        .pipe(
+          Effect.mapError(databaseError("rule deletion")),
+          Effect.flatMap((rows) =>
+            rows[0] === undefined
+              ? new NotFoundError({
+                  message: "GitHub synchronization rule was not found.",
+                })
+              : Effect.void
+          )
+        ),
     createPostIssue: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);

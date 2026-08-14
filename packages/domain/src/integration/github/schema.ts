@@ -164,6 +164,7 @@ export const GitHubRuleUpdate = Schema.Struct({
 export type GitHubRuleUpdate = Schema.Schema.Type<typeof GitHubRuleUpdate>;
 export const GitHubRuleDelete = Schema.Struct({
   organizationId: WorkspaceId.schema,
+  connectionId: IntegrationConnectionId.schema,
   id: GitHubSyncRuleId.schema,
 });
 export type GitHubRuleDelete = Schema.Schema.Type<typeof GitHubRuleDelete>;

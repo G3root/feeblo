@@ -363,7 +363,7 @@ describe("GitHub management service", () => {
           expect(Exit.isFailure(first)).toBe(true);
 
           const [request] = yield* db
-            .select({ id: schema.externalResourceCreateRequestTable.id })
+            .select({ state: schema.externalResourceCreateRequestTable.state })
             .from(schema.externalResourceCreateRequestTable)
             .where(
               and(
@@ -377,7 +377,7 @@ describe("GitHub management service", () => {
                 )
               )
             );
-          expect(request).toBeUndefined();
+          expect(request?.state).toBe("failed");
 
           const second = yield* Effect.exit(
             service.createPostIssue(createInput(seeded))
@@ -467,6 +467,7 @@ describe("GitHub management service", () => {
 
         yield* service.deleteRule({
           organizationId: seeded.organizationId,
+          connectionId: seeded.connectionId,
           id: created.id,
         });
         const rules = yield* service.listRules({

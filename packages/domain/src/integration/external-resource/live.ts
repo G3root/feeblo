@@ -26,6 +26,12 @@ const decodePostLink = (value: unknown) =>
     Effect.mapError(databaseError("row decoding"))
   );
 
+/**
+ * A creation reservation older than this is reclaimed so a crashed process
+ * cannot wedge its idempotency key in `pending` forever.
+ */
+const creationReservationStaleMs = 60 * 60 * 1000;
+
 /** Database implementation of provider-neutral external-resource storage. */
 const makeExternalResourceService = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -205,6 +211,8 @@ const makeExternalResourceService = Effect.gen(function* () {
             postExternalResourceLinkId:
               schema.externalResourceCreateRequestTable
                 .postExternalResourceLinkId,
+            state: schema.externalResourceCreateRequestTable.state,
+            createdAt: schema.externalResourceCreateRequestTable.createdAt,
           })
           .from(schema.externalResourceCreateRequestTable)
           .where(
@@ -230,6 +238,39 @@ const makeExternalResourceService = Effect.gen(function* () {
             message: "External resource creation reservation was not found.",
           });
         }
+        const stale =
+          existing.state === "pending" &&
+          existing.createdAt.getTime() <
+            Date.now() - creationReservationStaleMs;
+        if (existing.state === "failed" || stale) {
+          const reclaimedAt = new Date();
+          yield* db
+            .update(schema.externalResourceCreateRequestTable)
+            .set({
+              state: "pending",
+              externalResourceId: null,
+              postExternalResourceLinkId: null,
+              createdAt: reclaimedAt,
+              updatedAt: reclaimedAt,
+            })
+            .where(
+              and(
+                eq(schema.externalResourceCreateRequestTable.id, existing.id),
+                eq(
+                  schema.externalResourceCreateRequestTable.state,
+                  existing.state
+                )
+              )
+            )
+            .pipe(
+              Effect.mapError(databaseError("creation reservation reclaim"))
+            );
+          return {
+            id: asLegid(ExternalResourceCreateRequestId)(existing.id),
+            reserved: true,
+            postExternalResourceLinkId: null,
+          };
+        }
         return {
           id: asLegid(ExternalResourceCreateRequestId)(existing.id),
           reserved: false,
@@ -243,7 +284,8 @@ const makeExternalResourceService = Effect.gen(function* () {
       }),
     failCreation: (input) =>
       db
-        .delete(schema.externalResourceCreateRequestTable)
+        .update(schema.externalResourceCreateRequestTable)
+        .set({ state: "failed", updatedAt: new Date() })
         .where(
           and(
             eq(schema.externalResourceCreateRequestTable.id, input.requestId),

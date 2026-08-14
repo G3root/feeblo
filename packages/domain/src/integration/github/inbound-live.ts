@@ -299,6 +299,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .select({
                 connectionId: schema.githubInstallationTable.connectionId,
                 lifecycle: schema.integrationConnectionTable.lifecycle,
+                suspendedAt: schema.githubInstallationTable.suspendedAt,
               })
               .from(schema.githubInstallationTable)
               .innerJoin(
@@ -391,6 +392,9 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 );
               return;
             }
+            if (webhook.action !== "unsuspend") {
+              return;
+            }
             yield* db
               .update(schema.githubInstallationTable)
               .set({ suspendedAt: null })
@@ -405,7 +409,10 @@ const makeGitHubInboundService = Effect.gen(function* () {
                   inboundDatabaseError("installation restoration")
                 )
               );
-            if (installation.lifecycle === "paused") {
+            if (
+              installation.lifecycle === "paused" &&
+              installation.suspendedAt !== null
+            ) {
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "active" })

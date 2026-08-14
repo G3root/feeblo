@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "37e90224-c05a-4123-8f52-b7ae7d895915",
+  "id": "73e0981b-a5be-4445-942c-97187117ddf9",
   "prevIds": [
     "36ae8855-0542-4b1e-b9ad-1112e7da0a63"
   ],
@@ -10819,6 +10819,34 @@
           "opclass": null
         },
         {
+          "value": "id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "integration_route_connection_id_uidx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "integration_route"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "connection_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "capability_key",
           "isExpression": false,
           "asc": true,
@@ -12921,6 +12949,25 @@
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "integration_delivery_organization_route_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "integration_delivery"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "connection_id",
+        "route_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "integration_route",
+      "columnsTo": [
+        "connection_id",
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "integration_delivery_connection_route_fkey",
       "entityType": "fks",
       "schema": "public",
       "table": "integration_delivery"

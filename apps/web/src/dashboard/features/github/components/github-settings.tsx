@@ -854,6 +854,7 @@ function GitHubSyncRuleRow({
     try {
       await deleteGitHubSyncRule({
         organizationId: args.organizationId,
+        connectionId: args.connectionId,
         id: rule.id,
       });
       onChanged();
