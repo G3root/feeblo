@@ -13,6 +13,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { GitHubIssueCreateRouteConfiguration as IntegrationGitHubIssueCreateRouteConfiguration } from "@feeblo/integration-github/manifest";
 import * as Schema from "effect/Schema";
 
 /** Safe GitHub App installation details; installation access tokens are never persisted. */
@@ -45,12 +46,18 @@ export type GitHubPublishSettings = Schema.Schema.Type<
   typeof GitHubPublishSettings
 >;
 
-/** Persisted safe GitHub issue-create route configuration; credentials never belong here. */
+/**
+ * Persisted safe GitHub issue-create route configuration; credentials never
+ * belong here. Field definitions are shared with the provider's manifest
+ * schema; the repo and board fields stay optional here so an unconfigured
+ * route can decode to defaults, while the provider's schema keeps them
+ * required for enabled deliveries.
+ */
 export const GitHubIssueCreateRouteConfiguration = Schema.Struct({
-  version: Schema.Literal(1),
+  ...IntegrationGitHubIssueCreateRouteConfiguration.fields,
   boardId: Schema.optionalKey(BoardId.schema),
-  repositoryOwner: Schema.optionalKey(Schema.NonEmptyString),
   repositoryName: Schema.optionalKey(Schema.NonEmptyString),
+  repositoryOwner: Schema.optionalKey(Schema.NonEmptyString),
 });
 export type GitHubIssueCreateRouteConfiguration = Schema.Schema.Type<
   typeof GitHubIssueCreateRouteConfiguration
@@ -77,6 +84,8 @@ export const GitHubResolvedIssue = Schema.Struct({
   remoteId: Schema.NonEmptyString,
   issueUrl: Schema.URLFromString,
   issueState: GitHubIssueState,
+  /** GitHub issue title, persisted so the linked-resource card matches the provider. */
+  title: Schema.String,
 });
 export type GitHubResolvedIssue = Schema.Schema.Type<
   typeof GitHubResolvedIssue

@@ -1,9 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { isGitHubSyncRuleCombination } from "@feeblo/db/validation-schema/github-integration";
-import {
-  IntegrationExternalResourceType,
-  IntegrationProviderKey,
-} from "@feeblo/db/validation-schema/integration";
+import { IntegrationProviderKey } from "@feeblo/db/validation-schema/integration";
 import {
   asLegid,
   GitHubSyncRuleId,
@@ -11,6 +8,7 @@ import {
   IntegrationRouteId,
   PostStatusId,
 } from "@feeblo/id";
+import { makeGitHubIssueExternalResourceDraft } from "@feeblo/integration-github";
 import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manifest";
 import { and, eq, ne } from "drizzle-orm";
 import * as Cause from "effect/Cause";
@@ -112,6 +110,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
       .select({
         postSlug: schema.postTable.slug,
         postTitle: schema.postTable.title,
+        postContent: schema.postTable.content,
         boardSlug: schema.boardTable.slug,
       })
       .from(schema.postTable)
@@ -138,6 +137,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
                   `/${encodeURIComponent(organizationId)}/post/${encodeURIComponent(rows[0].boardSlug)}/${encodeURIComponent(rows[0].postSlug)}`,
                   emailConfig.appUrl
                 ),
+                postDescription: rows[0].postContent,
                 postTitle: rows[0].postTitle,
               })
         )
@@ -154,20 +154,28 @@ const makeGitHubManagementService = Effect.gen(function* () {
     InternalServerError
   > =>
     Effect.gen(function* () {
-      const resource: ExternalResourceRecord = {
-        connectionId: input.issue.connectionId,
-        displayKey: `${input.issue.repositoryOwner}/${input.issue.repositoryName}#${input.issue.issueNumber}`,
-        organizationId: input.organizationId,
+      // One shared provider mapping keeps displayKey, safeMetadata, and title
+      // identical to what the delivery worker records for automatic issues.
+      const draft = makeGitHubIssueExternalResourceDraft({
+        issueNumber: input.issue.issueNumber,
+        postId: input.postId,
+        repositoryName: input.issue.repositoryName,
+        repositoryOwner: input.issue.repositoryOwner,
         remoteId: input.issue.remoteId,
         remoteUrl: input.issue.issueUrl,
-        resourceType: IntegrationExternalResourceType.make("issue"),
-        safeMetadata: {
-          issueNumber: input.issue.issueNumber,
-          repositoryName: input.issue.repositoryName,
-          repositoryOwner: input.issue.repositoryOwner,
-        },
-        stateKey: input.issue.issueState,
-        title: null,
+        state: input.issue.issueState,
+        title: input.issue.title,
+      });
+      const resource: ExternalResourceRecord = {
+        connectionId: input.issue.connectionId,
+        displayKey: draft.displayKey ?? null,
+        organizationId: input.organizationId,
+        remoteId: draft.remoteId,
+        remoteUrl: draft.remoteUrl,
+        resourceType: draft.resourceType,
+        safeMetadata: draft.safeMetadata,
+        stateKey: draft.stateKey ?? null,
+        title: draft.title ?? null,
       };
       const recorded = yield* externalResources.recordPostLink({
         postId: input.postId,
@@ -656,6 +664,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
           );
           const issue = yield* provider.createIssue({
             ...input,
+            postDescription: post.postDescription,
             postTitle: post.postTitle,
             postUrl: post.postUrl,
           });

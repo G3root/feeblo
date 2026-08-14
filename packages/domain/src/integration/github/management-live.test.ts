@@ -55,8 +55,6 @@ const testConfig = Layer.succeed(
   GitHubIntegrationConfig.of({
     clientId: "client-id",
     configured: true,
-    oauthRedirectUrl: "http://localhost:3000/github/oauth/callback",
-    webhookUrl: "http://localhost:3000/github/webhook",
   })
 );
 
@@ -211,6 +209,7 @@ const succeedWithIssue = (input: {
     remoteId: "I_7",
     issueUrl: new URL("https://github.com/acme/feedback/issues/7"),
     issueState: "open",
+    title: "Dark mode",
   });
 
 describe("GitHub management service", () => {

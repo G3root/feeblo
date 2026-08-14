@@ -23,6 +23,7 @@ export interface GitHubProviderShape {
   /** Creates a GitHub issue using the stable idempotency key as its external request identity. */
   readonly createIssue: (
     input: GitHubPostIssueCreate & {
+      readonly postDescription: string | null;
       readonly postTitle: string | null;
       readonly postUrl: URL;
     }
