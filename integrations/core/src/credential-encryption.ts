@@ -4,7 +4,7 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 /** Failure encrypting or decrypting provider credentials at rest. */
-export class IntegrationCredentialEncryptionError extends Schema.TaggedErrorClass<IntegrationCredentialEncryptionError>()(
+export class IntegrationCredentialEncryptionError extends Schema.TaggedError<IntegrationCredentialEncryptionError>()(
   "IntegrationCredentialEncryptionError",
   { operation: Schema.Literals(["encrypt", "decrypt"]), reason: Schema.String }
 ) {}

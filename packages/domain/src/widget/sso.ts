@@ -31,7 +31,7 @@ import { UserRepository } from "../user/repository";
  * better-auth `APIError` by the jwt-auto-login plugin, keeping all error-code
  * knowledge inside the plugin.
  */
-export class SsoError extends S.TaggedErrorClass<SsoError>()("SsoError", {
+export class SsoError extends S.TaggedError<SsoError>()("SsoError", {
   code: S.Literals([
     "ORGANIZATION_HAS_NO_JWT_SECRET",
     "INVALID_JWT",

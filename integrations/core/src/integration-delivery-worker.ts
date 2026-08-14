@@ -26,7 +26,7 @@ export interface ClaimedIntegrationDelivery {
 }
 
 /** Safe persistence failure surfaced by a worker poll without leaking payloads or credentials. */
-export class IntegrationDeliveryWorkerPersistenceError extends Schema.TaggedErrorClass<IntegrationDeliveryWorkerPersistenceError>()(
+export class IntegrationDeliveryWorkerPersistenceError extends Schema.TaggedError<IntegrationDeliveryWorkerPersistenceError>()(
   "IntegrationDeliveryWorkerPersistenceError",
   { operation: Schema.String }
 ) {}

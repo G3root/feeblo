@@ -20,7 +20,7 @@ import type {
 } from "@feeblo/integration-core";
 
 /** Failure parsing a verified Slack inbound request body into its typed payload. */
-export class SlackInboundPayloadError extends Schema.TaggedErrorClass<SlackInboundPayloadError>()(
+export class SlackInboundPayloadError extends Schema.TaggedError<SlackInboundPayloadError>()(
   "SlackInboundPayloadError",
   { reason: Schema.String }
 ) {}

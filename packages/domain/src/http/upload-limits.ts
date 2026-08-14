@@ -15,7 +15,7 @@ const MAX_FIELD_BYTES = 1 * 1024 * 1024;
  * this schema declares them in API contracts so clients and OpenAPI know the
  * endpoint can respond with 413 Payload Too Large.
  */
-export class UploadLimitError extends Schema.TaggedErrorClass<UploadLimitError>()(
+export class UploadLimitError extends Schema.TaggedError<UploadLimitError>()(
   "UploadLimitError",
   {
     message: Schema.optional(Schema.String),

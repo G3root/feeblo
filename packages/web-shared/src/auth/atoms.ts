@@ -19,7 +19,7 @@ import { authClient } from "../lib/auth-client";
 // distinguish them from an authoritative signed-out response.
 // ---------------------------------------------------------------------------
 
-export class AuthSessionRequestError extends Schema.TaggedErrorClass<AuthSessionRequestError>()(
+export class AuthSessionRequestError extends Schema.TaggedError<AuthSessionRequestError>()(
   "AuthSessionRequestError",
   { cause: Schema.Defect() }
 ) {}

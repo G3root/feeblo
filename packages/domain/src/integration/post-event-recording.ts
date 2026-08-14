@@ -9,7 +9,7 @@ import { EmailOutboxConfig } from "../email-outbox/config";
 import { PostRepository } from "../post/repository";
 
 /** Failure while assembling or recording a post integration event. */
-export class PostIntegrationEventRecordingError extends Schema.TaggedErrorClass<PostIntegrationEventRecordingError>()(
+export class PostIntegrationEventRecordingError extends Schema.TaggedError<PostIntegrationEventRecordingError>()(
   "PostIntegrationEventRecordingError",
   {
     kind: Schema.Literals(["infrastructure", "lookup", "recording"]),

@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import { PolicyDeniedError } from "../policy";
 import { InternalServerError, UnauthorizedError } from "../rpc-errors";
 
-export class FailedToDeleteCommentError extends Schema.TaggedErrorClass<FailedToDeleteCommentError>()(
+export class FailedToDeleteCommentError extends Schema.TaggedError<FailedToDeleteCommentError>()(
   "FailedToDeleteCommentError",
   {
     message: Schema.optional(Schema.String),
@@ -11,7 +11,7 @@ export class FailedToDeleteCommentError extends Schema.TaggedErrorClass<FailedTo
   { httpApiStatus: 500, identifier: "FailedToDeleteCommentError" }
 ) {}
 
-export class FailedToUpdateCommentError extends Schema.TaggedErrorClass<FailedToUpdateCommentError>()(
+export class FailedToUpdateCommentError extends Schema.TaggedError<FailedToUpdateCommentError>()(
   "FailedToUpdateCommentError",
   {
     message: Schema.optional(Schema.String),
@@ -19,7 +19,7 @@ export class FailedToUpdateCommentError extends Schema.TaggedErrorClass<FailedTo
   { httpApiStatus: 500, identifier: "FailedToUpdateCommentError" }
 ) {}
 
-export class FailedToCreateCommentError extends Schema.TaggedErrorClass<FailedToCreateCommentError>()(
+export class FailedToCreateCommentError extends Schema.TaggedError<FailedToCreateCommentError>()(
   "FailedToCreateCommentError",
   {
     message: Schema.optional(Schema.String),

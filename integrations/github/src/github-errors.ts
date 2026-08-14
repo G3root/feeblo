@@ -19,7 +19,7 @@ import type {
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
 
-export class GitHubInboundPayloadError extends Schema.TaggedErrorClass<GitHubInboundPayloadError>()(
+export class GitHubInboundPayloadError extends Schema.TaggedError<GitHubInboundPayloadError>()(
   "GitHubInboundPayloadError",
   { reason: Schema.String }
 ) {}

@@ -15,7 +15,7 @@ import * as Schema from "effect/Schema";
 
 const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
-export class EmailOutboxInspectionError extends Schema.TaggedErrorClass<EmailOutboxInspectionError>()(
+export class EmailOutboxInspectionError extends Schema.TaggedError<EmailOutboxInspectionError>()(
   "EmailOutboxInspectionError",
   { reason: Schema.String }
 ) {}

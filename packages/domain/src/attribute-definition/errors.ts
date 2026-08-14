@@ -7,13 +7,13 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class AttributeDefinitionNotFoundError extends Schema.TaggedErrorClass<AttributeDefinitionNotFoundError>()(
+export class AttributeDefinitionNotFoundError extends Schema.TaggedError<AttributeDefinitionNotFoundError>()(
   "AttributeDefinitionNotFoundError",
   { message: Schema.optional(Schema.String) },
   { httpApiStatus: 404, identifier: "AttributeDefinitionNotFoundError" }
 ) {}
 
-export class FailedToUpsertAttributeValueError extends Schema.TaggedErrorClass<FailedToUpsertAttributeValueError>()(
+export class FailedToUpsertAttributeValueError extends Schema.TaggedError<FailedToUpsertAttributeValueError>()(
   "FailedToUpsertAttributeValueError",
   {},
   { httpApiStatus: 500, identifier: "FailedToUpsertAttributeValueError" }

@@ -20,7 +20,7 @@ import type {
 } from "@feeblo/integration-core";
 
 /** Failure parsing a verified Discord interaction request body into its typed payload. */
-export class DiscordInboundPayloadError extends Schema.TaggedErrorClass<DiscordInboundPayloadError>()(
+export class DiscordInboundPayloadError extends Schema.TaggedError<DiscordInboundPayloadError>()(
   "DiscordInboundPayloadError",
   { reason: Schema.String }
 ) {}

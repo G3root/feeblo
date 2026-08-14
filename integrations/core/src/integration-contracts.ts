@@ -221,7 +221,7 @@ export interface IntegrationDeliveryAttempt
   extends Schema.Schema.Type<typeof IntegrationDeliveryAttempt> {}
 
 /** Persistence failure while atomically recording an event and its matched deliveries. */
-export class IntegrationEventRecordingError extends Schema.TaggedErrorClass<IntegrationEventRecordingError>()(
+export class IntegrationEventRecordingError extends Schema.TaggedError<IntegrationEventRecordingError>()(
   "IntegrationEventRecordingError",
   { message: Schema.String }
 ) {}
@@ -253,7 +253,7 @@ export class IntegrationEventRecorder extends Context.Service<
 >()("@feeblo/IntegrationEventRecorder") {}
 
 /** Provider-side authentication failure requiring reconnection or remediation. */
-export class IntegrationProviderAuthenticationError extends Schema.TaggedErrorClass<IntegrationProviderAuthenticationError>()(
+export class IntegrationProviderAuthenticationError extends Schema.TaggedError<IntegrationProviderAuthenticationError>()(
   "IntegrationProviderAuthenticationError",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -263,7 +263,7 @@ export class IntegrationProviderAuthenticationError extends Schema.TaggedErrorCl
 ) {}
 
 /** Provider-side rate limiting; retryAfterMs is validated before retry scheduling. */
-export class IntegrationProviderRateLimitedError extends Schema.TaggedErrorClass<IntegrationProviderRateLimitedError>()(
+export class IntegrationProviderRateLimitedError extends Schema.TaggedError<IntegrationProviderRateLimitedError>()(
   "IntegrationProviderRateLimitedError",
   {
     message: Schema.String,
@@ -276,7 +276,7 @@ export class IntegrationProviderRateLimitedError extends Schema.TaggedErrorClass
 ) {}
 
 /** Provider configuration rejected before an outbound request can be made. */
-export class IntegrationProviderInvalidConfigurationError extends Schema.TaggedErrorClass<IntegrationProviderInvalidConfigurationError>()(
+export class IntegrationProviderInvalidConfigurationError extends Schema.TaggedError<IntegrationProviderInvalidConfigurationError>()(
   "IntegrationProviderInvalidConfigurationError",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -286,7 +286,7 @@ export class IntegrationProviderInvalidConfigurationError extends Schema.TaggedE
 ) {}
 
 /** Retryable provider or transport failure; secrets and raw response bodies stay private. */
-export class IntegrationProviderTemporaryFailure extends Schema.TaggedErrorClass<IntegrationProviderTemporaryFailure>()(
+export class IntegrationProviderTemporaryFailure extends Schema.TaggedError<IntegrationProviderTemporaryFailure>()(
   "IntegrationProviderTemporaryFailure",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -296,7 +296,7 @@ export class IntegrationProviderTemporaryFailure extends Schema.TaggedErrorClass
 ) {}
 
 /** Terminal provider rejection; retrying the same request cannot fix it. */
-export class IntegrationProviderPermanentRejection extends Schema.TaggedErrorClass<IntegrationProviderPermanentRejection>()(
+export class IntegrationProviderPermanentRejection extends Schema.TaggedError<IntegrationProviderPermanentRejection>()(
   "IntegrationProviderPermanentRejection",
   {
     httpStatus: Schema.optionalKey(Schema.Int),
@@ -370,7 +370,7 @@ export interface IntegrationInboundResponse {
 }
 
 /** Terminal rejection of an inbound request after verification failed. */
-export class IntegrationInboundRejection extends Schema.TaggedErrorClass<IntegrationInboundRejection>()(
+export class IntegrationInboundRejection extends Schema.TaggedError<IntegrationInboundRejection>()(
   "IntegrationInboundRejection",
   { message: Schema.String, provider: IntegrationProviderKey }
 ) {}

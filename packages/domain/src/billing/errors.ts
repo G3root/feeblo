@@ -7,7 +7,7 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
-export class FailedToCreateCheckoutError extends Schema.TaggedErrorClass<FailedToCreateCheckoutError>()(
+export class FailedToCreateCheckoutError extends Schema.TaggedError<FailedToCreateCheckoutError>()(
   "FailedToCreateCheckoutError",
   {
     message: Schema.optional(Schema.String),
@@ -15,7 +15,7 @@ export class FailedToCreateCheckoutError extends Schema.TaggedErrorClass<FailedT
   { httpApiStatus: 400, identifier: "FailedToCreateCheckoutError" }
 ) {}
 
-export class FailedToCreatePortalError extends Schema.TaggedErrorClass<FailedToCreatePortalError>()(
+export class FailedToCreatePortalError extends Schema.TaggedError<FailedToCreatePortalError>()(
   "FailedToCreatePortalError",
   {
     message: Schema.optional(Schema.String),
@@ -28,7 +28,7 @@ export class FailedToCreatePortalError extends Schema.TaggedErrorClass<FailedToC
  * subscription cannot be revoked — the subscription would otherwise keep
  * billing after the tenant is gone.
  */
-export class FailedToRevokeSubscriptionError extends Schema.TaggedErrorClass<FailedToRevokeSubscriptionError>()(
+export class FailedToRevokeSubscriptionError extends Schema.TaggedError<FailedToRevokeSubscriptionError>()(
   "FailedToRevokeSubscriptionError",
   {
     message: Schema.optional(Schema.String),

@@ -11,7 +11,7 @@ import {
   ReservedSubdomainError,
 } from "../site/subdomain/errors";
 
-export class FailedToCreateWorkspaceError extends Schema.TaggedErrorClass<FailedToCreateWorkspaceError>()(
+export class FailedToCreateWorkspaceError extends Schema.TaggedError<FailedToCreateWorkspaceError>()(
   "FailedToCreateWorkspaceError",
   {
     message: Schema.optional(Schema.String),

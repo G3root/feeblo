@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-export class EmailSubscriptionTokenError extends Schema.TaggedErrorClass<EmailSubscriptionTokenError>()(
+export class EmailSubscriptionTokenError extends Schema.TaggedError<EmailSubscriptionTokenError>()(
   "EmailSubscriptionTokenError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
