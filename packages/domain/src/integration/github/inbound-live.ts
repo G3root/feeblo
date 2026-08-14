@@ -1,4 +1,9 @@
-import { currentDb, Database, schema } from "@feeblo/db";
+import {
+  currentDb,
+  Database,
+  gitHubIssueSafeMetadataConditions,
+  schema,
+} from "@feeblo/db";
 import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
@@ -14,7 +19,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -119,9 +124,11 @@ const makeGitHubInboundService = Effect.gen(function* () {
                     schema.integrationExternalResourceTable.resourceType,
                     gitHubIssueResourceType
                   ),
-                  sql`${schema.integrationExternalResourceTable.safeMetadata}->>'repositoryOwner' = ${webhook.repositoryOwner}`,
-                  sql`${schema.integrationExternalResourceTable.safeMetadata}->>'repositoryName' = ${webhook.repositoryName}`,
-                  sql`(${schema.integrationExternalResourceTable.safeMetadata}->>'issueNumber')::integer = ${webhook.issueNumber}`
+                  ...gitHubIssueSafeMetadataConditions({
+                    issueNumber: webhook.issueNumber,
+                    repositoryName: webhook.repositoryName,
+                    repositoryOwner: webhook.repositoryOwner,
+                  })
                 )
               )
               .pipe(Effect.mapError(inboundDatabaseError("issue link lookup")));

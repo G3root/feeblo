@@ -465,6 +465,21 @@ export const integrationExternalResourceTable = pgTable(
   ]
 );
 
+/** Shared SQL conditions matching a GitHub issue external resource by its safe-metadata identity. */
+export const gitHubIssueSafeMetadataConditions = ({
+  issueNumber,
+  repositoryName,
+  repositoryOwner,
+}: {
+  readonly issueNumber: number;
+  readonly repositoryName: string;
+  readonly repositoryOwner: string;
+}) => [
+  sql`${integrationExternalResourceTable.safeMetadata}->>'repositoryOwner' = ${repositoryOwner}`,
+  sql`${integrationExternalResourceTable.safeMetadata}->>'repositoryName' = ${repositoryName}`,
+  sql`(${integrationExternalResourceTable.safeMetadata}->>'issueNumber')::integer = ${issueNumber}`,
+];
+
 /** A normalized many-to-many link from a Feeblo post to an external resource. */
 export const postExternalResourceLinkTable = pgTable(
   "post_external_resource_link",

@@ -1,5 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
-import { currentDb, schema } from "@feeblo/db";
+import {
+  currentDb,
+  gitHubIssueSafeMetadataConditions,
+  schema,
+} from "@feeblo/db";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { GitHubProvider } from "@feeblo/domain/integration/github/github-provider";
 import {
@@ -23,9 +27,10 @@ import {
   makeGitHubApiClient,
   makeGitHubInstallationTokenResolver,
   renderGitHubIssueBody,
+  renderGitHubIssueTitle,
 } from "@feeblo/integration-github";
 import { githubProviderKey } from "@feeblo/integration-github/manifest";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -50,7 +55,9 @@ export const GitHubProviderLive = Layer.effect(
       new InternalServerError({ message: `GitHub App ${operation} failed.` });
     const issueFailure = (operation: string) => (failure: unknown) => {
       if (Schema.is(NotFoundError)(failure)) {
-        return new NotFoundError({ message: "GitHub issue was not found." });
+        return new NotFoundError({
+          message: `GitHub resource was not found during ${operation}.`,
+        });
       }
       if (Schema.is(IntegrationProviderAuthenticationError)(failure)) {
         return new UnauthorizedError({
@@ -58,7 +65,9 @@ export const GitHubProviderLive = Layer.effect(
         });
       }
       if (Schema.is(IntegrationProviderInvalidConfigurationError)(failure)) {
-        return new NotFoundError({ message: "GitHub issue was not found." });
+        return new NotFoundError({
+          message: `GitHub resource was not found during ${operation}.`,
+        });
       }
       if (Schema.is(IntegrationProviderPermanentRejection)(failure)) {
         return new BadRequestError({
@@ -248,6 +257,12 @@ export const GitHubProviderLive = Layer.effect(
                 "GitHub App installation is not accessible to the installer.",
             });
           }
+          if (installation.account === null) {
+            return yield* new NotFoundError({
+              message: "GitHub App installation account is unavailable.",
+            });
+          }
+          const installationAccount = installation.account;
           yield* db
             .transaction(() =>
               Effect.gen(function* () {
@@ -317,10 +332,10 @@ export const GitHubProviderLive = Layer.effect(
                         installation.suspended_at === null
                           ? "active"
                           : "paused",
-                      remoteAccountId: installation.account.login,
+                      remoteAccountId: installationAccount.login,
                       retentionExpiresAt: null,
                       safeDisplayMetadata: {
-                        login: installation.account.login,
+                        login: installationAccount.login,
                       },
                       updatedAt: new Date(),
                     })
@@ -350,18 +365,18 @@ export const GitHubProviderLive = Layer.effect(
                     .values({
                       connectionId: reusedConnection.id,
                       installationId: input.installationId,
-                      accountId: String(installation.account.id),
-                      accountLogin: installation.account.login,
-                      accountType: installation.account.type,
+                      accountId: String(installationAccount.id),
+                      accountLogin: installationAccount.login,
+                      accountType: installationAccount.type,
                       suspendedAt: installation.suspended_at,
                     })
                     .onConflictDoUpdate({
                       target: schema.githubInstallationTable.connectionId,
                       set: {
                         installationId: input.installationId,
-                        accountId: String(installation.account.id),
-                        accountLogin: installation.account.login,
-                        accountType: installation.account.type,
+                        accountId: String(installationAccount.id),
+                        accountLogin: installationAccount.login,
+                        accountType: installationAccount.type,
                         suspendedAt: installation.suspended_at,
                       },
                     })
@@ -378,8 +393,8 @@ export const GitHubProviderLive = Layer.effect(
                     credentialsCiphertext: null,
                     lifecycle:
                       installation.suspended_at === null ? "active" : "paused",
-                    remoteAccountId: installation.account.login,
-                    safeDisplayMetadata: { login: installation.account.login },
+                    remoteAccountId: installationAccount.login,
+                    safeDisplayMetadata: { login: installationAccount.login },
                   })
                   .where(
                     and(
@@ -410,18 +425,18 @@ export const GitHubProviderLive = Layer.effect(
                   .values({
                     connectionId: connection.id,
                     installationId: input.installationId,
-                    accountId: String(installation.account.id),
-                    accountLogin: installation.account.login,
-                    accountType: installation.account.type,
+                    accountId: String(installationAccount.id),
+                    accountLogin: installationAccount.login,
+                    accountType: installationAccount.type,
                     suspendedAt: installation.suspended_at,
                   })
                   .onConflictDoUpdate({
                     target: schema.githubInstallationTable.connectionId,
                     set: {
                       installationId: input.installationId,
-                      accountId: String(installation.account.id),
-                      accountLogin: installation.account.login,
-                      accountType: installation.account.type,
+                      accountId: String(installationAccount.id),
+                      accountLogin: installationAccount.login,
+                      accountType: installationAccount.type,
                       suspendedAt: installation.suspended_at,
                     },
                   })
@@ -504,9 +519,10 @@ export const GitHubProviderLive = Layer.effect(
                 accessToken,
                 repositoryOwner: input.repositoryOwner,
                 repositoryName: input.repositoryName,
-                title: input.postTitle?.trim() || "Feeblo feedback",
+                title: renderGitHubIssueTitle({ title: input.postTitle }),
                 body: renderGitHubIssueBody({
                   description: input.postDescription,
+                  postUrl: input.postUrl.toString(),
                 }),
               });
               // The Feeblo backlink lives in a bot comment, matching the
@@ -563,9 +579,11 @@ export const GitHubProviderLive = Layer.effect(
                       schema.integrationExternalResourceTable.connectionId,
                       input.connectionId
                     ),
-                    sql`${schema.integrationExternalResourceTable.safeMetadata}->>'repositoryOwner' = ${input.repositoryOwner}`,
-                    sql`${schema.integrationExternalResourceTable.safeMetadata}->>'repositoryName' = ${input.repositoryName}`,
-                    sql`(${schema.integrationExternalResourceTable.safeMetadata}->>'issueNumber')::integer = ${input.issueNumber}`
+                    ...gitHubIssueSafeMetadataConditions({
+                      issueNumber: input.issueNumber,
+                      repositoryName: input.repositoryName,
+                      repositoryOwner: input.repositoryOwner,
+                    })
                   )
                 )
                 .limit(1)

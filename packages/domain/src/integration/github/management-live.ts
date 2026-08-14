@@ -423,13 +423,13 @@ const makeGitHubManagementService = Effect.gen(function* () {
           input.enabled &&
           (input.repositoryOwner === null || input.repositoryName === null)
         ) {
-          return yield* new InternalServerError({
+          return yield* new BadRequestError({
             message:
               "GitHub integration enabled settings require a repository.",
           });
         }
         if (input.boardScope === "specific_board" && input.boardId === null) {
-          return yield* new InternalServerError({
+          return yield* new BadRequestError({
             message:
               "GitHub integration specific board settings require a board.",
           });

@@ -58,7 +58,7 @@ export interface GitHubInstallationAccount
 
 /** Installation facts necessary to verify setup and route globally delivered webhooks. */
 export const GitHubUserInstallation = Schema.Struct({
-  account: GitHubInstallationAccount,
+  account: Schema.NullOr(GitHubInstallationAccount),
   id: Schema.Number,
   repository_selection: Schema.Literals(["all", "selected"]),
   suspended_at: Schema.NullOr(Schema.DateFromString),

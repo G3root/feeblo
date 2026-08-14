@@ -22,7 +22,10 @@ import {
   GitHubIssueWebhookPayload,
   type ParsedGitHubInboundRequest,
 } from "./github-inbound-schema";
-import { renderGitHubIssueBody } from "./github-issue-body";
+import {
+  renderGitHubIssueBody,
+  renderGitHubIssueTitle,
+} from "./github-issue-body";
 import {
   GitHubConnectionConfiguration,
   GitHubIssueCreateRouteConfiguration,
@@ -155,8 +158,6 @@ const parseGitHubAppWebhook = ({
   }
 };
 
-/** Converts a GitHub issue into the provider-neutral resource draft; both delivery and user-requested paths share this mapping. */
-
 /** Provider-owned raw GitHub App webhook authentication and decoding, before any domain service runs. */
 const makeGitHubAppWebhookHandler = ({
   webhookSecret,
@@ -261,10 +262,11 @@ export const makeGitHubProviderRegistration = ({
           accessToken: credentials.accessToken,
           body: renderGitHubIssueBody({
             description: eventData.post.description ?? null,
+            postUrl: eventData.post.url.toString(),
           }),
           repositoryName: routeConfig.repositoryName,
           repositoryOwner: routeConfig.repositoryOwner,
-          title: eventData.post.title,
+          title: renderGitHubIssueTitle({ title: eventData.post.title }),
         });
         // The bot backlink comment is part of the delivery so a retry after a
         // crash before acknowledgement re-runs both calls (at-least-once).

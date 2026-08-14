@@ -38,7 +38,13 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { startTransition, useEffect, useOptimistic, useState } from "react";
+import {
+  startTransition,
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+} from "react";
 import {
   type GitHubConnection,
   type GitHubPostStatus,
@@ -622,6 +628,9 @@ function GitHubSyncRuleSlot({
   // The slot's rule is created on first change; remember its id so follow-up
   // saves update it before the refreshed rule list arrives.
   const [createdRuleId, setCreatedRuleId] = useState<string | null>(null);
+  // Reuse the same in-flight (or just-resolved) create so concurrent first
+  // saves cannot issue duplicate createGitHubSyncRule calls.
+  const createInFlightRef = useRef<Promise<GitHubSyncRule> | null>(null);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<{
     readonly postStatusId: string;
@@ -658,16 +667,39 @@ function GitHubSyncRuleSlot({
       setSaving(true);
       try {
         if (ruleId === null) {
-          const created = await createGitHubSyncRule({
-            organizationId: args.organizationId,
-            connectionId: args.connectionId,
-            issueMatchMode,
-            issueState,
-            postStatusId: next.postStatusId,
-            upvoterNotificationPolicy: next.upvoterNotificationPolicy,
-            enabled: next.enabled,
-          });
+          const reused = createInFlightRef.current !== null;
+          const createPromise =
+            createInFlightRef.current ??
+            createGitHubSyncRule({
+              organizationId: args.organizationId,
+              connectionId: args.connectionId,
+              issueMatchMode,
+              issueState,
+              postStatusId: next.postStatusId,
+              upvoterNotificationPolicy: next.upvoterNotificationPolicy,
+              enabled: next.enabled,
+            });
+          createInFlightRef.current = createPromise;
+          let created: GitHubSyncRule;
+          try {
+            created = await createPromise;
+          } catch (error) {
+            if (!reused) {
+              createInFlightRef.current = null;
+            }
+            throw error;
+          }
           setCreatedRuleId(created.id);
+          if (reused) {
+            await updateGitHubSyncRule({
+              organizationId: args.organizationId,
+              connectionId: args.connectionId,
+              id: created.id,
+              postStatusId: next.postStatusId,
+              upvoterNotificationPolicy: next.upvoterNotificationPolicy,
+              enabled: next.enabled,
+            });
+          }
         } else {
           await updateGitHubSyncRule({
             organizationId: args.organizationId,
@@ -706,6 +738,7 @@ function GitHubSyncRuleSlot({
         id: ruleId,
       });
       setCreatedRuleId(null);
+      createInFlightRef.current = null;
       onChanged();
       toastManager.add({
         title: "GitHub synchronization rule removed",
@@ -752,7 +785,7 @@ function GitHubSyncRuleSlot({
         value={draft.postStatusId}
       />
       <RuleSelect
-        disabled={saving}
+        disabled={saving || !statusesReady}
         label="Upvoters"
         onValueChange={(upvoterNotificationPolicy) =>
           save({
