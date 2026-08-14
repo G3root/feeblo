@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 import {
   Dialog,
   DialogDescription,
@@ -18,11 +17,7 @@ const PostCreateForm = lazy(() =>
 );
 
 function PostCreateFormFallback() {
-  return (
-    <div className="flex h-full items-center justify-center p-12">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground" />
-    </div>
-  );
+  return <DialogPanel>Loading post form…</DialogPanel>;
 }
 
 export function PostCreateDialog() {
@@ -30,23 +25,18 @@ export function PostCreateDialog() {
   const open = useSelector(store, (state) => state.context.open);
   return (
     <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <DialogPopup
-        className="md:min-h-150 md:max-w-6xl"
-        showCloseButton={false}
-      >
+      <DialogPopup className="w-full max-w-187.5 md:min-h-150">
         <DialogHeader>
-          <DialogTitle className="sr-only">Create Post</DialogTitle>
-          <DialogDescription className="sr-only">
+          <DialogTitle>Create Post</DialogTitle>
+          <DialogDescription>
             Create a new post in the selected board.
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel>
-          {open ? (
-            <Suspense fallback={<PostCreateFormFallback />}>
-              <PostCreateForm />
-            </Suspense>
-          ) : null}
-        </DialogPanel>
+        {open ? (
+          <Suspense fallback={<PostCreateFormFallback />}>
+            <PostCreateForm />
+          </Suspense>
+        ) : null}
       </DialogPopup>
     </Dialog>
   );
