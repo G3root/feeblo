@@ -14,13 +14,10 @@ export type LegidId = typeof LegidId.Type;
 
 export type LegidOf<Name extends string> = LegidId & Brand.Brand<Name>;
 
-export class LegidError extends Schema.TaggedError<LegidError>()(
-  "LegidError",
-  {
-    input: Schema.String,
-    message: Schema.String,
-  }
-) {}
+export class LegidError extends Schema.TaggedError<LegidError>()("LegidError", {
+  input: Schema.String,
+  message: Schema.String,
+}) {}
 
 export interface LegidConfig {
   readonly approximateLength?: number;

@@ -1,7 +1,9 @@
 import {
   decryptIntegrationCredentialMaterial,
   encryptIntegrationCredentialMaterial,
+  type IntegrationCredentialEncryptionError,
 } from "@feeblo/integration-core";
+import type * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
@@ -21,7 +23,10 @@ export type GitHubEncryptedCredentialMaterial = Schema.Schema.Type<
 export const encryptGitHubCredentialMaterial = (
   encryptionKey: Redacted.Redacted<string>,
   credentials: GitHubEncryptedCredentialMaterial
-) =>
+): Effect.Effect<
+  EncryptedGitHubCredential,
+  IntegrationCredentialEncryptionError
+> =>
   encryptIntegrationCredentialMaterial(
     encryptionKey,
     GitHubEncryptedCredentialMaterial,
@@ -32,7 +37,10 @@ export const encryptGitHubCredentialMaterial = (
 export const decryptGitHubCredentialMaterial = (
   encryptionKey: Redacted.Redacted<string>,
   encryptedCredential: EncryptedGitHubCredential
-) =>
+): Effect.Effect<
+  GitHubEncryptedCredentialMaterial,
+  IntegrationCredentialEncryptionError
+> =>
   decryptIntegrationCredentialMaterial(
     encryptionKey,
     GitHubEncryptedCredentialMaterial,

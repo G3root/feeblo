@@ -161,16 +161,16 @@ export const runIntegrationDeliveryWorkerPoll = ({
                                 ),
                             }),
                             onSuccess: (response) => ({
-                            ...(response.httpStatus === undefined
-                              ? {}
-                              : { httpStatus: response.httpStatus }),
-                            ...(response.externalResourceDrafts === undefined
-                              ? {}
-                              : {
-                                  externalResourceDrafts:
-                                    response.externalResourceDrafts,
-                                }),
-                            outcome: { _tag: "Succeeded" } as const,
+                              ...(response.httpStatus === undefined
+                                ? {}
+                                : { httpStatus: response.httpStatus }),
+                              ...(response.externalResourceDrafts === undefined
+                                ? {}
+                                : {
+                                    externalResourceDrafts:
+                                      response.externalResourceDrafts,
+                                  }),
+                              outcome: { _tag: "Succeeded" } as const,
                             }),
                           })
                         );
@@ -182,8 +182,7 @@ export const runIntegrationDeliveryWorkerPoll = ({
                     ...(result.externalResourceDrafts === undefined
                       ? {}
                       : {
-                          externalResourceDrafts:
-                            result.externalResourceDrafts,
+                          externalResourceDrafts: result.externalResourceDrafts,
                         }),
                     ...(result.httpStatus === undefined
                       ? {}

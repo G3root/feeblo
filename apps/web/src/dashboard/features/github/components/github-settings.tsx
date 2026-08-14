@@ -878,6 +878,7 @@ function GitHubSyncRuleRow({
         onValueChange={(issueMatchMode) =>
           save({
             ...optimisticRule,
+            // SAFETY: the value originates from the hardcoded options below, so it is one of the allowed literals.
             issueMatchMode: issueMatchMode as GitHubSyncRule["issueMatchMode"],
           })
         }
@@ -893,6 +894,7 @@ function GitHubSyncRuleRow({
         onValueChange={(issueState) =>
           save({
             ...optimisticRule,
+            // SAFETY: the value originates from the hardcoded options below, so it is one of the allowed literals.
             issueState: issueState as GitHubSyncRule["issueState"],
           })
         }
@@ -932,6 +934,7 @@ function GitHubSyncRuleRow({
         onValueChange={(upvoterNotificationPolicy) =>
           save({
             ...optimisticRule,
+            // SAFETY: the value originates from the hardcoded options below, so it is one of the allowed literals.
             upvoterNotificationPolicy:
               upvoterNotificationPolicy as GitHubSyncRule["upvoterNotificationPolicy"],
           })

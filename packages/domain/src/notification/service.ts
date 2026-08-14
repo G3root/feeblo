@@ -200,7 +200,9 @@ const makeNotificationService = Effect.gen(function* () {
     }: PostNotificationInput & { readonly deduplicationKey: string }) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
-        if (!context) return;
+        if (!context) {
+          return;
+        }
         const upvoters = yield* db
           .select({ memberId: schema.upvoteTable.memberId })
           .from(schema.upvoteTable)

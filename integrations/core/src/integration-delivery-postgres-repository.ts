@@ -19,8 +19,8 @@ import { integrationDeliveryWorkerDefaults } from "./delivery-worker-defaults";
 import {
   IntegrationConnection,
   IntegrationDelivery,
-  type IntegrationExternalResourceDraft,
   IntegrationEventEnvelopeV1,
+  type IntegrationExternalResourceDraft,
   IntegrationRoute,
 } from "./integration-contracts";
 import {
