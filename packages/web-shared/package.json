@@ -100,7 +100,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@effect/atom-react": "4.0.0-beta.66",
+    "@effect/atom-react": "catalog:",
     "@epic-web/client-hints": "^1.3.9",
     "@feeblo/auth": "workspace:*",
     "@feeblo/db": "workspace:*",

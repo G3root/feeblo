@@ -22,7 +22,7 @@
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-beta.94",
+    "@effect/vitest": "catalog:",
     "@feeblo/config": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@types/node": "catalog:",
