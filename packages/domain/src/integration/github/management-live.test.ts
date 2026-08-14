@@ -3,6 +3,7 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import { IntegrationProviderKey } from "@feeblo/db/validation-schema/integration";
 import {
   BoardId,
+  GitHubSyncRuleId,
   IntegrationConnectionId,
   type LegidOf,
   PostId,
@@ -425,19 +426,17 @@ describe("GitHub management service", () => {
     );
 
     it.effect(
-      "updates a rule's match mode, issue state, and enabled flag",
+      "updates a rule's status, notification policy, and enabled flag without changing its shape",
       () =>
         Effect.gen(function* () {
           const service = yield* GitHubManagementService;
           const seeded = yield* seedRuleFixtures;
-          const created = yield* service.createRule(ruleCreateInput(seeded));
+          const created = yield* service.createRule(ruleCreateInput(seeded)); // (all, closed)
 
           const updated = yield* service.updateRule({
             id: created.id,
             organizationId: seeded.organizationId,
             connectionId: created.connectionId,
-            issueMatchMode: "any",
-            issueState: "open",
             postStatusId: created.postStatusId,
             upvoterNotificationPolicy: "do_not_notify_upvoters",
             enabled: false,
@@ -447,16 +446,75 @@ describe("GitHub management service", () => {
             connectionId: seeded.connectionId,
           });
 
-          expect(updated.issueMatchMode).toBe("any");
-          expect(updated.issueState).toBe("open");
+          expect(updated.issueMatchMode).toBe("all");
+          expect(updated.issueState).toBe("closed");
           expect(updated.enabled).toBe(false);
-          expect(persisted?.issueMatchMode).toBe("any");
-          expect(persisted?.issueState).toBe("open");
+          expect(persisted?.issueMatchMode).toBe("all");
+          expect(persisted?.issueState).toBe("closed");
           expect(persisted?.enabled).toBe(false);
           expect(persisted?.upvoterNotificationPolicy).toBe(
             "do_not_notify_upvoters"
           );
         })
+    );
+
+    it.effect("rejects a rule shape that is not hard-wired", () =>
+      Effect.gen(function* () {
+        const service = yield* GitHubManagementService;
+        const seeded = yield* seedRuleFixtures;
+
+        const result = yield* service
+          .createRule({
+            ...ruleCreateInput(seeded),
+            issueMatchMode: "any",
+            issueState: "closed",
+          })
+          .pipe(
+            Effect.match({
+              onFailure: (error) => error._tag,
+              onSuccess: () => "success",
+            })
+          );
+
+        expect(result).toBe("BadRequestError");
+      })
+    );
+
+    it.effect("rejects a duplicate rule for the same issue states", () =>
+      Effect.gen(function* () {
+        const service = yield* GitHubManagementService;
+        const seeded = yield* seedRuleFixtures;
+        yield* service.createRule(ruleCreateInput(seeded)); // (all, closed)
+
+        const result = yield* service.createRule(ruleCreateInput(seeded)).pipe(
+          Effect.match({
+            onFailure: (error) => error._tag,
+            onSuccess: () => "success",
+          })
+        );
+
+        expect(result).toBe("BadRequestError");
+      })
+    );
+
+    it.effect("allows the any-open plus all-closed rule pair", () =>
+      Effect.gen(function* () {
+        const service = yield* GitHubManagementService;
+        const seeded = yield* seedRuleFixtures;
+        yield* service.createRule(ruleCreateInput(seeded)); // (all, closed)
+
+        yield* service.createRule({
+          ...ruleCreateInput(seeded),
+          issueMatchMode: "any",
+          issueState: "open",
+        });
+        const rules = yield* service.listRules({
+          organizationId: seeded.organizationId,
+          connectionId: seeded.connectionId,
+        });
+
+        expect(rules).toHaveLength(2);
+      })
     );
 
     it.effect("deletes a rule so it no longer lists", () =>
@@ -497,6 +555,69 @@ describe("GitHub management service", () => {
           );
 
         expect(result).toBe("NotFoundError");
+      })
+    );
+
+    it.effect("rejects a non-hard-wired rule shape at the database level", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const seeded = yield* seedRuleFixtures;
+        const ruleId = yield* GitHubSyncRuleId.generate;
+
+        const result = yield* db
+          .insert(schema.githubSyncRuleTable)
+          .values({
+            id: ruleId,
+            organizationId: seeded.organizationId,
+            connectionId: seeded.connectionId,
+            issueMatchMode: "all",
+            issueState: "open",
+            postStatusId: seeded.postStatusId,
+            upvoterNotificationPolicy: "notify_upvoters",
+            enabled: true,
+          })
+          .pipe(
+            Effect.match({
+              onFailure: (error) => error._tag,
+              onSuccess: () => "success",
+            })
+          );
+
+        expect(result).toBe("EffectDrizzleQueryError");
+      })
+    );
+
+    it.effect("rejects a duplicate rule shape at the database level", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const seeded = yield* seedRuleFixtures;
+        const firstId = yield* GitHubSyncRuleId.generate;
+        const secondId = yield* GitHubSyncRuleId.generate;
+        const ruleRow = {
+          organizationId: seeded.organizationId,
+          connectionId: seeded.connectionId,
+          issueMatchMode: "all" as const,
+          issueState: "closed" as const,
+          postStatusId: seeded.postStatusId,
+          upvoterNotificationPolicy: "notify_upvoters" as const,
+          enabled: true,
+        };
+
+        yield* db.insert(schema.githubSyncRuleTable).values({
+          id: firstId,
+          ...ruleRow,
+        });
+        const result = yield* db
+          .insert(schema.githubSyncRuleTable)
+          .values({ id: secondId, ...ruleRow })
+          .pipe(
+            Effect.match({
+              onFailure: (error) => error._tag,
+              onSuccess: () => "success",
+            })
+          );
+
+        expect(result).toBe("EffectDrizzleQueryError");
       })
     );
   });

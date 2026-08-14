@@ -157,9 +157,13 @@ export const GitHubRuleCreate = Schema.Struct({
   enabled: Schema.Boolean,
 });
 export type GitHubRuleCreate = Schema.Schema.Type<typeof GitHubRuleCreate>;
+/** Updates the mutable fields of a hard-wired GitHub synchronization rule; the issue-state shape is fixed. */
 export const GitHubRuleUpdate = Schema.Struct({
-  ...GitHubRuleCreate.fields,
+  ...GitHubSettingsGet.fields,
   id: GitHubSyncRuleId.schema,
+  postStatusId: PostStatusId.schema,
+  upvoterNotificationPolicy: GitHubUpvoterNotificationPolicy,
+  enabled: Schema.Boolean,
 });
 export type GitHubRuleUpdate = Schema.Schema.Type<typeof GitHubRuleUpdate>;
 export const GitHubRuleDelete = Schema.Struct({

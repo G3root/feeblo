@@ -1,4 +1,5 @@
 import { currentDb, schema } from "@feeblo/db";
+import { isGitHubSyncRuleCombination } from "@feeblo/db/validation-schema/github-integration";
 import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
@@ -521,6 +522,39 @@ const makeGitHubManagementService = Effect.gen(function* () {
     createRule: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);
+        if (
+          !isGitHubSyncRuleCombination(input.issueMatchMode, input.issueState)
+        ) {
+          return yield* new BadRequestError({
+            message:
+              'Only "any open" and "all closed" GitHub synchronization rules are supported.',
+          });
+        }
+        const existing = yield* db
+          .select({ id: schema.githubSyncRuleTable.id })
+          .from(schema.githubSyncRuleTable)
+          .where(
+            and(
+              eq(
+                schema.githubSyncRuleTable.organizationId,
+                input.organizationId
+              ),
+              eq(schema.githubSyncRuleTable.connectionId, input.connectionId),
+              eq(
+                schema.githubSyncRuleTable.issueMatchMode,
+                input.issueMatchMode
+              ),
+              eq(schema.githubSyncRuleTable.issueState, input.issueState)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.mapError(databaseError("rule duplicate lookup")));
+        if (existing[0] !== undefined) {
+          return yield* new BadRequestError({
+            message:
+              "A GitHub synchronization rule for these issue states already exists.",
+          });
+        }
         const id = yield* GitHubSyncRuleId.generate.pipe(
           Effect.mapError(databaseError("rule identifier generation"))
         );
@@ -531,43 +565,45 @@ const makeGitHubManagementService = Effect.gen(function* () {
         return { ...input, id };
       }),
     updateRule: (input) =>
-      db
-        .update(schema.githubSyncRuleTable)
-        .set({
-          enabled: input.enabled,
-          issueMatchMode: input.issueMatchMode,
-          issueState: input.issueState,
+      Effect.gen(function* () {
+        const rows = yield* db
+          .update(schema.githubSyncRuleTable)
+          .set({
+            enabled: input.enabled,
+            postStatusId: input.postStatusId,
+            upvoterNotificationPolicy: input.upvoterNotificationPolicy,
+          })
+          .where(
+            and(
+              eq(schema.githubSyncRuleTable.id, input.id),
+              eq(
+                schema.githubSyncRuleTable.organizationId,
+                input.organizationId
+              ),
+              eq(schema.githubSyncRuleTable.connectionId, input.connectionId)
+            )
+          )
+          .returning({
+            connectionId: schema.githubSyncRuleTable.connectionId,
+            issueMatchMode: schema.githubSyncRuleTable.issueMatchMode,
+            issueState: schema.githubSyncRuleTable.issueState,
+          })
+          .pipe(Effect.mapError(databaseError("rule update")));
+        if (rows[0] === undefined) {
+          return yield* new NotFoundError({
+            message: "GitHub synchronization rule was not found.",
+          });
+        }
+        return {
+          id: input.id,
+          connectionId: asLegid(IntegrationConnectionId)(rows[0].connectionId),
+          issueMatchMode: rows[0].issueMatchMode,
+          issueState: rows[0].issueState,
           postStatusId: input.postStatusId,
           upvoterNotificationPolicy: input.upvoterNotificationPolicy,
-        })
-        .where(
-          and(
-            eq(schema.githubSyncRuleTable.id, input.id),
-            eq(schema.githubSyncRuleTable.organizationId, input.organizationId),
-            eq(schema.githubSyncRuleTable.connectionId, input.connectionId)
-          )
-        )
-        .returning({ connectionId: schema.githubSyncRuleTable.connectionId })
-        .pipe(
-          Effect.mapError(databaseError("rule update")),
-          Effect.flatMap((rows) =>
-            rows[0] === undefined
-              ? new NotFoundError({
-                  message: "GitHub synchronization rule was not found.",
-                })
-              : Effect.succeed({
-                  id: input.id,
-                  connectionId: asLegid(IntegrationConnectionId)(
-                    rows[0].connectionId
-                  ),
-                  issueMatchMode: input.issueMatchMode,
-                  issueState: input.issueState,
-                  postStatusId: input.postStatusId,
-                  upvoterNotificationPolicy: input.upvoterNotificationPolicy,
-                  enabled: input.enabled,
-                })
-          )
-        ),
+          enabled: input.enabled,
+        };
+      }),
     deleteRule: (input) =>
       db
         .delete(schema.githubSyncRuleTable)
