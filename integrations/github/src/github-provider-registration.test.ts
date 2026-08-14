@@ -6,24 +6,30 @@ import {
   IntegrationDeliveryId,
   IntegrationEventId,
   IntegrationRouteId,
+  PostId,
   WorkspaceId,
 } from "@feeblo/id";
-import type {
-  IntegrationExternalResourceDraft,
-  IntegrationProviderDeliveryInput,
+import {
+  type IntegrationExternalResourceDraft,
+  type IntegrationProviderDeliveryInput,
+  IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import type { GitHubApiClient } from "./github-api";
+import type { GitHubApiClient, GitHubIssue } from "./github-api";
 import { ParsedGitHubInboundRequest } from "./github-inbound-schema";
 import {
   githubIssueCreateCapabilityKey,
   githubProviderKey,
 } from "./github-manifest";
-import { makeGitHubProviderRegistration } from "./github-provider-registration";
+import {
+  makeGitHubCredentialResolver,
+  makeGitHubIssueExternalResourceDraft,
+  makeGitHubProviderRegistration,
+} from "./github-provider-registration";
 
 const deliveryInput: IntegrationProviderDeliveryInput = {
   connection: {
@@ -216,6 +222,273 @@ describe("GitHub provider registration", () => {
         if (parsed.kind === "installation") {
           expect(parsed.payload.installation.id).toBe(42);
         }
+      })
+  );
+});
+
+describe("makeGitHubIssueExternalResourceDraft", () => {
+  it("normalizes a GitHub issue into a provider-neutral resource", () => {
+    const issue: GitHubIssue = {
+      html_url: new URL("https://github.com/acme/feedback/issues/7"),
+      id: 7,
+      node_id: "I_7",
+      number: 7,
+      state: "open",
+      title: "Dark mode",
+    };
+    const draft = makeGitHubIssueExternalResourceDraft({
+      issue,
+      postId: asLegid(PostId)("pst_1"),
+      repositoryName: "feedback",
+      repositoryOwner: "acme",
+    });
+
+    expect(draft.displayKey).toBe("acme/feedback#7");
+    expect(draft.remoteId).toBe("I_7");
+    expect(draft.stateKey).toBe("open");
+    expect(draft.remoteUrl.href).toBe(
+      "https://github.com/acme/feedback/issues/7"
+    );
+    expect(draft.resourceType).toBe("issue");
+    expect(draft.safeMetadata).toEqual({
+      issueNumber: 7,
+      repositoryName: "feedback",
+      repositoryOwner: "acme",
+    });
+    expect(draft.title).toBe("Dark mode");
+  });
+});
+
+describe("GitHub provider credential resolver", () => {
+  const installationTokenResolver = {
+    getInstallationAccessToken: ({
+      installationId,
+    }: {
+      readonly installationId: string;
+    }) => Effect.succeed(Redacted.make(`token_${installationId}`)),
+  };
+
+  it.effect("mints credentials for an installed connection", () =>
+    Effect.gen(function* () {
+      const resolver = makeGitHubCredentialResolver({
+        installationTokenResolver,
+        loadInstallationId: () => Effect.succeed("12345"),
+      });
+
+      const credentials = yield* resolver.loadGitHubCredentials(deliveryInput);
+
+      expect(Redacted.value(credentials.accessToken)).toBe("token_12345");
+    })
+  );
+
+  it.effect("rejects a connection without a GitHub installation", () =>
+    Effect.gen(function* () {
+      const resolver = makeGitHubCredentialResolver({
+        installationTokenResolver,
+        loadInstallationId: () => Effect.succeed(null),
+      });
+
+      const tag = yield* resolver.loadGitHubCredentials(deliveryInput).pipe(
+        Effect.match({
+          onFailure: (error) => error._tag,
+          onSuccess: () => "success",
+        })
+      );
+
+      expect(tag).toBe("IntegrationProviderInvalidConfigurationError");
+    })
+  );
+
+  it.effect("maps token minting failures to a temporary provider failure", () =>
+    Effect.gen(function* () {
+      const resolver = makeGitHubCredentialResolver({
+        installationTokenResolver: {
+          getInstallationAccessToken: () =>
+            Effect.fail(
+              new IntegrationProviderTemporaryFailure({
+                message: "mint failed",
+                provider: githubProviderKey,
+              })
+            ),
+        },
+        loadInstallationId: () => Effect.succeed("12345"),
+      });
+
+      const tag = yield* resolver.loadGitHubCredentials(deliveryInput).pipe(
+        Effect.match({
+          onFailure: (error) => error._tag,
+          onSuccess: () => "success",
+        })
+      );
+
+      expect(tag).toBe("IntegrationProviderTemporaryFailure");
+    })
+  );
+});
+
+describe("GitHub App webhook handler", () => {
+  const webhookSecret = Redacted.make("webhook-secret");
+  const signatureFor = (rawBody: string) =>
+    `sha256=${createHmac("sha256", Redacted.value(webhookSecret))
+      .update(rawBody)
+      .digest("hex")}`;
+
+  const makeHandler = () => {
+    const registration = makeGitHubProviderRegistration({
+      apiClient,
+      credentialResolver: {
+        loadGitHubCredentials: () =>
+          Effect.succeed({ accessToken: Redacted.make("token") }),
+      },
+      webhookSecret,
+    });
+    return registration.inboundHandlers[0];
+  };
+
+  it.effect("rejects a delivery with an invalid signature", () =>
+    Effect.gen(function* () {
+      const handler = makeHandler();
+      if (handler === undefined) {
+        return;
+      }
+      const response = yield* handler.handle({
+        headers: {
+          "x-github-delivery": "delivery_1",
+          "x-github-event": "issues",
+          "x-hub-signature-256": "sha256=deadbeef",
+        },
+        rawBody: '{"action":"opened"}',
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.body).toBe("invalid request signature");
+    })
+  );
+
+  it.effect("acknowledges an unsupported GitHub event without retrying", () =>
+    Effect.gen(function* () {
+      const handler = makeHandler();
+      if (handler === undefined) {
+        return;
+      }
+      const rawBody = '{"ref":"refs/heads/main"}';
+      const response = yield* handler.handle({
+        headers: {
+          "x-github-delivery": "delivery_push_1",
+          "x-github-event": "push",
+          "x-hub-signature-256": signatureFor(rawBody),
+        },
+        rawBody,
+      });
+
+      expect(response.status).toBe(202);
+      expect(response.body).toBe("unsupported GitHub webhook event");
+    })
+  );
+
+  it.effect("rejects a malformed issue payload", () =>
+    Effect.gen(function* () {
+      const handler = makeHandler();
+      if (handler === undefined) {
+        return;
+      }
+      const rawBody = '{"action":"opened"}';
+      const response = yield* handler.handle({
+        headers: {
+          "x-github-delivery": "delivery_bad_1",
+          "x-github-event": "issues",
+          "x-hub-signature-256": signatureFor(rawBody),
+        },
+        rawBody,
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toBe("invalid request payload");
+    })
+  );
+
+  it.effect("rejects a signed delivery that is missing its delivery id", () =>
+    Effect.gen(function* () {
+      const handler = makeHandler();
+      if (handler === undefined) {
+        return;
+      }
+      const rawBody = '{"action":"opened"}';
+      const response = yield* handler.handle({
+        headers: {
+          "x-github-event": "issues",
+          "x-hub-signature-256": signatureFor(rawBody),
+        },
+        rawBody,
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toBe("invalid request payload");
+    })
+  );
+});
+
+describe("GitHub issue-create handler", () => {
+  const makeHandler = () => {
+    const registration = makeGitHubProviderRegistration({
+      apiClient,
+      credentialResolver: {
+        loadGitHubCredentials: () =>
+          Effect.succeed({ accessToken: Redacted.make("token") }),
+      },
+      webhookSecret: Redacted.make("webhook-secret"),
+    });
+    return registration.handlers[0];
+  };
+
+  it.effect("rejects events that are not new posts", () =>
+    Effect.gen(function* () {
+      const handler = makeHandler();
+      if (handler === undefined) {
+        return;
+      }
+      const tag = yield* handler
+        .deliver({
+          ...deliveryInput,
+          event: {
+            ...deliveryInput.event,
+            type: "feedback.post.status_changed",
+          },
+        })
+        .pipe(
+          Effect.match({
+            onFailure: (error) => error._tag,
+            onSuccess: () => "success",
+          })
+        );
+
+      expect(tag).toBe("IntegrationProviderInvalidConfigurationError");
+    })
+  );
+
+  it.effect(
+    "skips creation when the route board does not match the post board",
+    () =>
+      Effect.gen(function* () {
+        const handler = makeHandler();
+        if (handler === undefined) {
+          return;
+        }
+        const result = yield* handler.deliver({
+          ...deliveryInput,
+          route: {
+            ...deliveryInput.route,
+            providerConfig: {
+              version: 1,
+              repositoryOwner: "acme",
+              repositoryName: "feedback",
+              boardId: "brd_other",
+            },
+          },
+        });
+
+        expect(result.externalResourceDrafts).toBeUndefined();
+        expect(result.httpStatus).toBeUndefined();
       })
   );
 });
