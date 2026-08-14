@@ -2,11 +2,18 @@ import { timingSafeEqual } from "node:crypto";
 import { currentDb, schema } from "@feeblo/db";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { GitHubProvider } from "@feeblo/domain/integration/github/github-provider";
-import { InternalServerError, NotFoundError } from "@feeblo/domain/rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  NotFoundError,
+  UnauthorizedError,
+} from "@feeblo/domain/rpc-errors";
 import { IntegrationConnectionId } from "@feeblo/id";
 import {
   IntegrationOAuthState,
+  IntegrationProviderAuthenticationError,
   IntegrationProviderInvalidConfigurationError,
+  IntegrationProviderPermanentRejection,
 } from "@feeblo/integration-core";
 import {
   createGitHubAppJwt,
@@ -41,12 +48,27 @@ export const GitHubProviderLive = Layer.effect(
     const integrationKey = config.githubEncryptionKey;
     const providerFailure = (operation: string) =>
       new InternalServerError({ message: `GitHub App ${operation} failed.` });
-    const issueFailure = (operation: string) => (failure: unknown) =>
-      Schema.is(NotFoundError)(failure) ||
-      (Schema.is(IntegrationProviderInvalidConfigurationError)(failure) &&
-        failure.httpStatus === 404)
-        ? new NotFoundError({ message: "GitHub issue was not found." })
-        : providerFailure(operation);
+    const issueFailure = (operation: string) => (failure: unknown) => {
+      if (Schema.is(NotFoundError)(failure)) {
+        return new NotFoundError({ message: "GitHub issue was not found." });
+      }
+      if (Schema.is(IntegrationProviderAuthenticationError)(failure)) {
+        return new UnauthorizedError({
+          message: `GitHub authentication failed during ${operation}.`,
+        });
+      }
+      if (Schema.is(IntegrationProviderInvalidConfigurationError)(failure)) {
+        return new NotFoundError({ message: "GitHub issue was not found." });
+      }
+      if (Schema.is(IntegrationProviderPermanentRejection)(failure)) {
+        return new BadRequestError({
+          message: `GitHub rejected ${operation}.`,
+        });
+      }
+      // Rate-limited and temporary/transport failures are indeterminate: the
+      // issue may already exist, so callers must retain idempotency state.
+      return providerFailure(operation);
+    };
     const installationIdForConnection = (connectionId: string) =>
       Effect.gen(function* () {
         const [installation] = yield* db

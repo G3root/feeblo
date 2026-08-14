@@ -1,5 +1,4 @@
 import { currentDb, schema } from "@feeblo/db";
-import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manifest";
 import {
   IntegrationExternalResourceType,
   IntegrationProviderKey,
@@ -11,13 +10,20 @@ import {
   IntegrationRouteId,
   PostStatusId,
 } from "@feeblo/id";
+import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manifest";
 import { and, eq, ne } from "drizzle-orm";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { EmailOutboxConfig } from "../../email-outbox/config";
-import { InternalServerError, NotFoundError } from "../../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  NotFoundError,
+  UnauthorizedError,
+} from "../../rpc-errors";
 import type {
   ExternalResourceRecord,
   PostExternalResourceLink,
@@ -36,6 +42,18 @@ import { GitHubIssueCreateRouteConfiguration } from "./schema";
 const databaseError = (operation: string) => () =>
   new InternalServerError({
     message: `GitHub integration database ${operation} failed.`,
+  });
+
+/** Failures that prove GitHub never created the issue, so the reservation can be released. */
+const isDefinitelyNonApplied = (error: unknown): boolean =>
+  Schema.is(UnauthorizedError)(error) ||
+  Schema.is(NotFoundError)(error) ||
+  Schema.is(BadRequestError)(error);
+
+const shouldReleaseCreation = <E>(cause: Cause.Cause<E>): boolean =>
+  Option.match(Cause.findErrorOption(cause), {
+    onNone: () => false,
+    onSome: (error) => isDefinitelyNonApplied(error),
   });
 
 /** Database-backed GitHub management service. GitHubProvider owns App installation and GitHub API I/O. */
@@ -504,7 +522,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
           });
           return recorded.link;
         }).pipe(
-          Effect.onError(() =>
+          Effect.onErrorIf(shouldReleaseCreation, () =>
             externalResources
               .failCreation({ requestId: request.id })
               .pipe(Effect.catch((cause) => Effect.logError(cause)))

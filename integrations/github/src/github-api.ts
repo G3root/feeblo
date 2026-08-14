@@ -310,6 +310,16 @@ const mapSdkError =
           message: detail,
           provider: githubProviderKey,
         });
+      case "UnknownGithubError":
+        return new IntegrationProviderTemporaryFailure({
+          message: detail,
+          provider: githubProviderKey,
+        });
+      case "GithubParseError":
+        return new IntegrationProviderTemporaryFailure({
+          message: `GitHub returned an unparsable response during ${context}`,
+          provider: githubProviderKey,
+        });
       default:
         return new IntegrationProviderPermanentRejection({
           message: detail,
@@ -367,7 +377,7 @@ const decodeSdkResponse =
     Schema.decodeUnknownEffect(schema)(value).pipe(
       Effect.mapError(
         () =>
-          new IntegrationProviderPermanentRejection({
+          new IntegrationProviderTemporaryFailure({
             message: `GitHub ${context} response was invalid`,
             provider: githubProviderKey,
           })
