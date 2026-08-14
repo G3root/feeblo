@@ -68,13 +68,11 @@ export const createGitHubSyncRule = (input: {
   readonly enabled: boolean;
 }) => fetchRpc((rpc) => rpc.GitHubRuleCreate(input));
 
-/** Updates a GitHub issue synchronization rule. */
+/** Updates the mutable fields of a hard-wired GitHub synchronization rule. */
 export const updateGitHubSyncRule = (input: {
   readonly organizationId: string;
   readonly connectionId: string;
   readonly id: string;
-  readonly issueMatchMode: "all" | "any";
-  readonly issueState: "open" | "closed";
   readonly postStatusId: string;
   readonly upvoterNotificationPolicy:
     | "notify_upvoters"

@@ -18,25 +18,12 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { Card, CardPanel } from "@feeblo/ui/card";
 import {
-  Dialog,
-  DialogClose,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogPanel,
-  DialogPopup,
-  DialogTitle,
-  DialogTrigger,
-} from "@feeblo/ui/dialog";
-import { Field, FieldLabel } from "@feeblo/ui/field";
-import {
   Frame,
   FrameDescription,
   FrameHeader,
   FramePanel,
   FrameTitle,
 } from "@feeblo/ui/frame";
-import { useAppForm } from "@feeblo/ui/hooks/form";
 import {
   Select,
   SelectItem,
@@ -51,8 +38,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { startTransition, useOptimistic, useState } from "react";
-import { z } from "zod";
+import { startTransition, useEffect, useOptimistic, useState } from "react";
 import {
   type GitHubConnection,
   type GitHubPostStatus,
@@ -557,66 +543,67 @@ function GitHubSyncRules({
   const refreshRules = useAtomRefresh(gitHubSyncRulesAtom(args));
   const rules = useAsyncList<GitHubSyncRule>(rulesResult);
   const statuses = useAsyncList<GitHubPostStatus>(statusesResult);
-  let rulesContent: React.ReactNode;
+  const openRule = rules.list.find(
+    (rule) => rule.issueMatchMode === "any" && rule.issueState === "open"
+  );
+  const closedRule = rules.list.find(
+    (rule) => rule.issueMatchMode === "all" && rule.issueState === "closed"
+  );
   if (rules.isLoading) {
-    rulesContent = (
-      <p className="text-muted-foreground text-sm">Loading rules…</p>
+    return (
+      <FramePanel>
+        <p className="text-muted-foreground text-sm">Loading rules…</p>
+      </FramePanel>
     );
-  } else if (rules.loadFailed) {
-    rulesContent = (
-      <p className="text-destructive text-sm">Rules could not be loaded.</p>
+  }
+  if (rules.loadFailed) {
+    return (
+      <FramePanel>
+        <p className="text-destructive text-sm">Rules could not be loaded.</p>
+      </FramePanel>
     );
-  } else if (rules.list.length === 0) {
-    rulesContent = (
-      <p className="text-muted-foreground text-sm">No rules yet.</p>
-    );
-  } else {
-    rulesContent = rules.list.map((rule) => (
-      <GitHubSyncRuleRow
-        args={args}
-        key={rule.id}
-        onChanged={refreshRules}
-        rule={rule}
-        statuses={statuses.list}
-      />
-    ));
   }
   return (
     <FramePanel>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold text-sm">Issue status rules</h2>
-          <p className="text-muted-foreground text-sm">
-            Set a Feeblo status when all or any linked GitHub issues are open or
-            closed.
-          </p>
-        </div>
-        <GitHubSyncRuleCreateDialog
+      <div>
+        <h2 className="font-semibold text-sm">Issue status rules</h2>
+        <p className="text-muted-foreground text-sm">
+          Update a post's Feeblo status as its linked GitHub issues change.
+        </p>
+      </div>
+      <div className="mt-4 grid gap-3">
+        <GitHubSyncRuleSlot
           args={args}
-          key={statuses.list[0]?.id ?? "loading"}
-          onCreated={refreshRules}
+          description="When any linked issue is open"
+          issueMatchMode="any"
+          issueState="open"
+          onChanged={refreshRules}
+          rule={openRule}
+          statuses={statuses.list}
+          statusesLoading={statuses.isLoading}
+        />
+        <GitHubSyncRuleSlot
+          args={args}
+          description="When every linked issue is closed"
+          issueMatchMode="all"
+          issueState="closed"
+          onChanged={refreshRules}
+          rule={closedRule}
           statuses={statuses.list}
           statusesLoading={statuses.isLoading}
         />
       </div>
-      <div className="mt-4 grid gap-3">{rulesContent}</div>
     </FramePanel>
   );
 }
 
-const gitHubRuleFormSchema = z.object({
-  issueMatchMode: z.enum(["all", "any"]),
-  issueState: z.enum(["open", "closed"]),
-  postStatusId: z.string().min(1, "Select a Feeblo status"),
-  upvoterNotificationPolicy: z.enum([
-    "notify_upvoters",
-    "do_not_notify_upvoters",
-  ]),
-});
-
-function GitHubSyncRuleCreateDialog({
+function GitHubSyncRuleSlot({
   args,
-  onCreated,
+  description,
+  issueMatchMode,
+  issueState,
+  onChanged,
+  rule,
   statuses,
   statusesLoading,
 }: {
@@ -624,289 +611,124 @@ function GitHubSyncRuleCreateDialog({
     readonly organizationId: string;
     readonly connectionId: string;
   };
-  readonly onCreated: () => void;
+  readonly description: string;
+  readonly issueMatchMode: GitHubSyncRule["issueMatchMode"];
+  readonly issueState: GitHubSyncRule["issueState"];
+  readonly onChanged: () => void;
+  readonly rule: GitHubSyncRule | undefined;
   readonly statuses: readonly GitHubPostStatus[];
   readonly statusesLoading: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const form = useAppForm({
-    defaultValues: {
-      issueMatchMode: "all" as "all" | "any",
-      issueState: "closed" as "open" | "closed",
-      postStatusId: statuses[0]?.id ?? "",
-      upvoterNotificationPolicy: "notify_upvoters" as
-        | "notify_upvoters"
-        | "do_not_notify_upvoters",
-    },
-    validators: { onSubmit: gitHubRuleFormSchema },
-    onSubmit: async ({ value }) => {
-      const postStatusId = Schema.decodeUnknownOption(PostStatusId.schema)(
-        value.postStatusId
-      );
-      if (Option.isNone(postStatusId)) {
-        toastManager.add({
-          title: "The selected Feeblo status is no longer available",
-          type: "error",
-        });
-        return;
-      }
-      try {
-        await createGitHubSyncRule({
-          ...args,
-          ...value,
-          postStatusId: postStatusId.value,
-          enabled: true,
-        });
-        setOpen(false);
-        form.reset();
-        onCreated();
-        toastManager.add({
-          title: "GitHub synchronization rule created",
-          type: "success",
-        });
-      } catch {
-        toastManager.add({
-          title: "Could not create GitHub synchronization rule",
-          type: "error",
-        });
-      }
-    },
+  // The slot's rule is created on first change; remember its id so follow-up
+  // saves update it before the refreshed rule list arrives.
+  const [createdRuleId, setCreatedRuleId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<{
+    readonly postStatusId: string;
+    readonly upvoterNotificationPolicy: GitHubSyncRule["upvoterNotificationPolicy"];
+    readonly enabled: boolean;
+  }>({
+    postStatusId: rule?.postStatusId ?? statuses[0]?.id ?? "",
+    upvoterNotificationPolicy:
+      rule?.upvoterNotificationPolicy ?? "notify_upvoters",
+    enabled: rule?.enabled ?? false,
   });
-
-  return (
-    <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger
-        render={
-          <Button
-            disabled={statusesLoading || statuses.length === 0}
-            size="sm"
-            variant="outline"
-          />
-        }
-      >
-        Add rule
-      </DialogTrigger>
-      <DialogPopup>
-        <DialogHeader>
-          <DialogTitle>Add GitHub synchronization rule</DialogTitle>
-          <DialogDescription>
-            Choose when linked GitHub issues should update the Feeblo post.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          className="contents"
-          onSubmit={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            form.handleSubmit();
-          }}
-        >
-          <DialogPanel className="grid gap-4">
-            <form.Field name="issueMatchMode">
-              {(field) => (
-                <RuleFormField
-                  label="When"
-                  onValueChange={field.handleChange}
-                  options={[
-                    ["all", "All linked issues"],
-                    ["any", "Any linked issue"],
-                  ]}
-                  value={field.state.value}
-                />
-              )}
-            </form.Field>
-            <form.Field name="issueState">
-              {(field) => (
-                <RuleFormField
-                  label="Issue status"
-                  onValueChange={field.handleChange}
-                  options={[
-                    ["open", "Open"],
-                    ["closed", "Closed"],
-                  ]}
-                  value={field.state.value}
-                />
-              )}
-            </form.Field>
-            <form.Field name="postStatusId">
-              {(field) => (
-                <RuleFormField
-                  label="Set Feeblo status"
-                  onValueChange={field.handleChange}
-                  options={statuses.map(
-                    (status) =>
-                      [status.id, status.type.replaceAll("_", " ")] as const
-                  )}
-                  value={field.state.value}
-                />
-              )}
-            </form.Field>
-            <form.Field name="upvoterNotificationPolicy">
-              {(field) => (
-                <RuleFormField
-                  label="Upvoters"
-                  onValueChange={field.handleChange}
-                  options={[
-                    ["notify_upvoters", "Notify upvoters"],
-                    ["do_not_notify_upvoters", "Don't notify"],
-                  ]}
-                  value={field.state.value}
-                />
-              )}
-            </form.Field>
-          </DialogPanel>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="ghost" />}>
-              Cancel
-            </DialogClose>
-            <form.AppForm>
-              <form.SubscribeButton label="Add rule" />
-            </form.AppForm>
-          </DialogFooter>
-        </form>
-      </DialogPopup>
-    </Dialog>
-  );
-}
-
-function RuleFormField<const Value extends string>({
-  label,
-  onValueChange,
-  options,
-  value,
-}: {
-  readonly label: string;
-  readonly onValueChange: (value: Value) => void;
-  readonly options: readonly (readonly [Value, string])[];
-  readonly value: Value;
-}) {
-  return (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
-      <Select
-        onValueChange={(selectedValue) => {
-          const option = options.find(
-            ([optionValue]) => optionValue === selectedValue
-          );
-          if (option) {
-            onValueChange(option[0]);
-          }
-        }}
-        value={value}
-      >
-        <SelectTrigger className="w-full">
-          <SelectValue>
-            {(selectedValue: string) =>
-              options.find(
-                ([optionValue]) => optionValue === selectedValue
-              )?.[1] ?? `Select ${label.toLowerCase()}`
-            }
-          </SelectValue>
-        </SelectTrigger>
-        <SelectPopup>
-          {options.map(([optionValue, optionLabel]) => (
-            <SelectItem key={optionValue} value={optionValue}>
-              {optionLabel}
-            </SelectItem>
-          ))}
-        </SelectPopup>
-      </Select>
-    </Field>
-  );
-}
-
-function GitHubSyncRuleRow({
-  args,
-  rule,
-  statuses,
-  onChanged,
-}: {
-  readonly args: {
-    readonly organizationId: string;
-    readonly connectionId: string;
-  };
-  readonly rule: GitHubSyncRule;
-  readonly statuses: readonly GitHubPostStatus[];
-  readonly onChanged: () => void;
-}) {
-  const [optimisticRule, setOptimisticRule] = useOptimistic(
-    rule,
-    (_current, next: GitHubSyncRule) => next
-  );
-  const [deleting, setDeleting] = useState(false);
-  const save = (next: GitHubSyncRule) => {
+  // Re-derive the draft from the server rule once refreshes land.
+  useEffect(() => {
+    setDraft({
+      postStatusId: rule?.postStatusId ?? statuses[0]?.id ?? "",
+      upvoterNotificationPolicy:
+        rule?.upvoterNotificationPolicy ?? "notify_upvoters",
+      enabled: rule?.enabled ?? false,
+    });
+  }, [
+    rule?.enabled,
+    rule?.postStatusId,
+    rule?.upvoterNotificationPolicy,
+    statuses[0]?.id,
+  ]);
+  const ruleId = rule?.id ?? createdRuleId;
+  const save = (next: {
+    readonly postStatusId: string;
+    readonly upvoterNotificationPolicy: GitHubSyncRule["upvoterNotificationPolicy"];
+    readonly enabled: boolean;
+  }) => {
+    setDraft(next);
     startTransition(async () => {
-      setOptimisticRule(next);
+      setSaving(true);
       try {
-        await updateGitHubSyncRule({ ...args, ...next });
+        if (ruleId === null) {
+          const created = await createGitHubSyncRule({
+            organizationId: args.organizationId,
+            connectionId: args.connectionId,
+            issueMatchMode,
+            issueState,
+            postStatusId: next.postStatusId,
+            upvoterNotificationPolicy: next.upvoterNotificationPolicy,
+            enabled: next.enabled,
+          });
+          setCreatedRuleId(created.id);
+        } else {
+          await updateGitHubSyncRule({
+            organizationId: args.organizationId,
+            connectionId: args.connectionId,
+            id: ruleId,
+            postStatusId: next.postStatusId,
+            upvoterNotificationPolicy: next.upvoterNotificationPolicy,
+            enabled: next.enabled,
+          });
+        }
         onChanged();
       } catch {
         onChanged();
         toastManager.add({
-          title: "Could not update GitHub synchronization rule",
+          title:
+            ruleId === null
+              ? "Could not create GitHub synchronization rule"
+              : "Could not update GitHub synchronization rule",
           type: "error",
         });
+      } finally {
+        setSaving(false);
       }
     });
   };
+  const statusesReady = !statusesLoading && statuses.length > 0;
   const remove = async () => {
-    setDeleting(true);
+    if (ruleId === null) {
+      return;
+    }
+    setSaving(true);
     try {
       await deleteGitHubSyncRule({
         organizationId: args.organizationId,
         connectionId: args.connectionId,
-        id: rule.id,
+        id: ruleId,
       });
+      setCreatedRuleId(null);
       onChanged();
       toastManager.add({
         title: "GitHub synchronization rule removed",
         type: "success",
       });
     } catch {
+      onChanged();
       toastManager.add({
         title: "Could not remove GitHub synchronization rule",
         type: "error",
       });
     } finally {
-      setDeleting(false);
+      setSaving(false);
     }
   };
   return (
-    <div className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] md:items-end">
+    <div className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+      <div className="grid gap-1 text-xs">
+        <span className="text-muted-foreground">When</span>
+        <span className="font-medium text-sm">{description}</span>
+      </div>
       <RuleSelect
-        disabled={deleting}
-        label="When"
-        onValueChange={(issueMatchMode) =>
-          save({
-            ...optimisticRule,
-            // SAFETY: the value originates from the hardcoded options below, so it is one of the allowed literals.
-            issueMatchMode: issueMatchMode as GitHubSyncRule["issueMatchMode"],
-          })
-        }
-        options={[
-          ["all", "All linked issues"],
-          ["any", "Any linked issue"],
-        ]}
-        value={optimisticRule.issueMatchMode}
-      />
-      <RuleSelect
-        disabled={deleting}
-        label="are"
-        onValueChange={(issueState) =>
-          save({
-            ...optimisticRule,
-            // SAFETY: the value originates from the hardcoded options below, so it is one of the allowed literals.
-            issueState: issueState as GitHubSyncRule["issueState"],
-          })
-        }
-        options={[
-          ["open", "Open"],
-          ["closed", "Closed"],
-        ]}
-        value={optimisticRule.issueState}
-      />
-      <RuleSelect
-        disabled={deleting || statuses.length === 0}
+        disabled={saving || !statusesReady}
         label="Set Feeblo status"
         onValueChange={(postStatusId) => {
           Option.match(
@@ -920,21 +742,21 @@ function GitHubSyncRuleRow({
                   type: "error",
                 }),
               onSome: (decodedPostStatusId) =>
-                save({ ...optimisticRule, postStatusId: decodedPostStatusId }),
+                save({ ...draft, postStatusId: decodedPostStatusId }),
             }
           );
         }}
         options={statuses.map(
           (status) => [status.id, status.type.replaceAll("_", " ")] as const
         )}
-        value={optimisticRule.postStatusId}
+        value={draft.postStatusId}
       />
       <RuleSelect
-        disabled={deleting}
+        disabled={saving}
         label="Upvoters"
         onValueChange={(upvoterNotificationPolicy) =>
           save({
-            ...optimisticRule,
+            ...draft,
             // SAFETY: the value originates from the hardcoded options below, so it is one of the allowed literals.
             upvoterNotificationPolicy:
               upvoterNotificationPolicy as GitHubSyncRule["upvoterNotificationPolicy"],
@@ -944,18 +766,18 @@ function GitHubSyncRuleRow({
           ["notify_upvoters", "Notify upvoters"],
           ["do_not_notify_upvoters", "Don't notify"],
         ]}
-        value={optimisticRule.upvoterNotificationPolicy}
+        value={draft.upvoterNotificationPolicy}
       />
       <div className="flex items-center gap-2">
         <Switch
           aria-label="Enable GitHub synchronization rule"
-          checked={optimisticRule.enabled}
-          disabled={deleting}
-          onCheckedChange={(enabled) => save({ ...optimisticRule, enabled })}
+          checked={draft.enabled}
+          disabled={saving || !statusesReady}
+          onCheckedChange={(enabled) => save({ ...draft, enabled })}
         />
         <Button
-          aria-label="Delete GitHub synchronization rule"
-          disabled={deleting}
+          aria-label="Reset GitHub synchronization rule"
+          disabled={saving || ruleId === null}
           onClick={remove}
           size="icon-sm"
           variant="ghost"
