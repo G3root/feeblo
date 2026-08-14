@@ -34,3 +34,15 @@ export const GitHubUpvoterNotificationPolicy = S.Literals([
 export type TGitHubUpvoterNotificationPolicy = S.Schema.Type<
   typeof GitHubUpvoterNotificationPolicy
 >;
+
+/**
+ * The two supported GitHub sync rule shapes: (any, open) fires when any linked
+ * issue is open, (all, closed) fires only when every linked issue is closed.
+ * They can never match the same issue aggregate, so at most one rule applies.
+ */
+export const isGitHubSyncRuleCombination = (
+  issueMatchMode: TGitHubIssueMatchMode,
+  issueState: TGitHubIssueState
+): boolean =>
+  (issueMatchMode === "any" && issueState === "open") ||
+  (issueMatchMode === "all" && issueState === "closed");
