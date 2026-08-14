@@ -325,8 +325,6 @@ const program = Effect.gen(function* () {
         Redacted.value(config.githubClientSecret) !== "" &&
         Redacted.value(config.githubPrivateKey) !== "" &&
         Redacted.value(config.githubWebhookSecret) !== "",
-      oauthRedirectUrl: config.githubOAuthCallbackUrl,
-      webhookUrl: config.githubWebhookUrl,
     })
   );
   const ServiceLayers = Layer.mergeAll(

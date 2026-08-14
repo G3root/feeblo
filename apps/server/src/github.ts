@@ -149,16 +149,21 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
               });
               break;
             }
-            case "installation":
-              if (parsed.value.payload.action === "created") {
-                break;
+            case "installation": {
+              const action = parsed.value.payload.action;
+              if (
+                action === "deleted" ||
+                action === "suspend" ||
+                action === "unsuspend"
+              ) {
+                yield* inbound.applyInstallationLifecycleWebhook({
+                  action,
+                  deliveryId: parsed.value.deliveryId,
+                  installationId: String(parsed.value.payload.installation.id),
+                });
               }
-              yield* inbound.applyInstallationLifecycleWebhook({
-                action: parsed.value.payload.action,
-                deliveryId: parsed.value.deliveryId,
-                installationId: String(parsed.value.payload.installation.id),
-              });
               break;
+            }
             case "installation_repositories":
               // Settings validate repository availability on update; this event is
               // acknowledged so GitHub does not retry a delivery with no mutation.

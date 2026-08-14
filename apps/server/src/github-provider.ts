@@ -89,15 +89,11 @@ export const GitHubProviderLive = Layer.effect(
     const installationTokenForConnection = (connectionId: string) =>
       Effect.gen(function* () {
         const installationId = yield* installationIdForConnection(connectionId);
-        return yield* installationTokens
-          .getInstallationAccessToken({
-            installationId,
-          })
-          .pipe(
-            Effect.mapError(() =>
-              providerFailure("installation token creation")
-            )
-          );
+        // Typed token failures reach issueFailure unchanged so auth failures
+        // stay Unauthorized and missing installations stay NotFound.
+        return yield* installationTokens.getInstallationAccessToken({
+          installationId,
+        });
       });
     const provider = GitHubProvider.of({
       startInstallation: (organizationId) =>
@@ -479,7 +475,12 @@ export const GitHubProviderLive = Layer.effect(
             }
           }
           return repositories;
-        }),
+        }).pipe(
+          // installationTokenForConnection keeps its typed failures so a
+          // missing installation stays NotFound and token auth failures map
+          // through issueFailure like every other GitHub RPC.
+          Effect.mapError(issueFailure("repository listing"))
+        ),
       uninstallInstallation: ({ connectionId }) =>
         Effect.gen(function* () {
           const installationId =
@@ -498,12 +499,26 @@ export const GitHubProviderLive = Layer.effect(
       createIssue: (input) =>
         installationTokenForConnection(input.connectionId).pipe(
           Effect.flatMap((accessToken) =>
-            api.createIssue({
-              accessToken,
-              repositoryOwner: input.repositoryOwner,
-              repositoryName: input.repositoryName,
-              title: input.postTitle?.trim() || "Feeblo feedback",
-              body: renderGitHubIssueBody({ postUrl: input.postUrl }),
+            Effect.gen(function* () {
+              const issue = yield* api.createIssue({
+                accessToken,
+                repositoryOwner: input.repositoryOwner,
+                repositoryName: input.repositoryName,
+                title: input.postTitle?.trim() || "Feeblo feedback",
+                body: renderGitHubIssueBody({
+                  description: input.postDescription,
+                }),
+              });
+              // The Feeblo backlink lives in a bot comment, matching the
+              // link-existing-issue flow and the automatic delivery path.
+              yield* api.createIssueBacklinkComment({
+                accessToken,
+                backlinkUrl: input.postUrl,
+                issueNumber: issue.number,
+                repositoryName: input.repositoryName,
+                repositoryOwner: input.repositoryOwner,
+              });
+              return issue;
             })
           ),
           Effect.map((issue) => ({
@@ -514,6 +529,7 @@ export const GitHubProviderLive = Layer.effect(
             issueNumber: issue.number,
             issueUrl: issue.html_url,
             issueState: issue.state,
+            title: issue.title,
           })),
           Effect.mapError(issueFailure("issue creation"))
         ),
@@ -576,6 +592,7 @@ export const GitHubProviderLive = Layer.effect(
             issueNumber: issue.number,
             issueUrl: issue.html_url,
             issueState: issue.state,
+            title: issue.title,
           })),
           Effect.mapError(issueFailure("issue linking"))
         ),

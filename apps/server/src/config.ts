@@ -7,8 +7,6 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
-const trailingSlashPattern = /\/$/;
-
 export class ServerConfig extends Context.Service<ServerConfig>()(
   "ServerConfig",
   {
@@ -55,30 +53,6 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
             onNone: () => Config.redacted("AUTH_ENCRYPTION_KEY"),
             onSome: Effect.succeed,
           })
-        )
-      );
-      const githubOAuthCallbackUrl = yield* Config.string(
-        "GITHUB_INTEGRATION_APP_INSTALLATION_CALLBACK_URL"
-      ).pipe(
-        Config.option,
-        Effect.map((value) =>
-          Option.getOrElse(
-            value,
-            () =>
-              `${apiUrl.replace(trailingSlashPattern, "")}/github/app/installations/callback`
-          )
-        )
-      );
-      const githubWebhookUrl = yield* Config.string(
-        "GITHUB_INTEGRATION_APP_WEBHOOK_URL"
-      ).pipe(
-        Config.option,
-        Effect.map((value) =>
-          Option.getOrElse(
-            value,
-            () =>
-              `${apiUrl.replace(trailingSlashPattern, "")}/github/app/webhooks`
-          )
         )
       );
       // Outbound-webhook security configuration (encryption key and egress
@@ -138,9 +112,7 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
         githubClientId,
         githubClientSecret,
         githubEncryptionKey,
-        githubOAuthCallbackUrl,
         githubPrivateKey,
-        githubWebhookUrl,
         githubWebhookSecret,
         integrationConnectionConcurrency,
         integrationGlobalConcurrency,
