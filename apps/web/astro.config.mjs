@@ -154,6 +154,10 @@ export default defineConfig({
                 return "hugeicons-vendor";
               }
 
+              if (id.includes("/node_modules/dayjs/")) {
+                return "dayjs-vendor";
+              }
+
               if (id.includes("/node_modules/effect/dist/")) {
                 return "effect-runtime-vendor";
               }
