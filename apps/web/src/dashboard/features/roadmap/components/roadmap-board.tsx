@@ -6,10 +6,15 @@ import { useSortable } from "@dnd-kit/react/sortable";
 import { SortableRoadmapIssueCard } from "@feeblo/post-ui/roadmap/roadmap-issue-card";
 import { RoadmapLaneColumn } from "@feeblo/post-ui/roadmap/roadmap-lane-column";
 import type { RoadmapLane, RoadmapPost } from "@feeblo/post-ui/roadmap/types";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { memo, useCallback, useRef, useState } from "react";
+import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 const sensors = [
@@ -197,6 +202,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
   lane: RoadmapLane<RoadmapBoardPost>;
   organizationId: string;
 }) {
+  const createPostStore = usePostCreateDialogContext();
   const { ref, isDropTarget } = useSortable({
     id: lane.statusId,
     accept: "item",
@@ -208,11 +214,34 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
 
   return (
     <RoadmapLaneColumn
+      action={
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {lane.posts.length}
+          </span>
+          <Button
+            aria-label={`Add post to ${lane.name ?? getBoardStatusLabel(lane.status)}`}
+            onClick={() => {
+              createPostStore.send({
+                type: "toggle",
+                data: {
+                  source: "roadmap",
+                  status: lane.status,
+                  statusId: lane.statusId,
+                },
+              });
+            }}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} />
+          </Button>
+        </div>
+      }
       contentRef={ref}
       isHighlighted={isDropTarget}
       name={lane.name}
       status={lane.status}
-      totalPosts={lane.posts.length}
     >
       {lane.posts.length > 0 ? (
         lane.posts.map((post, postIndex) => (
