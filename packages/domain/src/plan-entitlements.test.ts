@@ -26,6 +26,10 @@ describe("plan feature catalog", () => {
       key: "widgetSso",
       label: "Widget SSO",
     });
+    expect(rows).not.toContainEqual({
+      key: "integrations",
+      label: "Integrations",
+    });
   });
 
   it("projects starter enforcement values into customer-facing feature rows", () => {
@@ -46,6 +50,7 @@ describe("plan feature catalog", () => {
         subscriberEmails: true,
         unlimitedEndUsers: true,
         unlimitedPosts: true,
+        integrations: true,
       },
     });
 
@@ -59,6 +64,7 @@ describe("plan feature catalog", () => {
       },
       { key: "roadmap", label: "Roadmap" },
       { key: "changelog", label: "Changelog" },
+      { key: "integrations", label: "Integrations" },
       { key: "subscriberEmails", label: "Subscriber Emails" },
       { key: "unlimitedEndUsers", label: "Unlimited End Users" },
       { key: "unlimitedPosts", label: "Unlimited Posts" },

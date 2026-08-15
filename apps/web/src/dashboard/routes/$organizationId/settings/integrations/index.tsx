@@ -1,49 +1,82 @@
-import { RegistryContext, useAtomValue } from "@effect/atom-react";
-import { Button } from "@feeblo/ui/button";
-import { Card, CardPanel } from "@feeblo/ui/card";
+import { RegistryContext } from "@effect/atom-react";
 import { toastManager } from "@feeblo/ui/toast";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import {
-  Chat01Icon,
-  ChatBotIcon,
-  LinkSquare02Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { DiscordIcon, GithubIcon, SlackIcon } from "@hugeicons/core-free-icons";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import * as Option from "effect/Option";
-import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { z } from "zod";
 import {
+  type DiscordConnection,
   discordAtomRegistry,
   connectionsAtom as discordConnectionsAtom,
   discordStatusAtom,
 } from "~/features/discord/atoms";
+import { startDiscordConnect } from "~/features/discord/lib/connections";
 import {
-  type loadConnections as loadDiscordConnections,
-  startDiscordConnect,
-} from "~/features/discord/lib/connections";
-import {
+  type GitHubConnection,
   gitHubAtomRegistry,
   gitHubConnectionsAtom,
   gitHubIntegrationStatusAtom,
 } from "~/features/github/atoms";
+import { startGitHubConnect } from "~/features/github/lib/github-connections";
 import {
-  type loadGitHubConnections,
-  startGitHubConnect,
-} from "~/features/github/lib/github-connections";
+  IntegrationCard,
+  type IntegrationCardConfig,
+} from "~/features/integrations/components/integration-card";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import {
   connectionsAtom,
+  type SlackConnection,
   slackAtomRegistry,
   slackStatusAtom,
 } from "~/features/slack/atoms";
-import {
-  type loadConnections,
-  startSlackConnect,
-} from "~/features/slack/lib/connections";
+import { startSlackConnect } from "~/features/slack/lib/connections";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+
+const slackConfig: IntegrationCardConfig<SlackConnection> = {
+  name: "Slack",
+  icon: SlackIcon,
+  description:
+    "Let your team send feedback with /feeblo, forward messages with “Send to Feeblo”, and get new requests posted to your channels.",
+  statusAtom: slackStatusAtom,
+  connectionsAtom,
+  startConnect: startSlackConnect,
+  connectErrorMessage: "Could not start Slack connection",
+  connectLabel: (connecting) => (connecting ? "Redirecting…" : "Connect"),
+  configureTo: "/$organizationId/settings/integrations/slack",
+  connectionDetail: (connections) =>
+    connections.map((connection) => connection.teamName).join(", "),
+};
+
+const discordConfig: IntegrationCardConfig<DiscordConnection> = {
+  name: "Discord",
+  icon: DiscordIcon,
+  description:
+    "Let your team send feedback with /feeblo, forward messages with “Send to Feeblo”, and get new requests posted to your channels.",
+  statusAtom: discordStatusAtom,
+  connectionsAtom: discordConnectionsAtom,
+  startConnect: startDiscordConnect,
+  connectErrorMessage: "Could not start Discord connection",
+  connectLabel: (connecting) => (connecting ? "Redirecting…" : "Connect"),
+  configureTo: "/$organizationId/settings/integrations/discord",
+  connectionDetail: (connections) =>
+    connections.map((connection) => connection.guildName).join(", "),
+};
+
+const gitHubConfig: IntegrationCardConfig<GitHubConnection> = {
+  name: "GitHub",
+  icon: GithubIcon,
+  description:
+    "Choose repositories for the Feeblo bot to publish feedback as GitHub issues and comments.",
+  statusAtom: gitHubIntegrationStatusAtom,
+  connectionsAtom: gitHubConnectionsAtom,
+  startConnect: startGitHubConnect,
+  connectErrorMessage: "Could not start GitHub App installation",
+  connectLabel: (connecting) =>
+    connecting ? "Opening GitHub…" : "Install GitHub App",
+  configureTo: "/$organizationId/settings/integrations/github",
+};
 
 export const Route = createFileRoute("/$organizationId/settings/integrations/")(
   {
@@ -138,420 +171,25 @@ function IntegrationsSettingsRoute() {
       <SettingsLayout.Content>
         <div className="grid gap-4">
           <RegistryContext.Provider value={slackAtomRegistry}>
-            <SlackIntegrationCard organizationId={organizationId} />
+            <IntegrationCard
+              config={slackConfig}
+              organizationId={organizationId}
+            />
           </RegistryContext.Provider>
           <RegistryContext.Provider value={discordAtomRegistry}>
-            <DiscordIntegrationCard organizationId={organizationId} />
+            <IntegrationCard
+              config={discordConfig}
+              organizationId={organizationId}
+            />
           </RegistryContext.Provider>
           <RegistryContext.Provider value={gitHubAtomRegistry}>
-            <GitHubIntegrationCard organizationId={organizationId} />
+            <IntegrationCard
+              config={gitHubConfig}
+              organizationId={organizationId}
+            />
           </RegistryContext.Provider>
         </div>
       </SettingsLayout.Content>
     </SettingsLayout.Root>
-  );
-}
-
-function GitHubIntegrationCard({
-  organizationId,
-}: {
-  readonly organizationId: string;
-}) {
-  const router = useRouter();
-  const [connecting, setConnecting] = useState(false);
-  const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
-  const statusResult = useAtomValue(gitHubIntegrationStatusAtom);
-  const configured = AsyncResult.match(statusResult, {
-    onInitial: () => null as boolean | null,
-    onFailure: () => false,
-    onSuccess: ({ value }) => value,
-  });
-  const { connections, isLoading, loadFailed } = AsyncResult.match(
-    connectionsResult,
-    {
-      onInitial: () => ({
-        connections: [] as Awaited<ReturnType<typeof loadGitHubConnections>>,
-        isLoading: true,
-        loadFailed: false,
-      }),
-      onFailure: ({ previousSuccess }) =>
-        Option.match(previousSuccess, {
-          onNone: () => ({
-            connections: [],
-            isLoading: false,
-            loadFailed: true,
-          }),
-          onSome: ({ value }) => ({
-            connections: value,
-            isLoading: false,
-            loadFailed: false,
-          }),
-        }),
-      onSuccess: ({ value }) => ({
-        connections: value,
-        isLoading: false,
-        loadFailed: false,
-      }),
-    }
-  );
-  const connected = connections.some(
-    (connection) =>
-      connection.lifecycle === "active" || connection.lifecycle === "connecting"
-  );
-  const connect = async () => {
-    setConnecting(true);
-    try {
-      const { authorizeUrl } = await startGitHubConnect(organizationId);
-      window.location.assign(authorizeUrl.toString());
-    } catch {
-      setConnecting(false);
-      toastManager.add({
-        title: "Could not start GitHub App installation",
-        type: "error",
-      });
-    }
-  };
-  if (configured === null) {
-    return (
-      <Card>
-        <CardPanel>
-          <p className="text-muted-foreground text-sm">Loading GitHub…</p>
-        </CardPanel>
-      </Card>
-    );
-  }
-  if (!configured) {
-    return null;
-  }
-  return (
-    <Card>
-      <CardPanel>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 shrink-0 rounded-lg border bg-muted p-2">
-              <HugeiconsIcon className="size-5" icon={LinkSquare02Icon} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-medium">GitHub</p>
-                {connectionStatusBadge({ connected, isLoading, loadFailed })}
-              </div>
-              <p className="mt-1 text-muted-foreground text-sm">
-                Choose repositories for the Feeblo bot to publish feedback as
-                GitHub issues and comments.
-              </p>
-            </div>
-          </div>
-          <div className="shrink-0">
-            {connected ? (
-              <Button
-                onClick={() =>
-                  router.navigate({
-                    to: "/$organizationId/settings/integrations/github",
-                    params: { organizationId },
-                  })
-                }
-              >
-                Configure
-              </Button>
-            ) : (
-              <Button disabled={connecting} onClick={connect} variant="outline">
-                {connecting ? "Opening GitHub…" : "Install GitHub App"}
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardPanel>
-    </Card>
-  );
-}
-
-function connectionStatusBadge({
-  connected,
-  isLoading,
-  loadFailed,
-}: {
-  readonly connected: boolean;
-  readonly isLoading: boolean;
-  readonly loadFailed: boolean;
-}) {
-  if (isLoading) {
-    return <span className="text-muted-foreground text-xs">Checking…</span>;
-  }
-  if (loadFailed) {
-    return <span className="text-destructive text-xs">Could not load</span>;
-  }
-  return connected ? (
-    <span className="rounded-full bg-success/10 px-2 py-0.5 font-medium text-success text-xs">
-      Connected
-    </span>
-  ) : (
-    <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
-      Not connected
-    </span>
-  );
-}
-
-function SlackIntegrationCard({
-  organizationId,
-}: {
-  readonly organizationId: string;
-}) {
-  const router = useRouter();
-  const [connecting, setConnecting] = useState(false);
-  const connectionsResult = useAtomValue(connectionsAtom(organizationId));
-  const statusResult = useAtomValue(slackStatusAtom);
-  const slackConfigured = AsyncResult.match(statusResult, {
-    onInitial: () => null as boolean | null,
-    onFailure: () => false,
-    onSuccess: ({ value }) => value,
-  });
-
-  const { connections, isLoading, loadFailed } = AsyncResult.match(
-    connectionsResult,
-    {
-      onInitial: () => ({
-        connections: [] as Awaited<ReturnType<typeof loadConnections>>,
-        isLoading: true,
-        loadFailed: false,
-      }),
-      onFailure: ({ previousSuccess }) =>
-        Option.match(previousSuccess, {
-          onNone: () => ({
-            connections: [],
-            isLoading: false,
-            loadFailed: true,
-          }),
-          onSome: ({ value }) => ({
-            connections: value,
-            isLoading: false,
-            loadFailed: false,
-          }),
-        }),
-      onSuccess: ({ value }) => ({
-        connections: value,
-        isLoading: false,
-        loadFailed: false,
-      }),
-    }
-  );
-
-  const activeConnections = connections.filter(
-    (connection) =>
-      connection.lifecycle === "active" || connection.lifecycle === "connecting"
-  );
-  const connected = activeConnections.length > 0;
-
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const { authorizeUrl } = await startSlackConnect(organizationId);
-      window.location.assign(authorizeUrl.toString());
-    } catch {
-      setConnecting(false);
-      toastManager.add({
-        title: "Could not start Slack connection",
-        type: "error",
-      });
-    }
-  };
-
-  if (slackConfigured === null) {
-    return (
-      <Card>
-        <CardPanel>
-          <p className="text-muted-foreground text-sm">Loading Slack…</p>
-        </CardPanel>
-      </Card>
-    );
-  }
-  if (!slackConfigured) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardPanel>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 shrink-0 rounded-lg border bg-muted p-2">
-              <HugeiconsIcon className="size-5" icon={Chat01Icon} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-medium">Slack</p>
-                {connectionStatusBadge({ isLoading, loadFailed, connected })}
-              </div>
-              <p className="mt-1 text-muted-foreground text-sm">
-                Let your team send feedback with /feeblo, forward messages with
-                “Send to Feeblo”, and get new requests posted to your channels.
-              </p>
-              {connected ? (
-                <p className="mt-1 truncate text-muted-foreground text-xs">
-                  {activeConnections
-                    .map((connection) => connection.teamName)
-                    .join(", ")}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="shrink-0">
-            {connected ? (
-              <Button
-                onClick={() =>
-                  router.navigate({
-                    to: "/$organizationId/settings/integrations/slack",
-                    params: { organizationId },
-                  })
-                }
-              >
-                Configure
-              </Button>
-            ) : (
-              <Button
-                disabled={connecting}
-                onClick={handleConnect}
-                variant="outline"
-              >
-                {connecting ? "Redirecting…" : "Connect"}
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardPanel>
-    </Card>
-  );
-}
-
-function DiscordIntegrationCard({
-  organizationId,
-}: {
-  readonly organizationId: string;
-}) {
-  const router = useRouter();
-  const [connecting, setConnecting] = useState(false);
-  const connectionsResult = useAtomValue(
-    discordConnectionsAtom(organizationId)
-  );
-  const statusResult = useAtomValue(discordStatusAtom);
-  const discordConfigured = AsyncResult.match(statusResult, {
-    onInitial: () => null as boolean | null,
-    onFailure: () => false,
-    onSuccess: ({ value }) => value,
-  });
-
-  const { connections, isLoading, loadFailed } = AsyncResult.match(
-    connectionsResult,
-    {
-      onInitial: () => ({
-        connections: [] as Awaited<ReturnType<typeof loadDiscordConnections>>,
-        isLoading: true,
-        loadFailed: false,
-      }),
-      onFailure: ({ previousSuccess }) =>
-        Option.match(previousSuccess, {
-          onNone: () => ({
-            connections: [],
-            isLoading: false,
-            loadFailed: true,
-          }),
-          onSome: ({ value }) => ({
-            connections: value,
-            isLoading: false,
-            loadFailed: false,
-          }),
-        }),
-      onSuccess: ({ value }) => ({
-        connections: value,
-        isLoading: false,
-        loadFailed: false,
-      }),
-    }
-  );
-
-  const activeConnections = connections.filter(
-    (connection) =>
-      connection.lifecycle === "active" || connection.lifecycle === "connecting"
-  );
-  const connected = activeConnections.length > 0;
-
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const { authorizeUrl } = await startDiscordConnect(organizationId);
-      window.location.assign(authorizeUrl.toString());
-    } catch {
-      setConnecting(false);
-      toastManager.add({
-        title: "Could not start Discord connection",
-        type: "error",
-      });
-    }
-  };
-
-  if (discordConfigured === null) {
-    return (
-      <Card>
-        <CardPanel>
-          <p className="text-muted-foreground text-sm">Loading Discord…</p>
-        </CardPanel>
-      </Card>
-    );
-  }
-  if (!discordConfigured) {
-    return null;
-  }
-
-  return (
-    <Card>
-      <CardPanel>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 shrink-0 rounded-lg border bg-muted p-2">
-              <HugeiconsIcon className="size-5" icon={ChatBotIcon} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-medium">Discord</p>
-                {connectionStatusBadge({ isLoading, loadFailed, connected })}
-              </div>
-              <p className="mt-1 text-muted-foreground text-sm">
-                Let your team send feedback with /feeblo, forward messages with
-                “Send to Feeblo”, and get new requests posted to your channels.
-              </p>
-              {connected ? (
-                <p className="mt-1 truncate text-muted-foreground text-xs">
-                  {activeConnections
-                    .map((connection) => connection.guildName)
-                    .join(", ")}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="shrink-0">
-            {connected ? (
-              <Button
-                onClick={() =>
-                  router.navigate({
-                    to: "/$organizationId/settings/integrations/discord",
-                    params: { organizationId },
-                  })
-                }
-              >
-                Configure
-              </Button>
-            ) : (
-              <Button
-                disabled={connecting}
-                onClick={handleConnect}
-                variant="outline"
-              >
-                {connecting ? "Redirecting…" : "Connect"}
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardPanel>
-    </Card>
   );
 }

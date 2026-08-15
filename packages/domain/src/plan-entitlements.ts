@@ -14,7 +14,8 @@ export type CapabilityFeatureKey =
   | "privateRoadmaps"
   | "removeBranding"
   | "subscriberEmails"
-  | "widgetSso";
+  | "widgetSso"
+  | "integrations";
 export type PlanFeatureKey = LimitFeatureKey | CapabilityFeatureKey;
 
 type PlanLimits = Record<LimitFeatureKey, number | null>;
@@ -76,6 +77,10 @@ export const PLAN_FEATURE_CATALOG = {
   },
   subscriberEmails: { kind: "capability", label: "Subscriber Emails" },
   widgetSso: { kind: "capability", label: "Widget SSO" },
+  integrations: {
+    kind: "capability",
+    label: "Integrations",
+  },
 } as const satisfies Record<PlanFeatureKey, PlanFeatureDefinition>;
 
 const defineFeatureOrder =
@@ -95,6 +100,7 @@ const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
 const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
   "roadmap",
   "changelog",
+  "integrations",
   "subscriberEmails",
   "unlimitedEndUsers",
   "unlimitedPosts",
@@ -122,6 +128,7 @@ export const PLAN_ENTITLEMENTS = {
       removeBranding: false,
       subscriberEmails: false,
       widgetSso: false,
+      integrations: false,
     },
   },
   starter: {
@@ -141,6 +148,7 @@ export const PLAN_ENTITLEMENTS = {
       removeBranding: true,
       subscriberEmails: true,
       widgetSso: true,
+      integrations: true,
     },
   },
   professional: {
@@ -160,6 +168,7 @@ export const PLAN_ENTITLEMENTS = {
       removeBranding: true,
       subscriberEmails: true,
       widgetSso: true,
+      integrations: true,
     },
   },
 } as const satisfies Record<OrganizationPlan, PlanEntitlements>;
