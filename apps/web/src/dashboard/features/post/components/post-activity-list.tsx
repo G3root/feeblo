@@ -25,6 +25,8 @@ import {
   SquareLock02Icon,
   SquareUnlock02Icon,
   StatusIcon,
+  Tag01Icon,
+  Tag02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -34,6 +36,7 @@ import {
   boardCollection,
   postActivityCollection,
   postStatusCollection,
+  tagCollection,
 } from "~/lib/collections";
 
 type NameLookup = ReadonlyMap<string, string>;
@@ -49,6 +52,8 @@ const activityIconMap: Record<TPostActivityKind, typeof FileAddIcon> = {
   POST_UNLOCKED: SquareUnlock02Icon,
   POST_ARCHIVED: Archive01Icon,
   POST_UNARCHIVED: ArchiveRestoreIcon,
+  TAG_ADDED: Tag01Icon,
+  TAG_REMOVED: Tag02Icon,
   OFFICIAL_UPDATE_PUBLISHED: NoteEditIcon,
   COMMENT_CREATED: CommentAdd01Icon,
   COMMENT_UPDATED: MessageEdit01Icon,
@@ -69,10 +74,12 @@ function getActivityDescription({
   activity,
   boardNames,
   statusNames,
+  tagNames,
 }: {
   activity: TPostActivity;
   boardNames: NameLookup;
   statusNames: NameLookup;
+  tagNames: NameLookup;
 }) {
   const descriptions: Record<TPostActivityKind, string> = {
     POST_CREATED: "created this post",
@@ -88,6 +95,8 @@ function getActivityDescription({
     POST_UNLOCKED: "unlocked the post",
     POST_ARCHIVED: "archived the post",
     POST_UNARCHIVED: "restored the post",
+    TAG_ADDED: `added the tag ${tagNames.get(activity.nextValue ?? "") ?? "Unknown"}`,
+    TAG_REMOVED: `removed the tag ${tagNames.get(activity.nextValue ?? "") ?? "Unknown"}`,
     OFFICIAL_UPDATE_PUBLISHED: "published an official update",
     COMMENT_CREATED:
       activity.nextValue === "INTERNAL"
@@ -156,6 +165,13 @@ export function PostActivityList({
         .where(({ board }) => eq(board.organizationId, organizationId)),
     [organizationId]
   );
+  const { data: tags } = useLiveQuery(
+    (query) =>
+      query
+        .from({ tag: tagCollection })
+        .where(({ tag }) => eq(tag.organizationId, organizationId)),
+    [organizationId]
+  );
 
   const statusNames = useMemo(
     () =>
@@ -174,6 +190,10 @@ export function PostActivityList({
   const boardNames = useMemo(
     () => new Map(boards.map((board) => [board.id, board.name])),
     [boards]
+  );
+  const tagNames = useMemo(
+    () => new Map(tags.map((tag) => [tag.id, tag.name])),
+    [tags]
   );
 
   if (isLoading) {
@@ -210,6 +230,7 @@ export function PostActivityList({
               activity,
               boardNames,
               statusNames,
+              tagNames,
             })}{" "}
             {dayjs.default(activity.createdAt).fromNow()}
           </ActivityTimelineItem>

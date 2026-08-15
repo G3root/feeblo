@@ -1,5 +1,4 @@
 import { currentDb, schema } from "@feeblo/db";
-import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
 import type { LegidOf } from "@feeblo/id";
 import { PostActivityId } from "@feeblo/id";
 import { and, asc, eq, gte } from "drizzle-orm";
@@ -7,22 +6,162 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-export interface CreatePostActivity {
-  actorId: string | null;
-  actorMemberId: string | null;
-  commentId?: string | null;
-  id?: LegidOf<"PostActivityId">;
-  kind: TPostActivityKind;
-  nextValue?: string | null;
-  organizationId: string;
-  postId: string;
-  previousValue?: string | null;
+/** Actor facts shared by every recorded activity. */
+export interface PostActivityActor {
+  readonly actorId: string | null;
+  readonly actorMemberId: string | null;
+  /** Explicit row id override; only official-update publishing sets one. */
+  readonly id?: LegidOf<"PostActivityId">;
+  readonly organizationId: string;
+  readonly postId: string;
 }
+
+/**
+ * Type-safe activity construction contract: each kind carries exactly the
+ * fields it records, so illegal payloads (e.g. a `TAG_ADDED` without a tag)
+ * are unrepresentable. The repository is the only place that maps these to
+ * the generic `previousValue` / `nextValue` / `commentId` columns.
+ */
+export type PostActivityInput = PostActivityActor &
+  (
+    | { readonly kind: "POST_CREATED" }
+    | {
+        readonly kind: "TITLE_CHANGED";
+        readonly previousTitle: string;
+        readonly nextTitle: string;
+      }
+    | { readonly kind: "CONTENT_CHANGED" }
+    | {
+        readonly kind: "STATUS_CHANGED";
+        readonly previousStatusId: string;
+        readonly nextStatusId: string;
+      }
+    | {
+        readonly kind: "BOARD_CHANGED";
+        readonly previousBoardId: string;
+        readonly nextBoardId: string;
+      }
+    | {
+        readonly kind: "ETA_CHANGED";
+        readonly previousEta: string | null;
+        readonly nextEta: string | null;
+      }
+    | { readonly kind: "POST_LOCKED" }
+    | { readonly kind: "POST_UNLOCKED" }
+    | { readonly kind: "POST_ARCHIVED" }
+    | { readonly kind: "POST_UNARCHIVED" }
+    | { readonly kind: "TAG_ADDED"; readonly tagId: string }
+    | { readonly kind: "TAG_REMOVED"; readonly tagId: string }
+    | { readonly kind: "OFFICIAL_UPDATE_PUBLISHED"; readonly body: string }
+    | {
+        readonly kind: "COMMENT_CREATED";
+        readonly commentId: string;
+        readonly visibility: string | null;
+      }
+    | {
+        readonly kind: "COMMENT_UPDATED";
+        readonly commentId: string;
+        readonly visibility: string | null;
+      }
+    | { readonly kind: "COMMENT_DELETED"; readonly commentId: string }
+  );
+
+type PostActivityRow = {
+  kind: PostActivityInput["kind"];
+  previousValue: string | null;
+  nextValue: string | null;
+  commentId: string | null;
+};
+
+/**
+ * Maps a typed activity input to the generic column vocabulary. Kept private:
+ * callers construct domain-shaped inputs and never see `previousValue` /
+ * `nextValue` / `commentId`. Exhaustive over `PostActivityInput`, so adding a
+ * new kind without a mapping here is a compile error.
+ */
+const toRow = (input: PostActivityInput): PostActivityRow => {
+  switch (input.kind) {
+    case "POST_CREATED":
+    case "CONTENT_CHANGED":
+    case "POST_LOCKED":
+    case "POST_UNLOCKED":
+    case "POST_ARCHIVED":
+    case "POST_UNARCHIVED":
+      return {
+        kind: input.kind,
+        previousValue: null,
+        nextValue: null,
+        commentId: null,
+      };
+    case "TITLE_CHANGED":
+      return {
+        kind: input.kind,
+        previousValue: input.previousTitle,
+        nextValue: input.nextTitle,
+        commentId: null,
+      };
+    case "STATUS_CHANGED":
+      return {
+        kind: input.kind,
+        previousValue: input.previousStatusId,
+        nextValue: input.nextStatusId,
+        commentId: null,
+      };
+    case "BOARD_CHANGED":
+      return {
+        kind: input.kind,
+        previousValue: input.previousBoardId,
+        nextValue: input.nextBoardId,
+        commentId: null,
+      };
+    case "ETA_CHANGED":
+      return {
+        kind: input.kind,
+        previousValue: input.previousEta,
+        nextValue: input.nextEta,
+        commentId: null,
+      };
+    case "TAG_ADDED":
+    case "TAG_REMOVED":
+      return {
+        kind: input.kind,
+        previousValue: null,
+        nextValue: input.tagId,
+        commentId: null,
+      };
+    case "OFFICIAL_UPDATE_PUBLISHED":
+      return {
+        kind: input.kind,
+        previousValue: null,
+        nextValue: input.body,
+        commentId: null,
+      };
+    case "COMMENT_CREATED":
+    case "COMMENT_UPDATED":
+      return {
+        kind: input.kind,
+        previousValue: null,
+        nextValue: input.visibility,
+        commentId: input.commentId,
+      };
+    case "COMMENT_DELETED":
+      return {
+        kind: input.kind,
+        previousValue: null,
+        nextValue: null,
+        commentId: input.commentId,
+      };
+    default:
+      // Every kind is handled above; the default arm only fires when a new
+      // kind is added to PostActivityInput without a mapping here.
+      return input satisfies never;
+  }
+};
 
 const makePostActivityRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
-  const makeRow = (input: CreatePostActivity) =>
+  const makeRow = (input: PostActivityInput) =>
     Effect.gen(function* () {
       const id = input.id ?? (yield* PostActivityId.generate);
       return {
@@ -31,21 +170,18 @@ const makePostActivityRepository = Effect.gen(function* () {
         postId: input.postId,
         actorId: input.actorId,
         actorMemberId: input.actorMemberId,
-        kind: input.kind,
-        previousValue: input.previousValue ?? null,
-        nextValue: input.nextValue ?? null,
-        commentId: input.commentId ?? null,
+        ...toRow(input),
       };
     });
 
   return {
-    create: (input: CreatePostActivity) =>
+    create: (input: PostActivityInput) =>
       makeRow(input).pipe(
         Effect.flatMap((row) =>
           db.insert(schema.postActivityTable).values(row).pipe(Effect.asVoid)
         )
       ),
-    createMany: (inputs: readonly CreatePostActivity[]) =>
+    createMany: (inputs: readonly PostActivityInput[]) =>
       Effect.forEach(inputs, makeRow).pipe(
         Effect.flatMap((rows) =>
           rows.length === 0

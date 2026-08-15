@@ -26,7 +26,7 @@ import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
 import {
-  type CreatePostActivity,
+  type PostActivityInput,
   PostActivityRepository,
 } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -284,21 +284,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.id,
           };
-          const activities: CreatePostActivity[] = [];
+          const activities: PostActivityInput[] = [];
           if (previous.statusId !== args.statusId) {
             activities.push({
               ...actor,
               kind: "STATUS_CHANGED",
-              previousValue: previous.statusId,
-              nextValue: args.statusId,
+              previousStatusId: previous.statusId,
+              nextStatusId: args.statusId,
             });
           }
           if (previous.boardId !== args.boardId) {
             activities.push({
               ...actor,
               kind: "BOARD_CHANGED",
-              previousValue: previous.boardId,
-              nextValue: args.boardId,
+              previousBoardId: previous.boardId,
+              nextBoardId: args.boardId,
             });
           }
           yield* repository.update(args);
@@ -442,8 +442,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.id,
             kind: "ETA_CHANGED",
-            previousValue: previous.etaQuarter,
-            nextValue: args.etaQuarter,
+            previousEta: previous.etaQuarter,
+            nextEta: args.etaQuarter,
           });
         })
       );
@@ -561,8 +561,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           yield* activityRepository.create({
             ...actor,
             kind: "TITLE_CHANGED",
-            previousValue: previous.title,
-            nextValue: args.title,
+            previousTitle: previous.title,
+            nextTitle: args.title,
           });
         })
       );
@@ -977,7 +977,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               organizationId: args.organizationId,
               postId: args.id,
             };
-            const activities: CreatePostActivity[] = [];
+            const activities: PostActivityInput[] = [];
             if (
               args.locked !== undefined &&
               Boolean(previous.lockedAt) !== args.locked
@@ -1024,7 +1024,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               actorMemberId: membership?.membershipId ?? null,
               id: args.updateId,
               kind: "OFFICIAL_UPDATE_PUBLISHED",
-              nextValue: args.body,
+              body: args.body,
               organizationId: args.organizationId,
               postId: args.postId,
             });

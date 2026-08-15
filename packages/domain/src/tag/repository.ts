@@ -249,6 +249,24 @@ const makeTagRepository = Effect.gen(function* () {
           )
         ),
 
+    findPostTagIds: ({
+      organizationId,
+      postId,
+    }: {
+      organizationId: string;
+      postId: string;
+    }) =>
+      db
+        .select({ tagId: schema.postTagTable.tagId })
+        .from(schema.postTagTable)
+        .where(
+          and(
+            eq(schema.postTagTable.postId, postId),
+            eq(schema.postTagTable.organizationId, organizationId)
+          )
+        )
+        .pipe(Effect.map((rows) => rows.map((row) => row.tagId))),
+
     findChangelogTags: (
       { organizationId }: TChangelogTagList,
       options?: { publishedOnly?: boolean }

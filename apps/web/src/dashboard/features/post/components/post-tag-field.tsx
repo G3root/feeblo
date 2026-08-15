@@ -15,7 +15,7 @@ import {
   type TagSelectOption,
 } from "~/features/tag/components/tag-select";
 import { TagCreateDialogProvider } from "~/features/tag/dialog-stores";
-import { tagCollection } from "~/lib/collections";
+import { postActivityCollection, tagCollection } from "~/lib/collections";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -102,6 +102,7 @@ export function PostTagField() {
       );
 
       await postTagCollection.utils.refetch();
+      await postActivityCollection.utils.refetch();
 
       if (showSuccessToast) {
         toastManager.add({

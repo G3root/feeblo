@@ -1,8 +1,10 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
+import { PostActivityRepository } from "../post-activity/repository";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -10,6 +12,7 @@ import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { TagPolicy } from "./policies";
+import { postTagChangeActivities } from "./post-tag-activities";
 import { TagRepository } from "./repository";
 import { TagRpcs } from "./rpcs";
 import type {
@@ -205,6 +208,8 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
 
     PostTagSet: (args: TPostTagSet) =>
       Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
         const tagIds = normalizeTagIds(args.tagIds);
         yield* validatePost({
           postId: args.postId,
@@ -216,7 +221,28 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           type: "FEEDBACK",
         });
 
-        yield* repository.setPostTags({ ...args, tagIds });
+        const actor = {
+          actorId: session.session.userId,
+          actorMemberId: membership?.membershipId ?? null,
+          organizationId: args.organizationId,
+          postId: args.postId,
+        };
+
+        yield* transaction(
+          Effect.gen(function* () {
+            const previousTagIds = yield* repository.findPostTagIds(args);
+            yield* repository.setPostTags({ ...args, tagIds });
+
+            const activityRepository = yield* PostActivityRepository;
+            yield* activityRepository.createMany(
+              postTagChangeActivities({
+                previousTagIds,
+                nextTagIds: tagIds,
+                actor,
+              })
+            );
+          })
+        );
       }).pipe(
         Policy.withPolicy(tagPolicy.canSetPostTags(args)),
         withRemapDbErrors("Tag", "update")
@@ -249,5 +275,6 @@ export const TagRpcHandlers = TagRpcs.toLayer(TagRpcHandlersEffect).pipe(
   Layer.provide(TagPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
+  Layer.provide(PostActivityRepository.layer),
   Layer.provide(TagRepository.layer)
 );

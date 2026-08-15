@@ -57,7 +57,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             actorMemberId: membership?.membershipId ?? null,
             kind: "COMMENT_CREATED",
             commentId: args.id,
-            nextValue: args.visibility,
+            visibility: args.visibility,
           });
 
           yield* Option.match(notifications, {
@@ -144,7 +144,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
               actorMemberId: membership?.membershipId ?? null,
               kind: "COMMENT_UPDATED",
               commentId: args.id,
-              nextValue: membership ? args.visibility : null,
+              visibility: membership ? args.visibility : null,
             });
           }
           return updated;
