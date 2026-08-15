@@ -10,6 +10,7 @@ import {
   TimelineSeparator,
   TimelineTitle,
 } from "@feeblo/ui/reui/timeline";
+import * as dayjs from "@feeblo/utils/dayjs";
 import {
   Archive01Icon,
   ArchiveRestoreIcon,
@@ -34,22 +35,6 @@ import {
   postActivityCollection,
   postStatusCollection,
 } from "~/lib/collections";
-
-const relativeTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-
-function formatRelativeTime(value: Date | string) {
-  const date = value instanceof Date ? value : new Date(value);
-  const difference = date.getTime() - Date.now();
-  const minutes = Math.round(difference / 60_000);
-  if (Math.abs(minutes) < 60) {
-    return relativeTime.format(minutes, "minute");
-  }
-  const hours = Math.round(difference / 3_600_000);
-  if (Math.abs(hours) < 24) {
-    return relativeTime.format(hours, "hour");
-  }
-  return relativeTime.format(Math.round(difference / 86_400_000), "day");
-}
 
 type NameLookup = ReadonlyMap<string, string>;
 
@@ -209,7 +194,7 @@ export function PostActivityList({
                 className="mt-2 mb-0"
                 dateTime={activity.createdAt.toISOString()}
               >
-                {formatRelativeTime(activity.createdAt)}
+                {dayjs.default(activity.createdAt).fromNow()}
               </TimelineDate>
             </TimelineContent>
           </TimelineItem>

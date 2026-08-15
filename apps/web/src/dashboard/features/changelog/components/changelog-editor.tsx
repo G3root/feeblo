@@ -13,6 +13,7 @@ import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
+import * as dayjs from "@feeblo/utils/dayjs";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
@@ -457,12 +458,12 @@ export function ChangelogEditorDetails() {
     {
       icon: Calendar03Icon,
       label: "Created",
-      value: formatDate(changelog.createdAt),
+      value: dayjs.default(changelog.createdAt).fromNow(),
     },
     {
       icon: RefreshIcon,
       label: "Updated",
-      value: formatDate(changelog.updatedAt),
+      value: dayjs.default(changelog.updatedAt).fromNow(),
     },
   ];
 

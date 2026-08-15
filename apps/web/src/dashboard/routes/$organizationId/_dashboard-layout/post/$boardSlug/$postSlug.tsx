@@ -11,6 +11,7 @@ import {
 import { Separator } from "@feeblo/ui/separator";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
+import * as dayjs from "@feeblo/utils/dayjs";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   Activity01Icon,
@@ -22,7 +23,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { GitHubPostResourceActions } from "~/features/github/components/post-github-actions";
 import { PostExternalResources } from "~/features/integrations/components/post-external-resources";
 import { PostActivityList } from "~/features/post/components/post-activity-list";
@@ -280,7 +280,7 @@ function PostDetails({
     {
       icon: Calendar03Icon,
       label: "Created",
-      value: formatPostDate(createdAt),
+      value: dayjs.default(createdAt).fromNow(),
     },
     // {
     //   icon: Time02Icon,
