@@ -408,6 +408,8 @@ describe("TagRpcHandlers", () => {
               kind: schema.postActivityTable.kind,
               nextValue: schema.postActivityTable.nextValue,
               postId: schema.postActivityTable.postId,
+              actorId: schema.postActivityTable.actorId,
+              actorMemberId: schema.postActivityTable.actorMemberId,
             })
             .from(schema.postActivityTable)
             .where(
@@ -418,30 +420,51 @@ describe("TagRpcHandlers", () => {
               )
             );
           expect(rows).toHaveLength(1);
-          expect(
-            yield* db
-              .select({ id: schema.postActivityTable.id })
-              .from(schema.postActivityTable)
-              .where(
-                and(
-                  eq(schema.postActivityTable.postId, f.postId),
-                  eq(schema.postActivityTable.kind, "TAG_ADDED"),
-                  eq(schema.postActivityTable.nextValue, tagA)
-                )
+          expect(rows[0]).toMatchObject({
+            kind: "TAG_ADDED",
+            nextValue: tagB,
+            postId: f.postId,
+            actorId: f.userId,
+            actorMemberId: f.membershipId,
+          });
+          const addedRows = yield* db
+            .select({
+              id: schema.postActivityTable.id,
+              actorId: schema.postActivityTable.actorId,
+              actorMemberId: schema.postActivityTable.actorMemberId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, f.postId),
+                eq(schema.postActivityTable.kind, "TAG_ADDED"),
+                eq(schema.postActivityTable.nextValue, tagA)
               )
-          ).toHaveLength(1);
-          expect(
-            yield* db
-              .select({ id: schema.postActivityTable.id })
-              .from(schema.postActivityTable)
-              .where(
-                and(
-                  eq(schema.postActivityTable.postId, f.postId),
-                  eq(schema.postActivityTable.kind, "TAG_REMOVED"),
-                  eq(schema.postActivityTable.nextValue, tagA)
-                )
+            );
+          expect(addedRows).toHaveLength(1);
+          expect(addedRows[0]).toMatchObject({
+            actorId: f.userId,
+            actorMemberId: f.membershipId,
+          });
+          const removedRows = yield* db
+            .select({
+              id: schema.postActivityTable.id,
+              actorId: schema.postActivityTable.actorId,
+              actorMemberId: schema.postActivityTable.actorMemberId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, f.postId),
+                eq(schema.postActivityTable.kind, "TAG_REMOVED"),
+                eq(schema.postActivityTable.nextValue, tagA)
               )
-          ).toHaveLength(1);
+            );
+          expect(removedRows).toHaveLength(1);
+          expect(removedRows[0]).toMatchObject({
+            actorId: f.userId,
+            actorMemberId: f.membershipId,
+          });
         })
       );
       it.effect(

@@ -99,6 +99,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
   const tagPolicy = yield* TagPolicy;
   const sitePolicy = yield* SitePolicy;
   const siteRepository = yield* SiteRepository;
+  const postActivityRepository = yield* PostActivityRepository;
 
   return {
     TagList: (args: TTagList) =>
@@ -233,8 +234,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
             const previousTagIds = yield* repository.findPostTagIds(args);
             yield* repository.setPostTags({ ...args, tagIds });
 
-            const activityRepository = yield* PostActivityRepository;
-            yield* activityRepository.createMany(
+            yield* postActivityRepository.createMany(
               postTagChangeActivities({
                 previousTagIds,
                 nextTagIds: tagIds,

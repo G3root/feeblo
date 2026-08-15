@@ -151,10 +151,16 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
         nextValue: null,
         commentId: input.commentId,
       };
-    default:
+    default: {
       // Every kind is handled above; the default arm only fires when a new
-      // kind is added to PostActivityInput without a mapping here.
-      return input satisfies never;
+      // kind is added to PostActivityInput without a mapping here, or when
+      // invalid runtime input reaches the switch. Fail loudly instead of
+      // letting that input be written to the database.
+      const unhandled: never = input;
+      throw new Error(
+        `Unhandled post activity kind: ${String((unhandled as PostActivityInput).kind)}`
+      );
+    }
   }
 };
 

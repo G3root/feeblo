@@ -84,15 +84,15 @@ export function PostTagField() {
     if (disabled) {
       return;
     }
-    try {
-      if (!postTags) {
-        return;
-      }
-      const currentTagIds = postTags.map((tag) => tag.tagId);
-      const newTagIds = isSelected
-        ? currentTagIds?.filter((id) => id !== option.id)
-        : [...currentTagIds, option.id];
+    if (!postTags) {
+      return;
+    }
+    const currentTagIds = postTags.map((tag) => tag.tagId);
+    const newTagIds = isSelected
+      ? currentTagIds?.filter((id) => id !== option.id)
+      : [...currentTagIds, option.id];
 
+    try {
       await fetchRpc((rpc) =>
         rpc.PostTagSet({
           postId: post.id,
@@ -100,20 +100,25 @@ export function PostTagField() {
           tagIds: newTagIds,
         })
       );
-
-      await postTagCollection.utils.refetch();
-      await postActivityCollection.utils.refetch();
-
-      if (showSuccessToast) {
-        toastManager.add({
-          title: "Tags updated",
-          type: "success",
-        });
-      }
     } catch {
       toastManager.add({
         title: "Failed to update tags",
         type: "error",
+      });
+      return;
+    }
+
+    // The tags were saved; refreshing local collections afterwards must not
+    // surface "Failed to update tags" if a refetch rejects.
+    await Promise.allSettled([
+      postTagCollection.utils.refetch(),
+      postActivityCollection.utils.refetch(),
+    ]);
+
+    if (showSuccessToast) {
+      toastManager.add({
+        title: "Tags updated",
+        type: "success",
       });
     }
   };
