@@ -123,7 +123,8 @@ function Toasts({
                 "data-[position*=bottom]:data-starting-style:transform-[translateY(calc(100%+var(--toast-inset)))]",
                 "data-ending-style:opacity-0",
                 // Ending animations (direction-aware)
-                "data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(100%+var(--toast-inset)))]",
+                "data-[position*=top]:data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(-100%-var(--toast-inset)))]",
+                "data-[position*=bottom]:data-ending-style:not-data-limited:not-data-swipe-direction:transform-[translateY(calc(100%+var(--toast-inset)))]",
                 "data-ending-style:data-[swipe-direction=left]:transform-[translateX(calc(var(--toast-swipe-movement-x)-100%-var(--toast-inset)))_translateY(var(--toast-calc-offset-y))]",
                 "data-ending-style:data-[swipe-direction=right]:transform-[translateX(calc(var(--toast-swipe-movement-x)+100%+var(--toast-inset)))_translateY(var(--toast-calc-offset-y))]",
                 "data-ending-style:data-[swipe-direction=up]:transform-[translateY(calc(var(--toast-swipe-movement-y)-100%-var(--toast-inset)))]",
@@ -202,13 +203,6 @@ function AnchoredToasts({
           const positionerProps = toast.positionerProps;
 
           if (!positionerProps?.anchor) {
-            return null;
-          }
-
-          // A detached anchor has no measurable position — Floating UI returns
-          // (0, 0), which pins the toast to the top-left of the page. Skip it
-          // instead of rendering in a wrong position.
-          if (!positionerProps.anchor.isConnected) {
             return null;
           }
 

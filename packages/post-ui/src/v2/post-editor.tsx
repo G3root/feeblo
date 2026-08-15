@@ -1,7 +1,7 @@
 import { Button } from "@feeblo/ui/button";
 import { Editor, finalizeEditorContent } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
-import { toastManager } from "@feeblo/ui/toast";
+import { anchoredToastManager, toastManager } from "@feeblo/ui/toast";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
 import {
@@ -74,14 +74,29 @@ function usePostEditorInitialContent() {
 function PostEditorInitialContentProvider({
   children,
   content,
+  resetKey,
 }: {
   children?: ReactNode;
   content: string;
+  resetKey: number;
 }) {
-  const initialContent = useRef({ value: content });
+  const [initialContent, setInitialContent] = useState(() => ({
+    value: content,
+  }));
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+
+  // Refresh the editor's initial content when the editor is reset. This is
+  // done by syncing state during render instead of remounting this provider
+  // with a changing `key`: the old approach also unmounted the children (e.g.
+  // the Submit button), which nulled their refs and detached elements that
+  // anchored toasts were about to be positioned against.
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setInitialContent({ value: content });
+  }
 
   return (
-    <PostEditorInitialContentContext value={initialContent.current}>
+    <PostEditorInitialContentContext value={initialContent}>
       {children}
     </PostEditorInitialContentContext>
   );
@@ -145,7 +160,7 @@ function PostEditorProvider({
   );
 
   return (
-    <PostEditorInitialContentProvider content={content} key={resetKey}>
+    <PostEditorInitialContentProvider content={content} resetKey={resetKey}>
       <PostEditorContext value={contextValue}>{children}</PostEditorContext>
     </PostEditorInitialContentProvider>
   );
@@ -177,14 +192,45 @@ const PostEditorEditor = memo(function PostEditorEditor() {
   );
 });
 
+const ANCHORED_SAVE_TOAST_ID = "post-save";
 const PostEditorSubmit = memo(function PostEditorSubmit() {
   const { actions, meta, state } = usePostEditor();
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="flex items-center justify-end pt-2">
       <Button
+        aria-label="Save"
         disabled={state.disabled}
-        onClick={actions.onSubmit}
+        onClick={async () => {
+          // Capture the anchor synchronously: awaiting the submit can unmount
+          // or replace the button, which would null `saveButtonRef.current`
+          // (or detach the element) before the toast is added.
+          const anchor = saveButtonRef.current;
+          if (!anchor) {
+            return;
+          }
+
+          try {
+            await actions.onSubmit();
+
+            anchoredToastManager.add({
+              id: ANCHORED_SAVE_TOAST_ID,
+              data: {
+                tooltipStyle: true,
+              },
+              positionerProps: {
+                anchor,
+                sideOffset: 8,
+              },
+              timeout: 2000,
+              title: `${meta.submitLabel} successful`,
+            });
+          } catch {
+            // Failure feedback is surfaced by the onSubmit handler.
+          }
+        }}
+        ref={saveButtonRef}
         size="sm"
         type="button"
       >
@@ -250,14 +296,10 @@ function PostEditorComponent({
       organizationId,
       { assetIds: existingAssetIds, scope: editorScope }
     );
-    try {
-      await onSubmit({
-        assetIds: finalized.assetIds,
-        content: finalized.content,
-      });
-    } catch {
-      return;
-    }
+    await onSubmit({
+      assetIds: finalized.assetIds,
+      content: finalized.content,
+    });
     finalized.commit();
     setResetKey((k) => k + 1);
     if (!isContentControlled) {
