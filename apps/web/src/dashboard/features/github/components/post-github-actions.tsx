@@ -10,23 +10,19 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@feeblo/ui/dialog";
-import { Input } from "@feeblo/ui/input";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { MenuItem } from "@feeblo/ui/menu";
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@feeblo/ui/select";
 import { toastManager } from "@feeblo/ui/toast";
 import { Link01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useSelector } from "@tanstack/react-store";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { usePostExternalResourceRefresh } from "~/features/integrations/components/post-external-resources";
 import {
+  type GitHubConnection,
+  type GitHubRepository,
   gitHubAtomRegistry,
   gitHubConnectionsAtom,
   gitHubRepositoriesAtom,
@@ -35,6 +31,14 @@ import {
   createGitHubPostIssue,
   linkGitHubPostIssue,
 } from "../lib/github-connections";
+import {
+  type GitHubPostIssueAction,
+  githubPostIssueFormOpts,
+} from "../shared-form";
+import {
+  GitHubConnectionField,
+  GitHubRepositoryField,
+} from "./github-post-issue-fields";
 
 type GitHubPostAction = "create" | "link" | null;
 
@@ -99,7 +103,7 @@ function GitHubPostIssueDialog({
   onChanged,
   onOpenChange,
 }: {
-  readonly action: Exclude<GitHubPostAction, null>;
+  readonly action: GitHubPostIssueAction;
   readonly organizationId: string;
   readonly postId: string;
   readonly onChanged: () => void;
@@ -107,93 +111,12 @@ function GitHubPostIssueDialog({
 }) {
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
   const connections = AsyncResult.match(connectionsResult, {
-    onInitial: () => [],
+    onInitial: () => null as readonly GitHubConnection[] | null,
     onFailure: ({ previousSuccess }) =>
       Option.getOrNull(previousSuccess)?.value ?? [],
     onSuccess: ({ value }) => value,
   });
-  const [connectionId, setConnectionId] = useState("");
-  const selectedConnectionId = connectionId || connections[0]?.id || "";
-  const repositoriesResult = useAtomValue(
-    gitHubRepositoriesAtom({
-      organizationId,
-      connectionId: selectedConnectionId,
-    })
-  );
-  const repositories = AsyncResult.match(repositoriesResult, {
-    onInitial: () => [],
-    onFailure: ({ previousSuccess }) =>
-      Option.getOrNull(previousSuccess)?.value ?? [],
-    onSuccess: ({ value }) => value,
-  });
-  const [repositoryFullName, setRepositoryFullName] = useState("");
-  const [issueNumber, setIssueNumber] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const submit = async () => {
-    const [repositoryOwner, repositoryName] = repositoryFullName.split("/");
-    const parsedIssueNumber = Number(issueNumber);
-    if (
-      !(
-        selectedConnectionId &&
-        repositoryOwner &&
-        repositoryName &&
-        (action === "create" ||
-          (Number.isInteger(parsedIssueNumber) && parsedIssueNumber > 0))
-      )
-    ) {
-      toastManager.add({
-        title: "Choose a repository and enter a valid issue number",
-        type: "error",
-      });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const input = {
-        organizationId,
-        postId,
-        connectionId: selectedConnectionId,
-        repositoryOwner,
-        repositoryName,
-        idempotencyKey,
-      };
-      if (action === "create") {
-        await createGitHubPostIssue(input);
-      } else {
-        await linkGitHubPostIssue({ ...input, issueNumber: parsedIssueNumber });
-      }
-      onChanged();
-      onOpenChange(false);
-      toastManager.add({
-        title:
-          action === "create"
-            ? "GitHub issue created by Feeblo bot"
-            : "GitHub issue linked and Feeblo bot comment added",
-        type: "success",
-      });
-    } catch {
-      toastManager.add({
-        title:
-          action === "create"
-            ? "Could not create GitHub issue"
-            : "Could not link GitHub issue or add the Feeblo bot comment",
-        type: "error",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-  const repositoryOptions = useMemo(
-    () => repositories.map((repository) => repository.fullName),
-    [repositories]
-  );
-  let submitLabel = "Link issue";
-  if (submitting) {
-    submitLabel = "Saving…";
-  } else if (action === "create") {
-    submitLabel = "Create issue";
-  }
+
   return (
     <Dialog onOpenChange={onOpenChange} open>
       <DialogPopup>
@@ -209,76 +132,158 @@ function GitHubPostIssueDialog({
               : "Link this feedback post to an existing GitHub issue. The Feeblo bot will add a link back to this discussion as a comment."}
           </DialogDescription>
         </DialogHeader>
-        <DialogPanel className="grid gap-4">
-          <div className="grid gap-1.5 text-sm">
-            <span>GitHub App installation</span>
-            <Select
-              onValueChange={(value) => {
-                setConnectionId(String(value));
-                setRepositoryFullName("");
-              }}
-              value={selectedConnectionId}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a GitHub App installation" />
-              </SelectTrigger>
-              <SelectPopup>
-                {connections.map((connection) => (
-                  <SelectItem key={connection.id} value={connection.id}>
-                    {connection.login ?? "GitHub installation"}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-          </div>
-          <div className="grid gap-1.5 text-sm">
-            <span>Repository</span>
-            <Select
-              disabled={!selectedConnectionId}
-              onValueChange={(value) => setRepositoryFullName(String(value))}
-              value={repositoryFullName}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a repository" />
-              </SelectTrigger>
-              <SelectPopup>
-                {repositoryOptions.map((repository) => (
-                  <SelectItem key={repository} value={repository}>
-                    {repository}
-                  </SelectItem>
-                ))}
-              </SelectPopup>
-            </Select>
-          </div>
-          {action === "link" ? (
-            <div className="grid gap-1.5 text-sm">
-              <span>Issue number</span>
-              <Input
-                inputMode="numeric"
-                min="1"
-                onChange={(event) => setIssueNumber(event.target.value)}
-                placeholder="42"
-                type="number"
-                value={issueNumber}
-              />
-            </div>
-          ) : null}
-        </DialogPanel>
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>
-            Cancel
-          </DialogClose>
-          <Button
-            disabled={
-              submitting || !selectedConnectionId || !repositoryFullName
-            }
-            onClick={submit}
-            type="button"
-          >
-            {submitLabel}
-          </Button>
-        </DialogFooter>
+        {connections === null ? (
+          <DialogPanel>
+            <p className="text-muted-foreground text-sm">
+              Loading GitHub App installations…
+            </p>
+          </DialogPanel>
+        ) : (
+          <GitHubPostIssueForm
+            action={action}
+            connections={connections}
+            onChanged={onChanged}
+            onOpenChange={onOpenChange}
+            organizationId={organizationId}
+            postId={postId}
+          />
+        )}
       </DialogPopup>
     </Dialog>
+  );
+}
+
+function GitHubPostIssueForm({
+  action,
+  connections,
+  organizationId,
+  postId,
+  onChanged,
+  onOpenChange,
+}: {
+  readonly action: GitHubPostIssueAction;
+  readonly connections: readonly GitHubConnection[];
+  readonly organizationId: string;
+  readonly postId: string;
+  readonly onChanged: () => void;
+  readonly onOpenChange: (open: boolean) => void;
+}) {
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const form = useAppForm({
+    ...githubPostIssueFormOpts,
+    defaultValues: {
+      action,
+      connectionId: String(connections[0]?.id ?? ""),
+      repositoryFullName: "",
+      issueNumber: "",
+    },
+    onSubmit: async ({ value }) => {
+      const [repositoryOwner, repositoryName] =
+        value.repositoryFullName.split("/");
+      const input = {
+        organizationId,
+        postId,
+        connectionId: value.connectionId,
+        repositoryOwner: repositoryOwner ?? "",
+        repositoryName: repositoryName ?? "",
+        idempotencyKey,
+      };
+      try {
+        if (value.action === "create") {
+          await createGitHubPostIssue(input);
+        } else {
+          await linkGitHubPostIssue({
+            ...input,
+            issueNumber: Number(value.issueNumber),
+          });
+        }
+        onChanged();
+        onOpenChange(false);
+        toastManager.add({
+          title:
+            value.action === "create"
+              ? "GitHub issue created by Feeblo bot"
+              : "GitHub issue linked and Feeblo bot comment added",
+          type: "success",
+        });
+      } catch {
+        toastManager.add({
+          title:
+            value.action === "create"
+              ? "Could not create GitHub issue"
+              : "Could not link GitHub issue or add the Feeblo bot comment",
+          type: "error",
+        });
+      }
+    },
+  });
+
+  const connectionId = useSelector(
+    form.store,
+    (state) => state.values.connectionId
+  );
+  const repositoriesResult = useAtomValue(
+    gitHubRepositoriesAtom({ organizationId, connectionId })
+  );
+  const repositories = AsyncResult.match(repositoriesResult, {
+    onInitial: () => ({
+      list: [] as readonly GitHubRepository[],
+      isLoading: true,
+    }),
+    onFailure: ({ previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => ({
+          list: [] as readonly GitHubRepository[],
+          isLoading: false,
+        }),
+        onSome: ({ value }) => ({ list: value, isLoading: false }),
+      }),
+    onSuccess: ({ value }) => ({ list: value, isLoading: false }),
+  });
+
+  const submitLabel = action === "create" ? "Create issue" : "Link issue";
+
+  return (
+    <form
+      className="contents"
+      data-slot="form"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        form.handleSubmit();
+      }}
+    >
+      <DialogPanel className="grid gap-4">
+        <GitHubConnectionField connections={connections} form={form} />
+        <GitHubRepositoryField
+          disabled={repositories.isLoading}
+          form={form}
+          repositories={repositories.list}
+        />
+        {action === "link" ? (
+          <form.AppField
+            children={(field) => (
+              <field.TextField
+                inputMode="numeric"
+                label="Issue number"
+                min="1"
+                placeholder="42"
+                type="number"
+              />
+            )}
+            name="issueNumber"
+          />
+        ) : null}
+      </DialogPanel>
+      <DialogFooter>
+        <DialogClose render={<Button type="button" variant="outline" />}>
+          Cancel
+        </DialogClose>
+        <form.AppForm>
+          <form.SubscribeButton label={submitLabel} />
+        </form.AppForm>
+      </DialogFooter>
+    </form>
   );
 }

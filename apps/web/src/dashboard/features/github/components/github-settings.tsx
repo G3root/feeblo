@@ -40,7 +40,7 @@ import * as Schema from "effect/Schema";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import {
   startTransition,
-  useEffect,
+  useMemo,
   useOptimistic,
   useRef,
   useState,
@@ -534,6 +534,12 @@ function BoardScopeSwitch({
   );
 }
 
+type GitHubSyncRuleDraft = {
+  readonly postStatusId: string;
+  readonly upvoterNotificationPolicy: GitHubSyncRule["upvoterNotificationPolicy"];
+  readonly enabled: boolean;
+};
+
 function GitHubSyncRules({
   args,
 }: {
@@ -632,38 +638,31 @@ function GitHubSyncRuleSlot({
   // saves cannot issue duplicate createGitHubSyncRule calls.
   const createInFlightRef = useRef<Promise<GitHubSyncRule> | null>(null);
   const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState<{
-    readonly postStatusId: string;
-    readonly upvoterNotificationPolicy: GitHubSyncRule["upvoterNotificationPolicy"];
-    readonly enabled: boolean;
-  }>({
-    postStatusId: rule?.postStatusId ?? statuses[0]?.id ?? "",
-    upvoterNotificationPolicy:
-      rule?.upvoterNotificationPolicy ?? "notify_upvoters",
-    enabled: rule?.enabled ?? false,
-  });
-  // Re-derive the draft from the server rule once refreshes land.
-  useEffect(() => {
-    setDraft({
+  // Optimistic draft derived from the server rule. Field changes render
+  // immediately and reset to the server value once the refresh lands (or a
+  // failed save reverts the rule).
+  const baseDraft = useMemo<GitHubSyncRuleDraft>(
+    () => ({
       postStatusId: rule?.postStatusId ?? statuses[0]?.id ?? "",
       upvoterNotificationPolicy:
         rule?.upvoterNotificationPolicy ?? "notify_upvoters",
       enabled: rule?.enabled ?? false,
-    });
-  }, [
-    rule?.enabled,
-    rule?.postStatusId,
-    rule?.upvoterNotificationPolicy,
-    statuses[0]?.id,
-  ]);
+    }),
+    [
+      rule?.enabled,
+      rule?.postStatusId,
+      rule?.upvoterNotificationPolicy,
+      statuses[0]?.id,
+    ]
+  );
+  const [draft, setDraftOptimistic] = useOptimistic(
+    baseDraft,
+    (_current, next: GitHubSyncRuleDraft) => next
+  );
   const ruleId = rule?.id ?? createdRuleId;
-  const save = (next: {
-    readonly postStatusId: string;
-    readonly upvoterNotificationPolicy: GitHubSyncRule["upvoterNotificationPolicy"];
-    readonly enabled: boolean;
-  }) => {
-    setDraft(next);
+  const save = (next: GitHubSyncRuleDraft) => {
     startTransition(async () => {
+      setDraftOptimistic(next);
       setSaving(true);
       try {
         if (ruleId === null) {
