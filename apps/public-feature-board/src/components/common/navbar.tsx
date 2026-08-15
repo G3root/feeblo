@@ -17,12 +17,7 @@ export function Navbar() {
         <div className="flex h-14 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex min-w-0 items-center gap-2">
-              <UserAvatar
-                className="rounded-md"
-                image={site.logo}
-                name={site.name}
-                size="sm"
-              />
+              <UserAvatar image={site.logo} name={site.name} />
               <h1 className="truncate font-semibold text-sm tracking-tight sm:text-base">
                 {site.name}
               </h1>
