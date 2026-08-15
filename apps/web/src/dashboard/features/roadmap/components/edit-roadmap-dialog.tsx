@@ -194,14 +194,14 @@ function EditRoadmapForm() {
         form.handleSubmit();
       }}
     >
-      <SheetPanel className="grid gap-4">
-        <RoadmapFields form={form} />
-      </SheetPanel>
-      <SheetFooter>
-        <form.AppForm>
+      <form.AppForm>
+        <SheetPanel className="grid gap-4">
+          <RoadmapFields form={form} />
+        </SheetPanel>
+        <SheetFooter>
           <form.SubscribeButton label="Save" />
-        </form.AppForm>
-      </SheetFooter>
+        </SheetFooter>
+      </form.AppForm>
     </form>
   );
 }

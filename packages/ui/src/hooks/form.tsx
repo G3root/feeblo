@@ -26,14 +26,15 @@ function SubscribeButton({
   );
 }
 
-export const { useAppForm, withForm, withFieldGroup } = createFormHook({
-  fieldComponents: {
-    TextField,
-    TextareaField,
-  },
-  formComponents: {
-    SubscribeButton,
-  },
-  fieldContext,
-  formContext,
-});
+export const { useAppForm, withForm, withFieldGroup, useTypedAppFormContext } =
+  createFormHook({
+    fieldComponents: {
+      TextField,
+      TextareaField,
+    },
+    formComponents: {
+      SubscribeButton,
+    },
+    fieldContext,
+    formContext,
+  });
