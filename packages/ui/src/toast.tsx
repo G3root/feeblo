@@ -205,6 +205,13 @@ function AnchoredToasts({
             return null;
           }
 
+          // A detached anchor has no measurable position — Floating UI returns
+          // (0, 0), which pins the toast to the top-left of the page. Skip it
+          // instead of rendering in a wrong position.
+          if (!positionerProps.anchor.isConnected) {
+            return null;
+          }
+
           return (
             <Toast.Positioner
               className="z-50 max-w-[min(--spacing(64),var(--available-width))]"
