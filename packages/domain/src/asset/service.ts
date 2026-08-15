@@ -237,11 +237,13 @@ export const prepareEditorAssetContent = ({
   userId,
   content,
   assetIds,
+  coverImageUrl,
 }: {
   readonly organizationId: string;
   readonly userId?: string;
   readonly content: string;
   readonly assetIds: readonly string[];
+  readonly coverImageUrl?: string | null;
 }) =>
   Effect.gen(function* () {
     const assets = yield* findEditorAssetsByIds({
@@ -254,7 +256,11 @@ export const prepareEditorAssetContent = ({
     );
 
     if (temporaryAssets.length === 0) {
-      return { content, promotions: [] as readonly PromotedEditorAsset[] };
+      return {
+        content,
+        coverImage: coverImageUrl ?? null,
+        promotions: [] as readonly PromotedEditorAsset[],
+      };
     }
 
     const s3 = yield* S3UploadService;
@@ -281,13 +287,21 @@ export const prepareEditorAssetContent = ({
           })
       )
     );
-    const rewrittenContent = promotions.reduce(
-      (value, { asset, permanentObject }) =>
-        value.split(asset.url).join(permanentObject.url),
-      content
-    );
+    const rewriteUrls = (value: string) =>
+      promotions.reduce(
+        (result, { asset, permanentObject }) =>
+          result.split(asset.url).join(permanentObject.url),
+        value
+      );
 
-    return { content: rewrittenContent, promotions };
+    return {
+      content: rewriteUrls(content),
+      coverImage:
+        coverImageUrl === undefined || coverImageUrl === null
+          ? (coverImageUrl ?? null)
+          : rewriteUrls(coverImageUrl),
+      promotions,
+    };
   });
 
 const commitEditorAssetPromotions = (
@@ -473,12 +487,20 @@ export const syncChangelogAssetReferences = ({
   userId,
   content,
   assetIds,
+  coverImageUrl,
 }: {
   readonly changelogId: string;
   readonly organizationId: string;
   readonly userId?: string;
   readonly content: string;
   readonly assetIds: readonly string[];
+  /**
+   * URL of the changelog cover image. The cover image is stored in its own
+   * column (not inside the editor content), so it must be kept in the
+   * changelog asset references explicitly or the orphan cleanup would delete
+   * it.
+   */
+  readonly coverImageUrl?: string | null;
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
@@ -497,12 +519,45 @@ export const syncChangelogAssetReferences = ({
       ...(userId ? { userId } : {}),
       assetIds,
     });
+    // The client only knows the cover image URL (not its asset id), so after
+    // a reload a re-save submits no cover asset id. Resolve the asset by URL
+    // to keep its reference alive across saves; a null cover image yields no
+    // asset and the previous cover reference is pruned below.
+    const coverAssets =
+      coverImageUrl === undefined || coverImageUrl === null
+        ? []
+        : yield* db
+            .select({
+              id: schema.assetTable.id,
+              bucket: schema.assetTable.bucket,
+              key: schema.assetTable.key,
+              url: schema.assetTable.url,
+            })
+            .from(schema.assetTable)
+            .where(
+              and(
+                userId
+                  ? or(
+                      eq(schema.assetTable.organizationId, organizationId),
+                      eq(schema.assetTable.userId, userId)
+                    )
+                  : eq(schema.assetTable.organizationId, organizationId),
+                inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
+                eq(schema.assetTable.url, coverImageUrl)
+              )
+            );
+    const coverAssetIds = new Set(coverAssets.map(({ id }) => id));
     const assets = [
       ...currentAssets,
+      ...coverAssets.filter(
+        ({ id }) => !currentAssets.some((asset) => asset.id === id)
+      ),
       ...submittedAssets.filter(
         ({ id, url }) =>
-          !currentAssets.some((asset) => asset.id === id) &&
-          content.includes(url)
+          !(
+            currentAssets.some((asset) => asset.id === id) ||
+            coverAssetIds.has(id)
+          ) && content.includes(url)
       ),
     ];
     yield* syncChangelogReferences({ changelogId, assets });

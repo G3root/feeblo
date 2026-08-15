@@ -35,10 +35,8 @@ export const Route = createLazyRoute("/changelog")({
 
 export function ChangelogPage() {
   const site = useSite();
-  const {
-    publicChangelogCategoryLinkCollection,
-    publicChangelogCollection,
-  } = usePublicCollections();
+  const { publicChangelogCategoryLinkCollection, publicChangelogCollection } =
+    usePublicCollections();
   const [search, setSearch] = useState("");
   const normalizedSearch = search.trim();
   const {
@@ -129,7 +127,7 @@ export function ChangelogPage() {
         </div>
       </div>
       {changelogs.length === 0 ? (
-        <Empty className="border">
+        <Empty>
           <EmptyHeader>
             <EmptyTitle>
               {normalizedSearch
@@ -159,6 +157,15 @@ export function ChangelogPage() {
                 </ChangelogTimelineDate>
 
                 <ChangelogTimelineBody className="space-y-6 p-0 sm:p-0">
+                  {item.coverImage ? (
+                    <img
+                      alt=""
+                      className="aspect-[16/7] w-full rounded-xl border object-cover"
+                      height={525}
+                      src={item.coverImage}
+                      width={1200}
+                    />
+                  ) : null}
                   <header className="space-y-3">
                     <ChangelogCategoryBadges
                       categoryIds={categoryIdsByChangelog.get(item.id) ?? []}

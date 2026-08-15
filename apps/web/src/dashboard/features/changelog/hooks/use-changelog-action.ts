@@ -53,6 +53,7 @@ export const useChangelogAction = () => {
         slug,
         content: "",
         excerpt: "",
+        coverImage: null,
         status: "draft" as ChangelogStatus,
         scheduledAt: null,
         publishedAt: null,

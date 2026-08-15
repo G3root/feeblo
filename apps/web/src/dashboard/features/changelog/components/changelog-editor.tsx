@@ -1,6 +1,7 @@
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
+import { Card } from "@feeblo/ui/card";
 import {
   Combobox,
   ComboboxEmpty,
@@ -11,10 +12,15 @@ import {
 } from "@feeblo/ui/combobox";
 import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { Spinner } from "@feeblo/ui/spinner";
 import { toastManager } from "@feeblo/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import * as dayjs from "@feeblo/utils/dayjs";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import {
+  editorMediaUploadEndpoint,
+  uploadedEditorMediaSchema,
+} from "@feeblo/web-shared/auth-client";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   ArrowLeft01Icon,
@@ -22,6 +28,8 @@ import {
   Cancel01Icon,
   Clock01Icon,
   Copy01Icon,
+  ImageRemove01Icon,
+  ImageUpload01Icon,
   Link03Icon,
   LinkSquare02Icon,
   RefreshIcon,
@@ -33,7 +41,14 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { createContext, type ReactNode, use, useRef } from "react";
+import {
+  createContext,
+  type MutableRefObject,
+  type ReactNode,
+  use,
+  useRef,
+  useState,
+} from "react";
 import { z } from "zod";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
@@ -49,6 +64,7 @@ import { ChangelogStatusBadge } from "./changelog-status";
 
 export type TChangelogEditorRecord = {
   assetIds?: readonly string[];
+  coverImage: string | null;
   id: string;
   title: string;
   slug: string;
@@ -69,6 +85,7 @@ export type TChangelogEditorRecord = {
 type ChangelogEditorFormValues = {
   title: string;
   content: string;
+  coverImage: string | null;
 };
 
 type ChangelogSubmitMeta = {
@@ -91,10 +108,12 @@ function useChangelogEditorForm({
   changelog,
   editorScope,
   organizationId,
+  coverImageAssetRef,
 }: {
   changelog: TChangelogEditorRecord;
   editorScope: string;
   organizationId: string;
+  coverImageAssetRef: MutableRefObject<string | null>;
 }) {
   const { changelogCollection } = useDashboardCollections();
   const navigate = useNavigate();
@@ -104,11 +123,13 @@ function useChangelogEditorForm({
     defaultValues: {
       title: changelog.title,
       content: changelog.content,
+      coverImage: changelog.coverImage ?? null,
     } satisfies ChangelogEditorFormValues,
     validators: {
       onSubmit: z.object({
         title: z.string().trim().min(1, "Title is required"),
         content: z.string(),
+        coverImage: z.string().nullable(),
       }),
     },
     onSubmit: async ({ value, meta }) => {
@@ -120,12 +141,17 @@ function useChangelogEditorForm({
           organizationId,
           { assetIds: changelog.assetIds, scope: editorScope }
         );
-        const { assetIds, content } = finalized;
+        const { assetIds: contentAssetIds, content } = finalized;
+        const assetIds = [
+          ...contentAssetIds,
+          ...(coverImageAssetRef.current ? [coverImageAssetRef.current] : []),
+        ];
         const payload = updatedChangelogSchema.parse({
           id: changelog.id,
           title: value.title.trim(),
           slug: submitMeta?.overrides?.slug ?? changelog.slug,
           content,
+          coverImage: value.coverImage,
           assetIds,
           status: submitMeta?.overrides?.status ?? changelog.status,
           scheduledAt:
@@ -144,6 +170,7 @@ function useChangelogEditorForm({
           draft.slug = payload.slug;
           draft.content = payload.content;
           draft.assetIds = payload.assetIds;
+          draft.coverImage = payload.coverImage;
           draft.status = payload.status;
           draft.scheduledAt = payload.scheduledAt;
           draft.publishedAt = payload.publishedAt;
@@ -184,6 +211,7 @@ function useChangelogEditorForm({
 
 type ChangelogEditorContextValue = {
   changelog: TChangelogEditorRecord;
+  coverImageAssetRef: MutableRefObject<string | null>;
   form: ReturnType<typeof useChangelogEditorForm>;
   formResetKey: string;
   editorScope: string;
@@ -205,6 +233,7 @@ export function ChangelogEditorProvider({
   const navigate = useNavigate();
   const { changelogCollection } = useDashboardCollections();
   const editorScope = useRef(crypto.randomUUID()).current;
+  const coverImageAssetRef = useRef<string | null>(null);
   const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
   // Backend mirror: ChangelogPolicy.canUpdate requires changelog.*.
   const { allowed: isOwner } = usePolicy(
@@ -214,6 +243,7 @@ export function ChangelogEditorProvider({
     changelog,
     editorScope,
     organizationId,
+    coverImageAssetRef,
   });
 
   async function handleMoveToDraft() {
@@ -255,6 +285,7 @@ export function ChangelogEditorProvider({
 
   const value: ChangelogEditorContextValue = {
     changelog,
+    coverImageAssetRef,
     editorScope,
     form,
     formResetKey,
@@ -351,6 +382,156 @@ export function ChangelogEditorTitleField() {
       )}
     </form.Field>
   );
+}
+
+export function ChangelogEditorCoverImageField() {
+  const { coverImageAssetRef, form, isOwner, organizationId } =
+    useChangelogEditor();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const uploadCoverImage = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const { assetId, url } = await uploadChangelogCoverImage(
+        file,
+        organizationId
+      );
+      coverImageAssetRef.current = assetId;
+      form.setFieldValue("coverImage", url);
+      toastManager.add({
+        title: "Cover image added",
+        type: "success",
+      });
+    } catch (_error) {
+      toastManager.add({
+        title: "Failed to upload cover image",
+        type: "error",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeCoverImage = () => {
+    coverImageAssetRef.current = null;
+    form.setFieldValue("coverImage", null);
+  };
+
+  return (
+    <form.Field name="coverImage">
+      {(field) =>
+        field.state.value ? (
+          <Card className="overflow-hidden" size="sm">
+            <div className="relative">
+              <img
+                alt=""
+                className="aspect-[16/7] w-full object-cover"
+                height={525}
+                src={field.state.value}
+                width={1200}
+              />
+              {isOwner ? (
+                <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/50 to-transparent p-3">
+                  <Button
+                    aria-label="Replace cover image"
+                    disabled={isUploading}
+                    onClick={() => inputRef.current?.click()}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {isUploading ? (
+                      <Spinner className="size-4" />
+                    ) : (
+                      <HugeiconsIcon icon={ImageUpload01Icon} />
+                    )}
+                    Replace
+                  </Button>
+                  <Button
+                    aria-label="Remove cover image"
+                    onClick={removeCoverImage}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <HugeiconsIcon icon={ImageRemove01Icon} />
+                    Remove
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+            <input
+              accept="image/gif,image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={!isOwner}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  uploadCoverImage(file).catch(() => undefined);
+                }
+                event.target.value = "";
+              }}
+              ref={inputRef}
+              type="file"
+            />
+          </Card>
+        ) : (
+          <Card className="h-32 items-center justify-center" size="sm">
+            <Button
+              aria-label="Add cover image"
+              disabled={!isOwner || isUploading}
+              onClick={() => inputRef.current?.click()}
+              type="button"
+              variant="secondary"
+            >
+              {isUploading ? (
+                <Spinner className="size-4" />
+              ) : (
+                <HugeiconsIcon icon={ImageUpload01Icon} />
+              )}
+              Add cover image
+            </Button>
+            <input
+              accept="image/gif,image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={!isOwner}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  uploadCoverImage(file).catch(() => undefined);
+                }
+                event.target.value = "";
+              }}
+              ref={inputRef}
+              type="file"
+            />
+          </Card>
+        )
+      }
+    </form.Field>
+  );
+}
+
+async function uploadChangelogCoverImage(
+  file: File,
+  organizationId: string
+): Promise<{ assetId: string; url: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("organizationId", organizationId);
+
+  const response = await fetch(editorMediaUploadEndpoint, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Cover image upload failed with status ${response.status}`);
+  }
+
+  return uploadedEditorMediaSchema.parse(await response.json());
 }
 
 export function ChangelogEditorSubmitAction() {
