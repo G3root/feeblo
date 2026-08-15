@@ -1,16 +1,16 @@
 import type { TPostActivityKind } from "@feeblo/db/validation-schema/activity-kind";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import {
-  Timeline,
-  TimelineContent,
-  TimelineDate,
-  TimelineHeader,
-  TimelineIndicator,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineTitle,
-} from "@feeblo/ui/reui/timeline";
+  ActivityTimeline,
+  ActivityTimelineItem,
+} from "@feeblo/ui/activity-timeline";
+import { cn } from "@feeblo/ui/utils";
 import * as dayjs from "@feeblo/utils/dayjs";
+import {
+  BOARD_LANE_COLOR_MAP,
+  BoardIconMap,
+  type BoardPostStatus,
+} from "@feeblo/web-shared/board/constants";
 import {
   Archive01Icon,
   ArchiveRestoreIcon,
@@ -100,6 +100,28 @@ function getActivityDescription({
   return descriptions[activity.kind];
 }
 
+function getActivityIcon(
+  activity: TPostActivity,
+  statusTypes: ReadonlyMap<string, string>
+): { icon: typeof FileAddIcon; color: string } {
+  if (activity.kind === "STATUS_CHANGED" && activity.nextValue) {
+    const statusType = statusTypes.get(activity.nextValue);
+    if (statusType) {
+      return {
+        icon: BoardIconMap[statusType as BoardPostStatus] ?? StatusIcon,
+        color:
+          BOARD_LANE_COLOR_MAP[statusType as BoardPostStatus] ??
+          "text-muted-foreground",
+      };
+    }
+  }
+
+  return {
+    icon: activityIconMap[activity.kind],
+    color: "text-muted-foreground",
+  };
+}
+
 export function PostActivityList({
   organizationId,
   postId,
@@ -145,6 +167,10 @@ export function PostActivityList({
       ),
     [statuses]
   );
+  const statusTypes = useMemo(
+    () => new Map(statuses.map((status) => [status.id, status.type])),
+    [statuses]
+  );
   const boardNames = useMemo(
     () => new Map(boards.map((board) => [board.id, board.name])),
     [boards]
@@ -163,43 +189,32 @@ export function PostActivityList({
   }
 
   return (
-    <Timeline className="w-full" value={activities.length}>
-      {activities.map((activity, index) => {
+    <ActivityTimeline className="w-full">
+      {activities.map((activity) => {
         const actorName = activity.actor.name ?? "Someone";
+        const { icon, color } = getActivityIcon(activity, statusTypes);
         return (
-          <TimelineItem
-            className="group-data-[orientation=vertical]/timeline:ms-10"
+          <ActivityTimelineItem
+            icon={
+              <HugeiconsIcon
+                aria-hidden="true"
+                className={cn("size-3.5", color)}
+                icon={icon}
+                strokeWidth={2}
+              />
+            }
             key={activity.id}
-            step={index + 1}
           >
-            <TimelineHeader>
-              <TimelineSeparator className="group-data-[orientation=vertical]/timeline:-left-7 group-data-[orientation=vertical]/timeline:h-[calc(100%-1.5rem-0.25rem)] group-data-[orientation=vertical]/timeline:translate-y-6.5" />
-              <TimelineTitle className="mt-0.5">{actorName}</TimelineTitle>
-              <TimelineIndicator className="flex size-6 items-center justify-center border-none bg-primary/10 group-data-[orientation=vertical]/timeline:-left-7 group-data-completed/timeline-item:bg-primary group-data-completed/timeline-item:text-primary-foreground">
-                <HugeiconsIcon
-                  aria-hidden="true"
-                  className="size-3.5"
-                  icon={activityIconMap[activity.kind]}
-                  strokeWidth={2}
-                />
-              </TimelineIndicator>
-            </TimelineHeader>
-            <TimelineContent>
-              {getActivityDescription({
-                activity,
-                boardNames,
-                statusNames,
-              })}
-              <TimelineDate
-                className="mt-2 mb-0"
-                dateTime={activity.createdAt.toISOString()}
-              >
-                {dayjs.default(activity.createdAt).fromNow()}
-              </TimelineDate>
-            </TimelineContent>
-          </TimelineItem>
+            {actorName}{" "}
+            {getActivityDescription({
+              activity,
+              boardNames,
+              statusNames,
+            })}{" "}
+            {dayjs.default(activity.createdAt).fromNow()}
+          </ActivityTimelineItem>
         );
       })}
-    </Timeline>
+    </ActivityTimeline>
   );
 }

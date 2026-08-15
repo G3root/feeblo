@@ -1,14 +1,10 @@
 import "../../tailwind.css";
 import {
-  Timeline,
-  TimelineContent,
-  TimelineDate,
-  TimelineHeader,
-  TimelineIndicator,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineTitle,
-} from "@feeblo/ui/reui/timeline";
+  ActivityTimeline,
+  ActivityTimelineItem,
+} from "@feeblo/ui/activity-timeline";
+import { CommentAdd01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { CommentDisplay } from "./comment-display";
 
@@ -223,57 +219,61 @@ export function TimelineComposition() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="w-full max-w-xl">
-        <Timeline>
-          {comments.map((comment, index) => (
-            <TimelineItem key={comment.commentId} step={index + 1}>
-              <TimelineIndicator />
-              <TimelineSeparator />
-              <TimelineHeader>
-                <TimelineDate>
-                  {formatRelativeTime(comment.createdAt)}
-                </TimelineDate>
-                <TimelineTitle>{comment.authorName}</TimelineTitle>
-              </TimelineHeader>
-              <TimelineContent>
-                <CommentDisplay
-                  authorName={comment.authorName}
-                  commentId={comment.commentId}
-                  content={comment.content}
-                  createdAt={comment.createdAt}
-                  isInternal={internalComments.has(comment.commentId)}
-                  onDelete={() => {
-                    // biome-ignore lint/suspicious/noConsole: story demo
-                    console.log(`Delete ${comment.commentId}`);
-                  }}
-                  onReply={async ({ content, isPrivate }) => {
-                    // biome-ignore lint/suspicious/noConsole: story demo
-                    console.log(`Reply to ${comment.commentId}`, {
-                      content,
-                      isPrivate,
-                    });
-                  }}
-                  onToggleVisibility={() => {
-                    setInternalComments((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(comment.commentId)) {
-                        next.delete(comment.commentId);
-                      } else {
-                        next.add(comment.commentId);
-                      }
-                      return next;
-                    });
-                  }}
-                  onUpdate={({ content }) => {
-                    // biome-ignore lint/suspicious/noConsole: story demo
-                    console.log(`Update ${comment.commentId}`, content);
-                  }}
-                  postId="post-1"
-                  postSlug="post-1"
+        <ActivityTimeline>
+          {comments.map((comment) => (
+            <ActivityTimelineItem
+              icon={
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-3.5 text-muted-foreground"
+                  icon={CommentAdd01Icon}
+                  strokeWidth={2}
                 />
-              </TimelineContent>
-            </TimelineItem>
+              }
+              key={comment.commentId}
+            >
+              <span className="font-medium text-foreground">
+                {comment.authorName}
+              </span>{" "}
+              {formatRelativeTime(comment.createdAt)}
+              <CommentDisplay
+                authorName={comment.authorName}
+                commentId={comment.commentId}
+                content={comment.content}
+                createdAt={comment.createdAt}
+                isInternal={internalComments.has(comment.commentId)}
+                onDelete={() => {
+                  // biome-ignore lint/suspicious/noConsole: story demo
+                  console.log(`Delete ${comment.commentId}`);
+                }}
+                onReply={async ({ content, isPrivate }) => {
+                  // biome-ignore lint/suspicious/noConsole: story demo
+                  console.log(`Reply to ${comment.commentId}`, {
+                    content,
+                    isPrivate,
+                  });
+                }}
+                onToggleVisibility={() => {
+                  setInternalComments((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(comment.commentId)) {
+                      next.delete(comment.commentId);
+                    } else {
+                      next.add(comment.commentId);
+                    }
+                    return next;
+                  });
+                }}
+                onUpdate={({ content }) => {
+                  // biome-ignore lint/suspicious/noConsole: story demo
+                  console.log(`Update ${comment.commentId}`, content);
+                }}
+                postId="post-1"
+                postSlug="post-1"
+              />
+            </ActivityTimelineItem>
           ))}
-        </Timeline>
+        </ActivityTimeline>
       </div>
     </div>
   );
