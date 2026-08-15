@@ -13,7 +13,11 @@ import {
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { MenuItem } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
-import { Link01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import {
+  GithubIcon,
+  Link01Icon,
+  PlusSignIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@tanstack/react-store";
 import * as Option from "effect/Option";
@@ -69,6 +73,34 @@ function GitHubPostResourceActionsContent({
 }) {
   const [action, setAction] = useState<GitHubPostAction>(null);
   const refreshPostExternalResources = usePostExternalResourceRefresh();
+  const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
+  const hasActiveConnection = AsyncResult.match(connectionsResult, {
+    onInitial: () => null as boolean | null,
+    onFailure: ({ previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => false,
+        onSome: ({ value }) =>
+          value.some((connection) => connection.lifecycle === "active"),
+      }),
+    onSuccess: ({ value }) =>
+      value.some((connection) => connection.lifecycle === "active"),
+  });
+
+  // While the installations are still loading, render nothing so the menu
+  // never flashes a stale or "not connected" state.
+  if (hasActiveConnection === null) {
+    return null;
+  }
+  // Without an active installation the issue actions would dead-end in an
+  // empty dialog, so surface a single muted status row instead.
+  if (!hasActiveConnection) {
+    return (
+      <MenuItem disabled>
+        <HugeiconsIcon icon={GithubIcon} />
+        GitHub not connected
+      </MenuItem>
+    );
+  }
   return (
     <>
       <MenuItem onClick={() => setAction("create")}>

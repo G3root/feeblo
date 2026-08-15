@@ -190,6 +190,10 @@ function RouteComponent() {
           <div className="space-y-4 lg:sticky lg:top-0">
             <PostSidebarActions />
 
+            <div>
+              <Separator />
+            </div>
+
             {githubResourcesPolicy.isPending ||
             !githubResourcesPolicy.allowed ? null : (
               <PostExternalResources
@@ -203,6 +207,10 @@ function RouteComponent() {
                 postId={post.id}
               />
             )}
+
+            <div>
+              <Separator />
+            </div>
 
             {/* Each field self-gates with the permission the backend enforces
                 (PostPolicy.canUpdateProperties): status → posts.status,

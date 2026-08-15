@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
-import { LinkSquare02Icon } from "@hugeicons/core-free-icons";
+import { Link03Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
@@ -71,12 +71,12 @@ export function PostExternalResources({
                   <Button
                     aria-label="Linked resource actions"
                     className="rounded-full"
-                    size="icon-sm"
+                    size="icon-xs"
                     variant="outline"
                   />
                 }
               >
-                <HugeiconsIcon icon={LinkSquare02Icon} />
+                <HugeiconsIcon icon={Link03Icon} />
               </MenuTrigger>
               <MenuPopup align="end">{actions}</MenuPopup>
             </Menu>
