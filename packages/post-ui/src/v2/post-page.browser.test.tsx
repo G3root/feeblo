@@ -43,11 +43,7 @@ vi.mock("./upvote-toggle", () => ({
   ),
 }));
 vi.mock("./subscribe-toggle", () => ({
-  SubscribeButton: ({ variant }: { variant?: string }) => (
-    <button type="button">
-      {variant === "compact" ? "compact subscribe" : "subscribe"}
-    </button>
-  ),
+  SubscribeButton: () => <button type="button">subscribe</button>,
 }));
 
 const board = { visibility: "PUBLIC" } as TBoard;

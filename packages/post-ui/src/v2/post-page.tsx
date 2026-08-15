@@ -124,14 +124,6 @@ function CompactVote() {
   return <UpvoteButton variant="compact" />;
 }
 
-function Subscribe() {
-  return <SubscribeButton />;
-}
-
-function SubscribeCompact() {
-  return <SubscribeButton variant="compact" />;
-}
-
 function PublicCommentComposer() {
   return <PostCommentComposer defaultVisibility="PUBLIC" />;
 }
@@ -156,8 +148,7 @@ export const PostPage = {
   PublicCommentComposer,
   Reactions,
   Root,
-  Subscribe,
-  SubscribeCompact,
+  Subscribe: SubscribeButton,
   Title,
   Unlocked,
   Vote,

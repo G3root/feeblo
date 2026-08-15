@@ -7,6 +7,12 @@
     "./editor": "./src/editor/index.tsx",
     "./editor/editor-store": "./src/editor/editor-store.ts",
     "./utils": "./src/utils.ts",
+    "./hooks/form": "./src/hooks/form.tsx",
+    "./hooks/use-clipboard": "./src/hooks/use-clipboard.ts",
+    "./hooks/use-as-ref": "./src/hooks/use-as-ref.ts",
+    "./hooks/use-isomorphic-layout-effect": "./src/hooks/use-isomorphic-layout-effect.ts",
+    "./hooks/use-lazy-ref": "./src/hooks/use-lazy-ref.ts",
+    "./hooks/use-media-query": "./src/hooks/use-media-query.ts",
     "./hooks/*": "./src/hooks/*.tsx",
     "./*": "./src/*.tsx"
   },

@@ -157,7 +157,6 @@ function RouteComponent() {
               <PostPage.Reactions />
 
               <div className="flex items-center gap-2">
-                <PostPage.Subscribe />
                 <PostPage.Vote />
               </div>
             </div>
@@ -234,6 +233,12 @@ function RouteComponent() {
             </div>
 
             <PostDetails author={post.user?.name} createdAt={post.createdAt} />
+
+            <div>
+              <Separator />
+            </div>
+
+            <PostPage.Subscribe fullWidth variant="default" />
           </div>
         </aside>
       </div>
