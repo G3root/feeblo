@@ -91,7 +91,8 @@ export type PostCreationSource =
   | "board_empty_state"
   | "board_list"
   | "dashboard"
-  | "public_portal";
+  | "public_portal"
+  | "roadmap";
 
 export type AnalyticsEventName = keyof AnalyticsEvents;
 
