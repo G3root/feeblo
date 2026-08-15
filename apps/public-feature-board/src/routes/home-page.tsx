@@ -460,7 +460,7 @@ function HomePage() {
               <CardPanel className="px-0 py-0">
                 {filteredPosts.length === 0 ? (
                   <div className="p-5">
-                    <Empty className="border">
+                    <Empty>
                       <EmptyHeader>
                         <EmptyTitle>No matching feedback</EmptyTitle>
                         <EmptyDescription>
