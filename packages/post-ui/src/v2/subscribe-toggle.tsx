@@ -1,7 +1,6 @@
 import { PostSubscriptionId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { anchoredToastManager, toastManager } from "@feeblo/ui/toast";
-import { cn } from "@feeblo/ui/utils";
 import { getPostSubscriptionCollectionKey } from "@feeblo/web-shared/reaction-keys";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { BellIcon, BellOffIcon } from "@hugeicons/core-free-icons";
@@ -29,10 +28,7 @@ const ANCHORED_SUBSCRIBE_TOAST_ID = "post-subscribe";
  * local collection immediately flips the button state, while the collection's
  * `onInsert`/`onDelete` handlers persist the change to the backend.
  */
-export function SubscribeButton({
-  fullWidth = false,
-  variant = "default",
-}: SubscribeButtonProps) {
+export function SubscribeButton({ variant = "default" }: SubscribeButtonProps) {
   const { isLocked, organizationId, post } = usePostCollectionData();
   const { data: session } = useAuthState();
   const {
@@ -174,7 +170,6 @@ export function SubscribeButton({
     <Button
       aria-label={label}
       aria-pressed={isSubscribed}
-      className={cn("gap-1.5 rounded-full", fullWidth && "w-full")}
       disabled={disabled}
       onClick={onToggle}
       ref={buttonRef}

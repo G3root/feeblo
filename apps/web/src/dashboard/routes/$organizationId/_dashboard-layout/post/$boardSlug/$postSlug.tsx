@@ -238,7 +238,14 @@ function RouteComponent() {
               <Separator />
             </div>
 
-            <PostPage.Subscribe fullWidth variant="default" />
+            <div className="flex flex-col gap-1.5">
+              <h2 className="font-semibold text-sm">Subscribe to post</h2>
+              <p className="text-pretty text-muted-foreground text-xs">
+                Subscribe to receive future updates on the post by email
+              </p>
+            </div>
+
+            <PostPage.Subscribe variant="default" />
           </div>
         </aside>
       </div>
