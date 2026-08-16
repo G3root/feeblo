@@ -50,6 +50,7 @@ export function BoardPostsEmpty({
                     },
                   })
                 }
+                variant="brand"
               >
                 Create post
               </Button>

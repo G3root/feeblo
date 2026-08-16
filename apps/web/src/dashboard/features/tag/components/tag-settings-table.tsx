@@ -102,10 +102,6 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   if (tags.length === 0) {
     return (
       <section className="space-y-6">
-        <TagTableActions
-          onCreate={handleCreate}
-          organizationId={organizationId}
-        />
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -121,6 +117,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
                   disabled={!allowed}
                   onClick={handleCreate}
                   type="button"
+                  variant="brand"
                 >
                   <HugeiconsIcon icon={Plus} />
                   <span>Create tag</span>

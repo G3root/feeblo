@@ -157,6 +157,7 @@ function WebhooksSettingsContent({
               <Button
                 onClick={() => createDialogStore.send({ type: "toggle" })}
                 type="button"
+                variant="brand"
               >
                 <HugeiconsIcon icon={Plus} />
                 New endpoint

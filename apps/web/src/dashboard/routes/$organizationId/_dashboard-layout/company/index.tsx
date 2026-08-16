@@ -125,6 +125,7 @@ function CompanyPage() {
                   disabled={!allowed}
                   onClick={openCreateDialog}
                   type="button"
+                  variant="brand"
                 >
                   <HugeiconsIcon icon={Building02Icon} />
                   Create company
@@ -146,6 +147,7 @@ function CompanyPage() {
               disabled={!allowed}
               onClick={openCreateDialog}
               type="button"
+              variant="brand"
             >
               <HugeiconsIcon icon={Building02Icon} />
               Create company

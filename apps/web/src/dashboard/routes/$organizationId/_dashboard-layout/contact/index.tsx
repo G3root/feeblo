@@ -154,6 +154,7 @@ function ContactPage() {
                   disabled={!allowed}
                   onClick={openCreateDialog}
                   type="button"
+                  variant="brand"
                 >
                   <HugeiconsIcon icon={UserAdd01Icon} />
                   Create contact
@@ -175,6 +176,7 @@ function ContactPage() {
               disabled={!allowed}
               onClick={openCreateDialog}
               type="button"
+              variant="brand"
             >
               <HugeiconsIcon icon={UserAdd01Icon} />
               Create contact

@@ -159,12 +159,16 @@ function RouteComponent() {
             data: { source: "dashboard", status: "PENDING" },
           })
         }
+        variant="brand"
       >
         <HugeiconsIcon icon={Plus} />
         Create your first post
       </Button>
     ) : (
-      <Button onClick={() => createBoardStore.send({ type: "toggle" })}>
+      <Button
+        onClick={() => createBoardStore.send({ type: "toggle" })}
+        variant="brand"
+      >
         <HugeiconsIcon icon={Plus} />
         Create your first board
       </Button>

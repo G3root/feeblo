@@ -99,10 +99,6 @@ export function ChangelogCategorySettingsTable() {
   if (categories.length === 0) {
     return (
       <section className="space-y-6">
-        <CategoryTableActions
-          disabled={false}
-          onSelectCategory={handleCreate}
-        />
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -125,6 +121,7 @@ export function ChangelogCategorySettingsTable() {
                   disabled={!allowed}
                   onClick={handleCreate}
                   type="button"
+                  variant="brand"
                 >
                   <HugeiconsIcon icon={Plus} />
                   <span>Create category</span>
@@ -204,6 +201,7 @@ function CategoryTableActions({
               disabled={!allowed || disabled}
               onClick={onSelectCategory}
               type="button"
+              variant="brand"
             >
               <HugeiconsIcon icon={Plus} />
               <span>New category</span>

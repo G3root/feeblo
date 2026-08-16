@@ -13,13 +13,19 @@ function SubscribeButton({
   label,
   type = "submit",
   children,
+  variant = "brand",
   ...props
 }: SubscribeButtonProps) {
   const form = useFormContext();
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (
-        <Button {...props} disabled={isSubmitting} type={type}>
+        <Button
+          {...props}
+          disabled={isSubmitting}
+          type={type}
+          variant={variant}
+        >
           {children ?? label}
         </Button>
       )}

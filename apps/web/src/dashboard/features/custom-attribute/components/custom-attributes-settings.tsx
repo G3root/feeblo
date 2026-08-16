@@ -1,12 +1,6 @@
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
-  Menu,
-  MenuPopup,
-  MenuItem,
-  MenuTrigger,
-} from "@feeblo/ui/menu";
-import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -14,6 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import {
   Table,
@@ -23,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@feeblo/ui/table";
-import { Tabs, TabsPanel, TabsList, TabsTab } from "@feeblo/ui/tabs";
+import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import {
   Building03Icon,
   Contact01Icon,
@@ -192,7 +187,6 @@ function AttributeList({
   if (!attributes || attributes.length === 0) {
     return (
       <section className="space-y-6">
-        <AttributeActions onCreate={onCreate} />
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -205,7 +199,7 @@ function AttributeList({
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={onCreate} type="button">
+            <Button onClick={onCreate} type="button" variant="brand">
               <HugeiconsIcon icon={Plus} />
               Create attribute
             </Button>
@@ -279,7 +273,7 @@ function AttributeActions({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex justify-end">
       <SkeletonWrapper>
-        <Button onClick={onCreate} type="button">
+        <Button onClick={onCreate} type="button" variant="brand">
           <HugeiconsIcon icon={Plus} />
           New attribute
         </Button>

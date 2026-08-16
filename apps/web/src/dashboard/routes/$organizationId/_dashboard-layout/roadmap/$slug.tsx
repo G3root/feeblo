@@ -135,15 +135,6 @@ function RoadmapDetailActions({
       {({ allowed }) => (
         <div className="flex shrink-0 items-center gap-2">
           <Button
-            disabled={!allowed}
-            onClick={() => createStore.send({ type: "toggle" })}
-            size="sm"
-            variant="default"
-          >
-            <HugeiconsIcon icon={Plus} />
-            New Roadmap
-          </Button>
-          <Button
             aria-label={
               isPrivate ? "Make roadmap public" : "Make roadmap private"
             }
@@ -174,6 +165,16 @@ function RoadmapDetailActions({
             variant="destructive-outline"
           >
             <HugeiconsIcon icon={Delete02Icon} />
+          </Button>
+
+          <Button
+            disabled={!allowed}
+            onClick={() => createStore.send({ type: "toggle" })}
+            size="sm"
+            variant="brand"
+          >
+            <HugeiconsIcon icon={Plus} />
+            New Roadmap
           </Button>
         </div>
       )}

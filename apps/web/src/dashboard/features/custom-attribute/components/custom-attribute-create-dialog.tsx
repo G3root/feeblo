@@ -242,7 +242,7 @@ function CustomAttributeCreateForm({
       </SheetPanel>
       <SheetFooter>
         <form.AppForm>
-          <form.SubscribeButton label="Create attribute" />
+          <form.SubscribeButton label="Create attribute" variant="brand" />
         </form.AppForm>
       </SheetFooter>
     </form>

@@ -128,7 +128,7 @@ function WebhookEditForm() {
       <SheetFooter>
         <SheetClose render={<Button variant="ghost" />}>Cancel</SheetClose>
         <form.AppForm>
-          <form.SubscribeButton label="Save changes" />
+          <form.SubscribeButton label="Save changes" variant="brand" />
         </form.AppForm>
       </SheetFooter>
     </form>

@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
 import { Card, CardPanel } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
-import { LockKeyIcon } from "@hugeicons/core-free-icons";
+import { LockedIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
 import { useRouter } from "@tanstack/react-router";
 import * as Option from "effect/Option";
@@ -26,7 +26,7 @@ export type IntegrationConfigureRoute =
 /**
  * Provider-specific wiring for one integration card. Declared once per
  * provider as a module-level constant so the card itself stays generic and
- * every provider shares the same connection, entitlements, and layout logic.
+ * every provider shares the same connection, connect flow, and layout logic.
  */
 export type IntegrationCardConfig<C extends IntegrationConnection> = {
   readonly name: string;
@@ -237,7 +237,7 @@ function ProLockedButton({
       onClick={() => upgradePlanStore.send({ type: "toggle" })}
       variant="outline"
     >
-      <HugeiconsIcon icon={LockKeyIcon} />
+      <HugeiconsIcon icon={LockedIcon} />
       Upgrade
     </Button>
   );

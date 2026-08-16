@@ -343,7 +343,9 @@ export function PostCreateForm() {
         </div>
         <div className="flex items-center justify-end gap-3">
           <PostCreateMoreField form={form} />
-          <Button type="submit">Create Post</Button>
+          <Button type="submit" variant="brand">
+            Create Post
+          </Button>
         </div>
       </DialogFooter>
     </form>
