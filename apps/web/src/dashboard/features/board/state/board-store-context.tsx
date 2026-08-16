@@ -181,6 +181,15 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
           ),
         };
       },
+      deselectPosts: (context, event: { postIds: string[] }) => {
+        const idsToRemove = new Set(event.postIds);
+        return {
+          ...context,
+          selectedPosts: context.selectedPosts.filter(
+            ({ postId }) => !idsToRemove.has(postId)
+          ),
+        };
+      },
       selectPosts: (context, event: { posts: SelectedBoardPost[] }) => {
         const selected = new Map(
           context.selectedPosts.map((entry) => [entry.postId, entry])

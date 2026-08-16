@@ -9,6 +9,7 @@ import {
   ContextMenu,
   ContextMenuItem,
   ContextMenuPopup,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@feeblo/ui/context-menu";
 import {
@@ -22,11 +23,15 @@ import {
   ArrowUp01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useBoardStore } from "~/features/board/state/board-store-context";
+import { memo } from "react";
+import {
+  useBoardStore,
+  useSelectedPosts,
+} from "~/features/board/state/board-store-context";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
-import type { BoardPostLane } from "./types";
+import type { BoardPostLane, BoardPostRow } from "./types";
 
 export function BoardListView({
   organizationId,
@@ -37,8 +42,6 @@ export function BoardListView({
   boardId?: string;
   groupedPosts: BoardPostLane[];
 }) {
-  const store = useBoardStore();
-
   return (
     <section>
       <Accordion
@@ -47,75 +50,160 @@ export function BoardListView({
         multiple
       >
         {groupedPosts.map((lane) => (
-          <AccordionPrimitive.Item key={lane.statusId} value={lane.statusId}>
-            <ContextMenu>
-              <ContextMenuTrigger className="block">
-                <div className="relative">
-                  <AccordionTrigger className="group/accordion-trigger rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-indicator]:hidden">
-                    <div className="flex items-center gap-2">
-                      <HugeiconsIcon
-                        className="size-4 text-muted-foreground group-aria-expanded/accordion-trigger:hidden"
-                        icon={ArrowDown01Icon}
-                        strokeWidth={2}
-                      />
-                      <HugeiconsIcon
-                        className="hidden size-4 text-muted-foreground group-aria-expanded/accordion-trigger:inline"
-                        icon={ArrowUp01Icon}
-                        strokeWidth={2}
-                      />
-                      <StatusIcon status={lane.status} />
-                      <h3 className="font-medium text-sm">
-                        {getBoardStatusLabel(lane.status)}
-                      </h3>
-                      <span className="text-muted-foreground text-xs">
-                        {lane.posts.length}
-                      </span>
-                    </div>
-                  </AccordionTrigger>
-
-                  <PolicyGuard policy={hasMembership(organizationId)}>
-                    {({ allowed }) => (
-                      <AddPostButton
-                        boardId={boardId}
-                        disabled={!allowed}
-                        status={lane.status}
-                        statusId={lane.statusId}
-                      />
-                    )}
-                  </PolicyGuard>
-                </div>
-              </ContextMenuTrigger>
-
-              <ContextMenuPopup align="start">
-                <ContextMenuItem
-                  disabled={lane.posts.length === 0}
-                  onClick={() => {
-                    store.send({
-                      type: "selectPosts",
-                      posts: lane.posts.map((post) => ({
-                        boardId: post.boardId,
-                        postId: post.id,
-                      })),
-                    });
-                  }}
-                >
-                  Select all posts in this lane
-                </ContextMenuItem>
-              </ContextMenuPopup>
-            </ContextMenu>
-            <AccordionPanel className="h-auto px-0 pb-0">
-              {lane.posts.map((post) => (
-                <BoardPostRowItem
-                  key={post.id}
-                  organizationId={organizationId}
-                  post={post}
-                />
-              ))}
-            </AccordionPanel>
-          </AccordionPrimitive.Item>
+          <BoardListLane
+            boardId={boardId}
+            key={lane.statusId}
+            lane={lane}
+            organizationId={organizationId}
+          />
         ))}
       </Accordion>
     </section>
+  );
+}
+
+const BoardListLane = memo(function BoardListLane({
+  boardId,
+  lane,
+  organizationId,
+}: {
+  boardId?: string;
+  lane: BoardPostLane;
+  organizationId: string;
+}) {
+  return (
+    <AccordionPrimitive.Item value={lane.statusId}>
+      <BoardListLaneHeader
+        boardId={boardId}
+        lane={lane}
+        organizationId={organizationId}
+      />
+      <AccordionPanel className="h-auto px-0 pb-0">
+        {lane.posts.map((post) => (
+          <BoardPostRowItem
+            key={post.id}
+            organizationId={organizationId}
+            post={post}
+          />
+        ))}
+      </AccordionPanel>
+    </AccordionPrimitive.Item>
+  );
+});
+
+function BoardListLaneHeader({
+  boardId,
+  lane,
+  organizationId,
+}: {
+  boardId?: string;
+  lane: BoardPostLane;
+  organizationId: string;
+}) {
+  const store = useBoardStore();
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger className="block">
+        <div className="relative">
+          <AccordionTrigger className="group/accordion-trigger rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-indicator]:hidden">
+            <div className="flex items-center gap-2">
+              <HugeiconsIcon
+                className="size-4 text-muted-foreground group-aria-expanded/accordion-trigger:hidden"
+                icon={ArrowDown01Icon}
+                strokeWidth={2}
+              />
+              <HugeiconsIcon
+                className="hidden size-4 text-muted-foreground group-aria-expanded/accordion-trigger:inline"
+                icon={ArrowUp01Icon}
+                strokeWidth={2}
+              />
+              <StatusIcon status={lane.status} />
+              <h3 className="font-medium text-sm">
+                {getBoardStatusLabel(lane.status)}
+              </h3>
+              <span className="text-muted-foreground text-xs">
+                {lane.posts.length}
+              </span>
+              <LaneSelectedCounter posts={lane.posts} />
+            </div>
+          </AccordionTrigger>
+
+          <PolicyGuard policy={hasMembership(organizationId)}>
+            {({ allowed }) => (
+              <AddPostButton
+                boardId={boardId}
+                disabled={!allowed}
+                status={lane.status}
+                statusId={lane.statusId}
+              />
+            )}
+          </PolicyGuard>
+        </div>
+      </ContextMenuTrigger>
+
+      <ContextMenuPopup align="start">
+        <ContextMenuItem
+          disabled={lane.posts.length === 0}
+          onClick={() => {
+            store.send({
+              type: "selectPosts",
+              posts: lane.posts.map((post) => ({
+                boardId: post.boardId,
+                postId: post.id,
+              })),
+            });
+          }}
+        >
+          Select all posts in this lane
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <LaneUnselectMenuItem posts={lane.posts} />
+      </ContextMenuPopup>
+    </ContextMenu>
+  );
+}
+
+function LaneSelectedCounter({ posts }: { posts: BoardPostRow[] }) {
+  const selectedCount = useLaneSelectedCount(posts);
+
+  if (selectedCount === 0) {
+    return null;
+  }
+
+  return (
+    <span className="hidden group-aria-expanded/accordion-trigger:flex">
+      {selectedCount}
+    </span>
+  );
+}
+
+function LaneUnselectMenuItem({ posts }: { posts: BoardPostRow[] }) {
+  const store = useBoardStore();
+  const selectedCount = useLaneSelectedCount(posts);
+
+  return (
+    <ContextMenuItem
+      disabled={selectedCount === 0}
+      onClick={() => {
+        store.send({
+          type: "deselectPosts",
+          postIds: posts.map((post) => post.id),
+        });
+      }}
+    >
+      Unselect all posts in this lane
+    </ContextMenuItem>
+  );
+}
+
+function useLaneSelectedCount(posts: BoardPostRow[]) {
+  const selectedPosts = useSelectedPosts();
+  const selectedIds = new Set(selectedPosts.map((entry) => entry.postId));
+
+  return posts.reduce(
+    (count, post) => count + (selectedIds.has(post.id) ? 1 : 0),
+    0
   );
 }
 
