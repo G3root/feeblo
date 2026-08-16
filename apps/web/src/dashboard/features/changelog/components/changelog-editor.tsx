@@ -440,7 +440,7 @@ export function ChangelogEditorCoverImageField() {
                       onClick={() => inputRef.current?.click()}
                       size="sm"
                       type="button"
-                      variant="outline"
+                      variant="destructive"
                     >
                       {isUploading ? (
                         <Spinner className="size-4" />
@@ -455,7 +455,7 @@ export function ChangelogEditorCoverImageField() {
                       onClick={removeCoverImage}
                       size="sm"
                       type="button"
-                      variant="outline"
+                      variant="destructive"
                     >
                       <HugeiconsIcon icon={ImageRemove01Icon} />
                       Remove
@@ -548,6 +548,7 @@ export function ChangelogEditorSubmitAction() {
                 })
               }
               type="button"
+              variant="brand"
             >
               Turn into draft
             </Button>

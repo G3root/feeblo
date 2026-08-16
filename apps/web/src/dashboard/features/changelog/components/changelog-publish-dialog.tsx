@@ -57,7 +57,7 @@ export function ChangelogPublishDialog({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} type="button">
+      <Button onClick={() => setOpen(true)} type="button" variant="brand">
         {triggerLabel}
       </Button>
       <AlertDialog onOpenChange={setOpen} open={open}>
@@ -93,11 +93,14 @@ export function ChangelogPublishDialog({
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isSubmitting}>
+              Cancel
+            </AlertDialogCancel>
             <Button
               disabled={isSubmitting}
               onClick={handleSubmit}
               type="button"
+              variant="brand"
             >
               Save
             </Button>
