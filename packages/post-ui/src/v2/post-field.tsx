@@ -177,7 +177,9 @@ export function PostBoardSelect({
                   />
                   {value.label}
                 </>
-              ) : null}
+              ) : (
+                <span className="text-muted-foreground">Select board</span>
+              )}
             </span>
           )}
         </ComboboxValue>
