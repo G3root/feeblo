@@ -4,6 +4,7 @@ import {
   AccordionPanel,
   AccordionTrigger,
 } from "@feeblo/ui/accordion";
+import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
   ContextMenu,
@@ -172,9 +173,13 @@ function LaneSelectedCounter({ posts }: { posts: BoardPostRow[] }) {
   }
 
   return (
-    <span className="hidden group-aria-expanded/accordion-trigger:flex">
+    <Badge
+      className="rounded-full group-aria-expanded/accordion-trigger:hidden"
+      size="sm"
+      variant="default"
+    >
       {selectedCount}
-    </span>
+    </Badge>
   );
 }
 
