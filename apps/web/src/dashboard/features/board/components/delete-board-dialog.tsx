@@ -1,13 +1,13 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -33,17 +33,17 @@ export function DeleteBoardDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={async () => {
               try {
                 const id = store.get().context.data.boardId;
-                store.send({ type: "toggle" });
                 const tx = boardCollection.delete(id);
                 await tx.isPersisted.promise;
                 toastManager.add({
                   title: "Board deleted successfully",
                   type: "success",
                 });
+                store.send({ type: "toggle" });
               } catch (_error) {
                 toastManager.add({
                   title: "Failed to delete board",
@@ -51,9 +51,11 @@ export function DeleteBoardDialog() {
                 });
               }
             }}
+            type="button"
+            variant="destructive"
           >
             Continue
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
