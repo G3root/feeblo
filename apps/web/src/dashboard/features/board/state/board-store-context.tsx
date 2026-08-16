@@ -181,6 +181,20 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
           ),
         };
       },
+      selectPosts: (context, event: { posts: SelectedBoardPost[] }) => {
+        const selected = new Map(
+          context.selectedPosts.map((entry) => [entry.postId, entry])
+        );
+
+        for (const post of event.posts) {
+          selected.set(post.postId, post);
+        }
+
+        return {
+          ...context,
+          selectedPosts: [...selected.values()],
+        };
+      },
       togglePostSelection: (
         context,
         event: { boardId: string; checked?: boolean; postId: string }
