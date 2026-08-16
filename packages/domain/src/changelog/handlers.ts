@@ -123,6 +123,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           userId: session.session.userId,
           content: sanitizedMarkdown,
           assetIds: args.assetIds,
+          coverImageUrl: args.coverImage,
         });
         const isMember = Policy.getMembership(session, args.organizationId);
 
@@ -131,6 +132,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             yield* repository.create({
               ...args,
               content: prepared.content,
+              coverImage: prepared.coverImage,
               creatorId: session.session.userId,
               ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
               excerpt: htmlToExcerpt(sanitizedHtml),
@@ -149,6 +151,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               userId: session.session.userId,
               content: prepared.content,
               assetIds: args.assetIds,
+              coverImageUrl: prepared.coverImage,
             });
             return createdOutboxId;
           })
@@ -201,6 +204,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           userId: session.session.userId,
           content: sanitizedMarkdown,
           assetIds: args.assetIds,
+          coverImageUrl: args.coverImage,
         });
 
         const outboxId = yield* transaction(
@@ -212,6 +216,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             yield* repository.update({
               ...args,
               content: prepared.content,
+              coverImage: prepared.coverImage,
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
             const createdOutboxId =
@@ -228,6 +233,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               userId: session.session.userId,
               content: prepared.content,
               assetIds: args.assetIds,
+              coverImageUrl: prepared.coverImage,
             });
             return createdOutboxId;
           })

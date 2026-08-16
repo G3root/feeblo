@@ -157,6 +157,15 @@ export function ChangeLogDetailPage() {
         </ChangelogStickyRail>
 
         <ChangelogTimelineBody className="space-y-8">
+          {changelog.coverImage ? (
+            <img
+              alt=""
+              className="aspect-[16/7] w-full rounded-xl border object-cover"
+              height={525}
+              src={changelog.coverImage}
+              width={1200}
+            />
+          ) : null}
           <header className="space-y-4">
             <p className="font-medium text-muted-foreground text-sm tracking-tight">
               {formatChangelogDate(

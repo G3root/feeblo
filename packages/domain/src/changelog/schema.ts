@@ -8,6 +8,7 @@ export type TChangelogStatus = S.Schema.Type<typeof ChangelogStatus>;
 
 export const Changelog = S.Struct({
   assetIds: S.optional(S.Array(S.String)),
+  coverImage: S.NullOr(S.String),
   id: S.String,
   title: S.String,
   slug: S.String,
@@ -35,10 +36,21 @@ export const ChangelogList = S.Struct({
 
 export type TChangelogList = S.Schema.Type<typeof ChangelogList>;
 
+const COVER_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+const COVER_IMAGE_URL_MAX_LENGTH = 2048;
+
+const coverImageWithDefault = S.NullOr(
+  S.String.pipe(
+    S.check(S.isPattern(COVER_IMAGE_URL_PATTERN)),
+    S.check(S.isMaxLength(COVER_IMAGE_URL_MAX_LENGTH))
+  )
+).pipe(S.withDecodingDefaultKey(Effect.succeed(null)));
+
 export const ChangelogCreate = S.Struct({
   assetIds: S.Array(S.String).pipe(
     S.withDecodingDefaultKey(Effect.succeed([] as string[]))
   ),
+  coverImage: coverImageWithDefault,
   id: ChangelogId.schema,
   title: S.String,
   slug: S.String,
@@ -55,6 +67,7 @@ export const ChangelogUpdate = S.Struct({
   assetIds: S.Array(S.String).pipe(
     S.withDecodingDefaultKey(Effect.succeed([] as string[]))
   ),
+  coverImage: coverImageWithDefault,
   id: ChangelogId.schema,
   title: S.String,
   slug: S.String,

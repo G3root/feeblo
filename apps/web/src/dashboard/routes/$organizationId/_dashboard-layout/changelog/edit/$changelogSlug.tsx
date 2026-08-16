@@ -14,6 +14,7 @@ import {
   ChangelogEditorBackLink,
   ChangelogEditorCategoryField,
   ChangelogEditorContentField,
+  ChangelogEditorCoverImageField,
   ChangelogEditorDetails,
   ChangelogEditorForm,
   ChangelogEditorProvider,
@@ -133,6 +134,7 @@ function RouteComponent() {
                   <ChangelogEditorBackLink />
                 </ChangelogEditor.Header>
 
+                <ChangelogEditorCoverImageField />
                 <ChangelogEditorTitleField />
                 <ChangelogEditorContentField />
                 <ChangelogCompletedPosts organizationId={organizationId} />

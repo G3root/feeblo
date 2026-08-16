@@ -128,6 +128,7 @@ describe("ChangelogRpcHandlers", () => {
         yield* handlers
           .ChangelogCreate({
             assetIds: [],
+            coverImage: null,
             id,
             organizationId: fixture.organizationId,
             title: "Release",
@@ -177,6 +178,7 @@ describe("ChangelogRpcHandlers", () => {
           yield* handlers
             .ChangelogCreate({
               assetIds: [assetId],
+              coverImage: null,
               id,
               organizationId: fixture.organizationId,
               title: "Release",
@@ -224,6 +226,163 @@ describe("ChangelogRpcHandlers", () => {
           ]);
         })
     );
+    it.effect(
+      "persists a promoted cover image and keeps its asset referenced",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ChangelogRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+          const id = yield* ChangelogId.generate;
+          const assetId = `asset_${id}`;
+          const temporaryUrl =
+            "https://assets.example/tmp/editor-media/cover.png";
+          const permanentUrl = "https://assets.example/editor-media/cover.png";
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: "test-bucket",
+            key: "tmp/editor-media/user/cover.png",
+            url: temporaryUrl,
+            kind: "editor_image",
+            userId: fixture.userId,
+          });
+          yield* db.insert(schema.siteTable).values({
+            id: `site_${id}`,
+            name: "Test site",
+            subdomain: `site-${id}`,
+            changelogVisibility: "PUBLIC",
+            organizationId: fixture.organizationId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          yield* handlers
+            .ChangelogCreate({
+              assetIds: [assetId],
+              coverImage: temporaryUrl,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Release",
+              slug: "release",
+              content: "Body",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: new Date(),
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(S3UploadService, {
+                uploadProfileImage: () => Effect.die("not used in this test"),
+                uploadOrganizationLogo: () =>
+                  Effect.die("not used in this test"),
+                uploadEditorMedia: () => Effect.die("not used in this test"),
+                promoteEditorMedia: ({ bucket }) =>
+                  Effect.succeed({
+                    bucket,
+                    key: "editor-media/user/cover.png",
+                    url: permanentUrl,
+                  }),
+                deleteObject: () =>
+                  Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
+              })
+            );
+
+          const [entry] = yield* db
+            .select({ coverImage: schema.changelogTable.coverImage })
+            .from(schema.changelogTable)
+            .where(eq(schema.changelogTable.id, id));
+          const references = yield* db
+            .select()
+            .from(schema.changelogAssetTable)
+            .where(eq(schema.changelogAssetTable.changelogId, id));
+          const listed = yield* handlers
+            .ChangelogListPublic({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          expect(entry?.coverImage).toBe(permanentUrl);
+          expect(references).toEqual([{ changelogId: id, assetId }]);
+          expect(listed[0]?.coverImage).toBe(permanentUrl);
+
+          // Simulate a re-save after a client reload: the cover asset id is
+          // unknown (assetIds empty) but the cover URL is unchanged, so the
+          // reference must survive so the asset is not garbage collected.
+          yield* handlers
+            .ChangelogUpdate({
+              assetIds: [],
+              coverImage: permanentUrl,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Release",
+              slug: "release",
+              content: "Body",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: new Date(),
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const referencesAfterResave = yield* db
+            .select()
+            .from(schema.changelogAssetTable)
+            .where(eq(schema.changelogAssetTable.changelogId, id));
+          expect(referencesAfterResave).toEqual([{ changelogId: id, assetId }]);
+
+          // Removing the cover image prunes the reference again.
+          yield* handlers
+            .ChangelogUpdate({
+              assetIds: [],
+              coverImage: null,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Release",
+              slug: "release",
+              content: "Body",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: new Date(),
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const referencesAfterRemove = yield* db
+            .select()
+            .from(schema.changelogAssetTable)
+            .where(eq(schema.changelogAssetTable.changelogId, id));
+          expect(referencesAfterRemove).toEqual([]);
+
+          // A cover URL that matches no caller-owned asset is retained
+          // verbatim, but produces no asset reference (there is nothing to
+          // keep alive).
+          const unmatchedCoverUrl =
+            "https://assets.example/unmatched/cover.png";
+          yield* handlers
+            .ChangelogUpdate({
+              assetIds: [],
+              coverImage: unmatchedCoverUrl,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Release",
+              slug: "release",
+              content: "Body",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: new Date(),
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [entryAfterUnmatched] = yield* db
+            .select({ coverImage: schema.changelogTable.coverImage })
+            .from(schema.changelogTable)
+            .where(eq(schema.changelogTable.id, id));
+          const referencesAfterUnmatched = yield* db
+            .select()
+            .from(schema.changelogAssetTable)
+            .where(eq(schema.changelogAssetTable.changelogId, id));
+          expect(entryAfterUnmatched?.coverImage).toBe(unmatchedCoverUrl);
+          expect(referencesAfterUnmatched).toEqual([]);
+        })
+    );
     it.effect("removes promoted media when the transaction fails", () =>
       Effect.gen(function* () {
         const deletedKeys = yield* Ref.make<string[]>([]);
@@ -255,6 +414,7 @@ describe("ChangelogRpcHandlers", () => {
           handlers
             .ChangelogCreate({
               assetIds: [assetId],
+              coverImage: null,
               id,
               organizationId: fixture.organizationId,
               title: "Duplicate",
@@ -306,142 +466,153 @@ describe("ChangelogRpcHandlers", () => {
       })
     );
 
-    it.effect("records one email intent when a changelog is first published", () =>
-      Effect.gen(function* () {
-        const handlers = yield* ChangelogRpcHandlersEffect;
-        const outbox = yield* EmailOutboxRepository;
-        const fixture = yield* makeFixture();
-        const id = yield* ChangelogId.generate;
-        const session = makeSession(fixture);
+    it.effect(
+      "records one email intent when a changelog is first published",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ChangelogRpcHandlersEffect;
+          const outbox = yield* EmailOutboxRepository;
+          const fixture = yield* makeFixture();
+          const id = yield* ChangelogId.generate;
+          const session = makeSession(fixture);
 
-        yield* handlers
-          .ChangelogCreate({
-            assetIds: [],
-            id,
-            organizationId: fixture.organizationId,
-            title: "Published release",
-            slug: "published-release",
-            content: "First publication",
-            status: "published",
-            scheduledAt: null,
-            publishedAt: new Date(),
-          })
-          .pipe(Effect.provideService(CurrentSession, session));
-
-        const intents = yield* outbox.findPending({
-          before: new Date(Date.now() + 60_000),
-          organizationId: fixture.organizationId,
-        });
-        expect(intents.map(({ kind }) => kind)).toEqual([
-          "changelog.published",
-        ]);
-      })
-    );
-
-    it.effect("does not send publication again when an already-published changelog is edited", () =>
-      Effect.gen(function* () {
-        const handlers = yield* ChangelogRpcHandlersEffect;
-        const outbox = yield* EmailOutboxRepository;
-        const fixture = yield* makeFixture();
-        const id = yield* ChangelogId.generate;
-        const session = makeSession(fixture);
-        const publishedAt = new Date();
-
-        yield* handlers
-          .ChangelogCreate({
-            assetIds: [],
-            id,
-            organizationId: fixture.organizationId,
-            title: "Draft release",
-            slug: "draft-release",
-            content: "Draft",
-            status: "draft",
-            scheduledAt: null,
-            publishedAt: null,
-          })
-          .pipe(Effect.provideService(CurrentSession, session));
-        yield* handlers
-          .ChangelogUpdate({
-            assetIds: [],
-            id,
-            organizationId: fixture.organizationId,
-            title: "Published release",
-            slug: "published-release",
-            content: "Published",
-            status: "published",
-            scheduledAt: null,
-            publishedAt,
-          })
-          .pipe(Effect.provideService(CurrentSession, session));
-        yield* handlers
-          .ChangelogUpdate({
-            assetIds: [],
-            id,
-            organizationId: fixture.organizationId,
-            title: "Edited release",
-            slug: "edited-release",
-            content: "Edited after publication",
-            status: "published",
-            scheduledAt: null,
-            publishedAt,
-          })
-          .pipe(Effect.provideService(CurrentSession, session));
-
-        const intents = yield* outbox.findPending({
-          before: new Date(Date.now() + 60_000),
-          organizationId: fixture.organizationId,
-        });
-        expect(intents.map(({ kind }) => kind)).toEqual([
-          "changelog.published",
-        ]);
-      })
-    );
-
-    it.effect("records distinct explicit changelog update requests idempotently", () =>
-      Effect.gen(function* () {
-        const handlers = yield* ChangelogRpcHandlersEffect;
-        const outbox = yield* EmailOutboxRepository;
-        const fixture = yield* makeFixture();
-        const id = yield* ChangelogId.generate;
-        const session = makeSession(fixture);
-
-        yield* handlers
-          .ChangelogCreate({
-            assetIds: [],
-            id,
-            organizationId: fixture.organizationId,
-            title: "Published release",
-            slug: "published-release",
-            content: "Published",
-            status: "published",
-            scheduledAt: null,
-            publishedAt: new Date(),
-          })
-          .pipe(Effect.provideService(CurrentSession, session));
-
-        const sendUpdate = (requestId: string) =>
-          handlers
-            .ChangelogSendUpdate({
+          yield* handlers
+            .ChangelogCreate({
+              assetIds: [],
+              coverImage: null,
               id,
               organizationId: fixture.organizationId,
-              requestId,
+              title: "Published release",
+              slug: "published-release",
+              content: "First publication",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: new Date(),
             })
             .pipe(Effect.provideService(CurrentSession, session));
 
-        yield* sendUpdate("request-one");
-        yield* sendUpdate("request-one");
-        yield* sendUpdate("request-two");
+          const intents = yield* outbox.findPending({
+            before: new Date(Date.now() + 60_000),
+            organizationId: fixture.organizationId,
+          });
+          expect(intents.map(({ kind }) => kind)).toEqual([
+            "changelog.published",
+          ]);
+        })
+    );
 
-        const intents = yield* outbox.findPending({
-          before: new Date(Date.now() + 60_000),
-          organizationId: fixture.organizationId,
-        });
-        expect(intents.map(({ kind }) => kind)).toEqual([
-          "changelog.published",
-          "changelog.update_requested",
-          "changelog.update_requested",
-        ]);
-      })
+    it.effect(
+      "does not send publication again when an already-published changelog is edited",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ChangelogRpcHandlersEffect;
+          const outbox = yield* EmailOutboxRepository;
+          const fixture = yield* makeFixture();
+          const id = yield* ChangelogId.generate;
+          const session = makeSession(fixture);
+          const publishedAt = new Date();
+
+          yield* handlers
+            .ChangelogCreate({
+              assetIds: [],
+              coverImage: null,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Draft release",
+              slug: "draft-release",
+              content: "Draft",
+              status: "draft",
+              scheduledAt: null,
+              publishedAt: null,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+          yield* handlers
+            .ChangelogUpdate({
+              assetIds: [],
+              coverImage: null,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Published release",
+              slug: "published-release",
+              content: "Published",
+              status: "published",
+              scheduledAt: null,
+              publishedAt,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+          yield* handlers
+            .ChangelogUpdate({
+              assetIds: [],
+              coverImage: null,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Edited release",
+              slug: "edited-release",
+              content: "Edited after publication",
+              status: "published",
+              scheduledAt: null,
+              publishedAt,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const intents = yield* outbox.findPending({
+            before: new Date(Date.now() + 60_000),
+            organizationId: fixture.organizationId,
+          });
+          expect(intents.map(({ kind }) => kind)).toEqual([
+            "changelog.published",
+          ]);
+        })
+    );
+
+    it.effect(
+      "records distinct explicit changelog update requests idempotently",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* ChangelogRpcHandlersEffect;
+          const outbox = yield* EmailOutboxRepository;
+          const fixture = yield* makeFixture();
+          const id = yield* ChangelogId.generate;
+          const session = makeSession(fixture);
+
+          yield* handlers
+            .ChangelogCreate({
+              assetIds: [],
+              coverImage: null,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Published release",
+              slug: "published-release",
+              content: "Published",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: new Date(),
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const sendUpdate = (requestId: string) =>
+            handlers
+              .ChangelogSendUpdate({
+                id,
+                organizationId: fixture.organizationId,
+                requestId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session));
+
+          yield* sendUpdate("request-one");
+          yield* sendUpdate("request-one");
+          yield* sendUpdate("request-two");
+
+          const intents = yield* outbox.findPending({
+            before: new Date(Date.now() + 60_000),
+            organizationId: fixture.organizationId,
+          });
+          expect(intents.map(({ kind }) => kind)).toEqual([
+            "changelog.published",
+            "changelog.update_requested",
+            "changelog.update_requested",
+          ]);
+        })
     );
   });
 });
