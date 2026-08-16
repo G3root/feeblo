@@ -22,16 +22,15 @@ export const UserOnboardingEmail = ({
       Hi{name ? ` ${name}` : " there"},
     </Text>
     <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
-      I&apos;m Nafees — I built Feeblo so teams can collect feedback and act on
-      it without the noise. Thanks for signing up.
+      I'm Nafees from Feeblo. Thanks for joining us!
     </Text>
     <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
-      Your workspace is ready whenever you are. I&apos;d genuinely love to know
-      what you&apos;re hoping to get out of it, what feels good, and what
-      doesn&apos;t.
+      I'd really love to hear what you're hoping to use Feeblo for, what you
+      like, what feels confusing, or anything you think we could do better.
     </Text>
     <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
-      If you get stuck or just want to talk, hit reply — I read every message.
+      If you ever get stuck or just want to chat, just hit reply. I read every
+      email myself.
     </Text>
     <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
       — Nafees
