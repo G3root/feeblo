@@ -29,7 +29,7 @@ export const buttonVariants = cva(
       },
       variant: {
         brand:
-          "inset-shadow-[0_1px_0_0_var(--brand-emphasis)] border-transparent bg-brand-emphasis bg-linear-to-b from-brand-gradient-start to-brand text-brand-foreground shadow-xs ring-1 ring-brand-ring hover:from-brand-emphasis focus:ring-brand-ring focus-visible:ring-2 focus-visible:ring-brand-ring focus-visible:ring-offset-0 active:ring-brand-ring disabled:opacity-50 *:data-[slot=button-loading-indicator]:text-brand-foreground",
+          "not-disabled:inset-shadow-[0_1px_0_0_var(--brand-emphasis)] border-transparent bg-brand-emphasis bg-linear-to-b from-brand-gradient-start to-brand text-brand-foreground shadow-xs ring-1 ring-brand-ring hover:from-brand-emphasis focus:ring-brand-ring focus-visible:ring-2 focus-visible:ring-brand-ring focus-visible:ring-offset-0 active:ring-brand-ring disabled:opacity-50 data-pressed:from-brand-emphasis *:data-[slot=button-loading-indicator]:text-brand-foreground [:active,[data-pressed]]:inset-shadow-[0_1px_0_0_var(--brand-ring)] [:disabled,:active,[data-pressed]]:shadow-none",
         default:
           "not-disabled:inset-shadow-[0_1px_--theme(--color-white/16%)] border-primary bg-primary text-primary-foreground shadow-primary/24 shadow-xs hover:bg-primary/90 data-pressed:bg-primary/90 *:data-[slot=button-loading-indicator]:text-primary-foreground [:active,[data-pressed]]:inset-shadow-[0_1px_--theme(--color-black/8%)] [:disabled,:active,[data-pressed]]:shadow-none",
         destructive:
