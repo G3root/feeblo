@@ -1,18 +1,33 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
+import { cva, type VariantProps } from "class-variance-authority";
 import type React from "react";
 import { cn } from "./utils";
+
+const switchCardVariants = cva(
+  "flex items-center justify-between gap-6 rounded-lg p-3 transition-colors hover:bg-accent/50 has-data-checked:bg-accent/50",
+  {
+    variants: {
+      variant: {
+        outline: "border has-data-checked:border-primary/48",
+        ghost: "border-transparent",
+      },
+    },
+    defaultVariants: {
+      variant: "outline",
+    },
+  }
+);
 
 export function SwitchCard({
   className,
   render,
+  variant = "outline",
   ...props
-}: useRender.ComponentProps<"label">): React.ReactElement {
+}: useRender.ComponentProps<"label"> &
+  VariantProps<typeof switchCardVariants>): React.ReactElement {
   const defaultProps = {
-    className: cn(
-      "flex items-center justify-between gap-6 rounded-lg border p-3 hover:bg-accent/50 has-data-checked:border-primary/48 has-data-checked:bg-accent/50",
-      className
-    ),
+    className: cn(switchCardVariants({ variant, className })),
     "data-slot": "switch-card",
   };
 
