@@ -1,12 +1,13 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
+import { CopyButton } from "@feeblo/ui/copy-button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { MoreVerticalIcon } from "@hugeicons/core-free-icons";
+import { MoreVerticalIcon, ReloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
@@ -105,19 +106,9 @@ function SecuritySettingsContent({
   }
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(activeSecret.secret).then(
-      () => {
-        trackEvent("sso_secret_copied", { success: true });
-        toastManager.add({
-          title: "Secret copied to clipboard",
-          type: "success",
-        });
-      },
-      () => {
-        trackEvent("sso_secret_copied", { success: false });
-        toastManager.add({ title: "Failed to copy secret", type: "error" });
-      }
-    );
+    trackEvent("sso_secret_copied", { success: true });
+
+    return activeSecret.secret;
   };
 
   const handleGenerate = async () => {
@@ -221,9 +212,16 @@ function SecuritySettingsContent({
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button onClick={handleCopy} size="sm" variant="outline">
+                      <CopyButton
+                        aria-label="Copy Secret"
+                        onCopy={handleCopy}
+                        size="sm"
+                        successMessage="Secret copied to clipboard!"
+                        tooltipPopup="Copy Secret"
+                        variant="brand"
+                      >
                         Copy Secret
-                      </Button>
+                      </CopyButton>
                       <Menu>
                         <MenuTrigger
                           render={
@@ -256,8 +254,8 @@ function SecuritySettingsContent({
                     <p className="text-muted-foreground text-sm">
                       No active JWT secret. Generate one to enable widget SSO.
                     </p>
-                    <Button onClick={handleGenerate} size="sm">
-                      Generate Secret
+                    <Button onClick={handleGenerate} size="sm" variant="brand">
+                      <HugeiconsIcon icon={ReloadIcon} /> Generate Secret
                     </Button>
                   </div>
                 </SettingsItem.ItemContent>

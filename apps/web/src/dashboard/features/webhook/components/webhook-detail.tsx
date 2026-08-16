@@ -24,6 +24,7 @@ import {
   CardPanel,
   CardTitle,
 } from "@feeblo/ui/card";
+import { CopyButton } from "@feeblo/ui/copy-button";
 import {
   Table,
   TableBody,
@@ -323,25 +324,16 @@ function WebhookDetailContent({
                     {oneTimeSecret.value}
                   </code>
                   <div className="mt-3 flex gap-2">
-                    <Button
-                      onClick={() =>
-                        navigator.clipboard.writeText(oneTimeSecret.value).then(
-                          () =>
-                            toastManager.add({
-                              title: "Signing secret copied",
-                              type: "success",
-                            }),
-                          () =>
-                            toastManager.add({
-                              title: "Could not copy signing secret",
-                              type: "error",
-                            })
-                        )
-                      }
+                    <CopyButton
+                      aria-label="Copy Secret"
+                      onCopy={() => oneTimeSecret.value}
                       size="sm"
+                      successMessage="Signing secret copied to clipboard!"
+                      tooltipPopup="Copy Secret"
+                      variant="brand"
                     >
-                      Copy secret
-                    </Button>
+                      Copy Secret
+                    </CopyButton>
                     <Button
                       onClick={() => setOneTimeSecret(null)}
                       size="sm"

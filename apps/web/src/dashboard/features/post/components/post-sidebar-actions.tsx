@@ -10,21 +10,19 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
-import { useCopyToClipboard } from "@feeblo/ui/hooks/use-clipboard";
-import { anchoredToastManager, toastManager } from "@feeblo/ui/toast";
+import { CopyButton } from "@feeblo/ui/copy-button";
+import { toastManager } from "@feeblo/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import {
   CircleLockIcon,
   CircleUnlockIcon,
-  Copy01Icon,
   LinkSquare02Icon,
-  Tick02Icon,
   Trash2,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createOptimisticAction } from "@tanstack/react-db";
-import { memo, useRef, useState } from "react";
+import { memo, useState } from "react";
 import { usePostDeleteDialogContext } from "~/features/post/dialog-stores";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
@@ -267,51 +265,19 @@ function RedirectToPostUrlButton() {
 function CopyPostButton() {
   const { post } = usePostCollectionData();
   const publicSiteUrl = getPublicSiteUrl();
-  const copyButtonRef = useRef<HTMLButtonElement>(null);
-
-  const { copyToClipboard, isCopied } = useCopyToClipboard({
-    onCopy: () => {
-      if (copyButtonRef.current) {
-        anchoredToastManager.add({
-          data: {
-            tooltipStyle: true,
-          },
-          positionerProps: {
-            anchor: copyButtonRef.current,
-          },
-          timeout: 2000,
-          title: "Post URL copied!",
-        });
-      }
-    },
-    timeout: 2000,
-  });
 
   if (!publicSiteUrl) {
     return null;
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={(props) => (
-          <Button
-            {...props}
-            aria-label="Copy post link"
-            className="rounded-full"
-            disabled={isCopied}
-            onClick={() => {
-              copyToClipboard(`${publicSiteUrl}/p/${post.slug}`);
-            }}
-            ref={copyButtonRef}
-            size="icon-sm"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={isCopied ? Tick02Icon : Copy01Icon} />
-          </Button>
-        )}
-      />
-      <TooltipPopup>Copy post link</TooltipPopup>
-    </Tooltip>
+    <CopyButton
+      aria-label="Copy post link"
+      onCopy={() => `${publicSiteUrl}/p/${post.slug}`}
+      size="icon-sm"
+      successMessage="Post URL copied!"
+      tooltipPopup="Copy post link"
+      variant="outline"
+    />
   );
 }
