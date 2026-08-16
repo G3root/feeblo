@@ -1,4 +1,10 @@
-import { Switch } from "@feeblo/ui/switch";
+import {
+  SwitchCard,
+  SwitchCardContent,
+  SwitchCardDescription,
+  SwitchCardInput,
+  SwitchCardTitle,
+} from "@feeblo/ui/switch-card";
 import { toastManager } from "@feeblo/ui/toast";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
@@ -64,35 +70,24 @@ function ChangelogPrivacySettingsPage() {
       <SettingsLayout.Content>
         <SettingsItem.Root>
           <SettingsItem.Content>
-            <SettingsItem.Item>
-              <SettingsItem.ItemContent>
-                <SettingsItem.FieldGroup>
-                  <SettingsItem.Field>
-                    <SettingsItem.FieldContent>
-                      <SettingsItem.FieldLabel>
-                        Show changelog on public board
-                      </SettingsItem.FieldLabel>
-                      <SettingsItem.FieldDescription>
-                        When disabled, the public changelog tab and published
-                        changelog routes are hidden from visitors.
-                      </SettingsItem.FieldDescription>
-                    </SettingsItem.FieldContent>
-                    <SettingsItem.ItemActions>
-                      <Switch
-                        checked={site?.changelogVisibility === "PUBLIC"}
-                        disabled={
-                          !site ||
-                          !canManagePrivacy ||
-                          isPending ||
-                          isPolicyPending
-                        }
-                        onCheckedChange={handleCheckedChange}
-                      />
-                    </SettingsItem.ItemActions>
-                  </SettingsItem.Field>
-                </SettingsItem.FieldGroup>
-              </SettingsItem.ItemContent>
-            </SettingsItem.Item>
+            <SwitchCard>
+              <SwitchCardContent>
+                <SwitchCardTitle>
+                  Show changelog on public board
+                </SwitchCardTitle>
+                <SwitchCardDescription>
+                  When disabled, the public changelog tab and published
+                  changelog routes are hidden from visitors.
+                </SwitchCardDescription>
+              </SwitchCardContent>
+              <SwitchCardInput
+                checked={site?.changelogVisibility === "PUBLIC"}
+                disabled={
+                  !(site && canManagePrivacy) || isPending || isPolicyPending
+                }
+                onCheckedChange={handleCheckedChange}
+              />
+            </SwitchCard>
           </SettingsItem.Content>
         </SettingsItem.Root>
       </SettingsLayout.Content>
