@@ -1,5 +1,11 @@
 import { Input } from "@feeblo/ui/input";
-import { Switch } from "@feeblo/ui/switch";
+import {
+  SwitchCard,
+  SwitchCardContent,
+  SwitchCardDescription,
+  SwitchCardInput,
+  SwitchCardTitle,
+} from "@feeblo/ui/switch-card";
 import { toastManager } from "@feeblo/ui/toast";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
@@ -65,7 +71,6 @@ function RouteComponent() {
 }
 
 function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
-  const id = useId();
   const site = useSite();
 
   async function handleChange(value: boolean) {
@@ -91,22 +96,19 @@ function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
   }
 
   return (
-    <SettingsItem.Field>
-      <SettingsItem.FieldContent>
-        <SettingsItem.FieldLabel htmlFor={id}>
-          Hide from search engines
-        </SettingsItem.FieldLabel>
-        <SettingsItem.FieldDescription>
+    <SwitchCard variant="ghost">
+      <SwitchCardContent>
+        <SwitchCardTitle>Hide from search engines</SwitchCardTitle>
+        <SwitchCardDescription>
           Ask search engines not to index any page on this public site.
-        </SettingsItem.FieldDescription>
-      </SettingsItem.FieldContent>
-      <Switch
+        </SwitchCardDescription>
+      </SwitchCardContent>
+      <SwitchCardInput
         checked={site?.noIndex ?? false}
         disabled={!(canEdit && site)}
-        id={id}
         onCheckedChange={handleChange}
       />
-    </SettingsItem.Field>
+    </SwitchCard>
   );
 }
 
@@ -177,7 +179,6 @@ function HidePoweredByBranding({
   canEdit: boolean;
   hasPaidPlan: boolean;
 }) {
-  const id = useId();
   const site = useSite();
 
   async function handleChange(value: boolean) {
@@ -207,22 +208,21 @@ function HidePoweredByBranding({
   }
 
   return (
-    <SettingsItem.Field>
-      <SettingsItem.FieldContent>
-        <SettingsItem.FieldLabel htmlFor={id}>
+    <SwitchCard variant="ghost">
+      <SwitchCardContent>
+        <SwitchCardTitle className="inline-flex items-center gap-2">
           Hide "Powered by" Branding
-        </SettingsItem.FieldLabel>
-      </SettingsItem.FieldContent>
-
-      <div className="flex items-center gap-2">
-        {hasPaidPlan ? null : <SettingsItem.PaidPlanIndicator />}
-        <Switch
-          checked={site?.hidePoweredBy ?? false}
-          disabled={!(canEdit && site)}
-          id={id}
-          onCheckedChange={handleChange}
-        />
-      </div>
-    </SettingsItem.Field>
+          {hasPaidPlan ? null : <SettingsItem.PaidPlanIndicator />}
+        </SwitchCardTitle>
+        <SwitchCardDescription>
+          Remove the "Powered by" branding from your public site.
+        </SwitchCardDescription>
+      </SwitchCardContent>
+      <SwitchCardInput
+        checked={site?.hidePoweredBy ?? false}
+        disabled={!(canEdit && site)}
+        onCheckedChange={handleChange}
+      />
+    </SwitchCard>
   );
 }

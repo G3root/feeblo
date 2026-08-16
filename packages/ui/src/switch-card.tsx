@@ -2,6 +2,7 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 import type React from "react";
+import { Switch } from "./switch";
 import { cn } from "./utils";
 
 const switchCardVariants = cva(
@@ -87,4 +88,20 @@ export function SwitchCardDescription({
     props: mergeProps<"p">(defaultProps, props),
     render,
   });
+}
+
+export function SwitchCardInput({
+  className,
+  ...props
+}: React.ComponentProps<typeof Switch>): React.ReactElement {
+  return (
+    <Switch
+      {...props}
+      className={cn(
+        "[--thumb-size:--spacing(4)] sm:[--thumb-size:--spacing(3)]",
+        className
+      )}
+      data-slot="switch-card-input"
+    />
+  );
 }
