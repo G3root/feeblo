@@ -8,6 +8,7 @@ import {
 import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import { toggleVariants } from "@feeblo/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
+import { cn } from "@feeblo/ui/utils";
 import {
   GridViewIcon,
   ListViewIcon,
@@ -17,7 +18,6 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
-import { cn } from "@feeblo/ui/utils";
 import { useBoardStore } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";
 
@@ -72,14 +72,13 @@ export function BoardToolbar({
                       exact: true,
                     }}
                     activeProps={{
-                      "data-active": "true",
+                      "data-pressed": "true",
                     }}
                     className={cn(
                       toggleVariants({
                         variant: "outline",
                         size: "sm",
-                      }),
-                      "h-7 min-w-7 data-active:bg-muted"
+                      })
                     )}
                     key={link.to}
                     params={{ organizationId }}
@@ -94,14 +93,13 @@ export function BoardToolbar({
                       exact: true,
                     }}
                     activeProps={{
-                      "data-active": "true",
+                      "data-pressed": "true",
                     }}
                     className={cn(
                       toggleVariants({
                         variant: "outline",
                         size: "sm",
-                      }),
-                      "h-7 min-w-7 data-active:bg-muted"
+                      })
                     )}
                     key={link.to}
                     params={{ boardSlug: boardSlug ?? "", organizationId }}

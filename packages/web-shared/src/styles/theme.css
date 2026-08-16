@@ -47,6 +47,12 @@
   --color-card: var(--card);
   --color-border: var(--border);
   --color-background: var(--background);
+  --color-brand: var(--brand);
+  --color-brand-emphasis: var(--brand-emphasis);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-gradient-end: var(--brand-gradient-end);
+  --color-brand-gradient-start: var(--brand-gradient-start);
+  --color-brand-ring: var(--brand-ring);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-warning-foreground: var(--warning-foreground);
@@ -173,6 +179,12 @@
   --primary-blue: oklch(0.623 0.214 259.815);
   --primary-green: oklch(0.723 0.219 149.579);
   --primary-yellow: oklch(0.795 0.184 86.047);
+  --brand: oklch(0.5772 0.2324 260);
+  --brand-foreground: var(--color-white);
+  --brand-emphasis: color-mix(in oklch, var(--brand), white 30%);
+  --brand-gradient-end: var(--brand);
+  --brand-gradient-start: color-mix(in oklch, var(--brand), white 15%);
+  --brand-ring: color-mix(in oklch, var(--brand), black 10%);
   --ring: var(--color-neutral-400);
   --secondary: --alpha(var(--color-black) / 4%);
   --secondary-foreground: var(--color-neutral-800);
@@ -234,6 +246,12 @@
   --popover-foreground: var(--color-neutral-100);
   --primary: var(--color-neutral-100);
   --primary-foreground: var(--color-neutral-800);
+  --brand: oklch(0.51948 0.2324 260);
+  --brand-foreground: var(--color-white);
+  --brand-emphasis: color-mix(in oklch, var(--brand), white 30%);
+  --brand-gradient-end: var(--brand);
+  --brand-gradient-start: color-mix(in oklch, var(--brand), white 15%);
+  --brand-ring: color-mix(in oklch, var(--brand), black 10%);
   --ring: var(--color-neutral-500);
   --secondary: --alpha(var(--color-white) / 4%);
   --secondary-foreground: var(--color-neutral-100);

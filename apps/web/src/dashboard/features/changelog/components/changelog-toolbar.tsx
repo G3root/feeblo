@@ -8,7 +8,7 @@ import {
 import { SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toggleVariants } from "@feeblo/ui/toggle";
 import { cn } from "@feeblo/ui/utils";
-import { Search01Icon } from "@hugeicons/core-free-icons";
+import { Plus, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
@@ -45,14 +45,13 @@ export function ChangelogToolbar() {
                   exact: true,
                 }}
                 activeProps={{
-                  "data-active": "true",
+                  "data-pressed": "true",
                 }}
                 className={cn(
                   toggleVariants({
                     variant: "outline",
                     size: "sm",
-                  }),
-                  "h-7 min-w-7 data-active:bg-muted"
+                  })
                 )}
                 key={link.to}
                 params={{ organizationId }}
@@ -76,7 +75,9 @@ export function ChangelogToolbar() {
             </InputGroup>
           </div>
           {canCreate ? (
-            <Button onClick={createChangeLog}>New Entry</Button>
+            <Button onClick={createChangeLog} variant="brand">
+              <HugeiconsIcon icon={Plus} /> New Entry
+            </Button>
           ) : null}
         </div>
       </div>
