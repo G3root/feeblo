@@ -8,11 +8,10 @@ import {
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
 import { Button } from "@feeblo/ui/button";
-import { Input } from "@feeblo/ui/input";
-import { Label } from "@feeblo/ui/label";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { useState } from "react";
-import { publishChangelogSchema } from "../schema";
+import { publishChangelogFormOpts } from "../shared-form";
 
 export function ChangelogPublishDialog({
   defaultPublishedAt,
@@ -26,34 +25,29 @@ export function ChangelogPublishDialog({
   triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [slug, setSlug] = useState(defaultSlug);
-  const [publishedAt, setPublishedAt] = useState(
-    toDatetimeLocalValue(defaultPublishedAt ?? new Date())
-  );
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit() {
-    const parsed = publishChangelogSchema.safeParse({ publishedAt, slug });
-
-    if (!parsed.success) {
-      toastManager.add({
-        title: parsed.error.issues[0]?.message ?? "Invalid publish settings",
-        type: "error",
-      });
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      await onPublish({
-        publishedAt: new Date(parsed.data.publishedAt),
-        slug: parsed.data.slug,
-      });
-      setOpen(false);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+  const form = useAppForm({
+    ...publishChangelogFormOpts,
+    defaultValues: {
+      slug: defaultSlug,
+      publishedAt: toDatetimeLocalValue(defaultPublishedAt ?? new Date()),
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        await onPublish({
+          publishedAt: new Date(value.publishedAt),
+          slug: value.slug,
+        });
+        form.reset();
+        setOpen(false);
+      } catch (_error) {
+        toastManager.add({
+          title: "Failed to publish changelog",
+          type: "error",
+        });
+      }
+    },
+  });
 
   return (
     <>
@@ -62,49 +56,53 @@ export function ChangelogPublishDialog({
       </Button>
       <AlertDialog onOpenChange={setOpen} open={open}>
         <AlertDialogPopup className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save changelog</AlertDialogTitle>
-            <AlertDialogDescription>
-              Choose the public URL and publication date for this changelog.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+          <form
+            className="contents"
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              form.handleSubmit();
+            }}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>Save changelog</AlertDialogTitle>
+              <AlertDialogDescription>
+                Choose the public URL and publication date for this changelog.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
 
-          <div className="space-y-4 px-6 pb-6">
-            <div className="space-y-2">
-              <Label htmlFor="changelog-slug">Slug</Label>
-              <Input
-                autoComplete="off"
-                id="changelog-slug"
-                onChange={(event) => setSlug(event.target.value)}
-                type="text"
-                value={slug}
+            <div className="space-y-4 px-6 pb-6">
+              <form.AppField
+                children={(field) => (
+                  <field.TextField autoComplete="off" label="Slug" />
+                )}
+                name="slug"
+              />
+
+              <form.AppField
+                children={(field) => (
+                  <field.TextField
+                    label="Published date"
+                    type="datetime-local"
+                  />
+                )}
+                name="publishedAt"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="published-at">Published date</Label>
-              <Input
-                id="published-at"
-                onChange={(event) => setPublishedAt(event.target.value)}
-                type="datetime-local"
-                value={publishedAt}
-              />
-            </div>
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>
-              Cancel
-            </AlertDialogCancel>
-            <Button
-              disabled={isSubmitting}
-              onClick={handleSubmit}
-              type="button"
-              variant="brand"
-            >
-              Save
-            </Button>
-          </AlertDialogFooter>
+            <AlertDialogFooter>
+              <form.Subscribe selector={(state) => state.isSubmitting}>
+                {(isSubmitting) => (
+                  <AlertDialogCancel disabled={isSubmitting}>
+                    Cancel
+                  </AlertDialogCancel>
+                )}
+              </form.Subscribe>
+              <form.AppForm>
+                <form.SubscribeButton label="Save" />
+              </form.AppForm>
+            </AlertDialogFooter>
+          </form>
         </AlertDialogPopup>
       </AlertDialog>
     </>

@@ -2,12 +2,13 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { useSelector } from "@xstate/store-react";
 import {
   useChangelogDeleteDialogContext,
@@ -35,15 +36,16 @@ export function ChangelogDeleteDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+
+          <Button
             onClick={async () => {
-              store.send({ type: "toggle" });
               await handleDelete();
+              store.send({ type: "toggle" });
             }}
             variant="destructive"
           >
             Continue
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
@@ -57,7 +59,7 @@ export function ChangelogMoveToDraftDialog() {
 
   return (
     <AlertDialog
-      onOpenChange={() => store.send({ type: "toggle" })}
+      onOpenChange={(open) => store.send({ type: "setOpen", open })}
       open={open}
     >
       <AlertDialogPopup>
@@ -73,7 +75,6 @@ export function ChangelogMoveToDraftDialog() {
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={async () => {
-              store.send({ type: "toggle" });
               await handleMoveToDraft();
             }}
           >
