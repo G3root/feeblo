@@ -107,7 +107,10 @@ function PaidPlanIndicator({
         <HugeiconsIcon
           strokeWidth={2.5}
           {...rest}
-          className={cn("size-4 text-primary-yellow", rest?.className)}
+          className={cn(
+            "size-4 cursor-pointer text-yellow-500",
+            rest?.className
+          )}
           icon={LockedIcon}
         />
       </TooltipTrigger>
