@@ -43,8 +43,8 @@ import { and, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   createContext,
-  type MutableRefObject,
   type ReactNode,
+  type RefObject,
   use,
   useRef,
   useState,
@@ -113,7 +113,7 @@ function useChangelogEditorForm({
   changelog: TChangelogEditorRecord;
   editorScope: string;
   organizationId: string;
-  coverImageAssetRef: MutableRefObject<string | null>;
+  coverImageAssetRef: RefObject<string | null>;
 }) {
   const { changelogCollection } = useDashboardCollections();
   const navigate = useNavigate();
@@ -211,7 +211,7 @@ function useChangelogEditorForm({
 
 type ChangelogEditorContextValue = {
   changelog: TChangelogEditorRecord;
-  coverImageAssetRef: MutableRefObject<string | null>;
+  coverImageAssetRef: RefObject<string | null>;
   form: ReturnType<typeof useChangelogEditorForm>;
   formResetKey: string;
   editorScope: string;
@@ -420,95 +420,84 @@ export function ChangelogEditorCoverImageField() {
 
   return (
     <form.Field name="coverImage">
-      {(field) =>
-        field.state.value ? (
-          <Card className="overflow-hidden" size="sm">
-            <div className="relative">
-              <img
-                alt=""
-                className="aspect-[16/7] w-full object-cover"
-                height={525}
-                src={field.state.value}
-                width={1200}
-              />
-              {isOwner ? (
-                <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/50 to-transparent p-3">
-                  <Button
-                    aria-label="Replace cover image"
-                    disabled={isUploading}
-                    onClick={() => inputRef.current?.click()}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {isUploading ? (
-                      <Spinner className="size-4" />
-                    ) : (
-                      <HugeiconsIcon icon={ImageUpload01Icon} />
-                    )}
-                    Replace
-                  </Button>
-                  <Button
-                    aria-label="Remove cover image"
-                    onClick={removeCoverImage}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    <HugeiconsIcon icon={ImageRemove01Icon} />
-                    Remove
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-            <input
-              accept="image/gif,image/jpeg,image/png,image/webp"
-              className="hidden"
-              disabled={!isOwner}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  uploadCoverImage(file).catch(() => undefined);
-                }
-                event.target.value = "";
-              }}
-              ref={inputRef}
-              type="file"
-            />
-          </Card>
-        ) : (
-          <Card className="h-32 items-center justify-center" size="sm">
-            <Button
-              aria-label="Add cover image"
-              disabled={!isOwner || isUploading}
-              onClick={() => inputRef.current?.click()}
-              type="button"
-              variant="secondary"
-            >
-              {isUploading ? (
-                <Spinner className="size-4" />
-              ) : (
-                <HugeiconsIcon icon={ImageUpload01Icon} />
-              )}
-              Add cover image
-            </Button>
-            <input
-              accept="image/gif,image/jpeg,image/png,image/webp"
-              className="hidden"
-              disabled={!isOwner}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  uploadCoverImage(file).catch(() => undefined);
-                }
-                event.target.value = "";
-              }}
-              ref={inputRef}
-              type="file"
-            />
-          </Card>
-        )
-      }
+      {(field) => (
+        <>
+          {field.state.value ? (
+            <Card className="overflow-hidden" size="sm">
+              <div className="relative">
+                <img
+                  alt=""
+                  className="aspect-[16/7] w-full object-cover"
+                  height={525}
+                  src={field.state.value}
+                  width={1200}
+                />
+                {isOwner ? (
+                  <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 bg-gradient-to-t from-black/50 to-transparent p-3">
+                    <Button
+                      aria-label="Replace cover image"
+                      disabled={isUploading}
+                      onClick={() => inputRef.current?.click()}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {isUploading ? (
+                        <Spinner className="size-4" />
+                      ) : (
+                        <HugeiconsIcon icon={ImageUpload01Icon} />
+                      )}
+                      Replace
+                    </Button>
+                    <Button
+                      aria-label="Remove cover image"
+                      disabled={isUploading}
+                      onClick={removeCoverImage}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <HugeiconsIcon icon={ImageRemove01Icon} />
+                      Remove
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            </Card>
+          ) : (
+            <Card className="h-32 items-center justify-center" size="sm">
+              <Button
+                aria-label="Add cover image"
+                disabled={!isOwner || isUploading}
+                onClick={() => inputRef.current?.click()}
+                type="button"
+                variant="secondary"
+              >
+                {isUploading ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  <HugeiconsIcon icon={ImageUpload01Icon} />
+                )}
+                Add cover image
+              </Button>
+            </Card>
+          )}
+          <input
+            accept="image/gif,image/jpeg,image/png,image/webp"
+            className="hidden"
+            disabled={!isOwner}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) {
+                uploadCoverImage(file).catch(() => undefined);
+              }
+              event.target.value = "";
+            }}
+            ref={inputRef}
+            type="file"
+          />
+        </>
+      )}
     </form.Field>
   );
 }

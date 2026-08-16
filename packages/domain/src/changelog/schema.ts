@@ -37,9 +37,13 @@ export const ChangelogList = S.Struct({
 export type TChangelogList = S.Schema.Type<typeof ChangelogList>;
 
 const COVER_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+const COVER_IMAGE_URL_MAX_LENGTH = 2048;
 
 const coverImageWithDefault = S.NullOr(
-  S.String.pipe(S.check(S.isPattern(COVER_IMAGE_URL_PATTERN)))
+  S.String.pipe(
+    S.check(S.isPattern(COVER_IMAGE_URL_PATTERN)),
+    S.check(S.isMaxLength(COVER_IMAGE_URL_MAX_LENGTH))
+  )
 ).pipe(S.withDecodingDefaultKey(Effect.succeed(null)));
 
 export const ChangelogCreate = S.Struct({

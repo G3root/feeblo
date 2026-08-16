@@ -5,7 +5,7 @@ export const changelogStatusSchema = z.enum(CHANGELOG_STATUSES);
 
 export const updatedChangelogSchema = z.object({
   assetIds: z.array(z.string()),
-  coverImage: z.url().nullable(),
+  coverImage: z.httpUrl().nullable(),
   id: z.string(),
   title: z.string(),
   slug: z.string(),

@@ -162,6 +162,7 @@ export function ChangelogPage() {
                       alt=""
                       className="aspect-[16/7] w-full rounded-xl border object-cover"
                       height={525}
+                      loading="lazy"
                       src={item.coverImage}
                       width={1200}
                     />

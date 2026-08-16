@@ -298,7 +298,7 @@ export const prepareEditorAssetContent = ({
       content: rewriteUrls(content),
       coverImage:
         coverImageUrl === undefined || coverImageUrl === null
-          ? (coverImageUrl ?? null)
+          ? null
           : rewriteUrls(coverImageUrl),
       promotions,
     };
@@ -526,7 +526,7 @@ export const syncChangelogAssetReferences = ({
     const coverAssets =
       coverImageUrl === undefined || coverImageUrl === null
         ? []
-        : yield* db
+        : (yield* db
             .select({
               id: schema.assetTable.id,
               bucket: schema.assetTable.bucket,
@@ -545,22 +545,25 @@ export const syncChangelogAssetReferences = ({
                 inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
                 eq(schema.assetTable.url, coverImageUrl)
               )
-            );
-    const coverAssetIds = new Set(coverAssets.map(({ id }) => id));
-    const assets = [
-      ...currentAssets,
-      ...coverAssets.filter(
-        ({ id }) => !currentAssets.some((asset) => asset.id === id)
-      ),
-      ...submittedAssets.filter(
-        ({ id, url }) =>
-          !(
-            currentAssets.some((asset) => asset.id === id) ||
-            coverAssetIds.has(id)
-          ) && content.includes(url)
-      ),
-    ];
-    yield* syncChangelogReferences({ changelogId, assets });
+            )).slice(0, 1);
+    const assetsById = new Map<string, EditorAsset>();
+    for (const asset of currentAssets) {
+      assetsById.set(asset.id, asset);
+    }
+    for (const asset of coverAssets) {
+      if (!assetsById.has(asset.id)) {
+        assetsById.set(asset.id, asset);
+      }
+    }
+    for (const asset of submittedAssets) {
+      if (!assetsById.has(asset.id) && content.includes(asset.url)) {
+        assetsById.set(asset.id, asset);
+      }
+    }
+    yield* syncChangelogReferences({
+      changelogId,
+      assets: [...assetsById.values()],
+    });
   });
 
 const unreferencedByPostOrChangelog = (db: PgDrizzle.EffectPgDatabase) =>

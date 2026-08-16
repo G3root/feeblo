@@ -350,6 +350,37 @@ describe("ChangelogRpcHandlers", () => {
             .from(schema.changelogAssetTable)
             .where(eq(schema.changelogAssetTable.changelogId, id));
           expect(referencesAfterRemove).toEqual([]);
+
+          // A cover URL that matches no caller-owned asset is retained
+          // verbatim, but produces no asset reference (there is nothing to
+          // keep alive).
+          const unmatchedCoverUrl =
+            "https://assets.example/unmatched/cover.png";
+          yield* handlers
+            .ChangelogUpdate({
+              assetIds: [],
+              coverImage: unmatchedCoverUrl,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Release",
+              slug: "release",
+              content: "Body",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: new Date(),
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [entryAfterUnmatched] = yield* db
+            .select({ coverImage: schema.changelogTable.coverImage })
+            .from(schema.changelogTable)
+            .where(eq(schema.changelogTable.id, id));
+          const referencesAfterUnmatched = yield* db
+            .select()
+            .from(schema.changelogAssetTable)
+            .where(eq(schema.changelogAssetTable.changelogId, id));
+          expect(entryAfterUnmatched?.coverImage).toBe(unmatchedCoverUrl);
+          expect(referencesAfterUnmatched).toEqual([]);
         })
     );
     it.effect("removes promoted media when the transaction fails", () =>
