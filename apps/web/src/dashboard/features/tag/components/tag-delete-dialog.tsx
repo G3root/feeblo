@@ -1,13 +1,13 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogPopup,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPopup,
   AlertDialogTitle,
 } from "@feeblo/ui/alert-dialog";
+import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -32,17 +32,17 @@ export function TagDeleteDialog() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
             onClick={async () => {
               try {
                 const tagId = store.get().context.data.tagId;
-                store.send({ type: "toggle" });
                 const tx = tagCollection.delete(tagId);
                 await tx.isPersisted.promise;
                 toastManager.add({
                   title: "Tag deleted successfully",
                   type: "success",
                 });
+                store.send({ type: "toggle" });
               } catch (_error) {
                 toastManager.add({
                   title: "Failed to delete tag",
@@ -50,9 +50,11 @@ export function TagDeleteDialog() {
                 });
               }
             }}
+            type="button"
+            variant="destructive"
           >
             Continue
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
