@@ -229,16 +229,12 @@ function RouteComponent() {
         />
 
         <form.AppField
-          children={(field) => (
-            <field.TextField label="Password" type="password" />
-          )}
+          children={(field) => <field.PasswordField label="Password" />}
           name="password"
         />
 
         <form.AppField
-          children={(field) => (
-            <field.TextField label="Confirm Password" type="password" />
-          )}
+          children={(field) => <field.PasswordField label="Confirm Password" />}
           name="confirmPassword"
         />
 

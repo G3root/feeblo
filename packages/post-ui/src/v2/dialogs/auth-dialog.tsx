@@ -380,9 +380,7 @@ function SignInForm({
         name="email"
       />
       <form.AppField
-        children={(field) => (
-          <field.TextField label="Password" type="password" />
-        )}
+        children={(field) => <field.PasswordField label="Password" />}
         name="password"
       />
       <div className="flex justify-end">
@@ -451,15 +449,11 @@ function SignUpForm({ onVerify }: { onVerify: (email: string) => void }) {
         name="email"
       />
       <form.AppField
-        children={(field) => (
-          <field.TextField label="Password" type="password" />
-        )}
+        children={(field) => <field.PasswordField label="Password" />}
         name="password"
       />
       <form.AppField
-        children={(field) => (
-          <field.TextField label="Confirm password" type="password" />
-        )}
+        children={(field) => <field.PasswordField label="Confirm password" />}
         name="confirmPassword"
       />
       <form.AppForm>

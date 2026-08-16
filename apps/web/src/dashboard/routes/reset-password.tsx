@@ -282,15 +282,13 @@ function RouteComponent() {
         >
           <div className="flex flex-col gap-4">
             <passwordForm.AppField
-              children={(field) => (
-                <field.TextField label="New Password" type="password" />
-              )}
+              children={(field) => <field.PasswordField label="New Password" />}
               name="password"
             />
 
             <passwordForm.AppField
               children={(field) => (
-                <field.TextField label="Confirm Password" type="password" />
+                <field.PasswordField label="Confirm Password" />
               )}
               name="confirmPassword"
             />
