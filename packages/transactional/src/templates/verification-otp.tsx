@@ -19,10 +19,10 @@ export const VerificationOtpEmail = ({
     titleLead={`Use this one-time code to finish your ${flowLabel.toLowerCase()} on Feeblo. This code will only be valid for the next few minutes.`}
   >
     <Section className="border border-stroke bg-bg-2 px-5 py-5 text-center">
-      <Text className="m-0 font-11 font-sans text-fg-3 uppercase">
+      <Text className="m-0 font-11 font-sans text-fg-3">
         One-time code
       </Text>
-      <Text className="m-0 mt-3 font-24 font-mono text-fg tracking-[0.24em]">
+      <Text className="m-0 mt-3 font-24 font-sans text-fg tracking-[0.24em]">
         {otp}
       </Text>
     </Section>

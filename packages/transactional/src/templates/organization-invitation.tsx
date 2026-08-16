@@ -26,15 +26,11 @@ export const OrganizationInvitationEmail = ({
     <Section className="border border-stroke bg-bg-2 px-5 py-4">
       <Row>
         <Column className="w-1/2 pr-2">
-          <Text className="m-0 font-11 font-sans text-fg-3 uppercase">
-            Role
-          </Text>
+          <Text className="m-0 font-11 font-sans text-fg-3">Role</Text>
           <Text className="mt-2 mb-0 font-15 font-sans text-fg">{role}</Text>
         </Column>
         <Column className="w-1/2 pl-2">
-          <Text className="m-0 font-11 font-sans text-fg-3 uppercase">
-            Workspace
-          </Text>
+          <Text className="m-0 font-11 font-sans text-fg-3">Workspace</Text>
           <Text className="mt-2 mb-0 font-15 font-sans text-fg">
             {organizationName}
           </Text>

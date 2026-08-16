@@ -1,65 +1,68 @@
 import type { TailwindConfig } from "react-email";
 import plugin from "tailwindcss/plugin";
 
+/**
+ * A restrained, Vercel-like light palette: white card on a near-white page,
+ * near-black text, and hairline gray borders. No accent color — contrast does
+ * the work.
+ */
 const colors = {
-  bg: "#131313",
-  "bg-2": "#212121",
-  fg: "#FFFFFF",
-  "fg-2": "#C4C4C4",
-  "fg-3": "#818181",
-  stroke: "#2B2B2B",
-  muted: "#4A4A4A",
+  bg: "#ffffff",
+  "bg-2": "#fafafa",
+  fg: "#171717",
+  "fg-2": "#666666",
+  "fg-3": "#888888",
+  stroke: "#eaeaea",
 } as const;
 
+/**
+ * Inter-only type scale. Weights are limited to 400 (body), 500 (labels,
+ * buttons), and 600 (headings) for a calm, readable hierarchy.
+ */
 const fontScale = {
   11: {
     fontSize: "11px",
     lineHeight: "1.5",
-    letterSpacing: "0.3px",
-    fontWeight: "300",
-  },
-  13: {
-    fontSize: "13px",
-    lineHeight: "1.5",
-    letterSpacing: "0.2px",
-    fontWeight: "300",
-  },
-  14: {
-    fontSize: "14px",
-    lineHeight: "1.5",
-    letterSpacing: "0.3px",
-    fontWeight: "350",
-  },
-  15: {
-    fontSize: "15px",
-    lineHeight: "1.5",
-    letterSpacing: "-0.075px",
-    fontWeight: "450",
-  },
-  20: { fontSize: "20px", lineHeight: "1.1", fontWeight: "500" },
-  24: {
-    fontSize: "24px",
-    lineHeight: "1.5",
-    letterSpacing: "-0.072px",
-    fontWeight: "500",
-  },
-  32: {
-    fontSize: "32px",
-    lineHeight: "0.9",
     letterSpacing: "0.4px",
     fontWeight: "500",
   },
-  40: {
-    fontSize: "40px",
-    lineHeight: "1",
-    letterSpacing: "-1.2px",
-    fontWeight: "500",
+  13: {
+    fontSize: "13px",
+    lineHeight: "1.6",
+    fontWeight: "400",
   },
-  56: {
-    fontSize: "56px",
-    lineHeight: "1",
-    letterSpacing: "-1.68px",
-    fontWeight: "500",
+  14: {
+    fontSize: "14px",
+    lineHeight: "1.6",
+    fontWeight: "400",
+  },
+  15: {
+    fontSize: "15px",
+    lineHeight: "1.6",
+    fontWeight: "400",
+  },
+  16: {
+    fontSize: "16px",
+    lineHeight: "1.6",
+    fontWeight: "400",
+  },
+  20: {
+    fontSize: "20px",
+    lineHeight: "1.4",
+    letterSpacing: "-0.01em",
+    fontWeight: "600",
+  },
+  24: {
+    fontSize: "24px",
+    lineHeight: "1.3",
+    letterSpacing: "-0.02em",
+    fontWeight: "600",
+  },
+  28: {
+    fontSize: "28px",
+    lineHeight: "1.2",
+    letterSpacing: "-0.02em",
+    fontWeight: "600",
   },
 } as const;
 
@@ -79,13 +82,6 @@ export const ditherTailwindConfig: TailwindConfig = {
       colors,
       fontFamily: {
         sans: ["Inter", "Arial", "sans-serif"],
-        mono: ["'IBM Plex Mono'", "'Courier New'", "monospace"],
-        condensed: [
-          "'IBM Plex Sans Condensed'",
-          "'Arial Narrow'",
-          "Arial",
-          "sans-serif",
-        ],
       },
     },
   },

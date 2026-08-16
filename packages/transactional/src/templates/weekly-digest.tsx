@@ -13,13 +13,13 @@ export const EmailPostList = ({
 }) => {
   return (
     <Section>
-      <Text className="m-0 font-20 font-condensed text-fg uppercase">
+      <Text className="m-0 font-20 font-sans text-fg">
         {heading}
       </Text>
       {posts.map((item) => (
         <Section className="border-stroke border-t" key={item.url}>
           <Link
-            className="inline-block w-full py-4 font-14 font-sans text-fg-2"
+            className="inline-block w-full py-4 font-14 font-sans text-fg"
             href={item.url}
           >
             {item.label}

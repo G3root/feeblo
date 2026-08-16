@@ -20,9 +20,7 @@ export const PasswordResetEmail = ({
     titleLead={`${recipientName ? `Hi ${recipientName},` : "Hi,"} we received a request to reset your password for Feeblo. If you didn't request a reset, you can safely ignore this email.`}
   >
     <Section className="border border-stroke bg-bg-2 px-4 py-3">
-      <Text className="m-0 font-11 font-sans text-fg-3 uppercase">
-        Reset link
-      </Text>
+      <Text className="m-0 font-11 font-sans text-fg-3">Reset link</Text>
       <Text className="mt-2 mb-0 break-all font-13 font-sans text-fg-2">
         {resetUrl}
       </Text>
