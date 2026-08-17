@@ -34,21 +34,23 @@
     "db:configure-embeddings": "pnpm --filter @feeblo/db db:configure-embeddings",
     "deploy": "turbo -F @feeblo/infra deploy",
     "destroy": "turbo -F @feeblo/infra destroy",
-    "format": "biome check --write --unsafe .",
-    "check": "ultracite check",
-    "fix": "ultracite fix"
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.0",
     "@cloudflare/workers-types": "catalog:",
     "@dotenvx/dotenvx": "catalog:",
     "@effect/language-service": "^0.85.1",
     "@feeblo/config": "workspace:*",
+    "@oxlint/plugins": "^1.78.0",
     "@types/node": "catalog:",
     "dotenv": "catalog:",
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
     "turbo": "^2.10.8",
     "typescript": "catalog:",
-    "ultracite": "7.2.3",
     "zod": "catalog:"
   },
   "packageManager": "pnpm@11.0.3",
