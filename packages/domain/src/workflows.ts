@@ -1,3 +1,4 @@
+import { MailerConfig } from "@feeblo/transactional/config";
 import { Mailer } from "@feeblo/transactional/mailer";
 import * as Cron from "effect/Cron";
 import * as Layer from "effect/Layer";
@@ -46,7 +47,10 @@ type MakeMailerLayer = () => Layer.Layer<
 
 const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
   Layer.mergeAll(
-    WelcomeUserWorkflowLayer.pipe(Layer.provide(makeMailerLayer())),
+    WelcomeUserWorkflowLayer.pipe(
+      Layer.provide(makeMailerLayer()),
+      Layer.provide(MailerConfig.layer)
+    ),
     EmailOutboxWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer()),
       Layer.provide(EmailOutboxConfig.layer),

@@ -78,12 +78,18 @@ export class MailerConfig extends Context.Service<MailerConfig>()(
           value._tag === "Some" ? value.value : "hello@feeblo.com"
         )
       );
+      // Personal lifecycle emails (user onboarding, user feedback) can use a
+      // dedicated sender distinct from SMTP_FROM_ADDRESS. When unset, the
+      // defaultFrom is used. Exposed as an Option so senders can decide
+      // whether to override per message.
+      const personalFrom = yield* optionalString("SMTP_PERSONAL_FROM_ADDRESS");
 
       return {
         defaultFrom,
         host,
         ignoreTLS,
         password,
+        personalFrom,
         port,
         secure,
         service,
