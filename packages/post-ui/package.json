@@ -153,7 +153,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@egoist/tailwindcss-icons": "^1.9.2",
     "@feeblo/config": "workspace:*",
     "@ladle/react": "^5.1.1",
     "@tailwindcss/vite": "catalog:",

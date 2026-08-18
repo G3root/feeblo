@@ -12,7 +12,13 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { useEffect, useRef, useState } from "react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
@@ -55,7 +61,7 @@ function SimilarPosts({
     setLoading(true);
     const timer = window.setTimeout(() => {
       suggestPosts({
-        ...(boardId ? { boardId } : {}),
+        ...(boardId && { boardId }),
         content,
         signal: controller.signal,
         title: normalizedTitle,
@@ -296,6 +302,15 @@ export function PostCreateForm() {
     },
   });
 
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      form.handleSubmit();
+    },
+    [form]
+  );
+
   if (postStatuses.length === 0) {
     return null;
   }
@@ -304,11 +319,7 @@ export function PostCreateForm() {
     <form
       className="contents"
       id="post-create-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        form.handleSubmit();
-      }}
+      onSubmit={handleSubmit}
     >
       <DialogPanel>
         <div className="space-y-4">

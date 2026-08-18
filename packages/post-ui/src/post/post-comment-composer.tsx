@@ -2,7 +2,7 @@ import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useState } from "react";
 
 import { CommentComposerField, useCommentForm } from "../v2/forms/comment-form";
 import { usePostCollectionData } from "../v2/post-page-context";
@@ -33,15 +33,17 @@ export function PostCommentComposer({
     showVisibilityPicker,
   });
 
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      form.handleSubmit();
+    },
+    [form]
+  );
+
   return (
-    <form
-      className="mt-3 flex flex-col gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        form.handleSubmit();
-      }}
-    >
+    <form className="mt-3 flex flex-col gap-2" onSubmit={handleSubmit}>
       <CommentComposerField
         disabled={disabled}
         form={form}

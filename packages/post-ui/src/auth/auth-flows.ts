@@ -58,26 +58,26 @@ export async function initializePasswordReset(email: string) {
     }),
   });
 
-  if (response.ok) {
-    return true;
+  if (!response.ok) {
+    const serverMessage = await response
+      .json()
+      .then((body: unknown) => {
+        if (typeof body === "object" && body !== null) {
+          const record = body as { error?: { message?: string } };
+          return record.error?.message;
+        }
+        return undefined;
+      })
+      .catch(() => undefined);
+
+    toastManager.add({
+      title: serverMessage ?? "Failed to initialize password reset",
+      type: "error",
+    });
+    return false;
   }
 
-  const serverMessage = await response
-    .json()
-    .then((body: unknown) => {
-      if (typeof body === "object" && body !== null) {
-        const record = body as { error?: { message?: string } };
-        return record.error?.message;
-      }
-      return undefined;
-    })
-    .catch(() => undefined);
-
-  toastManager.add({
-    title: serverMessage ?? "Failed to initialize password reset",
-    type: "error",
-  });
-  return false;
+  return true;
 }
 
 export async function signInWithSocialProvider({
@@ -92,7 +92,7 @@ export async function signInWithSocialProvider({
   const response = await authClient.signIn.social({
     provider,
     callbackURL: getSafeCallbackURL(redirectTo),
-    ...(requestSignUp ? { requestSignUp: true } : {}),
+    ...(requestSignUp && { requestSignUp: true }),
   });
 
   if (!response.error) {
