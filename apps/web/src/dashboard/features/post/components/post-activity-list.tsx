@@ -38,7 +38,7 @@ import {
 
 type NameLookup = ReadonlyMap<string, string>;
 
-const activityIconMap: Record<TPostActivityKind, typeof FileAddIcon> = {
+const activityIconMap = {
   POST_CREATED: FileAddIcon,
   TITLE_CHANGED: Edit01Icon,
   CONTENT_CHANGED: NoteEditIcon,
@@ -53,7 +53,7 @@ const activityIconMap: Record<TPostActivityKind, typeof FileAddIcon> = {
   COMMENT_CREATED: CommentAdd01Icon,
   COMMENT_UPDATED: MessageEdit01Icon,
   COMMENT_DELETED: CommentRemove01Icon,
-};
+} satisfies Record<TPostActivityKind, typeof FileAddIcon>;
 
 const ETA_PATTERN = /^(\d{4})-Q([1-4])$/;
 
@@ -74,7 +74,7 @@ function getActivityDescription({
   boardNames: NameLookup;
   statusNames: NameLookup;
 }) {
-  const descriptions: Record<TPostActivityKind, string> = {
+  const descriptions = {
     POST_CREATED: "created this post",
     TITLE_CHANGED: "changed the title",
     CONTENT_CHANGED: "updated the post content",
@@ -95,22 +95,24 @@ function getActivityDescription({
         : "added a comment",
     COMMENT_UPDATED: "updated a comment",
     COMMENT_DELETED: "deleted a comment",
-  };
+  } satisfies Record<TPostActivityKind, string>;
 
   return descriptions[activity.kind];
 }
 
+type ActivityIcon = { icon: typeof FileAddIcon; color: string };
+
 function getActivityIcon(
   activity: TPostActivity,
-  statusTypes: ReadonlyMap<string, string>
-): { icon: typeof FileAddIcon; color: string } {
+  statusTypes: ReadonlyMap<string, BoardPostStatus>
+): ActivityIcon {
   if (activity.kind === "STATUS_CHANGED" && activity.nextValue) {
     const statusType = statusTypes.get(activity.nextValue);
     if (statusType) {
       return {
-        icon: BoardIconMap[statusType as BoardPostStatus] ?? StatusIcon,
+        icon: BoardIconMap[statusType] ?? StatusIcon,
         color:
-          BOARD_LANE_COLOR_MAP[statusType as BoardPostStatus] ??
+          BOARD_LANE_COLOR_MAP[statusType] ??
           "text-muted-foreground",
       };
     }

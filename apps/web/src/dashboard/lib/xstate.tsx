@@ -1,7 +1,7 @@
 import { createStore } from "@xstate/store";
 import { createContext, useContext as useReactContext, useRef } from "react";
 
-type AnyRecord = Record<string, unknown>;
+type AnyRecord = object;
 
 export interface CreateStoreContextOptions<TStore, TDefaultValue = undefined> {
   createStore: (defaultValue?: TDefaultValue) => TStore;
@@ -73,6 +73,7 @@ export const createModalStore = <TData extends AnyRecord>(
   createStore({
     context: {
       open: false,
+      // SAFETY: Empty-state placeholder for the generic container until real data is set.
       data: {} as TData,
       ...defaultValue,
     },
@@ -80,12 +81,12 @@ export const createModalStore = <TData extends AnyRecord>(
       setOpen: (context, event: { open: boolean; data?: TData }) => ({
         ...context,
         open: event.open,
-        ...(event.data !== undefined ? { data: event.data } : {}),
+        ...(event.data !== undefined && { data: event.data }),
       }),
       toggle: (context, event: { data?: TData }) => ({
         ...context,
         open: !context.open,
-        ...(event.data !== undefined ? { data: event.data } : {}),
+        ...(event.data !== undefined && { data: event.data }),
       }),
       setData: (context, event: { data: TData }) => ({
         ...context,

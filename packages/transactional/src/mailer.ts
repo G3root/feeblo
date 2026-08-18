@@ -203,7 +203,7 @@ const classifyNodemailerFailure = (
     message: "SMTP provider submission failed",
     operation: "Mailer.NodemailerTransport.send",
     provider: "smtp" as const,
-    ...(details?.code ? { providerCode: details.code } : {}),
+    ...(details?.code && { providerCode: details.code }),
   };
 
   if (smtpStatusCode !== undefined) {
@@ -230,13 +230,9 @@ const toMailSendResult = (
   messageId: suppliedMessageId ?? receipt.messageId,
   providerMetadata: {
     acceptedRecipientCount: receipt.acceptedRecipientCount,
-    ...(receipt.providerMessageId
-      ? { providerMessageId: receipt.providerMessageId }
-      : {}),
+    ...(receipt.providerMessageId && { providerMessageId: receipt.providerMessageId }),
     rejectedRecipientCount: receipt.rejectedRecipientCount,
-    ...(receipt.responseCode !== undefined
-      ? { responseCode: receipt.responseCode }
-      : {}),
+    ...(receipt.responseCode !== undefined && { responseCode: receipt.responseCode }),
   },
 });
 
@@ -315,12 +311,10 @@ const makeNodemailerTransport = Effect.gen(function* () {
       username._tag === "Some"
         ? {
             user: username.value,
-            ...(password._tag === "Some"
-              ? { pass: Redacted.value(password.value) }
-              : {}),
+            ...(password._tag === "Some" && { pass: Redacted.value(password.value) }),
           }
         : undefined,
-    ...(service._tag === "Some" ? { service: service.value } : {}),
+    ...(service._tag === "Some" && { service: service.value }),
   });
 
   const send = Effect.fn("Mailer.NodemailerTransport.send")(
@@ -333,18 +327,16 @@ const makeNodemailerTransport = Effect.gen(function* () {
             html: message.html,
             text: message.text,
             from: message.from ?? defaultFrom,
-            ...(message.replyTo ? { replyTo: message.replyTo } : {}),
-            ...(message.headers ? { headers: message.headers } : {}),
-            ...(message.messageId ? { messageId: message.messageId } : {}),
+            ...(message.replyTo && { replyTo: message.replyTo }),
+            ...(message.headers && { headers: message.headers }),
+            ...(message.messageId && { messageId: message.messageId }),
           });
 
           return {
             acceptedRecipientCount: receipt.accepted.length,
             messageId: receipt.messageId,
             rejectedRecipientCount: receipt.rejected.length,
-            ...(smtpResponseCode(receipt.response) !== undefined
-              ? { responseCode: smtpResponseCode(receipt.response) }
-              : {}),
+            ...(smtpResponseCode(receipt.response) !== undefined && { responseCode: smtpResponseCode(receipt.response) }),
           };
         },
         catch: classifyNodemailerFailure,

@@ -13,7 +13,7 @@ export const loadDeliveries = (
   fetchRpc((rpc) =>
     rpc.WebhookDeliveryHistory({
       connectionId,
-      ...(cursor === undefined ? {} : { cursor }),
+      ...(cursor === undefined ? undefined : { cursor }),
       organizationId,
     })
   );

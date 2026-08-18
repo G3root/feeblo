@@ -76,7 +76,7 @@ function WebhookEditForm() {
           rpc.WebhookEndpointUpdate({
             connectionId: endpoint.id,
             ...(value.endpointUrl.trim() === ""
-              ? {}
+              ? undefined
               : { endpointUrl: value.endpointUrl.trim() }),
             eventTypes: [...value.eventTypes],
             name: value.name.trim(),

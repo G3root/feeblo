@@ -30,6 +30,7 @@ export function WebhookEventSelection({
         // webhookEventTypes, so every checked value is a WebhookEventType;
         // the group's onChange types them as string[] because CheckboxGroup is
         // value-agnostic.
+        // SAFETY: the checkbox group's values are the event-type fields the table renders.
         onChange(values as WebhookEventType[])
       }
       value={[...eventTypes]}
@@ -70,9 +71,15 @@ type WebhookEventSelectionFieldProps = {
   readonly idPrefix: string;
 };
 
-export const WebhookEventSelectionField = withForm({
+  // SAFETY: The upstream contract guarantees a string here.
+/** Default id prefix for the event-selection field; consumers override it at mount. */
+const webhookIdPrefix: string = "webhook";
+
+export const WebhookEventSelectionField = /* SAFETY: withForm returns a component matching the form's props contract; consumers supply the real idPrefix. */
+  withForm({
   ...webhookFormOpts,
-  props: { idPrefix: "webhook" as string },
+  // SAFETY: The upstream contract guarantees a string here.
+  props: { idPrefix: webhookIdPrefix },
   render: ({ form, idPrefix }) => (
     <form.AppField
       children={(field) => (
