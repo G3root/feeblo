@@ -3,11 +3,11 @@ import { getRouteApi, useNavigate } from "@tanstack/react-router";
 export type HomePageSortOption = "upvotes" | "newest" | "oldest";
 type FilterValue = "all" | string;
 
-const SORT_OPTIONS: readonly HomePageSortOption[] = [
+const SORT_OPTIONS: Set<HomePageSortOption> = new Set([
   "upvotes",
   "newest",
   "oldest",
-];
+]);
 
 const homeRouteApi = getRouteApi("/");
 
@@ -16,7 +16,7 @@ function normalizeFilterValue(value: string | undefined): FilterValue {
 }
 
 function normalizeSortValue(value: string | undefined): HomePageSortOption {
-  return SORT_OPTIONS.includes(value as HomePageSortOption)
+  return SORT_OPTIONS.has(value as HomePageSortOption)
     ? (value as HomePageSortOption)
     : "newest";
 }
