@@ -31,6 +31,9 @@ RUN pnpm turbo build
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 
+ARG APP_RELEASE="dev"
+ENV APP_RELEASE="${APP_RELEASE}"
+
 # Pin the app to the port the proxy, healthcheck and compose port mapping
 # expect. Without this, a runtime-injected PORT (e.g. 8000) hijacks the
 # listen port and the reverse proxy gets connection refused -> 502.
