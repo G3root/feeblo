@@ -42,7 +42,13 @@ export const GET: APIRoute = async ({ locals, url }) => {
 
   // `@astrojs/rss` escapes text nodes and cannot emit CDATA sections. Use
   // request-scoped markers and replace them after the feed is generated.
-  const cdataNonce = Math.random().toString(36).slice(2, 10);
+  // A non-security marker: use Web Crypto for collision-resistant randomness.
+  const cdataBytes = new Uint8Array(8);
+  crypto.getRandomValues(cdataBytes);
+  const cdataNonce = Array.from(
+    cdataBytes,
+    (byte) => byte.toString(16).padStart(2, "0")
+  ).join("");
   const cdataSections: Array<{ marker: string; content: string }> = [];
 
   let changelogs: readonly TChangelog[];

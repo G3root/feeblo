@@ -64,7 +64,7 @@
     "clsx": "catalog:",
     "dotenv": "catalog:",
     "effect": "catalog:",
-    "posthog-js": "^1.411.0",
+    "posthog-js": "^1.416.0",
     "react": "catalog:",
     "react-avatar-editor": "^15.1.0",
     "react-dom": "catalog:",
