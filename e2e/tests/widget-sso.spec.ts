@@ -167,7 +167,9 @@ test(
               e2eWidget?: WidgetHandle;
               addEventListener: (
                 event: string,
-                listener: (event: { detail: { data: { title: string } } }) => void,
+                listener: (event: {
+                  detail: { data: { title: string } };
+                }) => void,
                 options: { once: boolean }
               ) => void;
               document: { body: { dataset: Record<string, string> } };

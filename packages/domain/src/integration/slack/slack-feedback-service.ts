@@ -147,7 +147,9 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
                 eventType: "feedback.post.created",
                 organizationId: asLegid(WorkspaceId)(organizationId),
                 postId: id,
-                ...(Object.keys(metadata).length === 0 ? undefined : { metadata }),
+                ...(Object.keys(metadata).length === 0
+                  ? undefined
+                  : { metadata }),
                 postSlug: createdSlug,
                 statusId: asLegid(PostStatusId)(defaultStatus.id),
                 title,
@@ -176,7 +178,9 @@ export const makeSlackFeedbackServiceLive = (): Layer.Layer<
             postId: id,
             organizationId,
             title,
-            ...(embeddingService._tag === "Some" && { embeddingService: embeddingService.value }),
+            ...(embeddingService._tag === "Some" && {
+              embeddingService: embeddingService.value,
+            }),
           }).pipe(Effect.provideService(Database.Database, db));
           return {
             boardId,

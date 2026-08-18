@@ -1,4 +1,3 @@
-import { isObject } from "@feeblo/utils/runtime-kind";
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
 import {
@@ -22,6 +21,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
+import { isObject } from "@feeblo/utils/runtime-kind";
 import { and, eq, inArray } from "drizzle-orm";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -437,12 +437,7 @@ const ensureUser = ({
         })
       );
 
-      if (
-        !result ||
-        !isObject(result) ||
-        !("user" in result) ||
-        !result.user
-      ) {
+      if (!result || !isObject(result) || !("user" in result) || !result.user) {
         return yield* new SeedDataError({
           message: `Failed to create user ${email}`,
         });

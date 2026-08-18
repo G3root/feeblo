@@ -111,9 +111,7 @@ function getActivityIcon(
     if (statusType) {
       return {
         icon: BoardIconMap[statusType] ?? StatusIcon,
-        color:
-          BOARD_LANE_COLOR_MAP[statusType] ??
-          "text-muted-foreground",
+        color: BOARD_LANE_COLOR_MAP[statusType] ?? "text-muted-foreground",
       };
     }
   }

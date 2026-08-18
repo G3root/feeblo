@@ -158,10 +158,10 @@ export function BoardGridView({
       ) {
         setItems(snapshot.current);
         return;
-      // SAFETY: The upstream contract guarantees a string here.
+        // SAFETY: The upstream contract guarantees a string here.
       }
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
       const tx = postCollection.update(
         dragState?.sourceId ?? (source.id as string),

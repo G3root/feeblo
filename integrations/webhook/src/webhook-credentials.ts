@@ -98,13 +98,13 @@ export const decryptWebhookCredentialMaterial = (
               signingKeyring: {
                 current: Redacted.make(decoded.signingKeyring.current),
                 ...(decoded.signingKeyring.previous !== undefined && {
-                      previous: {
-                        expiresAt: decoded.signingKeyring.previous.expiresAt,
-                        secret: Redacted.make(
-                          decoded.signingKeyring.previous.secret
-                        ),
-                      },
-                    }),
+                  previous: {
+                    expiresAt: decoded.signingKeyring.previous.expiresAt,
+                    secret: Redacted.make(
+                      decoded.signingKeyring.previous.secret
+                    ),
+                  },
+                }),
               },
             })),
             Effect.mapError(

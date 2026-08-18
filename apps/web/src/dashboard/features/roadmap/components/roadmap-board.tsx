@@ -126,8 +126,8 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
       ) {
         setDragPreview(null);
         return;
-      // SAFETY: The upstream contract guarantees a string here.
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        // SAFETY: The upstream contract guarantees a string here.
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       }
 
       // SAFETY: The upstream contract guarantees a string here.

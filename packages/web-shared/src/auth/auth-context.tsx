@@ -1,6 +1,6 @@
-import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import type { AuthClientSession } from "@feeblo/auth/client";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import type React from "react";

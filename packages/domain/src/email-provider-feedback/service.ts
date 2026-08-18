@@ -125,7 +125,9 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             .update(schema.emailDeliveryTable)
             .set({
               state: nextState,
-              ...(nextState === "delivered" && { deliveredAt: event.occurredAt }),
+              ...(nextState === "delivered" && {
+                deliveredAt: event.occurredAt,
+              }),
               updatedAt: sql`greatest(${schema.emailDeliveryTable.updatedAt}, ${event.occurredAt})`,
             })
             .where(

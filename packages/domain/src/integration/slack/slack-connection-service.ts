@@ -227,8 +227,12 @@ export const makeSlackConnectionServiceLive = (
             config.encryptionKey,
             {
               botToken: oauth.access_token,
-              ...(oauth.authed_user?.access_token !== undefined && { userToken: oauth.authed_user.access_token }),
-              ...(oauth.incoming_webhook?.url !== undefined && { incomingWebhookUrl: oauth.incoming_webhook.url }),
+              ...(oauth.authed_user?.access_token !== undefined && {
+                userToken: oauth.authed_user.access_token,
+              }),
+              ...(oauth.incoming_webhook?.url !== undefined && {
+                incomingWebhookUrl: oauth.incoming_webhook.url,
+              }),
             }
           ).pipe(
             Effect.mapError(

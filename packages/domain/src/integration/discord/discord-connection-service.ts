@@ -382,7 +382,9 @@ export const makeDiscordConnectionServiceLive = (
                   safeDisplayMetadata: {
                     guildId: guild.id,
                     guildName: guild.name,
-                    ...(oauth.user !== undefined && { installerUserId: oauth.user.id }),
+                    ...(oauth.user !== undefined && {
+                      installerUserId: oauth.user.id,
+                    }),
                   },
                   updatedAt: now,
                 })

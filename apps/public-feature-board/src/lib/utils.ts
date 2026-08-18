@@ -1,5 +1,5 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { htmlToExcerpt } from "@feeblo/utils/html";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 

@@ -45,9 +45,8 @@ export const GET: APIRoute = async ({ locals, url }) => {
   // A non-security marker: use Web Crypto for collision-resistant randomness.
   const cdataBytes = new Uint8Array(8);
   crypto.getRandomValues(cdataBytes);
-  const cdataNonce = Array.from(
-    cdataBytes,
-    (byte) => byte.toString(16).padStart(2, "0")
+  const cdataNonce = Array.from(cdataBytes, (byte) =>
+    byte.toString(16).padStart(2, "0")
   ).join("");
   const cdataSections: Array<{ marker: string; content: string }> = [];
 

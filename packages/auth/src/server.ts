@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { NodeCrypto } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
@@ -19,6 +18,7 @@ import {
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import type { Role } from "@feeblo/permissions";
 import { Mailer } from "@feeblo/transactional/mailer";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { polar, webhooks } from "@polar-sh/better-auth";
 import {
   type BetterAuthOptions,
@@ -204,7 +204,7 @@ export const initAuthHandler = (
       },
     };
 
-    const mapPolicyDeniedToApiError = <T,>(error: T) => {
+    const mapPolicyDeniedToApiError = <T>(error: T) => {
       if (error instanceof PolicyDeniedError) {
         return new APIError("FORBIDDEN", {
           message: error.reason ?? "Forbidden",

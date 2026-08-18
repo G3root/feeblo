@@ -91,11 +91,11 @@ export const roleGrants = (role: Role, permission: Permission): boolean => {
  * always follows its grants. Mirrors `hasOwnerOrAdminRole` on the frontend,
  * which gates on the same permission.
  */
-export const PRIVILEGED_ROLES = /* SAFETY: the filtered items are members of ROLES, hence branded Role values. */
-  (ROLES.filter((role) =>
+export const PRIVILEGED_ROLES =
+  /* SAFETY: the filtered items are members of ROLES, hence branded Role values. */
+  ROLES.filter((role) =>
     roleGrants(role, "workspace.update")
-  )
-) as readonly Role[];
+  ) as readonly Role[];
 
 /** True when `role` is "owner" or "admin" — i.e. grants `workspace.update`. */
 export const isPrivilegedRole = (role: string): boolean =>

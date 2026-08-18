@@ -54,7 +54,7 @@ const getDatabaseErrorField = (
     onSome: (error) => error[field],
   });
 
-export const isUniqueViolation = <T,>(error: T): boolean =>
+export const isUniqueViolation = <T>(error: T): boolean =>
   error instanceof EffectDrizzleQueryError &&
   getDatabaseErrorField(error.cause, "code") === "23505";
 
@@ -64,7 +64,7 @@ export const isUniqueViolation = <T,>(error: T): boolean =>
  * distinguish which unique index rejected an insert instead of treating every
  * 23505 as the same collision.
  */
-export const getUniqueViolationConstraint = <T,>(
+export const getUniqueViolationConstraint = <T>(
   error: T
 ): string | undefined =>
   error instanceof EffectDrizzleQueryError
@@ -154,7 +154,9 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
       action,
       entity: entityOrConfig,
       ...(entityId === undefined ? undefined : { entityId }),
-      ...(options?.uniqueViolationMessage !== undefined && { uniqueViolationMessage: options.uniqueViolationMessage }),
+      ...(options?.uniqueViolationMessage !== undefined && {
+        uniqueViolationMessage: options.uniqueViolationMessage,
+      }),
     };
   } else {
     config = entityOrConfig;

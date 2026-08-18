@@ -86,7 +86,9 @@ const make = Effect.gen(function* () {
 
     const clientLayer = OpenAiClient.layer({
       apiKey: apiKey.value,
-      ...(Option.isSome(normalizedApiUrl) && { apiUrl: normalizedApiUrl.value.trim() }),
+      ...(Option.isSome(normalizedApiUrl) && {
+        apiUrl: normalizedApiUrl.value.trim(),
+      }),
     }).pipe(Layer.provide(FetchHttpClient.layer));
     const modelLayer = OpenAiEmbeddingModel.layer({
       model,

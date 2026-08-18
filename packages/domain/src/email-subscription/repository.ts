@@ -69,8 +69,8 @@ const dataError = (
 ): EmailSubscriptionDataError =>
   new EmailSubscriptionDataError({ operation, reason });
 
-const decodeContact = (
-  input: Schema.Json,
+const decodeContact = <V>(
+  input: V,
   operation: string
 ): Effect.Effect<Contact, EmailSubscriptionDataError> =>
   Schema.decodeUnknownEffect(EmailContactRecord)(input).pipe(
@@ -79,8 +79,8 @@ const decodeContact = (
     )
   );
 
-const decodeSubscription = (
-  input: Schema.Json,
+const decodeSubscription = <V>(
+  input: V,
   operation: string
 ): Effect.Effect<Subscription, EmailSubscriptionDataError> =>
   Schema.decodeUnknownEffect(EmailSubscriptionRecord)(input).pipe(

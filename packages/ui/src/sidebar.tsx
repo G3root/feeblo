@@ -1,6 +1,6 @@
-import { isFunction, isString } from "@feeblo/utils/runtime-kind";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
+import { isFunction, isString } from "@feeblo/utils/runtime-kind";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
@@ -94,7 +94,10 @@ export function SidebarProvider({
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
     async (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = isFunction(value) ? value(open) : value;
+      const openState = isFunction(value)
+        ? // SAFETY: the union branch narrowed by isFunction is the updater form.
+          (value as (current: boolean) => boolean)(open)
+        : value;
       if (setOpenProp) {
         setOpenProp(openState);
       } else {

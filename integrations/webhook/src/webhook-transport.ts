@@ -1,7 +1,7 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { isIP, type LookupFunction } from "node:net";
 
 import { NodeHttpClient } from "@effect/platform-node";
+import { isString } from "@feeblo/utils/runtime-kind";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -83,10 +83,9 @@ const familyLabelToNumber = {
 export const makeWebhookPinnedLookup =
   (pinnedAddresses: readonly string[]): LookupFunction =>
   (_hostname, options, callback) => {
-    const requestedFamily =
-      isString(options.family)
-        ? familyLabelToNumber[options.family]
-        : options.family;
+    const requestedFamily = isString(options.family)
+      ? familyLabelToNumber[options.family]
+      : options.family;
     const matchingAddresses = pinnedAddresses.filter(
       (address) =>
         requestedFamily === undefined ||

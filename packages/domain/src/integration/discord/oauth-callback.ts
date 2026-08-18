@@ -12,7 +12,9 @@ export interface OAuthCallbackQuery {
   readonly state: string | null;
 }
 
-export const parseDiscordOAuthCallbackUrl = (url: string): OAuthCallbackQuery => {
+export const parseDiscordOAuthCallbackUrl = (
+  url: string
+): OAuthCallbackQuery => {
   const parsed = new URL(url, "http://localhost");
   return {
     code: parsed.searchParams.get("code"),

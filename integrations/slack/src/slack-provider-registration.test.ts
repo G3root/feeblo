@@ -343,7 +343,7 @@ describe("slack provider registration", () => {
         },
         rawBody,
       }) ?? Effect.never
-    // SAFETY: The endpoint/API contract guarantees this response shape.
+      // SAFETY: The endpoint/API contract guarantees this response shape.
     );
     // SAFETY: The endpoint/API contract guarantees this response shape.
     expect(response.status).toBe(200);

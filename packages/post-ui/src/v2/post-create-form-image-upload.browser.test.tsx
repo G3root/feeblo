@@ -51,7 +51,9 @@ function setMemberData(value: MockMember | undefined) {
 }
 // The form's TanStack DB queries are exercised through an in-memory seam that
 // resolves the member / board / status reads the component performs.
-type MockLiveResult = { data: MockMember | typeof board | typeof postStatus | undefined };
+type MockLiveResult = {
+  data: MockMember | typeof board | typeof postStatus | undefined;
+};
 
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@tanstack/react-db", () => ({
@@ -62,7 +64,9 @@ vi.mock("@tanstack/react-db", () => ({
   useLiveQuery: vi.fn((query: (q: never) => MockLiveResult) => {
     let alias = "";
     const fakeQ = {
-      from: (arg: Record<string, string | number | boolean | null | undefined>) => {
+      from: (
+        arg: Record<string, string | number | boolean | null | undefined>
+      ) => {
         alias = Object.keys(arg)[0] ?? "";
         const chain = { where: () => chain, findOne: () => undefined };
         return chain;

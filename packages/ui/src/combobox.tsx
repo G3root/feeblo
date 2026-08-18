@@ -1,5 +1,5 @@
-import { isNumber, isString } from "@feeblo/utils/runtime-kind";
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
+import { isNumber, isString } from "@feeblo/utils/runtime-kind";
 import { ChevronsUpDownIcon, XIcon } from "lucide-react";
 import * as React from "react";
 

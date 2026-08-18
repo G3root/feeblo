@@ -30,7 +30,7 @@ export class RpcError extends Error {
  * unrelated thrown value, so it deliberately does not inspect domain tags or
  * expose internal failure messages.
  */
-export function parseRpcError<T,>(
+export function parseRpcError<T>(
   error: T,
   fallback = "Something went wrong. Please try again."
 ): ParsedRpcError {

@@ -5,7 +5,7 @@ import { VERSION } from "../src/version";
 
 describe("VERSION", () => {
   it("is a non-empty string", () => {
-    expect(typeof VERSION).toBe("string");
+    expect(VERSION).toEqual(expect.any(String));
     expect(VERSION.length).toBeGreaterThan(0);
   });
 });

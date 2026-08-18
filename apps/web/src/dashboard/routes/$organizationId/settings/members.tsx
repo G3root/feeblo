@@ -274,7 +274,7 @@ function InvitationsSection() {
         );
     },
     [organizationId]
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   );
   // SAFETY: The upstream contract guarantees this value here.
   const invitationsSource = (invitationsQuery.data ??
@@ -484,7 +484,7 @@ function MemberListItem({
               onValueChange={async (value) => {
                 if (!value) {
                   throw new Error("value not found");
-                // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+                  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                 }
                 // SAFETY: The upstream contract guarantees this value here.
                 const tx = membersCollection.update(id, (draft) => {
@@ -767,7 +767,8 @@ function InviteMemberForm() {
       />
 
       <div className="flex items-center gap-2">
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        // SAFETY: The runtime invariant checked by the surrounding code
+        guarantees this type.
         <form.AppField
           children={(field) => (
             // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.

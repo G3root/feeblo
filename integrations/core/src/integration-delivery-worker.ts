@@ -164,8 +164,10 @@ export const runIntegrationDeliveryWorkerPoll = ({
                               ...(response.httpStatus !== undefined && {
                                 httpStatus: response.httpStatus,
                               }),
-                              ...(response.externalResourceDrafts !== undefined && {
-                                externalResourceDrafts: response.externalResourceDrafts,
+                              ...(response.externalResourceDrafts !==
+                                undefined && {
+                                externalResourceDrafts:
+                                  response.externalResourceDrafts,
                               }),
                               outcome: { _tag: "Succeeded" } as const,
                             }),

@@ -1,5 +1,5 @@
-import { isObject, isString } from "@feeblo/utils/runtime-kind";
 import { Field as FieldPrimitive } from "@base-ui/react/field";
+import { isObject, isString } from "@feeblo/utils/runtime-kind";
 import type React from "react";
 
 import { Separator } from "./separator";

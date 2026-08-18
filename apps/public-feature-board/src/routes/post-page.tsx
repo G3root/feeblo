@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
@@ -13,6 +12,7 @@ import {
 } from "@feeblo/ui/empty";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";

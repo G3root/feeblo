@@ -1,12 +1,14 @@
 import type { TEmailDeliveryState } from "@feeblo/db/validation-schema/email";
 
+const EMPTY_STATES: readonly TEmailDeliveryState[] = [];
+
 const transitionTargets = {
   accepted: ["delivered", "deferred", "bounced", "failed"],
-  bounced: [],
+  bounced: EMPTY_STATES,
   deferred: ["sending", "expired", "failed", "paused_by_plan", "suppressed"],
-  delivered: [],
-  expired: [],
-  failed: [],
+  delivered: EMPTY_STATES,
+  expired: EMPTY_STATES,
+  failed: EMPTY_STATES,
   paused_by_plan: ["queued", "expired"],
   queued: ["sending", "expired", "failed", "paused_by_plan", "suppressed"],
   sending: [
@@ -19,7 +21,7 @@ const transitionTargets = {
     "paused_by_plan",
     "suppressed",
   ],
-  suppressed: [],
+  suppressed: EMPTY_STATES,
 } satisfies Readonly<
   Record<TEmailDeliveryState, readonly TEmailDeliveryState[]>
 >;
@@ -33,7 +35,11 @@ const deliveryStates = Object.keys(
 export const canTransitionDelivery = (
   from: TEmailDeliveryState,
   to: TEmailDeliveryState
-): boolean => transitionTargets[from].includes(to);
+): boolean => {
+  // SAFETY: transitionTargets indexes every TEmailDeliveryState key.
+  const targets = transitionTargets[from] as readonly TEmailDeliveryState[];
+  return targets.includes(to);
+};
 
 /** Persisted states from which a guarded SQL update may enter the target state. */
 export const deliverySourceStatesFor = (

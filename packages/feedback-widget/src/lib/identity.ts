@@ -7,10 +7,14 @@ export interface WidgetUserIdentity {
         id: string;
         name: string;
         avatar?: string | undefined;
-        customFields?: Record<string, string | number | boolean | null | undefined> | undefined;
+        customFields?:
+          | Record<string, string | number | boolean | null | undefined>
+          | undefined;
       }>
     | undefined;
-  customFields?: Record<string, string | number | boolean | null | undefined> | undefined;
+  customFields?:
+    | Record<string, string | number | boolean | null | undefined>
+    | undefined;
   email?: string | undefined;
   id: string;
   name?: string | undefined;

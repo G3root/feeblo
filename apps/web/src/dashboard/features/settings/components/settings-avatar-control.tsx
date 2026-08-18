@@ -1,4 +1,3 @@
-import { isNumber } from "@feeblo/utils/runtime-kind";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -13,6 +12,7 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { Slider } from "@feeblo/ui/slider";
 import { toastManager } from "@feeblo/ui/toast";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { isNumber } from "@feeblo/utils/runtime-kind";
 import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
@@ -296,8 +296,7 @@ function Root({
                       max={3}
                       min={1}
                       onValueChange={(value) => {
-                        const first =
-                          isNumber(value) ? value : value[0];
+                        const first = isNumber(value) ? value : value[0];
                         setZoom(first ?? 1);
                       }}
                       step={0.1}

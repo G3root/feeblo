@@ -39,13 +39,13 @@ export const BOARD_LANE_COLOR_MAP = {
 } satisfies Record<BoardPostStatus, string>;
 
 export const BOARD_STATUS_INDICATOR_COLOR_MAP = {
-    PENDING: "bg-neutral-500 dark:bg-neutral-400",
-    REVIEW: "bg-amber-600 dark:bg-amber-400",
-    PLANNED: "bg-indigo-600 dark:bg-indigo-400",
-    IN_PROGRESS: "bg-yellow-600 dark:bg-yellow-400",
-    COMPLETED: "bg-emerald-600 dark:bg-emerald-400",
-    CLOSED: "bg-red-600 dark:bg-red-400",
-  } satisfies Record<BoardPostStatus, string>;
+  PENDING: "bg-neutral-500 dark:bg-neutral-400",
+  REVIEW: "bg-amber-600 dark:bg-amber-400",
+  PLANNED: "bg-indigo-600 dark:bg-indigo-400",
+  IN_PROGRESS: "bg-yellow-600 dark:bg-yellow-400",
+  COMPLETED: "bg-emerald-600 dark:bg-emerald-400",
+  CLOSED: "bg-red-600 dark:bg-red-400",
+} satisfies Record<BoardPostStatus, string>;
 
 export function getBoardStatusIndicatorColor(status: string) {
   return (

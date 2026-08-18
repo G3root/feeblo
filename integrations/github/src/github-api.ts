@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import * as GitHub from "@distilled.cloud/github";
 import {
   IntegrationProviderAuthenticationError,
@@ -7,6 +6,7 @@ import {
   IntegrationProviderRateLimitedError,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
+import { isString } from "@feeblo/utils/runtime-kind";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -226,21 +226,19 @@ export interface GitHubApiClient {
 }
 
 /** Extracts the stable `_tag` of a tagged SDK error, if present. */
-const sdkErrorTag = <T,>(error: T): string | undefined =>
+const sdkErrorTag = <T>(error: T): string | undefined =>
   Predicate.isObject(error) && "_tag" in error && isString(error._tag)
     ? error._tag
     : undefined;
 
 /** Extracts a human-readable message from an SDK error, if present. */
-const sdkErrorMessage = <T,>(error: T): string | undefined =>
-  Predicate.isObject(error) &&
-  "message" in error &&
-  isString(error.message)
+const sdkErrorMessage = <T>(error: T): string | undefined =>
+  Predicate.isObject(error) && "message" in error && isString(error.message)
     ? error.message
     : undefined;
 
 /** Extracts a server-provided retry hint from an SDK error, if present. */
-const sdkRetryAfterMs = <T,>(error: T): number | undefined =>
+const sdkRetryAfterMs = <T>(error: T): number | undefined =>
   Predicate.isObject(error) &&
   "retryAfter" in error &&
   Duration.isDuration(error.retryAfter)
@@ -250,7 +248,7 @@ const sdkRetryAfterMs = <T,>(error: T): number | undefined =>
 /** Maps the Effect-native SDK's typed errors onto the integration kernel failure algebra. */
 const mapSdkError =
   (context: string) =>
-  <T,>(error: T): GitHubApiFailure => {
+  <T>(error: T): GitHubApiFailure => {
     if (HttpClientError.isHttpClientError(error)) {
       return new IntegrationProviderTemporaryFailure({
         message: `GitHub request failed during ${context}`,
@@ -405,9 +403,9 @@ const withSdk = <A, E>(
 
 /** Decodes an SDK response back through one of the repository's stricter schemas. */
 const decodeSdkResponse =
-  <S extends Schema.Constraint>(schema: S, context: string) =>
+  <S extends Schema.Constraint, V>(schema: S, context: string) =>
   (
-    value: Schema.Json
+    value: V
   ): Effect.Effect<S["Type"], GitHubApiFailure, S["DecodingServices"]> =>
     Schema.decodeUnknownEffect(schema)(value).pipe(
       Effect.mapError(

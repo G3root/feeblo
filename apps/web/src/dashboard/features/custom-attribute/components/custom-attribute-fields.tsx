@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import type {
   TCompanyAttributeValue,
   TCompanyAttributeValueUpsert,
@@ -11,6 +10,7 @@ import { CompanyAttributeValueId, ContactAttributeValueId } from "@feeblo/id";
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
+import { isString } from "@feeblo/utils/runtime-kind";
 
 import {
   companyAttributeValueCollection,
@@ -183,9 +183,7 @@ export function toCustomAttributeValueColumns(
       return {
         ...emptyColumns,
         valueDate:
-          isString(input) && input
-            ? new Date(`${input}T00:00:00`)
-            : null,
+          isString(input) && input ? new Date(`${input}T00:00:00`) : null,
       };
     case "DECIMAL":
       return {

@@ -103,9 +103,7 @@ const pgliteDbEffect = PgDrizzlePglite.make({ relations }).pipe(
   // SAFETY: PgDrizzlePglite.make returns a fully-initialized EffectPgDatabase;
   // the cast bridges the driver-specific return type to the pg dialect type
   // used by the rest of the codebase.
-  Effect.map(
-    (db) => db as PgDrizzle.EffectPgDatabase<typeof relations>
-  )
+  Effect.map((db) => db as PgDrizzle.EffectPgDatabase<typeof relations>)
 );
 
 // Define a DB service tag for dependency injection

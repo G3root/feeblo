@@ -16,7 +16,14 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, count, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
-import { createContext, type ReactNode, use, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
@@ -91,14 +98,7 @@ function ReactionPickerProvider({
         reactionList: reactionList ?? new Map(),
       },
     }),
-    [
-      disabled,
-      existingReactions,
-      label,
-      onToggle,
-      open,
-      reactionList,
-    ]
+    [disabled, existingReactions, label, onToggle, open, reactionList]
   );
 
   return (

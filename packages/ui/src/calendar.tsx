@@ -68,8 +68,8 @@ export function Calendar({
         : baseClass;
 
       return acc;
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    // SAFETY: The upstream contract guarantees this value here.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The upstream contract guarantees this value here.
     },
     // SAFETY: The upstream contract guarantees this value here.
     { ...defaultClassNames } as typeof defaultClassNames
@@ -140,7 +140,7 @@ export function Calendar({
     ...props,
   };
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
   return (
     <DayPicker

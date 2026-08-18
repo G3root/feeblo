@@ -1,4 +1,3 @@
-import { isObject } from "@feeblo/utils/runtime-kind";
 import { Database } from "@feeblo/db";
 import {
   parseSlackOAuthCallbackUrl,
@@ -13,6 +12,7 @@ import {
   slackMessageActionCapabilityKey,
   slackProviderKey,
 } from "@feeblo/integration-slack/manifest";
+import { isObject } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -40,7 +40,7 @@ const headerValue = (
  * already signature-verified and fully decoded the body, so this guard only
  * discriminates on the `kind` tag instead of re-running the full schema.
  */
-const isParsedSlackInboundRequest = <T,>(
+const isParsedSlackInboundRequest = <T>(
   value: T
 ): value is Extract<T, ParsedSlackInboundRequest> =>
   isObject(value) &&

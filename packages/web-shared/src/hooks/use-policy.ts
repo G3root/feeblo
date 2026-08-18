@@ -1,7 +1,7 @@
-import { isFunction } from "@feeblo/utils/runtime-kind";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import type { Permission, Role } from "@feeblo/permissions";
 import { can, isMember, roleIn } from "@feeblo/permissions";
+import { isFunction } from "@feeblo/utils/runtime-kind";
 import { type ReactNode, useMemo } from "react";
 
 import { useAuthState } from "./use-auth-state";
@@ -108,9 +108,9 @@ export function PolicyGuard({
   if (isFunction(children)) {
     // SAFETY: the union branch narrowed by isFunction is the render-function
     // form of children.
-    const renderChildren = children as (
-      result: { allowed: boolean }
-    ) => ReactNode;
+    const renderChildren = children as (result: {
+      allowed: boolean;
+    }) => ReactNode;
     if (isPending) {
       return renderChildren({ allowed: false });
     }

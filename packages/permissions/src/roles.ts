@@ -45,7 +45,7 @@ export const INVITABLE_ROLES = [
 
 export type InvitableRole = (typeof INVITABLE_ROLES)[number];
 
-export const isRole = <T,>(value: T): value is T & Role =>
+export const isRole = <T>(value: T): value is T & Role =>
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   isString(value) && (ROLES as readonly string[]).includes(value);
 

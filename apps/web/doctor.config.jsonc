@@ -16,6 +16,6 @@
   // lower `supplyChain.minScore`. The rule stays ENABLED and still flags any
   // dependency scoring below 31; only this one accepted dependency passes.
   "supplyChain": {
-    "minScore": 31
-  }
+    "minScore": 31,
+  },
 }

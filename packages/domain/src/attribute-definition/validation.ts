@@ -1,5 +1,5 @@
-import { isBoolean, isNumber, isString } from "@feeblo/utils/runtime-kind";
 import type { schema } from "@feeblo/db";
+import { isBoolean, isNumber, isString } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 

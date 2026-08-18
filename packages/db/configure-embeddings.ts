@@ -1,8 +1,8 @@
-import { isObject } from "@feeblo/utils/runtime-kind";
 import { parseArgs } from "node:util";
 
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
+import { isObject } from "@feeblo/utils/runtime-kind";
 import postgres from "postgres";
 
 const DEFAULT_DIMENSIONS = 1536;

@@ -84,7 +84,7 @@ describe("subscribe / unsubscribe", () => {
 
     emitWidgetEvent("widgetReady", undefined);
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
     const event = callback.mock.calls[0]?.[0] as CustomEvent<FeebloEventDetail>;
     expect(event.detail.data).toBeUndefined();
@@ -151,7 +151,7 @@ describe("emitWidgetEvent", () => {
 
     emitWidgetEvent("widgetReady", undefined);
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
     expect(handler).toHaveBeenCalledTimes(1);
     // SAFETY: The upstream contract guarantees this value here.

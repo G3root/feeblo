@@ -125,7 +125,7 @@ export const createFeedBackAction = action(
       body: JSON.stringify(body),
     });
 
-// SAFETY: The endpoint/API contract guarantees this response shape.
+    // SAFETY: The endpoint/API contract guarantees this response shape.
 
     // SAFETY: The endpoint/API contract guarantees this response shape.
     if (!response.ok) {

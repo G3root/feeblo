@@ -230,9 +230,13 @@ const toMailSendResult = (
   messageId: suppliedMessageId ?? receipt.messageId,
   providerMetadata: {
     acceptedRecipientCount: receipt.acceptedRecipientCount,
-    ...(receipt.providerMessageId && { providerMessageId: receipt.providerMessageId }),
+    ...(receipt.providerMessageId && {
+      providerMessageId: receipt.providerMessageId,
+    }),
     rejectedRecipientCount: receipt.rejectedRecipientCount,
-    ...(receipt.responseCode !== undefined && { responseCode: receipt.responseCode }),
+    ...(receipt.responseCode !== undefined && {
+      responseCode: receipt.responseCode,
+    }),
   },
 });
 
@@ -311,7 +315,9 @@ const makeNodemailerTransport = Effect.gen(function* () {
       username._tag === "Some"
         ? {
             user: username.value,
-            ...(password._tag === "Some" && { pass: Redacted.value(password.value) }),
+            ...(password._tag === "Some" && {
+              pass: Redacted.value(password.value),
+            }),
           }
         : undefined,
     ...(service._tag === "Some" && { service: service.value }),
@@ -336,7 +342,9 @@ const makeNodemailerTransport = Effect.gen(function* () {
             acceptedRecipientCount: receipt.accepted.length,
             messageId: receipt.messageId,
             rejectedRecipientCount: receipt.rejected.length,
-            ...(smtpResponseCode(receipt.response) !== undefined && { responseCode: smtpResponseCode(receipt.response) }),
+            ...(smtpResponseCode(receipt.response) !== undefined && {
+              responseCode: smtpResponseCode(receipt.response),
+            }),
           };
         },
         catch: classifyNodemailerFailure,

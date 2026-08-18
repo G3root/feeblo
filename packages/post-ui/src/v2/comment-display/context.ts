@@ -42,9 +42,8 @@ export type CommentDisplayContextValue = {
   state: CommentDisplayState;
 };
 
-export const CommentDisplayContext = createContext<CommentDisplayContextValue | null>(
-  null
-);
+export const CommentDisplayContext =
+  createContext<CommentDisplayContextValue | null>(null);
 
 export function useCommentDisplay() {
   const value = use(CommentDisplayContext);

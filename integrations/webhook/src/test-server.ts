@@ -1,7 +1,7 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import * as http from "node:http";
 
 import { afterEach } from "@effect/vitest";
+import { isString } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 
 /** Ephemeral loopback servers created by tests; closed after every test. */

@@ -12,12 +12,7 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import {
-  type FormEvent,
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
@@ -317,11 +312,7 @@ export function PostCreateForm() {
   }
 
   return (
-    <form
-      className="contents"
-      id="post-create-form"
-      onSubmit={handleSubmit}
-    >
+    <form className="contents" id="post-create-form" onSubmit={handleSubmit}>
       <DialogPanel>
         <div className="space-y-4">
           <PostTitleField form={form} />

@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { asLegid, IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
@@ -8,6 +7,7 @@ import {
   DiscordOAuthState,
 } from "@feeblo/integration-discord";
 import { discordProviderKey } from "@feeblo/integration-discord/manifest";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -77,8 +77,9 @@ const makeFakeDiscordApiClient = (
     oauth2TokenExchange: () => {
       calls.push({ method: "oauth2.token" });
       exchangeNumber += 1;
-      const exchangedGuildId =
-        isString(guildId) ? guildId : guildId(exchangeNumber);
+      const exchangedGuildId = isString(guildId)
+        ? guildId
+        : guildId(exchangeNumber);
       return Effect.succeed({
         access_token: "discord-user-token",
         expires_in: 604_800,

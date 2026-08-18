@@ -1,5 +1,5 @@
-import { isFunction, isNumber } from "@feeblo/utils/runtime-kind";
 import { Input as InputPrimitive } from "@base-ui/react/input";
+import { isFunction, isNumber } from "@feeblo/utils/runtime-kind";
 import type * as React from "react";
 
 import { cn } from "./utils";

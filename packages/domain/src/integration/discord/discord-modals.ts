@@ -164,7 +164,9 @@ export const buildFeedbackModal = ({
           style: 1,
           required: true,
           max_length: TITLE_MAX_LENGTH,
-          ...(initialTitle.length > 0 && { value: truncate(initialTitle, TITLE_MAX_LENGTH) }),
+          ...(initialTitle.length > 0 && {
+            value: truncate(initialTitle, TITLE_MAX_LENGTH),
+          }),
         },
       },
       {
@@ -215,4 +217,6 @@ export const buildEphemeralMessage = (
 export const buildPong = (): DiscordInteractionCallback => ({ type: 1 });
 
 /** Discord deferred-update acknowledgment for unhandled interaction types (callback type 6). */
-export const buildDeferredUpdate = (): DiscordInteractionCallback => ({ type: 6 });
+export const buildDeferredUpdate = (): DiscordInteractionCallback => ({
+  type: 6,
+});

@@ -1,4 +1,3 @@
-import { isObject } from "@feeblo/utils/runtime-kind";
 import {
   IntegrationProviderAuthenticationError,
   IntegrationProviderInvalidConfigurationError,
@@ -6,6 +5,7 @@ import {
   IntegrationProviderRateLimitedError,
   IntegrationProviderTemporaryFailure,
 } from "@feeblo/integration-core";
+import { isObject } from "@feeblo/utils/runtime-kind";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -320,12 +320,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
     // The Slack Web API always answers HTTP 200 and signals failure through
     // the `ok: false` envelope; classify that envelope (and any non-2xx
     // status) into the typed provider failure algebra.
-    if (
-      isObject(body) &&
-      body !== null &&
-      "ok" in body &&
-      body.ok === true
-    ) {
+    if (isObject(body) && body !== null && "ok" in body && body.ok === true) {
       return body;
     }
     return yield* classifySlackApiError(
@@ -337,13 +332,13 @@ export const makeSlackApiClient = (): SlackApiClient => {
     );
   });
 
-  const jsonRequest = (
+  const jsonRequest = <V>(
     path: string,
     {
       body,
       botToken,
     }: {
-      readonly body: Record<string, string | number | boolean | null | undefined>;
+      readonly body: Record<string, V>;
       readonly botToken?: Redacted.Redacted<string>;
     },
     context: string

@@ -1,5 +1,5 @@
-import { hasWindow, isObject } from "@feeblo/utils/runtime-kind";
 import { toastManager } from "@feeblo/ui/toast";
+import { hasWindow, isObject } from "@feeblo/utils/runtime-kind";
 import {
   authClient,
   verificationOtpEndpoint,

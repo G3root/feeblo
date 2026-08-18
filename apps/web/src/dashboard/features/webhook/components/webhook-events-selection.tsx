@@ -71,28 +71,29 @@ type WebhookEventSelectionFieldProps = {
   readonly idPrefix: string;
 };
 
-  // SAFETY: The upstream contract guarantees a string here.
+// SAFETY: The upstream contract guarantees a string here.
 /** Default id prefix for the event-selection field; consumers override it at mount. */
 const webhookIdPrefix: string = "webhook";
 
-export const WebhookEventSelectionField = /* SAFETY: withForm returns a component matching the form's props contract; consumers supply the real idPrefix. */
+export const WebhookEventSelectionField =
+  /* SAFETY: withForm returns a component matching the form's props contract; consumers supply the real idPrefix. */
   withForm({
-  ...webhookFormOpts,
-  // SAFETY: The upstream contract guarantees a string here.
-  props: { idPrefix: webhookIdPrefix },
-  render: ({ form, idPrefix }) => (
-    <form.AppField
-      children={(field) => (
-        <Field name={field.name}>
-          <FieldLabel>Events</FieldLabel>
-          <WebhookEventSelection
-            eventTypes={field.state.value}
-            idPrefix={idPrefix}
-            onChange={(eventTypes) => field.handleChange(eventTypes)}
-          />
-        </Field>
-      )}
-      name="eventTypes"
-    />
-  ),
-}) as ComponentType<WebhookEventSelectionFieldProps>;
+    ...webhookFormOpts,
+    // SAFETY: The upstream contract guarantees a string here.
+    props: { idPrefix: webhookIdPrefix },
+    render: ({ form, idPrefix }) => (
+      <form.AppField
+        children={(field) => (
+          <Field name={field.name}>
+            <FieldLabel>Events</FieldLabel>
+            <WebhookEventSelection
+              eventTypes={field.state.value}
+              idPrefix={idPrefix}
+              onChange={(eventTypes) => field.handleChange(eventTypes)}
+            />
+          </Field>
+        )}
+        name="eventTypes"
+      />
+    ),
+  }) as ComponentType<WebhookEventSelectionFieldProps>;

@@ -70,13 +70,7 @@ export function PostCollectionsProvider({
       organizationId,
       suggestPosts,
     }),
-    [
-      collections,
-      getPostHref,
-      onAuthRequired,
-      organizationId,
-      suggestPosts,
-    ]
+    [collections, getPostHref, onAuthRequired, organizationId, suggestPosts]
   );
 
   return (

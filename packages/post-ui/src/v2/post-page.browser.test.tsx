@@ -61,7 +61,7 @@ vi.mock("./subscribe-toggle", () => ({
   SubscribeButton: () => <button type="button">subscribe</button>,
 }));
 
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 const board = { visibility: "PUBLIC" } as TBoard;
 
 function state({

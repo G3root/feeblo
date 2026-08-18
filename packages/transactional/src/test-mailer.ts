@@ -74,9 +74,13 @@ const resultForOutcome = (
     messageId: message.messageId ?? defaultMessageId(attempt),
     providerMetadata: {
       acceptedRecipientCount: accepted ? 1 : 0,
-      ...(outcome?.providerMessageId && { providerMessageId: outcome.providerMessageId }),
+      ...(outcome?.providerMessageId && {
+        providerMessageId: outcome.providerMessageId,
+      }),
       rejectedRecipientCount: accepted ? 0 : 1,
-      ...(outcome?.responseCode !== undefined && { responseCode: outcome.responseCode }),
+      ...(outcome?.responseCode !== undefined && {
+        responseCode: outcome.responseCode,
+      }),
     },
   };
 };
@@ -131,7 +135,9 @@ const mailerLayer = Layer.effect(
                     {
                       ...(message.from && { from: message.from }),
                       ...(message.headers && { headers: message.headers }),
-                      ...(message.messageId && { messageId: message.messageId }),
+                      ...(message.messageId && {
+                        messageId: message.messageId,
+                      }),
                       html,
                       subject: message.subject,
                       text,
@@ -151,14 +157,18 @@ const mailerLayer = Layer.effect(
               message: "Test SMTP provider rejected the message",
               operation: "TestMailer.send",
               provider: "smtp",
-              ...(attempt.outcome.smtpStatusCode !== undefined && { smtpStatusCode: attempt.outcome.smtpStatusCode }),
+              ...(attempt.outcome.smtpStatusCode !== undefined && {
+                smtpStatusCode: attempt.outcome.smtpStatusCode,
+              }),
             });
           case "temporaryFailure":
             return yield* new MailTemporaryDeliveryError({
               message: "Test SMTP provider temporarily rejected the message",
               operation: "TestMailer.send",
               provider: "smtp",
-              ...(attempt.outcome.smtpStatusCode !== undefined && { smtpStatusCode: attempt.outcome.smtpStatusCode }),
+              ...(attempt.outcome.smtpStatusCode !== undefined && {
+                smtpStatusCode: attempt.outcome.smtpStatusCode,
+              }),
             });
           case "uncertainFailure":
             return yield* new MailUncertainDeliveryError({

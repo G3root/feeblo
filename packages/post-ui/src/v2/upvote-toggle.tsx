@@ -78,9 +78,7 @@ function UpvoteToggleProvider({
   );
 
   return (
-    <UpvoteToggleContext value={contextValue}>
-      {children}
-    </UpvoteToggleContext>
+    <UpvoteToggleContext value={contextValue}>{children}</UpvoteToggleContext>
   );
 }
 

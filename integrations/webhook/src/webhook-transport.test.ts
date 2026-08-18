@@ -1,3 +1,8 @@
+import type { LookupAddress } from "node:dns";
+
+/** Captured lookup result for the single-address (non-all) form. */
+type LookupCapture = { address: string; family: number | undefined };
+
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -30,7 +35,7 @@ describe("makeWebhookPinnedLookup", () => {
       "2a01:4f8:121:114d::2",
       "178.63.67.153",
     ]);
-    let captured: { address: string; family: number } | undefined;
+    let captured: readonly LookupAddress[] | string | undefined;
     lookup("webhook.site", { all: true }, (error, result) => {
       expect(error).toBeNull();
       captured = result;
@@ -43,7 +48,7 @@ describe("makeWebhookPinnedLookup", () => {
 
   it("keeps the classic single-address form when `all` is not requested", () => {
     const lookup = makeWebhookPinnedLookup(["178.63.67.153"]);
-    let captured: { address: string; family: number } | undefined;
+    let captured: LookupCapture | undefined;
     lookup("webhook.site", {}, (error, address, family) => {
       expect(error).toBeNull();
       captured = { address, family };
@@ -56,7 +61,7 @@ describe("makeWebhookPinnedLookup", () => {
       "2a01:4f8:121:114d::2",
       "178.63.67.153",
     ]);
-    let captured: { address: string; family: number } | undefined;
+    let captured: readonly LookupAddress[] | string | undefined;
     lookup("webhook.site", { all: true, family: 4 }, (error, result) => {
       expect(error).toBeNull();
       captured = result;
@@ -69,7 +74,7 @@ describe("makeWebhookPinnedLookup", () => {
       "178.63.67.153",
       "2a01:4f8:121:114d::2",
     ]);
-    let captured: { address: string; family: number } | undefined;
+    let captured: readonly LookupAddress[] | string | undefined;
     lookup("webhook.site", { all: true, family: 6 }, (error, result) => {
       expect(error).toBeNull();
       captured = result;
@@ -82,7 +87,7 @@ describe("makeWebhookPinnedLookup", () => {
       "2a01:4f8:121:114d::2",
       "178.63.67.153",
     ]);
-    let captured: { address: string; family: number } | undefined;
+    let captured: LookupCapture | undefined;
     lookup("webhook.site", { family: 4 }, (error, address, family) => {
       expect(error).toBeNull();
       captured = { address, family };
@@ -92,7 +97,7 @@ describe("makeWebhookPinnedLookup", () => {
 
   it("returns no addresses when no pinned address matches the family", () => {
     const lookup = makeWebhookPinnedLookup(["2a01:4f8:121:114d::2"]);
-    let captured: { address: string; family: number } | undefined;
+    let captured: readonly LookupAddress[] | string | undefined;
     lookup("webhook.site", { all: true, family: 4 }, (error, result) => {
       expect(error).toBeNull();
       captured = result;

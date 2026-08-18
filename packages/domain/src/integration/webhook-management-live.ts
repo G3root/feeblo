@@ -367,15 +367,15 @@ export const WebhookManagementServiceLive = Layer.effect(
                   signingKeyring: {
                     current: Redacted.value(credentials.signingKeyring.current),
                     ...(credentials.signingKeyring.previous !== undefined && {
-                          previous: {
-                            expiresAt: DateTime.makeUnsafe(
-                              credentials.signingKeyring.previous.expiresAt
-                            ),
-                            secret: Redacted.value(
-                              credentials.signingKeyring.previous.secret
-                            ),
-                          },
-                        }),
+                      previous: {
+                        expiresAt: DateTime.makeUnsafe(
+                          credentials.signingKeyring.previous.expiresAt
+                        ),
+                        secret: Redacted.value(
+                          credentials.signingKeyring.previous.secret
+                        ),
+                      },
+                    }),
                   },
                 }
               ).pipe(
@@ -391,7 +391,9 @@ export const WebhookManagementServiceLive = Layer.effect(
             yield* db
               .update(schema.integrationConnectionTable)
               .set({
-                ...(input.name === undefined ? undefined : { name: input.name }),
+                ...(input.name === undefined
+                  ? undefined
+                  : { name: input.name }),
                 credentialsCiphertext,
                 safeDisplayMetadata: { hostname },
               })
@@ -718,13 +720,13 @@ export const WebhookManagementServiceLive = Layer.effect(
                   signingKeyring: {
                     current: Redacted.value(keyring.current),
                     ...(keyring.previous !== undefined && {
-                          previous: {
-                            expiresAt: DateTime.makeUnsafe(
-                              keyring.previous.expiresAt
-                            ),
-                            secret: Redacted.value(keyring.previous.secret),
-                          },
-                        }),
+                      previous: {
+                        expiresAt: DateTime.makeUnsafe(
+                          keyring.previous.expiresAt
+                        ),
+                        secret: Redacted.value(keyring.previous.secret),
+                      },
+                    }),
                   },
                 }
               ).pipe(

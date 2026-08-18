@@ -1,7 +1,7 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { currentDb, schema } from "@feeblo/db";
 import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { and, count, desc, eq, isNull, lt, or } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";

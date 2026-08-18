@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { currentDb, type Database, schema } from "@feeblo/db";
 import {
   type DiscordEmbed,
@@ -10,6 +9,7 @@ import type {
   DiscordModalSubmitPayload,
 } from "@feeblo/integration-discord/inbound-schema";
 import { discordProviderKey } from "@feeblo/integration-discord/manifest";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -177,7 +177,10 @@ export const makeDiscordInboundServiceLive = (): Layer.Layer<
             channelId: payload.channel_id,
             guildId: payload.guild_id,
             initialTitle: (messageText ?? "").trim().slice(0, TITLE_INPUT_MAX),
-            ...(payload.data.type === 3 && payload.data.target_id !== undefined && { messageId: payload.data.target_id }),
+            ...(payload.data.type === 3 &&
+              payload.data.target_id !== undefined && {
+                messageId: payload.data.target_id,
+              }),
             organizationId: connection.value.organizationId,
           });
         });

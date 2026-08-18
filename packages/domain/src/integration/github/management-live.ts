@@ -46,7 +46,7 @@ const databaseError = (operation: string) => () =>
   });
 
 /** Failures that prove GitHub never created the issue, so the reservation can be released. */
-const isDefinitelyNonApplied = <T,>(error: T): boolean =>
+const isDefinitelyNonApplied = <T>(error: T): boolean =>
   Schema.is(UnauthorizedError)(error) ||
   Schema.is(NotFoundError)(error) ||
   Schema.is(BadRequestError)(error);
@@ -461,8 +461,12 @@ const makeGitHubManagementService = Effect.gen(function* () {
         const providerConfig = {
           version: 1,
           ...(input.boardId === null ? undefined : { boardId: input.boardId }),
-          ...(input.repositoryOwner !== null && { repositoryOwner: input.repositoryOwner }),
-          ...(input.repositoryName !== null && { repositoryName: input.repositoryName }),
+          ...(input.repositoryOwner !== null && {
+            repositoryOwner: input.repositoryOwner,
+          }),
+          ...(input.repositoryName !== null && {
+            repositoryName: input.repositoryName,
+          }),
         };
         yield* db
           .insert(schema.integrationRouteTable)

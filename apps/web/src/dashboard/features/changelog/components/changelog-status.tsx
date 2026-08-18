@@ -14,10 +14,10 @@ import {
 } from "../constants";
 
 const CHANGELOG_STATUS_STYLES = {
-    draft: "default",
-    scheduled: "info",
-    published: "success",
-  } satisfies Record<ChangelogStatus, BadgeProps["variant"]>;
+  draft: "default",
+  scheduled: "info",
+  published: "success",
+} satisfies Record<ChangelogStatus, BadgeProps["variant"]>;
 
 export function getChangelogStatusLabel(status: ChangelogStatus) {
   return CHANGELOG_STATUS_LABELS[status];

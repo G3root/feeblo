@@ -182,10 +182,10 @@ export class Embed {
         }
       },
       { once: true }
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     );
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
     window.addEventListener("message", handleMessage);
     // SAFETY: The upstream contract guarantees this value here.
@@ -419,7 +419,7 @@ export class Embed {
       // SAFETY: The event target is the expected DOM element type for this handler.
       if (e.key === "Escape") {
         this.close();
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       }
     };
     // SAFETY: The event target is the expected DOM element type for this handler.
@@ -454,7 +454,7 @@ export class Embed {
     }
   }
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
   destroy(): void {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -463,7 +463,7 @@ export class Embed {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     this.cleanupPositioning = null;
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
     const container = document.getElementById(
       CONTAINER_ID

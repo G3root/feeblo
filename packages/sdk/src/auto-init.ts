@@ -63,12 +63,11 @@ function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
   const mode = globalConfig?.mode ?? scriptDataset.feebloMode;
   const placement = globalConfig?.placement ?? scriptDataset.feebloPlacement;
   const modulesValue = scriptDataset.feebloModules;
+  // SAFETY: the parsed module list is one of the supported EmbedOptions modules.
   const modules =
     globalConfig?.modules ??
     (modulesValue
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      ? (/* SAFETY: the parsed module list is one of the supported EmbedOptions modules. */
-        modulesValue
+      ? (modulesValue
           .split(",")
           .map((value) => value.trim())
           .filter((value) => value.length > 0) as EmbedOptions["modules"])
@@ -95,7 +94,7 @@ function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
   }
   if (modules) {
     options.modules = modules;
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   }
   if (placement) {
     // SAFETY: The upstream contract guarantees this value here.

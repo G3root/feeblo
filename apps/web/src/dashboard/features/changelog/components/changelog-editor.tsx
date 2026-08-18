@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
@@ -17,6 +16,7 @@ import { Spinner } from "@feeblo/ui/spinner";
 import { toastManager } from "@feeblo/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import * as dayjs from "@feeblo/utils/dayjs";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import {
   editorMediaUploadEndpoint,

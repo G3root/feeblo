@@ -174,19 +174,19 @@ export const renderChannelUpdateMessageEmbed = (
     title,
     url: message.actionUrl,
     ...(message.facts.length > 0 && {
-          description: truncate(
-            message.facts
-              .map(
-                ({ label, value }) =>
-                  `**${truncate(
-                    formatDiscordMetadataValue(label),
-                    TRUNCATED_FACT_LABEL_MAX
-                  )}:** ${truncate(value, TRUNCATED_FACT_VALUE_MAX)}`
-              )
-              .join("\n"),
-            descriptionMax
-          ),
-        }),
+      description: truncate(
+        message.facts
+          .map(
+            ({ label, value }) =>
+              `**${truncate(
+                formatDiscordMetadataValue(label),
+                TRUNCATED_FACT_LABEL_MAX
+              )}:** ${truncate(value, TRUNCATED_FACT_VALUE_MAX)}`
+          )
+          .join("\n"),
+        descriptionMax
+      ),
+    }),
     color: EMBED_COLOR,
     ...(footer === undefined ? undefined : { footer }),
   };

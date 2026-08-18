@@ -13,7 +13,8 @@ type PossibleRef<T> = React.Ref<T> | undefined;
  */
 function setRef<T>(ref: PossibleRef<T>, value: T) {
   if (isFunction(ref)) {
-    return ref(value);
+    // SAFETY: the union branch narrowed by isFunction is the callback-ref form.
+    return (ref as (instance: T) => void)(value);
   }
 
   if (ref !== null && ref !== undefined) {

@@ -17,9 +17,9 @@
   "devDependencies": {
     "@feeblo/db": "workspace:*",
     "@feeblo/permissions": "workspace:*",
+    "@feeblo/utils": "workspace:*",
     "@playwright/test": "^1.61.1",
     "@types/node": "catalog:",
-    "tsx": "catalog:",
-    "@feeblo/utils": "workspace:*"
+    "tsx": "catalog:"
   }
 }

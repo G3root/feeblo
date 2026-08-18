@@ -271,7 +271,7 @@ describe("parseContactCustomAttributes", () => {
         )
       );
       expect.fail("Expected error was not thrown");
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     } catch (error) {
       // SAFETY: The upstream contract guarantees this value here.
       expect(error).toBeInstanceOf(DataValidationError);
@@ -361,7 +361,7 @@ describe("parseContactCustomAttributes", () => {
       );
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       expect.fail("Expected error was not thrown");
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     } catch (error) {
       // SAFETY: The upstream contract guarantees this value here.
       expect(error).toBeInstanceOf(DataValidationError);
@@ -383,11 +383,11 @@ describe("parseContactCustomAttributes", () => {
           { customFields: { birthday: "not-a-date" } },
           [def]
         )
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       );
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       expect.fail("Expected error was not thrown");
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     } catch (error) {
       // SAFETY: The upstream contract guarantees this value here.
       expect(error).toBeInstanceOf(DataValidationError);
@@ -573,11 +573,11 @@ describe("parsePersonAttributes", () => {
       await Effect.runPromise(
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         parsePersonAttributes({}, contactDefs, companyDefs)
-      // SAFETY: The upstream contract guarantees this value here.
+        // SAFETY: The upstream contract guarantees this value here.
       );
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       expect.fail("Expected error was not thrown");
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     } catch (error) {
       // SAFETY: The upstream contract guarantees this value here.
       expect(error).toBeInstanceOf(DataValidationError);
@@ -594,11 +594,11 @@ describe("parsePersonAttributes", () => {
       await Effect.runPromise(
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs)
-      // SAFETY: The upstream contract guarantees this value here.
+        // SAFETY: The upstream contract guarantees this value here.
       );
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       expect.fail("Expected error was not thrown");
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     } catch (error) {
       // SAFETY: The upstream contract guarantees this value here.
       expect(error).toBeInstanceOf(DataValidationError);

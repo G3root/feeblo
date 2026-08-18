@@ -49,7 +49,6 @@ type EncodedIntentPayload = Schema.Codec.Encoded<typeof EmailIntentPayload>;
 
 /** Raw value space of rows read back from the outbox/delivery tables. */
 
-
 export type RecordEmailIntentInput = EmailIntentWriteFields & {
   readonly kind: Exclude<EmailIntent["kind"], "post.status_changed">;
   readonly payload: Exclude<
@@ -353,7 +352,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           // SAFETY: the stored row is the encoded outbox record; the decoder
           // re-validates it before it is used.
           row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
-           "findPending.decodeIntent"
+          "findPending.decodeIntent"
         )
       );
     }
@@ -383,7 +382,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           // SAFETY: the stored row is the encoded outbox record; the decoder
           // re-validates it before it is used.
           row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
-           "findPausedByPlan.decodeIntent"
+          "findPausedByPlan.decodeIntent"
         )
       );
     }
@@ -398,7 +397,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           // SAFETY: the stored row is the encoded outbox record; the decoder
           // re-validates it before it is used.
           row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
-           "findById.decodeIntent"
+          "findById.decodeIntent"
         )
       : undefined;
   });
@@ -410,11 +409,11 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       });
       return row
         ? yield* decodeEmailDelivery(
-          // SAFETY: the stored row is the encoded delivery record; the decoder
-          // re-validates it before it is used.
-          row as Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
-           "findDeliveryById.decodeDelivery"
-        )
+            // SAFETY: the stored row is the encoded delivery record; the decoder
+            // re-validates it before it is used.
+            row as Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
+            "findDeliveryById.decodeDelivery"
+          )
         : undefined;
     }
   );
@@ -620,11 +619,11 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .limit(limit);
     return yield* Effect.forEach(rows, (row) =>
       decodeEmailDelivery(
-          // SAFETY: the stored row is the encoded delivery record; the decoder
-          // re-validates it before it is used.
-          row as Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
-           "findDueDeliveries.decodeDelivery"
-        )
+        // SAFETY: the stored row is the encoded delivery record; the decoder
+        // re-validates it before it is used.
+        row as Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
+        "findDueDeliveries.decodeDelivery"
+      )
     );
   });
 

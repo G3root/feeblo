@@ -1,5 +1,5 @@
-import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { createAuthClient } from "@feeblo/auth/client";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { z } from "zod";
 
 import { getClientTimeZone } from "./client-hints";
@@ -12,9 +12,7 @@ const API_URL = getRuntimePublicEnv().apiUrl;
 // URL and appends "/api/auth" itself, so a relative value resolves to the bare
 // page origin.
 const resolvedApiUrl =
-  API_URL?.startsWith("/") && hasWindow()
-    ? window.location.origin
-    : API_URL;
+  API_URL?.startsWith("/") && hasWindow() ? window.location.origin : API_URL;
 const baseUrl = resolvedApiUrl?.endsWith("/")
   ? resolvedApiUrl
   : `${resolvedApiUrl}/`;

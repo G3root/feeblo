@@ -1,9 +1,9 @@
-import { hasWindow } from "@feeblo/utils/runtime-kind";
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { Upvote } from "@feeblo/domain/upvote/schema";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import {
   getCommentReactionCollectionKey,
   getPostReactionCollectionKey,
@@ -1005,7 +1005,7 @@ export const postReactionCollection = createCollection(
         }
       );
       return [...data];
-    // SAFETY: The endpoint/API contract guarantees this response shape.
+      // SAFETY: The endpoint/API contract guarantees this response shape.
     },
     // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
@@ -1141,7 +1141,7 @@ export const postSubscriptionCollection = createCollection(
       );
       // SAFETY: The endpoint/API contract guarantees this response shape.
       return [...data];
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     },
     // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,

@@ -1,4 +1,5 @@
 import { hasWindow, isObject, isString } from "@feeblo/utils/runtime-kind";
+
 import type { WidgetModule } from "./config";
 import { isSupportedLocale } from "./config";
 import type { WidgetIdentity } from "./identity";
@@ -42,12 +43,14 @@ const PARENT_EVENT_NAMES = new Set<string>([
   "IDENTIFY",
 ]);
 
-export function isParentMessage<T,>(
+export function isParentMessage<T>(
   value: T
 ): value is Extract<T, ParentMessage> {
   // SAFETY: isObject establishes that `value` is a non-null object; the
   // optional-field view below only exposes the claims the guard inspects.
-  const record = isObject(value) ? (value as { event?: unknown; data?: unknown }) : undefined;
+  const record = isObject(value)
+    ? (value as { event?: unknown; data?: unknown })
+    : undefined;
   if (record === undefined || !("event" in record)) {
     return false;
   }
@@ -95,7 +98,9 @@ export function isParentMessage<T,>(
       );
     case "IDENTIFY":
       return (
-        "id" in dataRecord && isString(dataRecord.id) && dataRecord.id.length > 0
+        "id" in dataRecord &&
+        isString(dataRecord.id) &&
+        dataRecord.id.length > 0
       );
   }
   return false;

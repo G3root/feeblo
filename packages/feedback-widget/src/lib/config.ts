@@ -16,12 +16,13 @@ export interface WidgetConfig {
 const fallback: WidgetConfig = { mode: "feedback", modules: ["feedback"] };
 
 export function getWidgetConfig(): WidgetConfig {
-  const config = (
+  const config =
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    window as typeof window & {
-      global?: { __ENV?: { widgetConfig?: WidgetConfig } };
-    }
-  ).global?.__ENV?.widgetConfig;
+    (
+      window as typeof window & {
+        global?: { __ENV?: { widgetConfig?: WidgetConfig } };
+      }
+    ).global?.__ENV?.widgetConfig;
   return config ?? fallback;
 }
 

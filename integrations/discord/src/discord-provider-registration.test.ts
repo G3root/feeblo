@@ -349,7 +349,7 @@ describe("discord provider registration", () => {
       });
       const response = yield* (
         interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
-      // SAFETY: The endpoint/API contract guarantees this response shape.
+        // SAFETY: The endpoint/API contract guarantees this response shape.
       );
       // SAFETY: The endpoint/API contract guarantees this response shape.
       expect(response.status).toBe(200);

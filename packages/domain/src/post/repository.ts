@@ -1,6 +1,6 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { currentDb, schema } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { slugify } from "@feeblo/utils/url";
 import {
   and,

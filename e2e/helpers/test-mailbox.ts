@@ -67,7 +67,7 @@ export async function waitForVerificationEmail(
     timeout: 15_000,
   });
 
-// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
   return matchingEmail as TestEmail;
 }
@@ -90,7 +90,7 @@ export async function waitForPasswordResetEmail(
   }).toPass({
     intervals: [100, 250, 500, 1000],
     timeout: 15_000,
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   });
 
   // SAFETY: The upstream contract guarantees this value here.

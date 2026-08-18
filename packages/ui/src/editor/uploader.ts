@@ -91,7 +91,9 @@ export const createEditorUploader = (
       pendingEditorUploads.set(previewUrl, {
         file,
         scope: options.scope ?? previewUrl,
-        ...(options.organizationId && { organizationId: options.organizationId }),
+        ...(options.organizationId && {
+          organizationId: options.organizationId,
+        }),
       });
       return Promise.resolve(previewUrl);
     };

@@ -52,7 +52,8 @@ export const asLegid =
   ): ((input: string) => LegidOf<Name>) =>
   // SAFETY: the caller promises the input string is a valid legid for this
   // factory (e.g. freshly read from a database row); the brand is type-only.
-  (input) => input as LegidOf<Name>;
+  (input) =>
+    input as LegidOf<Name>;
 
 /**
  * Type-only helper that brands the `id` field of a single object using the

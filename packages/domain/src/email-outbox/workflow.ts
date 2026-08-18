@@ -121,7 +121,7 @@ export const materializeEmailIntent = (outboxId: string) =>
           state: "paused_by_plan",
         });
         yield* recordEmailIntentTransition(intent.kind, "paused_by_plan");
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       }
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
@@ -131,10 +131,10 @@ export const materializeEmailIntent = (outboxId: string) =>
       if (!(yield* repository.resumePausedIntent({ id: intent.id }))) {
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         return [] as readonly string[];
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       }
-    // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
     } else if (intent.state !== "pending") {
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
@@ -204,8 +204,8 @@ export const materializeEmailIntent = (outboxId: string) =>
         },
         columns: { slug: true, title: true },
         with: { board: { columns: { slug: true } } },
-      // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       });
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       if (!post) {
@@ -304,7 +304,7 @@ export const materializeEmailIntent = (outboxId: string) =>
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       intent
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     );
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     if (!content) {
@@ -1111,8 +1111,8 @@ export const reconcileEmailOutbox = ({
             eligible,
             now: reconciliationNow,
             organizationId,
-          // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+            // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+            // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           });
           // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           return eligible

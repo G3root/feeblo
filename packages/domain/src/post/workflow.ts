@@ -1,4 +1,3 @@
-import { isString } from "@feeblo/utils/runtime-kind";
 import { Database, schema, transaction } from "@feeblo/db";
 import {
   Mailer,
@@ -6,6 +5,7 @@ import {
   MailTemplateRenderError,
 } from "@feeblo/transactional/mailer";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
+import { isString } from "@feeblo/utils/runtime-kind";
 import { and, eq, inArray } from "drizzle-orm";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
