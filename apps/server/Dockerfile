@@ -31,6 +31,12 @@ RUN pnpm turbo build
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
 
+# Pin the app to the port the proxy, healthcheck and compose port mapping
+# expect. Without this, a runtime-injected PORT (e.g. 8000) hijacks the
+# listen port and the reverse proxy gets connection refused -> 502.
+ENV SERVER_PORT=8080
+ENV NODE_ENV=production
+
 LABEL org.opencontainers.image.source=https://github.com/g3root/feeblo
 LABEL org.opencontainers.image.description="API server of Feeblo — an open-source customer feedback platform"
 LABEL org.opencontainers.image.licenses=AGPL-3.0-or-later
