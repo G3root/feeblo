@@ -25,8 +25,8 @@
       "default": "./src/v2/providers/post-collections-provider.tsx"
     },
     "./comment-display": {
-      "types": "./src/v2/comment-display.tsx",
-      "default": "./src/v2/comment-display.tsx"
+      "types": "./src/v2/comment-display/index.tsx",
+      "default": "./src/v2/comment-display/index.tsx"
     },
     "./dialogs": {
       "types": "./src/v2/dialogs/index.ts",

@@ -21,7 +21,7 @@ vi.mock("@feeblo/web-shared/use-policy", () => ({
   isUser: vi.fn(),
   usePolicy: () => ({ allowed: false }),
 }));
-vi.mock("./comment-display", () => ({
+vi.mock("./comment-display/list", () => ({
   CommentsList: () => <div>comments list</div>,
 }));
 vi.mock("../post/post-comment-composer", () => ({

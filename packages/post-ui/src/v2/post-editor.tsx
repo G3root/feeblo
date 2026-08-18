@@ -9,6 +9,7 @@ import {
   memo,
   type ReactNode,
   use,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -130,10 +131,16 @@ function PostEditorProvider({
 }: PostEditorProviderProps) {
   const onContentChangeRef = useRef(onContentChange);
   const onSubmitRef = useRef(onSubmit);
-  const generatedEditorScope = useRef(crypto.randomUUID()).current;
+  const [generatedEditorScope] = useState(() => crypto.randomUUID());
   const editorScope = providedEditorScope ?? generatedEditorScope;
-  onContentChangeRef.current = onContentChange;
-  onSubmitRef.current = onSubmit;
+
+  // Keep the latest callbacks reachable from the memoized `actions` without
+  // writing refs during render (render must stay pure). Effects flush before
+  // any event handler runs, so the refs are always current when used.
+  useEffect(() => {
+    onContentChangeRef.current = onContentChange;
+    onSubmitRef.current = onSubmit;
+  }, [onContentChange, onSubmit]);
 
   const actions = useMemo<PostEditorActions>(
     () => ({
@@ -272,7 +279,7 @@ function PostEditorComponent({
   const [internalContent, setInternalContent] = useState(externalContent ?? "");
   const [resetKey, setResetKey] = useState(0);
   const contentRef = useRef(externalContent ?? "");
-  const generatedEditorScope = useRef(crypto.randomUUID()).current;
+  const [generatedEditorScope] = useState(() => crypto.randomUUID());
   const editorScope = providedEditorScope ?? generatedEditorScope;
 
   const isContentControlled = externalContent !== undefined;
@@ -281,7 +288,11 @@ function PostEditorComponent({
     ? (externalContent as string)
     : internalContent;
 
-  contentRef.current = content;
+  // Sync the latest content into the ref after render; the ref is only ever
+  // read from event handlers, which run after effects have flushed.
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   const handleContentChange = (doc: string) => {
     contentRef.current = doc;

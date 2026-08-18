@@ -88,7 +88,11 @@ export const PostContentField = withForm({
   props: {} as EditorProps & {
     assetOwner?: "organization" | "user";
   },
-  render: ({ assetOwner = "organization", form, ...rest }) => {
+  render: function PostContentFieldRender({
+    assetOwner = "organization",
+    form,
+    ...rest
+  }) {
     const { organizationId } = usePostCollections();
     return (
       <form.AppField name="content">
@@ -119,8 +123,10 @@ export const PostContentField = withForm({
 
 export const PostBoardField = withForm({
   ...postCreateFormOpts,
-  props: {} as {
-    boards: Array<{ id: string; name: string }>;
+  props: {
+    // SAFETY: [] satisfies the boards contract; consumers always provide the
+    // real board list when mounting the field.
+    boards: [] as Array<{ id: string; name: string }>,
   },
   render: ({ form, boards }) => {
     return (
@@ -152,8 +158,10 @@ export const PostBoardField = withForm({
 
 export const PostStatusField = withForm({
   ...postCreateFormOpts,
-  props: {} as {
-    statuses: Pick<TPostStatus, "id" | "type">[];
+  props: {
+    // SAFETY: [] satisfies the statuses contract; consumers always provide the
+    // real status list when mounting the field.
+    statuses: [] as Pick<TPostStatus, "id" | "type">[],
   },
   render: ({ form, statuses }) => {
     return (

@@ -75,8 +75,8 @@ export function PublicRoadmapIssueCard({
 
 type SortableRoadmapIssueCardProps = RoadmapIssueCardContentProps & {
   isDragging?: boolean;
-  onClick?: MouseEventHandler<HTMLDivElement>;
-  rootRef?: (element: HTMLDivElement | null) => void;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  rootRef?: (element: HTMLButtonElement | null) => void;
 };
 
 export function SortableRoadmapIssueCard({
@@ -86,12 +86,13 @@ export function SortableRoadmapIssueCard({
   ...contentProps
 }: SortableRoadmapIssueCardProps) {
   return (
-    <div
+    <button
       className={getRoadmapIssueCardClassName(isDragging)}
       onClick={onClick}
       ref={rootRef}
+      type="button"
     >
       <RoadmapIssueCardContent {...contentProps} />
-    </div>
+    </button>
   );
 }

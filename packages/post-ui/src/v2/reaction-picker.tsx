@@ -16,7 +16,7 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { SmileIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, count, eq, queryOnce, useLiveQuery } from "@tanstack/react-db";
-import { createContext, type ReactNode, use, useRef, useState } from "react";
+import { createContext, type ReactNode, use, useMemo, useRef, useState } from "react";
 
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
@@ -80,19 +80,29 @@ function ReactionPickerProvider({
 }: ReactionPickerProviderProps) {
   const [open, setOpen] = useState(false);
 
+  const contextValue = useMemo<ReactionPickerContextValue>(
+    () => ({
+      actions: { onToggle, setOpen },
+      meta: { label },
+      state: {
+        disabled,
+        open,
+        selectedReactions: existingReactions ?? new Set(),
+        reactionList: reactionList ?? new Map(),
+      },
+    }),
+    [
+      disabled,
+      existingReactions,
+      label,
+      onToggle,
+      open,
+      reactionList,
+    ]
+  );
+
   return (
-    <ReactionPickerContext
-      value={{
-        actions: { onToggle, setOpen },
-        meta: { label },
-        state: {
-          disabled,
-          open,
-          selectedReactions: existingReactions ?? new Set(),
-          reactionList: reactionList ?? new Map(),
-        },
-      }}
-    >
+    <ReactionPickerContext value={contextValue}>
       <Popover onOpenChange={setOpen} open={open}>
         {children}
       </Popover>

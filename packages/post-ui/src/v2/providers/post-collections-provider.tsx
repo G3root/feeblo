@@ -8,7 +8,7 @@ import type { TPostSubscription } from "@feeblo/domain/post-subscription/schema"
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import type { Collection } from "@tanstack/react-db";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 
 export interface PostCollections {
   boardCollection: Collection<TBoard, string, any, any>;
@@ -62,16 +62,25 @@ export function PostCollectionsProvider({
   organizationId: string;
   suggestPosts?: PostCollectionsValue["suggestPosts"];
 }) {
+  const contextValue = useMemo<PostCollectionsValue>(
+    () => ({
+      collections,
+      getPostHref,
+      onAuthRequired,
+      organizationId,
+      suggestPosts,
+    }),
+    [
+      collections,
+      getPostHref,
+      onAuthRequired,
+      organizationId,
+      suggestPosts,
+    ]
+  );
+
   return (
-    <PostCollectionsContext.Provider
-      value={{
-        collections,
-        getPostHref,
-        onAuthRequired,
-        organizationId,
-        suggestPosts,
-      }}
-    >
+    <PostCollectionsContext.Provider value={contextValue}>
       {children}
     </PostCollectionsContext.Provider>
   );

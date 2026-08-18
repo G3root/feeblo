@@ -2,17 +2,13 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { lazy, type ReactNode, Suspense } from "react";
 
 import { PostCommentComposer } from "../post/post-comment-composer";
-import { CommentsList } from "./comment-display";
-import {
-  CommentDeleteDialogProvider,
-  CommentVisibilityDialogProvider,
-  PostDeleteDialogProvider,
-} from "./dialog-stores";
-import {
-  CommentDeleteDialog,
-  CommentVisibilityDialog,
-  PostDeleteDialog,
-} from "./dialogs";
+import { CommentsList } from "./comment-display/list";
+import { CommentDeleteDialogProvider } from "./dialog-stores/comment";
+import { CommentVisibilityDialogProvider } from "./dialog-stores/comment-visibility";
+import { PostDeleteDialogProvider } from "./dialog-stores/post";
+import { CommentDeleteDialog } from "./dialogs/comment-delete-dialog";
+import { CommentVisibilityDialog } from "./dialogs/comment-visibility-dialog";
+import { PostDeleteDialog } from "./dialogs/post-delete-dialog";
 import { PostCollectionDataProvider } from "./post-collection";
 import {
   type PostCollectionDataProviderProps,

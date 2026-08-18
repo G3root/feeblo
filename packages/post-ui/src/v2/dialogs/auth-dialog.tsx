@@ -374,14 +374,12 @@ function SignInForm({
 
   return (
     <AuthForm form={form}>
-      <form.AppField
-        children={(field) => <field.TextField label="Email" type="email" />}
-        name="email"
-      />
-      <form.AppField
-        children={(field) => <field.PasswordField label="Password" />}
-        name="password"
-      />
+      <form.AppField name="email">
+        {(field) => <field.TextField label="Email" type="email" />}
+      </form.AppField>
+      <form.AppField name="password">
+        {(field) => <field.PasswordField label="Password" />}
+      </form.AppField>
       <div className="flex justify-end">
         <a
           className="text-muted-foreground text-sm underline underline-offset-4"
@@ -439,22 +437,18 @@ function SignUpForm({ onVerify }: { onVerify: (email: string) => void }) {
 
   return (
     <AuthForm form={form}>
-      <form.AppField
-        children={(field) => <field.TextField label="Full name" />}
-        name="name"
-      />
-      <form.AppField
-        children={(field) => <field.TextField label="Email" type="email" />}
-        name="email"
-      />
-      <form.AppField
-        children={(field) => <field.PasswordField label="Password" />}
-        name="password"
-      />
-      <form.AppField
-        children={(field) => <field.PasswordField label="Confirm password" />}
-        name="confirmPassword"
-      />
+      <form.AppField name="name">
+        {(field) => <field.TextField label="Full name" />}
+      </form.AppField>
+      <form.AppField name="email">
+        {(field) => <field.TextField label="Email" type="email" />}
+      </form.AppField>
+      <form.AppField name="password">
+        {(field) => <field.PasswordField label="Password" />}
+      </form.AppField>
+      <form.AppField name="confirmPassword">
+        {(field) => <field.PasswordField label="Confirm password" />}
+      </form.AppField>
       <form.AppForm>
         <form.SubscribeButton
           className="w-full"
@@ -516,8 +510,8 @@ function OtpVerificationForm({
   return (
     <AuthForm form={form}>
       <FieldGroup>
-        <form.Field
-          children={(field) => {
+        <form.Field name="otp">
+          {(field) => {
             const isInvalid =
               field.state.meta.isTouched && !field.state.meta.isValid;
             return (
@@ -573,8 +567,7 @@ function OtpVerificationForm({
               </Field>
             );
           }}
-          name="otp"
-        />
+        </form.Field>
         <form.AppForm>
           <form.SubscribeButton
             className="w-full"

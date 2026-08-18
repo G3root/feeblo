@@ -16,7 +16,6 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
-  useRef,
   useState,
 } from "react";
 
@@ -208,7 +207,7 @@ export function PostCreateForm() {
 
   const initialBoardId = store.get().context.data.boardId ?? "";
   const [contentEditorKey, setContentEditorKey] = useState(0);
-  const editorScope = useRef(crypto.randomUUID()).current;
+  const [editorScope] = useState(() => crypto.randomUUID());
 
   const form = useAppForm({
     ...postCreateFormOpts,

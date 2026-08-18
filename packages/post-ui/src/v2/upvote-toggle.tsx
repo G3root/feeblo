@@ -8,7 +8,7 @@ import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import NumberFlow from "@number-flow/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createContext, type ReactNode, use } from "react";
+import { createContext, type ReactNode, use, useMemo } from "react";
 
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
@@ -68,14 +68,17 @@ function UpvoteToggleProvider({
   onToggle,
   upvoteCount,
 }: UpvoteToggleProviderProps) {
+  const contextValue = useMemo<UpvoteToggleContextValue>(
+    () => ({
+      actions: { onToggle },
+      meta: { label },
+      state: { disabled, isUpvoted, upvoteCount },
+    }),
+    [disabled, isUpvoted, label, onToggle, upvoteCount]
+  );
+
   return (
-    <UpvoteToggleContext
-      value={{
-        actions: { onToggle },
-        meta: { label },
-        state: { disabled, isUpvoted, upvoteCount },
-      }}
-    >
+    <UpvoteToggleContext value={contextValue}>
       {children}
     </UpvoteToggleContext>
   );

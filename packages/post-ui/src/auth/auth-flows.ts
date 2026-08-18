@@ -1,3 +1,4 @@
+import { hasWindow, isObject } from "@feeblo/utils/runtime-kind";
 import { toastManager } from "@feeblo/ui/toast";
 import {
   authClient,
@@ -9,8 +10,7 @@ export type SocialProvider = "github" | "google";
 
 export const getSafeCallbackURL = (redirectTo?: string) => {
   const safePath = redirectTo?.startsWith("/") ? redirectTo : "/";
-  const currentOrigin =
-    typeof window !== "undefined" ? window.location.origin : undefined;
+  const currentOrigin = hasWindow() ? window.location.origin : undefined;
   const appUrl = getRuntimePublicEnv().appUrl;
   const callbackBase = currentOrigin ?? appUrl;
 
@@ -61,8 +61,11 @@ export async function initializePasswordReset(email: string) {
   if (!response.ok) {
     const serverMessage = await response
       .json()
-      .then((body: unknown) => {
-        if (typeof body === "object" && body !== null) {
+      .then((body) => {
+        if (isObject(body)) {
+          // SAFETY: isObject establishes that the response body is a
+          // non-null object; the optional-field view only exposes the
+          // error-message claim the UI renders.
           const record = body as { error?: { message?: string } };
           return record.error?.message;
         }
