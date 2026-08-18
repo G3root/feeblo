@@ -72,7 +72,8 @@ export function BoardGridView({
     setItems(groupedPosts);
   }
 
-  const snapshot = useRef(structuredClone(items));
+  const [initialSnapshot] = useState(() => structuredClone(items));
+  const snapshot = useRef(initialSnapshot);
   const activeDrag = useRef<{
     sourceId: string;
     sourceStatusId: string;

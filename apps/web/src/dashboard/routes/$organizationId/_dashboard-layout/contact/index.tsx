@@ -364,10 +364,12 @@ function ContactTableRow({
   );
 }
 
+const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+});
+
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(date);
+  return mediumDateFormatter.format(date);
 }
 
 function formatSource(source: "DASHBOARD" | "WIDGET" | "API" | "IMPORT") {

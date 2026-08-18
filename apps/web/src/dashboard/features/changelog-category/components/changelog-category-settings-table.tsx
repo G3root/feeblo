@@ -353,10 +353,12 @@ function CategoryTableErrorState() {
   );
 }
 
+const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+});
+
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(date);
+  return mediumDateFormatter.format(date);
 }
 
 const loadingRowIds = ["category-loading-1", "category-loading-2"];

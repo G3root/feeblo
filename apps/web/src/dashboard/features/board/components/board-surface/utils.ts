@@ -55,11 +55,17 @@ export const groupPostsByStatus = (
     });
   }
 
-  return [...map.entries()]
-    .filter(([, lane]) => lane.posts.length > 0)
-    .map(([, lane]): BoardPostLane => ({
+  const lanes: BoardPostLane[] = [];
+  for (const lane of map.values()) {
+    if (lane.posts.length === 0) {
+      continue;
+    }
+    lanes.push({
       status: lane.status,
       statusId: lane.statusId,
       posts: lane.posts,
-    }));
+    });
+  }
+
+  return lanes;
 };

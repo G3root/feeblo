@@ -71,6 +71,7 @@ const RoadmapColumnsSection = withForm({
     );
 
     const statusOptions = statuses ?? [];
+    const openItemIds = new Set(openItems);
 
     return (
       <div className="grid gap-3">
@@ -100,7 +101,7 @@ const RoadmapColumnsSection = withForm({
                           current.filter((item) => item !== column.id)
                         );
                       }}
-                      open={openItems.includes(column.id)}
+                      open={openItemIds.has(column.id)}
                       statusOptions={statusOptions}
                     />
                   ))

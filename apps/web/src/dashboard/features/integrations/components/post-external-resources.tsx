@@ -5,7 +5,7 @@ import { Link03Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
-import { createContext, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useMemo } from "react";
 
 import {
   type PostExternalResourceLink,
@@ -53,10 +53,13 @@ export function PostExternalResources({
       Option.getOrNull(previousSuccess)?.value ?? [],
     onSuccess: ({ value }) => value,
   });
+  const contextValue = useMemo(
+    () => ({ refreshPostExternalResources }),
+    [refreshPostExternalResources]
+  );
+
   return (
-    <PostExternalResourceActionsContext.Provider
-      value={{ refreshPostExternalResources }}
-    >
+    <PostExternalResourceActionsContext.Provider value={contextValue}>
       <section aria-labelledby="post-external-resources-heading">
         <div className="flex items-center justify-between gap-2">
           <h2

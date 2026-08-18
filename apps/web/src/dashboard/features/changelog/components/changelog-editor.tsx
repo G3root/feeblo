@@ -47,6 +47,8 @@ import {
   type ReactNode,
   type RefObject,
   use,
+  useCallback,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -236,7 +238,7 @@ export function ChangelogEditorProvider({
 }: ChangelogEditorProviderProps) {
   const navigate = useNavigate();
   const { changelogCollection } = useDashboardCollections();
-  const editorScope = useRef(crypto.randomUUID()).current;
+  const [editorScope] = useState(() => crypto.randomUUID());
   const coverImageAssetRef = useRef<string | null>(null);
   const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
   // Backend mirror: ChangelogPolicy.canUpdate requires changelog.*.
@@ -250,7 +252,7 @@ export function ChangelogEditorProvider({
     coverImageAssetRef,
   });
 
-  async function handleMoveToDraft() {
+  const handleMoveToDraft = useCallback(async () => {
     await form.handleSubmit({
       successTitle: "Moved to draft",
       overrides: {
@@ -259,9 +261,9 @@ export function ChangelogEditorProvider({
         publishedAt: null,
       },
     });
-  }
+  }, [form]);
 
-  async function handleDelete() {
+  const handleDelete = useCallback(async () => {
     try {
       const tx = changelogCollection.delete(changelog.id, {
         optimistic: false,
@@ -285,22 +287,37 @@ export function ChangelogEditorProvider({
         type: "error",
       });
     }
-  }
+  }, [changelog.id, changelogCollection, navigate, organizationId]);
 
-  const value: ChangelogEditorContextValue = {
-    changelog,
-    coverImageAssetRef,
-    editorScope,
-    form,
-    formResetKey,
-    handleDelete,
-    handleMoveToDraft,
-    isOwner,
-    organizationId,
-    submitDefault: () => {
-      form.handleSubmit({ successTitle: "Changes saved" });
-    },
-  };
+  const submitDefault = useCallback(() => {
+    form.handleSubmit({ successTitle: "Changes saved" });
+  }, [form]);
+  const value = useMemo<ChangelogEditorContextValue>(
+    () => ({
+      changelog,
+      coverImageAssetRef,
+      editorScope,
+      form,
+      formResetKey,
+      handleDelete,
+      handleMoveToDraft,
+      isOwner,
+      organizationId,
+      submitDefault,
+    }),
+    [
+      changelog,
+      coverImageAssetRef,
+      editorScope,
+      form,
+      formResetKey,
+      handleDelete,
+      handleMoveToDraft,
+      isOwner,
+      organizationId,
+      submitDefault,
+    ]
+  );
 
   return (
     <ChangelogEditorContext.Provider value={value}>
@@ -740,9 +757,13 @@ export function ChangelogEditorCategoryField() {
 
   const handleValueChange = async (nextSelected: typeof selectedCategories) => {
     const nextIds = new Set(nextSelected.map((category) => category.id));
-    await updateCategories(
-      categories.filter((category) => nextIds.has(category.id)).map((c) => c.id)
-    );
+    const nextCategoryIds: string[] = [];
+    for (const category of categories) {
+      if (nextIds.has(category.id)) {
+        nextCategoryIds.push(category.id);
+      }
+    }
+    await updateCategories(nextCategoryIds);
   };
 
   const removeCategory = async (categoryId: string) => {
@@ -761,11 +782,13 @@ export function ChangelogEditorCategoryField() {
         .select(({ link }) => ({ categoryId: link.categoryId }))
     );
 
-    await updateCategories(
-      currentLinks
-        .map((link) => link.categoryId)
-        .filter((id) => id !== categoryId)
-    );
+    const nextCategoryIds: string[] = [];
+    for (const link of currentLinks) {
+      if (link.categoryId !== categoryId) {
+        nextCategoryIds.push(link.categoryId);
+      }
+    }
+    await updateCategories(nextCategoryIds);
   };
 
   return (
@@ -929,10 +952,12 @@ export function ChangelogEditorSidebarActions() {
   );
 }
 
+const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+});
+
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(date);
+  return mediumDateFormatter.format(date);
 }
 
 function formatPublishAt(publishedAt: Date | null, scheduledAt: Date | null) {

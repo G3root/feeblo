@@ -152,10 +152,16 @@ export function ChangelogListView({
   );
 }
 
+const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+});
+const publishDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(date);
+  return mediumDateFormatter.format(date);
 }
 
 function formatPublishDate(publishedAt: Date | null, scheduledAt: Date | null) {
@@ -165,8 +171,5 @@ function formatPublishDate(publishedAt: Date | null, scheduledAt: Date | null) {
     return "Not scheduled";
   }
 
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(value);
+  return publishDateFormatter.format(value);
 }

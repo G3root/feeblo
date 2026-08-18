@@ -312,10 +312,12 @@ function TagTableErrorState() {
   );
 }
 
+const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+});
+
 function formatDate(date: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-  }).format(date);
+  return mediumDateFormatter.format(date);
 }
 
 const loadingRowIds = ["tag-loading-1", "tag-loading-2"];

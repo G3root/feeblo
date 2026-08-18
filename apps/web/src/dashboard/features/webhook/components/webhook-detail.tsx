@@ -562,19 +562,21 @@ function DeliveryHistoryTable({
     }
   };
 
+  const expandedIds = useMemo(() => new Set(expanded), [expanded]);
+
   // Flat row list: an expanded delivery becomes two virtualized rows (the
   // delivery plus its attempts), so both get measured and scrolled together.
   const rows = useMemo<readonly HistoryRow[]>(
     () =>
       deliveries.flatMap((delivery) =>
-        expanded.includes(delivery.id)
+        expandedIds.has(delivery.id)
           ? [
               { kind: "delivery", key: delivery.id, delivery },
               { kind: "attempts", key: `${delivery.id}-attempts`, delivery },
             ]
           : [{ kind: "delivery", key: delivery.id, delivery }]
       ),
-    [deliveries, expanded]
+    [deliveries, expandedIds]
   );
 
   const scrollRestoration = useElementScrollRestoration({
@@ -695,7 +697,7 @@ function DeliveryHistoryTable({
                     <DeliveryRow
                       dataIndex={item.index}
                       delivery={row.delivery}
-                      expanded={expanded.includes(row.delivery.id)}
+                      expanded={expandedIds.has(row.delivery.id)}
                       key={row.key}
                       measureRef={virtualizer.measureElement}
                       onRetry={handleRetry}

@@ -16,7 +16,14 @@ import { isNumber } from "@feeblo/utils/runtime-kind";
 import { Cancel01Icon, Edit01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
-import { createContext, use, useCallback, useRef, useState } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import AvatarEditor, { type AvatarEditorRef } from "react-avatar-editor";
 
 interface SettingsAvatarControlContextValue {
@@ -233,23 +240,34 @@ function Root({
     event.target.value = "";
   }
 
-  function openFileDialog() {
+  const openFileDialog = useCallback(() => {
     fileInputRef.current?.click();
-  }
+  }, []);
+  const contextValue = useMemo(
+    () => ({
+      ariaLabel,
+      imageAlt,
+      imageUrl,
+      maxSize,
+      name,
+      onRemove,
+      onUpload,
+      openFileDialog,
+    }),
+    [
+      ariaLabel,
+      imageAlt,
+      imageUrl,
+      maxSize,
+      name,
+      onRemove,
+      onUpload,
+      openFileDialog,
+    ]
+  );
 
   return (
-    <SettingsAvatarControlContext
-      value={{
-        ariaLabel,
-        imageAlt,
-        imageUrl,
-        maxSize,
-        name,
-        onRemove,
-        onUpload,
-        openFileDialog,
-      }}
-    >
+    <SettingsAvatarControlContext value={contextValue}>
       <input
         accept={accept}
         className="hidden"

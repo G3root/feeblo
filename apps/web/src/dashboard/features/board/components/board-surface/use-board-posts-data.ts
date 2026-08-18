@@ -30,8 +30,8 @@ function filterPostStatusesByPreset(
   if (filter === "all") {
     return statuses.slice();
   }
-  const allowed = STATUSES_BY_PRESET[filter];
-  return statuses.filter((s) => allowed.includes(s.type));
+  const allowed = new Set<BoardPostStatus>(STATUSES_BY_PRESET[filter]);
+  return statuses.filter((s) => allowed.has(s.type));
 }
 
 type UseBoardPostsDataOptions = {

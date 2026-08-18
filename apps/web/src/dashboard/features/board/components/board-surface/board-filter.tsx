@@ -26,7 +26,13 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
-import { createContext, type ReactNode, useContext } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+} from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -133,43 +139,76 @@ function BoardFilterRoot({
     [organizationId]
   );
 
-  const clearStatusFilter = () => {
+  const clearStatusFilter = useCallback(() => {
     store.send({ type: "setStatusOperator", operator: "isAnyOf" });
     for (const status of filters.statuses) {
       store.send({ type: "toggleStatusFilter", status });
     }
-  };
+  }, [filters.statuses, store]);
 
-  const clearTagFilter = () => {
+  const clearTagFilter = useCallback(() => {
     store.send({ type: "setTagOperator", operator: "includeAllOf" });
     for (const tagId of filters.tagIds) {
       store.send({ type: "toggleTagFilter", tagId });
     }
-  };
+  }, [filters.tagIds, store]);
 
-  const value: BoardFilterContextValue = {
-    clearAllFilters: () => {
-      store.send({ type: "clearFilters" });
-    },
-    clearStatusFilter,
-    clearTagFilter,
-    filters,
-    organizationId,
-    setStatusOperator: (operator) => {
+  const clearAllFilters = useCallback(() => {
+    store.send({ type: "clearFilters" });
+  }, [store]);
+  const setStatusOperator = useCallback(
+    (operator: BoardStatusOperator) => {
       store.send({ type: "setStatusOperator", operator });
     },
-    setTagOperator: (operator) => {
+    [store]
+  );
+  const setTagOperator = useCallback(
+    (operator: BoardTagOperator) => {
       store.send({ type: "setTagOperator", operator });
     },
-    postStatuses,
-    tags,
-    toggleStatus: (status) => {
+    [store]
+  );
+  const toggleStatus = useCallback(
+    (status: BoardPostStatus) => {
       store.send({ type: "toggleStatusFilter", status });
     },
-    toggleTag: (tagId) => {
+    [store]
+  );
+  const toggleTag = useCallback(
+    (tagId: string) => {
       store.send({ type: "toggleTagFilter", tagId });
     },
-  };
+    [store]
+  );
+
+  const value = useMemo<BoardFilterContextValue>(
+    () => ({
+      clearAllFilters,
+      clearStatusFilter,
+      clearTagFilter,
+      filters,
+      organizationId,
+      setStatusOperator,
+      setTagOperator,
+      postStatuses,
+      tags,
+      toggleStatus,
+      toggleTag,
+    }),
+    [
+      clearAllFilters,
+      clearStatusFilter,
+      clearTagFilter,
+      filters,
+      organizationId,
+      postStatuses,
+      setStatusOperator,
+      setTagOperator,
+      tags,
+      toggleStatus,
+      toggleTag,
+    ]
+  );
 
   return (
     <BoardFilterContext.Provider value={value}>
@@ -277,6 +316,7 @@ function BoardFilterStatusGroup() {
     postStatuses,
     toggleStatus,
   } = useBoardFilterContext();
+  const selectedStatuses = new Set(filters.statuses);
 
   return (
     <BoardFilterActiveGroup>
@@ -290,7 +330,7 @@ function BoardFilterStatusGroup() {
       />
       <BoardFilterValueMenu
         items={postStatuses.map((postStatus) => ({
-          checked: filters.statuses.includes(postStatus.type),
+          checked: selectedStatuses.has(postStatus.type),
           key: postStatus.type,
           label: getBoardStatusLabel(postStatus.type),
         }))}
@@ -315,6 +355,7 @@ function BoardFilterLabelsGroup({
 }) {
   const { clearTagFilter, filters, setTagOperator, tags, toggleTag } =
     useBoardFilterContext();
+  const selectedTagIds = new Set(filters.tagIds);
 
   return (
     <BoardFilterActiveGroup>
@@ -328,7 +369,7 @@ function BoardFilterLabelsGroup({
       />
       <BoardFilterValueMenu
         items={tags.map((tag) => ({
-          checked: filters.tagIds.includes(tag.id),
+          checked: selectedTagIds.has(tag.id),
           key: tag.id,
           label: tag.name,
         }))}
