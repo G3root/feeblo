@@ -159,8 +159,8 @@ function CustomAttributeCreateForm({
       }}
     >
       <SheetPanel className="grid gap-4">
-        <form.AppField
-          children={(field) => (
+        <form.AppField name="name">
+          {(field) => (
             <field.TextField
               label="Name"
               onChange={(event) =>
@@ -172,10 +172,9 @@ function CustomAttributeCreateForm({
               placeholder="e.g. Customer tier"
             />
           )}
-          name="name"
-        />
-        <form.AppField
-          children={(field) => (
+        </form.AppField>
+        <form.AppField name="key">
+          {(field) => (
             <field.TextField
               autoCapitalize="none"
               disabled
@@ -184,20 +183,18 @@ function CustomAttributeCreateForm({
               spellCheck={false}
             />
           )}
-          name="key"
-        />
-        <form.AppField
-          children={(field) => (
+        </form.AppField>
+        <form.AppField name="description">
+          {(field) => (
             <field.TextareaField
               label="Description"
               placeholder="Explain how your team should use this field"
               rows={3}
             />
           )}
-          name="description"
-        />
-        <form.AppField
-          children={(field) => (
+        </form.AppField>
+        <form.AppField name="type">
+          {(field) => (
             <Field>
               <FieldLabel>Data type</FieldLabel>
               <Select
@@ -223,10 +220,9 @@ function CustomAttributeCreateForm({
               </FieldDescription>
             </Field>
           )}
-          name="type"
-        />
-        <form.AppField
-          children={(field) => (
+        </form.AppField>
+        <form.AppField name="isRequired">
+          {(field) => (
             <Field orientation="horizontal">
               <div className="flex-1">
                 <FieldLabel htmlFor="attribute-required">Required</FieldLabel>
@@ -241,8 +237,7 @@ function CustomAttributeCreateForm({
               />
             </Field>
           )}
-          name="isRequired"
-        />
+        </form.AppField>
       </SheetPanel>
       <SheetFooter>
         <form.AppForm>

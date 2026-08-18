@@ -38,14 +38,12 @@ export const RoadmapFields = withForm({
   render: ({ form }) => {
     return (
       <>
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
-        <form.AppField
-          children={(field) => <field.TextareaField label="Description" />}
-          name="description"
-        />
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="description">
+          {(field) => <field.TextareaField label="Description" />}
+        </form.AppField>
         <RoadmapVisibilityField form={form} />
         <RoadmapColumnsSection form={form} />
       </>
@@ -182,10 +180,9 @@ function RoadmapColumnItem({
         </FrameHeader>
         <CollapsiblePanel>
           <FramePanel className="grid gap-3">
-            <form.AppField
-              children={(subField) => <subField.TextField label="Name" />}
-              name={`columns[${index}].name`}
-            />
+            <form.AppField name={`columns[${index}].name`}>
+              {(subField) => <subField.TextField label="Name" />}
+            </form.AppField>
             <form.Subscribe
               selector={(state) =>
                 state.values.columns.map((column) => column.statusId).join(",")
@@ -197,8 +194,8 @@ function RoadmapColumnItem({
                 );
 
                 return (
-                  <form.AppField
-                    children={(subField) => (
+                  <form.AppField name={`columns[${index}].statusId`}>
+                    {(subField) => (
                       <Field>
                         <FieldLabel>Status</FieldLabel>
                         <Select
@@ -237,8 +234,7 @@ function RoadmapColumnItem({
                         </Select>
                       </Field>
                     )}
-                    name={`columns[${index}].statusId`}
-                  />
+                  </form.AppField>
                 );
               }}
             </form.Subscribe>

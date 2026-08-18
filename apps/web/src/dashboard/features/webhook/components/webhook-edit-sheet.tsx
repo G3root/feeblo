@@ -111,20 +111,18 @@ function WebhookEditForm() {
       }}
     >
       <SheetPanel className="grid gap-4">
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
-        <form.AppField
-          children={(field) => (
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="endpointUrl">
+          {(field) => (
             <field.TextField
               label="New URL (optional)"
               placeholder="Leave blank to keep the current URL"
               type="url"
             />
           )}
-          name="endpointUrl"
-        />
+        </form.AppField>
         <WebhookEventSelectionField form={form} idPrefix="edit-webhook" />
       </SheetPanel>
       <SheetFooter>

@@ -219,25 +219,21 @@ function RouteComponent() {
           form.handleSubmit();
         }}
       >
-        <form.AppField
-          children={(field) => <field.TextField label="Full Name" />}
-          name="name"
-        />
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Full Name" />}
+        </form.AppField>
 
-        <form.AppField
-          children={(field) => <field.TextField label="Email" type="email" />}
-          name="email"
-        />
+        <form.AppField name="email">
+          {(field) => <field.TextField label="Email" type="email" />}
+        </form.AppField>
 
-        <form.AppField
-          children={(field) => <field.PasswordField label="Password" />}
-          name="password"
-        />
+        <form.AppField name="password">
+          {(field) => <field.PasswordField label="Password" />}
+        </form.AppField>
 
-        <form.AppField
-          children={(field) => <field.PasswordField label="Confirm Password" />}
-          name="confirmPassword"
-        />
+        <form.AppField name="confirmPassword">
+          {(field) => <field.PasswordField label="Confirm Password" />}
+        </form.AppField>
 
         {turnstileSiteKey ? (
           <Turnstile

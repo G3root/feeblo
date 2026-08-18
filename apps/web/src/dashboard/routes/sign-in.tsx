@@ -146,15 +146,13 @@ function RouteComponent() {
         }}
       >
         <div className="flex flex-col gap-4">
-          <form.AppField
-            children={(field) => <field.TextField label="Email" type="email" />}
-            name="email"
-          />
+          <form.AppField name="email">
+            {(field) => <field.TextField label="Email" type="email" />}
+          </form.AppField>
 
-          <form.AppField
-            children={(field) => <field.PasswordField label="Password" />}
-            name="password"
-          />
+          <form.AppField name="password">
+            {(field) => <field.PasswordField label="Password" />}
+          </form.AppField>
 
           <div className="flex justify-end">
             <Link

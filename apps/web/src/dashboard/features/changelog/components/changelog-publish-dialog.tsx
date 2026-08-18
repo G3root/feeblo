@@ -73,22 +73,18 @@ export function ChangelogPublishDialog({
             </AlertDialogHeader>
 
             <div className="space-y-4 px-6 pb-6">
-              <form.AppField
-                children={(field) => (
-                  <field.TextField autoComplete="off" label="Slug" />
-                )}
-                name="slug"
-              />
+              <form.AppField name="slug">
+                {(field) => <field.TextField autoComplete="off" label="Slug" />}
+              </form.AppField>
 
-              <form.AppField
-                children={(field) => (
+              <form.AppField name="publishedAt">
+                {(field) => (
                   <field.TextField
                     label="Published date"
                     type="datetime-local"
                   />
                 )}
-                name="publishedAt"
-              />
+              </form.AppField>
             </div>
 
             <AlertDialogFooter>

@@ -119,10 +119,9 @@ function TagCreateForm({
       }}
     >
       <DialogPanel className="grid gap-4">
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
       </DialogPanel>
       <DialogFooter>
         <DialogClose render={<Button variant="ghost" />}>Cancel</DialogClose>

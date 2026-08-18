@@ -209,24 +209,20 @@ function ContactEditFormFields({
       }}
     >
       <SheetPanel className="grid gap-4">
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
-        <form.AppField
-          children={(field) => <field.TextField label="Email" type="email" />}
-          name="email"
-        />
-        <form.AppField
-          children={(field) => <field.TextField label="External ID" />}
-          name="externalId"
-        />
-        <form.AppField
-          children={(field) => <field.TextField label="Phone" type="tel" />}
-          name="phone"
-        />
-        <form.AppField
-          children={(field) => (
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="email">
+          {(field) => <field.TextField label="Email" type="email" />}
+        </form.AppField>
+        <form.AppField name="externalId">
+          {(field) => <field.TextField label="External ID" />}
+        </form.AppField>
+        <form.AppField name="phone">
+          {(field) => <field.TextField label="Phone" type="tel" />}
+        </form.AppField>
+        <form.AppField name="companyId">
+          {(field) => (
             <div className="space-y-2">
               <label
                 className="text-sm font-medium"
@@ -259,8 +255,7 @@ function ContactEditFormFields({
               </Select>
             </div>
           )}
-          name="companyId"
-        />
+        </form.AppField>
         <form.Subscribe selector={(state) => state.values.attributes}>
           {(attributes) => (
             <CustomAttributeFields

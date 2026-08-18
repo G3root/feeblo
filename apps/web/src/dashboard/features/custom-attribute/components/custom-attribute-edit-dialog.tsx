@@ -159,20 +159,18 @@ function CustomAttributeEditForm() {
       }}
     >
       <SheetPanel className="grid gap-4">
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
-        <form.AppField
-          children={(field) => (
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="description">
+          {(field) => (
             <field.TextareaField
               label="Description"
               placeholder="Explain how your team should use this field"
               rows={3}
             />
           )}
-          name="description"
-        />
+        </form.AppField>
         <Field>
           <FieldLabel>Data type</FieldLabel>
           <Select disabled value={attribute.type}>
@@ -191,8 +189,8 @@ function CustomAttributeEditForm() {
             The data type cannot be changed after creation.
           </FieldDescription>
         </Field>
-        <form.AppField
-          children={(field) => (
+        <form.AppField name="isRequired">
+          {(field) => (
             <Field orientation="horizontal">
               <div className="flex-1">
                 <FieldLabel htmlFor="attribute-required">Required</FieldLabel>
@@ -207,8 +205,7 @@ function CustomAttributeEditForm() {
               />
             </Field>
           )}
-          name="isRequired"
-        />
+        </form.AppField>
       </SheetPanel>
       <SheetFooter>
         <form.AppForm>

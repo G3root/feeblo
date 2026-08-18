@@ -25,8 +25,8 @@ export const GitHubConnectionField = withForm({
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   props: { connections: [] } as GitHubConnectionFieldProps,
   render: ({ form, connections }) => (
-    <form.AppField
-      children={(field) => (
+    <form.AppField name="connectionId">
+      {(field) => (
         <Field
           dirty={field.state.meta.isDirty}
           invalid={!field.state.meta.isValid}
@@ -65,8 +65,7 @@ export const GitHubConnectionField = withForm({
           />
         </Field>
       )}
-      name="connectionId"
-    />
+    </form.AppField>
   ),
 });
 
@@ -78,8 +77,8 @@ export const GitHubRepositoryField = withForm({
     repositories: [],
   } as GitHubRepositoryFieldProps,
   render: ({ form, disabled, repositories }) => (
-    <form.AppField
-      children={(field) => (
+    <form.AppField name="repositoryFullName">
+      {(field) => (
         <Field
           dirty={field.state.meta.isDirty}
           invalid={!field.state.meta.isValid}
@@ -119,7 +118,6 @@ export const GitHubRepositoryField = withForm({
           />
         </Field>
       )}
-      name="repositoryFullName"
-    />
+    </form.AppField>
   ),
 });

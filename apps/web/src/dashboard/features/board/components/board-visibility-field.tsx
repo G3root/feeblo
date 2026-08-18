@@ -19,8 +19,8 @@ export const BoardVisibilityField = withForm({
     const canUsePrivateBoards = entitlements.capabilities.privateBoards;
 
     return (
-      <form.AppField
-        children={(field) => (
+      <form.AppField name="visibility">
+        {(field) => (
           <Field name={field.name}>
             <FieldLabel>Visibility</FieldLabel>
 
@@ -49,8 +49,7 @@ export const BoardVisibilityField = withForm({
             )}
           </Field>
         )}
-        name="visibility"
-      />
+      </form.AppField>
     );
   },
 });

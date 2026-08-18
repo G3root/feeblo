@@ -136,14 +136,12 @@ function CompanyCreateForm() {
       }}
     >
       <SheetPanel className="grid gap-4">
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
-        <form.AppField
-          children={(field) => <field.TextField label="External ID" />}
-          name="externalId"
-        />
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="externalId">
+          {(field) => <field.TextField label="External ID" />}
+        </form.AppField>
         <form.Subscribe selector={(state) => state.values.attributes}>
           {(attributes) => (
             <CustomAttributeFields

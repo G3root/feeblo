@@ -104,20 +104,18 @@ function WebhookCreateForm({
       }}
     >
       <SheetPanel className="grid gap-4">
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
-        <form.AppField
-          children={(field) => (
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="endpointUrl">
+          {(field) => (
             <field.TextField
               label="Endpoint URL"
               placeholder="https://example.com/hooks/feeblo"
               type="url"
             />
           )}
-          name="endpointUrl"
-        />
+        </form.AppField>
         <WebhookEventSelectionField form={form} idPrefix="create-webhook" />
       </SheetPanel>
       <SheetFooter>

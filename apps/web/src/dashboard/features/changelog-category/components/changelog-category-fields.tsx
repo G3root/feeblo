@@ -8,10 +8,9 @@ export const ChangelogCategoryFields = withForm({
   render: ({ form }) => {
     return (
       <>
-        <form.AppField
-          children={(field) => <field.TextField label="Name" />}
-          name="name"
-        />
+        <form.AppField name="name">
+          {(field) => <field.TextField label="Name" />}
+        </form.AppField>
         <ChangelogCategoryColorField form={form} />
       </>
     );

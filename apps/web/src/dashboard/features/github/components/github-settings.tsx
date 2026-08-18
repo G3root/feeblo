@@ -643,18 +643,19 @@ function GitHubSyncRuleSlot({
   // Optimistic draft derived from the server rule. Field changes render
   // immediately and reset to the server value once the refresh lands (or a
   // failed save reverts the rule).
+  const firstStatusId = statuses[0]?.id;
   const baseDraft = useMemo<GitHubSyncRuleDraft>(
     () => ({
-      postStatusId: rule?.postStatusId ?? statuses[0]?.id ?? "",
+      postStatusId: rule?.postStatusId ?? firstStatusId ?? "",
       upvoterNotificationPolicy:
         rule?.upvoterNotificationPolicy ?? "notify_upvoters",
       enabled: rule?.enabled ?? false,
     }),
     [
+      firstStatusId,
       rule?.enabled,
       rule?.postStatusId,
       rule?.upvoterNotificationPolicy,
-      statuses[0]?.id,
     ]
   );
   const [draft, setDraftOptimistic] = useOptimistic(

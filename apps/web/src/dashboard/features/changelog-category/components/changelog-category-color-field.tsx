@@ -14,8 +14,8 @@ export const ChangelogCategoryColorField = withForm({
   ...changelogCategoryFormOpts,
   render: ({ form }) => {
     return (
-      <form.AppField
-        children={(field) => (
+      <form.AppField name="color">
+        {(field) => (
           <Field
             dirty={field.state.meta.isDirty}
             invalid={!field.state.meta.isValid}
@@ -51,8 +51,7 @@ export const ChangelogCategoryColorField = withForm({
             </RadioGroupPrimitive>
           </Field>
         )}
-        name="color"
-      />
+      </form.AppField>
     );
   },
 });

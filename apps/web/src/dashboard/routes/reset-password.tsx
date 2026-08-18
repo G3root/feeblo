@@ -282,17 +282,13 @@ function RouteComponent() {
           }}
         >
           <div className="flex flex-col gap-4">
-            <passwordForm.AppField
-              children={(field) => <field.PasswordField label="New Password" />}
-              name="password"
-            />
+            <passwordForm.AppField name="password">
+              {(field) => <field.PasswordField label="New Password" />}
+            </passwordForm.AppField>
 
-            <passwordForm.AppField
-              children={(field) => (
-                <field.PasswordField label="Confirm Password" />
-              )}
-              name="confirmPassword"
-            />
+            <passwordForm.AppField name="confirmPassword">
+              {(field) => <field.PasswordField label="Confirm Password" />}
+            </passwordForm.AppField>
 
             <passwordForm.AppForm>
               <passwordForm.SubscribeButton
@@ -328,8 +324,8 @@ function RouteComponent() {
         }}
       >
         <FieldGroup>
-          <otpForm.Field
-            children={(field) => {
+          <otpForm.Field name="otp">
+            {(field) => {
               const isInvalid =
                 field.state.meta.isTouched && !field.state.meta.isValid;
               return (
@@ -383,8 +379,7 @@ function RouteComponent() {
                 </Field>
               );
             }}
-            name="otp"
-          />
+          </otpForm.Field>
 
           <Field>
             <Button type="submit">Continue</Button>

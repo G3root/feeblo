@@ -178,11 +178,10 @@ function movePostToStatus(
   postId: string,
   targetStatusId: string
 ) {
-  const nextLanes = structuredClone(lanes);
-  const sourceLane = nextLanes.find((lane) =>
+  const sourceLane = lanes.find((lane) =>
     lane.posts.some((post) => post.id === postId)
   );
-  const targetLane = nextLanes.find((lane) => lane.statusId === targetStatusId);
+  const targetLane = lanes.find((lane) => lane.statusId === targetStatusId);
 
   if (!(sourceLane && targetLane) || sourceLane === targetLane) {
     return lanes;
@@ -193,15 +192,35 @@ function movePostToStatus(
     return lanes;
   }
 
-  const [post] = sourceLane.posts.splice(postIndex, 1);
+  const post = sourceLane.posts[postIndex];
   if (!post) {
     return lanes;
   }
 
-  post.status = targetLane.status;
-  post.statusId = targetLane.statusId;
-  targetLane.posts.push(post);
-  return nextLanes;
+  return lanes.map((lane) => {
+    if (lane.statusId === sourceLane.statusId) {
+      return {
+        ...lane,
+        posts: lane.posts.filter((item) => item.id !== postId),
+      };
+    }
+
+    if (lane.statusId === targetLane.statusId) {
+      return {
+        ...lane,
+        posts: [
+          ...lane.posts,
+          {
+            ...post,
+            status: targetLane.status,
+            statusId: targetLane.statusId,
+          },
+        ],
+      };
+    }
+
+    return lane;
+  });
 }
 
 const RoadmapBoardLane = memo(function RoadmapBoardLane({

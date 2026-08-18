@@ -24,11 +24,10 @@ function movePostToColumn(
   sourceId: string,
   targetStatusId: string
 ) {
-  const nextItems = structuredClone(lanes);
-  const fromLane = nextItems.find((lane) =>
+  const fromLane = lanes.find((lane) =>
     lane.posts.some((post) => post.id === sourceId)
   );
-  const toLane = nextItems.find((lane) => lane.statusId === targetStatusId);
+  const toLane = lanes.find((lane) => lane.statusId === targetStatusId);
 
   if (!(fromLane && toLane) || fromLane.statusId === toLane.statusId) {
     return lanes;
@@ -40,17 +39,36 @@ function movePostToColumn(
     return lanes;
   }
 
-  const [movedPost] = fromLane.posts.splice(itemIndex, 1);
+  const movedPost = fromLane.posts[itemIndex];
 
   if (!movedPost) {
     return lanes;
   }
 
-  movedPost.status = toLane.status;
-  movedPost.statusId = toLane.statusId;
-  toLane.posts.push(movedPost);
+  return lanes.map((lane) => {
+    if (lane.statusId === fromLane.statusId) {
+      return {
+        ...lane,
+        posts: lane.posts.filter((post) => post.id !== sourceId),
+      };
+    }
 
-  return nextItems;
+    if (lane.statusId === toLane.statusId) {
+      return {
+        ...lane,
+        posts: [
+          ...lane.posts,
+          {
+            ...movedPost,
+            status: toLane.status,
+            statusId: toLane.statusId,
+          },
+        ],
+      };
+    }
+
+    return lane;
+  });
 }
 
 export function BoardGridView({

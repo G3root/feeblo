@@ -20,8 +20,8 @@ export const RoadmapVisibilityField = withForm({
       isLoading || entitlements.capabilities.privateRoadmaps;
 
     return (
-      <form.AppField
-        children={(field) => (
+      <form.AppField name="visibility">
+        {(field) => (
           <Field name={field.name}>
             <FieldLabel>Visibility</FieldLabel>
 
@@ -53,8 +53,7 @@ export const RoadmapVisibilityField = withForm({
             )}
           </Field>
         )}
-        name="visibility"
-      />
+      </form.AppField>
     );
   },
 });

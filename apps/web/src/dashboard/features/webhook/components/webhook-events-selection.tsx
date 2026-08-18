@@ -82,8 +82,8 @@ export const WebhookEventSelectionField =
     // SAFETY: The upstream contract guarantees a string here.
     props: { idPrefix: webhookIdPrefix },
     render: ({ form, idPrefix }) => (
-      <form.AppField
-        children={(field) => (
+      <form.AppField name="eventTypes">
+        {(field) => (
           <Field name={field.name}>
             <FieldLabel>Events</FieldLabel>
             <WebhookEventSelection
@@ -93,7 +93,6 @@ export const WebhookEventSelectionField =
             />
           </Field>
         )}
-        name="eventTypes"
-      />
+      </form.AppField>
     ),
   }) as ComponentType<WebhookEventSelectionFieldProps>;

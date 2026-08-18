@@ -116,10 +116,10 @@ function MembersSection() {
         .where(({ member }) => eq(member.organizationId, organizationId)),
     [organizationId]
   );
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  const membersSource = (membersQuery.data ?? []) as OrganizationMemberRow[];
-
+  const membersData = membersQuery.data;
   const members = React.useMemo(() => {
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    const membersSource = (membersData ?? []) as OrganizationMemberRow[];
     const term = search.trim().toLowerCase();
     if (!term) {
       return membersSource;
@@ -130,10 +130,10 @@ function MembersSection() {
       const email = member.user?.email?.toLowerCase() ?? "";
       return name.includes(term) || email.includes(term);
     });
-  }, [membersSource, search]);
+  }, [membersData, search]);
 
   const noFilter = members.length === 0 && search.trim() !== "";
-  const isEmpty = membersSource.length === 0;
+  const isEmpty = (membersData?.length ?? 0) === 0;
 
   if (membersQuery.isLoading) {
     return (
@@ -276,11 +276,11 @@ function InvitationsSection() {
     [organizationId]
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   );
-  // SAFETY: The upstream contract guarantees this value here.
-  const invitationsSource = (invitationsQuery.data ??
-    []) as OrganizationInvitationRow[];
-
+  const invitationsData = invitationsQuery.data;
   const invitations = React.useMemo(() => {
+    // SAFETY: The upstream contract guarantees this value here.
+    const invitationsSource = (invitationsData ??
+      []) as OrganizationInvitationRow[];
     const term = search.trim().toLowerCase();
     if (!term) {
       return invitationsSource;
@@ -289,10 +289,10 @@ function InvitationsSection() {
     return invitationsSource.filter((invitation) =>
       invitation.email.toLowerCase().includes(term)
     );
-  }, [invitationsSource, search]);
+  }, [invitationsData, search]);
 
   const noFilter = invitations.length === 0 && search.trim() !== "";
-  const isEmpty = invitationsSource.length === 0;
+  const isEmpty = (invitationsData?.length ?? 0) === 0;
 
   if (invitationsQuery.isLoading) {
     return (
@@ -752,8 +752,8 @@ function InviteMemberForm() {
         form.handleSubmit();
       }}
     >
-      <form.AppField
-        children={(field) => (
+      <form.AppField name="email">
+        {(field) => (
           <SkeletonWrapper>
             <field.TextField
               hideLabel
@@ -763,14 +763,13 @@ function InviteMemberForm() {
             />
           </SkeletonWrapper>
         )}
-        name="email"
-      />
+      </form.AppField>
 
       <div className="flex items-center gap-2">
-        // SAFETY: The runtime invariant checked by the surrounding code
-        guarantees this type.
-        <form.AppField
-          children={(field) => (
+        {/* SAFETY: The runtime invariant checked by the surrounding code
+        guarantees this type. */}
+        <form.AppField name="role">
+          {(field) => (
             // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
             <Select
               onValueChange={(value) =>
@@ -792,8 +791,7 @@ function InviteMemberForm() {
               </SelectPopup>
             </Select>
           )}
-          name="role"
-        />
+        </form.AppField>
         {atLimit ? (
           <SettingsItem.PaidPlanIndicator
             content={`Admin roles are limited to ${limit} on this plan. Upgrade to add more.`}

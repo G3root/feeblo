@@ -163,8 +163,8 @@ function RouteComponent() {
                   We sent a 6-digit code to your email address
                 </FieldDescription>
               </Field>
-              <form.Field
-                children={(field) => {
+              <form.Field name="otp">
+                {(field) => {
                   const isInvalid =
                     field.state.meta.isTouched && !field.state.meta.isValid;
                   return (
@@ -220,8 +220,7 @@ function RouteComponent() {
                     </Field>
                   );
                 }}
-                name="otp"
-              />
+              </form.Field>
 
               <Field>
                 <Button type="submit">Verify</Button>

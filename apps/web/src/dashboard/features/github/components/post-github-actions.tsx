@@ -300,8 +300,8 @@ function GitHubPostIssueForm({
           repositories={repositories.list}
         />
         {action === "link" ? (
-          <form.AppField
-            children={(field) => (
+          <form.AppField name="issueNumber">
+            {(field) => (
               <field.TextField
                 inputMode="numeric"
                 label="Issue number"
@@ -310,8 +310,7 @@ function GitHubPostIssueForm({
                 type="number"
               />
             )}
-            name="issueNumber"
-          />
+          </form.AppField>
         ) : null}
       </DialogPanel>
       <DialogFooter>
