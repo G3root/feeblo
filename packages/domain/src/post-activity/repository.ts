@@ -157,6 +157,8 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
       // invalid runtime input reaches the switch. Fail loudly instead of
       // letting that input be written to the database.
       const unhandled: never = input;
+      // SAFETY: `unhandled` is statically `never`; this cast only preserves the
+      // discriminant for the defensive runtime error below.
       throw new Error(
         `Unhandled post activity kind: ${String((unhandled as PostActivityInput).kind)}`
       );

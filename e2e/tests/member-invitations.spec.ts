@@ -122,13 +122,11 @@ test.describe("member invitations", () => {
     expect(
       await page
         .getByRole("textbox", { name: "Invite email" })
-        .evaluate(
-          (input) =>
-            "checkValidity" in input &&
-            typeof input.checkValidity === "function" &&
-            !input.checkValidity()
-        )
-    ).toBeTruthy();
+        .evaluate((input) => {
+          // SAFETY: This locator targets the email input rendered by the invite form.
+          return !(input as HTMLInputElement).checkValidity();
+        })
+    ).toBe(true);
     const emails = await getTestEmails(page.context().request);
     expect(emails.filter((email) => email.to === invalidEmail)).toHaveLength(0);
   });
