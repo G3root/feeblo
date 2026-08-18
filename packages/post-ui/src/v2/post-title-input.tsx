@@ -16,10 +16,7 @@ interface PostTitleInputProps extends Omit<
   size?: "default" | "sm";
 }
 
-export function PostTitleInput({
-  className,
-  ...props
-}: PostTitleInputProps) {
+export function PostTitleInput({ className, ...props }: PostTitleInputProps) {
   const generateId = useId();
   const id = props.id ?? generateId;
 

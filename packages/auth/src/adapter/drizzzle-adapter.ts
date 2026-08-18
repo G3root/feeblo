@@ -1232,8 +1232,7 @@ export const drizzleAdapter = (
       usePlural: config.usePlural ?? false,
       debugLogs: config.debugLogs ?? false,
       supportsUUIDs: config.provider === "pg",
-      supportsJSON:
-        config.provider === "pg", // even though mysql also supports it, mysql requires to pass stringified json anyway.
+      supportsJSON: config.provider === "pg", // even though mysql also supports it, mysql requires to pass stringified json anyway.
       supportsArrays: config.provider === "pg",
       customTransformOutput: ({ data, fieldAttributes }) => {
         // not all providers support dates
