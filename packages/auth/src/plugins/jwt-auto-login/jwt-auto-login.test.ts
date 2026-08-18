@@ -17,20 +17,20 @@ import {
 
 import { jwtAutoLoginClient } from "./client";
 import { jwtAutoLogin, SIGN_IN_PATH } from "./plugin";
+import type { SessionExtraFields } from "./types";
 
-vi.mock("better-auth/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("better-auth/api")>();
+/**
+ * Faithful stand-ins for better-auth's session internals. Each test injects
+ * these through the plugin's options seam and controls them directly, so the
+ * suite never module-mocks `better-auth/api`.
+ */
+function mockSessionApi() {
   return {
-    ...actual,
-    getSessionFromCtx: vi.fn((...args: any[]) =>
-      actual.getSessionFromCtx(...(args as [any, ...any[]]))
-    ),
-    getOAuthState: vi.fn(() => actual.getOAuthState()),
-    addOAuthServerContext: vi.fn((value: any) =>
-      actual.addOAuthServerContext(value)
-    ),
+    getSessionFromCtx: vi.fn(),
+    getOAuthState: vi.fn(),
+    addOAuthServerContext: vi.fn(),
   };
-});
+}
 
 function stripSessionCookie(
   headers: Headers,
@@ -47,6 +47,14 @@ function stripSessionCookie(
   }
   return result;
 }
+
+/** Shape of a user field declared in the plugin schema. */
+type SchemaUserField = {
+  type: string;
+  required: boolean;
+  input: boolean;
+  defaultValue: null;
+};
 
 const testSecret = "better-auth-secret-that-is-long-enough-for-validation-test";
 
@@ -463,18 +471,21 @@ describe("jwtAutoLogin", async () => {
     path = "/sign-in/jwt-auto-login",
     setCookie = "better-auth.session_token=new-token.value; Path=/; HttpOnly",
   }: {
-    newSessionUser: Record<string, any>;
+    newSessionUser: SessionExtraFields;
     deleteUser: ReturnType<typeof vi.fn>;
     deleteUserSessions?: ReturnType<typeof vi.fn>;
     findUserById?: ReturnType<typeof vi.fn>;
     listSessions?: ReturnType<typeof vi.fn>;
     newSession?: {
-      user: Record<string, any>;
+      user: SessionExtraFields;
       session: { token: string };
     } | null;
     path?: string;
     setCookie?: string | null;
   }) {
+    // SAFETY: this fixture builds a partial GenericEndpointContext and casts
+    // it to the full type; the injected session internals read only the fields
+    // it actually provides.
     return {
       path,
       context: {
@@ -497,10 +508,10 @@ describe("jwtAutoLogin", async () => {
         },
         newSession:
           newSession === undefined
-            ? ({
+            ? {
                 user: newSessionUser,
                 session: { token: "new-token" },
-              } as { user: Record<string, any>; session: { token: string } })
+              }
             : newSession,
         internalAdapter: {
           deleteUser,
@@ -527,9 +538,10 @@ describe("jwtAutoLogin", async () => {
 
   describe("cleanup safeguards", () => {
     it("does not delete when the new session is still restricted", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
+      const { getSessionFromCtx } = mockSessionApi();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
@@ -541,7 +553,7 @@ describe("jwtAutoLogin", async () => {
         deleteUser,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: {
           id: "restricted-user",
           restrictedToOrganizationId: "org-1",
@@ -549,7 +561,7 @@ describe("jwtAutoLogin", async () => {
         session: {
           token: "old-token",
         },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -557,9 +569,10 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("deletes the previous restricted user when linking a new account", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
+      const { getSessionFromCtx } = mockSessionApi();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
@@ -573,7 +586,7 @@ describe("jwtAutoLogin", async () => {
         deleteUserSessions,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: {
           id: "restricted-user",
           restrictedToOrganizationId: "org-1",
@@ -581,7 +594,7 @@ describe("jwtAutoLogin", async () => {
         session: {
           token: "old-token",
         },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -590,10 +603,11 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("does not link or clean up when the new session belongs to the same user", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
+      const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -603,10 +617,10 @@ describe("jwtAutoLogin", async () => {
         deleteUser,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: { id: "same-user", restrictedToOrganizationId: "org-1" },
         session: { token: "old-token" },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -615,10 +629,11 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("does not link or clean up when the new session is still anonymous", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
+      const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -631,10 +646,10 @@ describe("jwtAutoLogin", async () => {
         deleteUser,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: { id: "restricted-user", restrictedToOrganizationId: "org-1" },
         session: { token: "old-token" },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -643,10 +658,11 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("skips cleanup when onLinkAccount throws", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
+      const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn().mockRejectedValue(new Error("link failed"));
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -658,10 +674,10 @@ describe("jwtAutoLogin", async () => {
         deleteUserSessions,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: { id: "restricted-user", restrictedToOrganizationId: "org-1" },
         session: { token: "old-token" },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -672,10 +688,11 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("logs and continues when cleanup throws", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
+      const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -687,10 +704,10 @@ describe("jwtAutoLogin", async () => {
         deleteUserSessions,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: { id: "restricted-user", restrictedToOrganizationId: "org-1" },
         session: { token: "old-token" },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -703,21 +720,21 @@ describe("jwtAutoLogin", async () => {
 
   describe("before hook", () => {
     it("adds oauth server context when the session is restricted", async () => {
-      const { getSessionFromCtx, addOAuthServerContext } =
-        await import("better-auth/api");
-      const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
+      const { getSessionFromCtx, addOAuthServerContext } = mockSessionApi();
+      const plugin = jwtAutoLogin({
+        createSsoUser: vi.fn(),
+        getSessionFromCtx,
+        addOAuthServerContext,
+      });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: { id: "anon-user", restrictedToOrganizationId: "org-1" },
         session: { token: "tok" },
-      } as any);
-      // The real addOAuthServerContext needs an active request state; we only
-      // care that the before-hook forwards the autoLoginUserId, so stub it.
-      vi.mocked(addOAuthServerContext).mockImplementation(
-        async () => undefined
-      );
+      });
 
+      // SAFETY: the injected session internals ignore the context object, so a
+      // bare value satisfies the middleware's context parameter.
       await handler?.({} as any);
 
       expect(addOAuthServerContext).toHaveBeenCalledWith({
@@ -726,31 +743,39 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("does not add oauth server context when the session is not restricted", async () => {
-      const { getSessionFromCtx, addOAuthServerContext } =
-        await import("better-auth/api");
-      vi.mocked(addOAuthServerContext).mockClear();
-      const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
+      const { getSessionFromCtx, addOAuthServerContext } = mockSessionApi();
+      const plugin = jwtAutoLogin({
+        createSsoUser: vi.fn(),
+        getSessionFromCtx,
+        addOAuthServerContext,
+      });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: { id: "real-user", restrictedToOrganizationId: null },
         session: { token: "tok" },
-      } as any);
+      });
 
+      // SAFETY: the injected session internals ignore the context object, so a
+      // bare value satisfies the middleware's context parameter.
       await handler?.({} as any);
 
       expect(addOAuthServerContext).not.toHaveBeenCalled();
     });
 
     it("does not add oauth server context when there is no session", async () => {
-      const { getSessionFromCtx, addOAuthServerContext } =
-        await import("better-auth/api");
-      vi.mocked(addOAuthServerContext).mockClear();
-      const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
+      const { getSessionFromCtx, addOAuthServerContext } = mockSessionApi();
+      const plugin = jwtAutoLogin({
+        createSsoUser: vi.fn(),
+        getSessionFromCtx,
+        addOAuthServerContext,
+      });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+      getSessionFromCtx.mockResolvedValue(null);
 
+      // SAFETY: the injected session internals ignore the context object, so a
+      // bare value satisfies the middleware's context parameter.
       await handler?.({} as any);
 
       expect(addOAuthServerContext).not.toHaveBeenCalled();
@@ -759,10 +784,11 @@ describe("jwtAutoLogin", async () => {
 
   describe("after-hook anonymous session resolution", () => {
     it("returns early when the response has no session cookie", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
+      const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -773,8 +799,7 @@ describe("jwtAutoLogin", async () => {
         setCookie: null,
       });
 
-      vi.mocked(getSessionFromCtx).mockClear();
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+      getSessionFromCtx.mockResolvedValue(null);
 
       await handler?.(ctx);
 
@@ -784,11 +809,12 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("returns early when no cookie session and no oauth state", async () => {
-      const { getSessionFromCtx, getOAuthState } =
-        await import("better-auth/api");
+      const { getSessionFromCtx, getOAuthState } = mockSessionApi();
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
+        getOAuthState,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -798,8 +824,8 @@ describe("jwtAutoLogin", async () => {
         deleteUser,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
-      vi.mocked(getOAuthState).mockResolvedValue(undefined as any);
+      getSessionFromCtx.mockResolvedValue(null);
+      getOAuthState.mockResolvedValue(undefined);
 
       await handler?.(ctx);
 
@@ -808,11 +834,12 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("returns early when the oauth-state user is not restricted", async () => {
-      const { getSessionFromCtx, getOAuthState } =
-        await import("better-auth/api");
+      const { getSessionFromCtx, getOAuthState } = mockSessionApi();
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
+        getOAuthState,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -826,10 +853,10 @@ describe("jwtAutoLogin", async () => {
         findUserById,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
-      vi.mocked(getOAuthState).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue(null);
+      getOAuthState.mockResolvedValue({
         serverContext: { autoLoginUserId: "u" },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -839,11 +866,12 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("returns early when the oauth-state user has no active sessions", async () => {
-      const { getSessionFromCtx, getOAuthState } =
-        await import("better-auth/api");
+      const { getSessionFromCtx, getOAuthState } = mockSessionApi();
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
+        getSessionFromCtx,
+        getOAuthState,
         onLinkAccount,
       });
       const handler = plugin.hooks?.after?.[0]?.handler;
@@ -859,10 +887,10 @@ describe("jwtAutoLogin", async () => {
         listSessions,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
-      vi.mocked(getOAuthState).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue(null);
+      getOAuthState.mockResolvedValue({
         serverContext: { autoLoginUserId: "u" },
-      } as any);
+      });
 
       await handler?.(ctx);
 
@@ -874,8 +902,11 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("throws when the auto-login path is reached without a new session", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
-      const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
+      const { getSessionFromCtx } = mockSessionApi();
+      const plugin = jwtAutoLogin({
+        createSsoUser: vi.fn(),
+        getSessionFromCtx,
+      });
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
       const ctx = createMiddlewareContext({
@@ -885,10 +916,10 @@ describe("jwtAutoLogin", async () => {
         path: SIGN_IN_PATH,
       });
 
-      vi.mocked(getSessionFromCtx).mockResolvedValue({
+      getSessionFromCtx.mockResolvedValue({
         user: { id: "restricted-user", restrictedToOrganizationId: "org-1" },
         session: { token: "old-token" },
-      } as any);
+      });
 
       await expect(handler?.(ctx)).rejects.toThrow(
         "Anonymous users cannot sign in again anonymously"
@@ -899,13 +930,14 @@ describe("jwtAutoLogin", async () => {
 
   describe("endpoint error mapping", () => {
     it("should return FAILED_TO_CREATE_SSO_CONTACT when createSsoUser reports a contact failure", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+      const { getSessionFromCtx } = mockSessionApi();
+      getSessionFromCtx.mockResolvedValue(null);
 
       const { client: localClient } = await getTestInstance(
         {
           plugins: [
             jwtAutoLogin({
+              getSessionFromCtx,
               async createSsoUser() {
                 return {
                   code: "FAILED_TO_CREATE_SSO_CONTACT" as const,
@@ -930,13 +962,14 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("should return FAILED_TO_CREATE_SSO_USER when the created user cannot be found", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+      const { getSessionFromCtx } = mockSessionApi();
+      getSessionFromCtx.mockResolvedValue(null);
 
       const { client: localClient } = await getTestInstance(
         {
           plugins: [
             jwtAutoLogin({
+              getSessionFromCtx,
               async createSsoUser() {
                 return { name: "Ghost User", userId: "non-existent-id" };
               },
@@ -958,14 +991,15 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("should return COULD_NOT_CREATE_SESSION when session creation fails", async () => {
-      const { getSessionFromCtx } = await import("better-auth/api");
-      vi.mocked(getSessionFromCtx).mockResolvedValue(null as any);
+      const { getSessionFromCtx } = mockSessionApi();
+      getSessionFromCtx.mockResolvedValue(null);
 
       let _localAuth: any = null;
       const { client: localClient, auth: localAuth } = await getTestInstance(
         {
           plugins: [
             jwtAutoLogin({
+              getSessionFromCtx,
               async createSsoUser({ organizationId }) {
                 const ctx = await _localAuth.$context;
                 const user = await ctx.internalAdapter.createUser({
@@ -986,6 +1020,8 @@ describe("jwtAutoLogin", async () => {
       _localAuth = localAuth;
 
       const ctx = await localAuth.$context;
+      // SAFETY: the test forces session creation to fail by returning null, a
+      // value the real adapter's typed signature would never produce.
       ctx.internalAdapter.createSession = async () => null as any;
 
       const res = await localClient.signIn.jwtAutoLogin({
@@ -1000,12 +1036,17 @@ describe("jwtAutoLogin", async () => {
   describe("schema", () => {
     it("declares the restrictedToOrganizationId user field", () => {
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
-      const field = (plugin.schema as { user: { fields: Record<string, any> } })
-        .user.fields.restrictedToOrganizationId;
+      // SAFETY: the plugin schema declares the restrictedToOrganizationId user
+      // field; the cast only narrows to the schema field shape it exposes.
+      const field = (
+        plugin.schema as {
+          user: { fields: Record<string, SchemaUserField> };
+        }
+      ).user.fields.restrictedToOrganizationId;
       expect(field).toBeDefined();
-      expect(field.type).toBe("string");
-      expect(field.required).toBe(false);
-      expect(field.input).toBe(false);
+      expect(field?.type).toBe("string");
+      expect(field?.required).toBe(false);
+      expect(field?.input).toBe(false);
     });
   });
 });

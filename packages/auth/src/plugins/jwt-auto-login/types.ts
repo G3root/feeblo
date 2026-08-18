@@ -1,8 +1,19 @@
 import type { GenericEndpointContext, Session, User } from "better-auth";
+import type {
+  addOAuthServerContext as baseAddOAuthServerContext,
+  getOAuthState as baseGetOAuthState,
+  getSessionFromCtx as baseGetSessionFromCtx,
+} from "better-auth/api";
+
+/** Extra claims Better Auth carries through the session objects. */
+export type SessionExtraFields = Record<
+  string,
+  string | number | boolean | null | undefined | Date
+>;
 
 export type JwtAutoLoginSession = { session: Session; user: User } & {
   user: { restrictedToOrganizationId: string | null };
-} & Record<string, any>;
+} & SessionExtraFields;
 
 export interface UserWithJwtAutoLogin extends User {
   restrictedToOrganizationId: string;
@@ -56,13 +67,23 @@ export interface JwtAutoLoginOptions {
    */
   onLinkAccount?: (data: {
     anonymousUser: {
-      user: UserWithJwtAutoLogin & Record<string, any>;
-      session: Session & Record<string, any>;
+      user: UserWithJwtAutoLogin & SessionExtraFields;
+      session: Session & SessionExtraFields;
     };
     newUser: {
-      user: User & Record<string, any>;
-      session: Session & Record<string, any>;
+      user: User & SessionExtraFields;
+      session: Session & SessionExtraFields;
     };
     ctx: GenericEndpointContext;
   }) => Promise<void> | void;
+
+  /**
+   * Better-auth session internals the plugin needs to read the current
+   * session and carry the anonymous user across the OAuth redirect. Defaults
+   * to the real implementations; injectable so the plugin can be tested with a
+   * faithful seam instead of module mocks.
+   */
+  getSessionFromCtx?: typeof baseGetSessionFromCtx;
+  getOAuthState?: typeof baseGetOAuthState;
+  addOAuthServerContext?: typeof baseAddOAuthServerContext;
 }

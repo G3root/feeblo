@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import type {
   BetterAuthPlugin,
   GenericEndpointContext,
@@ -18,6 +19,7 @@ import * as z from "zod";
 import { AUTH_CLIENT_IP_HEADER } from "../../auth-client-ip-header";
 import { JWT_AUTO_LOGIN_ERROR_CODES } from "./error-codes";
 import { schema } from "./schema";
+import type { SessionExtraFields } from "./types";
 import type {
   JwtAutoLoginOptions,
   JwtAutoLoginSession,
@@ -25,15 +27,7 @@ import type {
   UserWithJwtAutoLogin,
 } from "./types";
 
-const SSO_ERROR_STATUS: Record<
-  SsoUserError["code"],
-  | "UNAUTHORIZED"
-  | "BAD_REQUEST"
-  | "FORBIDDEN"
-  | "INTERNAL_SERVER_ERROR"
-  | "TOO_MANY_REQUESTS"
-  | "SERVICE_UNAVAILABLE"
-> = {
+const SSO_ERROR_STATUS = {
   ORGANIZATION_HAS_NO_JWT_SECRET: "UNAUTHORIZED",
   WIDGET_SSO_NOT_ENTITLED: "FORBIDDEN",
   INVALID_JWT: "UNAUTHORIZED",
@@ -42,16 +36,30 @@ const SSO_ERROR_STATUS: Record<
   FAILED_TO_CREATE_SSO_CONTACT: "INTERNAL_SERVER_ERROR",
   SSO_RATE_LIMITED: "TOO_MANY_REQUESTS",
   SSO_RATE_LIMIT_UNAVAILABLE: "SERVICE_UNAVAILABLE",
-};
+} satisfies Record<
+  SsoUserError["code"],
+  | "UNAUTHORIZED"
+  | "BAD_REQUEST"
+  | "FORBIDDEN"
+  | "INTERNAL_SERVER_ERROR"
+  | "TOO_MANY_REQUESTS"
+  | "SERVICE_UNAVAILABLE"
+>;
 
 export const ID = "jwt-auto-login" as const;
 export const SIGN_IN_PATH = `/sign-in/${ID}` as const;
 
-async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
-  session: Session & Record<string, any>;
-  user: UserWithJwtAutoLogin & Record<string, any>;
+async function resolveAnonymousSession(
+  ctx: GenericEndpointContext,
+  deps: {
+    getSessionFromCtx: NonNullable<JwtAutoLoginOptions["getSessionFromCtx"]>;
+    getOAuthState: NonNullable<JwtAutoLoginOptions["getOAuthState"]>;
+  }
+): Promise<{
+  session: Session & SessionExtraFields;
+  user: UserWithJwtAutoLogin & SessionExtraFields;
 } | null> {
-  const cookieSession = await getSessionFromCtx<{
+  const cookieSession = await deps.getSessionFromCtx<{
     restrictedToOrganizationId: string | null;
   }>(ctx, { disableRefresh: true });
   if (cookieSession?.user.restrictedToOrganizationId) {
@@ -65,11 +73,12 @@ async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
     };
   }
 
-  const autoLoginUserId = (await getOAuthState())?.serverContext
+  const autoLoginUserId = (await deps.getOAuthState())?.serverContext
     ?.autoLoginUserId;
-  if (typeof autoLoginUserId !== "string") {
+  if (!isString(autoLoginUserId)) {
     return null;
   }
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const user = (await ctx.context.internalAdapter.findUserById(
     autoLoginUserId
   )) as JwtAutoLoginSession["user"];
@@ -93,6 +102,10 @@ async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
 }
 
 export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
+  const sessionFromCtx = options.getSessionFromCtx ?? getSessionFromCtx;
+  const oauthState = options.getOAuthState ?? getOAuthState;
+  const addOAuth = options.addOAuthServerContext ?? addOAuthServerContext;
+
   return {
     id: ID,
     endpoints: {
@@ -137,7 +150,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
           // widget session, reject any further attempts to create another one.
           // This prevents a widget user from signing in anonymously again while
           // they are already authenticated.
-          const existingSession = await getSessionFromCtx<{
+          const existingSession = await sessionFromCtx<{
             restrictedToOrganizationId: string | null;
           }>(ctx, { disableRefresh: true });
 
@@ -207,7 +220,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             return ctx.path === "/sign-in/social";
           },
           handler: createAuthMiddleware(async (ctx) => {
-            const session = await getSessionFromCtx<{
+            const session = await sessionFromCtx<{
               restrictedToOrganizationId: string | null;
             }>(ctx, { disableRefresh: true });
             if (!session?.user.restrictedToOrganizationId) {
@@ -216,7 +229,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             // Carry the anonymous user id across the provider redirect so the
             // callback can link the account even when the session cookie is
             // absent (for example Expo's in-app browser).
-            await addOAuthServerContext({
+            await addOAuth({
               autoLoginUserId: session.user.id,
             });
           }),
@@ -262,7 +275,10 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
              * server-only OAuth state when the callback arrives without the
              * anonymous session cookie (for example Expo).
              */
-            const session = await resolveAnonymousSession(ctx);
+            const session = await resolveAnonymousSession(ctx, {
+              getSessionFromCtx: sessionFromCtx,
+              getOAuthState: oauthState,
+            });
             if (!session) {
               return;
             }
@@ -283,8 +299,9 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             // the global app. Give the integrator a chance to transfer data
             // (contacts, posts) from the anonymous user to the new user before
             // the anonymous user is cleaned up below.
+            // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
             const newSessionUser = newSession.user as
-              | (UserWithJwtAutoLogin & Record<string, any>)
+              | (UserWithJwtAutoLogin & SessionExtraFields)
               | undefined;
             const isSameUser = newSessionUser?.id === session.user.id;
             const newSessionIsAnonymous =

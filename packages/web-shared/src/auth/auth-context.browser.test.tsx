@@ -1,13 +1,25 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Session transport is overridden through the atom's test seam below; setting
+// the runtime env keeps the (otherwise unused) authClient construction valid
+// when the auth modules are imported.
+vi.hoisted(() => {
+  // SAFETY: the browser-test global carries the runtime env the SDK reads
+  // from window.global.__ENV when the auth modules are imported.
+  const globalWindow = window as Window & {
+    global?: { __ENV?: Record<string, string> };
+  };
+  globalWindow.global = globalWindow.global ?? {};
+  globalWindow.global.__ENV = { API_URL: "http://localhost:3000/api" };
+});
+
 import { render } from "vitest-browser-react";
 
+import {
+  overrideSessionGetterForTests,
+  resetSessionGetterForTests,
+} from "./atoms";
 import { AuthProvider, useAuth } from "./auth-context";
-
-const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));
-
-vi.mock("../lib/auth-client", () => ({
-  authClient: { getSession },
-}));
 
 function AuthProbe() {
   const auth = useAuth();
@@ -20,22 +32,32 @@ function AuthProbe() {
 }
 
 describe("AuthProvider session revalidation", () => {
+  afterEach(() => {
+    resetSessionGetterForTests();
+  });
+
   it("revalidates on window focus without signing out after a transient failure", async () => {
-    getSession
-      .mockResolvedValueOnce({
+    const responses: Array<
+      () => Promise<
+        | {
+            data: { user: { email: string; image: null; name: string } };
+            error: null;
+          }
+        | { data: null; error: { message: string } }
+      >
+    > = [
+      async () => ({
         data: {
-          user: {
-            email: "person@example.com",
-            image: null,
-            name: "Person",
-          },
+          user: { email: "person@example.com", image: null, name: "Person" },
         },
         error: null,
-      })
-      .mockResolvedValueOnce({
-        data: null,
-        error: { message: "Network unavailable" },
-      });
+      }),
+      async () => ({ data: null, error: { message: "Network unavailable" } }),
+    ];
+    let callIndex = 0;
+    const getSession = vi.fn(() => responses[callIndex++]());
+
+    overrideSessionGetterForTests(getSession);
 
     const screen = await render(
       <AuthProvider initialHint={null}>

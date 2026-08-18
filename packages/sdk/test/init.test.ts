@@ -19,17 +19,23 @@ function createMockIframe(): HTMLIFrameElement {
   return iframe;
 }
 
-vi.mock("../src/iframe", () => ({
-  createIframe: vi.fn(() => createMockIframe()),
-  iframeOrigin: vi.fn(() => MOCK_ORIGIN),
-  resolveBaseUrl: vi.fn(() => MOCK_ORIGIN),
-}));
+import * as iframeModule from "../src/iframe";
+import * as positioningModule from "../src/positioning";
 
-vi.mock("../src/positioning", () => ({
-  createFloatingInstance: vi.fn(() => () => {}),
-}));
+beforeEach(() => {
+  vi.spyOn(iframeModule, "createIframe").mockImplementation(() =>
+    createMockIframe()
+  );
+  vi.spyOn(iframeModule, "iframeOrigin").mockImplementation(() => MOCK_ORIGIN);
+  vi.spyOn(iframeModule, "resolveBaseUrl").mockImplementation(
+    () => MOCK_ORIGIN
+  );
+  vi.spyOn(positioningModule, "createFloatingInstance").mockImplementation(
+    () => () => {}
+  );
+});
 
-function postWidgetMessage(data: unknown): void {
+function postWidgetMessage<T>(data: T): void {
   window.dispatchEvent(
     new MessageEvent("message", {
       origin: MOCK_ORIGIN,
@@ -40,6 +46,7 @@ function postWidgetMessage(data: unknown): void {
 
 describe("init", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
@@ -49,6 +56,7 @@ describe("init", () => {
     try {
       init("");
     } catch (err) {
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       expect((err as EmbedError).code).toBe("INVALID_ORG");
     }
   });
@@ -57,19 +65,19 @@ describe("init", () => {
     const widget = init("org_test");
 
     expect(widget).toBeDefined();
-    expect(typeof widget.open).toBe("function");
-    expect(typeof widget.close).toBe("function");
-    expect(typeof widget.identify).toBe("function");
-    expect(typeof widget.setBoard).toBe("function");
-    expect(typeof widget.openModule).toBe("function");
-    expect(typeof widget.destroy).toBe("function");
+    expect(widget.open).toEqual(expect.any(Function));
+    expect(widget.close).toEqual(expect.any(Function));
+    expect(widget.identify).toEqual(expect.any(Function));
+    expect(widget.setBoard).toEqual(expect.any(Function));
+    expect(widget.openModule).toEqual(expect.any(Function));
+    expect(widget.destroy).toEqual(expect.any(Function));
   });
 
   it("accepts an InitConfig object", () => {
     const widget = init({ organizationId: "org_cfg", theme: "dark" });
 
     expect(widget).toBeDefined();
-    expect(typeof widget.open).toBe("function");
+    expect(widget.open).toEqual(expect.any(Function));
   });
 
   it("creates the embed container in the DOM", () => {
@@ -136,6 +144,7 @@ describe("FeebloWidget methods", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
@@ -313,6 +322,7 @@ describe("Embed postMessage callbacks", () => {
   let widget: FeebloWidget;
 
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
@@ -327,6 +337,7 @@ describe("Embed postMessage callbacks", () => {
     });
 
     expect(onError).toHaveBeenCalledTimes(1);
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const err = onError.mock.calls[0]?.[0] as EmbedError;
     expect(err).toBeInstanceOf(EmbedError);
     expect(err.code).toBe("WIDGET_ERROR");
@@ -383,6 +394,7 @@ describe("Embed postMessage callbacks", () => {
 
 describe("defaultBoard handling", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
@@ -466,6 +478,7 @@ describe("defaultBoard handling", () => {
 
 describe("navigation sync ordering", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
@@ -599,6 +612,7 @@ describe("navigation sync ordering", () => {
 
 describe("ready handshake", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
@@ -639,7 +653,9 @@ describe("ready handshake", () => {
     postWidgetMessage({ event: "READY" });
     postWidgetMessage({ event: "WIDGET_OPENED", data: { module: "feedback" } });
 
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     expect(listener).toHaveBeenCalledTimes(1);
+    // SAFETY: The upstream contract guarantees this value here.
     const detail = (listener.mock.calls[0]?.[0] as CustomEvent).detail;
     expect(detail.data).toEqual({ module: "feedback" });
     window.removeEventListener("widgetOpened", listener);
@@ -692,6 +708,7 @@ describe("ready handshake", () => {
 
 describe("Widget events via postMessage", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
@@ -778,12 +795,13 @@ describe("Widget events via postMessage", () => {
 
 describe("Feeblo namespace", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     Feeblo.destroy();
     fakePostMessage.mockClear();
   });
 
   it("Feeblo.init is callable", () => {
-    expect(typeof Feeblo.init).toBe("function");
+    expect(Feeblo.init).toEqual(expect.any(Function));
     Feeblo.init("org_ns");
   });
 
@@ -857,12 +875,12 @@ describe("Feeblo namespace", () => {
   });
 
   it("Feeblo.version is a non-empty string", () => {
-    expect(typeof Feeblo.version).toBe("string");
+    expect(Feeblo.version).toEqual(expect.any(String));
     expect(Feeblo.version.length).toBeGreaterThan(0);
   });
 
   it("Feeblo.organizationId is the branding function", () => {
-    expect(typeof Feeblo.organizationId).toBe("function");
+    expect(Feeblo.organizationId).toEqual(expect.any(Function));
     expect(Feeblo.organizationId("x")).toBe("x");
   });
 

@@ -1,12 +1,18 @@
+import { isFunction } from "@feeblo/utils/runtime-kind";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
+// The editor exposes only this module boundary for its upload schema + RPC
+// transport; the stubs are faithful pass-throughs of the runtime's contracts.
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/auth-client", () => ({
   editorMediaUploadEndpoint: "/api/media/upload",
   uploadedEditorMediaSchema: {
-    parse: (value: unknown) => value,
+    // SAFETY: the stub replaces the zod parser with an identity pass-through.
+    parse: <T,>(value: T) => value,
   },
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/runtime", () => ({
   fetchRpc: vi.fn(),
 }));
@@ -47,10 +53,11 @@ class MockXMLHttpRequest {
 
   private dispatch(type: string) {
     const listener = this.listeners.get(type);
-    if (typeof listener === "function") {
-      listener(new Event(type));
-    } else {
-      listener?.handleEvent(new Event(type));
+    if (isFunction(listener)) {
+      // SAFETY: the non-object union branch is a callable EventListener.
+      (listener as (event: Event) => void)(new Event(type));
+    } else if (listener && "handleEvent" in listener) {
+      listener.handleEvent(new Event(type));
     }
   }
 }

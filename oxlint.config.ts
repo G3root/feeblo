@@ -1,7 +1,7 @@
 import { defineConfig } from "oxlint";
 
 export default defineConfig({
-  plugins: ["eslint", "oxc", "unicorn", "typescript"],
+  plugins: ["eslint", "oxc", "unicorn", "typescript", "vitest"],
   categories: {
     correctness: "warn",
     suspicious: "warn",
@@ -93,6 +93,11 @@ export default defineConfig({
     "typescript/restrict-template-expressions": "off",
     "typescript/unbound-method": "off",
     "react/no-children-prop": "off",
+
+    // Tests place assertions inside vi.waitFor / Promise callbacks, which the
+    // plugin reports as standalone expects even though they run within a test.
+    "vitest/no-standalone-expect": "off",
+    "vitest/require-mock-type-parameters": "off",
 
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
