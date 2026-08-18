@@ -1,5 +1,4 @@
 import type { InvitableRole } from "@feeblo/permissions";
-import { isFunction } from "@feeblo/utils/runtime-kind";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 import {
@@ -126,7 +125,7 @@ test.describe("member invitations", () => {
         .evaluate(
           (input) =>
             "checkValidity" in input &&
-            isFunction(input.checkValidity) &&
+            typeof input.checkValidity === "function" &&
             !input.checkValidity()
         )
     ).toBeTruthy();
