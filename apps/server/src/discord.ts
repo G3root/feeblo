@@ -1,3 +1,4 @@
+import { isObject } from "@feeblo/utils/runtime-kind";
 import { Database } from "@feeblo/db";
 import {
   DiscordInboundService,
@@ -41,10 +42,10 @@ const headerValue = (
  * already signature-verified and fully decoded the body, so this guard only
  * discriminates on the `kind` tag instead of re-running the full schema.
  */
-const isParsedDiscordInboundRequest = (
-  value: unknown
-): value is ParsedDiscordInboundRequest =>
-  typeof value === "object" &&
+const isParsedDiscordInboundRequest = <T,>(
+  value: T
+): value is Extract<T, ParsedDiscordInboundRequest> =>
+  isObject(value) &&
   value !== null &&
   "kind" in value &&
   (value.kind === "ping" ||

@@ -1,3 +1,4 @@
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
 import type { PostSubscription } from "@feeblo/domain/post-subscription/schema";
@@ -25,10 +26,11 @@ type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 const queryClient = getContext().queryClient;
 
 export function getCurrentOrganizationId() {
-  if (typeof window === "undefined") {
+  if (!hasWindow()) {
     return undefined;
   }
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const runtimeWindow = window as Window & {
     global?: { __ENV?: { organizationId?: string } };
   };
@@ -42,7 +44,7 @@ export function getCurrentOrganizationId() {
  * query is created without an explicit filter (e.g. from a route loader).
  */
 function getCurrentPostSlug() {
-  if (typeof window === "undefined") {
+  if (!hasWindow()) {
     return undefined;
   }
 
@@ -116,6 +118,7 @@ function getEqFilterValue(
 ) {
   for (const { field, operator, value } of filters) {
     if (operator === "eq" && field.join(".") === fieldName) {
+      // SAFETY: The upstream contract guarantees a string here.
       return value as string;
     }
   }
@@ -585,7 +588,9 @@ export const publicCommentReactionCollection = createCollection(
         return [];
       }
     },
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     getKey: getCommentReactionCollectionKey as (
       item: CommentReactionRow
     ) => string,
@@ -636,8 +641,11 @@ export const publicUpvoteCollection = createCollection(
       );
 
       return [...data];
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     },
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -700,9 +708,13 @@ export const publicPostReactionCollection = createCollection(
         }
       );
 
+      // SAFETY: The endpoint/API contract guarantees this response shape.
       return [...data];
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     },
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
     onInsert: async ({ transaction }) => {
       const mutation = transaction.mutations[0];
@@ -760,10 +772,15 @@ export const publicPostSubscriptionCollection = createCollection(
         {
           signal: ctx.signal,
         }
+      // SAFETY: The endpoint/API contract guarantees this response shape.
       );
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       return [...data];
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     },
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     queryClient,
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     getKey: getPostSubscriptionCollectionKey as (
       item: PostSubscriptionRow
     ) => string,

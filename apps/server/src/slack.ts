@@ -1,3 +1,4 @@
+import { isObject } from "@feeblo/utils/runtime-kind";
 import { Database } from "@feeblo/db";
 import {
   parseSlackOAuthCallbackUrl,
@@ -39,10 +40,10 @@ const headerValue = (
  * already signature-verified and fully decoded the body, so this guard only
  * discriminates on the `kind` tag instead of re-running the full schema.
  */
-const isParsedSlackInboundRequest = (
-  value: unknown
-): value is ParsedSlackInboundRequest =>
-  typeof value === "object" &&
+const isParsedSlackInboundRequest = <T,>(
+  value: T
+): value is Extract<T, ParsedSlackInboundRequest> =>
+  isObject(value) &&
   value !== null &&
   "kind" in value &&
   (value.kind === "slash_command" || value.kind === "interactive");

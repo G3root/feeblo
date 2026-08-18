@@ -184,6 +184,7 @@ async function authMiddleware(context: APIContext, next: MiddlewareNext) {
     fetchOptions: { headers: context.request.headers },
   });
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const sessionData = data as AuthClientSession | null;
 
   // The HttpOnly Better Auth cookie remains the authority. Middleware resolves

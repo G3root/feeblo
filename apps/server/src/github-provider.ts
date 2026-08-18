@@ -55,7 +55,7 @@ export const GitHubProviderLive = Layer.effect(
     const integrationKey = config.githubEncryptionKey;
     const providerFailure = (operation: string) =>
       new InternalServerError({ message: `GitHub App ${operation} failed.` });
-    const issueFailure = (operation: string) => (failure: unknown) => {
+    const issueFailure = (operation: string) => <T,>(failure: T) => {
       if (Schema.is(NotFoundError)(failure)) {
         return new NotFoundError({
           message: `GitHub resource was not found during ${operation}.`,

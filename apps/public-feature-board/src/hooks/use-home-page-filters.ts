@@ -16,6 +16,7 @@ function normalizeFilterValue(value: string | undefined): FilterValue {
 }
 
 function normalizeSortValue(value: string | undefined): HomePageSortOption {
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   return SORT_OPTIONS.has(value as HomePageSortOption)
     ? (value as HomePageSortOption)
     : "newest";

@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -18,7 +19,7 @@ export function getInitials(name: string | null | undefined) {
 }
 
 export function formatDate(value: Date | string) {
-  const date = typeof value === "string" ? new Date(value) : value;
+  const date = isString(value) ? new Date(value) : value;
 
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",

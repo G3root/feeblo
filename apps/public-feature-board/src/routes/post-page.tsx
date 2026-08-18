@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { AuthDialog } from "@feeblo/post-ui/auth-dialog";
 import { PostCommentGuestPrompt } from "@feeblo/post-ui/post-comment-composer";
 import { PostPage as ComposedPostPage } from "@feeblo/post-ui/post-page";
@@ -50,7 +51,7 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function formatPublishedDate(value: Date | string) {
-  const date = typeof value === "string" ? new Date(value) : value;
+  const date = isString(value) ? new Date(value) : value;
 
   return new Intl.DateTimeFormat(undefined, {
     day: "numeric",

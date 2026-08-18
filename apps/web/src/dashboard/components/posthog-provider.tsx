@@ -1,3 +1,4 @@
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import type { AnalyticsClient } from "@feeblo/web-shared/analytics-provider";
 import { useResolvedAuth } from "@feeblo/web-shared/auth-context";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
@@ -31,7 +32,7 @@ function initPostHog() {
 initPostHog();
 
 export const posthogAnalyticsClient: AnalyticsClient | undefined =
-  typeof window !== "undefined" && posthogKey
+  hasWindow() && posthogKey
     ? (name: any, properties: any) => posthog.capture(name, properties)
     : undefined;
 

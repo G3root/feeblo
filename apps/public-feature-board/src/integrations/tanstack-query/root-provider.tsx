@@ -1,3 +1,4 @@
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Client-side singleton to ensure the same instance is used across the app
@@ -9,7 +10,7 @@ function makeQueryClient() {
 
 export function getContext() {
   // Server: always create a new QueryClient per request to avoid data leaks
-  if (typeof window === "undefined") {
+  if (!hasWindow()) {
     return {
       queryClient: makeQueryClient(),
     };

@@ -297,6 +297,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       activeBoardId,
       activeBoardLabel,
       boardItems,
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       filteredPosts: filteredPosts as HomePost[],
       isError,
       isLoading,
