@@ -11,10 +11,12 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
+import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { EntitlementPolicy } from "../entitlement/policies";
+import { PostActivityRepository } from "../post-activity/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -164,7 +166,8 @@ describe("TagRpcHandlers", () => {
   const Repositories = Layer.mergeAll(
     TagRepository.layer,
     SiteRepository.layer,
-    WorkspaceRepository.layer
+    WorkspaceRepository.layer,
+    PostActivityRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
@@ -366,6 +369,103 @@ describe("TagRpcHandlers", () => {
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toMatchObject([{ postId: f.postId, tagId }]);
           })
+      );
+      it.effect("records add/remove activities when tags change", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* TagRpcHandlersEffect;
+          const f = yield* fixture();
+          const tagA = yield* TagId.generate;
+          const tagB = yield* TagId.generate;
+          for (const tagId of [tagA, tagB]) {
+            yield* handlers
+              .TagCreate({
+                id: tagId,
+                name: tagId,
+                type: "FEEDBACK",
+                organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+          }
+
+          yield* handlers
+            .PostTagSet({
+              organizationId: f.organizationId,
+              postId: f.postId,
+              tagIds: [tagA, tagB],
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .PostTagSet({
+              organizationId: f.organizationId,
+              postId: f.postId,
+              tagIds: [tagB],
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+
+          const rows = yield* db
+            .select({
+              kind: schema.postActivityTable.kind,
+              nextValue: schema.postActivityTable.nextValue,
+              postId: schema.postActivityTable.postId,
+              actorId: schema.postActivityTable.actorId,
+              actorMemberId: schema.postActivityTable.actorMemberId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, f.postId),
+                eq(schema.postActivityTable.kind, "TAG_ADDED"),
+                eq(schema.postActivityTable.nextValue, tagB)
+              )
+            );
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            kind: "TAG_ADDED",
+            nextValue: tagB,
+            postId: f.postId,
+            actorId: f.userId,
+            actorMemberId: f.membershipId,
+          });
+          const addedRows = yield* db
+            .select({
+              id: schema.postActivityTable.id,
+              actorId: schema.postActivityTable.actorId,
+              actorMemberId: schema.postActivityTable.actorMemberId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, f.postId),
+                eq(schema.postActivityTable.kind, "TAG_ADDED"),
+                eq(schema.postActivityTable.nextValue, tagA)
+              )
+            );
+          expect(addedRows).toHaveLength(1);
+          expect(addedRows[0]).toMatchObject({
+            actorId: f.userId,
+            actorMemberId: f.membershipId,
+          });
+          const removedRows = yield* db
+            .select({
+              id: schema.postActivityTable.id,
+              actorId: schema.postActivityTable.actorId,
+              actorMemberId: schema.postActivityTable.actorMemberId,
+            })
+            .from(schema.postActivityTable)
+            .where(
+              and(
+                eq(schema.postActivityTable.postId, f.postId),
+                eq(schema.postActivityTable.kind, "TAG_REMOVED"),
+                eq(schema.postActivityTable.nextValue, tagA)
+              )
+            );
+          expect(removedRows).toHaveLength(1);
+          expect(removedRows[0]).toMatchObject({
+            actorId: f.userId,
+            actorMemberId: f.membershipId,
+          });
+        })
       );
       it.effect(
         "denies contributors from setting tags on changelogs they did not create",
