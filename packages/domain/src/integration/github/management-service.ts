@@ -6,7 +6,7 @@ import type { GitHubIntegrationError } from "./errors";
 import type * as S from "./schema";
 
 /** Application-owned GitHub capability: the provider adapter implements GitHub App installation and API I/O behind this boundary. */
-export interface GitHubManagementServiceShape {
+export interface GitHubManagementServiceContract {
   /** Completes the App setup callback; provider code verifies temporary installer access and persists no token. */
   readonly connectComplete: (
     input: S.GitHubAppInstallationCallback
@@ -59,5 +59,5 @@ export interface GitHubManagementServiceShape {
 /** Service key supplied by server composition after it wires the GitHub adapter. */
 export class GitHubManagementService extends Context.Service<
   GitHubManagementService,
-  GitHubManagementServiceShape
+  GitHubManagementServiceContract
 >()("@feeblo/GitHubManagementService") {}

@@ -36,7 +36,7 @@ import { GitHubIntegrationConfig } from "./config";
 import { GitHubProvider } from "./github-provider";
 import {
   GitHubManagementService,
-  type GitHubManagementServiceShape,
+  type GitHubManagementServiceContract,
 } from "./management-service";
 import { GitHubIssueCreateRouteConfiguration } from "./schema";
 
@@ -46,7 +46,7 @@ const databaseError = (operation: string) => () =>
   });
 
 /** Failures that prove GitHub never created the issue, so the reservation can be released. */
-const isDefinitelyNonApplied = (error: unknown): boolean =>
+const isDefinitelyNonApplied = <T,>(error: T): boolean =>
   Schema.is(UnauthorizedError)(error) ||
   Schema.is(NotFoundError)(error) ||
   Schema.is(BadRequestError)(error);
@@ -197,7 +197,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
       }
       return { externalResourceId: recorded.externalResourceId, link };
     });
-  const service: GitHubManagementServiceShape = {
+  const service: GitHubManagementServiceContract = {
     status: () => Effect.succeed({ configured: config.configured }),
     connectStart: (input) => provider.startInstallation(input.organizationId),
     connectComplete: (input) => provider.completeInstallation(input),
@@ -460,13 +460,9 @@ const makeGitHubManagementService = Effect.gen(function* () {
         );
         const providerConfig = {
           version: 1,
-          ...(input.boardId === null ? {} : { boardId: input.boardId }),
-          ...(input.repositoryOwner === null
-            ? {}
-            : { repositoryOwner: input.repositoryOwner }),
-          ...(input.repositoryName === null
-            ? {}
-            : { repositoryName: input.repositoryName }),
+          ...(input.boardId === null ? undefined : { boardId: input.boardId }),
+          ...(input.repositoryOwner !== null && { repositoryOwner: input.repositoryOwner }),
+          ...(input.repositoryName !== null && { repositoryName: input.repositoryName }),
         };
         yield* db
           .insert(schema.integrationRouteTable)

@@ -168,7 +168,7 @@ const seedRuleScenario = ({
         postStatusId: targetStatusIds[rule.targetStatus],
         upvoterNotificationPolicy: "do_not_notify_upvoters",
         enabled: rule.enabled ?? true,
-        ...(rule.createdAt === undefined ? {} : { createdAt: rule.createdAt }),
+        ...(rule.createdAt === undefined ? undefined : { createdAt: rule.createdAt }),
       });
     }
 

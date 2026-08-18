@@ -191,9 +191,9 @@ export const makeDiscordProviderRegistration = ({
         const embed = renderChannelUpdateMessageEmbed({
           actionUrl: eventData.post.url.toString(),
           ...(eventData.actor.kind === "member" &&
-          eventData.actor.displayName !== undefined
-            ? { actorName: eventData.actor.displayName }
-            : {}),
+            eventData.actor.displayName !== undefined && {
+              actorName: eventData.actor.displayName,
+            }),
           eventType: input.event.type,
           facts: [
             { label: "Board", value: eventData.board.name },

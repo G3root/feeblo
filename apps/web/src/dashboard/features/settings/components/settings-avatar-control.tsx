@@ -1,3 +1,4 @@
+import { isNumber } from "@feeblo/utils/runtime-kind";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -296,7 +297,7 @@ function Root({
                       min={1}
                       onValueChange={(value) => {
                         const first =
-                          typeof value === "number" ? value : value[0];
+                          isNumber(value) ? value : value[0];
                         setZoom(first ?? 1);
                       }}
                       step={0.1}

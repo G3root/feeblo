@@ -22,7 +22,7 @@ const databaseError = (operation: string) => () =>
     message: `External resource ${operation} failed.`,
   });
 
-const decodePostLink = (value: unknown) =>
+const decodePostLink = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(PostExternalResourceLink)(value).pipe(
     Effect.mapError(databaseError("row decoding"))
   );

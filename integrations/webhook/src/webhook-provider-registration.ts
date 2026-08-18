@@ -77,12 +77,8 @@ export const makeWebhookProviderRegistration = ({
           )({
             actor: {
               type: eventData.actor.kind,
-              ...(eventData.actor.memberId === undefined
-                ? {}
-                : { memberId: eventData.actor.memberId }),
-              ...(eventData.actor.displayName === undefined
-                ? {}
-                : { displayName: eventData.actor.displayName }),
+              ...(eventData.actor.memberId !== undefined && { memberId: eventData.actor.memberId }),
+              ...(eventData.actor.displayName !== undefined && { displayName: eventData.actor.displayName }),
             },
             board: eventData.board,
             id: input.event.id,
@@ -93,9 +89,7 @@ export const makeWebhookProviderRegistration = ({
               title: eventData.post.title,
               url: eventData.post.url.toString(),
             },
-            ...(eventData.previousStatus === undefined
-              ? {}
-              : { previousStatus: eventData.previousStatus }),
+            ...(eventData.previousStatus !== undefined && { previousStatus: eventData.previousStatus }),
             status: eventData.post.status,
             type: input.event.type,
             version: input.event.version,
@@ -183,7 +177,7 @@ export const makeWebhookProviderRegistration = ({
               httpStatus: response.status,
               message: "Webhook receiver rate limited delivery",
               provider: webhookProviderKey,
-              ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+              ...(retryAfterMs === undefined ? undefined : { retryAfterMs }),
             });
           }
           if (outcome._tag === "Retry") {

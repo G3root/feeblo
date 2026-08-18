@@ -89,9 +89,7 @@ const makeFakeSlackApiClient = (
       return Effect.succeed({
         channels: [...page],
         ok: true as const,
-        ...(hasMore
-          ? { response_metadata: { next_cursor: String(pageIndex) } }
-          : {}),
+        ...(hasMore && { response_metadata: { next_cursor: String(pageIndex) } }),
       });
     },
     oauthV2Access: () => {

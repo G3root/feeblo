@@ -19,7 +19,7 @@ import { EmailOutboxConfig } from "../../email-outbox/config";
 import { BadRequestError, InternalServerError } from "../../rpc-errors";
 import { ExternalResourceServiceLive } from "../external-resource/live";
 import { GitHubIntegrationConfig } from "./config";
-import { GitHubProvider, type GitHubProviderShape } from "./github-provider";
+import { GitHubProvider, type GitHubProviderContract } from "./github-provider";
 import { GitHubManagementServiceLive } from "./management-live";
 import { GitHubManagementService } from "./management-service";
 import type { GitHubResolvedIssue } from "./schema";
@@ -27,14 +27,14 @@ import type { GitHubResolvedIssue } from "./schema";
 /** Recording fake provider; the test sets `createIssue` behavior per scenario. */
 const makeFakeGitHubProvider = () => {
   const calls: string[] = [];
-  let createIssueImpl: GitHubProviderShape["createIssue"] = () =>
+  let createIssueImpl: GitHubProviderContract["createIssue"] = () =>
     Effect.die("createIssue not configured");
   return {
     calls,
     reset: () => {
       calls.length = 0;
     },
-    setCreateIssue: (impl: GitHubProviderShape["createIssue"]) => {
+    setCreateIssue: (impl: GitHubProviderContract["createIssue"]) => {
       createIssueImpl = impl;
     },
     service: GitHubProvider.of({

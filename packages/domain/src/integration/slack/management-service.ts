@@ -5,7 +5,7 @@ import type { SlackIntegrationError } from "./errors";
 import type * as S from "./schema";
 
 /** Organization-scoped Slack management boundary; read methods never return credentials. */
-export interface SlackManagementServiceShape {
+export interface SlackManagementServiceContract {
   /** Completes the OAuth handshake; called by the server callback route. */
   readonly connectComplete: (input: {
     readonly code: string;
@@ -36,5 +36,5 @@ export interface SlackManagementServiceShape {
 /** Service key implemented by the server composition root for Slack commands. */
 export class SlackManagementService extends Context.Service<
   SlackManagementService,
-  SlackManagementServiceShape
+  SlackManagementServiceContract
 >()("@feeblo/SlackManagementService") {}

@@ -175,7 +175,7 @@ export const classifyDiscordApiError = (
     return new IntegrationProviderRateLimitedError({
       message: `Discord rate limited ${context}`,
       provider: discordProviderKey,
-      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      ...(retryAfterMs === undefined ? undefined : { retryAfterMs }),
       httpStatus: status,
     });
   }
@@ -189,7 +189,7 @@ export const classifyDiscordApiError = (
   return new IntegrationProviderPermanentRejection({
     message: `Discord rejected ${context}${errorCode === undefined ? "" : `: error ${errorCode}`}`,
     provider: discordProviderKey,
-    ...(status === undefined ? {} : { httpStatus: status }),
+    ...(status === undefined ? undefined : { httpStatus: status }),
   });
 };
 
@@ -392,7 +392,7 @@ export const makeDiscordApiClient = (
           `/channels/${channelId}/messages`,
           {
             body: {
-              ...(content === undefined ? {} : { content }),
+              ...(content === undefined ? undefined : { content }),
               embeds,
             },
             botToken,

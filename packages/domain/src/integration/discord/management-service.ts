@@ -6,7 +6,7 @@ import type { DiscordIntegrationError } from "./errors";
 import type * as S from "./schema";
 
 /** Organization-scoped Discord management boundary; read methods never return credentials. */
-export interface DiscordManagementServiceShape {
+export interface DiscordManagementServiceContract {
   /** Completes the OAuth handshake; called by the server callback route. */
   readonly connectComplete: (input: {
     readonly code: string;
@@ -37,5 +37,5 @@ export interface DiscordManagementServiceShape {
 /** Service key implemented by the server composition root for Discord commands. */
 export class DiscordManagementService extends Context.Service<
   DiscordManagementService,
-  DiscordManagementServiceShape
+  DiscordManagementServiceContract
 >()("@feeblo/DiscordManagementService") {}

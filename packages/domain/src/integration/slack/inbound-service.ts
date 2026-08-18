@@ -13,7 +13,7 @@ export interface SlackInboundHttpResponse {
 }
 
 /** Inbound Slack surface: slash command, message action, and modal submission. */
-export interface SlackInboundServiceShape {
+export interface SlackInboundServiceContract {
   readonly handleInteractive: (
     payload: SlackInteractivePayload
   ) => Effect.Effect<SlackInboundHttpResponse, never>;
@@ -25,5 +25,5 @@ export interface SlackInboundServiceShape {
 /** Service key implemented by the server composition root. */
 export class SlackInboundService extends Context.Service<
   SlackInboundService,
-  SlackInboundServiceShape
+  SlackInboundServiceContract
 >()("@feeblo/SlackInboundService") {}

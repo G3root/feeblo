@@ -49,11 +49,11 @@ export const decryptDiscordCredentialMaterial = (
     DiscordEncryptedCredentialMaterial,
     encryptedCredential,
     (decoded) => ({
-      ...(decoded.oauthState === undefined
-        ? {}
-        : { oauthState: decoded.oauthState }),
-      ...(decoded.userToken === undefined
-        ? {}
-        : { userToken: Redacted.make(decoded.userToken) }),
+      ...(decoded.oauthState !== undefined && {
+        oauthState: decoded.oauthState,
+      }),
+      ...(decoded.userToken !== undefined && {
+        userToken: Redacted.make(decoded.userToken),
+      }),
     })
   );

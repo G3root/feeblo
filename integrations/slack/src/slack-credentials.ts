@@ -44,17 +44,9 @@ export const decryptSlackCredentialMaterial = (
     SlackEncryptedCredentialMaterial,
     encryptedCredential,
     (decoded) => ({
-      ...(decoded.botToken === undefined
-        ? {}
-        : { botToken: Redacted.make(decoded.botToken) }),
-      ...(decoded.oauthState === undefined
-        ? {}
-        : { oauthState: decoded.oauthState }),
-      ...(decoded.userToken === undefined
-        ? {}
-        : { userToken: Redacted.make(decoded.userToken) }),
-      ...(decoded.incomingWebhookUrl === undefined
-        ? {}
-        : { incomingWebhookUrl: Redacted.make(decoded.incomingWebhookUrl) }),
+      ...(decoded.botToken !== undefined && { botToken: Redacted.make(decoded.botToken) }),
+      ...(decoded.oauthState !== undefined && { oauthState: decoded.oauthState }),
+      ...(decoded.userToken !== undefined && { userToken: Redacted.make(decoded.userToken) }),
+      ...(decoded.incomingWebhookUrl !== undefined && { incomingWebhookUrl: Redacted.make(decoded.incomingWebhookUrl) }),
     })
   );

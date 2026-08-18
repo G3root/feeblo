@@ -44,7 +44,7 @@ const registryValidationFailure = ({
   readonly provider: string;
 }) =>
   new IntegrationProviderRegistryValidationError({
-    ...(capabilityKey === undefined ? {} : { capabilityKey }),
+    ...(capabilityKey === undefined ? undefined : { capabilityKey }),
     message,
     provider,
   });

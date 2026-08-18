@@ -162,9 +162,9 @@ export const makeIntegrationDeliveryWorkerRepository = (
           },
           event: {
             causalHopCount: row.event.causalHopCount,
-            ...(row.event.causationId === null
-              ? {}
-              : { causationId: row.event.causationId }),
+            ...(row.event.causationId !== null && {
+              causationId: row.event.causationId,
+            }),
             correlationId: row.event.correlationId,
             data: row.event.payload,
             id: asLegid(IntegrationEventId)(row.event.id),
@@ -205,6 +205,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
               and(
                 eq(
                   schema.integrationConnectionTable.provider,
+                  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                   provider as TIntegrationProviderKey
                 ),
                 inArray(
@@ -437,9 +438,9 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       0,
                       now.getTime() - attempt.startedAt.getTime()
                     ),
-                    ...(errorTag === undefined ? {} : { errorTag }),
+                    ...(errorTag === undefined ? undefined : { errorTag }),
                     finishedAt: now,
-                    ...(httpStatus === undefined ? {} : { httpStatus }),
+                    ...(httpStatus === undefined ? undefined : { httpStatus }),
                     retryDecision,
                   })
                   .where(

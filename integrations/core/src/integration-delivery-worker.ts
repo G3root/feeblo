@@ -152,41 +152,36 @@ export const runIntegrationDeliveryWorkerPoll = ({
                           Effect.match({
                             onFailure: (failure) => ({
                               errorTag: failure._tag,
-                              ...(failure.httpStatus === undefined
-                                ? {}
-                                : { httpStatus: failure.httpStatus }),
+                              ...(failure.httpStatus !== undefined && {
+                                httpStatus: failure.httpStatus,
+                              }),
                               outcome:
                                 classifyIntegrationProviderDeliveryFailure(
                                   failure
                                 ),
                             }),
                             onSuccess: (response) => ({
-                              ...(response.httpStatus === undefined
-                                ? {}
-                                : { httpStatus: response.httpStatus }),
-                              ...(response.externalResourceDrafts === undefined
-                                ? {}
-                                : {
-                                    externalResourceDrafts:
-                                      response.externalResourceDrafts,
-                                  }),
+                              ...(response.httpStatus !== undefined && {
+                                httpStatus: response.httpStatus,
+                              }),
+                              ...(response.externalResourceDrafts !== undefined && {
+                                externalResourceDrafts: response.externalResourceDrafts,
+                              }),
                               outcome: { _tag: "Succeeded" } as const,
                             }),
                           })
                         );
                   yield* repository.persistDeliveryResult({
                     claimed: delivery,
-                    ...(result.errorTag === undefined
-                      ? {}
-                      : { errorTag: result.errorTag }),
-                    ...(result.externalResourceDrafts === undefined
-                      ? {}
-                      : {
-                          externalResourceDrafts: result.externalResourceDrafts,
-                        }),
-                    ...(result.httpStatus === undefined
-                      ? {}
-                      : { httpStatus: result.httpStatus }),
+                    ...(result.errorTag !== undefined && {
+                      errorTag: result.errorTag,
+                    }),
+                    ...(result.externalResourceDrafts !== undefined && {
+                      externalResourceDrafts: result.externalResourceDrafts,
+                    }),
+                    ...(result.httpStatus !== undefined && {
+                      httpStatus: result.httpStatus,
+                    }),
                     outcome: result.outcome,
                   });
                   const finishedAt = yield* DateTime.nowAsDate;

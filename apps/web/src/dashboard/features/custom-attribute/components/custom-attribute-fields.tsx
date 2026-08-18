@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import type {
   TCompanyAttributeValue,
   TCompanyAttributeValueUpsert,
@@ -101,7 +102,7 @@ export function CustomAttributeFields({
               required={definition.isRequired}
               step={definition.type === "INTEGER" ? "1" : undefined}
               type={inputType(definition.type)}
-              value={typeof value === "string" ? value : ""}
+              value={isString(value) ? value : ""}
             />
           </div>
         );
@@ -182,24 +183,24 @@ export function toCustomAttributeValueColumns(
       return {
         ...emptyColumns,
         valueDate:
-          typeof input === "string" && input
+          isString(input) && input
             ? new Date(`${input}T00:00:00`)
             : null,
       };
     case "DECIMAL":
       return {
         ...emptyColumns,
-        valueDecimal: typeof input === "string" && input ? Number(input) : null,
+        valueDecimal: isString(input) && input ? Number(input) : null,
       };
     case "INTEGER":
       return {
         ...emptyColumns,
-        valueInteger: typeof input === "string" && input ? Number(input) : null,
+        valueInteger: isString(input) && input ? Number(input) : null,
       };
     case "TEXT":
       return {
         ...emptyColumns,
-        valueText: typeof input === "string" && input ? input : null,
+        valueText: isString(input) && input ? input : null,
       };
   }
 }

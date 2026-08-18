@@ -97,9 +97,7 @@ export const decryptWebhookCredentialMaterial = (
               endpointUrl: Redacted.make(decoded.endpointUrl),
               signingKeyring: {
                 current: Redacted.make(decoded.signingKeyring.current),
-                ...(decoded.signingKeyring.previous === undefined
-                  ? {}
-                  : {
+                ...(decoded.signingKeyring.previous !== undefined && {
                       previous: {
                         expiresAt: decoded.signingKeyring.previous.expiresAt,
                         secret: Redacted.make(

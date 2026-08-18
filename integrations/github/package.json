@@ -19,7 +19,8 @@
     "@distilled.cloud/github": "1.0.0-rc.4",
     "@feeblo/integration-core": "workspace:*",
     "effect": "catalog:",
-    "jose": "catalog:"
+    "jose": "catalog:",
+    "@feeblo/utils": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

@@ -5,13 +5,14 @@
  * The server request framework exposes `request.url` as the relative path
  * only, so `new URL` needs a dummy base to parse the query string.
  */
-export const parseSlackOAuthCallbackUrl = (
-  url: string
-): {
+/** Query parameters parsed from the OAuth callback URL. */
+export interface OAuthCallbackQuery {
   readonly code: string | null;
   readonly error: string | null;
   readonly state: string | null;
-} => {
+}
+
+export const parseSlackOAuthCallbackUrl = (url: string): OAuthCallbackQuery => {
   const parsed = new URL(url, "http://localhost");
   return {
     code: parsed.searchParams.get("code"),

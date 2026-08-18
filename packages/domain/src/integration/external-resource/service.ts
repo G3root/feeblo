@@ -5,7 +5,7 @@ import type { InternalServerError } from "../../rpc-errors";
 import type * as S from "./schema";
 
 /** Provider-neutral persistence capability for external resources and their Feeblo-post links. */
-export interface ExternalResourceServiceShape {
+export interface ExternalResourceServiceContract {
   readonly completeCreation: (
     input: S.ExternalResourceCreationCompletion
   ) => Effect.Effect<void, InternalServerError>;
@@ -32,5 +32,5 @@ export interface ExternalResourceServiceShape {
 /** Service key for generic external-resource persistence. */
 export class ExternalResourceService extends Context.Service<
   ExternalResourceService,
-  ExternalResourceServiceShape
+  ExternalResourceServiceContract
 >()("@feeblo/ExternalResourceService") {}

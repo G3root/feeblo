@@ -49,7 +49,7 @@ const DiscordSafeDisplayMetadata = Schema.Struct({
   installerUserId: Schema.optionalKey(Schema.String),
 });
 
-const decodeSafeDisplayMetadata = (value: unknown) =>
+const decodeSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(DiscordSafeDisplayMetadata)(value ?? {}).pipe(
     Effect.mapError(
       () =>
@@ -64,7 +64,7 @@ const decodeSafeDisplayMetadata = (value: unknown) =>
  * completion with guild-scoped command registration), listing connections,
  * and disconnecting with credential erasure.
  */
-export interface DiscordConnectionServiceShape {
+export interface DiscordConnectionServiceContract {
   readonly connectComplete: (input: {
     readonly code: string;
     readonly state: string;
@@ -85,7 +85,7 @@ export interface DiscordConnectionServiceShape {
 
 export class DiscordConnectionService extends Context.Service<
   DiscordConnectionService,
-  DiscordConnectionServiceShape
+  DiscordConnectionServiceContract
 >()("@feeblo/DiscordConnectionService") {}
 
 /** Creates the Discord connection lifecycle service with an injectable API client. */
@@ -382,9 +382,7 @@ export const makeDiscordConnectionServiceLive = (
                   safeDisplayMetadata: {
                     guildId: guild.id,
                     guildName: guild.name,
-                    ...(oauth.user === undefined
-                      ? {}
-                      : { installerUserId: oauth.user.id }),
+                    ...(oauth.user !== undefined && { installerUserId: oauth.user.id }),
                   },
                   updatedAt: now,
                 })

@@ -1,4 +1,8 @@
-const htmlEntityMap: Record<string, string> = {
+interface HtmlEntityMap {
+  readonly [key: string]: string;
+}
+
+const htmlEntityMap: HtmlEntityMap = {
   amp: "&",
   apos: "'",
   gt: ">",

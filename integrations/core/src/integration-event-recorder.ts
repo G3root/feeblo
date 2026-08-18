@@ -12,7 +12,7 @@ import {
   IntegrationConnectionLifecycleStatus,
   type IntegrationEventEnvelopeV1,
   IntegrationEventRecorder,
-  type IntegrationEventRecorderShape,
+  type IntegrationEventRecorderContract,
   IntegrationEventRecordingError,
   IntegrationProviderKey,
   IntegrationRouteEventSelection,
@@ -136,7 +136,7 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
             })
         )
       ),
-  } satisfies IntegrationEventRecorderShape;
+  } satisfies IntegrationEventRecorderContract;
 });
 
 /** Live transaction-bound event recorder; callers provide the surrounding transaction. */

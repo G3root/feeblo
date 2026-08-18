@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import * as http from "node:http";
 
 import { afterEach } from "@effect/vitest";
@@ -30,7 +31,7 @@ export const startTestServer = (handler: http.RequestListener) =>
         server.once("error", reject);
         server.listen(0, "127.0.0.1", () => {
           const address = server.address();
-          if (address === null || typeof address === "string") {
+          if (address === null || isString(address)) {
             reject(new TypeError("Expected TCP test server"));
             return;
           }

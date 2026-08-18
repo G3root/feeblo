@@ -109,9 +109,9 @@ export const decideIntegrationDeliveryRetry = ({
   const delayMs = computeIntegrationRetryDelayMs({
     attemptCount,
     jitterRatio,
-    ...(outcome.retryAfterMs === undefined
-      ? {}
-      : { retryAfterMs: outcome.retryAfterMs }),
+    ...(outcome.retryAfterMs !== undefined && {
+      retryAfterMs: outcome.retryAfterMs,
+    }),
   });
   return delayMs === undefined
     ? { _tag: "Exhausted" }

@@ -29,7 +29,7 @@ import {
 const CHANNELS_PAGE_SIZE = 200;
 const MAX_CHANNEL_PAGES = 25;
 
-const decodeProviderConfig = (value: unknown) =>
+const decodeProviderConfig = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(SlackChannelNotificationRouteConfiguration)(
     value ?? {}
   ).pipe(
@@ -46,7 +46,7 @@ const decodeProviderConfig = (value: unknown) =>
  * connection: lists the bot's channels and toggles per-channel notification
  * routes.
  */
-export interface SlackChannelServiceShape {
+export interface SlackChannelServiceContract {
   readonly listChannels: (
     input: S.TSlackChannelList
   ) => Effect.Effect<readonly S.TSlackChannel[], SlackIntegrationError>;
@@ -57,7 +57,7 @@ export interface SlackChannelServiceShape {
 
 export class SlackChannelService extends Context.Service<
   SlackChannelService,
-  SlackChannelServiceShape
+  SlackChannelServiceContract
 >()("@feeblo/SlackChannelService") {}
 
 /** Creates the Slack channel service with an injectable API client. */
@@ -135,7 +135,7 @@ export const makeSlackChannelServiceLive = (
                 botToken: credentials.botToken,
                 limit: CHANNELS_PAGE_SIZE,
                 types: "public_channel,private_channel",
-                ...(cursor === undefined ? {} : { cursor }),
+                ...(cursor === undefined ? undefined : { cursor }),
               })
               .pipe(mapSlackApiError("channel listing"));
             for (const channel of pageResult.channels) {

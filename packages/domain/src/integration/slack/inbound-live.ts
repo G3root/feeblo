@@ -163,7 +163,7 @@ export const makeSlackInboundServiceLive = (
             connectionId,
             organizationId,
             teamId,
-            ...(messageTs === undefined ? {} : { messageTs }),
+            ...(messageTs === undefined ? undefined : { messageTs }),
           }).pipe(
             Effect.mapError(
               () =>
@@ -275,7 +275,7 @@ export const makeSlackInboundServiceLive = (
                 metadata: created.metadata,
                 postId: created.id,
                 postTitle: created.title,
-                ...(postUrl === undefined ? {} : { postUrl }),
+                ...(postUrl === undefined ? undefined : { postUrl }),
                 status: created.status,
                 submitterName: payload.user.name,
               }),

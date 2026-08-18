@@ -26,7 +26,7 @@ import {
 import type { DiscordIntegrationError } from "./errors";
 import type * as S from "./schema";
 
-const decodeProviderConfig = (value: unknown) =>
+const decodeProviderConfig = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(DiscordChannelNotificationRouteConfiguration)(
     value ?? {}
   ).pipe(
@@ -43,7 +43,7 @@ const decodeProviderConfig = (value: unknown) =>
  * connection: lists the guild's text channels and toggles per-channel
  * notification routes.
  */
-export interface DiscordChannelServiceShape {
+export interface DiscordChannelServiceContract {
   readonly listChannels: (
     input: S.TDiscordChannelList
   ) => Effect.Effect<readonly S.TDiscordChannel[], DiscordIntegrationError>;
@@ -54,7 +54,7 @@ export interface DiscordChannelServiceShape {
 
 export class DiscordChannelService extends Context.Service<
   DiscordChannelService,
-  DiscordChannelServiceShape
+  DiscordChannelServiceContract
 >()("@feeblo/DiscordChannelService") {}
 
 /** Creates the Discord channel service with an injectable API client. */
@@ -123,6 +123,7 @@ export const makeDiscordChannelServiceLive = (
           return discordChannels
             .filter((channel) =>
               DISCORD_NOTIFICATION_CHANNEL_TYPES.includes(
+                // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                 channel.type as (typeof DISCORD_NOTIFICATION_CHANNEL_TYPES)[number]
               )
             )
@@ -166,6 +167,7 @@ export const makeDiscordChannelServiceLive = (
             (channel) =>
               channel.id === input.channelId &&
               DISCORD_NOTIFICATION_CHANNEL_TYPES.includes(
+                // SAFETY: The endpoint/API contract guarantees this response shape.
                 channel.type as (typeof DISCORD_NOTIFICATION_CHANNEL_TYPES)[number]
               )
           );

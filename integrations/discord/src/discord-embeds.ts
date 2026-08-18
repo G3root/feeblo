@@ -173,8 +173,7 @@ export const renderChannelUpdateMessageEmbed = (
     type: "rich",
     title,
     url: message.actionUrl,
-    ...(message.facts.length > 0
-      ? {
+    ...(message.facts.length > 0 && {
           description: truncate(
             message.facts
               .map(
@@ -187,9 +186,8 @@ export const renderChannelUpdateMessageEmbed = (
               .join("\n"),
             descriptionMax
           ),
-        }
-      : {}),
+        }),
     color: EMBED_COLOR,
-    ...(footer === undefined ? {} : { footer }),
+    ...(footer === undefined ? undefined : { footer }),
   };
 };

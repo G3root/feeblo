@@ -13,7 +13,7 @@ import type {
 } from "./schema";
 
 /** Narrow GitHub I/O capability implemented by the provider adapter; persistence and policy stay in the domain service. */
-export interface GitHubProviderShape {
+export interface GitHubProviderContract {
   /** Verifies installer access to the App installation without persisting either temporary token. */
   readonly completeInstallation: (
     input: GitHubAppInstallationCallback
@@ -49,5 +49,5 @@ export interface GitHubProviderShape {
 /** Provider adapter key selected by server composition. */
 export class GitHubProvider extends Context.Service<
   GitHubProvider,
-  GitHubProviderShape
+  GitHubProviderContract
 >()("@feeblo/GitHubProvider") {}
