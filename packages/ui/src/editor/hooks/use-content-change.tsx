@@ -26,7 +26,6 @@ const useContentChange = (
   const store = useEditorContext();
   const [largeDocument, setLargeDocument] = useState(false);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   const updatePostContent = useCallback(
     (markdown: string) => {
       setLargeDocument(markdown.length > DEBOUNCE_CHARS_THRESHOLD);

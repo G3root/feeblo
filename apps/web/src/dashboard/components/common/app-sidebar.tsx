@@ -256,7 +256,6 @@ function BoardList() {
             boardPublicId={`board-id-${index}`}
             boardSlug={`board-slug-${index}`}
             key={`board-skeleton-${
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholders are static.
               index
             }`}
             name="Loading"

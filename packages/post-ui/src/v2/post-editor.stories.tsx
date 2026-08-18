@@ -13,7 +13,6 @@ export function Default() {
         <PostEditor
           onSubmit={async ({ content }) => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({ content });
           }}
         />
@@ -29,7 +28,6 @@ export function WithSubmit() {
         <PostEditor
           onSubmit={async ({ content }) => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({ content });
           }}
         >
@@ -62,7 +60,6 @@ export function ControlledState() {
           content={content}
           onContentChange={(c) => setContent(c)}
           onSubmit={async ({ content: submittedContent }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({ content: submittedContent });
           }}
         >
@@ -79,7 +76,6 @@ export function Composed() {
 
   const handleSubmit = async () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    // biome-ignore lint/suspicious/noConsole: story demo
     console.log({ content });
     setResetKey((k) => k + 1);
     setContent("");
@@ -110,7 +106,6 @@ export function CustomLabels() {
       <div className="w-full max-w-xl">
         <PostEditor
           onSubmit={async ({ content }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({ content });
           }}
           placeholder="What's on your mind?"

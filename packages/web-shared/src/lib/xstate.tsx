@@ -109,5 +109,4 @@ export function createModalStoreContext<T extends AnyRecord>(
   });
 }
 
-// biome-ignore lint/performance/noBarrelFile: <explanation>
 export { createStore } from "@xstate/store";

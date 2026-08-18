@@ -41,7 +41,6 @@ export interface EditorProps {
 export function Editor(props: EditorProps) {
   const store = useEditorContext();
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   const defaultContent = useMemo(() => {
     const markdown = store.get().context.postContent;
     return markdown ? markdownToHtml(markdown) : undefined;
@@ -95,6 +94,5 @@ export function Editor(props: EditorProps) {
   );
 }
 
-// biome-ignore lint/performance/noBarrelFile: <explanation>
 export { EditorProvider, useEditorContext } from "./editor-store";
 export { finalizeEditorContent } from "./uploader";

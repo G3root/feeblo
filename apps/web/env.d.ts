@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNamespace: <explanation> */
 type Runtime = import("@astrojs/cloudflare").Runtime<Env>;
 
 declare module "@feeblo/feedback-widget/styles";

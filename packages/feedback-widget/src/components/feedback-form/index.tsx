@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: intentional barrel file for compound component API */
 import { FeedbackFormActions, FeedbackFormActionsSecondary } from "./actions";
 import { FeedbackFormBackButton } from "./back-button";
 import { FeedbackFormContentField } from "./content-field";

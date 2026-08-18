@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 
 export * as Database from "./database";
 export { currentDb, transaction } from "./database";

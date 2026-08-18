@@ -1,6 +1,4 @@
 // credits: https://lucas-barake.github.io/building-a-composable-policy-system/
-/** biome-ignore-all lint/style/useForOf: <explanation> */
-/** biome-ignore-all lint/complexity/noBannedTypes: <explanation> */
 // credits: https://github.com/CapSoftware/Cap/blob/main/packages/web-domain/src/Policy.ts
 
 import type { Permission, Role } from "@feeblo/permissions";

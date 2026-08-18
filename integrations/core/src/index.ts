@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: package public entry point */
 /** Provider-neutral integration kernel contracts and deterministic delivery policy. */
 export * from "./channel-update-message";
 export * from "./credential-encryption";

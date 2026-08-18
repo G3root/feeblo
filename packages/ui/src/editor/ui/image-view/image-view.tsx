@@ -70,8 +70,6 @@ export default function ImageView(props: ReactNodeViewProps) {
       width={attrs.width ?? null}
     >
       {url && !error && (
-        // biome-ignore lint/a11y/noNoninteractiveElementInteractions: image load updates editor dimensions
-        // biome-ignore lint/correctness/useImageSize: dimensions are stored in editor node attributes
         <img
           alt="upload preview"
           className="h-full max-h-full w-full max-w-full object-contain"

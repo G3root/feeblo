@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/suspicious/useAwait: <explanation> */
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,

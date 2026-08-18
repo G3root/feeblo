@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/complexity/noVoid: <explanation> */
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { toastManager } from "@feeblo/ui/toast";

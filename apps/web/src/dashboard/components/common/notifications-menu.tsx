@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/complexity/noVoid: <explanation> */
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { BellDotIcon } from "@hugeicons/core-free-icons";

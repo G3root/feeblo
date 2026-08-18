@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: discord module public entry point */
 export * from "./config";
 export * from "./discord-channel-service";
 export * from "./discord-connection-service";

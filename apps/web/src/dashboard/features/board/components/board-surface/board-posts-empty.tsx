@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: <explanation> */
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,

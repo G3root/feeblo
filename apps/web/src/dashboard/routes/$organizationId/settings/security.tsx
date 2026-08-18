@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import { CopyButton } from "@feeblo/ui/copy-button";

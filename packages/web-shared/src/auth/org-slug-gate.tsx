@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/complexity/noVoid: Navigation is intentionally fire-and-forget from the effect. */
 import { useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 

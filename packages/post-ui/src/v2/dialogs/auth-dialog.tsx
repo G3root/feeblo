@@ -1,5 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: Keeps the auth action ordering compact. */
-/** biome-ignore-all lint/style/useDefaultSwitchClause: DialogStep is an exhaustive union. */
 
 import { Button } from "@feeblo/ui/button";
 import {
@@ -144,7 +142,6 @@ export function AuthDialogRoot() {
     setStep(CHOOSER_STEP);
   }, [step]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the dialog step whenever the store opens or switches variant.
   useEffect(() => {
     setStep(CHOOSER_STEP);
   }, [variant, isOpen]);

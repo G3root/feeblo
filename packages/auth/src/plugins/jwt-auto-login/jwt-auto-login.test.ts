@@ -1,6 +1,4 @@
 // CREDIT: https://github.com/better-auth/better-auth/blob/next/packages/better-auth/src/plugins/anonymous/anon.test.ts
-/** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
-/** biome-ignore-all lint/suspicious/useAwait: <explanation> */
 
 import type { GoogleProfile } from "@better-auth/core/social-providers";
 import { signJWT } from "better-auth/crypto";

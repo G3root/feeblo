@@ -27,7 +27,6 @@ export function RootComponent(props: RouteSectionProps) {
   const config = getWidgetConfig();
 
   const handleParentMessage = (message: ParentMessage) => {
-    // biome-ignore lint/style/useDefaultSwitchClause: ParentMessage is an exhaustive union.
     switch (message.event) {
       case "SHOW":
         setIsOpen(true);

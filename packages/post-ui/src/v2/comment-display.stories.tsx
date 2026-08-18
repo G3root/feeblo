@@ -73,16 +73,13 @@ export function AsAuthor() {
           createdAt={new Date(Date.now() - 1000 * 60 * 5)}
           isInternal={isInternal}
           onDelete={() => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Delete comment");
           }}
           onReply={async ({ content, isPrivate }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Reply", { content, isPrivate });
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
           onUpdate={({ content }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Update comment", content);
             setContent(content);
           }}
@@ -146,16 +143,13 @@ export function Composed() {
           createdAt={new Date(Date.now() - 1000 * 60 * 60 * 2)}
           isInternal={isInternal}
           onDelete={() => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Delete comment");
           }}
           onReply={async ({ content, isPrivate }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Reply", { content, isPrivate });
           }}
           onToggleVisibility={() => setIsInternal((prev) => !prev)}
           onUpdate={({ content, isPrivate }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log("Update comment", { content, isPrivate });
           }}
           postId="post-1"
@@ -243,11 +237,9 @@ export function TimelineComposition() {
                 createdAt={comment.createdAt}
                 isInternal={internalComments.has(comment.commentId)}
                 onDelete={() => {
-                  // biome-ignore lint/suspicious/noConsole: story demo
                   console.log(`Delete ${comment.commentId}`);
                 }}
                 onReply={async ({ content, isPrivate }) => {
-                  // biome-ignore lint/suspicious/noConsole: story demo
                   console.log(`Reply to ${comment.commentId}`, {
                     content,
                     isPrivate,
@@ -265,7 +257,6 @@ export function TimelineComposition() {
                   });
                 }}
                 onUpdate={({ content }) => {
-                  // biome-ignore lint/suspicious/noConsole: story demo
                   console.log(`Update ${comment.commentId}`, content);
                 }}
                 postId="post-1"

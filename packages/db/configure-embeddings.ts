@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: CLI script requires console output
 import { parseArgs } from "node:util";
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";

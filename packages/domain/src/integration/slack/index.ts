@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: slack module public entry point */
 export * from "./config";
 export * from "./errors";
 export * from "./handlers";

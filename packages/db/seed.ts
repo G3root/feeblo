@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: Seed script requires console output
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
 import {

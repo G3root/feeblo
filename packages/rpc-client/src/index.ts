@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: <explanation> */
 import { AllRpcs } from "@feeblo/domain/rpc-group";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";

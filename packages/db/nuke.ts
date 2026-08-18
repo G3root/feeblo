@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: CLI script requires console output
 import * as Effect from "effect/Effect";
 
 import { Database } from "./src";

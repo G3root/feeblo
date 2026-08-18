@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNonNullAssertion: test fixtures assert rows that were inserted immediately above */
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";

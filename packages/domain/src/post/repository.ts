@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: query value selection is clearer inline */
 import { currentDb, schema } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";

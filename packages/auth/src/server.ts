@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: provider option construction is clearer inline */
 
 import { NodeCrypto } from "@effect/platform-node";
 import { Database } from "@feeblo/db";

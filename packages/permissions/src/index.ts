@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: intentional package entry point. */
 export type { PermissionContext } from "./can";
 export {
   can,

@@ -30,7 +30,7 @@ initPostHog();
 
 export const posthogAnalyticsClient: AnalyticsClient | undefined =
   typeof window !== "undefined" && posthogKey
-    ? // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    ?
       (name: any, properties: any) => posthog.capture(name, properties)
     : undefined;
 

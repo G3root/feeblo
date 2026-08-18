@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noConsole: container administration CLI
 import { parseArgs } from "node:util";
 import postgres from "postgres";
 

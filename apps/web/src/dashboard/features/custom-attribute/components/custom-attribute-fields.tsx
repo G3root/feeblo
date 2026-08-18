@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/useDefaultSwitchClause: <explanation> */
 import type {
   TCompanyAttributeValue,
   TCompanyAttributeValueUpsert,

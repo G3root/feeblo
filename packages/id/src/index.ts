@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: exposes id factories from a single entrypoint */
 export * from "./legid";
 
 import { makeId } from "./legid";

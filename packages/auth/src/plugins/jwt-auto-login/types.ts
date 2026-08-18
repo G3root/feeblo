@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: better-auth session/user types are intentionally loose */
 import type { GenericEndpointContext, Session, User } from "better-auth";
 
 export type JwtAutoLoginSession = { session: Session; user: User } & {

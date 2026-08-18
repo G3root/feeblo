@@ -13,7 +13,6 @@ export function Default() {
         <CommentComposer
           onSubmit={async ({ content, isPrivate }) => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({
               content,
               isPrivate: isPrivate ? "Internal" : "Public",
@@ -32,7 +31,6 @@ export function PrivateDefault() {
         <CommentComposer
           isPrivate
           onSubmit={async ({ content, isPrivate }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({
               content,
               isPrivate: isPrivate ? "Internal" : "Public",
@@ -60,7 +58,6 @@ export function CustomLabels() {
       <div className="w-full max-w-xl">
         <CommentComposer
           onSubmit={async ({ content, isPrivate }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({
               content,
               isPrivate: isPrivate ? "Team Only" : "Everyone",
@@ -90,7 +87,6 @@ export function ControlledState() {
             content: submittedContent,
             isPrivate: submittedIsPrivate,
           }) => {
-            // biome-ignore lint/suspicious/noConsole: story demo
             console.log({
               content: submittedContent,
               isPrivate: submittedIsPrivate ? "Internal" : "Public",
@@ -110,7 +106,6 @@ export function Composed() {
 
   const handleSubmit = async () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    // biome-ignore lint/suspicious/noConsole: story demo
     console.log({
       content,
       isPrivate: isPrivate ? "Internal" : "Public",

@@ -20,7 +20,6 @@ export function MarkdownContent({
   return (
     <div
       className={cn("typeset", className)}
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized Markdown rendered to HTML
       dangerouslySetInnerHTML={{ __html: html }}
       {...props}
     />

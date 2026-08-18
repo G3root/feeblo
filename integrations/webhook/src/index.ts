@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: package public entry point */
 /** Public custom-webhook provider package entry point. */
 export * from "./webhook-credentials";
 export * from "./webhook-endpoint-security";

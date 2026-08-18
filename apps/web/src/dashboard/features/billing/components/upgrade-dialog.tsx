@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: compact CTA state labels remain easier to scan inline */
 
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";

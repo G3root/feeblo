@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/complexity/noVoid: persistence is intentionally handled after an optimistic collection update */
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";

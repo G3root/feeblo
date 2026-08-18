@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/useDefaultSwitchClause: <explanation> */
 import type { WidgetModule } from "./config";
 import { isSupportedLocale } from "./config";
 import type { WidgetIdentity } from "./identity";

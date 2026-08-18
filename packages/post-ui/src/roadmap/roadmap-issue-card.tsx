@@ -85,9 +85,6 @@ export function SortableRoadmapIssueCard({
   ...contentProps
 }: SortableRoadmapIssueCardProps) {
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: sortable card mirrors existing board interaction model
-    // biome-ignore lint/a11y/noStaticElementInteractions: sortable card mirrors existing board interaction model
-    // biome-ignore lint/a11y/useKeyWithClickEvents: sortable card mirrors existing board interaction model
     <div
       className={getRoadmapIssueCardClassName(isDragging)}
       onClick={onClick}

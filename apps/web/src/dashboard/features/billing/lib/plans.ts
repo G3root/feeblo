@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: compact selection among trial, recurring, and one-time billing copy */
 import {
   getPlanFeatureRows,
   type PlanFeatureRow,

@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: package public entry point */
 /** Public GitHub provider package entry point. */
 export * from "./github-api";
 export * from "./github-app-auth";

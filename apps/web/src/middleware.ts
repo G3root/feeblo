@@ -1,5 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: Redirect suffixes mirror the route decision tree. */
-/** biome-ignore-all lint/suspicious/useAwait: <explanation> */
 import { defineMiddleware, sequence } from "astro:middleware";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";

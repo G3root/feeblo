@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/style/noNestedTernary: compact plan CTA state labels remain easier to scan inline */
 
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Badge } from "@feeblo/ui/badge";

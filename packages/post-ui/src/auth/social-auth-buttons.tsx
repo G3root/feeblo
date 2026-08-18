@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/a11y/noSvgWithoutTitle: icons are decorative and labeled by button text */
 
 import { Button } from "@feeblo/ui/button";
 import { Field, FieldSeparator } from "@feeblo/ui/field";

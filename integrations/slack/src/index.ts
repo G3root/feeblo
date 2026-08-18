@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: package public entry point */
 /** Public Slack provider package entry point. */
 export * from "./slack-api";
 export * from "./slack-blocks";

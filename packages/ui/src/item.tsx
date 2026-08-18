@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/a11y/useSemanticElements: <explanation> */
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";

@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: provider error re-exports are the public entry surface */
 import * as Schema from "effect/Schema";
 
 export {

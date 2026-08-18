@@ -1,7 +1,3 @@
-/** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
-/** biome-ignore-all lint/suspicious/useGuardForIn: <explanation> */
-/** biome-ignore-all lint/performance/noAccumulatingSpread: <explanation> */
-/** biome-ignore-all lint/suspicious/noExplicitAny: <explanation> */
 
 import type { BetterAuthOptions } from "@better-auth/core";
 import type {

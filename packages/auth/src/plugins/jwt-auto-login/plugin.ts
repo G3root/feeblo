@@ -1,5 +1,3 @@
-/** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
-/** biome-ignore-all lint/suspicious/noNonNullAssertedOptionalChain: <explanation> */
 import type {
   BetterAuthPlugin,
   GenericEndpointContext,
@@ -49,9 +47,7 @@ export const ID = "jwt-auto-login" as const;
 export const SIGN_IN_PATH = `/sign-in/${ID}` as const;
 
 async function resolveAnonymousSession(ctx: GenericEndpointContext): Promise<{
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   session: Session & Record<string, any>;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   user: UserWithJwtAutoLogin & Record<string, any>;
 } | null> {
   const cookieSession = await getSessionFromCtx<{
@@ -229,7 +225,6 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
         {
           matcher(ctx) {
             return (
-              // biome-ignore lint/complexity/useSimplifiedLogicExpression: <explanation>
               ctx.path?.startsWith("/sign-in") ||
               ctx.path?.startsWith("/sign-up") ||
               ctx.path?.startsWith("/callback") ||
@@ -288,7 +283,6 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             // (contacts, posts) from the anonymous user to the new user before
             // the anonymous user is cleaned up below.
             const newSessionUser = newSession.user as
-              // biome-ignore lint/suspicious/noExplicitAny: <explanation>
               (UserWithJwtAutoLogin & Record<string, any>) | undefined;
             const isSameUser = newSessionUser?.id === session.user.id;
             const newSessionIsAnonymous =

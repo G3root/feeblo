@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: provider error aliases are the public error surface */
 import * as Schema from "effect/Schema";
 
 export {

@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/suspicious/noExplicitAny: the shared schema validates the endpoint URL with Zod's `z.url()` (a `ZodPipe`), while the edit sheet relaxes that field to `z.string().trim()` so a blank URL keeps the current one; the field component's `form` prop is therefore widened to accept any webhook form. It only renders the eventTypes field and never reads the URL validator. */
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { CheckboxGroup } from "@feeblo/ui/checkbox-group";
 import { Field, FieldLabel } from "@feeblo/ui/field";

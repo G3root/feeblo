@@ -1,4 +1,3 @@
-/** biome-ignore-all lint/performance/noBarrelFile: <explanation> */
 export {
   AuthDialogProvider,
   type AuthDialogVariant,
