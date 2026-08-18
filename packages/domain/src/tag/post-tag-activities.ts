@@ -22,11 +22,15 @@ export function postTagChangeActivities({
   const removed = previousTagIds.filter((tagId) => !next.has(tagId));
 
   return [
-    ...added.map(
-      (tagId): PostActivityInput => ({ ...actor, kind: "TAG_ADDED", tagId })
-    ),
-    ...removed.map(
-      (tagId): PostActivityInput => ({ ...actor, kind: "TAG_REMOVED", tagId })
-    ),
+    ...added.map((tagId): PostActivityInput => ({
+      ...actor,
+      kind: "TAG_ADDED",
+      tagId,
+    })),
+    ...removed.map((tagId): PostActivityInput => ({
+      ...actor,
+      kind: "TAG_REMOVED",
+      tagId,
+    })),
   ];
 }
