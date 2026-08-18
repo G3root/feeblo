@@ -20,6 +20,7 @@ import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
 import { EmailOutboxRepository } from "@feeblo/domain/email-outbox/repository";
 import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedback/config";
 import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feedback/service";
+import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/ses-webhook";
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { Api } from "@feeblo/domain/http/api";
@@ -73,6 +74,7 @@ import * as Redacted from "effect/Redacted";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Tracer from "effect/Tracer";
+import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import * as HttpMiddleware from "effect/unstable/http/HttpMiddleware";
 import * as HttpRouter from "effect/unstable/http/HttpRouter";
@@ -88,6 +90,7 @@ import { e2eSetPlanRouter } from "./e2e-set-plan";
 import { makeGitHubRouters } from "./github";
 import { GitHubProviderLive } from "./github-provider";
 import { makeIntegrationLayers } from "./integrations";
+import { makeSesEmailFeedbackRouter } from "./ses-email-feedback";
 import { makeSlackRouters } from "./slack";
 
 const MAX_REQUEST_BODY_BYTES = 1_000_000;
@@ -335,6 +338,11 @@ const program = Effect.gen(function* () {
     EmailOutboxRepository.layer,
     EmailProviderFeedbackConfig.layer,
     EmailProviderFeedbackService.layer,
+    SesEmailFeedbackWebhook.layer.pipe(
+      Layer.provide(EmailProviderFeedbackService.layer),
+      Layer.provide(EmailProviderFeedbackConfig.layer),
+      Layer.provide(FetchHttpClient.layer)
+    ),
     EmailSubscriptionRepository.layer,
     integrationRuntime.layer,
     ExternalResourceServiceLive,
@@ -457,7 +465,8 @@ const program = Effect.gen(function* () {
     DocsRoute,
     SlackRouters,
     DiscordRouters,
-    GitHubRouters
+    GitHubRouters,
+    makeSesEmailFeedbackRouter()
   );
   const AllRoutes = MergedRoutes.pipe(
     Layer.provide(

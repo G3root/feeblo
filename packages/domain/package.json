@@ -310,6 +310,12 @@
     "./email-provider-feedback/service": {
       "default": "./src/email-provider-feedback/service.ts"
     },
+    "./email-provider-feedback/ses-webhook": {
+      "default": "./src/email-provider-feedback/ses-webhook.ts"
+    },
+    "./email-provider-feedback/ses-mapping": {
+      "default": "./src/email-provider-feedback/ses-mapping.ts"
+    },
     "./email-subscription/repository": {
       "default": "./src/email-subscription/repository.ts"
     },

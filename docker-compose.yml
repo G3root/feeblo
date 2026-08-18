@@ -41,7 +41,9 @@ services:
       AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-${APP_URL:-http://localhost:3001},${API_URL:-http://localhost:3000},*.${APP_ROOT_DOMAIN:-localhost}}
       DATABASE_URL: ${DATABASE_URL:-postgres://feeblo:password@pg:5432/feeblo}
       AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-dev-key}
-      EMAIL_PROVIDER_WEBHOOK_TOKEN: ${EMAIL_PROVIDER_WEBHOOK_TOKEN:-test-email-provider-webhook-token}
+      # Optional SES feedback webhook: leave unset to keep the route inert (404).
+      EMAIL_PROVIDER_WEBHOOK_TOKEN: ${EMAIL_PROVIDER_WEBHOOK_TOKEN:-}
+      EMAIL_PROVIDER_SNS_TOPIC_ARN: ${EMAIL_PROVIDER_SNS_TOPIC_ARN:-}
       MEDIA_UPLOAD_REGION: ${MEDIA_UPLOAD_REGION:-us-east-1}
       MEDIA_UPLOAD_ENDPOINT: ${MEDIA_UPLOAD_ENDPOINT:-http://127.0.0.1:9002}
       MEDIA_UPLOAD_ACCESS_KEY_ID: ${MEDIA_UPLOAD_ACCESS_KEY_ID:-feeblo}
