@@ -1,7 +1,9 @@
 import type { AnalyticsClient } from "@feeblo/web-shared/analytics-provider";
+import { useResolvedAuth } from "@feeblo/web-shared/auth-context";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { PostHogProvider as PostHogReactProvider } from "@posthog/react";
 import posthog from "posthog-js";
+import { useEffect } from "react";
 
 const env = getRuntimePublicEnv();
 
@@ -55,6 +57,25 @@ export function groupPostHogOrganization(organizationId: string) {
   if (posthogKey) {
     posthog.group("organization", organizationId);
   }
+}
+
+/**
+ * Identifies the PostHog person once the auth session is confirmed.
+ *
+ * Mounted inside `AuthProvider` so it can read the authoritative session;
+ * it deliberately ignores the display-only hint (the atom's resolved response
+ * always replaces it).
+ */
+export function PostHogIdentify() {
+  const state = useResolvedAuth();
+
+  useEffect(() => {
+    if (state.status !== "loading") {
+      identifyPostHog(state);
+    }
+  }, [state]);
+
+  return null;
 }
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {

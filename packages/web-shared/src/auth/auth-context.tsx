@@ -3,7 +3,7 @@ import type { AuthClientSession } from "@feeblo/auth/client";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import type React from "react";
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 
 import type { AuthHint } from "../utils/auth-hint";
 import { authAtomRegistry, meAtom } from "./atoms";
@@ -36,15 +36,38 @@ export type AuthState =
       user: AuthUser;
     };
 
-export type IdentifyFn = (
-  state:
-    | Extract<AuthState, { status: "authenticated" }>
-    | { status: "unauthenticated" }
-) => void;
-
 const AuthContext = createContext<AuthState>({ status: "loading" });
 
 export const useAuth = () => useContext(AuthContext);
+
+/**
+ * Authoritative session state from the atom, ignoring the display-only hint.
+ *
+ * The provider renders through this state so the hint can paint before the
+ * atom resolves; hosts that need to react to a *confirmed* resolution
+ * (analytics identify, redirects, …) subscribe to this hook directly instead
+ * of receiving data back through a parent callback in an effect.
+ */
+export const useResolvedAuth = (): AuthState => {
+  const session = useAtomValue(meAtom);
+
+  return useMemo<AuthState>(
+    () =>
+      AsyncResult.match(session, {
+        onInitial: () => ({ status: "loading" }),
+        // A failed revalidation is not evidence that the user signed out. Keep
+        // the last authoritative result when available; otherwise remain in the
+        // reconciliation state so an initial server hint can continue to paint.
+        onFailure: ({ previousSuccess }) =>
+          Option.match(previousSuccess, {
+            onNone: () => ({ status: "loading" }),
+            onSome: ({ value }) => confirmedState(value),
+          }),
+        onSuccess: ({ value }) => confirmedState(value),
+      }),
+    [session]
+  );
+};
 
 const hintState = (hint: AuthHint | null): AuthState | null =>
   hint === null
@@ -71,36 +94,11 @@ const confirmedState = (session: AuthClientSession | null): AuthState =>
 function AuthProviderClient({
   children,
   initialHint,
-  onIdentify,
 }: {
   readonly children: React.ReactNode;
   readonly initialHint: AuthHint | null;
-  readonly onIdentify?: IdentifyFn;
 }) {
-  const session = useAtomValue(meAtom);
-
-  const resolved = useMemo<AuthState>(
-    () =>
-      AsyncResult.match(session, {
-        onInitial: () => ({ status: "loading" }),
-        // A failed revalidation is not evidence that the user signed out. Keep
-        // the last authoritative result when available; otherwise remain in the
-        // reconciliation state so an initial server hint can continue to paint.
-        onFailure: ({ previousSuccess }) =>
-          Option.match(previousSuccess, {
-            onNone: () => ({ status: "loading" }),
-            onSome: ({ value }) => confirmedState(value),
-          }),
-        onSuccess: ({ value }) => confirmedState(value),
-      }),
-    [session]
-  );
-
-  useEffect(() => {
-    if (resolved.status !== "loading") {
-      onIdentify?.(resolved);
-    }
-  }, [onIdentify, resolved]);
+  const resolved = useResolvedAuth();
 
   const state = useMemo<AuthState>(
     () =>
@@ -116,17 +114,20 @@ function AuthProviderClient({
 export function AuthProvider({
   children,
   initialHint,
-  onIdentify,
 }: {
   readonly children: React.ReactNode;
   readonly initialHint: AuthHint | null;
-  readonly onIdentify?: IdentifyFn;
 }) {
+  // The server renders the app shell once per request, but consumers still
+  // need a stable value identity.
+  const serverState = useMemo<AuthState>(
+    () => hintState(initialHint) ?? { status: "loading" },
+    [initialHint]
+  );
+
   if (typeof window === "undefined") {
     return (
-      <AuthContext.Provider
-        value={hintState(initialHint) ?? { status: "loading" }}
-      >
+      <AuthContext.Provider value={serverState}>
         {children}
       </AuthContext.Provider>
     );
@@ -134,7 +135,7 @@ export function AuthProvider({
 
   return (
     <RegistryContext.Provider value={authAtomRegistry}>
-      <AuthProviderClient initialHint={initialHint} onIdentify={onIdentify}>
+      <AuthProviderClient initialHint={initialHint}>
         {children}
       </AuthProviderClient>
     </RegistryContext.Provider>

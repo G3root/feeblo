@@ -4,7 +4,7 @@ import type { AuthHint } from "@feeblo/web-shared/auth-hint";
 import { RouterProvider } from "@tanstack/react-router";
 
 import {
-  identifyPostHog,
+  PostHogIdentify,
   PostHogProvider,
   posthogAnalyticsClient,
 } from "./components/posthog-provider";
@@ -19,7 +19,8 @@ export const Dashboard = ({
 }) => (
   <AnalyticsProvider client={posthogAnalyticsClient}>
     <PostHogProvider>
-      <AuthProvider initialHint={initialHint} onIdentify={identifyPostHog}>
+      <AuthProvider initialHint={initialHint}>
+        <PostHogIdentify />
         <RouterProvider router={router} />
       </AuthProvider>
     </PostHogProvider>
