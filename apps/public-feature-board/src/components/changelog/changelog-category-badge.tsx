@@ -20,7 +20,7 @@ export function ChangelogCategoryBadges({
   );
 }
 
-export function ChangelogCategoryBadge({ categoryId }: { categoryId: string }) {
+function ChangelogCategoryBadge({ categoryId }: { categoryId: string }) {
   const { publicChangelogCategoryCollection } = usePublicCollections();
 
   const categoryQuery = useLiveQuery(

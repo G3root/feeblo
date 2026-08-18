@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
-    "@feeblo/id": "workspace:*",
     "@feeblo/post-ui": "workspace:*",
     "@feeblo/ui": "workspace:*",
     "@feeblo/utils": "workspace:*",
@@ -29,8 +28,7 @@
     "clsx": "catalog:",
     "effect": "catalog:",
     "react": "catalog:",
-    "tailwind-merge": "catalog:",
-    "zod": "catalog:"
+    "tailwind-merge": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",

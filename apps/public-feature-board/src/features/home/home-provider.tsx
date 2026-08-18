@@ -235,9 +235,10 @@ export function HomeProvider({ children }: { children: ReactNode }) {
 
   const boardItems = useMemo(() => {
     const countMap = new Map<string, number>();
+    const boardsById = new Map(boards.map((board) => [board.id, board]));
 
     for (const bc of boardCounts) {
-      const board = boards.find((b) => b.id === bc.boardId);
+      const board = boardsById.get(bc.boardId);
       if (!board) {
         continue;
       }

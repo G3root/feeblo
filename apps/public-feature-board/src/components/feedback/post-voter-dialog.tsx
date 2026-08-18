@@ -11,7 +11,7 @@ import {
 } from "@feeblo/ui/dialog";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import { createContext, type ReactNode, use } from "react";
+import { createContext, type ReactNode, use, useMemo } from "react";
 
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
@@ -68,24 +68,29 @@ function PostVoterDialogRoot({
     [organizationId, postId]
   );
 
-  if (!upvotes?.length) {
+  const voterData = useMemo(() => {
+    if (!upvotes?.length) {
+      return null;
+    }
+
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    const voters = upvotes as PostVoter[];
+    const visibleVoters = voters.slice(0, 4);
+
+    return {
+      hiddenVoterCount: Math.max(voters.length - visibleVoters.length, 0),
+      visibleVoters,
+      voters,
+      voterCount: voters.length,
+    };
+  }, [upvotes]);
+
+  if (!voterData) {
     return null;
   }
 
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  const voters = upvotes as PostVoter[];
-  const visibleVoters = voters.slice(0, 4);
-  const hiddenVoterCount = Math.max(voters.length - visibleVoters.length, 0);
-
   return (
-    <PostVoterDialogContext
-      value={{
-        hiddenVoterCount,
-        visibleVoters,
-        voters,
-        voterCount: voters.length,
-      }}
-    >
+    <PostVoterDialogContext value={voterData}>
       <Dialog>{children}</Dialog>
     </PostVoterDialogContext>
   );

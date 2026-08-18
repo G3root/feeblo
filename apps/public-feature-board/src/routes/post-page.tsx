@@ -50,14 +50,16 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+const publishedDateFormatter = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
 function formatPublishedDate(value: Date | string) {
   const date = isString(value) ? new Date(value) : value;
 
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return publishedDateFormatter.format(date);
 }
 
 export const Route = createLazyRoute("/p/$slug")({

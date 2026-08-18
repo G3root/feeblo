@@ -27,6 +27,18 @@ import { useSite } from "../../providers/site-provider";
 import { Navbar } from "../common/navbar";
 import { PoweredByTag } from "./powered-by-tag";
 
+const collections: PostCollections = {
+  boardCollection: publicBoardCollection,
+  postCollection: publicPostCollection,
+  postStatusCollection: publicPostStatusCollection,
+  upvoteCollection: publicUpvoteCollection,
+  commentCollection: publicCommentCollection,
+  postReactionCollection: publicPostReactionCollection,
+  commentReactionCollection: publicCommentReactionCollection,
+  postSubscriptionCollection: publicPostSubscriptionCollection,
+  //todo add member collection
+};
+
 export function PublicBoardShell({ children }: { children: ReactNode }) {
   const site = useSite();
   const authDialogStore = useAuthDialogContext();
@@ -58,18 +70,6 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
       ),
     [site.organizationId]
   );
-
-  const collections: PostCollections = {
-    boardCollection: publicBoardCollection,
-    postCollection: publicPostCollection,
-    postStatusCollection: publicPostStatusCollection,
-    upvoteCollection: publicUpvoteCollection,
-    commentCollection: publicCommentCollection,
-    postReactionCollection: publicPostReactionCollection,
-    commentReactionCollection: publicCommentReactionCollection,
-    postSubscriptionCollection: publicPostSubscriptionCollection,
-    //todo add member collection
-  };
 
   return (
     <PostCollectionsProvider

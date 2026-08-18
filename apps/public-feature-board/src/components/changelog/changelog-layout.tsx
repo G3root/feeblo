@@ -7,6 +7,12 @@ import {
   FeedbackBrowseLayoutMain,
 } from "../layout/feedback-browse-layout";
 
+const changelogDateFormatter = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
 export function ChangelogPageLayout({ children }: { children: ReactNode }) {
   return (
     <FeedbackBrowseLayout>
@@ -83,9 +89,5 @@ export function ChangelogTimelineBody({
 }
 
 export function formatChangelogDate(value: Date) {
-  return new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(value);
+  return changelogDateFormatter.format(value);
 }
