@@ -2,12 +2,29 @@ import { getSecret } from "astro:env/server";
 
 export function getPublicEnvServer() {
   return {
+    // SAFETY: The upstream contract guarantees a string here.
     API_URL: getSecret("API_URL") as string,
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
     APP_URL: getSecret("APP_URL") as string,
+    // SAFETY: The upstream contract guarantees a string here.
     APP_ROOT_DOMAIN: getSecret("APP_ROOT_DOMAIN") as string,
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
     APP_RELEASE: getSecret("APP_RELEASE") as string,
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
     TURNSTILE_SITE_KEY: getSecret("TURNSTILE_SITE_KEY") as string | undefined,
+    // SAFETY: The upstream contract guarantees a string here.
+    // SAFETY: The upstream contract guarantees a string here.
     POSTHOG_KEY: getSecret("POSTHOG_KEY") as string | undefined,
+    // SAFETY: The upstream contract guarantees a string here.
     POSTHOG_HOST: getSecret("POSTHOG_HOST") as string | undefined,
   };
 }

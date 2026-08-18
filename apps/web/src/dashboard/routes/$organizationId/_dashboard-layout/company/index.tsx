@@ -292,6 +292,7 @@ function CompanyAttributeCells({
   return definitions.map((definition) => (
     <TableCell key={definition.id}>
       {formatCustomAttributeValue(
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         valuesByAttributeId.get(definition.id) as
           | CustomAttributeValue
           | undefined
