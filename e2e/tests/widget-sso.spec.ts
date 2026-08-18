@@ -56,7 +56,7 @@ test(
     const workspace = await createAuthenticatedWorkspace(page, owner);
     const organizationId = new URL(workspace.organizationUrl).pathname
       .split("/")
-      .filter(Boolean)[0];
+      .find(Boolean);
 
     if (!organizationId) {
       throw new Error("Workspace URL did not contain an organization id");

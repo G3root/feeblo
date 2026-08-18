@@ -40,7 +40,7 @@ describe("SubdomainValidationService", () => {
     Effect.gen(function* () {
       for (const slug of ["class", "cocktail", "scunthorpe", "analysis"]) {
         const result = yield* validate(slug);
-        expect(result.valid, slug).toBe(true);
+        expect(result.valid).toBe(true);
       }
     })
   );
@@ -59,7 +59,7 @@ describe("SubdomainValidationService", () => {
       Effect.gen(function* () {
         for (const slug of ["fuck", "shit-app", "my-asshole-workspace"]) {
           const error = yield* Effect.flip(validate(slug));
-          expect(error, slug).toBeInstanceOf(ProfanityError);
+          expect(error).toBeInstanceOf(ProfanityError);
         }
       })
   );
@@ -140,8 +140,8 @@ describe("SubdomainValidationService", () => {
     Effect.gen(function* () {
       for (const slug of ["APP", "Dashboard", "Www"]) {
         const error = yield* Effect.flip(validate(slug));
-        expect(error, slug).toBeInstanceOf(ReservedSubdomainError);
-        expect(error.message, slug).toContain("reserved");
+        expect(error).toBeInstanceOf(ReservedSubdomainError);
+        expect(error.message).toContain("reserved");
       }
     })
   );

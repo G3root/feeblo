@@ -35,9 +35,9 @@ function getCurrentOrganizationId() {
     return undefined;
   }
 
-  const [organizationId] = window.location.pathname
+  const organizationId = window.location.pathname
     .split("/")
-    .filter((segment) => segment.length > 0);
+    .find((segment) => segment.length > 0);
 
   return organizationId ? decodeURIComponent(organizationId) : undefined;
 }

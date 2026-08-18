@@ -43,12 +43,12 @@ export const AttributeValueColumns = S.Struct({
 export type AttributeValueColumns = S.Schema.Type<typeof AttributeValueColumns>;
 
 const isStringValue = (value: AttributeSourceValue): value is string =>
-  Object(value) instanceof String;
+  Object(value).constructor === String;
 const isBooleanValue = (value: AttributeSourceValue): value is boolean =>
-  Object(value) instanceof Boolean;
+  Object(value).constructor === Boolean;
 
-// SAFETY: the prototype of a boxed primitive exactly mirrors its type, so
-// the narrowed view below is sound for every AttributeSourceValue.
+// SAFETY: the boxed candidate's constructor mirrors its primitive type, so the
+// narrowed view below is sound for every AttributeSourceValue.
 export function buildAttributeValueColumns(
   value: AttributeValue | undefined
 ): AttributeValueColumns {

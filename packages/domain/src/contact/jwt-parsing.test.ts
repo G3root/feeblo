@@ -99,11 +99,8 @@ describe("JWT payload parsing", () => {
       iss: "feeblo",
     });
 
-    try {
-      await Effect.runPromise(parsePersonAttributes(verified, [], []));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(DataValidationError);
-    }
+    await expect(
+      Effect.runPromise(parsePersonAttributes(verified, [], []))
+    ).rejects.toBeInstanceOf(DataValidationError);
   });
 });

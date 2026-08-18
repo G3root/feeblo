@@ -48,12 +48,9 @@ describe("verifyJwt", () => {
       SECRET
     );
 
-    try {
-      await Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(UnauthorizedError);
-    }
+    await expect(
+      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
   it.effect("accepts a token without an exp claim (exp is optional)", () =>
@@ -83,12 +80,9 @@ describe("verifyJwt", () => {
       SECRET
     );
 
-    try {
-      await Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(UnauthorizedError);
-    }
+    await expect(
+      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
   it("rejects a token bound to a different organization", async () => {
@@ -97,23 +91,17 @@ describe("verifyJwt", () => {
       SECRET
     );
 
-    try {
-      await Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(UnauthorizedError);
-    }
+    await expect(
+      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
   it("rejects an unbound token (no aud claim)", async () => {
     const token = await signToken({ userId: "u_1", exp: futureExp }, SECRET);
 
-    try {
-      await Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(UnauthorizedError);
-    }
+    await expect(
+      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
   it.effect("succeeds when at least one secret matches", () =>
@@ -141,22 +129,14 @@ describe("verifyJwt", () => {
       "unknown-secret"
     );
 
-    try {
-      await Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(UnauthorizedError);
-    }
+    await expect(
+      Effect.runPromise(verifyJwt(token, [SECRET], ORGANIZATION_ID))
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
   it("fails for a malformed token", async () => {
-    try {
-      await Effect.runPromise(
-        verifyJwt("not-a-token", [SECRET], ORGANIZATION_ID)
-      );
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(UnauthorizedError);
-    }
+    await expect(
+      Effect.runPromise(verifyJwt("not-a-token", [SECRET], ORGANIZATION_ID))
+    ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 });

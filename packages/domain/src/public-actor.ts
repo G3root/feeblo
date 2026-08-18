@@ -32,7 +32,7 @@ export const redactActorIdentities = <T extends ActorRow>(
   rows: readonly T[],
   sessionUserId: string | undefined
 ): T[] => {
-  const redacted: T[] = new Array<T>(rows.length);
+  const redacted: T[] = Array.from<T>({ length: rows.length });
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
     if (row) {

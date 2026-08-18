@@ -8,8 +8,6 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-/// <reference path="../styles.d.ts" />
-
 import "prosekit/basic/style.css";
 import "./typeset.css";
 import { markdownToHtml } from "@feeblo/utils/markdown";

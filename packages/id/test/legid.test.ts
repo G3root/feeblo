@@ -204,19 +204,19 @@ describe("makeId", () => {
 
   describe("prefix validation", () => {
     it("throws on a prefix with uppercase letters", () => {
-      expect(() => makeId("post", "PST")).toThrow();
+      expect(() => makeId("post", "PST")).toThrow(/Prefix must match/);
     });
 
     it("throws on a prefix with digits", () => {
-      expect(() => makeId("post", "ps1")).toThrow();
+      expect(() => makeId("post", "ps1")).toThrow(/Prefix must match/);
     });
 
     it("throws on an empty prefix", () => {
-      expect(() => makeId("post", "")).toThrow();
+      expect(() => makeId("post", "")).toThrow(/Prefix must match/);
     });
 
     it("throws on a prefix with underscores", () => {
-      expect(() => makeId("post", "p_s")).toThrow();
+      expect(() => makeId("post", "p_s")).toThrow(/Prefix must match/);
     });
   });
 

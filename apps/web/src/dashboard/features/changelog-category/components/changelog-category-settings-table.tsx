@@ -238,7 +238,6 @@ function CategoryTableShell({ children }: { children: ReactNode }) {
 }
 
 function CategoryTableRow({
-  categoryId,
   createdAt,
   icon,
   name,

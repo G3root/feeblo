@@ -52,13 +52,9 @@ describe("init", () => {
   });
 
   it("throws INVALID_ORG when organizationId is empty", () => {
-    expect(() => init("")).toThrow(EmbedError);
-    try {
-      init("");
-    } catch (err) {
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      expect((err as EmbedError).code).toBe("INVALID_ORG");
-    }
+    expect(() => init("")).toThrow(
+      expect.objectContaining({ code: "INVALID_ORG" })
+    );
   });
 
   it("returns a widget handle with expected methods", () => {
@@ -656,7 +652,7 @@ describe("ready handshake", () => {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     expect(listener).toHaveBeenCalledTimes(1);
     // SAFETY: The upstream contract guarantees this value here.
-    const detail = (listener.mock.calls[0]?.[0] as CustomEvent).detail;
+    const detail = (listener.mock.calls[0][0] as CustomEvent).detail;
     expect(detail.data).toEqual({ module: "feedback" });
     window.removeEventListener("widgetOpened", listener);
   });

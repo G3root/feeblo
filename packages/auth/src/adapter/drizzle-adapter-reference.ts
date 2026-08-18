@@ -852,10 +852,10 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
               select?.length && select.length > 0
                 ? select.reduce((acc, field) => {
                     const fieldName = getFieldName({ model, field });
-                    return {
-                      ...acc,
+                    Object.assign(acc, {
                       [fieldName]: schemaModel[fieldName],
-                    };
+                    });
+                    return acc;
                   }, {})
                 : undefined
             )
@@ -951,10 +951,10 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
               select?.length && select.length > 0
                 ? select.reduce((acc, field) => {
                     const fieldName = getFieldName({ model, field });
-                    return {
-                      ...acc,
+                    Object.assign(acc, {
                       [fieldName]: schemaModel[fieldName],
-                    };
+                    });
+                    return acc;
                   }, {})
                 : undefined
             )
@@ -1172,12 +1172,10 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
       adapterName: "Drizzle Adapter",
       usePlural: config.usePlural ?? false,
       debugLogs: config.debugLogs ?? false,
-      supportsUUIDs: config.provider === "pg" ? true : false,
+      supportsUUIDs: config.provider === "pg",
       supportsJSON:
-        config.provider === "pg" // even though mysql also supports it, mysql requires to pass stringified json anyway.
-          ? true
-          : false,
-      supportsArrays: config.provider === "pg" ? true : false,
+        config.provider === "pg", // even though mysql also supports it, mysql requires to pass stringified json anyway.
+      supportsArrays: config.provider === "pg",
       customTransformOutput: ({ data, fieldAttributes }) => {
         // not all providers support dates
         // one such example case is https://github.com/better-auth/better-auth/issues/7819

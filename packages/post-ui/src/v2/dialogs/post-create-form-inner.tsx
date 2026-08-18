@@ -285,13 +285,13 @@ export function PostCreateForm() {
         form.reset();
         setContentEditorKey((current) => current + 1);
         store.send({ type: "toggle" });
-      } catch {
+      } catch (error) {
         trackEvent("post_created", { source, success: false });
 
-        const error = parseRpcError(_error);
+        const parsed = parseRpcError(error);
 
         toastManager.add({
-          title: error.message,
+          title: parsed.message,
           type: "error",
         });
       }

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { EmbedError } from "../src/errors";
 import { normalizeUserIdentity } from "../src/identity";
 
 describe("normalizeUserIdentity", () => {
@@ -11,15 +10,9 @@ describe("normalizeUserIdentity", () => {
   });
 
   it("throws INVALID_IDENTITY when id is empty", () => {
-    expect(() => normalizeUserIdentity({ id: "" })).toThrow(EmbedError);
-
-    try {
-      normalizeUserIdentity({ id: "" });
-    } catch (err) {
-      expect(err).toBeInstanceOf(EmbedError);
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      expect((err as EmbedError).code).toBe("INVALID_IDENTITY");
-    }
+    expect(() => normalizeUserIdentity({ id: "" })).toThrow(
+      expect.objectContaining({ code: "INVALID_IDENTITY" })
+    );
   });
 
   it("strips undefined fields from the user", () => {
@@ -65,7 +58,7 @@ describe("normalizeUserIdentity", () => {
     });
 
     expect(result.companies).toHaveLength(1);
-    const company = result.companies?.[0]!;
+    const company = result.companies![0];
     expect(company).toHaveProperty("id", "comp_1");
     expect(company).toHaveProperty("name", "Acme Inc");
     expect(company).toHaveProperty("avatar", "https://example.com/acme.png");
@@ -86,8 +79,8 @@ describe("normalizeUserIdentity", () => {
       ],
     });
 
-    expect(result.companies?.[0]!).not.toHaveProperty("avatar");
-    expect(result.companies?.[0]!).not.toHaveProperty("customFields");
+    expect(result.companies![0]).not.toHaveProperty("avatar");
+    expect(result.companies![0]).not.toHaveProperty("customFields");
   });
 
   it("preserves user customFields", () => {

@@ -191,7 +191,9 @@ describe("toMutableConfig", () => {
   });
 
   it("throws for invalid config type", () => {
-    expect(() => toMutableConfig({ min: "not-a-number" })).toThrow();
+    expect(() => toMutableConfig({ min: "not-a-number" })).toThrow(
+      /Expected number/
+    );
   });
 });
 
@@ -245,17 +247,8 @@ describe("parseContactCustomAttributes", () => {
       key: "requiredField",
       isRequired: true,
     });
-    try {
-      await Effect.runPromise(parseContactCustomAttributes({}, [def]));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      expect(error).toBeInstanceOf(DataValidationError);
-      // SAFETY: The upstream contract guarantees this value here.
-      expect((error as DataValidationError).message).toContain(
-        'Missing required attribute "requiredField"'
-      );
-    }
+    await expect(Effect.runPromise(parseContactCustomAttributes({}, [def]))).rejects.toBeInstanceOf(DataValidationError);
+    await expect(Effect.runPromise(parseContactCustomAttributes({}, [def]))).rejects.toThrow('Missing required attribute "requiredField"');
   });
 
   it("fails on invalid value for INTEGER attribute", async () => {
@@ -263,23 +256,14 @@ describe("parseContactCustomAttributes", () => {
       key: "age",
       type: "INTEGER",
     });
-    try {
-      await Effect.runPromise(
-        parseContactCustomAttributes(
+    await expect(Effect.runPromise(parseContactCustomAttributes(
           { customFields: { age: "not-a-number" } },
           [def]
-        )
-      );
-      expect.fail("Expected error was not thrown");
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    } catch (error) {
-      // SAFETY: The upstream contract guarantees this value here.
-      expect(error).toBeInstanceOf(DataValidationError);
-      // SAFETY: The upstream contract guarantees this value here.
-      expect((error as DataValidationError).message).toContain(
-        'Invalid value for attribute "age"'
-      );
-    }
+        ))).rejects.toBeInstanceOf(DataValidationError);
+    await expect(Effect.runPromise(parseContactCustomAttributes(
+          { customFields: { age: "not-a-number" } },
+          [def]
+        ))).rejects.toThrow('Invalid value for attribute "age"');
   });
 
   it.effect("validates INTEGER attribute within min/max range", () =>
@@ -305,14 +289,7 @@ describe("parseContactCustomAttributes", () => {
       type: "INTEGER",
       config: { min: 1, max: 100 },
     });
-    try {
-      await Effect.runPromise(
-        parseContactCustomAttributes({ customFields: { score: 101 } }, [def])
-      );
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(DataValidationError);
-    }
+    await expect(Effect.runPromise(parseContactCustomAttributes({ customFields: { score: 101 } }, [def]))).rejects.toBeInstanceOf(DataValidationError);
   });
 
   it.effect("parses a BOOLEAN attribute", () =>
@@ -352,24 +329,14 @@ describe("parseContactCustomAttributes", () => {
       key: "birthday",
       type: "DATE",
     });
-    try {
-      await Effect.runPromise(
-        parseContactCustomAttributes(
+    await expect(Effect.runPromise(parseContactCustomAttributes(
           { customFields: { birthday: new Date(Number.NaN) } },
           [def]
-        )
-      );
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      expect.fail("Expected error was not thrown");
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    } catch (error) {
-      // SAFETY: The upstream contract guarantees this value here.
-      expect(error).toBeInstanceOf(DataValidationError);
-      // SAFETY: The upstream contract guarantees this value here.
-      expect((error as DataValidationError).message).toContain(
-        'Invalid value for attribute "birthday"'
-      );
-    }
+        ))).rejects.toBeInstanceOf(DataValidationError);
+    await expect(Effect.runPromise(parseContactCustomAttributes(
+          { customFields: { birthday: new Date(Number.NaN) } },
+          [def]
+        ))).rejects.toThrow('Invalid value for attribute "birthday"');
   });
 
   it("rejects a non-date string for a DATE attribute", async () => {
@@ -377,25 +344,22 @@ describe("parseContactCustomAttributes", () => {
       key: "birthday",
       type: "DATE",
     });
-    try {
-      await Effect.runPromise(
+    await expect(
+      Effect.runPromise(
         parseContactCustomAttributes(
           { customFields: { birthday: "not-a-date" } },
           [def]
         )
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      );
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      expect.fail("Expected error was not thrown");
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    } catch (error) {
-      // SAFETY: The upstream contract guarantees this value here.
-      expect(error).toBeInstanceOf(DataValidationError);
-      // SAFETY: The upstream contract guarantees this value here.
-      expect((error as DataValidationError).message).toContain(
-        'Invalid value for attribute "birthday"'
-      );
-    }
+      )
+    ).rejects.toBeInstanceOf(DataValidationError);
+    await expect(
+      Effect.runPromise(
+        parseContactCustomAttributes(
+          { customFields: { birthday: "not-a-date" } },
+          [def]
+        )
+      )
+    ).rejects.toThrow('Invalid value for attribute "birthday"');
   });
 
   it.effect("allows null value for non-required attribute", () =>
@@ -451,14 +415,7 @@ describe("parseContactCustomAttributes", () => {
       type: "TEXT",
       config: { pattern: "^[A-Z]{3}$" },
     });
-    try {
-      await Effect.runPromise(
-        parseContactCustomAttributes({ customFields: { code: "abc" } }, [def])
-      );
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(DataValidationError);
-    }
+    await expect(Effect.runPromise(parseContactCustomAttributes({ customFields: { code: "abc" } }, [def]))).rejects.toBeInstanceOf(DataValidationError);
   });
 
   it("reports invalid TEXT pattern syntax as a validation failure", async () => {
@@ -538,12 +495,7 @@ describe("parseCompanyCustomAttributes", () => {
       key: "industry",
       isRequired: true,
     });
-    try {
-      await Effect.runPromise(parseCompanyCustomAttributes({}, [def]));
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(DataValidationError);
-    }
+    await expect(Effect.runPromise(parseCompanyCustomAttributes({}, [def]))).rejects.toBeInstanceOf(DataValidationError);
   });
 });
 
@@ -569,44 +521,21 @@ describe("parsePersonAttributes", () => {
   );
 
   it("fails when required contact fields are missing", async () => {
-    try {
-      await Effect.runPromise(
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        parsePersonAttributes({}, contactDefs, companyDefs)
-        // SAFETY: The upstream contract guarantees this value here.
-      );
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      expect.fail("Expected error was not thrown");
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    } catch (error) {
-      // SAFETY: The upstream contract guarantees this value here.
-      expect(error).toBeInstanceOf(DataValidationError);
-      // SAFETY: The upstream contract guarantees this value here.
-      expect((error as DataValidationError).message).toContain(
-        "Invalid contact fields"
-      );
-    }
+    await expect(
+      Effect.runPromise(parsePersonAttributes({}, contactDefs, companyDefs))
+    ).rejects.toBeInstanceOf(DataValidationError);
+    await expect(
+      Effect.runPromise(parsePersonAttributes({}, contactDefs, companyDefs))
+    ).rejects.toThrow("Invalid contact fields");
   });
 
   it("fails on invalid email type", async () => {
-    try {
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      await Effect.runPromise(
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs)
-        // SAFETY: The upstream contract guarantees this value here.
-      );
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      expect.fail("Expected error was not thrown");
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-    } catch (error) {
-      // SAFETY: The upstream contract guarantees this value here.
-      expect(error).toBeInstanceOf(DataValidationError);
-      // SAFETY: The upstream contract guarantees this value here.
-      expect((error as DataValidationError).message).toContain(
-        "Invalid contact fields"
-      );
-    }
+    await expect(
+      Effect.runPromise(parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs))
+    ).rejects.toBeInstanceOf(DataValidationError);
+    await expect(
+      Effect.runPromise(parsePersonAttributes({ userId: 123 }, contactDefs, companyDefs))
+    ).rejects.toThrow("Invalid contact fields");
   });
 
   it.effect("parses contact custom attributes alongside common fields", () =>
@@ -726,14 +655,7 @@ describe("parsePersonAttributes", () => {
   );
 
   it("fails for non-object data (null)", async () => {
-    try {
-      await Effect.runPromise(
-        parsePersonAttributes(null, contactDefs, companyDefs)
-      );
-      expect.fail("Expected error was not thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(DataValidationError);
-    }
+    await expect(Effect.runPromise(parsePersonAttributes(null, contactDefs, companyDefs))).rejects.toBeInstanceOf(DataValidationError);
   });
 
   it.effect("ignores excess properties on common fields", () =>

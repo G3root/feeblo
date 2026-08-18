@@ -128,9 +128,9 @@ function BulkDeleteAlert() {
                   } deleted successfully`,
                   type: "success",
                 });
-              } catch {
+              } catch (error) {
                 trackEvent("post_deleted", { mode: "bulk", success: false });
-                console.error(_error);
+                console.error(error);
                 toastManager.add({
                   title: "Failed to delete selected posts",
                   type: "error",

@@ -88,12 +88,13 @@ function SecuritySettingsContent({
 
   const now = new Date();
 
-  const activeSecrets = (secrets ?? []).filter((s) => s.revokedAt === null);
+  // SAFETY: rotating/generating a secret always leaves exactly one non-revoked
+  // secret, and the UI only surfaces copy/revoke actions when one exists.
+  const activeSecret = (secrets ?? []).find((s) => s.revokedAt === null)!;
   const gracePeriodSecrets = (secrets ?? []).filter(
     (s) => s.revokedAt !== null && s.revokedAt > now
   );
 
-  const activeSecret = activeSecrets[0];
   const lastRevokedAt = (secrets ?? []).reduce<Date | null>((latest, s) => {
     if (s.revokedAt && (!latest || s.revokedAt > latest)) {
       return s.revokedAt;

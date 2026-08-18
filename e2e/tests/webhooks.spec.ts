@@ -97,7 +97,7 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     const owner = await createAuthenticatedWorkspace(page);
     const organizationId = new URL(owner.organizationUrl).pathname
       .split("/")
-      .filter(Boolean)[0];
+      .find(Boolean);
     if (!organizationId) {
       throw new Error("Workspace URL did not contain an organization id");
     }

@@ -11,7 +11,9 @@ describe("EtaQuarter", () => {
   it.each(["2026-Q0", "2026-Q5", "26-Q3", "2026-q3", "2026-Q3-extra"])(
     "rejects malformed value %s",
     (value) => {
-      expect(() => S.decodeUnknownSync(EtaQuarter)(value)).toThrow();
+      expect(() => S.decodeUnknownSync(EtaQuarter)(value)).toThrow(
+        /^Expected a string matching the RegExp/
+      );
     }
   );
 });

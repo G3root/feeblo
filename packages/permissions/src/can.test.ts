@@ -198,7 +198,7 @@ describe("can()", () => {
       "companies.create",
       "companies.*",
     ] as const) {
-      expect(can(session, org, permission), permission).toBe(false);
+      expect(can(session, org, permission)).toBe(false);
     }
   });
 
@@ -224,7 +224,7 @@ describe("can()", () => {
       "companies.create",
       "companies.update",
     ] as const) {
-      expect(can(session, org, permission), permission).toBe(true);
+      expect(can(session, org, permission)).toBe(true);
     }
     expect(can(session, org, "boards.create")).toBe(false);
     expect(can(session, org, "boards.*")).toBe(false);
