@@ -296,6 +296,7 @@ function BoardFilterStatusGroup() {
         }))}
         label={getStatusSummary(filters.statuses)}
         onToggle={(status) => {
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           toggleStatus(status as BoardPostStatus);
         }}
       />

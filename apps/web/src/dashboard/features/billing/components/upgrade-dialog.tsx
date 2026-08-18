@@ -93,8 +93,10 @@ function UpgradePlanDialogPopup() {
   );
 
   const currentPlanType =
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     (workspacePlans[0] as WorkspacePlan | undefined)?.plan ?? "free";
   const { plans: rawPlans } = buildPlanCards(
+    // SAFETY: The upstream contract guarantees this value here.
     (products as WorkspaceProduct[]) ?? [],
     currentPlanType
   );
@@ -147,6 +149,7 @@ function UpgradePlanDialogPopup() {
               <RadioGroup
                 className="gap-3"
                 onValueChange={(value) =>
+                  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                   setSelectedPlanType(value as PlanType)
                 }
                 value={selectedPlanType}

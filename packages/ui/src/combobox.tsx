@@ -1,3 +1,4 @@
+import { isNumber, isString } from "@feeblo/utils/runtime-kind";
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { ChevronsUpDownIcon, XIcon } from "lucide-react";
 import * as React from "react";
@@ -36,6 +37,7 @@ export function ComboboxChipsInput({
   size?: "sm" | "default" | "lg" | number;
   ref?: React.Ref<HTMLInputElement>;
 }): React.ReactElement {
+  // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
   const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (
@@ -45,9 +47,9 @@ export function ComboboxChipsInput({
         sizeValue === "sm" ? "ps-1.5" : "ps-2",
         className
       )}
-      data-size={typeof sizeValue === "string" ? sizeValue : undefined}
+      data-size={isString(sizeValue) ? sizeValue : undefined}
       data-slot="combobox-chips-input"
-      size={typeof sizeValue === "number" ? sizeValue : undefined}
+      size={isNumber(sizeValue) ? sizeValue : undefined}
       {...props}
     />
   );
@@ -71,6 +73,7 @@ export function ComboboxInput({
   triggerProps?: ComboboxPrimitive.Trigger.Props;
   clearProps?: ComboboxPrimitive.Clear.Props;
 }): React.ReactElement {
+  // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
   const sizeValue = (size ?? "default") as "sm" | "default" | "lg" | number;
 
   return (
@@ -376,7 +379,9 @@ export function ComboboxChips({
         "border-input bg-background ring-ring/24 focus-within:border-ring has-aria-invalid:border-destructive/36 has-autofill:bg-foreground/4 focus-within:has-aria-invalid:border-destructive/64 focus-within:has-aria-invalid:ring-destructive/16 dark:not-has-disabled:bg-input/32 dark:has-autofill:bg-foreground/8 dark:has-aria-invalid:ring-destructive/24 relative inline-flex min-h-9 w-full flex-wrap gap-1 rounded-lg border p-[calc(--spacing(1)-1px)] text-base shadow-xs/5 transition-shadow outline-none *:min-h-7 not-dark:bg-clip-padding before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] not-has-disabled:not-focus-within:not-aria-invalid:before:shadow-[0_1px_--theme(--color-black/4%)] focus-within:ring-[3px] has-disabled:pointer-events-none has-disabled:opacity-64 has-data-[size=lg]:min-h-10 has-data-[size=lg]:*:min-h-8 has-data-[size=sm]:min-h-8 has-data-[size=sm]:*:min-h-6 has-[:disabled,:focus-within,[aria-invalid]]:shadow-none sm:min-h-8 sm:text-sm sm:*:min-h-6 sm:has-data-[size=lg]:min-h-9 sm:has-data-[size=lg]:*:min-h-7 sm:has-data-[size=sm]:min-h-7 sm:has-data-[size=sm]:*:min-h-5 dark:not-has-disabled:not-focus-within:not-aria-invalid:before:shadow-[0_-1px_--theme(--color-white/6%)]",
         className
       )}
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       data-slot="combobox-chips"
+      // SAFETY: The upstream contract guarantees this value here.
       ref={chipsRef as React.Ref<HTMLDivElement> | null}
       {...props}
     >

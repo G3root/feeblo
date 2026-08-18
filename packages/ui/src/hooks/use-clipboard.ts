@@ -1,4 +1,10 @@
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as React from "react";
+
+export type CopyToClipboardResult = {
+  copyToClipboard: (value: string) => void;
+  isCopied: boolean;
+};
 
 export function useCopyToClipboard({
   timeout = 2000,
@@ -6,12 +12,12 @@ export function useCopyToClipboard({
 }: {
   timeout?: number;
   onCopy?: () => void;
-} = {}): { copyToClipboard: (value: string) => void; isCopied: boolean } {
+} = {}): CopyToClipboardResult {
   const [isCopied, setIsCopied] = React.useState(false);
   const timeoutIdRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const copyToClipboard = (value: string): void => {
-    if (typeof window === "undefined" || !navigator.clipboard.writeText) {
+    if (!hasWindow() || !navigator.clipboard.writeText) {
       return;
     }
 

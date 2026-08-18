@@ -40,11 +40,11 @@ export default function SlashMenu() {
           ? {
               deferUploads: Boolean(editorStore.get().context.deferUploads),
               organizationId,
-              ...(scope ? { scope } : {}),
+              ...(scope && { scope }),
             }
           : {
               deferUploads: Boolean(editorStore.get().context.deferUploads),
-              ...(scope ? { scope } : {}),
+              ...(scope && { scope }),
             }
       ),
     });

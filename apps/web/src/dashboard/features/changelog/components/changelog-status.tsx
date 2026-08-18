@@ -13,12 +13,11 @@ import {
   type ChangelogStatus,
 } from "../constants";
 
-const CHANGELOG_STATUS_STYLES: Record<ChangelogStatus, BadgeProps["variant"]> =
-  {
+const CHANGELOG_STATUS_STYLES = {
     draft: "default",
     scheduled: "info",
     published: "success",
-  };
+  } satisfies Record<ChangelogStatus, BadgeProps["variant"]>;
 
 export function getChangelogStatusLabel(status: ChangelogStatus) {
   return CHANGELOG_STATUS_LABELS[status];
@@ -44,6 +43,7 @@ export function ChangelogStatusSelect({
   return (
     <Select
       disabled={disabled}
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       onValueChange={(value) => onValueChange(value as ChangelogStatus)}
       value={currentStatus}
     >

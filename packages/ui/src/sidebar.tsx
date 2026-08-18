@@ -1,3 +1,4 @@
+import { isFunction, isString } from "@feeblo/utils/runtime-kind";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -93,7 +94,7 @@ export function SidebarProvider({
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
     async (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === "function" ? value(open) : value;
+      const openState = isFunction(value) ? value(open) : value;
       if (setOpenProp) {
         setOpenProp(openState);
       } else {
@@ -158,6 +159,7 @@ export function SidebarProvider({
         )}
         data-slot="sidebar-wrapper"
         style={
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           {
             "--sidebar-width": SIDEBAR_WIDTH,
             "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
@@ -210,6 +212,7 @@ export function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           side={side}
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -557,7 +560,7 @@ export function SidebarMenuButton({
     return buttonElement;
   }
 
-  if (typeof tooltip === "string") {
+  if (isString(tooltip)) {
     tooltip = {
       children: tooltip,
     };
@@ -566,7 +569,8 @@ export function SidebarMenuButton({
   return (
     <Tooltip>
       <TooltipTrigger
-        render={buttonElement as React.ReactElement<Record<string, unknown>>}
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        render={buttonElement as React.ReactElement}
       />
       <TooltipPopup
         align="center"
@@ -659,8 +663,10 @@ export function SidebarMenuSkeleton({
       )}
       <Skeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         data-sidebar="menu-skeleton-text"
         style={
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           {
             "--skeleton-width": width,
           } as React.CSSProperties

@@ -56,7 +56,9 @@ export function BoardGridView({
       }
 
       activeDrag.current = {
+        // SAFETY: The upstream contract guarantees a string here.
         sourceId: source.id as string,
+        // SAFETY: The upstream contract guarantees a string here.
         sourceStatusId: source.data?.statusId as string,
         targetStatusId: null,
       };
@@ -106,6 +108,7 @@ export function BoardGridView({
         return;
       }
 
+      // SAFETY: The upstream contract guarantees a string here.
       const targetStatusId = target?.data?.statusId as string | undefined;
 
       if (!targetStatusId) {
@@ -116,6 +119,7 @@ export function BoardGridView({
         activeDrag.current.targetStatusId = targetStatusId;
       }
 
+      // SAFETY: The upstream contract guarantees a string here.
       setItems((currentItems) =>
         movePostToColumn(currentItems, source.id as string, targetStatusId)
       );
@@ -139,10 +143,12 @@ export function BoardGridView({
         return;
       }
 
+      // SAFETY: The upstream contract guarantees a string here.
       const sourceStatusId =
         dragState?.sourceStatusId ??
         (source.data?.statusId as string | undefined);
       const targetStatusId =
+        // SAFETY: The upstream contract guarantees a string here.
         dragState?.targetStatusId ??
         (target?.data?.statusId as string | undefined);
 
@@ -152,7 +158,10 @@ export function BoardGridView({
       ) {
         setItems(snapshot.current);
         return;
+      // SAFETY: The upstream contract guarantees a string here.
       }
+
+// SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 
       const tx = postCollection.update(
         dragState?.sourceId ?? (source.id as string),

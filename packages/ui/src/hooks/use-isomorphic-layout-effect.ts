@@ -1,6 +1,7 @@
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import * as React from "react";
 
 const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
+  hasWindow() ? React.useLayoutEffect : React.useEffect;
 
 export { useIsomorphicLayoutEffect };

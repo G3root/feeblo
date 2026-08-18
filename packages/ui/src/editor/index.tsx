@@ -57,7 +57,7 @@ export function Editor(props: EditorProps) {
     });
     return createEditor({
       extension,
-      ...(defaultContent ? { defaultContent } : {}),
+      ...(defaultContent && { defaultContent }),
     });
   }, [
     props.deferUploads,

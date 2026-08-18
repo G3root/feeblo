@@ -5,6 +5,7 @@ import { ResizableHandle, ResizableRoot } from "prosekit/react/resizable";
 import { type SyntheticEvent, useEffect, useState } from "react";
 
 export default function ImageView(props: ReactNodeViewProps) {
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const attrs = props.node.attrs as ImageAttrs;
   const url = attrs.src || "";
   const uploadTask = url.startsWith("blob:")
@@ -49,6 +50,7 @@ export default function ImageView(props: ReactNodeViewProps) {
   }, [url, uploading]);
 
   const handleImageLoad = (event: SyntheticEvent) => {
+    // SAFETY: The event target is the expected DOM element type for this handler.
     const img = event.target as HTMLImageElement;
     const { naturalWidth, naturalHeight } = img;
     const ratio = naturalWidth / naturalHeight;

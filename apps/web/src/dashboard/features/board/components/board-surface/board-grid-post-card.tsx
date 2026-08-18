@@ -48,6 +48,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
         })
       }
       rootRef={ref}
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       status={group as BoardPostStatus}
       title={post.title}
       updatedAt={post.updatedAt}

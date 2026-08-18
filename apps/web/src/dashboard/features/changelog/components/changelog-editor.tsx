@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { PostTitleInput } from "@feeblo/post-ui/post-title-input";
 import { Button } from "@feeblo/ui/button";
@@ -135,6 +136,7 @@ function useChangelogEditorForm({
       }),
     },
     onSubmit: async ({ value, meta }) => {
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const submitMeta = meta as ChangelogSubmitMeta | undefined;
 
       try {
@@ -663,7 +665,7 @@ export function ChangelogEditorDetails() {
             <dt className="text-muted-foreground">{detail.label}</dt>
             <dd
               className={
-                typeof detail.value === "string"
+                isString(detail.value)
                   ? "text-foreground max-w-32 truncate font-medium"
                   : "text-foreground font-medium"
               }

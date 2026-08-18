@@ -110,6 +110,7 @@ function ThemeMenu() {
       <MenuSubPopup>
         <MenuRadioGroup
           onValueChange={(value) =>
+            // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
             setTheme(value as "light" | "dark" | "auto")
           }
           value={themeMode}

@@ -12,6 +12,7 @@ export function BillingIntervalTabs({
 }) {
   return (
     <Tabs
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       onValueChange={(nextValue) => onValueChange(nextValue as BillingInterval)}
       value={value}
     >

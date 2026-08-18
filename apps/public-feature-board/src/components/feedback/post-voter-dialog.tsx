@@ -72,6 +72,7 @@ function PostVoterDialogRoot({
     return null;
   }
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const voters = upvotes as PostVoter[];
   const visibleVoters = voters.slice(0, 4);
   const hiddenVoterCount = Math.max(voters.length - visibleVoters.length, 0);

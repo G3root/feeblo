@@ -48,7 +48,7 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
             dashboardUrl: payload.dashboardUrl,
             name: payload.name,
           }),
-          ...(personalFrom._tag === "Some" ? { from: personalFrom.value } : {}),
+          ...(personalFrom._tag === "Some" && { from: personalFrom.value }),
           messageId: `<welcome.${payload.userId}@notifications.feeblo>`,
           to: payload.email,
         });
@@ -82,7 +82,7 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
             feedbackUrl: "https://feedback.feeblo.com",
             name: payload.name,
           }),
-          ...(personalFrom._tag === "Some" ? { from: personalFrom.value } : {}),
+          ...(personalFrom._tag === "Some" && { from: personalFrom.value }),
           messageId: `<feedback-request.${payload.userId}@notifications.feeblo>`,
           to: payload.email,
         });

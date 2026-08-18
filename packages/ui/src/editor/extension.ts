@@ -46,9 +46,9 @@ export function defineExtension({
           ? {
               deferUploads,
               organizationId,
-              ...(editorScope ? { scope: editorScope } : {}),
+              ...(editorScope && { scope: editorScope }),
             }
-          : { deferUploads, ...(editorScope ? { scope: editorScope } : {}) }
+          : { deferUploads, ...(editorScope && { scope: editorScope }) }
       ),
     }),
   ];

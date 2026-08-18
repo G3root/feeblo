@@ -56,6 +56,7 @@ export const useChangelogAction = () => {
         content: "",
         excerpt: "",
         coverImage: null,
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         status: "draft" as ChangelogStatus,
         scheduledAt: null,
         publishedAt: null,

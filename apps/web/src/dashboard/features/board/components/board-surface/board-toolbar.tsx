@@ -177,6 +177,7 @@ function ViewSelect() {
       onValueChange={(value) => {
         store.send({
           type: "setDisplayMode",
+          // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
           mode: value?.[0] as "grid" | "list",
         });
       }}

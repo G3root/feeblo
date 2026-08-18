@@ -1,3 +1,4 @@
+import { isFunction, isNumber } from "@feeblo/utils/runtime-kind";
 import { Input as InputPrimitive } from "@base-ui/react/input";
 import type * as React from "react";
 
@@ -47,15 +48,15 @@ export function Input({
         <input
           className={inputClassName}
           data-slot="input"
-          size={typeof size === "number" ? size : undefined}
-          style={typeof style === "function" ? undefined : style}
+          size={isNumber(size) ? size : undefined}
+          style={isFunction(style) ? undefined : style}
           {...props}
         />
       ) : (
         <InputPrimitive
           className={inputClassName}
           data-slot="input"
-          size={typeof size === "number" ? size : undefined}
+          size={isNumber(size) ? size : undefined}
           style={style}
           {...props}
         />

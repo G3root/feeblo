@@ -101,12 +101,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
             organizationId: payload.organizationId,
             publicOnly: true,
             limit: Option.isSome(queryEmbedding) ? 5 : 25,
-            ...(Option.isSome(queryEmbedding)
-              ? {
-                  embedding: queryEmbedding.value.vector,
-                  embeddingModel: queryEmbedding.value.model,
-                }
-              : {}),
+            ...(Option.isSome(queryEmbedding) && {
+              embedding: queryEmbedding.value.vector,
+              embeddingModel: queryEmbedding.value.model,
+            }),
           });
           if (Option.isSome(queryEmbedding)) {
             const matches = candidates
@@ -209,7 +207,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
               eventType: "feedback.post.created",
               organizationId,
               postId: id,
-              ...(metadata === undefined ? {} : { metadata }),
+              ...(metadata === undefined ? undefined : { metadata }),
               postSlug,
               statusId,
               title,
@@ -269,13 +267,17 @@ export const WidgetApiLive = HttpApiBuilder.group(
             }
 
             const contactDefs =
+              // SAFETY: the repository contract returns contact attribute definitions
+              // in the canonical domain shape; the cast bridges the DB-row encoding.
               (yield* attributeDefinitionRepository.findContactAttributeDefinitions(
                 organizationId
-              )) as unknown as readonly TContactAttributeDefinition[];
+              )) as readonly TContactAttributeDefinition[];
             const companyDefs =
+              // SAFETY: the repository contract returns company attribute definitions
+              // in the canonical domain shape; the cast bridges the DB-row encoding.
               (yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
                 organizationId
-              )) as unknown as readonly TCompanyAttributeDefinition[];
+              )) as readonly TCompanyAttributeDefinition[];
 
             const jwtPayload = yield* verifyJwt(
               token,

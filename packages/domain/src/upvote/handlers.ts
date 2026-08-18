@@ -66,7 +66,7 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         const upvotes = yield* repository.list({
           organizationId: args.organizationId,
           publicOnly: true,
-          ...(args.postId ? { postId: args.postId } : {}),
+          ...(args.postId && { postId: args.postId }),
         });
 
         // Never leak internal voter identifiers to public callers.

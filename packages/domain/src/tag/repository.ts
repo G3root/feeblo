@@ -180,7 +180,7 @@ const makeTagRepository = Effect.gen(function* () {
             type,
             organizationId,
             creatorId,
-            ...(creatorMemberId ? { creatorMemberId } : {}),
+            ...(creatorMemberId && { creatorMemberId }),
             createdAt: now,
             updatedAt: now,
           })

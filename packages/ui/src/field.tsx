@@ -1,3 +1,4 @@
+import { isObject, isString } from "@feeblo/utils/runtime-kind";
 import { Field as FieldPrimitive } from "@base-ui/react/field";
 import type React from "react";
 
@@ -75,9 +76,9 @@ export function FieldError({
 }: FieldPrimitive.Error.Props & { errors?: unknown[] }): React.ReactElement {
   const message = errors
     ?.map((error) =>
-      typeof error === "string"
+      isString(error)
         ? error
-        : error && typeof error === "object" && "message" in error
+        : error && isObject(error) && "message" in error
           ? String(error.message)
           : null
     )

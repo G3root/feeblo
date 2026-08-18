@@ -68,6 +68,7 @@ function getCurrentLink(state: EditorState): string | undefined {
   }
   for (const mark of marks) {
     if (mark.type.name === "link") {
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       return (mark.attrs as LinkAttrs).href;
     }
   }
@@ -189,6 +190,7 @@ export default function InlineMenu() {
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
+                    // SAFETY: The event target is the expected DOM element type for this handler.
                     const target = event.target as HTMLFormElement | null;
                     const href = target?.querySelector("input")?.value?.trim();
                     handleLinkUpdate(href);

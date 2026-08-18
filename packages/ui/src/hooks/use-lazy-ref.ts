@@ -7,6 +7,7 @@ function useLazyRef<T>(fn: () => T) {
     ref.current = fn();
   }
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   return ref as React.RefObject<T>;
 }
 

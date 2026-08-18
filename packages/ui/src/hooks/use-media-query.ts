@@ -1,3 +1,4 @@
+import { hasWindow, isNumber, isString } from "@feeblo/utils/runtime-kind";
 import { useCallback, useSyncExternalStore } from "react";
 
 const BREAKPOINTS = {
@@ -18,19 +19,19 @@ type BreakpointQuery =
   | `${Breakpoint}:max-${Breakpoint}`;
 
 function resolveMin(value: Breakpoint | number): string {
-  const px = typeof value === "number" ? value : BREAKPOINTS[value];
+  const px = isNumber(value) ? value : BREAKPOINTS[value];
   return `(min-width: ${px}px)`;
 }
 
 function resolveMax(value: Breakpoint | number): string {
-  const px = typeof value === "number" ? value : BREAKPOINTS[value];
+  const px = isNumber(value) ? value : BREAKPOINTS[value];
   return `(max-width: ${px - 1}px)`;
 }
 
 function parseQuery(
   query: BreakpointQuery | MediaQueryInput | (string & {})
 ): string {
-  if (typeof query !== "string") {
+  if (!isString(query)) {
     const parts: string[] = [];
     if (query.min != null) {
       parts.push(resolveMin(query.min));
@@ -59,9 +60,11 @@ function parseQuery(
     if (segment.startsWith("max-")) {
       const bp = segment.slice(4);
       if (bp in BREAKPOINTS) {
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         parts.push(resolveMax(bp as Breakpoint));
       }
     } else if (segment in BREAKPOINTS) {
+      // SAFETY: The upstream contract guarantees this value here.
       parts.push(resolveMin(segment as Breakpoint));
     }
   }
@@ -87,7 +90,7 @@ export function useMediaQuery(
 
   const subscribe = useCallback(
     (callback: () => void) => {
-      if (typeof window === "undefined") {
+      if (!hasWindow()) {
         return () => {};
       }
       const mql = window.matchMedia(mediaQuery);
@@ -98,7 +101,7 @@ export function useMediaQuery(
   );
 
   const getSnapshot = useCallback(() => {
-    if (typeof window === "undefined") {
+    if (!hasWindow()) {
       return false;
     }
     return window.matchMedia(mediaQuery).matches;

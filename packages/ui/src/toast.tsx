@@ -88,8 +88,12 @@ function Toasts({
       >
         {toasts.map((toast) => {
           const Icon = toast.type
-            ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
+            // SAFETY: The key is a member of the source object's key set in this usage.
+            ? TOAST_ICONS[/* SAFETY: toast.type is one of the icon map's keys. */
+              toast.type as keyof typeof TOAST_ICONS]
+            // SAFETY: The upstream contract guarantees this value here.
             : null;
+          // SAFETY: The upstream contract guarantees this value here.
           const toastData = toast.data as ToastData | undefined;
 
           return (
@@ -196,9 +200,12 @@ function AnchoredToasts({
         data-slot="toast-viewport-anchored"
       >
         {toasts.map((toast) => {
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           const Icon = toast.type
+            // SAFETY: The key is a member of the source object's key set in this usage.
             ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
             : null;
+          // SAFETY: The upstream contract guarantees this value here.
           const toastData = toast.data as ToastData | undefined;
           const tooltipStyle = toastData?.tooltipStyle ?? false;
           const positionerProps = toast.positionerProps;

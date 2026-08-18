@@ -21,12 +21,12 @@ import {
 import { ChangelogListView } from "./changelog-list-view";
 import { ChangelogToolbar } from "./changelog-toolbar";
 
-const FILTER_LABELS: Record<"all" | ChangelogStatus, string> = {
+const FILTER_LABELS = {
   all: "changelog entries",
   draft: "draft changelog entries",
   scheduled: "scheduled changelog entries",
   published: "published changelog entries",
-};
+} satisfies Record<"all" | ChangelogStatus, string>;
 
 export function ChangelogIndex({
   organizationId,

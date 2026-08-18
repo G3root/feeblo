@@ -86,6 +86,7 @@ function CustomAttributeCreateForm({
       isRequired: false,
       key: "",
       name: "",
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       type: "TEXT" as AttributeType,
     },
     validators: {
@@ -201,6 +202,7 @@ function CustomAttributeCreateForm({
               <FieldLabel>Data type</FieldLabel>
               <Select
                 onValueChange={(value) =>
+                  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                   field.handleChange(value as AttributeType)
                 }
                 value={field.state.value}

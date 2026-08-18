@@ -85,7 +85,7 @@ export function NotificationsMenu() {
                 const url = new URL(notification.href, window.location.origin);
                 void navigate({
                   to: url.pathname,
-                  ...(url.hash ? { hash: url.hash.slice(1) } : {}),
+                  ...(url.hash && { hash: url.hash.slice(1) }),
                 });
 
                 if (!notification.readAt) {

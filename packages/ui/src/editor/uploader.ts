@@ -91,9 +91,7 @@ export const createEditorUploader = (
       pendingEditorUploads.set(previewUrl, {
         file,
         scope: options.scope ?? previewUrl,
-        ...(options.organizationId
-          ? { organizationId: options.organizationId }
-          : {}),
+        ...(options.organizationId && { organizationId: options.organizationId }),
       });
       return Promise.resolve(previewUrl);
     };
@@ -157,7 +155,7 @@ export const finalizeEditorContent = async (
               file: pending.file,
               options: organizationId ? { organizationId } : {},
             })),
-            ...(organizationId ? { organizationId } : {}),
+            ...(organizationId && { organizationId }),
           };
     const uploadedPending = { ...pending, uploaded };
     pendingEditorUploads.set(previewUrl, uploadedPending);

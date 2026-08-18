@@ -8,6 +8,7 @@ import type { ReactNodeViewProps } from "prosekit/react";
 import { useRef } from "react";
 
 export default function CodeBlockView(props: ReactNodeViewProps) {
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const attrs = props.node.attrs as CodeBlockAttrs;
   const language = attrs.language || "";
   const hidePreview = props.decorations.some(
