@@ -13,6 +13,7 @@ import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { memo, useCallback, useRef, useState } from "react";
+
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -252,7 +253,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
           />
         ))
       ) : (
-        <div className="rounded-md border border-border/70 border-dashed bg-background/40 px-3 py-6 text-center text-muted-foreground text-sm">
+        <div className="border-border/70 bg-background/40 text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-sm">
           No issues in this stage.
         </div>
       )}

@@ -9,6 +9,7 @@ import { defineImageUploadHandler } from "prosekit/extensions/image";
 import { defineMention } from "prosekit/extensions/mention";
 import { definePlaceholder } from "prosekit/extensions/placeholder";
 import { defineReadonly } from "prosekit/extensions/readonly";
+
 import { defineCodeBlockView } from "./ui/code-block-view/index.js";
 import { defineImageView } from "./ui/image-view/index.js";
 import { createEditorUploader } from "./uploader";

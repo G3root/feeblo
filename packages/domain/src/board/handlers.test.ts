@@ -4,6 +4,7 @@ import { BoardId, type LegidOf, WorkspaceId } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { BoardPolicy } from "../board/policies";
 import { BoardRepository } from "../board/repository";
 import { EntitlementPolicy } from "../entitlement/policies";

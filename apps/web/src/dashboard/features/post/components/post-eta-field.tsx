@@ -10,6 +10,7 @@ import { Calendar03Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createOptimisticAction } from "@tanstack/react-db";
 import { useState } from "react";
+
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -134,7 +135,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
         <div className="flex max-sm:flex-col">
           <div className="relative py-1 ps-1 max-sm:order-1 max-sm:border-t">
             <div className="flex h-full flex-col sm:border-e sm:pe-3">
-              <p className="px-2 pb-1 font-medium text-muted-foreground text-xs">
+              <p className="text-muted-foreground px-2 pb-1 text-xs font-medium">
                 {month.getFullYear()}
               </p>
               {QUARTERS.map((quarter) => {
@@ -156,7 +157,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
 
               {post.etaQuarter ? (
                 <Button
-                  className="mt-auto w-full justify-start text-muted-foreground"
+                  className="text-muted-foreground mt-auto w-full justify-start"
                   onClick={() => updateEta(null)}
                   size="sm"
                   variant="ghost"
@@ -169,7 +170,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
           </div>
 
           <div>
-            <p className="px-3 pt-2 text-muted-foreground text-xs">
+            <p className="text-muted-foreground px-3 pt-2 text-xs">
               Choose a date to set its quarter
             </p>
             <Calendar

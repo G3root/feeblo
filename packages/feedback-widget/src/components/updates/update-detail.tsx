@@ -1,4 +1,5 @@
 import { useNavigate } from "@solidjs/router";
+
 import type { WidgetUpdate } from "../../lib/api";
 import { Button } from "../ui/button";
 import { Icon } from "../ui/icon";

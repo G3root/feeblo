@@ -1,6 +1,7 @@
 import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useRef } from "react";
+
 import { Button, type ButtonProps } from "./button";
 import { useCopyToClipboard } from "./hooks/use-clipboard";
 import { anchoredToastManager } from "./toast";

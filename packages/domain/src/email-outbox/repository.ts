@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 import { Database, schema } from "@feeblo/db";
 import { EmailDeliveryId, EmailOutboxId } from "@feeblo/id";
 import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
@@ -7,6 +8,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+
 import {
   type EmailAddress,
   parseEmailAddress,

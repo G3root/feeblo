@@ -12,6 +12,7 @@ import { useDebouncedCallback } from "@tanstack/react-pacer";
 import type { Editor } from "prosekit/core";
 import { useDocChange } from "prosekit/react";
 import { useCallback, useState } from "react";
+
 import { useEditorContext } from "../editor-store";
 import type { EditorExtension } from "../extension";
 import { getMarkdownContent } from "../helpers/markdown-content";

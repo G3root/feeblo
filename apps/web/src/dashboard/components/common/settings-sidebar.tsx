@@ -30,6 +30,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Fragment } from "react";
+
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 const settingsItems = [

@@ -17,6 +17,7 @@ import {
 import { LayoutThreeColumnIcon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
+
 import { RoadmapBoard } from "~/features/roadmap/components/roadmap-board";
 import { useCreateRoadmapDialogContext } from "~/features/roadmap/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -85,9 +86,9 @@ function RouteComponent() {
             key={roadmap.id}
           >
             <header className="px-3">
-              <h1 className="font-semibold text-xl">{roadmap.name}</h1>
+              <h1 className="text-xl font-semibold">{roadmap.name}</h1>
               {roadmap.description ? (
-                <p className="mt-1 text-muted-foreground text-sm">
+                <p className="text-muted-foreground mt-1 text-sm">
                   {roadmap.description}
                 </p>
               ) : null}
@@ -114,7 +115,7 @@ function RoadmapListHeader({
 
   return (
     <div className="flex items-center justify-between px-3">
-      <h1 className="font-semibold text-xl">Roadmaps</h1>
+      <h1 className="text-xl font-semibold">Roadmaps</h1>
       {showCreateAction ? (
         <PolicyGuard policy={hasPermission(organizationId, "roadmap.*")}>
           {({ allowed }) => (
@@ -138,7 +139,7 @@ function RoadmapLoadingState() {
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden p-4 md:p-6">
       <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
         {["planned", "in-progress", "completed"].map((key) => (
-          <div className="h-96 w-80 rounded-lg bg-muted/30" key={key} />
+          <div className="bg-muted/30 h-96 w-80 rounded-lg" key={key} />
         ))}
       </div>
     </div>

@@ -8,8 +8,10 @@ import {
   or,
   useLiveQuery,
 } from "@tanstack/react-db";
+
 import { getChangelogPostKey } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { useChangelogEditorContext } from "./changelog-editor";
 
 export function ChangelogCompletedPosts({
@@ -82,7 +84,7 @@ export function ChangelogCompletedPosts({
   return (
     <section aria-labelledby="recently-completed-heading" className="space-y-3">
       <div className="space-y-1">
-        <h2 className="font-medium text-sm" id="recently-completed-heading">
+        <h2 className="text-sm font-medium" id="recently-completed-heading">
           Recently completed
         </h2>
         <p className="text-muted-foreground text-sm">
@@ -110,7 +112,7 @@ export function ChangelogCompletedPosts({
           ))}
         </div>
       ) : (
-        <p className="rounded-xl border border-dashed px-4 py-5 text-muted-foreground text-sm">
+        <p className="text-muted-foreground rounded-xl border border-dashed px-4 py-5 text-sm">
           Completed posts that have not appeared in a changelog will show here.
         </p>
       )}

@@ -13,15 +13,16 @@ import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { recordPostIntegrationEvent } from "../../integration/post-event-recording";
+import { PostStatusRepository } from "../../post-status/repository";
+import { PostSubscriptionRepository } from "../../post-subscription/repository";
 import {
   PostEmbeddingService,
   schedulePostEmbeddingBestEffort,
 } from "../../post/embedding-service";
 import { PostRepository } from "../../post/repository";
-import { PostStatusRepository } from "../../post-status/repository";
-import { PostSubscriptionRepository } from "../../post-subscription/repository";
 import { DiscordInboundFailure } from "./errors";
 
 /** A feedback post created from an inbound Discord submission. */

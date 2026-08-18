@@ -32,6 +32,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
+
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
 import { ContactCreateDialog } from "~/features/contact/components/contact-create-dialog";
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";

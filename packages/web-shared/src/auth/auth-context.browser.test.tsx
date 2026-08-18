@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
+
 import { AuthProvider, useAuth } from "./auth-context";
 
 const { getSession } = vi.hoisted(() => ({ getSession: vi.fn() }));

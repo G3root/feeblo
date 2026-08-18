@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { parseDiscordOAuthCallbackUrl } from "./oauth-callback";
 
 describe("parseDiscordOAuthCallbackUrl", () => {

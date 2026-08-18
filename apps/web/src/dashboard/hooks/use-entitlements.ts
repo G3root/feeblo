@@ -2,6 +2,7 @@ import {
   type OrganizationPlan,
   PLAN_ENTITLEMENTS,
 } from "@feeblo/domain/plan-entitlements";
+
 import { usePlan } from "./use-plan";
 
 export const useEntitlements = () => {

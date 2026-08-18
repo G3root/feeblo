@@ -8,6 +8,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
 import type { TAssetKind } from "../validation-schema/asset-kind";
 import { organizationTable, userTable } from "./auth";
 import { changelogTable, postTable } from "./feedback";

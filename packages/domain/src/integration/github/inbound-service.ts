@@ -1,5 +1,6 @@
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
+
 import type { GitHubIntegrationError } from "./errors";
 
 /** Parsed GitHub issue webhook fact accepted after signature verification by the adapter. */

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { getPlanFeatureRows, PLAN_ENTITLEMENTS } from "./plan-entitlements";
 
 describe("plan feature catalog", () => {

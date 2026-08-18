@@ -1,5 +1,5 @@
-import { describe, expect, layer } from "@effect/vitest";
 import { NodeCrypto } from "@effect/platform-node";
+import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   IntegrationDeliveryId,
@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
+
 import { WebhookIntegrationConfig } from "./config";
 import { WebhookManagementServiceLive } from "./webhook-management-live";
 import { WebhookManagementService } from "./webhook-management-service";

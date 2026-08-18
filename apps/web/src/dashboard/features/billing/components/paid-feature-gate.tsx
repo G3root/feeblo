@@ -9,6 +9,7 @@ import {
 } from "@feeblo/ui/empty";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+
 import { useUpgradePlanDialogContext } from "../dialog-stores";
 
 export function PaidFeatureGate({ feature }: { feature: string }) {

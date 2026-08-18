@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { renderChannelUpdateMessageBlocks } from "./slack-blocks";
 
 describe("renderChannelUpdateMessageBlocks", () => {

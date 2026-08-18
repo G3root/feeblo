@@ -1,4 +1,5 @@
 import { createEditor, type NodeJSON } from "prosekit/core";
+
 import { defineExtension } from "./extension.js";
 import { sampleContent } from "./sample/sample-doc-full.js";
 

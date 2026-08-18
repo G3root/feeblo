@@ -5,7 +5,9 @@ import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
+
 import { useBoardStore } from "~/features/board/state/board-store-context";
+
 import { StatusIcon } from "./status-icon";
 import type { BoardPostRow } from "./types";
 import { formatPostDate } from "./utils";
@@ -23,7 +25,7 @@ export function BoardPostRowItem({
   );
 
   return (
-    <div className="group mt-1 flex items-center gap-2 rounded-xl px-4 py-3 transition-colors hover:bg-muted/50">
+    <div className="group hover:bg-muted/50 mt-1 flex items-center gap-2 rounded-xl px-4 py-3 transition-colors">
       <Checkbox
         aria-label={`Select ${post.title}`}
         checked={checked}
@@ -57,17 +59,17 @@ export function BoardPostRowItem({
             {post.upvoteCount}
           </Badge>
           <StatusIcon status={post.status} />
-          <p className="no-underline! truncate font-medium text-sm">
+          <p className="truncate text-sm font-medium no-underline!">
             {post.title}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           {post.boardName ? (
-            <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-[11px] text-muted-foreground">
+            <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
               {post.boardName}
             </span>
           ) : null}
-          <span className="flex items-center gap-1.5 text-muted-foreground text-xs">
+          <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
             <UserAvatar
               className="size-5"
               image={post.user.image}

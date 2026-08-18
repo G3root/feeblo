@@ -2,15 +2,16 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
 import type React from "react";
+
 import { Switch } from "./switch";
 import { cn } from "./utils";
 
 const switchCardVariants = cva(
-  "flex items-center justify-between gap-6 rounded-lg p-3 transition-colors hover:bg-accent/50 has-data-checked:bg-accent/50",
+  "hover:bg-accent/50 has-data-checked:bg-accent/50 flex items-center justify-between gap-6 rounded-lg p-3 transition-colors",
   {
     variants: {
       variant: {
-        outline: "border has-data-checked:border-primary/48",
+        outline: "has-data-checked:border-primary/48 border",
         ghost: "border-transparent",
       },
     },
@@ -62,7 +63,7 @@ export function SwitchCardTitle({
   ...props
 }: useRender.ComponentProps<"p">): React.ReactElement {
   const defaultProps = {
-    className: cn("font-medium text-sm", className),
+    className: cn("text-sm font-medium", className),
     "data-slot": "switch-card-title",
   };
 

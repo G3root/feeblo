@@ -4,6 +4,7 @@ import * as Schema from "effect/Schema";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import * as Atom from "effect/unstable/reactivity/Atom";
 import * as AtomRegistry from "effect/unstable/reactivity/AtomRegistry";
+
 import { authClient } from "../lib/auth-client";
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/utils",
-  "type": "module",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "exports": {
     "./url": "./src/url.ts",
     "./crypto": "./src/crypto.ts",

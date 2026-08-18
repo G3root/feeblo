@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+
 import { parseGitHubAppInstallationCallbackUrl } from "./oauth-callback";
 
 describe("parseGitHubAppInstallationCallbackUrl", () => {

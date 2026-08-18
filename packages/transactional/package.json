@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/transactional",
-  "type": "module",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

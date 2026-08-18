@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { TriggerTarget } from "../src/triggers";
 import {
   bindTriggers,

@@ -1,6 +1,7 @@
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
+
 import { CustomAttributeCreateDialog } from "~/features/custom-attribute/components/custom-attribute-create-dialog";
 import { CustomAttributeDeleteDialog } from "~/features/custom-attribute/components/custom-attribute-delete-dialog";
 import { CustomAttributeEditDialog } from "~/features/custom-attribute/components/custom-attribute-edit-dialog";

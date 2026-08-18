@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/server",
-  "type": "module",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
+  "type": "module",
   "scripts": {
     "build": "dotenvx run -f ../../.env -- rolldown -c",
     "dev": "dotenvx run -f ../../.env -- tsx watch src/index.ts",
@@ -20,13 +20,13 @@
     "@feeblo/integration-core": "workspace:*",
     "@feeblo/integration-discord": "workspace:*",
     "@feeblo/integration-github": "workspace:*",
+    "@feeblo/integration-slack": "workspace:*",
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
     "@sentry/effect": "^10.67.0",
     "drizzle-orm": "catalog:",
-    "effect": "catalog:",
-    "@feeblo/integration-slack": "workspace:*"
+    "effect": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

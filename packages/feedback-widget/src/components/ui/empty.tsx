@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { type ComponentProps, splitProps } from "solid-js";
+
 import { cn } from "../../lib/utils";
 
 export function Empty(props: ComponentProps<"div">) {
@@ -7,7 +8,7 @@ export function Empty(props: ComponentProps<"div">) {
   return (
     <div
       class={cn(
-        "flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 text-balance rounded-2xl border-dashed p-12 text-center",
+        "flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-2xl border-dashed p-12 text-center text-balance",
         local.class
       )}
       data-slot="empty"
@@ -33,7 +34,7 @@ const emptyMediaVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        icon: "flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground [&_svg:not([class*='size-'])]:size-5",
+        icon: "bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-xl [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {
@@ -62,7 +63,7 @@ export function EmptyTitle(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
   return (
     <div
-      class={cn("font-heading font-medium text-lg tracking-tight", local.class)}
+      class={cn("font-heading text-lg font-medium tracking-tight", local.class)}
       data-slot="empty-title"
       {...others}
     />
@@ -74,7 +75,7 @@ export function EmptyDescription(props: ComponentProps<"div">) {
   return (
     <div
       class={cn(
-        "text-muted-foreground text-sm/relaxed [&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
+        "text-muted-foreground [&>a:hover]:text-primary text-sm/relaxed [&>a]:underline [&>a]:underline-offset-4",
         local.class
       )}
       data-slot="empty-description"
@@ -88,7 +89,7 @@ export function EmptyContent(props: ComponentProps<"div">) {
   return (
     <div
       class={cn(
-        "flex w-full min-w-0 max-w-sm flex-col items-center gap-4 text-balance text-sm",
+        "flex w-full max-w-sm min-w-0 flex-col items-center gap-4 text-sm text-balance",
         local.class
       )}
       data-slot="empty-content"

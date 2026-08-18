@@ -2,6 +2,7 @@ import type { AuthClientSession } from "@feeblo/auth/client";
 import type { Permission, Role } from "@feeblo/permissions";
 import { can, isMember, roleIn } from "@feeblo/permissions";
 import { type ReactNode, useMemo } from "react";
+
 import { useAuthState } from "./use-auth-state";
 
 type SessionData = AuthClientSession;

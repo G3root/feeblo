@@ -1,5 +1,6 @@
 import { Badge } from "@feeblo/ui/badge";
 import { Tabs, TabsList, TabsTab } from "@feeblo/ui/tabs";
+
 import type { BillingInterval } from "../lib/plans";
 
 export function BillingIntervalTabs({

@@ -23,6 +23,7 @@ import { and, asc, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { NotificationService } from "../../notification/service";
 import { PostRepository } from "../../post/repository";

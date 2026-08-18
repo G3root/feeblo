@@ -29,7 +29,7 @@ export function FieldRow({
 }) {
   return (
     <div className="flex items-center gap-3 py-3">
-      <span className="w-14 shrink-0 text-muted-foreground text-sm">
+      <span className="text-muted-foreground w-14 shrink-0 text-sm">
         {label}
       </span>
       <div className="min-w-0 flex-1">{children}</div>
@@ -162,16 +162,14 @@ export function PostBoardSelect({
           : null
       }
     >
-      <ComboboxTrigger
-        render={<SelectButton className="w-full" size="sm" />}
-      >
+      <ComboboxTrigger render={<SelectButton className="w-full" size="sm" />}>
         <ComboboxValue placeholder="Select board">
           {(value) => (
             <span className="flex items-center gap-2">
               {value ? (
                 <>
                   <HugeiconsIcon
-                    className="size-4 text-primary-blue"
+                    className="text-primary-blue size-4"
                     icon={DashedLine02Icon}
                     strokeWidth={2}
                   />
@@ -199,7 +197,7 @@ export function PostBoardSelect({
             <ComboboxItem key={item.value} value={item}>
               <span className="flex items-center gap-2 whitespace-nowrap">
                 <HugeiconsIcon
-                  className="size-4 text-primary-blue"
+                  className="text-primary-blue size-4"
                   icon={DashedLine02Icon}
                   strokeWidth={2}
                 />

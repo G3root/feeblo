@@ -17,6 +17,7 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import {
   BadRequestError,

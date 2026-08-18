@@ -1,8 +1,9 @@
-import { defineMiddleware, sequence } from "astro:middleware";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import { extractSubdomain } from "@feeblo/utils/url";
 import type { AuthHint } from "@feeblo/web-shared/auth-hint";
 import type { APIContext, MiddlewareNext } from "astro";
+import { defineMiddleware, sequence } from "astro:middleware";
+
 import { fetchRpcServer } from "~/lib/runtime-server";
 import { authClient } from "~/lib/server-auth-client";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { emitWidgetEvent, subscribe, unsubscribe } from "../src/events";
 import type { FeebloEventDetail, SubmittedFeedback } from "../src/types";
 

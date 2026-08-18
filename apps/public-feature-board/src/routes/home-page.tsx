@@ -1,4 +1,5 @@
 import { createLazyRoute } from "@tanstack/react-router";
+
 import { Home } from "../features/home/home";
 
 export const Route = createLazyRoute("/")({

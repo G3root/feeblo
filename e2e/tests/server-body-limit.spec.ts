@@ -1,4 +1,5 @@
 import { request as httpRequest } from "node:http";
+
 import { expect, test } from "@playwright/test";
 
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";

@@ -5,6 +5,7 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { formOptions } from "@tanstack/react-form";
 import type { Dispatch, SetStateAction } from "react";
 import z from "zod";
+
 import {
   CommentComposer,
   type CommentComposerProviderProps,
@@ -121,7 +122,7 @@ export const CommentComposerField = withForm({
                 }
                 {...rest}
               >
-                <div className="rounded-md border border-border p-3">
+                <div className="border-border rounded-md border p-3">
                   <CommentComposer.Editor />
                   <CommentComposer.Submit />
                 </div>

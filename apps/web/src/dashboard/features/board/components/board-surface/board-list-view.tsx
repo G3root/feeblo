@@ -25,11 +25,13 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo } from "react";
+
 import {
   useBoardStore,
   useSelectedPosts,
 } from "~/features/board/state/board-store-context";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
+
 import { BoardPostRowItem } from "./board-post-row-item";
 import { StatusIcon } from "./status-icon";
 import type { BoardPostLane, BoardPostRow } from "./types";
@@ -107,20 +109,20 @@ function BoardListLaneHeader({
     <ContextMenu>
       <ContextMenuTrigger className="block">
         <div className="relative">
-          <AccordionTrigger className="group/accordion-trigger rounded-xl border-0 bg-muted/70 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-indicator]:hidden">
+          <AccordionTrigger className="group/accordion-trigger bg-muted/70 rounded-xl border-0 px-4 py-2.5 pr-14 hover:no-underline **:data-[slot=accordion-indicator]:hidden">
             <div className="flex items-center gap-2">
               <HugeiconsIcon
-                className="size-4 text-muted-foreground group-aria-expanded/accordion-trigger:hidden"
+                className="text-muted-foreground size-4 group-aria-expanded/accordion-trigger:hidden"
                 icon={ArrowDown01Icon}
                 strokeWidth={2}
               />
               <HugeiconsIcon
-                className="hidden size-4 text-muted-foreground group-aria-expanded/accordion-trigger:inline"
+                className="text-muted-foreground hidden size-4 group-aria-expanded/accordion-trigger:inline"
                 icon={ArrowUp01Icon}
                 strokeWidth={2}
               />
               <StatusIcon status={lane.status} />
-              <h3 className="font-medium text-sm">
+              <h3 className="text-sm font-medium">
                 {getBoardStatusLabel(lane.status)}
               </h3>
               <span className="text-muted-foreground text-xs">

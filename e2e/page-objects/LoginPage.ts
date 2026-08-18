@@ -10,7 +10,10 @@ export class LoginPage {
     this.page = page;
     this.emailInput = page.getByRole("textbox", { name: "Email" });
     this.passwordInput = page.getByLabel("Password", { exact: true });
-    this.submitButton = page.getByRole("button", { name: "Login", exact: true });
+    this.submitButton = page.getByRole("button", {
+      name: "Login",
+      exact: true,
+    });
   }
 
   async goto() {

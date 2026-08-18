@@ -39,9 +39,8 @@ export const e2eRoadmapSeedRouter = HttpRouter.use((router) =>
     return yield* router.add("POST", "/__e2e/seed-roadmap", (request) =>
       Effect.gen(function* () {
         const body = yield* request.json;
-        const payload = yield* Schema.decodeUnknownEffect(SeedRoadmapPayload)(
-          body
-        );
+        const payload =
+          yield* Schema.decodeUnknownEffect(SeedRoadmapPayload)(body);
 
         const statuses = yield* postStatuses.findMany({
           organizationId: payload.organizationId,

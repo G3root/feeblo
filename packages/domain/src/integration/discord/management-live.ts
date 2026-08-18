@@ -5,6 +5,7 @@ import {
 } from "@feeblo/integration-discord";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { DiscordIntegrationConfig } from "./config";
 import {
   DiscordChannelService,

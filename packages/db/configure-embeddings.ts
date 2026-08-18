@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+
 import { PGlite } from "@electric-sql/pglite";
 import { vector } from "@electric-sql/pglite-pgvector";
 import postgres from "postgres";

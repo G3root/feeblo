@@ -1,4 +1,5 @@
 import { useNavigate } from "@solidjs/router";
+
 import { Button } from "../ui/button";
 import { Icon } from "../ui/icon";
 
@@ -7,13 +8,13 @@ export function FeedbackSuccess() {
   return (
     <div class="flex h-full flex-col p-6">
       <div class="flex flex-1 flex-col items-center justify-center text-center">
-        <div class="flex size-12 items-center justify-center rounded-full bg-muted text-foreground">
+        <div class="bg-muted text-foreground flex size-12 items-center justify-center rounded-full">
           <Icon class="size-6" name="CheckIcon" />
         </div>
-        <p class="mt-4 font-medium text-foreground text-lg">
+        <p class="text-foreground mt-4 text-lg font-medium">
           Thanks for your feedback
         </p>
-        <p class="mt-1 max-w-xs text-muted-foreground text-sm">
+        <p class="text-muted-foreground mt-1 max-w-xs text-sm">
           Your post has been shared with the team. We will get back to you soon.
         </p>
       </div>

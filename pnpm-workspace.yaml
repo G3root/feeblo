@@ -4,8 +4,8 @@ packages:
   - packages/*
   - e2e
 allowBuilds:
-  '@parcel/watcher': true
-  '@swc/core': true
+  "@parcel/watcher": true
+  "@swc/core": true
   core-js: true
   esbuild: true
   msgpackr-extract: true
@@ -69,4 +69,3 @@ nodeLinker: hoisted
 overrides:
   prosemirror-model: ^1.25.9
   "@effect/platform-node-shared": 4.0.0-beta.107
-

@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
 import type { TSimpleRoadmapFilter } from "@feeblo/domain/roadmap/schema";
+import { describe, expect, it, vi } from "vitest";
 import { renderHook } from "vitest-browser-react";
+
 import { createMockCollection } from "../testing/in-memory-collections";
 import { useRoadmapData } from "./use-roadmap-data";
 

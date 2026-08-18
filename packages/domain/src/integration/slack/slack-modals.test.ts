@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { buildSuccessModal } from "./slack-modals";
 
 describe("buildSuccessModal", () => {

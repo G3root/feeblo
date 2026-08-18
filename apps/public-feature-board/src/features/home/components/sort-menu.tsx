@@ -8,6 +8,7 @@ import {
 } from "@feeblo/ui/menu";
 import { Sorting01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+
 import { useHome } from "../home-context";
 import { SORT_ITEMS } from "./sort-options";
 

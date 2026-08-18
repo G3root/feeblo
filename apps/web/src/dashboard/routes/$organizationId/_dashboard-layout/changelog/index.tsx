@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import { ChangelogIndex } from "~/features/changelog/components/changelog-index";
 import {
   changelogCategoryCollection,

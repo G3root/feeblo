@@ -17,6 +17,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use, useState } from "react";
+
 import { CommentComposer } from "./comment-composer";
 import {
   useCommentDeleteDialogContext,
@@ -212,7 +213,7 @@ function CommentDisplayHeader() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="font-medium text-sm">{state.authorName}</span>
+      <span className="text-sm font-medium">{state.authorName}</span>
       <span className="text-muted-foreground text-xs">
         {formatRelativeTime(state.createdAt)}
       </span>

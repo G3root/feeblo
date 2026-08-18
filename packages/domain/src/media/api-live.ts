@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
-
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+
 import { registerUploadedAsset } from "../asset/service";
 import { Api } from "../http/api";
 import {
@@ -43,16 +43,14 @@ export const MediaApiLive = HttpApiBuilder.group(
         const kind = getMediaKind(file.contentType);
         if (!kind) {
           return yield* new BadRequestError({
-            message:
-              "Unsupported file type. Use PNG/JPEG/WEBP/GIF",
+            message: "Unsupported file type. Use PNG/JPEG/WEBP/GIF",
           });
         }
 
         const extension = getFileExtension(file.contentType);
         if (!extension) {
           return yield* new BadRequestError({
-            message:
-              "Unsupported file type. Use PNG/JPEG/WEBP/GIF",
+            message: "Unsupported file type. Use PNG/JPEG/WEBP/GIF",
           });
         }
 

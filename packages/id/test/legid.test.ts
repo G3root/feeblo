@@ -1,7 +1,12 @@
+import { beforeEach, describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import { beforeEach, describe, expect, it } from "@effect/vitest";
-import { asLegidArray, asLegidArrayById, LegidError, makeId } from "../src/legid";
+import {
+  asLegidArray,
+  asLegidArrayById,
+  LegidError,
+  makeId,
+} from "../src/legid";
 
 describe("makeId", () => {
   const factory = makeId("post", "pst", { approximateLength: 12 });
@@ -98,9 +103,11 @@ describe("makeId", () => {
 
     it.effect("fails with LegidError on missing prefix", () =>
       Effect.gen(function* () {
-        const result = yield* factory.parse("aB3xY9kQ2rMn").pipe(
-          Effect.catchTag("LegidError", (error) => Effect.succeed(error))
-        );
+        const result = yield* factory
+          .parse("aB3xY9kQ2rMn")
+          .pipe(
+            Effect.catchTag("LegidError", (error) => Effect.succeed(error))
+          );
 
         expect(result).toBeInstanceOf(LegidError);
         expect((result as LegidError).message).toBe(
@@ -111,9 +118,11 @@ describe("makeId", () => {
 
     it.effect("fails with LegidError on wrong prefix", () =>
       Effect.gen(function* () {
-        const result = yield* factory.parse("cmt_aB3xY9kQ2rMn").pipe(
-          Effect.catchTag("LegidError", (error) => Effect.succeed(error))
-        );
+        const result = yield* factory
+          .parse("cmt_aB3xY9kQ2rMn")
+          .pipe(
+            Effect.catchTag("LegidError", (error) => Effect.succeed(error))
+          );
 
         expect(result).toBeInstanceOf(LegidError);
         expect((result as LegidError).message).toBe('ID prefix must be "pst"');
@@ -124,9 +133,11 @@ describe("makeId", () => {
       Effect.gen(function* () {
         const id = yield* factory.generate;
         const tampered = `${id.slice(0, -1)}0`;
-        const result = yield* factory.parse(tampered).pipe(
-          Effect.catchTag("LegidError", (error) => Effect.succeed(error))
-        );
+        const result = yield* factory
+          .parse(tampered)
+          .pipe(
+            Effect.catchTag("LegidError", (error) => Effect.succeed(error))
+          );
 
         expect(result).toBeInstanceOf(LegidError);
       })
@@ -134,9 +145,11 @@ describe("makeId", () => {
 
     it.effect("fails with LegidError on empty input", () =>
       Effect.gen(function* () {
-        const result = yield* factory.parse("").pipe(
-          Effect.catchTag("LegidError", (error) => Effect.succeed(error))
-        );
+        const result = yield* factory
+          .parse("")
+          .pipe(
+            Effect.catchTag("LegidError", (error) => Effect.succeed(error))
+          );
 
         expect(result).toBeInstanceOf(LegidError);
       })

@@ -3,7 +3,9 @@ import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useCallback, useRef, useState } from "react";
+
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { BoardGridLaneColumn } from "./board-grid-lane-column";
 import { BoardGridPostCard } from "./board-grid-post-card";
 import type { BoardPostLane } from "./types";

@@ -6,24 +6,25 @@ import { authClient } from "@feeblo/web-shared/auth-client";
 import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Link, useLocation } from "@tanstack/react-router";
+
 import { useSite } from "../../providers/site-provider";
 
 export function Navbar() {
   const site = useSite();
 
   return (
-    <header className="border-b bg-background/80 backdrop-blur-sm">
+    <header className="bg-background/80 border-b backdrop-blur-sm">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
             <div className="flex min-w-0 items-center gap-2">
               <UserAvatar image={site.logo} name={site.name} />
-              <h1 className="truncate font-semibold text-sm tracking-tight sm:text-base">
+              <h1 className="truncate text-sm font-semibold tracking-tight sm:text-base">
                 {site.name}
               </h1>
             </div>
 
-            <nav className="hidden items-center gap-4 self-stretch text-muted-foreground text-sm sm:flex">
+            <nav className="text-muted-foreground hidden items-center gap-4 self-stretch text-sm sm:flex">
               <NavTab href="/" label="Feedback" />
               {site.roadmapVisibility === "PUBLIC" ? (
                 <NavTab href="/roadmap" label="Roadmap" />
@@ -39,7 +40,7 @@ export function Navbar() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-4 pb-2 text-muted-foreground text-sm sm:hidden">
+        <nav className="text-muted-foreground flex items-center gap-4 pb-2 text-sm sm:hidden">
           <NavTab href="/" label="Feedback" />
           {site.roadmapVisibility === "PUBLIC" ? (
             <NavTab href="/roadmap" label="Roadmap" />
@@ -61,14 +62,14 @@ function NavTab({ href, label }: { href: string; label: string }) {
   return (
     <Link
       className={cn(
-        "relative flex items-center px-1.5 text-sm transition-colors hover:text-foreground sm:h-full",
+        "hover:text-foreground relative flex items-center px-1.5 text-sm transition-colors sm:h-full",
         isActive ? "text-foreground" : "text-muted-foreground"
       )}
       to={href}
     >
       <span>{label}</span>
       {isActive ? (
-        <span className="absolute inset-x-1 -bottom-2 h-0.5 rounded-full bg-foreground/80 sm:-bottom-4" />
+        <span className="bg-foreground/80 absolute inset-x-1 -bottom-2 h-0.5 rounded-full sm:-bottom-4" />
       ) : null}
     </Link>
   );

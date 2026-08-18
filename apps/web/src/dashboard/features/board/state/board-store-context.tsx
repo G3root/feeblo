@@ -1,7 +1,8 @@
+import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { createStore } from "@xstate/store";
 import { useSelector } from "@xstate/store-react";
+
 import { createStoreContext } from "~/lib/xstate";
-import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 
 export type BoardDisplayMode = "list" | "grid";
 export type BoardPostStatusFilter = "all" | "active" | "backlog";

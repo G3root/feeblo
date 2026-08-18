@@ -23,7 +23,9 @@ import { useSelector } from "@tanstack/react-store";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useState } from "react";
+
 import { usePostExternalResourceRefresh } from "~/features/integrations/components/post-external-resources";
+
 import {
   type GitHubConnection,
   type GitHubRepository,

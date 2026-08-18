@@ -7,6 +7,7 @@ import {
 } from "@feeblo/ui/select";
 import { useTheme } from "@feeblo/ui/theme-provider";
 import { createFileRoute } from "@tanstack/react-router";
+
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 

@@ -7,6 +7,7 @@ import {
 } from "better-auth/client/plugins";
 import { createAuthClient as createAuthClientBase } from "better-auth/react";
 import { z } from "zod";
+
 import { clientTimeZoneHeader } from "./client-time-zone";
 import {
   ORGANIZATION_ROLES,

@@ -7,6 +7,7 @@ import * as Schema from "effect/Schema";
 import { createTransport } from "nodemailer";
 import type { ReactElement } from "react";
 import { render, toPlainText } from "react-email";
+
 import { MailerConfig } from "./config";
 
 /** An application-owned request to send one rendered transactional email. */
@@ -46,8 +47,9 @@ export const MailProviderMetadata = Schema.Struct({
   responseCode: Schema.optionalKey(SmtpResponseCode),
 });
 
-export interface MailProviderMetadata
-  extends Schema.Schema.Type<typeof MailProviderMetadata> {}
+export interface MailProviderMetadata extends Schema.Schema.Type<
+  typeof MailProviderMetadata
+> {}
 
 /** Provider-neutral result of one mail submission attempt. */
 export const MailSendResult = Schema.Struct({
@@ -56,8 +58,9 @@ export const MailSendResult = Schema.Struct({
   providerMetadata: MailProviderMetadata,
 });
 
-export interface MailSendResult
-  extends Schema.Schema.Type<typeof MailSendResult> {}
+export interface MailSendResult extends Schema.Schema.Type<
+  typeof MailSendResult
+> {}
 
 /** The normalized receipt returned by a concrete outbound mail transport. */
 export const MailTransportReceipt = Schema.Struct({
@@ -68,8 +71,9 @@ export const MailTransportReceipt = Schema.Struct({
   responseCode: MailProviderMetadata.fields.responseCode,
 });
 
-export interface MailTransportReceipt
-  extends Schema.Schema.Type<typeof MailTransportReceipt> {}
+export interface MailTransportReceipt extends Schema.Schema.Type<
+  typeof MailTransportReceipt
+> {}
 
 type RenderedMailMessage = Omit<MailMessage, "react"> & {
   readonly html: string;

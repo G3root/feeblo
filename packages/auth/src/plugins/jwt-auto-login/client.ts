@@ -1,4 +1,5 @@
 import type { BetterAuthClientPlugin } from "@better-auth/core";
+
 import { JWT_AUTO_LOGIN_ERROR_CODES } from "./error-codes";
 import { ID, type jwtAutoLogin, SIGN_IN_PATH } from "./plugin";
 

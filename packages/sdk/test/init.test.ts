@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { EmbedError } from "../src/errors";
 import { Feeblo } from "../src/index";
 import { getCurrentEmbed, init } from "../src/instance";

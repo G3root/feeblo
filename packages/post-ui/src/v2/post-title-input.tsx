@@ -5,11 +5,14 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
 import { useId, useRef } from "react";
+
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
-interface PostTitleInputProps
-  extends Omit<React.ComponentProps<"input">, "size"> {
+interface PostTitleInputProps extends Omit<
+  React.ComponentProps<"input">,
+  "size"
+> {
   size?: "default" | "sm";
 }
 
@@ -28,7 +31,7 @@ export function PostTitleInput({
       </label>
       <Input
         className={cn(
-          "rounded-md border-none bg-transparent font-medium tracking-tight hover:bg-input/30 focus:bg-input/30 md:text-2xl",
+          "hover:bg-input/30 focus:bg-input/30 rounded-md border-none bg-transparent font-medium tracking-tight md:text-2xl",
           className
         )}
         {...props}

@@ -1,4 +1,5 @@
 import { createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
+
 import { describe, expect, it } from "@effect/vitest";
 import {
   asLegid,
@@ -16,8 +17,12 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
+
 import type { DiscordApiClient } from "./discord-api";
-import { discordChannelNotificationsCapabilityKey, discordProviderKey } from "./discord-manifest";
+import {
+  discordChannelNotificationsCapabilityKey,
+  discordProviderKey,
+} from "./discord-manifest";
 import { makeDiscordProviderRegistration } from "./discord-provider-registration";
 
 // Discord interaction signatures are Ed25519; the test keypair is generated
@@ -271,8 +276,9 @@ describe("discord provider registration", () => {
         token: "token_1",
       });
 
-      const response = yield* interactions?.handle(signedHeaders(rawBody)) ??
-        Effect.never;
+      const response = yield* (
+        interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
+      );
       expect(response.status).toBe(200);
       const parsed = response.body as {
         kind: string;
@@ -293,8 +299,9 @@ describe("discord provider registration", () => {
         (candidate) => candidate.capabilityKey === "interactions"
       );
       const rawBody = JSON.stringify({ id: "ping_1", type: 1 });
-      const response = yield* interactions?.handle(signedHeaders(rawBody)) ??
-        Effect.never;
+      const response = yield* (
+        interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
+      );
       expect(response.status).toBe(200);
       const parsed = response.body as { kind: string };
       expect(parsed.kind).toBe("ping");
@@ -336,8 +343,9 @@ describe("discord provider registration", () => {
         member: { user: { id: "user_1", username: "alice" } },
         token: "token_2",
       });
-      const response = yield* interactions?.handle(signedHeaders(rawBody)) ??
-        Effect.never;
+      const response = yield* (
+        interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
+      );
       expect(response.status).toBe(200);
       const parsed = response.body as { kind: string };
       expect(parsed.kind).toBe("modal_submit");
@@ -353,10 +361,12 @@ describe("discord provider registration", () => {
       const interactions = registration.inboundHandlers.find(
         (candidate) => candidate.capabilityKey === "interactions"
       );
-      const response = yield* interactions?.handle({
-        headers: {},
-        rawBody: JSON.stringify({ type: 1 }),
-      }) ?? Effect.never;
+      const response = yield* (
+        interactions?.handle({
+          headers: {},
+          rawBody: JSON.stringify({ type: 1 }),
+        }) ?? Effect.never
+      );
       expect(response.status).toBe(401);
     })
   );
@@ -370,8 +380,9 @@ describe("discord provider registration", () => {
       const interactions = registration.inboundHandlers.find(
         (candidate) => candidate.capabilityKey === "interactions"
       );
-      const response = yield* interactions?.handle(signedHeaders("not-json")) ??
-        Effect.never;
+      const response = yield* (
+        interactions?.handle(signedHeaders("not-json")) ?? Effect.never
+      );
       expect(response.status).toBe(400);
     })
   );

@@ -6,6 +6,7 @@ import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
+
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { EmbedError } from "../src/errors";
 
 describe("EmbedError", () => {

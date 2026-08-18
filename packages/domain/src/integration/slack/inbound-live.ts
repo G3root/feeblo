@@ -18,6 +18,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+
 import { BoardRepository } from "../../board/repository";
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { SlackIntegrationConfig } from "./config";

@@ -5,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
+
 import { cn } from "../../lib/utils";
 
 export type BoardOption = {
@@ -25,7 +26,7 @@ export function BoardSelect({
 }) {
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <span className="text-muted-foreground text-xs uppercase tracking-wider">
+      <span className="text-muted-foreground text-xs tracking-wider uppercase">
         Board
       </span>
       <Select onValueChange={(v) => v !== null && onChange(v)} value={value}>

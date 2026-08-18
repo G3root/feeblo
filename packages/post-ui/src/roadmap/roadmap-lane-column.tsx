@@ -2,6 +2,7 @@ import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { cn } from "@feeblo/ui/utils";
 import { getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
 import type { ReactNode, Ref } from "react";
+
 import { RoadmapStatusIcon } from "./roadmap-status-icon";
 import type { RoadmapStatus } from "./types";
 
@@ -25,12 +26,12 @@ export function RoadmapLaneColumn({
   const readableStatus = getBoardStatusLabel(status);
 
   return (
-    <div className="flex h-full min-h-0 w-80 flex-col overflow-hidden rounded-lg bg-muted/30">
+    <div className="bg-muted/30 flex h-full min-h-0 w-80 flex-col overflow-hidden rounded-lg">
       <div className="px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <RoadmapStatusIcon status={status} />
-            <h3 className="font-medium text-sm">{name ?? readableStatus}</h3>
+            <h3 className="text-sm font-medium">{name ?? readableStatus}</h3>
           </div>
           {action}
         </div>

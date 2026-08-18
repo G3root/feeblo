@@ -12,6 +12,7 @@ import {
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
+
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
@@ -138,7 +139,7 @@ function PostVoterDialogPopup() {
             <li key={voter.id}>
               <div className="flex items-center gap-3 rounded-xl px-2 py-2">
                 <UserAvatar image={voter.user.image} name={voter.user.name} />
-                <span className="font-medium text-foreground text-sm">
+                <span className="text-foreground text-sm font-medium">
                   {voter.user.name}
                 </span>
               </div>

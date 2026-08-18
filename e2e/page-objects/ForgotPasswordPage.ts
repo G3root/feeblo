@@ -23,9 +23,7 @@ export class ForgotPasswordPage {
     await this.emailInput.fill(email);
     const responsePromise = this.page.waitForResponse(
       (response) =>
-        response
-          .url()
-          .includes("/api/auth/email-otp/request-password-reset") &&
+        response.url().includes("/api/auth/email-otp/request-password-reset") &&
         response.request().method() === "POST"
     );
     await this.submitButton.click();

@@ -14,6 +14,7 @@ import {
   it,
   vi,
 } from "vitest";
+
 import { jwtAutoLoginClient } from "./client";
 import { jwtAutoLogin, SIGN_IN_PATH } from "./plugin";
 
@@ -525,7 +526,6 @@ describe("jwtAutoLogin", async () => {
   }
 
   describe("cleanup safeguards", () => {
-
     it("does not delete when the new session is still restricted", async () => {
       const { getSessionFromCtx } = await import("better-auth/api");
       const plugin = jwtAutoLogin({
@@ -644,9 +644,7 @@ describe("jwtAutoLogin", async () => {
 
     it("skips cleanup when onLinkAccount throws", async () => {
       const { getSessionFromCtx } = await import("better-auth/api");
-      const onLinkAccount = vi
-        .fn()
-        .mockRejectedValue(new Error("link failed"));
+      const onLinkAccount = vi.fn().mockRejectedValue(new Error("link failed"));
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         onLinkAccount,
@@ -705,9 +703,8 @@ describe("jwtAutoLogin", async () => {
 
   describe("before hook", () => {
     it("adds oauth server context when the session is restricted", async () => {
-      const { getSessionFromCtx, addOAuthServerContext } = await import(
-        "better-auth/api"
-      );
+      const { getSessionFromCtx, addOAuthServerContext } =
+        await import("better-auth/api");
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
       const handler = plugin.hooks?.before?.[0]?.handler;
 
@@ -717,7 +714,9 @@ describe("jwtAutoLogin", async () => {
       } as any);
       // The real addOAuthServerContext needs an active request state; we only
       // care that the before-hook forwards the autoLoginUserId, so stub it.
-      vi.mocked(addOAuthServerContext).mockImplementation(async () => undefined);
+      vi.mocked(addOAuthServerContext).mockImplementation(
+        async () => undefined
+      );
 
       await handler?.({} as any);
 
@@ -727,9 +726,8 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("does not add oauth server context when the session is not restricted", async () => {
-      const { getSessionFromCtx, addOAuthServerContext } = await import(
-        "better-auth/api"
-      );
+      const { getSessionFromCtx, addOAuthServerContext } =
+        await import("better-auth/api");
       vi.mocked(addOAuthServerContext).mockClear();
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
       const handler = plugin.hooks?.before?.[0]?.handler;
@@ -745,9 +743,8 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("does not add oauth server context when there is no session", async () => {
-      const { getSessionFromCtx, addOAuthServerContext } = await import(
-        "better-auth/api"
-      );
+      const { getSessionFromCtx, addOAuthServerContext } =
+        await import("better-auth/api");
       vi.mocked(addOAuthServerContext).mockClear();
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
       const handler = plugin.hooks?.before?.[0]?.handler;
@@ -787,9 +784,8 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("returns early when no cookie session and no oauth state", async () => {
-      const { getSessionFromCtx, getOAuthState } = await import(
-        "better-auth/api"
-      );
+      const { getSessionFromCtx, getOAuthState } =
+        await import("better-auth/api");
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
@@ -812,9 +808,8 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("returns early when the oauth-state user is not restricted", async () => {
-      const { getSessionFromCtx, getOAuthState } = await import(
-        "better-auth/api"
-      );
+      const { getSessionFromCtx, getOAuthState } =
+        await import("better-auth/api");
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
@@ -844,9 +839,8 @@ describe("jwtAutoLogin", async () => {
     });
 
     it("returns early when the oauth-state user has no active sessions", async () => {
-      const { getSessionFromCtx, getOAuthState } = await import(
-        "better-auth/api"
-      );
+      const { getSessionFromCtx, getOAuthState } =
+        await import("better-auth/api");
       const onLinkAccount = vi.fn();
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
@@ -1006,9 +1000,8 @@ describe("jwtAutoLogin", async () => {
   describe("schema", () => {
     it("declares the restrictedToOrganizationId user field", () => {
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
-      const field = (
-        plugin.schema as { user: { fields: Record<string, any> } }
-      ).user.fields.restrictedToOrganizationId;
+      const field = (plugin.schema as { user: { fields: Record<string, any> } })
+        .user.fields.restrictedToOrganizationId;
       expect(field).toBeDefined();
       expect(field.type).toBe("string");
       expect(field.required).toBe(false);

@@ -50,9 +50,11 @@ import {
   useState,
 } from "react";
 import { z } from "zod";
+
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import type { ChangelogStatus } from "../constants";
 import {
   useChangelogDeleteDialogContext,
@@ -654,7 +656,7 @@ export function ChangelogEditorDetails() {
           >
             <HugeiconsIcon
               aria-hidden="true"
-              className="size-4 text-muted-foreground/72"
+              className="text-muted-foreground/72 size-4"
               icon={detail.icon}
               strokeWidth={1.75}
             />
@@ -662,8 +664,8 @@ export function ChangelogEditorDetails() {
             <dd
               className={
                 typeof detail.value === "string"
-                  ? "max-w-32 truncate font-medium text-foreground"
-                  : "font-medium text-foreground"
+                  ? "text-foreground max-w-32 truncate font-medium"
+                  : "text-foreground font-medium"
               }
             >
               {detail.value}
@@ -802,7 +804,7 @@ export function ChangelogEditorCategoryField() {
         <ul className="flex flex-wrap gap-1.5">
           {selectedCategories.map((category) => (
             <li
-              className="flex min-w-0 items-center gap-1 rounded-md border border-input bg-background py-0.5 ps-2 pe-0.5 text-sm"
+              className="border-input bg-background flex min-w-0 items-center gap-1 rounded-md border py-0.5 ps-2 pe-0.5 text-sm"
               key={category.id}
             >
               <span

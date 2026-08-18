@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+
 import {
   GITHUB_ISSUE_BODY_CHARACTER_LIMIT,
   renderGitHubIssueBody,

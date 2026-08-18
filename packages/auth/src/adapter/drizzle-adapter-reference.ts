@@ -1,4 +1,3 @@
-
 import type { BetterAuthOptions } from "@better-auth/core";
 import type {
   AdapterFactoryCustomizeAdapterCreator,
@@ -30,6 +29,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+
 import {
   insensitiveEq,
   insensitiveIlike,

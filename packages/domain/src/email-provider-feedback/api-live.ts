@@ -1,8 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
+
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+
 import { Api } from "../http/api";
 import {
   BadRequestError,

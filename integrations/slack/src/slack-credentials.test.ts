@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import { describe, expect, it } from "vitest";
+
 import {
   decryptSlackCredentialMaterial,
   encryptSlackCredentialMaterial,

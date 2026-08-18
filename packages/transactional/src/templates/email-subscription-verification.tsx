@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Section, Text } from "react-email";
+
 import { EmailShell } from "./email-shell";
 
 /** Properties for the manual email subscription double-opt-in message. */
@@ -19,8 +20,8 @@ export const EmailSubscriptionVerification = ({
     title="Verify your email subscription"
     titleLead="Confirm this address before Feeblo sends workspace updates."
   >
-    <Section className="border border-stroke bg-bg-2 px-4 py-3">
-      <Text className="m-0 break-all font-13 font-sans text-fg-2">
+    <Section className="border-stroke bg-bg-2 border px-4 py-3">
+      <Text className="font-13 text-fg-2 m-0 font-sans break-all">
         {verificationUrl}
       </Text>
     </Section>

@@ -1,4 +1,5 @@
 import { type ComponentProps, type JSX, splitProps } from "solid-js";
+
 import type { IconName } from "../../icons/types";
 import { cn } from "../../lib/utils";
 

@@ -1,6 +1,7 @@
 import type { LegidOf } from "@feeblo/id";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
+
 import type { GitHubIntegrationError } from "./errors";
 import type {
   GitHubAppInstallationCallback,

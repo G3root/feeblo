@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { fetchRpc } from "~/lib/runtime";
 
@@ -47,14 +48,14 @@ export function NotificationsMenu() {
       >
         <HugeiconsIcon icon={BellDotIcon} />
         {(unread.data?.count ?? 0) > 0 && (
-          <span className="absolute top-0.5 right-0.5 flex min-w-4 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground leading-4">
+          <span className="bg-primary text-primary-foreground absolute top-0.5 right-0.5 flex min-w-4 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full px-1 text-[10px] leading-4">
             {(unread.data?.count ?? 0) > 99 ? "99+" : unread.data?.count}
           </span>
         )}
       </MenuTrigger>
       <MenuPopup align="end" className="w-96 p-0" sideOffset={8}>
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <span className="font-semibold text-sm">Notifications</span>
+          <span className="text-sm font-semibold">Notifications</span>
           {(unread.data?.count ?? 0) > 0 && (
             <Button
               onClick={async () => {
@@ -72,13 +73,13 @@ export function NotificationsMenu() {
         </div>
         <div className="max-h-96 overflow-y-auto">
           {list.data?.length === 0 && (
-            <p className="px-4 py-8 text-center text-muted-foreground text-sm">
+            <p className="text-muted-foreground px-4 py-8 text-center text-sm">
               You’re all caught up.
             </p>
           )}
           {list.data?.map((notification) => (
             <MenuItem
-              className={`h-auto rounded-none border-b px-4 py-3 hover:bg-accent/60 ${notification.readAt ? "" : "bg-accent/30"}`}
+              className={`hover:bg-accent/60 h-auto rounded-none border-b px-4 py-3 ${notification.readAt ? "" : "bg-accent/30"}`}
               key={notification.id}
               onClick={() => {
                 const url = new URL(notification.href, window.location.origin);
@@ -98,9 +99,9 @@ export function NotificationsMenu() {
               }}
             >
               <div className="min-w-0">
-                <p className="font-medium text-sm">{notification.title}</p>
+                <p className="text-sm font-medium">{notification.title}</p>
                 {notification.body && (
-                  <p className="mt-0.5 truncate text-muted-foreground text-sm">
+                  <p className="text-muted-foreground mt-0.5 truncate text-sm">
                     {notification.body}
                   </p>
                 )}

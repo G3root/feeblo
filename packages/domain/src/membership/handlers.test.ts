@@ -4,6 +4,7 @@ import { MemberId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -477,7 +478,10 @@ describe("MembershipRpcHandlers", () => {
             memberId,
           })
           .pipe(
-            Effect.provideService(CurrentSession, makeSession(fixture, "manager"))
+            Effect.provideService(
+              CurrentSession,
+              makeSession(fixture, "manager")
+            )
           );
 
         const remaining = yield* db

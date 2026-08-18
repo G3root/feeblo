@@ -258,7 +258,10 @@ export const drizzleAdapter = (
 
           const clause = convertWhereClause(updatedWhere, model);
           const res: any[] = await runQuery(
-            dbt.select().from(schemaModel).where(...clause)
+            dbt
+              .select()
+              .from(schemaModel)
+              .where(...clause)
           );
           return res[0];
         }
@@ -360,11 +363,7 @@ export const drizzleAdapter = (
             const combined = and(...conditions);
             if (combined) {
               const res: any[] = await runQuery(
-                tx
-                  .select()
-                  .from(schemaModel)
-                  .where(combined)
-                  .limit(2)
+                tx.select().from(schemaModel).where(combined).limit(2)
               );
               if (res.length === 1) {
                 return res[0];

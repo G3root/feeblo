@@ -3,15 +3,15 @@ description: "Sets up a consistent Node.js environment"
 inputs:
   cache:
     required: false
-    default: 'pnpm'
+    default: "pnpm"
     description: Allow to disable pnpm cache for better security
   install:
     required: false
-    default: ''
+    default: ""
     description: Allow to disable `pnpm install` call
   registry-url:
     required: false
-    default: ''
+    default: ""
     description: Optional npm registry URL; enables npm auth via NODE_AUTH_TOKEN
 runs:
   using: "composite"

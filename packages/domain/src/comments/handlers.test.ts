@@ -11,11 +11,12 @@ import {
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+
 import { BoardRepository } from "../board/repository";
-import { PostPolicy } from "../post/policies";
-import { PostRepository } from "../post/repository";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
+import { PostPolicy } from "../post/policies";
+import { PostRepository } from "../post/repository";
 import {
   CurrentSession,
   OptionalCurrentSession,

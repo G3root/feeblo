@@ -1,6 +1,7 @@
 import type { LegidFrom, WorkspaceId } from "@feeblo/id";
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
+
 import type { DiscordIntegrationError } from "./errors";
 import type * as S from "./schema";
 

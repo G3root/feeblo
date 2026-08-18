@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/integration-slack",
-  "type": "module",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./manifest": "./src/slack-manifest.ts",

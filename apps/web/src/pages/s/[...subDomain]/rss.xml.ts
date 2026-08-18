@@ -2,6 +2,7 @@ import rss, { type RSSFeedItem } from "@astrojs/rss";
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
 import { markdownToHtml } from "@feeblo/utils/markdown";
 import type { APIRoute } from "astro";
+
 import { fetchRpcServer } from "~/lib/runtime-server";
 
 export const prerender = false;

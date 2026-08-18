@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+
 import { expect, test } from "@playwright/test";
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3101";

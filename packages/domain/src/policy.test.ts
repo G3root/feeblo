@@ -1,5 +1,5 @@
-import * as Effect from "effect/Effect";
 import { describe, expect, it } from "@effect/vitest";
+import * as Effect from "effect/Effect";
 
 import * as Policy from "./policy";
 import { CurrentSession, type Session } from "./session-middleware";

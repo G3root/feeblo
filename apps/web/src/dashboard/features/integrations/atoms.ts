@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Atom from "effect/unstable/reactivity/Atom";
+
 import { loadPostExternalResourceLinks } from "./lib/post-external-resources";
 
 /** Safe, provider-neutral external resource link returned for a feedback post. */

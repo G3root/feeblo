@@ -15,6 +15,7 @@ import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { z } from "zod";
+
 import { AuthShell } from "~/features/auth/components/auth-shell";
 
 export const Route = createFileRoute("/sign-up")({

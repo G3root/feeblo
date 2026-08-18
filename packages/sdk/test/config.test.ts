@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { normalizeWidgetConfig } from "../src/config";
 import { EmbedError } from "../src/errors";
 

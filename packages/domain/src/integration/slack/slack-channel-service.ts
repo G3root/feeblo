@@ -13,6 +13,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+
 import { InternalServerError, NotFoundError } from "../../rpc-errors";
 import { SlackIntegrationConfig } from "./config";
 import type { SlackIntegrationError } from "./errors";

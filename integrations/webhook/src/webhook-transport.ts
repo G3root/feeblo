@@ -1,6 +1,6 @@
 import { isIP, type LookupFunction } from "node:net";
-import { NodeHttpClient } from "@effect/platform-node";
 
+import { NodeHttpClient } from "@effect/platform-node";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";

@@ -12,6 +12,11 @@ import {
   MenuSubTrigger,
   MenuTrigger,
 } from "@feeblo/ui/menu";
+import { cn } from "@feeblo/ui/utils";
+import {
+  type BoardPostStatus,
+  getBoardStatusLabel,
+} from "@feeblo/web-shared/board/constants";
 import {
   Cancel01Icon,
   DashedLineCircleIcon,
@@ -22,9 +27,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { createContext, type ReactNode, useContext } from "react";
-import { cn } from "@feeblo/ui/utils";
+
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-import { type BoardPostStatus, getBoardStatusLabel } from "@feeblo/web-shared/board/constants";
+
 import {
   type BoardStatusOperator,
   type BoardTagOperator,
@@ -250,7 +255,7 @@ function BoardFilterActiveRow() {
   const tagNameMap = new Map(tags.map((tag) => [tag.id, tag.name]));
 
   return (
-    <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2">
+    <div className="border-border/60 bg-muted/20 flex items-start justify-between gap-3 rounded-2xl border px-3 py-2">
       <div className="flex flex-wrap items-center gap-2">
         {hasStatusFilter ? <BoardFilterStatusGroup /> : null}
         {hasTagFilter ? (
@@ -338,11 +343,7 @@ function BoardFilterLabelsGroup({
 }
 
 function BoardFilterActiveGroup({ children }: { children: ReactNode }) {
-  return (
-    <Group className="rounded-full bg-background/90">
-      {children}
-    </Group>
-  );
+  return <Group className="bg-background/90 rounded-full">{children}</Group>;
 }
 
 function BoardFilterReadonlySegment({
@@ -353,7 +354,7 @@ function BoardFilterReadonlySegment({
   icon: typeof DashedLineCircleIcon;
 }) {
   return (
-    <GroupText className="rounded-full border-border bg-background px-3 text-foreground">
+    <GroupText className="border-border bg-background text-foreground rounded-full px-3">
       <HugeiconsIcon className="text-muted-foreground" icon={icon} />
       {children}
     </GroupText>

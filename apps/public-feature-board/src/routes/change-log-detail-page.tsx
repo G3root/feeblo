@@ -11,6 +11,7 @@ import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link, useParams } from "@tanstack/react-router";
+
 import { ChangelogCategoryBadges } from "../components/changelog/changelog-category-badge";
 import {
   ChangelogPageLayout,
@@ -166,14 +167,14 @@ export function ChangeLogDetailPage() {
             />
           ) : null}
           <header className="space-y-4">
-            <p className="font-medium text-muted-foreground text-sm tracking-tight">
+            <p className="text-muted-foreground text-sm font-medium tracking-tight">
               {formatChangelogDate(
                 changelog.publishedAt ?? changelog.createdAt
               )}
             </p>
             <div className="space-y-3">
               <ChangelogCategoryBadges categoryIds={categoryIds} />
-              <h1 className="max-w-3xl font-semibold text-4xl tracking-tight sm:text-5xl">
+              <h1 className="max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
                 {changelog.title}
               </h1>
               <p className="text-muted-foreground text-sm">
@@ -198,7 +199,7 @@ export function ChangeLogDetailPage() {
               className="space-y-3"
             >
               <h2
-                className="font-semibold text-xl tracking-tight"
+                className="text-xl font-semibold tracking-tight"
                 id="linked-posts-heading"
               >
                 Linked posts
@@ -206,15 +207,15 @@ export function ChangeLogDetailPage() {
               <div className="divide-y rounded-xl border">
                 {linkedPosts.map((post) => (
                   <Link
-                    className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/40"
+                    className="hover:bg-muted/40 flex items-center justify-between gap-4 px-4 py-3 transition-colors"
                     key={post.id}
                     params={{ slug: post.slug }}
                     to="/p/$slug"
                   >
-                    <span className="min-w-0 truncate font-medium text-sm">
+                    <span className="min-w-0 truncate text-sm font-medium">
                       {post.title}
                     </span>
-                    <span className="shrink-0 text-muted-foreground text-xs">
+                    <span className="text-muted-foreground shrink-0 text-xs">
                       {formatPostStatus(post.status)}
                     </span>
                   </Link>

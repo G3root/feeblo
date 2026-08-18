@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { toWorkspaceSlug } from "./utils";
 
 export const registerFormSchema = z

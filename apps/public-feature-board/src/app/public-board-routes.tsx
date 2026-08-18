@@ -5,6 +5,7 @@ import {
 } from "@feeblo/web-shared/auth-session";
 import { createRootRoute, createRoute, Outlet } from "@tanstack/react-router";
 import * as S from "effect/Schema";
+
 import { PublicBoardShell } from "../components/layout/public-board-shell";
 import {
   getCurrentOrganizationId,

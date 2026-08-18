@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link, Text } from "react-email";
+
 import { EmailShell } from "./email-shell";
 
 type UserOnboardingEmailProps = {
@@ -18,26 +19,26 @@ export const UserOnboardingEmail = ({
     title="Welcome to Feeblo"
     titleSize="md"
   >
-    <Text className="m-0 font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 font-sans">
       Hi{name ? ` ${name}` : " there"},
     </Text>
-    <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 mt-[18px] font-sans">
       I'm Nafees from Feeblo. Thanks for joining us!
     </Text>
-    <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 mt-[18px] font-sans">
       I'd really love to hear what you're hoping to use Feeblo for, what you
       like, what feels confusing, or anything you think we could do better.
     </Text>
-    <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 mt-[18px] font-sans">
       If you ever get stuck or just want to chat, just hit reply. I read every
       email myself.
     </Text>
-    <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 mt-[18px] font-sans">
       — Nafees
       <br />
       Founder, Feeblo
     </Text>
-    <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 mt-[18px] font-sans">
       <Link className="text-fg" href={dashboardUrl}>
         Open your workspace
       </Link>

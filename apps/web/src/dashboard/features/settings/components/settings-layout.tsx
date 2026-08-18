@@ -43,7 +43,7 @@ function HeaderTitle({ children, className, ...props }: HeaderTitleProps) {
   return (
     <h1
       className={cn(
-        "font-semibold text-2xl leading-tight tracking-tight",
+        "text-2xl leading-tight font-semibold tracking-tight",
         className
       )}
       {...props}

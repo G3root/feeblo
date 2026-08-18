@@ -5,6 +5,7 @@ import {
 } from "@feeblo/integration-slack";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { SlackIntegrationConfig } from "./config";
 import { SlackManagementService } from "./management-service";
 import {

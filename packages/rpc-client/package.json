@@ -1,19 +1,19 @@
 {
   "name": "@feeblo/rpc-client",
-  "type": "module",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "exports": {
     ".": {
       "default": "./src/index.ts"
     }
   },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
     "effect": "catalog:"
-  },
-  "scripts": {
-    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",

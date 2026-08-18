@@ -1,4 +1,3 @@
-
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -30,9 +29,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useState } from "react";
+
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { useUpgradePlanDialogContext } from "../dialog-stores";
 import { startBillingCheckout, startBillingPortal } from "../lib/checkout";
 import {
@@ -119,10 +120,10 @@ function UpgradePlanDialogPopup() {
     <DialogPopup className="max-w-5xl">
       <DialogPanel scrollFade={false}>
         <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-          <div className="flex flex-col border-border lg:border-r">
+          <div className="border-border flex flex-col lg:border-r">
             <DialogHeader className="gap-4 px-6 pt-6 pb-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
                   <HugeiconsIcon className="h-4 w-4" icon={SparklesIcon} />
                 </div>
                 <div>
@@ -136,7 +137,7 @@ function UpgradePlanDialogPopup() {
 
             <div className="flex flex-1 flex-col px-6 pb-6">
               <div className="mb-4 flex items-center justify-between gap-4">
-                <div className="font-medium text-sm">Select plan:</div>
+                <div className="text-sm font-medium">Select plan:</div>
                 <BillingIntervalTabs
                   onValueChange={setSelectedInterval}
                   value={selectedInterval}
@@ -196,12 +197,12 @@ function UpgradePlanDialogPopup() {
             </div>
           </div>
 
-          <aside className="flex flex-col bg-muted/20 px-6 py-6">
+          <aside className="bg-muted/20 flex flex-col px-6 py-6">
             <div className="max-w-sm">
-              <div className="font-semibold text-2xl tracking-tight">
+              <div className="text-2xl font-semibold tracking-tight">
                 {selectedPlan.name}
               </div>
-              <p className="mt-2 text-base text-muted-foreground">
+              <p className="text-muted-foreground mt-2 text-base">
                 {selectedPlan.description}
               </p>
             </div>

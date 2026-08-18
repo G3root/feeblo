@@ -1,5 +1,6 @@
-import * as Effect from "effect/Effect";
 import { describe, expect, it } from "@effect/vitest";
+import * as Effect from "effect/Effect";
+
 import {
   isWebhookPrivateOrReservedAddress,
   parseWebhookEndpointUrl,
@@ -85,19 +86,21 @@ describe("webhook endpoint security", () => {
     }
   });
 
-  it.effect("rejects a mixed public/private DNS answer before it can be pinned", () =>
-    Effect.gen(function* () {
-      const resolver = () =>
-        Effect.succeed(["8.8.8.8", "169.254.169.254"] as const);
-      const error = yield* Effect.flip(
-        resolveAndParseWebhookEndpoint(
-          "https://example.com/hook",
-          production,
-          resolver
-        )
-      );
+  it.effect(
+    "rejects a mixed public/private DNS answer before it can be pinned",
+    () =>
+      Effect.gen(function* () {
+        const resolver = () =>
+          Effect.succeed(["8.8.8.8", "169.254.169.254"] as const);
+        const error = yield* Effect.flip(
+          resolveAndParseWebhookEndpoint(
+            "https://example.com/hook",
+            production,
+            resolver
+          )
+        );
 
-      expect(error).toMatchObject({ _tag: "WebhookEndpointSecurityError" });
-    })
+        expect(error).toMatchObject({ _tag: "WebhookEndpointSecurityError" });
+      })
   );
 });

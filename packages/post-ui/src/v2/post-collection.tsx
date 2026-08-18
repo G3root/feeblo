@@ -7,6 +7,7 @@ import {
   isUser,
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
+
 import {
   createPostCollectionState as buildPostCollectionState,
   type PostCollectionDataProviderProps,
@@ -25,10 +26,7 @@ export function PostCollectionDataProvider({
     hasPermission(organizationId, "posts.*")
   );
   const { allowed: isPostCreator } = usePolicy(
-    allPolicy(
-      hasMembership(organizationId),
-      isUser(post?.creatorId ?? "")
-    )
+    allPolicy(hasMembership(organizationId), isUser(post?.creatorId ?? ""))
   );
   // Backend mirror: PostPolicy.canUpdate = hasMembership AND
   // (posts.* OR post creator). PostPolicy.canDelete additionally requires

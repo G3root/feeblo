@@ -4,6 +4,7 @@ import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { CurrentSession, type Session } from "../session-middleware";
 import { ReservedSubdomainError } from "../site/subdomain/errors";
 import { SubdomainValidationService } from "../site/subdomain/service";
@@ -119,136 +120,142 @@ describe("WorkspaceRpcHandlers", () => {
 
   layer(TestLayer)("handlers", (it) => {
     describe("WorkspaceCreate", () => {
-      it.effect("creates a workspace with default boards, statuses, and tags", () =>
-        Effect.gen(function* () {
-          const handlers = yield* WorkspaceRpcHandlersEffect;
-          const db = yield* currentDb;
-          const userId = "user_new_workspace";
+      it.effect(
+        "creates a workspace with default boards, statuses, and tags",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* WorkspaceRpcHandlersEffect;
+            const db = yield* currentDb;
+            const userId = "user_new_workspace";
 
-          yield* db.insert(schema.userTable).values({
-            id: userId,
-            email: "newuser@example.com",
-            name: "New User",
-          });
-
-          const session: Session = {
-            user: {
+            yield* db.insert(schema.userTable).values({
               id: userId,
               email: "newuser@example.com",
               name: "New User",
-              restrictedToOrganizationId: null,
-            },
-            session: { userId, token: "test-token" },
-            organizations: [],
-            memberships: [],
-          };
+            });
 
-          const result = yield* handlers
-            .WorkspaceCreate({ workspaceName: "My Awesome Workspace" })
-            .pipe(Effect.provideService(CurrentSession, session));
+            const session: Session = {
+              user: {
+                id: userId,
+                email: "newuser@example.com",
+                name: "New User",
+                restrictedToOrganizationId: null,
+              },
+              session: { userId, token: "test-token" },
+              organizations: [],
+              memberships: [],
+            };
 
-          expect(result.organizationId).toBeDefined();
+            const result = yield* handlers
+              .WorkspaceCreate({ workspaceName: "My Awesome Workspace" })
+              .pipe(Effect.provideService(CurrentSession, session));
 
-          // Verify the organization was created
-          const orgs = yield* db
-            .select()
-            .from(schema.organizationTable)
-            .where(eq(schema.organizationTable.id, result.organizationId));
-          expect(orgs).toHaveLength(1);
-          expect(orgs[0]?.name).toBe("My Awesome Workspace");
-          expect(orgs[0]?.slug).toBe("my-awesome-workspace");
+            expect(result.organizationId).toBeDefined();
 
-          // Verify a member was created with owner role
-          const members = yield* db
-            .select()
-            .from(schema.memberTable)
-            .where(
-              eq(schema.memberTable.organizationId, result.organizationId)
+            // Verify the organization was created
+            const orgs = yield* db
+              .select()
+              .from(schema.organizationTable)
+              .where(eq(schema.organizationTable.id, result.organizationId));
+            expect(orgs).toHaveLength(1);
+            expect(orgs[0]?.name).toBe("My Awesome Workspace");
+            expect(orgs[0]?.slug).toBe("my-awesome-workspace");
+
+            // Verify a member was created with owner role
+            const members = yield* db
+              .select()
+              .from(schema.memberTable)
+              .where(
+                eq(schema.memberTable.organizationId, result.organizationId)
+              );
+            expect(members).toHaveLength(1);
+            expect(members[0]?.userId).toBe(userId);
+            expect(members[0]?.role).toBe("owner");
+
+            // Verify default boards were created
+            const boards = yield* db
+              .select()
+              .from(schema.boardTable)
+              .where(
+                eq(schema.boardTable.organizationId, result.organizationId)
+              );
+            expect(boards).toHaveLength(2);
+            const boardNames = boards.map((b) => b.name);
+            expect(boardNames).toContain("Bugs 🐞");
+            expect(boardNames).toContain("Features 💡");
+
+            // Verify default post statuses were created
+            const statuses = yield* db
+              .select()
+              .from(schema.postStatusTable)
+              .where(
+                eq(schema.postStatusTable.organizationId, result.organizationId)
+              );
+            expect(statuses).toHaveLength(6);
+
+            // Verify default post tags were created
+            const tags = yield* db
+              .select()
+              .from(schema.tagTable)
+              .where(eq(schema.tagTable.organizationId, result.organizationId));
+            expect(tags).toHaveLength(2);
+            expect(
+              tags.map((tag) => ({ name: tag.name, type: tag.type }))
+            ).toEqual(
+              expect.arrayContaining([
+                { name: "High Priority", type: "FEEDBACK" },
+                { name: "Low Priority", type: "FEEDBACK" },
+              ])
             );
-          expect(members).toHaveLength(1);
-          expect(members[0]?.userId).toBe(userId);
-          expect(members[0]?.role).toBe("owner");
 
-          // Verify default boards were created
-          const boards = yield* db
-            .select()
-            .from(schema.boardTable)
-            .where(eq(schema.boardTable.organizationId, result.organizationId));
-          expect(boards).toHaveLength(2);
-          const boardNames = boards.map((b) => b.name);
-          expect(boardNames).toContain("Bugs 🐞");
-          expect(boardNames).toContain("Features 💡");
+            // Verify the primary status roadmap and its ordered columns were created
+            const roadmaps = yield* db
+              .select()
+              .from(schema.roadmapTable)
+              .where(
+                eq(schema.roadmapTable.organizationId, result.organizationId)
+              );
+            expect(roadmaps).toHaveLength(1);
+            expect(roadmaps[0]).toMatchObject({
+              isPrimary: true,
+              mode: "status",
+              name: "Roadmap",
+              slug: "roadmap",
+            });
 
-          // Verify default post statuses were created
-          const statuses = yield* db
-            .select()
-            .from(schema.postStatusTable)
-            .where(
-              eq(schema.postStatusTable.organizationId, result.organizationId)
+            const columns = yield* db
+              .select()
+              .from(schema.roadmapColumnTable)
+              .where(eq(schema.roadmapColumnTable.roadmapId, roadmaps[0]!.id))
+              .orderBy(schema.roadmapColumnTable.position);
+            expect(columns.map((column) => column.name)).toEqual([
+              "Planned",
+              "In progress",
+              "Completed",
+            ]);
+
+            const statusTypeById = new Map(
+              statuses.map((status) => [status.id, status.type])
             );
-          expect(statuses).toHaveLength(6);
+            expect(
+              columns.map((column) =>
+                column.config.type === "status"
+                  ? statusTypeById.get(column.config.statusId)
+                  : undefined
+              )
+            ).toEqual(["PLANNED", "IN_PROGRESS", "COMPLETED"]);
 
-          // Verify default post tags were created
-          const tags = yield* db
-            .select()
-            .from(schema.tagTable)
-            .where(eq(schema.tagTable.organizationId, result.organizationId));
-          expect(tags).toHaveLength(2);
-          expect(
-            tags.map((tag) => ({ name: tag.name, type: tag.type }))
-          ).toEqual(
-            expect.arrayContaining([
-              { name: "High Priority", type: "FEEDBACK" },
-              { name: "Low Priority", type: "FEEDBACK" },
-            ])
-          );
-
-          // Verify the primary status roadmap and its ordered columns were created
-          const roadmaps = yield* db
-            .select()
-            .from(schema.roadmapTable)
-            .where(
-              eq(schema.roadmapTable.organizationId, result.organizationId)
-            );
-          expect(roadmaps).toHaveLength(1);
-          expect(roadmaps[0]).toMatchObject({
-            isPrimary: true,
-            mode: "status",
-            name: "Roadmap",
-            slug: "roadmap",
-          });
-
-          const columns = yield* db
-            .select()
-            .from(schema.roadmapColumnTable)
-            .where(eq(schema.roadmapColumnTable.roadmapId, roadmaps[0]!.id))
-            .orderBy(schema.roadmapColumnTable.position);
-          expect(columns.map((column) => column.name)).toEqual([
-            "Planned",
-            "In progress",
-            "Completed",
-          ]);
-
-          const statusTypeById = new Map(
-            statuses.map((status) => [status.id, status.type])
-          );
-          expect(
-            columns.map((column) =>
-              column.config.type === "status"
-                ? statusTypeById.get(column.config.statusId)
-                : undefined
-            )
-          ).toEqual(["PLANNED", "IN_PROGRESS", "COMPLETED"]);
-
-          // Verify a site was created
-          const sites = yield* db
-            .select()
-            .from(schema.siteTable)
-            .where(eq(schema.siteTable.organizationId, result.organizationId));
-          expect(sites).toHaveLength(1);
-          expect(sites[0]?.subdomain).toBe("my-awesome-workspace");
-          expect(sites[0]?.name).toBe("My Awesome Workspace");
-        })
+            // Verify a site was created
+            const sites = yield* db
+              .select()
+              .from(schema.siteTable)
+              .where(
+                eq(schema.siteTable.organizationId, result.organizationId)
+              );
+            expect(sites).toHaveLength(1);
+            expect(sites[0]?.subdomain).toBe("my-awesome-workspace");
+            expect(sites[0]?.name).toBe("My Awesome Workspace");
+          })
       );
 
       it.effect(

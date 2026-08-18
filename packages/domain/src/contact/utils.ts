@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
+
 import type {
   TCompanyAttributeDefinition,
   TContactAttributeDefinition,
@@ -295,13 +296,11 @@ const parseCustomAttributes = (
       }
       effects.push(
         validateSingleAttribute(definition, raw).pipe(
-          Effect.map(
-            (value): ParsedAttribute => ({
-              definitionId: definition.id,
-              key: definition.key,
-              value,
-            })
-          )
+          Effect.map((value): ParsedAttribute => ({
+            definitionId: definition.id,
+            key: definition.key,
+            value,
+          }))
         )
       );
     }

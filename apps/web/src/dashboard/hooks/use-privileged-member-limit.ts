@@ -1,6 +1,8 @@
 import { isPrivilegedRole } from "@feeblo/permissions";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
+
 import { invitationsCollection, membersCollection } from "~/lib/collections";
+
 import { useEntitlements } from "./use-entitlements";
 import { useOrganizationId } from "./use-organization-id";
 

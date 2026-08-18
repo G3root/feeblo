@@ -29,7 +29,7 @@ function Header({ children }: { children: React.ReactNode }) {
 }
 
 function Title({ children }: { children: React.ReactNode }) {
-  return <h3 className="font-medium text-base">{children}</h3>;
+  return <h3 className="text-base font-medium">{children}</h3>;
 }
 
 function Description({ children }: { children: React.ReactNode }) {
@@ -63,7 +63,7 @@ function Field({
   return (
     <BaseField
       className={cn(
-        "@md/field-group:flex-row flex-col @md/field-group:items-center [&>.sr-only]:w-auto [&>[data-slot=field-content]]:w-full @md/field-group:[&>[data-slot=field-content]]:min-w-0 @md/field-group:[&>[data-slot=field-content]]:flex-1 @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+        "flex-col @md/field-group:flex-row @md/field-group:items-center [&>.sr-only]:w-auto [&>[data-slot=field-content]]:w-full @md/field-group:[&>[data-slot=field-content]]:min-w-0 @md/field-group:[&>[data-slot=field-content]]:flex-1 @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
         className
       )}
       orientation="vertical"

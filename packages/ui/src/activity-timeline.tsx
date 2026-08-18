@@ -1,6 +1,7 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import type { ReactNode } from "react";
+
 import { cn } from "./utils";
 
 /**
@@ -61,12 +62,12 @@ function ActivityTimelineItem({
             {icon}
           </div>
           <div
-            className="w-0.5 flex-1 bg-border group-last/activity-timeline-item:hidden"
+            className="bg-border w-0.5 flex-1 group-last/activity-timeline-item:hidden"
             data-slot="activity-timeline-separator"
           />
         </div>
         <div
-          className="min-w-0 flex-1 text-muted-foreground text-xs leading-[1.4]"
+          className="text-muted-foreground min-w-0 flex-1 text-xs leading-[1.4]"
           data-slot="activity-timeline-content"
         >
           {children}

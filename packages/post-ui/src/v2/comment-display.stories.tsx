@@ -6,6 +6,7 @@ import {
 import { CommentAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
+
 import { CommentDisplay } from "./comment-display";
 
 export default {
@@ -22,7 +23,7 @@ const noopReply = async () => {};
 
 export function Default() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentDisplay
           authorName="Jane Smith"
@@ -41,7 +42,7 @@ export function Default() {
 
 export function InternalNote() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentDisplay
           authorName="John Doe"
@@ -64,7 +65,7 @@ export function AsAuthor() {
   const [isInternal, setIsInternal] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentDisplay
           authorName="You"
@@ -93,7 +94,7 @@ export function AsAuthor() {
 
 export function WithReactions() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentDisplay
           authorName="Alice Johnson"
@@ -112,7 +113,7 @@ export function WithReactions() {
 
 export function Disabled() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentDisplay
           authorName="Bob Williams"
@@ -134,7 +135,7 @@ export function Composed() {
   const [isInternal, setIsInternal] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentDisplay.Provider
           authorName="Charlie Brown"
@@ -155,7 +156,7 @@ export function Composed() {
           postId="post-1"
           postSlug="post-1"
         >
-          <div className="rounded-md border border-border p-4">
+          <div className="border-border rounded-md border p-4">
             <div className="flex items-start gap-3">
               <CommentDisplay.Avatar />
               <div className="min-w-0 flex-1">
@@ -211,7 +212,7 @@ export function TimelineComposition() {
   ];
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <ActivityTimeline>
           {comments.map((comment) => (
@@ -219,14 +220,14 @@ export function TimelineComposition() {
               icon={
                 <HugeiconsIcon
                   aria-hidden="true"
-                  className="size-3.5 text-muted-foreground"
+                  className="text-muted-foreground size-3.5"
                   icon={CommentAdd01Icon}
                   strokeWidth={2}
                 />
               }
               key={comment.commentId}
             >
-              <span className="font-medium text-foreground">
+              <span className="text-foreground font-medium">
                 {comment.authorName}
               </span>{" "}
               {formatRelativeTime(comment.createdAt)}

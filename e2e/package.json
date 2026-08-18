@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/e2e",
-  "type": "module",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build:apps:e2e": "CLOUDFLARE_ADAPTER=false turbo run build --ui=stream --filter=@feeblo/web --filter=@feeblo/sdk",
     "db:migrate": "tsx scripts/migrate-pglite.ts",

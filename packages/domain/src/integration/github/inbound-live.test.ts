@@ -18,6 +18,7 @@ import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { NotificationService } from "../../notification/service";
 import { PostRepository } from "../../post/repository";

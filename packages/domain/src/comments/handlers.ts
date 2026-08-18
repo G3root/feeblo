@@ -3,10 +3,11 @@ import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
-import { PostRepository } from "../post/repository";
 import { PostActivityRepository } from "../post-activity/repository";
+import { PostRepository } from "../post/repository";
 import { redactActorIdentities } from "../public-actor";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";

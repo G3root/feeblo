@@ -4,6 +4,7 @@ import { WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { EmailProviderFeedbackInputError } from "./schema";
 import { EmailProviderFeedbackService } from "./service";
 

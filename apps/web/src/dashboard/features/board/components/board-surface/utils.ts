@@ -1,4 +1,5 @@
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+
 import type { BoardPostLane, BoardPostRow } from "./types";
 
 export function formatPostDate(value: Date | string) {
@@ -56,11 +57,9 @@ export const groupPostsByStatus = (
 
   return [...map.entries()]
     .filter(([, lane]) => lane.posts.length > 0)
-    .map(
-      ([, lane]): BoardPostLane => ({
-        status: lane.status,
-        statusId: lane.statusId,
-        posts: lane.posts,
-      })
-    );
+    .map(([, lane]): BoardPostLane => ({
+      status: lane.status,
+      statusId: lane.statusId,
+      posts: lane.posts,
+    }));
 };

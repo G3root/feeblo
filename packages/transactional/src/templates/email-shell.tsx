@@ -57,9 +57,9 @@ export const EmailShell = ({
         <FeebloFonts />
       </Head>
 
-      <Body className="m-0 bg-bg-2 p-0 font-14 font-sans text-fg">
+      <Body className="bg-bg-2 font-14 text-fg m-0 p-0 font-sans">
         <Preview>{preview}</Preview>
-        <Container className="mx-auto max-w-[600px] bg-bg">
+        <Container className="bg-bg mx-auto max-w-[600px]">
           <Section className="mobile:px-5 px-8 pt-8">
             <Link href={homeUrl}>
               <Img
@@ -72,16 +72,16 @@ export const EmailShell = ({
             </Link>
           </Section>
 
-          <Section className="mobile:px-5 px-8 mobile:pt-8 pt-10 mobile:pb-8 pb-10">
+          <Section className="mobile:px-5 mobile:pt-8 mobile:pb-8 px-8 pt-10 pb-10">
             <Text
-              className={`m-0 font-sans text-fg ${
+              className={`text-fg m-0 font-sans ${
                 titleSize === "md" ? "font-24" : "font-28"
               }`}
             >
               {title}
             </Text>
             {titleLead ? (
-              <Text className="m-0 mt-4 max-w-[480px] font-15 font-sans text-fg-2">
+              <Text className="font-15 text-fg-2 m-0 mt-4 max-w-[480px] font-sans">
                 {titleLead}
               </Text>
             ) : null}
@@ -93,7 +93,7 @@ export const EmailShell = ({
             {cta ? (
               <Section className="mobile:mt-6 mt-8">
                 <Button
-                  className="inline-block bg-fg text-center font-sans text-bg"
+                  className="bg-fg text-bg inline-block text-center font-sans"
                   href={cta.href}
                   style={{
                     borderRadius: "6px",
@@ -109,13 +109,13 @@ export const EmailShell = ({
             ) : null}
           </Section>
 
-          <Section className="border-stroke border-t mobile:px-5 px-8 mobile:py-8 py-10">
-            <Text className="m-0 max-w-[420px] font-13 font-sans text-fg-2">
+          <Section className="border-stroke mobile:px-5 mobile:py-8 border-t px-8 py-10">
+            <Text className="font-13 text-fg-2 m-0 max-w-[420px] font-sans">
               {footerBlurb}
             </Text>
             <Row align="left">
               <Column className="w-full pt-6 align-top">
-                <Text className="m-0 font-11 font-sans text-fg-3">
+                <Text className="font-11 text-fg-3 m-0 font-sans">
                   <Link className="text-fg-3" href={homeUrl}>
                     {companyName}
                   </Link>

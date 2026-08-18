@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { createIframe, iframeOrigin, resolveBaseUrl } from "../src/iframe";
 
 describe("resolveBaseUrl", () => {

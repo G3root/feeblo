@@ -1,7 +1,7 @@
+import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
-import { describe, expect, it } from "@effect/vitest";
 
 import {
   decryptWebhookCredentialMaterial,
@@ -21,24 +21,29 @@ describe("webhook credential material", () => {
     "encrypts the whole structured credential and returns redacted decrypted secrets",
     () =>
       Effect.gen(function* () {
-        const encrypted = yield* encryptWebhookCredentialMaterial(key, material);
+        const encrypted = yield* encryptWebhookCredentialMaterial(
+          key,
+          material
+        );
         expect(encrypted).not.toContain(material.endpointUrl);
         const decoded = yield* decryptWebhookCredentialMaterial(key, encrypted);
         expect(decoded.endpointUrl).not.toContain(material.endpointUrl);
         expect(Redacted.value(decoded.endpointUrl)).toBe(material.endpointUrl);
       })
   );
-  it.effect("fails malformed stored ciphertext and short keys as typed failures", () =>
-    Effect.gen(function* () {
-      const shortKeyExit = yield* Effect.exit(
-        validateWebhookEncryptionKey(Redacted.make("short"))
-      );
-      expect(Exit.isFailure(shortKeyExit)).toBe(true);
+  it.effect(
+    "fails malformed stored ciphertext and short keys as typed failures",
+    () =>
+      Effect.gen(function* () {
+        const shortKeyExit = yield* Effect.exit(
+          validateWebhookEncryptionKey(Redacted.make("short"))
+        );
+        expect(Exit.isFailure(shortKeyExit)).toBe(true);
 
-      const ciphertextExit = yield* Effect.exit(
-        decryptWebhookCredentialMaterial(key, "not-ciphertext")
-      );
-      expect(Exit.isFailure(ciphertextExit)).toBe(true);
-    })
+        const ciphertextExit = yield* Effect.exit(
+          decryptWebhookCredentialMaterial(key, "not-ciphertext")
+        );
+        expect(Exit.isFailure(ciphertextExit)).toBe(true);
+      })
   );
 });

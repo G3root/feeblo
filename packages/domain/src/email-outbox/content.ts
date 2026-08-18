@@ -1,5 +1,6 @@
 import { Database } from "@feeblo/db";
 import * as Effect from "effect/Effect";
+
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
 import type {
   EmailIntentPayload,

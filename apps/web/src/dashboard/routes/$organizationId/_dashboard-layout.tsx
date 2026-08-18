@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+
 import { DashboardLayout } from "~/layouts/dashboard-layout.tsx";
 import {
   boardCollection,

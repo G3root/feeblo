@@ -12,6 +12,7 @@ import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+
 import type { DiscordApiFailure } from "./discord-errors";
 import { discordProviderKey } from "./discord-manifest";
 

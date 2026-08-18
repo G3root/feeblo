@@ -18,6 +18,7 @@ import * as Headers from "effect/unstable/http/Headers";
 import * as HttpClient from "effect/unstable/http/HttpClient";
 import * as HttpClientError from "effect/unstable/http/HttpClientError";
 import * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+
 import type { GitHubApiFailure } from "./github-errors";
 import { githubProviderKey } from "./github-manifest";
 
@@ -36,16 +37,18 @@ export const GitHubInstallationAccessToken = Schema.Struct({
   expires_at: Schema.DateFromString,
   token: Schema.NonEmptyString,
 });
-export interface GitHubInstallationAccessToken
-  extends Schema.Schema.Type<typeof GitHubInstallationAccessToken> {}
+export interface GitHubInstallationAccessToken extends Schema.Schema.Type<
+  typeof GitHubInstallationAccessToken
+> {}
 
 /** One-time user token returned during GitHub App installer verification. */
 export const GitHubUserAccessToken = Schema.Struct({
   access_token: Schema.NonEmptyString,
   token_type: Schema.String,
 });
-export interface GitHubUserAccessToken
-  extends Schema.Schema.Type<typeof GitHubUserAccessToken> {}
+export interface GitHubUserAccessToken extends Schema.Schema.Type<
+  typeof GitHubUserAccessToken
+> {}
 
 /** GitHub account associated with an app installation. */
 export const GitHubInstallationAccount = Schema.Struct({
@@ -53,8 +56,9 @@ export const GitHubInstallationAccount = Schema.Struct({
   login: Schema.NonEmptyString,
   type: Schema.Literals(["Organization", "User"]),
 });
-export interface GitHubInstallationAccount
-  extends Schema.Schema.Type<typeof GitHubInstallationAccount> {}
+export interface GitHubInstallationAccount extends Schema.Schema.Type<
+  typeof GitHubInstallationAccount
+> {}
 
 /** Installation facts necessary to verify setup and route globally delivered webhooks. */
 export const GitHubUserInstallation = Schema.Struct({
@@ -63,16 +67,18 @@ export const GitHubUserInstallation = Schema.Struct({
   repository_selection: Schema.Literals(["all", "selected"]),
   suspended_at: Schema.NullOr(Schema.DateFromString),
 });
-export interface GitHubUserInstallation
-  extends Schema.Schema.Type<typeof GitHubUserInstallation> {}
+export interface GitHubUserInstallation extends Schema.Schema.Type<
+  typeof GitHubUserInstallation
+> {}
 
 /** GitHub's user-installations response envelope. */
 export const GitHubUserInstallations = Schema.Struct({
   installations: Schema.Array(GitHubUserInstallation),
   total_count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
-export interface GitHubUserInstallations
-  extends Schema.Schema.Type<typeof GitHubUserInstallations> {}
+export interface GitHubUserInstallations extends Schema.Schema.Type<
+  typeof GitHubUserInstallations
+> {}
 
 /** A repository accessible to an authenticated GitHub App installation. */
 export const GitHubRepository = Schema.Struct({
@@ -82,16 +88,18 @@ export const GitHubRepository = Schema.Struct({
   owner: Schema.Struct({ login: Schema.NonEmptyString }),
   private: Schema.Boolean,
 });
-export interface GitHubRepository
-  extends Schema.Schema.Type<typeof GitHubRepository> {}
+export interface GitHubRepository extends Schema.Schema.Type<
+  typeof GitHubRepository
+> {}
 
 /** Paginated repository response returned to a GitHub App installation. */
 export const GitHubInstallationRepositories = Schema.Struct({
   repositories: Schema.Array(GitHubRepository),
   total_count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
-export interface GitHubInstallationRepositories
-  extends Schema.Schema.Type<typeof GitHubInstallationRepositories> {}
+export interface GitHubInstallationRepositories extends Schema.Schema.Type<
+  typeof GitHubInstallationRepositories
+> {}
 
 /** Safe issue fields used to persist a normalized external resource link. */
 export const GitHubIssue = Schema.Struct({

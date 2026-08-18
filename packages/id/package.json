@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/id",
-  "type": "module",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./legid": "./src/legid.ts"

@@ -1,7 +1,9 @@
 import { createPrivateKey, generateKeyPairSync, sign } from "node:crypto";
+
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+
 import {
   DISCORD_SIGNATURE_MAX_AGE_MS,
   verifyDiscordRequestSignature,

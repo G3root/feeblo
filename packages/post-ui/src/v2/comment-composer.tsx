@@ -308,7 +308,7 @@ function CommentComposerComponent({
       showVisibilityToggle={showVisibilityToggle}
       submitLabel={submitLabel}
     >
-      <div className="rounded-md border border-border p-3">
+      <div className="border-border rounded-md border p-3">
         <CommentComposerEditor />
         <CommentComposerSubmit />
       </div>

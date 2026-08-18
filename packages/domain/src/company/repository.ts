@@ -12,7 +12,6 @@ import {
   FailedToCreateCompanyError,
   FailedToUpdateCompanyError,
 } from "./errors";
-
 import type {
   TCompanyCreate,
   TCompanyDelete,

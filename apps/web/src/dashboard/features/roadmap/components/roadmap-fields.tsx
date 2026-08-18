@@ -26,8 +26,10 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
+
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { postStatusCollection } from "~/lib/collections";
+
 import { roadmapFormOpts } from "../shared-form";
 import { RoadmapVisibilityField } from "./roadmap-visibility-field";
 
@@ -73,7 +75,7 @@ const RoadmapColumnsSection = withForm({
     return (
       <div className="grid gap-3">
         <Separator />
-        <div className="font-medium text-sm">Columns</div>
+        <div className="text-sm font-medium">Columns</div>
         <form.Field mode="array" name="columns">
           {(field) => {
             const columns = field.state.value;

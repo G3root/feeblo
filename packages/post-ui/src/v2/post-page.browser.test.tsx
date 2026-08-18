@@ -2,6 +2,7 @@ import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
+
 import { PostPage } from "./post-page";
 import {
   createPostCollectionState,

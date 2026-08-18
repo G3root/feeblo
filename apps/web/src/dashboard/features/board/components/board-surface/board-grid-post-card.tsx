@@ -1,8 +1,9 @@
 import { useSortable } from "@dnd-kit/react/sortable";
-import { useNavigate } from "@tanstack/react-router";
-import { memo } from "react";
 import { SortableRoadmapIssueCard } from "@feeblo/post-ui/roadmap/roadmap-issue-card";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { useNavigate } from "@tanstack/react-router";
+import { memo } from "react";
+
 import type { BoardPostRow } from "./types";
 
 interface BoardGridPostCardProps {

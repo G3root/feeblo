@@ -9,6 +9,7 @@ import {
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+
 import { ChangelogCompletedPosts } from "~/features/changelog/components/changelog-completed-posts";
 import {
   ChangelogEditorBackLink,
@@ -165,7 +166,7 @@ function ChangelogEditorLoadingState() {
         <ChangelogEditor.Main>
           <ChangelogEditor.Header className="items-center gap-3">
             <SkeletonWrapper>
-              <div className="size-8 rounded-full border bg-background" />
+              <div className="bg-background size-8 rounded-full border" />
             </SkeletonWrapper>
           </ChangelogEditor.Header>
 
@@ -174,7 +175,7 @@ function ChangelogEditorLoadingState() {
           </SkeletonWrapper>
 
           <SkeletonWrapper>
-            <div className="h-72 w-full rounded-2xl border bg-background" />
+            <div className="bg-background h-72 w-full rounded-2xl border" />
           </SkeletonWrapper>
 
           <div className="flex justify-end pt-2">
@@ -186,13 +187,13 @@ function ChangelogEditorLoadingState() {
         <ChangelogEditor.Sidebar>
           <div className="flex items-center justify-end gap-2">
             <SkeletonWrapper>
-              <div className="size-8 rounded-full border bg-background" />
+              <div className="bg-background size-8 rounded-full border" />
             </SkeletonWrapper>
             <SkeletonWrapper>
-              <div className="size-8 rounded-full border bg-background" />
+              <div className="bg-background size-8 rounded-full border" />
             </SkeletonWrapper>
             <SkeletonWrapper>
-              <div className="size-8 rounded-full border bg-background" />
+              <div className="bg-background size-8 rounded-full border" />
             </SkeletonWrapper>
           </div>
           <SkeletonWrapper>

@@ -8,6 +8,7 @@ import {
 } from "@feeblo/ui/menu";
 import { DashedLineCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+
 import { useHome } from "../home-context";
 
 export function HomeStatusMenu({ className }: { className?: string }) {

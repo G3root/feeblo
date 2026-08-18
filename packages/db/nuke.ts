@@ -9,9 +9,9 @@ const nuke = Effect.gen(function* () {
   console.log("Database reset complete.");
 });
 
-Effect.runPromise(nuke.pipe(Effect.provide(Database.DatabaseContextLive))).catch(
-  (error) => {
-    console.error("Database nuke failed:", error);
-    process.exit(1);
-  }
-);
+Effect.runPromise(
+  nuke.pipe(Effect.provide(Database.DatabaseContextLive))
+).catch((error) => {
+  console.error("Database nuke failed:", error);
+  process.exit(1);
+});

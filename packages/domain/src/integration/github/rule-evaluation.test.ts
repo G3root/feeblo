@@ -5,6 +5,7 @@ import {
   PostStatusId,
 } from "@feeblo/id";
 import { describe, expect, it } from "vitest";
+
 import { findMatchingGitHubSyncRules } from "./rule-evaluation";
 
 const rule = {

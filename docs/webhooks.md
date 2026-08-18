@@ -5,7 +5,21 @@ V1 emits `feedback.post.created` and `feedback.post.status_changed`. A dashboard
 Each external payload is versioned and includes `id`, `organizationId`, `type`, `version`, and `occurredAt`. It contains the post ID/title/absolute URL/current status, board ID/name/slug, optional previous status, and an actor classification. It excludes post content, email addresses, credentials, and private organization data.
 
 ```json
-{"id":"iev_example","organizationId":"org_example","type":"feedback.post.created","version":1,"occurredAt":"2026-08-11T00:00:00.000Z","post":{"id":"pst_example","title":"Example","url":"https://app.feeblo.com/org_example/post/feedback/example"},"board":{"id":"brd_feedback","name":"Feedback","slug":"feedback"},"status":{"id":"pss_open","type":"PENDING"},"actor":{"type":"end_user"}}
+{
+  "id": "iev_example",
+  "organizationId": "org_example",
+  "type": "feedback.post.created",
+  "version": 1,
+  "occurredAt": "2026-08-11T00:00:00.000Z",
+  "post": {
+    "id": "pst_example",
+    "title": "Example",
+    "url": "https://app.feeblo.com/org_example/post/feedback/example"
+  },
+  "board": { "id": "brd_feedback", "name": "Feedback", "slug": "feedback" },
+  "status": { "id": "pss_open", "type": "PENDING" },
+  "actor": { "type": "end_user" }
+}
 ```
 
 ## Signing and verification
@@ -19,7 +33,7 @@ const webhook = new Webhook(process.env.FEEBLO_WEBHOOK_SECRET!);
 const event = webhook.verify(rawBody, {
   "webhook-id": request.headers.get("webhook-id")!,
   "webhook-timestamp": request.headers.get("webhook-timestamp")!,
-  "webhook-signature": request.headers.get("webhook-signature")!
+  "webhook-signature": request.headers.get("webhook-signature")!,
 });
 ```
 

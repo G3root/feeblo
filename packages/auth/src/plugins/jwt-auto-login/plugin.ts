@@ -14,6 +14,7 @@ import {
 import { parseSetCookieHeader, setSessionCookie } from "better-auth/cookies";
 import { parseUserOutput } from "better-auth/db";
 import * as z from "zod";
+
 import { AUTH_CLIENT_IP_HEADER } from "../../auth-client-ip-header";
 import { JWT_AUTO_LOGIN_ERROR_CODES } from "./error-codes";
 import { schema } from "./schema";
@@ -283,7 +284,8 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             // (contacts, posts) from the anonymous user to the new user before
             // the anonymous user is cleaned up below.
             const newSessionUser = newSession.user as
-              (UserWithJwtAutoLogin & Record<string, any>) | undefined;
+              | (UserWithJwtAutoLogin & Record<string, any>)
+              | undefined;
             const isSameUser = newSessionUser?.id === session.user.id;
             const newSessionIsAnonymous =
               !!newSessionUser?.restrictedToOrganizationId;

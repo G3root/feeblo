@@ -10,6 +10,7 @@ import { Label } from "@feeblo/ui/label";
 import { Switch } from "@feeblo/ui/switch";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
+
 import { PostEditor } from "../post-editor";
 import { PostBoardSelect, StatusField } from "../post-field";
 import { PostTitleInput } from "../post-title-input";

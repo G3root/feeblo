@@ -16,6 +16,7 @@ import { markdownToHtml } from "@feeblo/utils/markdown";
 import { createEditor } from "prosekit/core";
 import { ProseKit } from "prosekit/react";
 import { useMemo } from "react";
+
 import { cn } from "../utils";
 import { useEditorContext } from "./editor-store";
 import { defineExtension } from "./extension";
@@ -74,7 +75,7 @@ export function Editor(props: EditorProps) {
       <div
         aria-multiline="true"
         className={cn(
-          'ProseMirror typeset box-border min-h-full px-0 outline-none outline-0 [&_span[data-mention="tag"]]:text-primary',
+          'ProseMirror typeset [&_span[data-mention="tag"]]:text-primary box-border min-h-full px-0 outline-0 outline-none',
           props.className
         )}
         ref={editor.mount}

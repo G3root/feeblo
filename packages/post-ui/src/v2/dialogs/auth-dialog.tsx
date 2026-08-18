@@ -1,4 +1,3 @@
-
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -38,6 +37,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@xstate/store-react";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
+
 import { getSafeCallbackURL } from "../../auth/auth-flows";
 import { SocialAuthButtons } from "../../auth/social-auth-buttons";
 import {
@@ -236,14 +236,14 @@ function AuthMethodChooser({
       {actions.map((action) => (
         <Button
           autoFocus={action.step === preferredEmailStep}
-          className="!h-auto w-full flex-col items-start gap-1.5 whitespace-normal rounded-2xl px-4 py-3 text-left"
+          className="!h-auto w-full flex-col items-start gap-1.5 rounded-2xl px-4 py-3 text-left whitespace-normal"
           key={action.label}
           onClick={() => onSelectEmailStep(action.step)}
           type="button"
           variant={action.variant}
         >
           <span>{action.label}</span>
-          <span className="font-normal text-current/70 text-sm">
+          <span className="text-sm font-normal text-current/70">
             {action.description}
           </span>
         </Button>

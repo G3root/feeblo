@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
+
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { UserRepository } from "./repository";
 
 describe("UserRepository", () => {

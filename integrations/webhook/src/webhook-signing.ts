@@ -4,6 +4,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { Webhook } from "standardwebhooks";
+
 import { WebhookSigningError } from "./webhook-errors";
 
 /** A signing key is redacted from logs, errors, and ordinary object inspection. */

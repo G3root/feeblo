@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 
 function customAttributesUrl(organizationUrl: string): string {
@@ -175,7 +176,9 @@ test.describe("custom attributes", () => {
     await page.goto(contactUrl(owner.organizationUrl));
     await page.getByRole("button", { name: "Create contact" }).click();
     const contactDialog = page.getByRole("dialog", { name: "Create contact" });
-    await contactDialog.getByRole("textbox", { name: "Name" }).fill(contactName);
+    await contactDialog
+      .getByRole("textbox", { name: "Name" })
+      .fill(contactName);
     await contactDialog
       .getByRole("textbox", { name: "Email" })
       .fill(contactEmail);
@@ -222,7 +225,9 @@ test.describe("custom attributes", () => {
     await page.goto(companyUrl(owner.organizationUrl));
     await page.getByRole("button", { name: "Create company" }).click();
     const companyDialog = page.getByRole("dialog", { name: "Create company" });
-    await companyDialog.getByRole("textbox", { name: "Name" }).fill(companyName);
+    await companyDialog
+      .getByRole("textbox", { name: "Name" })
+      .fill(companyName);
     await companyDialog
       .getByRole("textbox", { name: attributeName })
       .fill("Computing");

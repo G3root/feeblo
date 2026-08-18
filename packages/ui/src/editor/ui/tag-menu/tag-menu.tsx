@@ -29,15 +29,15 @@ export default function TagMenu(props: {
   return (
     <AutocompleteRoot regex={regex}>
       <AutocompletePositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
-        <AutocompletePopup className="relative box-border flex max-h-100 min-h-0 min-w-60 origin-(--transform-origin) starting:scale-95 select-none flex-col overflow-hidden whitespace-nowrap rounded-xl border border-border bg-popover text-popover-foreground starting:opacity-0 shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none">
+        <AutocompletePopup className="border-border bg-popover text-popover-foreground relative box-border flex max-h-100 min-h-0 min-w-60 origin-(--transform-origin) flex-col overflow-hidden rounded-xl border whitespace-nowrap shadow-lg transition-[opacity,scale] transition-discrete duration-40 select-none data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none starting:scale-95 starting:opacity-0">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-1">
-            <AutocompleteEmpty className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between whitespace-nowrap rounded-md px-3 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground">
+            <AutocompleteEmpty className="data-highlighted:bg-accent data-highlighted:text-accent-foreground relative box-border flex min-w-32 cursor-default scroll-my-1 items-center justify-between rounded-md px-3 py-1.5 text-sm whitespace-nowrap outline-hidden select-none">
               No results
             </AutocompleteEmpty>
 
             {props.tags.map((tag) => (
               <AutocompleteItem
-                className="relative box-border flex min-w-32 cursor-default select-none scroll-my-1 items-center justify-between whitespace-nowrap rounded-md px-3 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                className="data-highlighted:bg-accent data-highlighted:text-accent-foreground relative box-border flex min-w-32 cursor-default scroll-my-1 items-center justify-between rounded-md px-3 py-1.5 text-sm whitespace-nowrap outline-hidden select-none"
                 key={tag.id}
                 onSelect={() => handleTagInsert(tag.id, tag.label)}
               >

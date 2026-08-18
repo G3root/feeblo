@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/cleanup-untagged-images.yml'
-      - '.github/actions/setup-node/action.yml'
+      - ".github/workflows/cleanup-untagged-images.yml"
+      - ".github/actions/setup-node/action.yml"
   pull_request:
     paths:
-      - '.github/workflows/cleanup-untagged-images.yml'
-      - '.github/actions/setup-node/action.yml'
+      - ".github/workflows/cleanup-untagged-images.yml"
+      - ".github/actions/setup-node/action.yml"
   schedule:
-    - cron: '00 10 * * 1' # Every Monday at 10:00 UTC
+    - cron: "00 10 * * 1" # Every Monday at 10:00 UTC
 
 permissions:
   packages: write

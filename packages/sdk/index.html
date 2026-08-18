@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Feeblo Widget Workbench</title>
     <style>
       :root {
@@ -14,7 +14,12 @@
         --accent: #4b5cff;
         --accent-soft: #eef0ff;
         --success: #147d64;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          sans-serif;
         color-scheme: light;
       }
 
@@ -445,17 +450,22 @@
             <h3>Connection</h3>
             <div class="field">
               <label for="organization-id">Organization ID</label>
-              <input id="organization-id" name="org" autocomplete="off">
+              <input id="organization-id" name="org" autocomplete="off" />
             </div>
             <div class="field">
               <label for="base-url">Widget host</label>
-              <input id="base-url" name="baseUrl" inputmode="url">
+              <input id="base-url" name="baseUrl" inputmode="url" />
             </div>
           </section>
 
           <section class="control-section">
             <h3>Experience</h3>
-            <div class="button-grid three" data-control="mode" role="group" aria-label="Mode">
+            <div
+              class="button-grid three"
+              data-control="mode"
+              role="group"
+              aria-label="Mode"
+            >
               <button class="choice" data-value="feedback" type="button">
                 Feedback
               </button>
@@ -466,7 +476,12 @@
             </div>
             <div class="hub-options" id="hub-options">
               <h3 class="hub-options-heading">Hub modules</h3>
-              <div class="button-grid" data-control="modules" role="group" aria-label="Hub modules">
+              <div
+                class="button-grid"
+                data-control="modules"
+                role="group"
+                aria-label="Hub modules"
+              >
                 <button
                   class="choice"
                   data-value="feedback,updates"
@@ -493,7 +508,12 @@
 
           <section class="control-section">
             <h3>Appearance</h3>
-            <div class="button-grid" data-control="theme" role="group" aria-label="Theme">
+            <div
+              class="button-grid"
+              data-control="theme"
+              role="group"
+              aria-label="Theme"
+            >
               <button class="choice" data-value="light" type="button">
                 Light
               </button>
@@ -502,7 +522,12 @@
               </button>
             </div>
             <h3 class="hub-options-heading">Placement</h3>
-            <div class="button-grid three" data-control="placement" role="group" aria-label="Placement">
+            <div
+              class="button-grid three"
+              data-control="placement"
+              role="group"
+              aria-label="Placement"
+            >
               <button class="choice" data-value="" type="button">
                 Trigger
               </button>
@@ -524,7 +549,7 @@
                 name="userId"
                 autocomplete="off"
                 placeholder="Optional"
-              >
+              />
             </div>
             <div class="field">
               <label for="user-name">Name</label>
@@ -533,7 +558,7 @@
                 name="name"
                 autocomplete="name"
                 placeholder="Ada Lovelace"
-              >
+              />
             </div>
             <div class="field">
               <label for="user-email">Email</label>
@@ -542,7 +567,7 @@
                 name="email"
                 autocomplete="email"
                 placeholder="ada@example.com"
-              >
+              />
             </div>
           </section>
 

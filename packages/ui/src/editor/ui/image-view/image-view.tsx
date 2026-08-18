@@ -63,7 +63,7 @@ export default function ImageView(props: ReactNodeViewProps) {
   return (
     <ResizableRoot
       aspectRatio={aspectRatio ?? null}
-      className="group relative my-2 box-border flex max-h-150 min-h-16 min-w-16 max-w-full items-center justify-center overflow-hidden outline-2 outline-solid outline-transparent data-selected:outline-primary"
+      className="group data-selected:outline-primary relative my-2 box-border flex max-h-150 min-h-16 max-w-full min-w-16 items-center justify-center overflow-hidden outline-2 outline-transparent outline-solid"
       data-selected={props.selected ? "" : undefined}
       height={attrs.height ?? null}
       onResizeEnd={(event) => props.setAttrs(event.detail)}
@@ -78,21 +78,21 @@ export default function ImageView(props: ReactNodeViewProps) {
         />
       )}
       {uploading && !error && (
-        <div className="absolute start-0 bottom-0 m-1 flex content-center items-center gap-2 rounded-sm bg-foreground/60 p-1.5 text-background/80 text-xs transition">
+        <div className="bg-foreground/60 text-background/80 absolute start-0 bottom-0 m-1 flex content-center items-center gap-2 rounded-sm p-1.5 text-xs transition">
           <div className="i-lucide-loader-circle block size-4 animate-spin" />
           <div>{Math.round(progress * 100)}%</div>
         </div>
       )}
       {error && (
-        <div className="@container absolute start-0 end-0 top-0 bottom-0 flex flex-col items-center justify-center gap-4 bg-muted p-2 text-sm">
+        <div className="bg-muted @container absolute start-0 end-0 top-0 bottom-0 flex flex-col items-center justify-center gap-4 p-2 text-sm">
           <div className="i-lucide-image-off block size-8" />
-          <div className="@xs:block hidden opacity-80">
+          <div className="hidden opacity-80 @xs:block">
             Failed to upload image
           </div>
         </div>
       )}
       <ResizableHandle
-        className="absolute end-0 bottom-0 m-1.5 rounded-sm bg-foreground/30 p-1 text-background/50 opacity-0 transition hover:bg-foreground/60 hover:opacity-100 active:translate-x-0.5 active:translate-y-0.5 active:bg-foreground/60 active:text-background/80 group-hover:opacity-100 group-data-resizing:opacity-100 rtl:active:-translate-x-0.5"
+        className="bg-foreground/30 text-background/50 hover:bg-foreground/60 active:bg-foreground/60 active:text-background/80 absolute end-0 bottom-0 m-1.5 rounded-sm p-1 opacity-0 transition group-hover:opacity-100 group-data-resizing:opacity-100 hover:opacity-100 active:translate-x-0.5 active:translate-y-0.5 rtl:active:-translate-x-0.5"
         position="bottom-right"
       >
         <div className="i-lucide-arrow-down-right block size-4" />

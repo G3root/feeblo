@@ -209,7 +209,7 @@ export const isTrustedProxy = (
   const peer = parseIpAddress(peerIp);
   return Boolean(
     peer &&
-      proxyTrust.trustedProxyCidrs.some((cidr) => ipAddressInCidr(peer, cidr))
+    proxyTrust.trustedProxyCidrs.some((cidr) => ipAddressInCidr(peer, cidr))
   );
 };
 

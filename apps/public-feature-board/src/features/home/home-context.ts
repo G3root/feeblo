@@ -1,7 +1,8 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
-import type { TPost } from "@feeblo/domain/post/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import type { TPost } from "@feeblo/domain/post/schema";
 import { createContext, use } from "react";
+
 import type { HomePageSortOption } from "../../hooks/use-home-page-filters";
 
 export type HomeFilterItem = {

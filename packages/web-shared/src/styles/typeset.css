@@ -40,11 +40,11 @@
   .typeset
     *:not(
       :where(
-          .not-typeset,
-          [data-not-typeset],
-          .not-typeset *,
-          [data-not-typeset] *
-        )
+        .not-typeset,
+        [data-not-typeset],
+        .not-typeset *,
+        [data-not-typeset] *
+      )
     ) {
     /* Paragraphs. */
     &:where(p) {
@@ -450,23 +450,23 @@
 
   /* First child adds no space above. Last so it wins ties. */
   .typeset
-  > :where(:first-child):not(
-    :where(
+    > :where(:first-child):not(
+      :where(
         .not-typeset,
         [data-not-typeset],
         .not-typeset *,
         [data-not-typeset] *
       )
-  ),
+    ),
   .typeset
     > :where(:first-child)
     > :where(:first-child):not(
       :where(
-          .not-typeset,
-          [data-not-typeset],
-          .not-typeset *,
-          [data-not-typeset] *
-        )
+        .not-typeset,
+        [data-not-typeset],
+        .not-typeset *,
+        [data-not-typeset] *
+      )
     ),
   .typeset
     :where(
@@ -479,11 +479,11 @@
       figure > picture > img
     ):not(
       :where(
-          .not-typeset,
-          [data-not-typeset],
-          .not-typeset *,
-          [data-not-typeset] *
-        )
+        .not-typeset,
+        [data-not-typeset],
+        .not-typeset *,
+        [data-not-typeset] *
+      )
     ) {
     margin-block-start: 0;
   }

@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/db-migrator",
-  "type": "module",
-  "private": true,
   "version": "1.0.0",
+  "private": true,
+  "type": "module",
   "scripts": {
     "migrate": "node ./src/migrator.mjs",
     "build": "rolldown -c",

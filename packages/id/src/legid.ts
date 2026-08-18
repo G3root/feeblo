@@ -2,7 +2,6 @@ import type * as Brand from "effect/Brand";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
-
 import { createId, verifyId } from "legid";
 
 const maxIdLength = 54;
@@ -36,8 +35,9 @@ export interface LegidFactory<Name extends string> {
   readonly verify: (input: string) => Effect.Effect<boolean>;
 }
 
-export interface PrefixableLegidFactory<Name extends string>
-  extends LegidFactory<Name> {
+export interface PrefixableLegidFactory<
+  Name extends string,
+> extends LegidFactory<Name> {
   readonly prefix: string;
 }
 

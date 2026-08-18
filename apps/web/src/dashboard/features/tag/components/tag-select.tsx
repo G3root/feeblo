@@ -15,6 +15,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
+
 import { useTagCreateDialogContext } from "../dialog-stores";
 
 export interface TagSelectOption {
@@ -123,11 +124,11 @@ export function TagSelect({
         <ul className="flex flex-wrap gap-1.5">
           {selected.map((tag) => (
             <li
-              className="flex min-w-0 items-center gap-1 rounded-md border border-input bg-background py-0.5 ps-2 pe-0.5 text-sm"
+              className="border-input bg-background flex min-w-0 items-center gap-1 rounded-md border py-0.5 ps-2 pe-0.5 text-sm"
               key={tag.id}
             >
               <HugeiconsIcon
-                className="size-3.5 shrink-0 text-muted-foreground"
+                className="text-muted-foreground size-3.5 shrink-0"
                 icon={Tag01Icon}
               />
               <span className="truncate font-medium">{tag.name}</span>

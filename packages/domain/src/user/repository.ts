@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+
 import { currentDb, schema } from "@feeblo/db";
 import { UserId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
@@ -8,6 +9,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+
 import { UserPersistenceError } from "./errors";
 
 function hashEmail(email: string): string {

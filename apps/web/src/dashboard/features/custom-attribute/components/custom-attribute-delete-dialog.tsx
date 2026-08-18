@@ -11,7 +11,9 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
+
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import {
   type CustomAttributeEntityType,
   useCustomAttributeDeleteDialogContext,

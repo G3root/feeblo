@@ -154,12 +154,10 @@ const parseSlashCommand = (
   Schema.decodeUnknownEffect(SlackSlashCommandPayload)(
     parseFormBody(rawBody)
   ).pipe(
-    Effect.map(
-      (payload): ParsedSlackInboundRequest => ({
-        kind: "slash_command",
-        payload,
-      })
-    ),
+    Effect.map((payload): ParsedSlackInboundRequest => ({
+      kind: "slash_command",
+      payload,
+    })),
     Effect.mapError(
       () =>
         new SlackInboundPayloadError({
@@ -188,12 +186,10 @@ const parseInteractive = (
   return Schema.decodeUnknownEffect(
     Schema.fromJsonString(SlackInteractivePayload)
   )(payloadJson).pipe(
-    Effect.map(
-      (payload): ParsedSlackInboundRequest => ({
-        kind: "interactive",
-        payload,
-      })
-    ),
+    Effect.map((payload): ParsedSlackInboundRequest => ({
+      kind: "interactive",
+      payload,
+    })),
     Effect.mapError(
       () =>
         new SlackInboundPayloadError({
@@ -303,7 +299,10 @@ export const makeSlackProviderRegistration = ({
     ],
     manifest: slackProviderManifest,
     routeConfigurationSchemas: new Map([
-      [slackChannelNotificationsCapabilityKey, SlackChannelNotificationRouteConfiguration],
+      [
+        slackChannelNotificationsCapabilityKey,
+        SlackChannelNotificationRouteConfiguration,
+      ],
       [slackCommandsCapabilityKey, SlackInboundRouteConfiguration],
       [slackMessageActionCapabilityKey, SlackInboundRouteConfiguration],
     ]),

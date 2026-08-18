@@ -1,12 +1,5 @@
 export type { PermissionContext } from "./can";
-export {
-  can,
-  canAll,
-  canAny,
-  isMember,
-  isOwnerOrAdmin,
-  roleIn,
-} from "./can";
+export { can, canAll, canAny, isMember, isOwnerOrAdmin, roleIn } from "./can";
 export type { Permission, PermissionDefinition } from "./permissions";
 export {
   createPermissions,

@@ -8,7 +8,7 @@ export function FeedbackFormHeader() {
       {/* <span class="text-muted-foreground/60 dark:text-muted-foreground/50">
         <Icon class="size-4" name="MessageSquare" />
       </span> */}
-      <p class="font-medium text-foreground text-lg first-letter:uppercase">
+      <p class="text-foreground text-lg font-medium first-letter:uppercase">
         {meta.board.name}
       </p>
     </div>

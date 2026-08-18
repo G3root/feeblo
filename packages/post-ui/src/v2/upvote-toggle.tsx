@@ -9,6 +9,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import NumberFlow from "@number-flow/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createContext, type ReactNode, use } from "react";
+
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 
@@ -106,7 +107,7 @@ function UpvoteToggleTrigger({
         <span className="flex items-center gap-1.5">
           <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
           <NumberFlow
-            className="font-medium text-xs tabular-nums leading-none"
+            className="text-xs leading-none font-medium tabular-nums"
             style={{ fontVariantNumeric: "tabular-nums" }}
             value={state.upvoteCount}
             willChange

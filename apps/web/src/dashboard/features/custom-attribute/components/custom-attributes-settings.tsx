@@ -31,8 +31,10 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
+
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import {
   type CustomAttributeEntityType,
   useCustomAttributeCreateDialogContext,
@@ -217,7 +219,7 @@ function AttributeList({
           <TableRow key={attribute.id}>
             <TableCell className="font-medium">{attribute.name}</TableCell>
             <TableCell>
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+              <code className="bg-muted rounded px-1.5 py-0.5 text-xs">
                 {attribute.key}
               </code>
             </TableCell>

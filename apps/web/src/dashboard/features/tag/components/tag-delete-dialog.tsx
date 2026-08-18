@@ -10,7 +10,9 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { useSelector } from "@xstate/store-react";
+
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { useTagDeleteDialogContext } from "../dialog-stores";
 
 export function TagDeleteDialog() {

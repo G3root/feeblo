@@ -1,5 +1,6 @@
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import type React from "react";
+
+import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 
 const WHITESPACE_REGEX = /\s+/;
 
@@ -29,7 +30,9 @@ export function UserAvatar({
 }: UserAvatarProps): React.ReactElement {
   return (
     <Avatar {...props}>
-      {image ? <AvatarImage alt={imageAlt ?? name ?? "User avatar"} src={image} /> : null}
+      {image ? (
+        <AvatarImage alt={imageAlt ?? name ?? "User avatar"} src={image} />
+      ) : null}
       <AvatarFallback>{getInitials(name)}</AvatarFallback>
       {children}
     </Avatar>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+
 import { sniffMediaType } from "./api-live";
 
 const bytes = (hex: string): Uint8Array =>
@@ -46,9 +47,7 @@ describe("sniffMediaType", () => {
 
   it("rejects video content", () => {
     expect(
-      sniffMediaType(
-        bytes("00 00 00 10 66 74 79 70 69 73 6f 6d 00 00 00 00")
-      )
+      sniffMediaType(bytes("00 00 00 10 66 74 79 70 69 73 6f 6d 00 00 00 00"))
     ).toBeNull();
   });
 

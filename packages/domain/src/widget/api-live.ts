@@ -6,6 +6,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
+
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import type {
   TCompanyAttributeDefinition,
@@ -22,6 +23,7 @@ import { Api } from "../http/api";
 import { recordPostIntegrationEvent } from "../integration/post-event-recording";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { verifyJwt } from "../jwt-secret/verification";
+import { PostStatusRepository } from "../post-status/repository";
 import {
   PostEmbeddingService,
   postEmbeddingInput,
@@ -32,7 +34,6 @@ import {
   postLexicalSimilarity,
   SUGGESTION_MAX_DISTANCE,
 } from "../post/suggestions";
-import { PostStatusRepository } from "../post-status/repository";
 import * as RateLimit from "../rate-limit";
 import {
   InternalServerError,

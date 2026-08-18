@@ -7,6 +7,7 @@ import {
 } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { ContactRpcHandlersEffect } from "./handlers";

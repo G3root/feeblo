@@ -1,4 +1,5 @@
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
+
 import { BoardNotFound } from "~/features/board/components/board-not-found";
 import { BoardSurface } from "~/features/board/components/board-surface";
 import type { BoardView } from "~/features/board/state/board-store-context";

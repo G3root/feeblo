@@ -14,6 +14,7 @@ import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { BadRequestError, InternalServerError } from "../../rpc-errors";
 import { ExternalResourceServiceLive } from "../external-resource/live";

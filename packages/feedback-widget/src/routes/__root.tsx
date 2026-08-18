@@ -8,6 +8,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
+
 import { Button } from "../components/ui/button";
 import { ErrorFallback } from "../components/ui/error-fallback";
 import { Icon } from "../components/ui/icon";
@@ -78,7 +79,7 @@ export function RootComponent(props: RouteSectionProps) {
   return (
     <Show when={isOpen()}>
       <div
-        class="flex h-full min-h-full w-full flex-col bg-popover text-popover-foreground"
+        class="bg-popover text-popover-foreground flex h-full min-h-full w-full flex-col"
         data-feeblo-widget-container
       >
         <div class="absolute top-5 right-5 z-10">
@@ -101,7 +102,7 @@ export function RootComponent(props: RouteSectionProps) {
         <Show when={config.mode === "hub"}>
           <nav
             aria-label="Feeblo Hub modules"
-            class="z-10 m-3 mt-0 flex shrink-0 gap-1 rounded-xl border bg-popover/95 p-1 shadow-lg backdrop-blur"
+            class="bg-popover/95 z-10 m-3 mt-0 flex shrink-0 gap-1 rounded-xl border p-1 shadow-lg backdrop-blur"
           >
             <For each={config.modules}>
               {(module) => (
@@ -111,7 +112,7 @@ export function RootComponent(props: RouteSectionProps) {
                       ? "page"
                       : undefined
                   }
-                  class="flex h-10 flex-1 items-center justify-center gap-2 rounded-lg font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-foreground aria-[current=page]:text-background"
+                  class="text-muted-foreground hover:bg-muted hover:text-foreground aria-[current=page]:bg-foreground aria-[current=page]:text-background flex h-10 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors"
                   href={module === "updates" ? "/updates" : "/"}
                 >
                   <span aria-hidden="true">

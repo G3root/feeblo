@@ -10,6 +10,7 @@ import {
 import { hasMembership, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 
 export function BoardPostsEmpty({

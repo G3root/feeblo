@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+
 import { RoadmapLaneColumn } from "./roadmap-lane-column";
 import type { RoadmapLane, RoadmapPost } from "./types";
 
@@ -38,7 +39,7 @@ export function RoadmapGrid<TPost extends RoadmapPost>({
                 })
               )
             ) : (
-              <div className="rounded-md border border-border/70 border-dashed bg-background/40 px-3 py-6 text-center text-muted-foreground text-sm">
+              <div className="border-border/70 bg-background/40 text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-sm">
                 {emptyLaneMessage}
               </div>
             )}

@@ -38,7 +38,7 @@ function Section({
   return (
     <section className="grid gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-sm">{title}</h3>
+        <h3 className="text-sm font-medium">{title}</h3>
       </div>
       {children}
     </section>

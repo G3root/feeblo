@@ -1,4 +1,5 @@
 import { cn } from "@feeblo/ui/utils";
+
 import type { HomeFilterItem } from "../home-context";
 
 export function HomeFilterList({
@@ -14,7 +15,7 @@ export function HomeFilterList({
 }) {
   return (
     <div className="space-y-2">
-      <div className="px-1 font-medium text-sm">{title}</div>
+      <div className="px-1 text-sm font-medium">{title}</div>
       <div className="space-y-1">
         {items.map((item) => {
           const isActive = item.value === selectedValue;

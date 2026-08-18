@@ -23,14 +23,15 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+
 import { GitHubPostResourceActions } from "~/features/github/components/post-github-actions";
 import { PostExternalResources } from "~/features/integrations/components/post-external-resources";
+import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
 import { PostActivityList } from "~/features/post/components/post-activity-list";
 import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostEtaField } from "~/features/post/components/post-eta-field";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
-import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
 import {
   boardCollection,
   commentCollection,
@@ -142,7 +143,7 @@ function RouteComponent() {
           <section className="space-y-6">
             <div className="space-y-3">
               <Link
-                className="inline-block text-muted-foreground text-xs underline-offset-4 hover:underline"
+                className="text-muted-foreground inline-block text-xs underline-offset-4 hover:underline"
                 params={{ organizationId, boardSlug }}
                 to="/$organizationId/board/$boardSlug"
               >
@@ -239,8 +240,8 @@ function RouteComponent() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <h2 className="font-semibold text-sm">Subscribe to post</h2>
-              <p className="text-pretty text-muted-foreground text-xs">
+              <h2 className="text-sm font-semibold">Subscribe to post</h2>
+              <p className="text-muted-foreground text-xs text-pretty">
                 Subscribe to receive future updates on the post by email
               </p>
             </div>
@@ -322,12 +323,12 @@ function PostDetails({
           >
             <HugeiconsIcon
               aria-hidden="true"
-              className="size-4 text-muted-foreground/72"
+              className="text-muted-foreground/72 size-4"
               icon={detail.icon}
               strokeWidth={1.75}
             />
             <dt className="text-muted-foreground">{detail.label}</dt>
-            <dd className="max-w-32 truncate font-medium text-foreground">
+            <dd className="text-foreground max-w-32 truncate font-medium">
               {detail.value}
             </dd>
           </div>

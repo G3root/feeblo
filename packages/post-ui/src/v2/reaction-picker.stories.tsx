@@ -1,6 +1,7 @@
 import "../../tailwind.css";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
 import { useState } from "react";
+
 import { ReactionPicker } from "./reaction-picker";
 
 export default {
@@ -11,7 +12,7 @@ export function Default() {
   const [selected, setSelected] = useState<Set<ReactionEmoji>>(new Set());
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <ReactionPicker
         existingReactions={selected}
         onToggle={(emoji) => {
@@ -32,7 +33,7 @@ export function Default() {
 
 export function Disabled() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <ReactionPicker
         disabled
         existingReactions={new Set()}
@@ -48,7 +49,7 @@ export function Preselected() {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <ReactionPicker
         existingReactions={selected}
         onToggle={(emoji) => {
@@ -77,7 +78,7 @@ export function Composed() {
   const [selected, setSelected] = useState<Set<ReactionEmoji>>(new Set());
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <ReactionPicker.Provider
         existingReactions={selected}
         label="React to this post"
@@ -105,7 +106,7 @@ export function InlineDisplay() {
   const [selected, setSelected] = useState<Set<ReactionEmoji>>(new Set());
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <ReactionPicker.Provider
         existingReactions={selected}
         onToggle={(emoji) => {

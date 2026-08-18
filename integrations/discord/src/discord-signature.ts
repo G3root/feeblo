@@ -1,9 +1,11 @@
 import { createPublicKey, verify } from "node:crypto";
+
 import {
   IntegrationRequestSignatureError,
   verifyRequestSignature,
 } from "@feeblo/integration-core";
 import * as Effect from "effect/Effect";
+
 import type { DiscordSignatureVerificationError } from "./discord-errors";
 
 /** Maximum age of a Discord request before its signature is rejected (Discord recommends a small replay window). */

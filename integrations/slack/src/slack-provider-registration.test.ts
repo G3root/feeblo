@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+
 import {
   asLegid,
   IntegrationConnectionId,
@@ -16,8 +17,12 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import { describe, expect, it } from "vitest";
+
 import type { SlackApiClient } from "./slack-api";
-import { slackChannelNotificationsCapabilityKey, slackProviderKey } from "./slack-manifest";
+import {
+  slackChannelNotificationsCapabilityKey,
+  slackProviderKey,
+} from "./slack-manifest";
 import { makeSlackProviderRegistration } from "./slack-provider-registration";
 
 const signingSecret = Redacted.make("signing-secret");

@@ -42,6 +42,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { z } from "zod";
+
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
@@ -465,11 +466,11 @@ function MemberListItem({
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0">
-        <p className="truncate font-medium text-sm">
+        <p className="truncate text-sm font-medium">
           {name}
           {isCurrentUser ? " (You)" : ""}
         </p>
-        <p className="truncate text-muted-foreground text-xs">{email}</p>
+        <p className="text-muted-foreground truncate text-xs">{email}</p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -577,10 +578,10 @@ function MemberListItemLoading() {
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0 space-y-1">
         <SkeletonWrapper>
-          <p className="truncate font-medium text-sm">Loading member</p>
+          <p className="truncate text-sm font-medium">Loading member</p>
         </SkeletonWrapper>
         <SkeletonWrapper>
-          <p className="truncate text-muted-foreground text-xs">
+          <p className="text-muted-foreground truncate text-xs">
             loading@example.com
           </p>
         </SkeletonWrapper>
@@ -618,7 +619,7 @@ function InvitationListItem({
   return (
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
       <div className="space-y-1">
-        <p className="font-medium text-sm">{email}</p>
+        <p className="text-sm font-medium">{email}</p>
         <p className="text-muted-foreground text-xs">Invited as {role}</p>
         <p className="text-muted-foreground text-xs">
           Expires {expiresAt ? new Date(expiresAt).toLocaleString() : "Unknown"}
@@ -663,7 +664,7 @@ function InvitationListItemLoading() {
     <div className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
       <div className="space-y-1">
         <SkeletonWrapper>
-          <p className="font-medium text-sm">invite@example.com</p>
+          <p className="text-sm font-medium">invite@example.com</p>
         </SkeletonWrapper>
         <SkeletonWrapper>
           <p className="text-muted-foreground text-xs">Invited as manager</p>

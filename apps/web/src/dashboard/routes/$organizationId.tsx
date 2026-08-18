@@ -1,6 +1,7 @@
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
+
 import { groupPostHogOrganization } from "../components/posthog-provider";
 
 export const Route = createFileRoute("/$organizationId")({
@@ -20,7 +21,7 @@ export const Route = createFileRoute("/$organizationId")({
 
 function Loading({ label }: { readonly label: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center text-muted-foreground text-sm">
+    <div className="text-muted-foreground flex min-h-screen items-center justify-center text-sm">
       {label}
     </div>
   );

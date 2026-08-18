@@ -1,4 +1,7 @@
-import { isFeatureEnabled, type FeatureFlag } from "@feeblo/domain/feature-flags";
+import {
+  isFeatureEnabled,
+  type FeatureFlag,
+} from "@feeblo/domain/feature-flags";
 import type { ReactNode } from "react";
 
 export const useFeatureFlag = (flag: FeatureFlag): boolean => {

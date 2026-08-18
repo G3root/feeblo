@@ -15,8 +15,10 @@ import { slugify } from "@feeblo/utils/url";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
+
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { useRenameBoardDialogContext } from "../dialog-stores";
 import { boardFormOpts } from "../shared-form";
 import { BoardVisibilityField } from "./board-visibility-field";

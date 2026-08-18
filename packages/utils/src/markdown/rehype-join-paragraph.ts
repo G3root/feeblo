@@ -9,7 +9,6 @@
 // (at your option) any later version.
 
 import type { Element, Node, Parent, Root } from "hast";
-
 import type { Plugin } from "unified";
 import { visitParents } from "unist-util-visit-parents";
 

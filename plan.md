@@ -209,15 +209,15 @@ Initial delivery states:
 
 ### `email_contact`
 
-| Column | Purpose |
-| --- | --- |
-| `id` | Contact identifier. |
-| `organization_id` | Workspace scope. |
-| `user_id` | Optional Feeblo user. |
-| `email` | Normalized address. |
-| `verification_state` | `pending` or `verified`. |
-| `verified_at` | Verification timestamp. |
-| `created_at` / `updated_at` | Audit timestamps. |
+| Column                      | Purpose                  |
+| --------------------------- | ------------------------ |
+| `id`                        | Contact identifier.      |
+| `organization_id`           | Workspace scope.         |
+| `user_id`                   | Optional Feeblo user.    |
+| `email`                     | Normalized address.      |
+| `verification_state`        | `pending` or `verified`. |
+| `verified_at`               | Verification timestamp.  |
+| `created_at` / `updated_at` | Audit timestamps.        |
 
 Use a unique index on `(organization_id, email)`.
 
@@ -242,12 +242,12 @@ Use a unique index covering the contact and topic.
 
 ### `email_suppression`
 
-| Column | Purpose |
-| --- | --- |
-| `email` | Normalized suppressed address. |
-| `reason` | Hard bounce, complaint, or administrative block. |
-| `provider_event_id` | Idempotency for provider feedback. |
-| `created_at` | Suppression timestamp. |
+| Column              | Purpose                                          |
+| ------------------- | ------------------------------------------------ |
+| `email`             | Normalized suppressed address.                   |
+| `reason`            | Hard bounce, complaint, or administrative block. |
+| `provider_event_id` | Idempotency for provider feedback.               |
+| `created_at`        | Suppression timestamp.                           |
 
 ## Outbox and Transaction Boundaries
 

@@ -11,7 +11,7 @@
 @source "../../../public-feature-board/src/**/*.{ts,tsx}";
 
 .skeleton-loader {
-  @apply animate-pulse bg-muted;
+  @apply bg-muted animate-pulse;
   background-image: none !important;
   background-clip: border-box !important;
   border: none !important;

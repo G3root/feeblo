@@ -26,6 +26,7 @@ import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
 import { formatPostDate } from "~/features/board/components/board-surface/utils";
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
@@ -81,10 +82,10 @@ function RouteComponent() {
   } else if (isError) {
     recentPostsSection = (
       <section>
-        <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+        <h2 className="text-muted-foreground mb-3 text-sm font-medium">
           Recent posts
         </h2>
-        <div className="flex min-h-32 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
+        <div className="border-border/70 bg-muted/20 text-muted-foreground flex min-h-32 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
           There was a problem loading your recent posts.
         </div>
       </section>
@@ -92,7 +93,7 @@ function RouteComponent() {
   } else if (recentPosts.length > 0) {
     recentPostsSection = (
       <section>
-        <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+        <h2 className="text-muted-foreground mb-3 text-sm font-medium">
           Recent posts
         </h2>
         <ItemGroup>
@@ -176,7 +177,7 @@ function RouteComponent() {
 
     recentPostsSection = (
       <section>
-        <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+        <h2 className="text-muted-foreground mb-3 text-sm font-medium">
           Recent posts
         </h2>
         <Empty>
@@ -196,7 +197,7 @@ function RouteComponent() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-semibold text-2xl text-wrap-balance">
+        <h1 className="text-wrap-balance text-2xl font-semibold">
           Hello, {userName}
         </h1>
         <div className="flex gap-2">
@@ -229,10 +230,10 @@ function RouteComponent() {
       <Separator />
 
       <section>
-        <p className="text-muted-foreground text-sm text-wrap-pretty">
+        <p className="text-muted-foreground text-wrap-pretty text-sm">
           Have feedback? Share it at{" "}
           <a
-            className="text-primary underline underline-offset-4 transition-colors duration-150 hover:text-primary/80"
+            className="text-primary hover:text-primary/80 underline underline-offset-4 transition-colors duration-150"
             href="https://feedback.feeblo.com"
             rel="noopener noreferrer"
             target="_blank"
@@ -248,7 +249,7 @@ function RouteComponent() {
 function RecentPostsSkeleton() {
   return (
     <section>
-      <h2 className="mb-3 font-medium text-muted-foreground text-sm">
+      <h2 className="text-muted-foreground mb-3 text-sm font-medium">
         Recent posts
       </h2>
       <ItemGroup>

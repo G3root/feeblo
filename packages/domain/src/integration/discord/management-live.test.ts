@@ -13,6 +13,7 @@ import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+
 import { DiscordIntegrationConfig } from "./config";
 import { makeDiscordManagementServiceLive } from "./management-live";
 import { DiscordManagementService } from "./management-service";

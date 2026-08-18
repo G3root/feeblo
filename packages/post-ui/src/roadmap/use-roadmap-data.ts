@@ -1,11 +1,12 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
-import type { TPost } from "@feeblo/domain/post/schema";
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
-import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
+import type { TPost } from "@feeblo/domain/post/schema";
 import type { TStatusRoadmapColumn } from "@feeblo/domain/roadmap-column/schema";
+import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
 import type { Collection, UtilsRecord } from "@tanstack/db";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useCallback, useMemo } from "react";
+
 import type {
   RoadmapBoardPost,
   RoadmapColumnDefinition,

@@ -1,16 +1,19 @@
 import { Avatar as AvatarPrimitive } from "@base-ui/react/avatar";
 import type React from "react";
+
 import { cn } from "./utils";
 
 export function Avatar({
   className,
   size = "default",
   ...props
-}: AvatarPrimitive.Root.Props & { size?: "sm" | "default" | "lg" }): React.ReactElement {
+}: AvatarPrimitive.Root.Props & {
+  size?: "sm" | "default" | "lg";
+}): React.ReactElement {
   return (
     <AvatarPrimitive.Root
       className={cn(
-        "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full bg-background align-middle font-medium text-xs",
+        "bg-background inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full align-middle text-xs font-medium select-none",
         size === "sm" && "size-6",
         size === "default" && "size-8",
         size === "lg" && "size-10",
@@ -22,12 +25,31 @@ export function Avatar({
   );
 }
 
-export function AvatarGroup(props: React.ComponentProps<"div">): React.ReactElement {
-  return <div className={cn("flex -space-x-2", props.className)} data-slot="avatar-group" {...props} />;
+export function AvatarGroup(
+  props: React.ComponentProps<"div">
+): React.ReactElement {
+  return (
+    <div
+      className={cn("flex -space-x-2", props.className)}
+      data-slot="avatar-group"
+      {...props}
+    />
+  );
 }
 
-export function AvatarGroupCount(props: React.ComponentProps<"div">): React.ReactElement {
-  return <div className={cn("relative flex size-8 items-center justify-center rounded-full bg-muted text-xs ring-2 ring-background", props.className)} data-slot="avatar-group-count" {...props} />;
+export function AvatarGroupCount(
+  props: React.ComponentProps<"div">
+): React.ReactElement {
+  return (
+    <div
+      className={cn(
+        "bg-muted ring-background relative flex size-8 items-center justify-center rounded-full text-xs ring-2",
+        props.className
+      )}
+      data-slot="avatar-group-count"
+      {...props}
+    />
+  );
 }
 
 export function AvatarImage({
@@ -50,7 +72,7 @@ export function AvatarFallback({
   return (
     <AvatarPrimitive.Fallback
       className={cn(
-        "flex size-full items-center justify-center rounded-full bg-muted",
+        "bg-muted flex size-full items-center justify-center rounded-full",
         className
       )}
       data-slot="avatar-fallback"

@@ -1,7 +1,9 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { IntegrationRequestSignatureError } from "@feeblo/integration-core";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
+
 import type { GitHubSignatureVerificationError } from "./github-errors";
 
 /** Verifies GitHub's X-Hub-Signature-256 against the exact raw UTF-8 body. */

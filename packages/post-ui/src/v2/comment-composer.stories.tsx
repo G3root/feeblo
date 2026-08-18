@@ -1,5 +1,6 @@
 import "../../tailwind.css";
 import { useState } from "react";
+
 import { CommentComposer } from "./comment-composer";
 
 export default {
@@ -8,7 +9,7 @@ export default {
 
 export function Default() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentComposer
           onSubmit={async ({ content, isPrivate }) => {
@@ -26,7 +27,7 @@ export function Default() {
 
 export function PrivateDefault() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentComposer
           isPrivate
@@ -44,7 +45,7 @@ export function PrivateDefault() {
 
 export function Disabled() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentComposer disabled onSubmit={async () => {}} />
       </div>
@@ -54,7 +55,7 @@ export function Disabled() {
 
 export function CustomLabels() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentComposer
           onSubmit={async ({ content, isPrivate }) => {
@@ -77,7 +78,7 @@ export function ControlledState() {
   const [isPrivate, setIsPrivate] = useState(false);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentComposer
           content={content}
@@ -115,7 +116,7 @@ export function Composed() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <CommentComposer.Provider
           content={content}

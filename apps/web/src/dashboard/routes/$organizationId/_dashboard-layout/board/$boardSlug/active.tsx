@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+
 import { ActiveBoardPage } from "~/features/board/components/board-route-pages";
 
 export const Route = createFileRoute(

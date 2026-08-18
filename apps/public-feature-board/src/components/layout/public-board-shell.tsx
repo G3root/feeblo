@@ -12,6 +12,7 @@ import { PostCreateDialog } from "@feeblo/post-ui/post-create-dialog";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import type { ReactNode } from "react";
 import { useCallback } from "react";
+
 import {
   publicBoardCollection,
   publicCommentCollection,
@@ -79,7 +80,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
       suggestPosts={suggestPosts}
     >
       <PostCreateDialogProvider>
-        <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
+        <div className="bg-background text-foreground flex h-dvh flex-col overflow-hidden">
           <Navbar />
           <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
           <AuthDialogRoot />

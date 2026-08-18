@@ -5,6 +5,7 @@ import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants";
 import { Link } from "@tanstack/react-router";
+
 import { formatPostStatus, truncate } from "../../lib/utils";
 
 function StatusIndicator({ status }: { status: string }) {
@@ -16,7 +17,7 @@ function StatusIndicator({ status }: { status: string }) {
           getBoardStatusIndicatorColor(status)
         )}
       />
-      <span className="whitespace-nowrap text-muted-foreground text-xs">
+      <span className="text-muted-foreground text-xs whitespace-nowrap">
         {formatPostStatus(status)}
       </span>
     </div>
@@ -29,10 +30,10 @@ export function FeedbackCard({ status }: { status: string }) {
   const description = truncate(post.excerpt, 100) || "No details yet.";
 
   return (
-    <div className="group relative flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
+    <div className="group hover:bg-muted/40 relative flex items-center gap-3 px-4 py-3 transition-colors">
       <Link
         aria-label={`View ${post.title}`}
-        className="absolute inset-0 z-0 focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-[-2px]"
+        className="focus-visible:outline-primary absolute inset-0 z-0 focus-visible:outline-2 focus-visible:outline-offset-[-2px]"
         params={{
           slug: post.slug,
         }}
@@ -44,13 +45,13 @@ export function FeedbackCard({ status }: { status: string }) {
       </div>
 
       <div className="pointer-events-none relative z-10 min-w-0 flex-1">
-        <h3 className="truncate font-medium text-sm leading-snug">
+        <h3 className="truncate text-sm leading-snug font-medium">
           {post.title}
         </h3>
-        <p className="mt-0.5 truncate text-muted-foreground text-xs">
+        <p className="text-muted-foreground mt-0.5 truncate text-xs">
           {description}
         </p>
-        <div className="mt-2 flex items-center gap-2 text-muted-foreground text-xs sm:hidden">
+        <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs sm:hidden">
           <UserAvatar image={post.user.image} name={post.user.name} />
           <span className="truncate">{post.user.name ?? "Anonymous"}</span>
           <span className="text-border">·</span>
@@ -60,12 +61,12 @@ export function FeedbackCard({ status }: { status: string }) {
 
       <div className="pointer-events-none relative z-10 hidden shrink-0 items-center gap-3 sm:flex">
         <StatusIndicator status={status} />
-        <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-muted-foreground text-xs">
+        <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
           {board.name}
         </span>
         <div className="flex items-center gap-2">
           <UserAvatar image={post.user.image} name={post.user.name} />
-          <span className="truncate text-right text-muted-foreground text-xs">
+          <span className="text-muted-foreground truncate text-right text-xs">
             {post.user.name ?? "Anonymous"}
           </span>
         </div>

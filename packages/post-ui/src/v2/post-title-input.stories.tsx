@@ -1,5 +1,6 @@
 import "../../tailwind.css";
 import { useState } from "react";
+
 import { PostTitleInput } from "./post-title-input";
 
 export default {
@@ -10,7 +11,7 @@ export function Default() {
   const [value, setValue] = useState("");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostTitleInput
           name="title"
@@ -27,7 +28,7 @@ export function Small() {
   const [value, setValue] = useState("");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostTitleInput
           name="title"
@@ -43,7 +44,7 @@ export function Small() {
 
 export function Prefilled() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostTitleInput
           defaultValue="My Awesome Feature Request"
@@ -57,7 +58,7 @@ export function Prefilled() {
 
 export function Disabled() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostTitleInput
           defaultValue="Cannot edit this title"

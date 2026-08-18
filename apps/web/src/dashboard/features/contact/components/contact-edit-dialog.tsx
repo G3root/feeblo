@@ -25,6 +25,7 @@ import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+
 import {
   CustomAttributeFields,
   createContactAction,
@@ -33,6 +34,7 @@ import {
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { useContactEditDialogContext } from "../dialog-stores";
 
 export function ContactEditDialog() {
@@ -227,7 +229,7 @@ function ContactEditFormFields({
           children={(field) => (
             <div className="space-y-2">
               <label
-                className="font-medium text-sm"
+                className="text-sm font-medium"
                 htmlFor="contact-edit-company-id"
               >
                 Company

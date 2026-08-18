@@ -34,11 +34,11 @@ No hard documented-standard violations found.
 ### Missing / broken
 
 1. **Double opt-in cannot complete for external subscribers.** Plan: "The subscriber must verify the email address through double opt-in" and slice 7 "Verification tokens, double opt-in…". The token is generated, hashed, returned to the RPC adapter — which deliberately discards it (`handlers.ts:153`, `rpcs.ts:16` "responses never include link tokens"). Nothing sends the verification email; no outbox intent kind exists for it. A changelog subscriber is stuck `pending_verification` forever. This is the plan's central consent flow and it's dead-ended.
-2. **No one-click unsubscribe in emails.** Plan: "Every subscription email includes a one-click unsubscribe mechanism" and "list-unsubscribe headers". Emails carry `unsubscribeUrl: …/settings/notifications` (a placeholder, acknowledged in comments); the workflow test *asserts* `List-Unsubscribe` headers are absent — directly contradicting the plan.
+2. **No one-click unsubscribe in emails.** Plan: "Every subscription email includes a one-click unsubscribe mechanism" and "list-unsubscribe headers". Emails carry `unsubscribeUrl: …/settings/notifications` (a placeholder, acknowledged in comments); the workflow test _asserts_ `List-Unsubscribe` headers are absent — directly contradicting the plan.
 3. **`post.official_update_published` unimplemented.** Plan: "Official post updates, merges, and closures send immediately" (slice 10). Merges/closures/status-coalescing work; official updates are a schema-only stub that the workflow hard-fails.
 4. **Provider feedback not wired.** Plan: "Cloudflare lifecycle event ingestion …" — `EmailProviderFeedbackService` + tests exist but no HTTP/queue consumer registers it; no route references it.
-5. **Configured free recipient / admin opt-in absent.** Plan: "Free workspaces receive new-submission notifications at one *configurable* email address"; paid fan-out is to "opted-in administrators". Code uses owner/admin roles with a `slice(0, limit)` (`workflow.ts:307-316`), acknowledged as temporary.
-6. **Guardrails mostly missing (slice 12).** Only the verification rate limit exists (3/24h per org+address; plan asked per *IP*, address, and workspace). No circuit breakers, spend/volume controls, concurrent-send limits, or cost metric.
+5. **Configured free recipient / admin opt-in absent.** Plan: "Free workspaces receive new-submission notifications at one _configurable_ email address"; paid fan-out is to "opted-in administrators". Code uses owner/admin roles with a `slice(0, limit)` (`workflow.ts:307-316`), acknowledged as temporary.
+6. **Guardrails mostly missing (slice 12).** Only the verification rate limit exists (3/24h per org+address; plan asked per _IP_, address, and workspace). No circuit breakers, spend/volume controls, concurrent-send limits, or cost metric.
 7. **Status dedup key deviates.** Plan: the key "should identify the post's open coalescing window"; code embeds `now.getTime()` (`post/handlers.ts:281`). The partial unique index `email_outbox_pendingStatusAggregate_uidx` compensates, so behavior is right, but a retried status change after window close can re-send.
 
 ### Implemented well
@@ -46,7 +46,7 @@ No hard documented-standard violations found.
 - Atomic intent+product transactions with post-commit wake + hourly reconciliation
 - Per-recipient retries with bounded jittered backoff
 - Deterministic message IDs
-- Plan recheck at materialization *and* delivery
+- Plan recheck at materialization _and_ delivery
 - Downgrade pause / 7-day expiry / upgrade resume (covered by tests)
 - First-publish-only changelog sends
 - Creator auto-subscribe and removal of comment/upvote auto-subscribe

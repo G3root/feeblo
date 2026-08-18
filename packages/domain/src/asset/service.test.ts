@@ -314,10 +314,7 @@ describe("registerUploadedAsset", () => {
           organizationId,
           content:
             "![first](https://assets.example/tmp/first.png) ![second](https://assets.example/tmp/second.png)",
-          assetIds: [
-            "asset_promoted_before_failure",
-            "asset_failed_promotion",
-          ],
+          assetIds: ["asset_promoted_before_failure", "asset_failed_promotion"],
         }).pipe(
           Effect.provideService(S3UploadService, {
             uploadProfileImage: () => Effect.die("not used in this test"),

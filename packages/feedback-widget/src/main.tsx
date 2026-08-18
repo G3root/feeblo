@@ -1,12 +1,10 @@
 import { HashRouter, Route } from "@solidjs/router";
 import { lazy } from "solid-js";
+
 import { preloadBoards } from "./lib/api";
 import { RootComponent } from "./routes/__root";
 
-export {
-  isSupportedLocale,
-  type WidgetConfig,
-} from "./lib/config";
+export { isSupportedLocale, type WidgetConfig } from "./lib/config";
 
 const HomeRoute = lazy(() => import("./routes/index"));
 const LazyBoardDetail = lazy(() => import("./routes/board"));

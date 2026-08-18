@@ -9,7 +9,9 @@ import {
 } from "@feeblo/ui/table";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
+
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import type { ChangelogStatus } from "../constants";
 import { ChangelogStatusBadge } from "./changelog-status";
 
@@ -110,7 +112,7 @@ export function ChangelogListView({
                     <span className="flex flex-wrap gap-1.5">
                       {changelogCategories.map((category) => (
                         <span
-                          className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium text-xs"
+                          className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium"
                           key={category.id}
                           style={{
                             backgroundColor: `color-mix(in oklab, ${category.icon} 12%, transparent)`,

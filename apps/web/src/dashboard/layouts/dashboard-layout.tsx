@@ -18,6 +18,7 @@ import {
 } from "@feeblo/ui/sidebar";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useCallback } from "react";
+
 import { AppSidebar } from "~/components/common/app-sidebar";
 import { NotificationsMenu } from "~/components/common/notifications-menu";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";

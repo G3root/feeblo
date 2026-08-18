@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+
 import { authenticateLink, startLinkAuthentication } from "../src/links";
 
 describe("data-feeblo-link", () => {

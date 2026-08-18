@@ -325,9 +325,9 @@ const makeNotificationService = Effect.gen(function* () {
             and(
               eq(schema.notificationTable.organizationId, organizationId),
               eq(schema.notificationTable.recipientMemberId, recipientMemberId),
-            isNull(schema.notificationTable.readAt)
-          )
-        );
+              isNull(schema.notificationTable.readAt)
+            )
+          );
       }),
   };
 });

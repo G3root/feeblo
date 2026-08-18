@@ -1,5 +1,6 @@
 import { Window } from "happy-dom";
 import { describe, expect, it } from "vitest";
+
 import { secureBlankTarget } from "./html-sanitizer";
 
 describe("HtmlSanitizer", () => {

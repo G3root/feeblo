@@ -4,6 +4,7 @@ import { authClient } from "@feeblo/web-shared/auth-client";
 import { EmailSchema } from "@feeblo/web-shared/user-validation";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+
 import { AuthShell } from "~/features/auth/components/auth-shell";
 import {
   clearVerificationOtp,

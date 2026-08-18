@@ -224,7 +224,10 @@ export const makeDiscordProviderRegistration = ({
     inboundHandlers: [makeDiscordInteractionsHandler({ publicKey })],
     manifest: discordProviderManifest,
     routeConfigurationSchemas: new Map([
-      [discordChannelNotificationsCapabilityKey, DiscordChannelNotificationRouteConfiguration],
+      [
+        discordChannelNotificationsCapabilityKey,
+        DiscordChannelNotificationRouteConfiguration,
+      ],
       [discordInteractionsCapabilityKey, DiscordInboundRouteConfiguration],
     ]),
   };

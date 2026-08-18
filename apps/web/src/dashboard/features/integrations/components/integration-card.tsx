@@ -9,6 +9,7 @@ import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import type * as Atom from "effect/unstable/reactivity/Atom";
 import { useState } from "react";
+
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { useEntitlements } from "~/hooks/use-entitlements";
 
@@ -135,7 +136,7 @@ export function IntegrationCard<C extends IntegrationConnection>({
       <CardPanel>
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="mt-0.5 shrink-0 rounded-lg border bg-muted p-2">
+            <div className="bg-muted mt-0.5 shrink-0 rounded-lg border p-2">
               <HugeiconsIcon className="size-5" icon={config.icon} />
             </div>
             <div className="min-w-0">
@@ -147,11 +148,11 @@ export function IntegrationCard<C extends IntegrationConnection>({
                   loadFailed={loadFailed}
                 />
               </div>
-              <p className="mt-1 text-muted-foreground text-sm">
+              <p className="text-muted-foreground mt-1 text-sm">
                 {config.description}
               </p>
               {connected && config.connectionDetail ? (
-                <p className="mt-1 truncate text-muted-foreground text-xs">
+                <p className="text-muted-foreground mt-1 truncate text-xs">
                   {config.connectionDetail(activeConnections)}
                 </p>
               ) : null}
@@ -259,11 +260,11 @@ function ConnectionStatusBadge({
     return <span className="text-destructive text-xs">Could not load</span>;
   }
   return connected ? (
-    <span className="rounded-full bg-success/10 px-2 py-0.5 font-medium text-success text-xs">
+    <span className="bg-success/10 text-success rounded-full px-2 py-0.5 text-xs font-medium">
       Connected
     </span>
   ) : (
-    <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+    <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
       Not connected
     </span>
   );

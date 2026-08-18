@@ -1,5 +1,6 @@
 import type { useSubmission } from "@solidjs/router";
 import { type Accessor, createContext, useContext } from "solid-js";
+
 import type { FeedbackResult, WidgetSuggestion } from "../../lib/api";
 import type { Board } from "../../lib/boards";
 

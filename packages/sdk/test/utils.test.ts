@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { compact, isBrowser } from "../src/utils";
 
 describe("isBrowser", () => {

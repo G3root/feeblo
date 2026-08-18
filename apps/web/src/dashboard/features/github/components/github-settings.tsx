@@ -45,6 +45,7 @@ import {
   useRef,
   useState,
 } from "react";
+
 import {
   type GitHubConnection,
   type GitHubPostStatus,
@@ -170,7 +171,7 @@ function GitHubSettingsContent({
           </FrameDescription>
         </FrameHeader>
         <FramePanel>
-          <h2 className="font-semibold text-sm">Install the GitHub App</h2>
+          <h2 className="text-sm font-semibold">Install the GitHub App</h2>
           <p className="text-muted-foreground text-sm">
             Choose the GitHub organization and repositories where the Feeblo bot
             can publish issues, add linked-feedback comments, and synchronize
@@ -287,7 +288,7 @@ function GitHubConnectionFrame({
         </FramePanel>
       )}
       <FramePanel>
-        <h2 className="font-semibold text-sm">Remove integration</h2>
+        <h2 className="text-sm font-semibold">Remove integration</h2>
         <p className="text-muted-foreground text-sm">
           Stop GitHub publishing and synchronization for this Feeblo
           organization.
@@ -391,7 +392,7 @@ function GitHubPublishingSettings({
       : "";
   return (
     <FramePanel>
-      <h2 className="font-semibold text-sm">Automatic issue publishing</h2>
+      <h2 className="text-sm font-semibold">Automatic issue publishing</h2>
       <p className="text-muted-foreground text-sm">
         Create a GitHub issue automatically when a new post matches this scope.
       </p>
@@ -522,7 +523,7 @@ function BoardScopeSwitch({
   return (
     <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
       <div className="min-w-0">
-        <p className="truncate font-medium text-sm">{label}</p>
+        <p className="truncate text-sm font-medium">{label}</p>
         <p className="text-muted-foreground text-xs">{description}</p>
       </div>
       <Switch
@@ -578,7 +579,7 @@ function GitHubSyncRules({
   return (
     <FramePanel>
       <div>
-        <h2 className="font-semibold text-sm">Issue status rules</h2>
+        <h2 className="text-sm font-semibold">Issue status rules</h2>
         <p className="text-muted-foreground text-sm">
           Update a post's Feeblo status as its linked GitHub issues change.
         </p>
@@ -757,7 +758,7 @@ function GitHubSyncRuleSlot({
     <div className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
       <div className="grid gap-1 text-xs">
         <span className="text-muted-foreground">When</span>
-        <span className="font-medium text-sm">{description}</span>
+        <span className="text-sm font-medium">{description}</span>
       </div>
       <RuleSelect
         disabled={saving || !statusesReady}

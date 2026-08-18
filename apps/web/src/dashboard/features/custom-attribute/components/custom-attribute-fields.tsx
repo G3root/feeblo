@@ -10,13 +10,13 @@ import { CompanyAttributeValueId, ContactAttributeValueId } from "@feeblo/id";
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { Input } from "@feeblo/ui/input";
 import { Label } from "@feeblo/ui/label";
+
 import {
   companyAttributeValueCollection,
   companyCollection,
   contactAttributeValueCollection,
   contactCollection,
 } from "~/lib/collections";
-
 import { fetchRpc } from "~/lib/runtime";
 
 export type CustomAttributeDefinition = {
@@ -64,7 +64,7 @@ export function CustomAttributeFields({
 
   return (
     <fieldset className="space-y-4 border-t pt-4">
-      <legend className="font-medium text-sm">Custom details</legend>
+      <legend className="text-sm font-medium">Custom details</legend>
       {definitions.map((definition) => {
         const id = `${entityName}-attribute-${definition.id}`;
         const value = values[definition.id] ?? defaultInputValue(definition);

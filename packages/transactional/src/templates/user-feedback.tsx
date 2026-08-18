@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Text } from "react-email";
+
 import { EmailShell } from "./email-shell";
 
 type UserFeedbackEmailProps = {
@@ -19,14 +20,14 @@ export const UserFeedbackEmail = ({
     title={`How's your first week${name ? `, ${name}` : ""}?`}
     titleLead={`You've had some time to explore Feeblo, and we'd love to hear what you think.`}
   >
-    <Text className="m-0 font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 font-sans">
       What's working well? What could be better?
     </Text>
-    <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 mt-[18px] font-sans">
       What has worked well so far, and what could we make better? Your feedback
       helps us prioritize what to build next.
     </Text>
-    <Text className="m-0 mt-[18px] font-14 font-sans text-fg-2">
+    <Text className="font-14 text-fg-2 m-0 mt-[18px] font-sans">
       — Nafees
       <br />
       Founder, Feeblo

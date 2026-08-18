@@ -134,9 +134,11 @@ describe("PostEditor", () => {
         type: "image/png",
       })
     );
-    editor.element().dispatchEvent(
-      new ClipboardEvent("paste", { bubbles: true, clipboardData })
-    );
+    editor
+      .element()
+      .dispatchEvent(
+        new ClipboardEvent("paste", { bubbles: true, clipboardData })
+      );
 
     await expect.element(screen.getByRole("img")).toBeVisible();
     await screen.getByRole("button", { name: "Save" }).click();

@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import type * as Redacted from "effect/Redacted";
+
 import { SlackInboundFailure } from "./errors";
 
 const SYNTHETIC_SLACK_EMAIL_SUFFIX = "@slack.invalid";

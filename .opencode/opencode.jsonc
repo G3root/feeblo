@@ -5,13 +5,13 @@
   "references": {
     "effect": {
       "repository": "Effect-TS/effect-smol",
-      "description": "Use for Effect v4 and effect-smol implementation details"
+      "description": "Use for Effect v4 and effect-smol implementation details",
     },
     "tanstack-db": {
       "repository": "TanStack/db",
-      "description": "Use for TanStack DB client, query building, and database patterns"
-    }
+      "description": "Use for TanStack DB client, query building, and database patterns",
+    },
   },
   "mcp": {},
-  "tools": {}
+  "tools": {},
 }

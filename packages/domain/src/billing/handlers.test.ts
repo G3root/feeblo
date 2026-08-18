@@ -4,6 +4,7 @@ import { WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+
 import { CurrentSession, type Session } from "../session-middleware";
 import { BillingRpcHandlersEffect } from "./handlers";
 import { BillingRepository } from "./repository";

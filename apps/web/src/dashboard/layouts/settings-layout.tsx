@@ -6,6 +6,7 @@ import {
   SidebarTrigger,
 } from "@feeblo/ui/sidebar";
 import { Link } from "@tanstack/react-router";
+
 import { SettingsSidebar } from "~/components/common/settings-sidebar";
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";

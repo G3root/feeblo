@@ -3,6 +3,7 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useState } from "react";
+
 import { CommentComposerField, useCommentForm } from "../v2/forms/comment-form";
 import { usePostCollectionData } from "../v2/post-page-context";
 
@@ -75,9 +76,9 @@ export function PostCommentGuestPrompt({
   }
 
   return (
-    <div className="rounded-xl border border-border/80 px-4 py-4">
-      <p className="font-medium text-sm">{title}</p>
-      <p className="mt-1 text-muted-foreground text-sm">{description}</p>
+    <div className="border-border/80 rounded-xl border px-4 py-4">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="text-muted-foreground mt-1 text-sm">{description}</p>
       <div className="mt-3">{action}</div>
     </div>
   );

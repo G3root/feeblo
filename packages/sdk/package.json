@@ -1,13 +1,29 @@
 {
   "name": "@feeblo/sdk",
   "version": "0.0.1",
-  "type": "module",
   "private": false,
-  "publishConfig": {
-    "access": "public"
-  },
   "description": "Embeddable feedback widget SDK for Feeblo.",
+  "keywords": [
+    "changelog",
+    "embed",
+    "feature-requests",
+    "feeblo",
+    "feedback",
+    "sdk",
+    "widget"
+  ],
+  "homepage": "https://github.com/G3root/feeblo/tree/main/packages/sdk",
   "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/G3root/feeblo.git",
+    "directory": "packages/sdk"
+  },
+  "files": [
+    "dist/**",
+    "README.md"
+  ],
+  "type": "module",
   "sideEffects": true,
   "main": "./dist/feeblo-sdk.umd.cjs",
   "module": "./dist/feeblo-sdk.js",
@@ -20,25 +36,9 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "dist/**",
-    "README.md"
-  ],
-  "keywords": [
-    "feeblo",
-    "feedback",
-    "widget",
-    "embed",
-    "sdk",
-    "feature-requests",
-    "changelog"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/G3root/feeblo.git",
-    "directory": "packages/sdk"
+  "publishConfig": {
+    "access": "public"
   },
-  "homepage": "https://github.com/G3root/feeblo/tree/main/packages/sdk",
   "scripts": {
     "dev": "vite",
     "build": "vite build && tsc -p tsconfig.build.json",

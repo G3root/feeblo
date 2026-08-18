@@ -43,9 +43,11 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useScrollBottom } from "~/hooks/use-scroll-bottom";
 import { fetchRpc } from "~/lib/runtime";
+
 import {
   type Delivery,
   deliveriesAtom,
@@ -243,7 +245,7 @@ function WebhookDetailContent({
     <>
       <SettingsLayout.Header>
         <Link
-          className="text-muted-foreground text-sm hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground text-sm"
           params={{ organizationId }}
           to="/$organizationId/settings/webhooks"
         >
@@ -313,14 +315,14 @@ function WebhookDetailContent({
               {oneTimeSecret === null ? null : (
                 <section
                   aria-label="Webhook signing secret"
-                  className="rounded-xl border border-warning/30 bg-warning/5 p-4"
+                  className="border-warning/30 bg-warning/5 rounded-xl border p-4"
                 >
                   <h2 className="font-medium">Copy the signing secret now</h2>
-                  <p className="mt-1 text-muted-foreground text-sm">
+                  <p className="text-muted-foreground mt-1 text-sm">
                     This secret for {oneTimeSecret.endpointName} will not be
                     shown again.
                   </p>
-                  <code className="mt-3 block break-all rounded-md border bg-background p-3 text-sm">
+                  <code className="bg-background mt-3 block rounded-md border p-3 text-sm break-all">
                     {oneTimeSecret.value}
                   </code>
                   <div className="mt-3 flex gap-2">
@@ -647,7 +649,7 @@ function DeliveryHistoryTable({
         {deliveries.length === 0 ? null : (
           <>
             {hasLoadError ? (
-              <p className="pb-2 text-muted-foreground text-sm">
+              <p className="text-muted-foreground pb-2 text-sm">
                 Could not load the latest deliveries.{" "}
                 <button
                   className="underline"
@@ -705,12 +707,12 @@ function DeliveryHistoryTable({
                       ref={virtualizer.measureElement}
                     >
                       <TableCell
-                        className="whitespace-normal bg-muted/40"
+                        className="bg-muted/40 whitespace-normal"
                         colSpan={5}
                       >
                         <ul
                           aria-label={`Attempts for ${row.delivery.id}`}
-                          className="grid gap-1 text-muted-foreground text-sm"
+                          className="text-muted-foreground grid gap-1 text-sm"
                         >
                           {row.delivery.attempts.map((attempt) => (
                             <li key={attempt.id}>

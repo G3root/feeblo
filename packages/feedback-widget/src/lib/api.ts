@@ -1,4 +1,5 @@
 import { action, query, type RoutePreloadFuncArgs } from "@solidjs/router";
+
 import { getWidgetContext } from "./context";
 import { getWidgetToken } from "./identity";
 import { sendToParent } from "./messages";

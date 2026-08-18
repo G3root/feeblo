@@ -1,4 +1,3 @@
-
 import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
@@ -18,6 +17,7 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
+
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import {
   startBillingCheckout,
@@ -189,7 +189,7 @@ function BillingSettingsContent({
               ) : null}
             </Alert>
           ) : null}
-          <Card className="border border-border shadow-none ring-0">
+          <Card className="border-border border shadow-none ring-0">
             <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
                 <CardTitle>Current Plan</CardTitle>
@@ -239,7 +239,7 @@ function BillingSettingsContent({
             </CardPanel>
           </Card>
 
-          <Card className="border border-border shadow-none ring-0">
+          <Card className="border-border border shadow-none ring-0">
             <CardHeader>
               <CardTitle>Available Plans</CardTitle>
             </CardHeader>
@@ -255,7 +255,7 @@ function BillingSettingsContent({
                 <PlanGridSkeleton />
               ) : productsError ? (
                 <Card size="sm">
-                  <CardPanel className="py-2 text-muted-foreground">
+                  <CardPanel className="text-muted-foreground py-2">
                     Plans are unavailable right now.
                   </CardPanel>
                 </Card>
@@ -293,7 +293,7 @@ function BillingSettingsContent({
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <div className="font-semibold text-3xl tracking-tight">
+                            <div className="text-3xl font-semibold tracking-tight">
                               {formatPlanPrice(
                                 selectedProduct,
                                 selectedInterval
@@ -367,7 +367,7 @@ function BillingSettingsContent({
               )}
 
               {hasPaidPlan ? (
-                <div className="rounded-4xl border px-4 py-3 text-muted-foreground text-sm">
+                <div className="text-muted-foreground rounded-4xl border px-4 py-3 text-sm">
                   You are on the {PLAN_COPY[currentPlanType].name} plan. Use the
                   billing portal to change plans, update payment details, or
                   cancel.
@@ -384,10 +384,10 @@ function BillingSettingsContent({
 function CurrentPlanStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1">
-      <div className="text-muted-foreground text-xs uppercase tracking-wide">
+      <div className="text-muted-foreground text-xs tracking-wide uppercase">
         {label}
       </div>
-      <div className="font-medium text-sm">{value}</div>
+      <div className="text-sm font-medium">{value}</div>
     </div>
   );
 }

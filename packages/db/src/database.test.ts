@@ -1,9 +1,10 @@
+import { expect, it } from "@effect/vitest";
 import { sql } from "drizzle-orm";
 import { integer, pgTable } from "drizzle-orm/pg-core";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { expect, it } from "@effect/vitest";
+
 import {
   currentDb,
   Database,

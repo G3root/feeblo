@@ -31,6 +31,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useNavigate } from "@tanstack/react-router";
+
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 export function NavUser() {

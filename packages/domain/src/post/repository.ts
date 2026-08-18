@@ -575,8 +575,7 @@ const makePostRepository = Effect.gen(function* () {
           .set({
             archivedAt:
               archived === undefined ? undefined : archived ? now : null,
-            lockedAt:
-              locked === undefined ? undefined : locked ? now : null,
+            lockedAt: locked === undefined ? undefined : locked ? now : null,
             updatedAt: now,
           })
           .where(

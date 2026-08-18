@@ -1,4 +1,5 @@
 import { eq, useLiveQuery } from "@tanstack/react-db";
+
 import { usePublicCollections } from "../../providers/public-collections-provider";
 
 export function ChangelogCategoryBadges({
@@ -39,7 +40,7 @@ export function ChangelogCategoryBadge({ categoryId }: { categoryId: string }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-medium text-xs"
+      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
       style={{
         backgroundColor: `color-mix(in oklab, ${category.icon} 12%, transparent)`,
         color: category.icon,

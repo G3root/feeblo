@@ -28,7 +28,10 @@ export function commonmarkEscape(str: string): string {
 
       // Check if the next character is escapable (a punctuation character)
       const nextChar = str[i + 1];
-      if (nextChar !== undefined && markdownSyntaxCharacters.includes(nextChar)) {
+      if (
+        nextChar !== undefined &&
+        markdownSyntaxCharacters.includes(nextChar)
+      ) {
         // Valid escape sequence - keep the backslash and the character as is
         result += char + nextChar;
         i += 2;

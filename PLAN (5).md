@@ -401,14 +401,14 @@ Disabling or removing one route affects only that capability instance. Reconnect
 
 ## Provider Extension Model
 
-| Shared kernel                          | Provider-owned code                      |
-| -------------------------------------- | ---------------------------------------- |
-| Canonical Feeblo events                | OAuth scopes and callbacks               |
-| Connection and route lifecycle         | Credential and configuration schemas     |
-| Encryption and redaction               | Event-to-provider action mapping         |
-| Durable delivery, leases, and retries  | Wire payloads and HTTP/GraphQL calls     |
-| History, metrics, and tracing          | Provider error/rate-limit classification |
-| Inbox deduplication and bindings later | Provider signature verification          |
+| Shared kernel | Provider-owned code |
+| --- | --- |
+| Canonical Feeblo events | OAuth scopes and callbacks |
+| Connection and route lifecycle | Credential and configuration schemas |
+| Encryption and redaction | Event-to-provider action mapping |
+| Durable delivery, leases, and retries | Wire payloads and HTTP/GraphQL calls |
+| History, metrics, and tracing | Provider error/rate-limit classification |
+| Inbox deduplication and bindings later | Provider signature verification |
 
 ### Slack and Discord
 

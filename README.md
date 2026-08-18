@@ -108,9 +108,7 @@ The embeddable SDK lives in `packages/sdk` and ships ESM + UMD builds. See [`pac
 
 ## Billing
 
-Billing uses Polar. Set `POLAR_MODE`, `POLAR_ACCESS_TOKEN`, and
-`POLAR_WEBHOOK_SECRET` to enable checkout, subscription synchronization, and
-the customer portal.
+Billing uses Polar. Set `POLAR_MODE`, `POLAR_ACCESS_TOKEN`, and `POLAR_WEBHOOK_SECRET` to enable checkout, subscription synchronization, and the customer portal.
 
 Configure the Polar webhook URL as:
 
@@ -118,34 +116,23 @@ Configure the Polar webhook URL as:
 https://<API_URL>/api/auth/polar/webhooks
 ```
 
-Each recurring product must include metadata that identifies its entitlement
-plan and billing variant:
+Each recurring product must include metadata that identifies its entitlement plan and billing variant:
 
 ```json
 { "plan": "starter", "variant": "monthly" }
 ```
 
-Supported plan values are `starter` and `professional`; supported variants are
-`monthly` and `yearly`. The variant must match the product's recurring
-interval. Products without valid metadata, archived products, and one-time
-products are rejected by the checkout API.
+Supported plan values are `starter` and `professional`; supported variants are `monthly` and `yearly`. The variant must match the product's recurring interval. Products without valid metadata, archived products, and one-time products are rejected by the checkout API.
 
-After adding the webhook to an existing Polar organization, resend
-`product.created` or `product.updated` events for the current products so the
-local product catalog is populated before enabling billing.
+After adding the webhook to an existing Polar organization, resend `product.created` or `product.updated` events for the current products so the local product catalog is populated before enabling billing.
 
 ## Deployment
 
 Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Cloudflare deployments are managed via Alchemy and Wrangler configuration in `apps/web`. Use `pnpm deploy` / `pnpm destroy` to provision and remove infrastructure.
 
-The Compose database uses the pgvector-enabled PostgreSQL image. Post
-embeddings default to OpenAI `text-embedding-3-small` at 1536 dimensions. Set
-`EMBEDDING_API_KEY` to enable embeddings; OpenAI-compatible self-hosted
-providers can also set `EMBEDDING_API_URL`, `EMBEDDING_MODEL`, and
-`EMBEDDING_DIMENSIONS`.
+The Compose database uses the pgvector-enabled PostgreSQL image. Post embeddings default to OpenAI `text-embedding-3-small` at 1536 dimensions. Set `EMBEDDING_API_KEY` to enable embeddings; OpenAI-compatible self-hosted providers can also set `EMBEDDING_API_URL`, `EMBEDDING_MODEL`, and `EMBEDDING_DIMENSIONS`.
 
-When changing to a model with a different vector size, reconfigure the database
-column from the published server image before restarting it:
+When changing to a model with a different vector size, reconfigure the database column from the published server image before restarting it:
 
 ```sh
 docker compose run --rm server \
@@ -154,8 +141,7 @@ docker compose run --rm server \
   --clear-existing
 ```
 
-The command clears incompatible vectors and rebuilds the HNSW index. Omit
-`--clear-existing` to make it fail safely when existing vectors would be lost.
+The command clears incompatible vectors and rebuilds the HNSW index. Omit `--clear-existing` to make it fail safely when existing vectors would be lost.
 
 ## License
 

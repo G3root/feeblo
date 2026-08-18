@@ -1,4 +1,5 @@
 import { createAuthClient } from "@feeblo/auth/client";
+
 import { getServerRuntimePublicEnv } from "./server-runtime-public-env";
 
 const API_URL = getServerRuntimePublicEnv().apiUrl;

@@ -27,9 +27,7 @@ export const e2eSetPlanRouter = HttpRouter.use((router) =>
     return yield* router.add("POST", "/__e2e/set-plan", (request) =>
       Effect.gen(function* () {
         const body = yield* request.json;
-        const payload = yield* Schema.decodeUnknownEffect(SetPlanPayload)(
-          body
-        );
+        const payload = yield* Schema.decodeUnknownEffect(SetPlanPayload)(body);
         const now = new Date();
 
         // Converge on the requested plan: drop any existing subscription so
@@ -37,7 +35,9 @@ export const e2eSetPlanRouter = HttpRouter.use((router) =>
         // The product row goes with it (subscription.productId cascades).
         yield* db
           .delete(schema.subscriptionTable)
-          .where(eq(schema.subscriptionTable.organizationId, payload.organizationId));
+          .where(
+            eq(schema.subscriptionTable.organizationId, payload.organizationId)
+          );
 
         const productId = `prod_e2e_${payload.organizationId}`;
         yield* db.insert(schema.productTable).values({
@@ -75,7 +75,4 @@ export const e2eSetPlanRouter = HttpRouter.use((router) =>
       }).pipe(Effect.orDie)
     );
   })
-).pipe(
-  Layer.provide(Database.DatabaseContextLive),
-  Layer.orDie
-);
+).pipe(Layer.provide(Database.DatabaseContextLive), Layer.orDie);

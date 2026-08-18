@@ -16,6 +16,9 @@
     "./hooks/*": "./src/hooks/*.tsx",
     "./*": "./src/*.tsx"
   },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "dependencies": {
     "@base-ui/react": "catalog:",
     "@feeblo/utils": "workspace:*",
@@ -36,9 +39,6 @@
     "react-dom": "catalog:",
     "tailwind-merge": "catalog:",
     "zod": "catalog:"
-  },
-  "scripts": {
-    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",

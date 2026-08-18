@@ -1,5 +1,5 @@
-import { assert, describe, expect, layer } from "@effect/vitest";
 import { NodeCrypto } from "@effect/platform-node";
+import { assert, describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
   initialTestMailerState,
@@ -14,6 +14,7 @@ import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
 import * as Workflow from "effect/unstable/workflow/Workflow";
 import * as WorkflowEngine from "effect/unstable/workflow/WorkflowEngine";
+
 import {
   SubmissionEmailNotificationWorkflow,
   SubmissionEmailNotificationWorkflowLayer,

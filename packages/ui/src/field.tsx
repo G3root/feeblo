@@ -1,5 +1,6 @@
 import { Field as FieldPrimitive } from "@base-ui/react/field";
 import type React from "react";
+
 import { Separator } from "./separator";
 import { cn } from "./utils";
 
@@ -31,7 +32,7 @@ export function FieldLabel({
   return (
     <FieldPrimitive.Label
       className={cn(
-        "inline-flex items-center gap-2 font-medium text-base/4.5 text-foreground data-disabled:opacity-64 sm:text-sm/4",
+        "text-foreground inline-flex items-center gap-2 text-base/4.5 font-medium data-disabled:opacity-64 sm:text-sm/4",
         className
       )}
       data-slot="field-label"
@@ -123,7 +124,7 @@ export function FieldTitle(
 ): React.ReactElement {
   return (
     <div
-      className={cn("font-medium text-sm", props.className)}
+      className={cn("text-sm font-medium", props.className)}
       data-slot="field-title"
       {...props}
     />
@@ -143,7 +144,7 @@ export function FieldSeparator({
     >
       <Separator className="absolute inset-x-0" />
       {children ? (
-        <span className="relative mx-auto bg-background px-2 text-muted-foreground text-xs">
+        <span className="bg-background text-muted-foreground relative mx-auto px-2 text-xs">
           {children}
         </span>
       ) : null}

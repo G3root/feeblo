@@ -47,7 +47,7 @@ export function CommentComposer({
       }}
     >
       <UserAvatar className="mt-1 hidden sm:flex" name={userName} />
-      <div className="flex-1 rounded-xl border bg-card p-3">
+      <div className="bg-card flex-1 rounded-xl border p-3">
         <form.AppField name="content">
           {(field) => (
             <field.TextareaField
@@ -61,7 +61,7 @@ export function CommentComposer({
           )}
         </form.AppField>
         {submitError ? (
-          <p className="mt-2 text-destructive text-sm">{submitError}</p>
+          <p className="text-destructive mt-2 text-sm">{submitError}</p>
         ) : null}
         <div className="mt-3 flex items-center justify-end">
           <form.AppForm>

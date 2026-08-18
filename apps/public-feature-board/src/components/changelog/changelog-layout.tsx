@@ -1,5 +1,6 @@
 import { cn } from "@feeblo/ui/utils";
 import type { HTMLAttributes, ReactNode } from "react";
+
 import {
   FeedbackBrowseLayout,
   FeedbackBrowseLayoutContent,
@@ -21,7 +22,7 @@ export function ChangelogTimeline({ children }: { children: ReactNode }) {
     <div className="relative">
       <div
         aria-hidden="true"
-        className="absolute top-0 left-3 hidden h-full w-px bg-border/60 md:block"
+        className="bg-border/60 absolute top-0 left-3 hidden h-full w-px md:block"
       />
       {children}
     </div>
@@ -54,8 +55,8 @@ export function ChangelogTimelineDate({ children }: { children: ReactNode }) {
           aria-hidden="true"
           className="absolute top-1/2 left-3 hidden size-2.5 -translate-x-1/2 -translate-y-1/2 md:block"
         >
-          <span className="absolute inset-0 size-2.5 animate-ping rounded-full bg-foreground/35" />
-          <span className="relative block size-2.5 rounded-full bg-foreground" />
+          <span className="bg-foreground/35 absolute inset-0 size-2.5 animate-ping rounded-full" />
+          <span className="bg-foreground relative block size-2.5 rounded-full" />
         </span>
         {children}
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { fetchRpc } from "~/lib/runtime";
 
 type SlugStatus = "idle" | "checking" | "available" | "taken" | "error";

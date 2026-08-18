@@ -19,8 +19,12 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { Webhook } from "standardwebhooks";
+
 import { startTestServer } from "./test-server";
-import { webhookEventsPostCapabilityKey, webhookProviderKey } from "./webhook-manifest";
+import {
+  webhookEventsPostCapabilityKey,
+  webhookProviderKey,
+} from "./webhook-manifest";
 import { WebhookExternalPayload } from "./webhook-payload";
 import { makeWebhookProviderRegistration } from "./webhook-provider-registration";
 

@@ -5,15 +5,16 @@ import {
   FieldError,
   FieldLabel,
 } from "@feeblo/ui/field";
+import { withForm } from "@feeblo/ui/hooks/form";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   InputGroupText,
 } from "@feeblo/ui/input-group";
-import { useStore } from "@tanstack/react-store";
-import { withForm } from "@feeblo/ui/hooks/form";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
+import { useStore } from "@tanstack/react-store";
+
 import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
 import { registerFormOpts } from "../shared-form";
 import { toWorkspaceSlug } from "../utils";

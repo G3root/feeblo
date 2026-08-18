@@ -1,5 +1,6 @@
 import { createAsync, useParams } from "@solidjs/router";
 import { createMemo, Show } from "solid-js";
+
 import { FeedbackForm, useFeedbackForm } from "../components/feedback-form";
 import { fetchBoards } from "../lib/api";
 import type { Board } from "../lib/boards";

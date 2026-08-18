@@ -7,6 +7,7 @@ import {
 import { cn } from "@feeblo/ui/utils";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+
 import { useHome } from "../home-context";
 
 export function HomeSearchInput() {

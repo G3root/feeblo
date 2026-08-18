@@ -13,6 +13,7 @@ import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useEffect, useRef, useState } from "react";
+
 import { usePostCreateDialogContext } from "../dialog-stores/post";
 import {
   PostBoardField,
@@ -93,10 +94,10 @@ function SimilarPosts({
       aria-busy={loading}
       aria-label="Similar posts"
       aria-live="polite"
-      className="overflow-hidden rounded-lg border bg-muted/30"
+      className="bg-muted/30 overflow-hidden rounded-lg border"
     >
       <div className="border-b px-3 py-2">
-        <p className="font-medium text-sm">Similar posts</p>
+        <p className="text-sm font-medium">Similar posts</p>
         <p className="text-muted-foreground text-xs">
           Check whether your idea already exists.
         </p>
@@ -106,9 +107,9 @@ function SimilarPosts({
           const href = getPostHref?.(post);
           const body = (
             <>
-              <span className="font-medium text-sm">{post.title}</span>
+              <span className="text-sm font-medium">{post.title}</span>
               {post.excerpt ? (
-                <span className="line-clamp-1 text-muted-foreground text-xs">
+                <span className="text-muted-foreground line-clamp-1 text-xs">
                   {post.excerpt}
                 </span>
               ) : null}
@@ -116,7 +117,7 @@ function SimilarPosts({
           );
           return href ? (
             <a
-              className="flex flex-col gap-0.5 px-3 py-2.5 transition-colors hover:bg-muted"
+              className="hover:bg-muted flex flex-col gap-0.5 px-3 py-2.5 transition-colors"
               href={href}
               key={post.id}
             >

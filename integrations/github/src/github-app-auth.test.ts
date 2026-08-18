@@ -1,9 +1,11 @@
 import { generateKeyPairSync } from "node:crypto";
+
 import { describe, expect, it } from "@effect/vitest";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as jose from "jose";
+
 import type { GitHubApiClient } from "./github-api";
 import {
   createGitHubAppJwt,

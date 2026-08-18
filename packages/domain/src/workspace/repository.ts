@@ -249,7 +249,10 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             and(
               eq(schema.subscriptionTable.organizationId, args.organizationId),
               or(
-                inArray(schema.subscriptionTable.status, ["active", "trialing"]),
+                inArray(schema.subscriptionTable.status, [
+                  "active",
+                  "trialing",
+                ]),
                 and(
                   eq(schema.subscriptionTable.status, "past_due"),
                   gt(schema.subscriptionTable.currentPeriodEnd, now)

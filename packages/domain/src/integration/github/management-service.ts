@@ -1,5 +1,6 @@
 import * as Context from "effect/Context";
 import type * as Effect from "effect/Effect";
+
 import type { PostExternalResourceLink } from "../external-resource/schema";
 import type { GitHubIntegrationError } from "./errors";
 import type * as S from "./schema";

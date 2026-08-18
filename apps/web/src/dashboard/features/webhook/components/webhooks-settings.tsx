@@ -24,6 +24,7 @@ import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useContext, useMemo, useState } from "react";
+
 import {
   type Endpoint,
   endpointsAtom,
@@ -107,14 +108,14 @@ function WebhooksSettingsContent({
         {oneTimeSecret === null ? null : (
           <section
             aria-label="Webhook signing secret"
-            className="rounded-xl border border-warning/30 bg-warning/5 p-4"
+            className="border-warning/30 bg-warning/5 rounded-xl border p-4"
           >
             <h2 className="font-medium">Copy the signing secret now</h2>
-            <p className="mt-1 text-muted-foreground text-sm">
+            <p className="text-muted-foreground mt-1 text-sm">
               This secret for {oneTimeSecret.endpointName} will not be shown
               again.
             </p>
-            <code className="mt-3 block break-all rounded-md border bg-background p-3 text-sm">
+            <code className="bg-background mt-3 block rounded-md border p-3 text-sm break-all">
               {oneTimeSecret.value}
             </code>
             <div className="mt-3 flex gap-2">
@@ -192,7 +193,7 @@ function WebhooksSettingsContent({
           {!(isLoading || loadFailed) && endpoints.length === 0 ? (
             <Card>
               <CardPanel>
-                <p className="py-4 text-center text-muted-foreground text-sm">
+                <p className="text-muted-foreground py-4 text-center text-sm">
                   No webhook endpoints yet.
                 </p>
               </CardPanel>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { organizationId } from "../src/types";
 import { VERSION } from "../src/version";
 

@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema";
-
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
+
 import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware } from "../session-middleware";
 import { PostStatusServiceErrors } from "./errors";

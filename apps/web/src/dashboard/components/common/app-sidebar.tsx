@@ -53,6 +53,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useRouterState } from "@tanstack/react-router";
+
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import {
@@ -64,6 +65,7 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { getPublicSiteUrl } from "~/hooks/use-site";
 import { roadmapCollection } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { NavUser } from "./nav-user";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
@@ -255,9 +257,7 @@ function BoardList() {
           <BoardItem
             boardPublicId={`board-id-${index}`}
             boardSlug={`board-slug-${index}`}
-            key={`board-skeleton-${
-              index
-            }`}
+            key={`board-skeleton-${index}`}
             name="Loading"
           />
         ))}

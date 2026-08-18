@@ -22,6 +22,7 @@ import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+
 import {
   CustomAttributeFields,
   createContactAction,
@@ -29,6 +30,7 @@ import {
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { useContactCreateDialogContext } from "../dialog-stores";
 
 export function ContactCreateDialog() {
@@ -168,7 +170,7 @@ function ContactCreateForm() {
           children={(field) => (
             <div className="space-y-2">
               <label
-                className="font-medium text-sm"
+                className="text-sm font-medium"
                 htmlFor="contact-create-company-id"
               >
                 Company

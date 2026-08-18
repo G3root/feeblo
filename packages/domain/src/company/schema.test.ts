@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { CompanyAttributeDefinitionId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+
 import { CompanyCreate } from "./schema";
 
 describe("CompanyCreate", () => {

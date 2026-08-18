@@ -5,6 +5,7 @@ import {
   offset,
   shift,
 } from "@floating-ui/dom";
+
 import type { Logger } from "./debug";
 
 export function createFloatingInstance(

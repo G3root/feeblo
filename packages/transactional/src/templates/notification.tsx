@@ -1,6 +1,6 @@
 import * as React from "react";
-import { EmailShell } from "./email-shell";
 
+import { EmailShell } from "./email-shell";
 import { type EmailPost, EmailPostList } from "./weekly-digest";
 
 type NotificationEmailProps = {

@@ -1,5 +1,6 @@
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { lazy, type ReactNode, Suspense } from "react";
+
 import { PostCommentComposer } from "../post/post-comment-composer";
 import { CommentsList } from "./comment-display";
 import {

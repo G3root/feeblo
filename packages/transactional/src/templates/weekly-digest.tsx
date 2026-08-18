@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link, Section, Text } from "react-email";
+
 import { EmailShell } from "./email-shell";
 
 export type EmailPost = { readonly label: string; readonly url: string };
@@ -13,13 +14,11 @@ export const EmailPostList = ({
 }) => {
   return (
     <Section>
-      <Text className="m-0 font-20 font-sans text-fg">
-        {heading}
-      </Text>
+      <Text className="font-20 text-fg m-0 font-sans">{heading}</Text>
       {posts.map((item) => (
         <Section className="border-stroke border-t" key={item.url}>
           <Link
-            className="inline-block w-full py-4 font-14 font-sans text-fg"
+            className="font-14 text-fg inline-block w-full py-4 font-sans"
             href={item.url}
           >
             {item.label}

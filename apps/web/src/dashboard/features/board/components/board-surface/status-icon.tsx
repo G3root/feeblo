@@ -1,10 +1,10 @@
-import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@feeblo/ui/utils";
 import {
   BOARD_LANE_COLOR_MAP,
   BoardIconMap,
   type BoardPostStatus,
 } from "@feeblo/web-shared/board/constants";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 export function StatusIcon({ status }: { status: BoardPostStatus }) {
   const Icon = BoardIconMap[status] ?? BoardIconMap.PLANNED;

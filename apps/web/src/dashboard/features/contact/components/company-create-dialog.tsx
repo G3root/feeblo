@@ -15,6 +15,7 @@ import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+
 import {
   CustomAttributeFields,
   createCompanyAction,
@@ -23,6 +24,7 @@ import {
 } from "~/features/custom-attribute/components/custom-attribute-fields";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import { useCompanyCreateDialogContext } from "../dialog-stores";
 
 export function CompanyCreateDialog() {

@@ -115,7 +115,10 @@ const makeS3UploadService = Effect.gen(function* () {
     promoteEditorMedia: ({
       bucket: sourceBucket,
       key: sourceKey,
-    }: { bucket: string; key: string }) =>
+    }: {
+      bucket: string;
+      key: string;
+    }) =>
       Effect.gen(function* () {
         const finalKey = sourceKey.slice(
           `${TEMPORARY_EDITOR_MEDIA_PREFIX}/`.length

@@ -3,6 +3,7 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import { PostStatusId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { CurrentSession, type Session } from "../session-middleware";
 import { PostStatusRpcHandlersEffect } from "./handlers";
 import { PostStatusRepository } from "./repository";
@@ -24,11 +25,13 @@ describe("PostStatusRpcHandlers", () => {
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
     memberships: isMember
-      ? [{
-          membershipId: fixture.membershipId,
-          organizationId: fixture.organizationId,
-          role: "owner",
-        }]
+      ? [
+          {
+            membershipId: fixture.membershipId,
+            organizationId: fixture.organizationId,
+            role: "owner",
+          },
+        ]
       : [],
   });
 
@@ -64,7 +67,7 @@ describe("PostStatusRpcHandlers", () => {
 
   const TestLayer = Layer.merge(
     PostStatusRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
-    Database.PgliteDatabaseLive,
+    Database.PgliteDatabaseLive
   );
 
   layer(TestLayer)("handlers", (it) => {
@@ -77,16 +80,26 @@ describe("PostStatusRpcHandlers", () => {
         const firstId = yield* PostStatusId.generate;
 
         yield* db.insert(schema.postStatusTable).values([
-          { id: laterId, type: "COMPLETED", orderIndex: 1, organizationId: fixture.organizationId },
-          { id: firstId, type: "PENDING", orderIndex: 0, organizationId: fixture.organizationId },
+          {
+            id: laterId,
+            type: "COMPLETED",
+            orderIndex: 1,
+            organizationId: fixture.organizationId,
+          },
+          {
+            id: firstId,
+            type: "PENDING",
+            orderIndex: 0,
+            organizationId: fixture.organizationId,
+          },
         ]);
 
-        const statuses = yield* handlers.PostStatusList({ organizationId: fixture.organizationId }).pipe(
-          Effect.provideService(CurrentSession, makeSession(fixture)),
-        );
+        const statuses = yield* handlers
+          .PostStatusList({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         expect(statuses.map((status) => status.id)).toEqual([firstId, laterId]);
-      }),
+      })
     );
 
     it.effect("rejects non-members from listing statuses", () =>
@@ -94,13 +107,15 @@ describe("PostStatusRpcHandlers", () => {
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const error = yield* Effect.flip(
-          handlers.PostStatusList({ organizationId: fixture.organizationId }).pipe(
-            Effect.provideService(CurrentSession, makeSession(fixture, false)),
-          ),
+          handlers
+            .PostStatusList({ organizationId: fixture.organizationId })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, false))
+            )
         );
 
         expect(error._tag).toBe("PolicyDenied");
-      }),
+      })
     );
 
     it.effect("lists statuses publicly without a session", () =>
@@ -117,10 +132,15 @@ describe("PostStatusRpcHandlers", () => {
           organizationId: fixture.organizationId,
         });
 
-        const statuses = yield* handlers.PostStatusListPublic({ organizationId: fixture.organizationId });
+        const statuses = yield* handlers.PostStatusListPublic({
+          organizationId: fixture.organizationId,
+        });
         expect(statuses).toHaveLength(1);
-        expect(statuses[0]).toMatchObject({ id: statusId, type: "IN_PROGRESS" });
-      }),
+        expect(statuses[0]).toMatchObject({
+          id: statusId,
+          type: "IN_PROGRESS",
+        });
+      })
     );
   });
 });

@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+
 import { LoginPage } from "../page-objects/LoginPage";
 import { RegisterPage } from "../page-objects/RegisterPage";
 import { SignUpPage } from "../page-objects/SignUpPage";
@@ -15,29 +16,27 @@ export type AuthenticatedUser = TestUser & {
 const apiURL = process.env.E2E_API_URL ?? "http://localhost:3100";
 
 export async function signUpProgrammatically(page: Page, user: TestUser) {
-  const response = await page.context().request.post(
-    `${apiURL}/api/auth/sign-up/email`,
-    {
+  const response = await page
+    .context()
+    .request.post(`${apiURL}/api/auth/sign-up/email`, {
       data: {
         name: user.name,
         email: user.email,
         password: user.password,
       },
-    }
-  );
+    });
 
   expect(response.ok()).toBeTruthy();
 
   const email = await waitForVerificationEmail(page.request, user.email);
-  const verificationResponse = await page.context().request.post(
-    `${apiURL}/api/auth/email-otp/verify-email`,
-    {
+  const verificationResponse = await page
+    .context()
+    .request.post(`${apiURL}/api/auth/email-otp/verify-email`, {
       data: {
         email: user.email,
         otp: verificationCodeFromEmail(email),
       },
-    }
-  );
+    });
   expect(verificationResponse.ok()).toBeTruthy();
 }
 

@@ -64,6 +64,7 @@ vi.mock("@feeblo/id", () => ({
 }));
 
 import { PostId } from "@feeblo/id";
+
 import { PostCreateDialogProvider } from "./dialog-stores/post";
 import { PostCreateForm } from "./dialogs/post-create-form-inner";
 import { PostCollectionsProvider } from "./providers/post-collections-provider";

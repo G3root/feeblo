@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { CHANGELOG_STATUSES } from "./constants";
 
 export const changelogStatusSchema = z.enum(CHANGELOG_STATUSES);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { EmbedError } from "../src/errors";
 import { normalizeUserIdentity } from "../src/identity";
 
@@ -65,10 +66,7 @@ describe("normalizeUserIdentity", () => {
     const company = result.companies?.[0]!;
     expect(company).toHaveProperty("id", "comp_1");
     expect(company).toHaveProperty("name", "Acme Inc");
-    expect(company).toHaveProperty(
-      "avatar",
-      "https://example.com/acme.png"
-    );
+    expect(company).toHaveProperty("avatar", "https://example.com/acme.png");
     expect(company).toHaveProperty("customFields", { industry: "Fintech" });
     expect(company).not.toHaveProperty("extraField");
   });

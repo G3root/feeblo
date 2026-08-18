@@ -1,5 +1,6 @@
 import { cn } from "@feeblo/ui/utils";
 import type { MouseEventHandler, ReactNode } from "react";
+
 import { RoadmapStatusIcon } from "./roadmap-status-icon";
 import type { RoadmapStatus } from "./types";
 import { formatRoadmapPostDate } from "./utils";
@@ -22,7 +23,7 @@ function RoadmapIssueCardContent({
   return (
     <>
       <div className="flex justify-between gap-2">
-        <span className="line-clamp-2 text-muted-foreground text-xs uppercase tracking-wide">
+        <span className="text-muted-foreground line-clamp-2 text-xs tracking-wide uppercase">
           {title}
         </span>
         <div className="flex items-start">
@@ -32,13 +33,13 @@ function RoadmapIssueCardContent({
 
       {boardName ? (
         <div className="mt-3">
-          <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-[11px] text-muted-foreground">
+          <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
             {boardName}
           </span>
         </div>
       ) : null}
 
-      <div className="mt-3 flex items-center justify-between gap-2 text-muted-foreground text-xs">
+      <div className="text-muted-foreground mt-3 flex items-center justify-between gap-2 text-xs">
         <span>{formatRoadmapPostDate(updatedAt)}</span>
         {footer}
       </div>
@@ -48,7 +49,7 @@ function RoadmapIssueCardContent({
 
 function getRoadmapIssueCardClassName(isDragging: boolean) {
   return cn(
-    "block w-full rounded-md bg-background p-3 text-left transition-all hover:border-muted-foreground/40 hover:bg-muted/20",
+    "bg-background hover:border-muted-foreground/40 hover:bg-muted/20 block w-full rounded-md p-3 text-left transition-all",
     isDragging && "opacity-60"
   );
 }

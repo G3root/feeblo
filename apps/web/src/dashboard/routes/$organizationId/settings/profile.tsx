@@ -1,15 +1,19 @@
 import { Button } from "@feeblo/ui/button";
 import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
+import {
+  authClient,
+  profilePictureUploadEndpoint,
+} from "@feeblo/web-shared/auth-client";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
+
 import { SettingsAvatarControl } from "~/features/settings/components/settings-avatar-control";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
-import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { authClient, profilePictureUploadEndpoint } from "@feeblo/web-shared/auth-client";
 
 export const Route = createFileRoute("/$organizationId/settings/profile")({
   component: ProfileSettingsPage,

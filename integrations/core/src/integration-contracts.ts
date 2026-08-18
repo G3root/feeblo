@@ -71,8 +71,9 @@ export const IntegrationCapabilityManifest = Schema.Struct({
   direction: IntegrationCapabilityDirection,
   key: IntegrationCapabilityKey,
 });
-export interface IntegrationCapabilityManifest
-  extends Schema.Schema.Type<typeof IntegrationCapabilityManifest> {}
+export interface IntegrationCapabilityManifest extends Schema.Schema.Type<
+  typeof IntegrationCapabilityManifest
+> {}
 
 /** Browser-safe manifest; credentials and provider configuration never belong here. */
 export const IntegrationProviderManifest = Schema.Struct({
@@ -81,8 +82,9 @@ export const IntegrationProviderManifest = Schema.Struct({
   displayName: Schema.NonEmptyString,
   provider: IntegrationProviderKey,
 });
-export interface IntegrationProviderManifest
-  extends Schema.Schema.Type<typeof IntegrationProviderManifest> {}
+export interface IntegrationProviderManifest extends Schema.Schema.Type<
+  typeof IntegrationProviderManifest
+> {}
 
 /** Canonical V1 facts that outbound routes may subscribe to. */
 export type SubscribableIntegrationEventType =
@@ -99,8 +101,9 @@ export const IntegrationEventOrigin = Schema.Struct({
   connectionId: Schema.optionalKey(IntegrationConnectionId.schema),
   routeId: Schema.optionalKey(IntegrationRouteId.schema),
 });
-export interface IntegrationEventOrigin
-  extends Schema.Schema.Type<typeof IntegrationEventOrigin> {}
+export interface IntegrationEventOrigin extends Schema.Schema.Type<
+  typeof IntegrationEventOrigin
+> {}
 
 /** Immutable provider-neutral envelope persisted before any external request. */
 export const IntegrationEventEnvelopeV1 = Schema.Struct({
@@ -118,8 +121,9 @@ export const IntegrationEventEnvelopeV1 = Schema.Struct({
   type: IntegrationEventType,
   version: Schema.Literal(1),
 });
-export interface IntegrationEventEnvelopeV1
-  extends Schema.Schema.Type<typeof IntegrationEventEnvelopeV1> {}
+export interface IntegrationEventEnvelopeV1 extends Schema.Schema.Type<
+  typeof IntegrationEventEnvelopeV1
+> {}
 
 /** Safe post snapshot used by post-created and post-status-changed envelopes. */
 export const IntegrationPostEventData = Schema.Struct({
@@ -149,8 +153,9 @@ export const IntegrationPostEventData = Schema.Struct({
     Schema.Struct({ id: PostStatusId.schema, type: PostStatusType })
   ),
 });
-export interface IntegrationPostEventData
-  extends Schema.Schema.Type<typeof IntegrationPostEventData> {}
+export interface IntegrationPostEventData extends Schema.Schema.Type<
+  typeof IntegrationPostEventData
+> {}
 
 /** Lifecycle state shared by simple endpoints and future OAuth connections. */
 export type IntegrationConnectionLifecycleStatus =
@@ -173,8 +178,9 @@ export const IntegrationRoute = Schema.Struct({
   providerConfig: Schema.Json,
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
-export interface IntegrationRoute
-  extends Schema.Schema.Type<typeof IntegrationRoute> {}
+export interface IntegrationRoute extends Schema.Schema.Type<
+  typeof IntegrationRoute
+> {}
 
 /** Connection fields that are safe to persist and return without credentials. */
 export const IntegrationConnection = Schema.Struct({
@@ -186,8 +192,9 @@ export const IntegrationConnection = Schema.Struct({
   provider: IntegrationProviderKey,
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
-export interface IntegrationConnection
-  extends Schema.Schema.Type<typeof IntegrationConnection> {}
+export interface IntegrationConnection extends Schema.Schema.Type<
+  typeof IntegrationConnection
+> {}
 
 /** Durable delivery record; IDs remain stable through attempts and manual retries. */
 export const IntegrationDelivery = Schema.Struct({
@@ -202,8 +209,9 @@ export const IntegrationDelivery = Schema.Struct({
   routeId: IntegrationRouteId.schema,
   state: IntegrationDeliveryState,
 });
-export interface IntegrationDelivery
-  extends Schema.Schema.Type<typeof IntegrationDelivery> {}
+export interface IntegrationDelivery extends Schema.Schema.Type<
+  typeof IntegrationDelivery
+> {}
 
 /** Append-only safe attempt diagnostics; response bodies and secrets are excluded. */
 export const IntegrationDeliveryAttempt = Schema.Struct({
@@ -219,8 +227,9 @@ export const IntegrationDeliveryAttempt = Schema.Struct({
   retryDecision: Schema.NullOr(IntegrationDeliveryRetryDecision),
   startedAt: Schema.DateTimeUtcFromString,
 });
-export interface IntegrationDeliveryAttempt
-  extends Schema.Schema.Type<typeof IntegrationDeliveryAttempt> {}
+export interface IntegrationDeliveryAttempt extends Schema.Schema.Type<
+  typeof IntegrationDeliveryAttempt
+> {}
 
 /** Persistence failure while atomically recording an event and its matched deliveries. */
 export class IntegrationEventRecordingError extends Schema.TaggedError<IntegrationEventRecordingError>()(
@@ -338,8 +347,9 @@ export const IntegrationExternalResourceDraft = Schema.Struct({
   safeMetadata: IntegrationSafeDisplayMetadata,
   title: Schema.optionalKey(Schema.String),
 });
-export interface IntegrationExternalResourceDraft
-  extends Schema.Schema.Type<typeof IntegrationExternalResourceDraft> {}
+export interface IntegrationExternalResourceDraft extends Schema.Schema.Type<
+  typeof IntegrationExternalResourceDraft
+> {}
 
 /** Provider handler reports only safe outcome metadata to the delivery kernel. */
 export interface IntegrationProviderDeliveryResult {

@@ -32,8 +32,8 @@
   "dependencies": {
     "@effect/platform-node": "catalog:",
     "@feeblo/config": "workspace:*",
-    "@feeblo/domain": "workspace:*",
     "@feeblo/db": "workspace:*",
+    "@feeblo/domain": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/permissions": "workspace:*",
     "@feeblo/transactional": "workspace:*",
@@ -43,8 +43,8 @@
     "better-auth": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
-    "zod": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"

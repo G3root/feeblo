@@ -102,7 +102,7 @@ export default function InlineMenu() {
       >
         <InlinePopoverPositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
           <InlinePopoverPopup
-            className="relative box-border flex min-w-32 origin-(--transform-origin) starting:scale-95 space-x-1 overflow-auto whitespace-nowrap rounded-lg border border-border bg-popover p-1 text-popover-foreground starting:opacity-0 shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none rtl:space-x-reverse"
+            className="border-border bg-popover text-popover-foreground relative box-border flex min-w-32 origin-(--transform-origin) space-x-1 overflow-auto rounded-lg border p-1 whitespace-nowrap shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none rtl:space-x-reverse starting:scale-95 starting:opacity-0"
             data-testid="inline-menu-main"
           >
             {items.bold && (
@@ -182,7 +182,7 @@ export default function InlineMenu() {
             placement="bottom"
           >
             <InlinePopoverPopup
-              className="relative box-border flex w-xs origin-(--transform-origin) starting:scale-95 flex-col items-stretch gap-y-2 rounded-lg border border-border bg-popover p-4 text-popover-foreground starting:opacity-0 shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none"
+              className="border-border bg-popover text-popover-foreground relative box-border flex w-xs origin-(--transform-origin) flex-col items-stretch gap-y-2 rounded-lg border p-4 shadow-lg transition-[opacity,scale] transition-discrete duration-40 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none starting:scale-95 starting:opacity-0"
               data-testid="inline-menu-link"
             >
               {linkMenuOpen && (
@@ -195,7 +195,7 @@ export default function InlineMenu() {
                   }}
                 >
                   <input
-                    className="box-border flex h-9 w-full rounded-md border border-input border-solid bg-background px-3 py-2 text-sm outline-hidden ring-0 ring-transparent transition file:border-0 file:bg-transparent file:font-medium file:text-sm placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring box-border flex h-9 w-full rounded-md border border-solid px-3 py-2 text-sm ring-0 ring-transparent outline-hidden transition file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
                     defaultValue={items.link.currentLink}
                     placeholder="Paste the link..."
                   />
@@ -203,7 +203,7 @@ export default function InlineMenu() {
               )}
               {items.link.isActive && (
                 <button
-                  className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border-0 bg-primary px-3 font-medium text-primary-foreground text-sm transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring inline-flex h-9 items-center justify-center rounded-md border-0 px-3 text-sm font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
                   onClick={() => handleLinkUpdate()}
                   onMouseDown={(event) => event.preventDefault()}
                   type="button"

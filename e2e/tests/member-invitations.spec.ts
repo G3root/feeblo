@@ -1,5 +1,6 @@
 import type { InvitableRole } from "@feeblo/permissions";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
+
 import {
   createAuthenticatedWorkspace,
   signUpProgrammatically,

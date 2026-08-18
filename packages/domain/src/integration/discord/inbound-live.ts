@@ -13,6 +13,7 @@ import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
 import { BoardRepository } from "../../board/repository";
 import { EmailOutboxConfig } from "../../email-outbox/config";
 import { DiscordFeedbackService } from "./discord-feedback-service";

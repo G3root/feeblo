@@ -10,7 +10,7 @@ import { Link } from "@tanstack/react-router";
 export function NotFoundPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      <Empty className="border border-border/70 border-dashed bg-muted/20">
+      <Empty className="border-border/70 bg-muted/20 border border-dashed">
         <EmptyHeader>
           <EmptyTitle>Page not found</EmptyTitle>
           <EmptyDescription>

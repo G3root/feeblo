@@ -290,7 +290,7 @@ function Root({
                     width={EDITOR_SIZE}
                   />
                   <div className="flex items-center gap-3">
-                    <Label className="whitespace-nowrap text-sm">Zoom</Label>
+                    <Label className="text-sm whitespace-nowrap">Zoom</Label>
                     <Slider
                       max={3}
                       min={1}
@@ -302,7 +302,7 @@ function Root({
                       step={0.1}
                       value={[zoom]}
                     />
-                    <span className="w-10 text-right text-muted-foreground text-xs tabular-nums">
+                    <span className="text-muted-foreground w-10 text-right text-xs tabular-nums">
                       {zoom.toFixed(1)}x
                     </span>
                   </div>

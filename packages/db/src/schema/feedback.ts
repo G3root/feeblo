@@ -18,6 +18,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
+
 import type { TPostActivityKind } from "../validation-schema/activity-kind";
 import type { TAttributeType } from "../validation-schema/attribute-type";
 import type { TChangelogCategoryIconType } from "../validation-schema/changelog-category-icon-type";

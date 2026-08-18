@@ -1,5 +1,6 @@
 import { createAsync } from "@solidjs/router";
 import { Show } from "solid-js";
+
 import { BoardList } from "../components/board-list/board-list";
 import { UpdatesList } from "../components/updates/updates-list";
 import { fetchBoards } from "../lib/api";
@@ -15,7 +16,7 @@ export function IndexComponent() {
   return (
     <Show
       fallback={
-        <div class="p-6 text-muted-foreground text-sm">Loading boards...</div>
+        <div class="text-muted-foreground p-6 text-sm">Loading boards...</div>
       }
       keyed
       when={boards()}

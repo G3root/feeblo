@@ -20,7 +20,5 @@
     "**/routeTree.gen.ts": true,
     "repos/**": true
   },
-  "js/ts.preferences.autoImportFileExcludePatterns": [
-    "repos/**"
-  ]
+  "js/ts.preferences.autoImportFileExcludePatterns": ["repos/**"]
 }

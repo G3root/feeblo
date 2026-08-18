@@ -57,13 +57,13 @@ export default function CodeBlockView(props: ReactNodeViewProps) {
   return (
     <>
       <div
-        className="relative top-3 mx-2 h-0 select-none overflow-visible text-xs data-preview:hidden"
+        className="relative top-3 mx-2 h-0 overflow-visible text-xs select-none data-preview:hidden"
         contentEditable={false}
         // data-preview={showMermaidPreview ? "" : undefined}
       >
         <select
           aria-label="Code block language"
-          className="relative box-border w-auto cursor-pointer select-none appearance-none rounded-sm border-none bg-transparent px-2 py-1 text-muted-foreground text-xs opacity-0 outline-unset transition hover:opacity-80 focus:outline-unset [div[data-node-view-root]:hover_&]:opacity-50 hover:[div[data-node-view-root]:hover_&]:opacity-80"
+          className="text-muted-foreground outline-unset focus:outline-unset relative box-border w-auto cursor-pointer appearance-none rounded-sm border-none bg-transparent px-2 py-1 text-xs opacity-0 transition select-none hover:opacity-80 [div[data-node-view-root]:hover_&]:opacity-50 hover:[div[data-node-view-root]:hover_&]:opacity-80"
           onChange={(event) => setLanguage(event.target.value)}
           value={language}
         >

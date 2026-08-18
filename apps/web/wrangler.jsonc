@@ -1,15 +1,12 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-06-10",
-  "compatibility_flags": [
-    "nodejs_compat",
-    "global_fetch_strictly_public"
-  ],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "name": "feeblo",
   "main": "@astrojs/cloudflare/entrypoints/server",
   "assets": {
     "directory": "./dist",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
   },
   "observability": {
     "enabled": true,
@@ -18,34 +15,26 @@
       "enabled": true,
       "head_sampling_rate": 1,
       "persist": true,
-      "invocation_logs": true
+      "invocation_logs": true,
     },
     "traces": {
       "enabled": false,
       "persist": true,
-      "head_sampling_rate": 1
-    }
+      "head_sampling_rate": 1,
+    },
   },
   "secrets": {
-    "required": [
-      "API_URL",
-      "APP_URL",
-      "APP_ROOT_DOMAIN"
-    ]
+    "required": ["API_URL", "APP_URL", "APP_ROOT_DOMAIN"],
   },
   "env": {
     "staging": {
       "name": "feeblo-staging",
       "secrets": {
-        "required": [
-          "API_URL",
-          "APP_URL",
-          "APP_ROOT_DOMAIN"
-        ]
-      }
+        "required": ["API_URL", "APP_URL", "APP_ROOT_DOMAIN"],
+      },
     },
     "production": {
-      "name": "feeblo"
-    }
-  }
+      "name": "feeblo",
+    },
+  },
 }

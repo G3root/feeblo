@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+
 import { describe, expect, it } from "@effect/vitest";
 import {
   asLegid,
@@ -20,6 +21,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+
 import type { GitHubApiClient, GitHubIssue } from "./github-api";
 import { makeGitHubIssueExternalResourceDraft } from "./github-external-resource";
 import { ParsedGitHubInboundRequest } from "./github-inbound-schema";

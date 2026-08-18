@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+
 import {
   currentDb,
   gitHubIssueSafeMetadataConditions,
@@ -35,6 +36,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+
 import { ServerConfig } from "./config";
 
 /** Server-owned GitHub App adapter. Durable state is installation identity only; all bearer tokens are ephemeral. */

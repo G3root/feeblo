@@ -1,5 +1,6 @@
 import { RoadmapColumnId, RoadmapId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
+
 import { SimpleRoadmapFilter } from "../roadmap/schema";
 
 export const StatusRoadmapColumnConfig = S.Struct({
@@ -40,9 +41,7 @@ export const StatusRoadmapColumn = S.Struct({
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });
-export type TStatusRoadmapColumn = S.Schema.Type<
-  typeof StatusRoadmapColumn
->;
+export type TStatusRoadmapColumn = S.Schema.Type<typeof StatusRoadmapColumn>;
 
 const ColumnInput = {
   roadmapId: RoadmapId.schema,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as jose from "jose";
+
 import { DataValidationError } from "./errors";
 import { parsePersonAttributes } from "./utils";
 

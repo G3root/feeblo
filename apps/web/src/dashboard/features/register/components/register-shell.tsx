@@ -1,5 +1,5 @@
-import type React from "react";
 import { cn } from "@feeblo/ui/utils";
+import type React from "react";
 
 type RootProps = {
   children: React.ReactNode;
@@ -20,7 +20,7 @@ function Root({ children, className }: RootProps) {
   return (
     <div
       className={cn(
-        "flex min-h-svh w-full flex-col items-center justify-center bg-muted/40 px-4 py-12",
+        "bg-muted/40 flex min-h-svh w-full flex-col items-center justify-center px-4 py-12",
         className
       )}
     >
@@ -32,7 +32,7 @@ function Root({ children, className }: RootProps) {
 function Heading({ title, description }: HeadingProps) {
   return (
     <header className="flex flex-col gap-1">
-      <h1 className="font-semibold text-lg tracking-tight">{title}</h1>
+      <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
       {description && (
         <p className="text-muted-foreground text-sm">{description}</p>
       )}

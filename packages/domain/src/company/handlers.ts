@@ -3,10 +3,10 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import * as Policy from "../policy";
-import { withRemapDbErrors } from "../rpc-errors";
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
+import * as Policy from "../policy";
+import { withRemapDbErrors } from "../rpc-errors";
 import { CompanyNotFoundError, FailedToCreateCompanyError } from "./errors";
 import { CompanyPolicy } from "./policies";
 import { CompanyRepository } from "./repository";
@@ -55,12 +55,10 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
             Effect.gen(function* () {
               yield* Policy.policy(() =>
-                attributeDefinitionRepository.companyAttributeDefinitionExists(
-                  {
-                    id: attributeValue.attributeId,
-                    organizationId: args.organizationId,
-                  }
-                )
+                attributeDefinitionRepository.companyAttributeDefinitionExists({
+                  id: attributeValue.attributeId,
+                  organizationId: args.organizationId,
+                })
               );
 
               const definition =

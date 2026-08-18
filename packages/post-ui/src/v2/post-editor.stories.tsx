@@ -1,5 +1,6 @@
 import "../../tailwind.css";
 import { useState } from "react";
+
 import { PostEditor } from "./post-editor";
 
 export default {
@@ -8,7 +9,7 @@ export default {
 
 export function Default() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostEditor
           onSubmit={async ({ content }) => {
@@ -23,7 +24,7 @@ export function Default() {
 
 export function WithSubmit() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostEditor
           onSubmit={async ({ content }) => {
@@ -40,7 +41,7 @@ export function WithSubmit() {
 
 export function Disabled() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostEditor disabled onSubmit={async () => {}}>
           <PostEditor.Submit />
@@ -54,7 +55,7 @@ export function ControlledState() {
   const [content, setContent] = useState("Pre-filled **rich text** content");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostEditor
           content={content}
@@ -82,7 +83,7 @@ export function Composed() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostEditor.Provider
           content={content}
@@ -102,7 +103,7 @@ export function Composed() {
 
 export function CustomLabels() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-8">
+    <div className="bg-background flex min-h-screen items-center justify-center p-8">
       <div className="w-full max-w-xl">
         <PostEditor
           onSubmit={async ({ content }) => {

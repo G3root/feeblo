@@ -8,11 +8,12 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+import { htmlToMarkdown, markdownToHtml } from "@feeblo/utils/markdown";
 import type { Editor } from "prosekit/core";
 import { htmlFromNode, nodeFromHTML } from "prosekit/core";
 import { ListDOMSerializer } from "prosekit/extensions/list";
+
 import type { EditorExtension } from "../extension";
-import { htmlToMarkdown, markdownToHtml } from "@feeblo/utils/markdown";
 
 export const getMarkdownContent = (editor: Editor<EditorExtension>): string => {
   if (!editor.mounted) {

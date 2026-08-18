@@ -30,8 +30,7 @@ initPostHog();
 
 export const posthogAnalyticsClient: AnalyticsClient | undefined =
   typeof window !== "undefined" && posthogKey
-    ?
-      (name: any, properties: any) => posthog.capture(name, properties)
+    ? (name: any, properties: any) => posthog.capture(name, properties)
     : undefined;
 
 export function identifyPostHog(state: {

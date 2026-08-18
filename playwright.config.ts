@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+
 import e2eConfig from "./e2e/playwright.config";
 
 /**

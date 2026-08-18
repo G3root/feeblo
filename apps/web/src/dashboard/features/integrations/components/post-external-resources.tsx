@@ -6,6 +6,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { createContext, type ReactNode, useContext } from "react";
+
 import {
   type PostExternalResourceLink,
   postExternalResourceLinksAtom,
@@ -59,7 +60,7 @@ export function PostExternalResources({
       <section aria-labelledby="post-external-resources-heading">
         <div className="flex items-center justify-between gap-2">
           <h2
-            className="font-medium text-sm"
+            className="text-sm font-medium"
             id="post-external-resources-heading"
           >
             Linked resources
@@ -131,7 +132,7 @@ function PostExternalResourceProviderGroup({
   const providerDisplayName = resources[0]?.providerDisplayName ?? "External";
   return (
     <div className="grid gap-2">
-      <h3 className="font-medium text-muted-foreground text-xs">
+      <h3 className="text-muted-foreground text-xs font-medium">
         <span className="inline-flex items-center gap-1.5">
           <HugeiconsIcon
             aria-hidden
@@ -165,13 +166,13 @@ function PostExternalResourceCard({
       <span className="min-w-0">
         <span className="block truncate">{resourceLabel}</span>
         {resourceDetails === "" ? null : (
-          <span className="block truncate text-muted-foreground text-xs">
+          <span className="text-muted-foreground block truncate text-xs">
             {resourceDetails}
           </span>
         )}
       </span>
       {resource.stateKey === null ? null : (
-        <span className="shrink-0 text-muted-foreground text-xs capitalize">
+        <span className="text-muted-foreground shrink-0 text-xs capitalize">
           {resource.stateKey}
         </span>
       )}
@@ -179,7 +180,7 @@ function PostExternalResourceCard({
   );
   return (
     <a
-      className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted"
+      className="hover:bg-muted flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
       href={resource.remoteUrl.toString()}
       rel="noopener noreferrer"
       target="_blank"

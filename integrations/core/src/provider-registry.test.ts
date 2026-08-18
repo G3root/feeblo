@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
+
 import {
   IntegrationCapabilityKey,
   IntegrationProviderKey,
@@ -27,7 +28,11 @@ const webhookRegistration = ({
   inboundHandlers,
   manifest: manifest ?? {
     capabilities: [
-      { configVersion: 1, direction: "outbound", key: IntegrationCapabilityKey.make("events.post") },
+      {
+        configVersion: 1,
+        direction: "outbound",
+        key: IntegrationCapabilityKey.make("events.post"),
+      },
     ],
     connectionMode: "none",
     displayName: "Webhook",
@@ -103,8 +108,16 @@ describe("makeIntegrationProviderRegistry", () => {
       ],
       manifest: {
         capabilities: [
-          { configVersion: 1, direction: "outbound", key: IntegrationCapabilityKey.make("events.post") },
-          { configVersion: 1, direction: "inbound", key: IntegrationCapabilityKey.make("commands") },
+          {
+            configVersion: 1,
+            direction: "outbound",
+            key: IntegrationCapabilityKey.make("events.post"),
+          },
+          {
+            configVersion: 1,
+            direction: "inbound",
+            key: IntegrationCapabilityKey.make("commands"),
+          },
         ],
         connectionMode: "none",
         displayName: "Webhook",
@@ -136,7 +149,11 @@ describe("makeIntegrationProviderRegistry", () => {
           manifest: {
             ...registration.manifest,
             capabilities: [
-              { configVersion: 1, direction: "inbound", key: IntegrationCapabilityKey.make("commands") },
+              {
+                configVersion: 1,
+                direction: "inbound",
+                key: IntegrationCapabilityKey.make("commands"),
+              },
             ],
           },
           routeConfigurationSchemas: new Map([["commands", Schema.Json]]),

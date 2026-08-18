@@ -1,20 +1,13 @@
 # Shared permission system
 
-Feeblo's permissions live in **one place** — `packages/permissions` — and are
-imported by both the backend (`packages/domain`) and the frontend
-(`packages/web-shared`, `apps/web`). The backend enforces them; the frontend
-uses the exact same definitions to show/hide UI, so the two can never drift.
+Feeblo's permissions live in **one place** — `packages/permissions` — and are imported by both the backend (`packages/domain`) and the frontend (`packages/web-shared`, `apps/web`). The backend enforces them; the frontend uses the exact same definitions to show/hide UI, so the two can never drift.
 
 ## Why this exists
 
 Permissions were previously defined twice, by hand, in two places:
 
-- **Backend** — `packages/domain/src/policy.ts` plus per-module `*Policy`
-  services, with ad-hoc `role === "owner" || role === "admin"` checks and a
-  `role: "owner" | "admin" | "member"` literal duplicated across schemas.
-- **Frontend** — `packages/web-shared/src/hooks/use-policy.ts` re-implemented
-  the same vocabulary (`hasRole`, `hasOwnerOrAdminRole`, hardcoded literals)
-  with no link to the backend definitions.
+- **Backend** — `packages/domain/src/policy.ts` plus per-module `*Policy` services, with ad-hoc `role === "owner" || role === "admin"` checks and a `role: "owner" | "admin" | "member"` literal duplicated across schemas.
+- **Frontend** — `packages/web-shared/src/hooks/use-policy.ts` re-implemented the same vocabulary (`hasRole`, `hasOwnerOrAdminRole`, hardcoded literals) with no link to the backend definitions.
 
 Because the two copies were independent, they drifted:
 
@@ -38,32 +31,21 @@ Real-world feedback platforms use a two-layer model:
 owner > admin > manager > contributor
 ```
 
-An administrative precedence order where higher roles inherit everything
-below them. Owner retains the highest legacy rank for ownership-transfer and
-invitation rules, while its effective capability set is identical to admin:
+An administrative precedence order where higher roles inherit everything below them. Owner retains the highest legacy rank for ownership-transfer and invitation rules, while its effective capability set is identical to admin:
 
-- **owner** — legacy workspace-owner designation; created with the workspace
-  and never invited. It has the same effective permissions as admin.
+- **owner** — legacy workspace-owner designation; created with the workspace and never invited. It has the same effective permissions as admin.
 - **admin** — unrestricted workspace administrator.
-- **manager** — content manager: handles posts, changelogs, tags, roadmaps,
-  and lower-ranked user cleanup (formerly the "member" role).
+- **manager** — content manager: handles posts, changelogs, tags, roadmaps, and lower-ranked user cleanup (formerly the "member" role).
 - **contributor** — contributes feedback: creates/votes/comments on posts.
 
-`packages/permissions/src/roles.ts` is its single definition (`ROLES`,
-`ROLE_RANK`, `roleAtLeast`, `compareRoles`). Owner and admin are "privileged"
-— `PRIVILEGED_ROLES`/`isPrivilegedRole` are **derived** from the permission
-table via the `workspace.update` grant (admin directly, owner by inheritance),
-not a hardcoded role list; admin/manager/contributor can be invited
-(`INVITABLE_ROLES`).
+`packages/permissions/src/roles.ts` is its single definition (`ROLES`, `ROLE_RANK`, `roleAtLeast`, `compareRoles`). Owner and admin are "privileged" — `PRIVILEGED_ROLES`/`isPrivilegedRole` are **derived** from the permission table via the `workspace.update` grant (admin directly, owner by inheritance), not a hardcoded role list; admin/manager/contributor can be invited (`INVITABLE_ROLES`).
 
 ### Predefined role matrix
 
-Admin and owner are intentionally equivalent for authorization. `owner` is
-kept only for legacy workspace records. "Own" post/comment actions still
-require the resource-level authorship checks described below.
+Admin and owner are intentionally equivalent for authorization. `owner` is kept only for legacy workspace records. "Own" post/comment actions still require the resource-level authorship checks described below.
 
 | Area | Capability | Contributor | Manager | Admin / Owner |
-| --- | --- | :---: | :---: | :---: |
+| --- | --- | :-: | :-: | :-: |
 | Boards | Import posts | No | Yes | Yes |
 | Boards | Export data to CSV | No | Yes | Yes |
 | Boards | Customize the create-post form | No | Yes | Yes |
@@ -94,17 +76,11 @@ require the resource-level authorship checks described below.
 | Settings | Manage teammates | No | No | Yes |
 | Settings | Delete the workspace | No | No | Yes |
 
-The matrix is the authorization contract, including capabilities planned for
-future product surfaces. Board import, CSV export, create-post-form
-customization, outbound webhook management, and configurable post fields or
-statuses are not currently shipped. They must receive distinct named
-permissions and matching backend/frontend gates when implemented; no existing
-generic permission should be reused for them.
+The matrix is the authorization contract, including capabilities planned for future product surfaces. Board import, CSV export, create-post-form customization, outbound webhook management, and configurable post fields or statuses are not currently shipped. They must receive distinct named permissions and matching backend/frontend gates when implemented; no existing generic permission should be reused for them.
 
 ### Layer 2 — Named permissions
 
-Instead of scattering `role === "owner" || role === "admin"`, every gate is a
-**named permission**:
+Instead of scattering `role === "owner" || role === "admin"`, every gate is a **named permission**:
 
 ```text
 boards.*             changelog.*         posts.*
@@ -113,13 +89,7 @@ members.assign       site.*              roadmap.*
 billing.*            contacts.*          companies.*
 ```
 
-`packages/permissions/src/permissions.ts` is the catalog (id + label +
-description, anchored to the backend policy it maps to). Its
-`createPermissions(resource, actions)` utility creates the action permissions
-and the matching `{resource}.*` wildcard. `roleGrants` resolves a wildcard
-grant for action checks. `src/role-permissions.ts` is the role → permission
-table. Roles inherit
-permissions from lower ranks automatically (`permissionsForRole`).
+`packages/permissions/src/permissions.ts` is the catalog (id + label + description, anchored to the backend policy it maps to). Its `createPermissions(resource, actions)` utility creates the action permissions and the matching `{resource}.*` wildcard. `roleGrants` resolves a wildcard grant for action checks. `src/role-permissions.ts` is the role → permission table. Roles inherit permissions from lower ranks automatically (`permissionsForRole`).
 
 ### The `can()` API
 
@@ -130,36 +100,27 @@ Both sides call the same pure function:
 can(context, organizationId, permission) => boolean
 ```
 
-`context` only needs `memberships: [{ organizationId, role }]` — both the
-backend `Session` and the frontend `AuthClientSession` satisfy it structurally.
+`context` only needs `memberships: [{ organizationId, role }]` — both the backend `Session` and the frontend `AuthClientSession` satisfy it structurally.
 
-- **Backend:** `Policy.canPermission(organizationId, "posts.*")`
-  wraps `can()` in the Effect policy machinery.
-- **Frontend:** `hasPermission(organizationId, "posts.*")` is a
-  `ClientPolicy` over the same `can()`.
+- **Backend:** `Policy.canPermission(organizationId, "posts.*")` wraps `can()` in the Effect policy machinery.
+- **Frontend:** `hasPermission(organizationId, "posts.*")` is a `ClientPolicy` over the same `can()`.
 
 ### Resource checks stay on the backend
 
-"Can this actor edit THIS changelog?" needs data the frontend may not have.
-Two complementary rules:
+"Can this actor edit THIS changelog?" needs data the frontend may not have. Two complementary rules:
 
 1. The **role/permission part** comes from the shared table (never drifts).
-2. The **resource part** ("is the actor the creator?") is composed in the
-   backend policy and mirrored client-side **only when the resource data is
-   already loaded** (e.g. `post.creatorId`, `board.creatorId`):
+2. The **resource part** ("is the actor the creator?") is composed in the backend policy and mirrored client-side **only when the resource data is already loaded** (e.g. `post.creatorId`, `board.creatorId`):
 
    ```ts
    // backend  ChangelogPolicy.canUpdate
-   Policy.canPermission(orgId, "changelog.*")
+   Policy.canPermission(orgId, "changelog.*");
 
    // frontend changelog-editor.tsx (same permission id)
-   hasPermission(orgId, "changelog.*")
+   hasPermission(orgId, "changelog.*");
    ```
 
-Plan entitlements (limits/capabilities) remain a separate, orthogonal layer —
-they gate *how much* (board count, admin count), not *who may*. They already
-use the shared vocabulary (`isPrivilegedRole`, now permission-derived) for
-privileged-member limits.
+Plan entitlements (limits/capabilities) remain a separate, orthogonal layer — they gate _how much_ (board count, admin count), not _who may_. They already use the shared vocabulary (`isPrivilegedRole`, now permission-derived) for privileged-member limits.
 
 ## Package layout
 
@@ -176,113 +137,63 @@ Zero runtime dependencies — safe for Node (backend) and browsers (frontend).
 
 ## Role rename (member → manager) and contributor
 
-The former `member` role was renamed to `manager` (same permissions) and a new
-lowest tier `contributor` was added:
+The former `member` role was renamed to `manager` (same permissions) and a new lowest tier `contributor` was added:
 
 | Role | Grants (beyond inheritance) |
- | --- | --- |
+| --- | --- |
 | `contributor` | + `posts.move`; other contribution actions use membership/resource policies |
 | `manager` | + `members.remove`, `posts.*`, `changelog.*`, `tags.*`, `roadmap.*`, `comments.*`, CRM create/update |
 | `admin` | + `workspace.*`, `members.*`, `billing.*`, `site.*`, `boards.*`, `contacts.*`, `companies.*` |
 | `owner` | No additional grants; retained as a legacy alias of admin |
 
-The DB `member.role` column is `text` (not an enum), so the rename is a data
-migration (`packages/db/src/migrations/20260805000000_rename_member_role_to_manager`)
-that updates `member` and `invitation` rows; the schema default now reads
-`manager`. All role literals across the repo flow from `ROLES` in
-`@feeblo/permissions`.
+The DB `member.role` column is `text` (not an enum), so the rename is a data migration (`packages/db/src/migrations/20260805000000_rename_member_role_to_manager`) that updates `member` and `invitation` rows; the schema default now reads `manager`. All role literals across the repo flow from `ROLES` in `@feeblo/permissions`.
 
 ## Wiring
 
 **Backend (`packages/domain`):**
 
-- `policy.ts` — `hasMembership`/`hasOrganizationRole`/
-  `hasOrganizationOwnerOrAdmin`/`isMember` now delegate to
-  `@feeblo/permissions`; new `canPermission(organizationId, permission)` for
-  role gates. `hasOrganizationOwnerOrAdmin` is kept as an alias of
-  `canPermission(orgId, "workspace.update")`.
-- Module policies (`board`, `post`, `changelog`, `tag`, `site`, `contact`,
-  `company`, `attribute-definition`, `membership`, `billing`, `roadmap`,
-  `roadmap-column`) use `canPermission` with named permissions instead of
-  role-literal checks.
+- `policy.ts` — `hasMembership`/`hasOrganizationRole`/ `hasOrganizationOwnerOrAdmin`/`isMember` now delegate to `@feeblo/permissions`; new `canPermission(organizationId, permission)` for role gates. `hasOrganizationOwnerOrAdmin` is kept as an alias of `canPermission(orgId, "workspace.update")`.
+- Module policies (`board`, `post`, `changelog`, `tag`, `site`, `contact`, `company`, `attribute-definition`, `membership`, `billing`, `roadmap`, `roadmap-column`) use `canPermission` with named permissions instead of role-literal checks.
 - `membership/schema.ts` builds `ROLE_LITERAL` from `ROLES`.
-- `plan-entitlements.ts` uses `PRIVILEGED_ROLES`/`isPrivilegedRole` from
-  `@feeblo/permissions` directly (the old `PRIVILEGED_MEMBER_ROLES` /
-  `isPrivilegedMemberRole` aliases were removed). `isPrivilegedRole` is
-  derived from the permission table (`roleGrants(role, "workspace.update")`)
-  rather than a hardcoded role list.
-- The `member.role` / `invitation.role` columns in `packages/db` are typed
-  `.$type<Role>()` / `.$type<Role | null>()`, so repository results stay
-  assignable to the Effect schemas.
+- `plan-entitlements.ts` uses `PRIVILEGED_ROLES`/`isPrivilegedRole` from `@feeblo/permissions` directly (the old `PRIVILEGED_MEMBER_ROLES` / `isPrivilegedMemberRole` aliases were removed). `isPrivilegedRole` is derived from the permission table (`roleGrants(role, "workspace.update")`) rather than a hardcoded role list.
+- The `member.role` / `invitation.role` columns in `packages/db` are typed `.$type<Role>()` / `.$type<Role | null>()`, so repository results stay assignable to the Effect schemas.
 
 **Frontend (`packages/web-shared`):**
 
-- `use-policy.ts` — new `hasPermission(organizationId, permission)` delegates
-  to the shared `can()`; `hasRole` is now **org-scoped**
-  (`hasRole(organizationId, role)`); `hasMembership`/`hasOwnerOrAdminRole`
-  delegate to shared helpers. `usePolicy`/`PolicyGuard`/`allPolicy`/
-  `anyPolicy`/`isUser` unchanged.
+- `use-policy.ts` — new `hasPermission(organizationId, permission)` delegates to the shared `can()`; `hasRole` is now **org-scoped** (`hasRole(organizationId, role)`); `hasMembership`/`hasOwnerOrAdminRole` delegate to shared helpers. `usePolicy`/`PolicyGuard`/`allPolicy`/ `anyPolicy`/`isUser` unchanged.
 
 **Mismatch fixes applied:**
 
 1. `hasRole` is org-scoped (bug class removed).
-2. Board lifecycle and privacy are available to admins and owners through
-   `boards.create` and `boards.*`.
-3. `post-sidebar-actions.tsx` — manager+ users can manage/moderate posts;
-   contributors retain author-level post editing, with own-post deletion
-   restricted to posts without comments or other votes.
+2. Board lifecycle and privacy are available to admins and owners through `boards.create` and `boards.*`.
+3. `post-sidebar-actions.tsx` — manager+ users can manage/moderate posts; contributors retain author-level post editing, with own-post deletion restricted to posts without comments or other votes.
 4. `changelog-editor.tsx` — edit/delete/publish requires `changelog.*`.
 5. Roadmap pages use `roadmap.*` instead of the generic owner/admin gate.
 6. Managers can delete other users' comments through `comments.*`.
 
-**Manager-only operations are enforced on the backend, not just in the UI.**
-The board/changelog/tag/contact/company create/update policies check named
-permissions instead of bare `hasMembership`, so direct RPC calls from a
-contributor are
-rejected with `PolicyDenied`. Frontend mirrors gate the same actions
-(`CreateBoardButton`, changelog “New Entry”, tag/contact/company rows) so
-contributors never see actions that would 403. `TagList` now returns
-`creatorId` so the tag rename/delete menu keeps the creator fallback, matching
-`TagPolicy.canUpdate`/`canDelete`.
+**Manager-only operations are enforced on the backend, not just in the UI.** The board/changelog/tag/contact/company create/update policies check named permissions instead of bare `hasMembership`, so direct RPC calls from a contributor are rejected with `PolicyDenied`. Frontend mirrors gate the same actions (`CreateBoardButton`, changelog “New Entry”, tag/contact/company rows) so contributors never see actions that would 403. `TagList` now returns `creatorId` so the tag rename/delete menu keeps the creator fallback, matching `TagPolicy.canUpdate`/`canDelete`.
 
 ## Rules of thumb for new code
 
-- **Never write `role === "owner"`.** Add a permission to
-  `role-permissions.ts` (and `permissions.ts` for its label) and gate with
-  `Policy.canPermission` / `hasPermission`.
-- **Never duplicate the role literal.** Import `Role` / `ROLES` from
-  `@feeblo/permissions`.
-- **Frontend gates must mirror a backend policy.** When a gate needs resource
-  data the frontend lacks, either add the field to the RPC response (as was
-  done for `board.creatorId`) or return a derived `canX` flag from the backend.
-- **Entitlements are not permissions.** Plan limits stay in
-  `plan-entitlements.ts`; they gate quantity, not identity.
+- **Never write `role === "owner"`.** Add a permission to `role-permissions.ts` (and `permissions.ts` for its label) and gate with `Policy.canPermission` / `hasPermission`.
+- **Never duplicate the role literal.** Import `Role` / `ROLES` from `@feeblo/permissions`.
+- **Frontend gates must mirror a backend policy.** When a gate needs resource data the frontend lacks, either add the field to the RPC response (as was done for `board.creatorId`) or return a derived `canX` flag from the backend.
+- **Entitlements are not permissions.** Plan limits stay in `plan-entitlements.ts`; they gate quantity, not identity.
 
 ## Migration checklist (remaining call sites)
 
-- `apps/web/src/dashboard/routes/$organizationId/settings/*` still use the
-  `hasOwnerOrAdminRole` convenience alias (works, maps to `workspace.update`).
-  Prefer explicit permissions (`site.*`, `members.invite`/`members.remove`)
-  when next touched.
-- `members.tsx` parses `member.role.split(",")` from the DB — replace with a
-  `Role`-typed mapper when the member collection schema is tightened.
-- `packages/domain/src/policy.ts#hasOrganizationRole` remains exported for
-  legacy call sites; prefer `canPermission` in new code.
+- `apps/web/src/dashboard/routes/$organizationId/settings/*` still use the `hasOwnerOrAdminRole` convenience alias (works, maps to `workspace.update`). Prefer explicit permissions (`site.*`, `members.invite`/`members.remove`) when next touched.
+- `members.tsx` parses `member.role.split(",")` from the DB — replace with a `Role`-typed mapper when the member collection schema is tightened.
+- `packages/domain/src/policy.ts#hasOrganizationRole` remains exported for legacy call sites; prefer `canPermission` in new code.
 
 ## Renaming a role or adding one
 
-This rename (member → manager + new contributor tier) touched every layer, and
-each step follows the same pattern:
+This rename (member → manager + new contributor tier) touched every layer, and each step follows the same pattern:
 
-1. `packages/permissions/src/roles.ts` — edit `ROLES`, `ROLE_RANK`,
-   `INVITABLE_ROLES` (the only role-literal source).
+1. `packages/permissions/src/roles.ts` — edit `ROLES`, `ROLE_RANK`, `INVITABLE_ROLES` (the only role-literal source).
 2. `packages/permissions/src/role-permissions.ts` — assign permissions.
-3. `packages/db/src/schema/auth.ts` — update the `member.role` column type
-   and default; add a data migration for existing rows.
-4. `packages/auth/src/organization-roles.ts` — mirror the role in better-auth's
-   org-plugin ACL (server and client share this file, so the inferred
-   invitation/member role types stay in sync).
+3. `packages/db/src/schema/auth.ts` — update the `member.role` column type and default; add a data migration for existing rows.
+4. `packages/auth/src/organization-roles.ts` — mirror the role in better-auth's org-plugin ACL (server and client share this file, so the inferred invitation/member role types stay in sync).
 5. Update UI labels/defaults in `settings/members.tsx` and e2e fixtures.
 
-Because everything else imports `Role`/`ROLES`/`can()` from the shared
-package, no other consumer needs to change.
+Because everything else imports `Role`/`ROLES`/`can()` from the shared package, no other consumer needs to change.

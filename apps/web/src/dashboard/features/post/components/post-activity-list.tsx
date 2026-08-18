@@ -182,7 +182,7 @@ export function PostActivityList({
 
   if (activities.length === 0) {
     return (
-      <p className="py-10 text-center text-muted-foreground text-sm">
+      <p className="text-muted-foreground py-10 text-center text-sm">
         No activity has been recorded yet.
       </p>
     );

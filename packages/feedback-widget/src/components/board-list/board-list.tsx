@@ -1,4 +1,5 @@
 import { For } from "solid-js";
+
 import type { Board } from "../../lib/boards";
 import { PoweredByBadge } from "../ui/powered-by-badge";
 import { BoardCard } from "./board-card";
@@ -6,8 +7,8 @@ import { BoardCard } from "./board-card";
 export function BoardList(props: { boards: Board[] }) {
   return (
     <div class="p-6">
-      <p class="font-medium text-foreground text-lg">Give us feedback</p>
-      <p class="mt-1 max-w-xs text-muted-foreground text-sm">
+      <p class="text-foreground text-lg font-medium">Give us feedback</p>
+      <p class="text-muted-foreground mt-1 max-w-xs text-sm">
         Tell us how we could make the product more useful for you.
       </p>
 

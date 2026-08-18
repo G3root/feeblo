@@ -10,6 +10,7 @@ import {
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { useState } from "react";
+
 import { formatDate } from "../../lib/utils";
 import { CommentComposer } from "./comment-composer";
 
@@ -32,7 +33,7 @@ export function CommentThread({
   return (
     <div className="space-y-3">
       <Item
-        className="items-start gap-3 rounded-xl border border-border/70 bg-card px-4 py-4"
+        className="border-border/70 bg-card items-start gap-3 rounded-xl border px-4 py-4"
         variant="outline"
       >
         <ItemMedia>
@@ -79,7 +80,7 @@ export function CommentThread({
       ) : null}
 
       {replies.length > 0 ? (
-        <div className="ml-0 space-y-3 border-border/70 border-l pl-4 sm:ml-11">
+        <div className="border-border/70 ml-0 space-y-3 border-l pl-4 sm:ml-11">
           {replies.map((reply) => (
             <CommentThread
               canReply={canReply}

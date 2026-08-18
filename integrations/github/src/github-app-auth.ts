@@ -1,4 +1,5 @@
 import { createPrivateKey } from "node:crypto";
+
 import {
   IntegrationProviderInvalidConfigurationError,
   IntegrationProviderTemporaryFailure,
@@ -8,6 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import * as jose from "jose";
+
 import type { GitHubApiClient } from "./github-api";
 import type { GitHubApiFailure } from "./github-errors";
 import { githubProviderKey } from "./github-manifest";

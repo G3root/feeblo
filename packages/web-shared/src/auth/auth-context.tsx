@@ -4,6 +4,7 @@ import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo } from "react";
+
 import type { AuthHint } from "../utils/auth-hint";
 import { authAtomRegistry, meAtom } from "./atoms";
 

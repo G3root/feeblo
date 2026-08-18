@@ -28,6 +28,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import * as Option from "effect/Option";
 import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useState } from "react";
+
 import {
   channelsAtom,
   connectionsAtom,
@@ -184,7 +185,7 @@ function DiscordSettingsContent({
           </FrameDescription>
         </FrameHeader>
         <FramePanel>
-          <h2 className="font-semibold text-sm">Connect your server</h2>
+          <h2 className="text-sm font-semibold">Connect your server</h2>
           <p className="text-muted-foreground text-sm">
             Let your team send feedback with /feeblo, forward messages with
             “Send to Feeblo”, and post new requests to your channels.
@@ -254,7 +255,7 @@ function DiscordConnectionFrame({
       <FramePanel>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="font-semibold text-sm">Server</h2>
+            <h2 className="text-sm font-semibold">Server</h2>
             <p className="text-muted-foreground text-sm">
               {connection.guildId ?? "Connecting…"}
             </p>
@@ -301,7 +302,7 @@ function DiscordConnectionFrame({
       </FramePanel>
       {connection.lifecycle === "active" ? (
         <FramePanel>
-          <h2 className="font-semibold text-sm">New post notifications</h2>
+          <h2 className="text-sm font-semibold">New post notifications</h2>
           <p className="text-muted-foreground text-sm">
             Post new requests to one or more text channels.
           </p>
@@ -324,20 +325,20 @@ function ConnectionBadge({
 }) {
   if (lifecycle === "active") {
     return (
-      <span className="rounded-full bg-success/10 px-2 py-0.5 font-medium text-success text-xs">
+      <span className="bg-success/10 text-success rounded-full px-2 py-0.5 text-xs font-medium">
         Connected
       </span>
     );
   }
   if (lifecycle === "connecting") {
     return (
-      <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
         Awaiting Discord approval
       </span>
     );
   }
   return (
-    <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+    <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
       {lifecycle}
     </span>
   );
@@ -419,7 +420,7 @@ function FeedbackChannelSelect({
             key={channel.id}
           >
             <div className="min-w-0">
-              <p className="truncate font-medium text-sm">#{channel.name}</p>
+              <p className="truncate text-sm font-medium">#{channel.name}</p>
             </div>
             <Switch
               checked={channel.notificationsEnabled}

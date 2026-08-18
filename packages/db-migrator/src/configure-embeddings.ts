@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+
 import postgres from "postgres";
 
 const MAX_DIMENSIONS = 2000;

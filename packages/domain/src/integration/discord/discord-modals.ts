@@ -2,6 +2,7 @@ import type { DiscordEmbed } from "@feeblo/integration-discord/embeds";
 import { truncate } from "@feeblo/utils/text";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+
 import { DiscordInboundFailure } from "./errors";
 
 const TITLE_MAX_LENGTH = 200;

@@ -31,8 +31,7 @@ widget.identify(user).setBoard("roadmap").open();
 
 ### Widget modes
 
-Focused feedback remains the default. Use `updates` for a card-based product
-updates panel, or combine an ordered subset of modules in Feeblo Hub:
+Focused feedback remains the default. Use `updates` for a card-based product updates panel, or combine an ordered subset of modules in Feeblo Hub:
 
 ```ts
 Feeblo.init("org_123", { mode: "feedback" });
@@ -51,10 +50,7 @@ const hub = Feeblo.init("org_123", {
 hub.openModule("feedback");
 ```
 
-`placement` renders Feeblo's launcher in the selected bottom corner. Omit it
-to keep programmatic and `data-feeblo-feedback` triggers as the only ways to
-open the widget. Hub requires at least one unique module and initially shows
-the first module in the array.
+`placement` renders Feeblo's launcher in the selected bottom corner. Omit it to keep programmatic and `data-feeblo-feedback` triggers as the only ways to open the widget. Hub requires at least one unique module and initially shows the first module in the array.
 
 ### Config-object form
 
@@ -95,15 +91,12 @@ Feeblo.identify(user);
 
 `id` is required; all other fields are optional.
 
-- Use `name` for the user's full name. `firstName` and `lastName` are still
-  accepted but deprecated; they are normalized into `name` when provided.
-- `token` is **required** for submitting feedback. It must be a JWT signed by
-  your organization's Feeblo secret (see [Server-side JWT](#server-side-jwt)).
+- Use `name` for the user's full name. `firstName` and `lastName` are still accepted but deprecated; they are normalized into `name` when provided.
+- `token` is **required** for submitting feedback. It must be a JWT signed by your organization's Feeblo secret (see [Server-side JWT](#server-side-jwt)).
 
 ### Typed organization IDs
 
-For integrators who want to distinguish widget IDs from arbitrary strings at
-type-check time, use the branded `OrganizationId` helper:
+For integrators who want to distinguish widget IDs from arbitrary strings at type-check time, use the branded `OrganizationId` helper:
 
 ```ts
 import { Feeblo, organizationId } from "@feeblo/sdk";
@@ -116,18 +109,18 @@ Plain strings remain accepted everywhere — the brand is strictly opt-in.
 
 ## Server-side JWT
 
-Feedback submissions require an authenticated user. Generate a JWT on your
-server using your organization's Feeblo secret (found in Settings → Security):
+Feedback submissions require an authenticated user. Generate a JWT on your server using your organization's Feeblo secret (found in Settings → Security):
 
 ```ts
 import jwt from "jsonwebtoken";
 
 const token = jwt.sign(
   {
-    userId: user.id,        // required
-    email: user.email,      // required
-    name: user.name,        // required
-    companies: [            // optional
+    userId: user.id, // required
+    email: user.email, // required
+    name: user.name, // required
+    companies: [
+      // optional
       { id: company.id, name: company.name },
     ],
   },
@@ -149,41 +142,31 @@ Feeblo.identify({
 
 ## Public board auto-login
 
-You can also use the same JWT to sign users into your public Feeblo board
-automatically. Redirect them to:
+You can also use the same JWT to sign users into your public Feeblo board automatically. Redirect them to:
 
 ```
 https://feedback.yourdomain.com/?ssoToken=JWT
 ```
 
-Feeblo will verify the token, create a session, and redirect the user back with
-the token removed from the URL.
+Feeblo will verify the token, create a session, and redirect the user back with the token removed from the URL.
 
-Links marked with `data-feeblo-link` receive the JWT from the most recent
-`identify` call automatically when the user interacts with them:
+Links marked with `data-feeblo-link` receive the JWT from the most recent `identify` call automatically when the user interacts with them:
 
 ```html
-<a href="https://feedback.yourdomain.com/" data-feeblo-link>
-  Give feedback
-</a>
+<a href="https://feedback.yourdomain.com/" data-feeblo-link> Give feedback </a>
 ```
 
-The SDK adds `?ssoToken=JWT` on mouse, keyboard, and context-menu interaction.
-The public board exchanges it for a restricted session cookie and immediately
-removes the token from the visible URL.
+The SDK adds `?ssoToken=JWT` on mouse, keyboard, and context-menu interaction. The public board exchanges it for a restricted session cookie and immediately removes the token from the visible URL.
 
 ## Triggers
 
-Any element with the `data-feeblo-feedback` attribute automatically opens the
-widget when clicked. The SDK continuously scans the DOM for new triggers, so
-they can be added at any time.
+Any element with the `data-feeblo-feedback` attribute automatically opens the widget when clicked. The SDK continuously scans the DOM for new triggers, so they can be added at any time.
 
 ```html
 <button data-feeblo-feedback>Feedback</button>
 ```
 
-Pass extra context via `data-feeblo-*` attributes. Keys are camel-cased after
-the `feeblo` prefix, so `data-feeblo-board` becomes `board`:
+Pass extra context via `data-feeblo-*` attributes. Keys are camel-cased after the `feeblo` prefix, so `data-feeblo-board` becomes `board`:
 
 ```html
 <button data-feeblo-feedback data-feeblo-board="roadmap">Roadmap ideas</button>
@@ -198,8 +181,7 @@ Feeblo.close();
 
 ## Events
 
-Subscribe to widget lifecycle events with a typed `on`/`off` API. Callbacks
-receive a `CustomEvent` whose `detail` is narrowed by event name.
+Subscribe to widget lifecycle events with a typed `on`/`off` API. Callbacks receive a `CustomEvent` whose `detail` is narrowed by event name.
 
 ```ts
 import { Feeblo, type FeebloEventName } from "@feeblo/sdk";
@@ -219,14 +201,11 @@ Feeblo.on("*", (e) => {
 off(); // unsubscribe
 ```
 
-Supported events: `widgetReady`, `widgetOpened`, `feedbackSubmitted` (or `*` for
-all three). `on` returns an unsubscribe function.
+Supported events: `widgetReady`, `widgetOpened`, `feedbackSubmitted` (or `*` for all three). `on` returns an unsubscribe function.
 
 ## Debugging
 
-Pass `debug: true` to stream diagnostics to the console — postMessage traffic
-(in/out), lifecycle transitions, floating-ui positioning, and trigger binding,
-all prefixed with `[feeblo:<category>]`:
+Pass `debug: true` to stream diagnostics to the console — postMessage traffic (in/out), lifecycle transitions, floating-ui positioning, and trigger binding, all prefixed with `[feeblo:<category>]`:
 
 ```ts
 Feeblo.init("org_123", { debug: true });
@@ -241,25 +220,24 @@ console.log(Feeblo.version);
 
 ## Options
 
-| Option           | Type                                        | Description                                                                                  |
-| ---------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `baseUrl`        | `string`                                    | Override the widget host. Defaults to `https://app.feeblo.com` (or `localhost:3001` in dev). |
-| `theme`          | `string`                                    | Widget theme, forwarded as a query param.                                                    |
-| `mode`           | `"feedback" \| "updates" \| "hub"`       | Widget experience. Defaults to `feedback`.                                                   |
-| `modules`        | `Array<"feedback" \| "updates">`           | Ordered Hub modules. Defaults to feedback then updates.                                      |
-| `placement`      | `"bottom-left" \| "bottom-right"`           | Render a launcher in the selected bottom corner.                                             |
-| `user`           | `UserIdentity`                              | Identify the current user on init.                                                           |
-| `debug`          | `boolean`                                   | Enable diagnostic logging.                                                                   |
-| `root`           | `HTMLElement`                               | Where to mount the widget container. Defaults to `document.body`.                            |
-| `containerStyles`| `Partial<CSSStyleDeclaration>`              | Override the floating container styles.                                                      |
-| `onClose`        | `() => void`                                | Called when the widget closes itself.                                                        |
-| `onError`        | `(error: EmbedError) => void`               | Called with structured errors (`code` + `message`).                                          |
-| `onHeightChange` | `(height: number) => void`                  | Called when the widget reports a new height.                                                 |
+| Option | Type | Description |
+| --- | --- | --- |
+| `baseUrl` | `string` | Override the widget host. Defaults to `https://app.feeblo.com` (or `localhost:3001` in dev). |
+| `theme` | `string` | Widget theme, forwarded as a query param. |
+| `mode` | `"feedback" \| "updates" \| "hub"` | Widget experience. Defaults to `feedback`. |
+| `modules` | `Array<"feedback" \| "updates">` | Ordered Hub modules. Defaults to feedback then updates. |
+| `placement` | `"bottom-left" \| "bottom-right"` | Render a launcher in the selected bottom corner. |
+| `user` | `UserIdentity` | Identify the current user on init. |
+| `debug` | `boolean` | Enable diagnostic logging. |
+| `root` | `HTMLElement` | Where to mount the widget container. Defaults to `document.body`. |
+| `containerStyles` | `Partial<CSSStyleDeclaration>` | Override the floating container styles. |
+| `onClose` | `() => void` | Called when the widget closes itself. |
+| `onError` | `(error: EmbedError) => void` | Called with structured errors (`code` + `message`). |
+| `onHeightChange` | `(height: number) => void` | Called when the widget reports a new height. |
 
 ## Auto-init
 
-When loaded as a `<script>` tag, the SDK auto-initialises from a global config
-or the script's `data-feeblo-*` attributes — no JavaScript required:
+When loaded as a `<script>` tag, the SDK auto-initialises from a global config or the script's `data-feeblo-*` attributes — no JavaScript required:
 
 ```html
 <script
@@ -284,24 +262,23 @@ Or via a global config placed before the script:
 
 ### `Feeblo` namespace
 
-| Member            | Description                                                            |
-| ----------------- | ---------------------------------------------------------------------- |
-| `version`         | The installed SDK version.                                             |
-| `init(id, opts?)` | Initialise the widget. Returns a chainable `FeebloWidget`.             |
-| `identify(user)`  | Identify or update the current user. Chainable.                        |
-| `open()`          | Open the widget. Chainable.                                            |
-| `openModule(name)`| Open an enabled module. Chainable.                                     |
-| `close()`         | Close the widget. Chainable.                                           |
-| `setBoard(board)` | Switch the active board. Chainable.                                    |
-| `destroy()`       | Tear down the widget and release listeners.                            |
-| `on(event, cb)`   | Subscribe to an event (`*` for all). Returns an unsubscribe function.  |
-| `off(event, cb)`  | Unsubscribe a previously registered callback.                          |
-| `organizationId`  | Brand a string as an `OrganizationId`.                                 |
+| Member | Description |
+| --- | --- |
+| `version` | The installed SDK version. |
+| `init(id, opts?)` | Initialise the widget. Returns a chainable `FeebloWidget`. |
+| `identify(user)` | Identify or update the current user. Chainable. |
+| `open()` | Open the widget. Chainable. |
+| `openModule(name)` | Open an enabled module. Chainable. |
+| `close()` | Close the widget. Chainable. |
+| `setBoard(board)` | Switch the active board. Chainable. |
+| `destroy()` | Tear down the widget and release listeners. |
+| `on(event, cb)` | Subscribe to an event (`*` for all). Returns an unsubscribe function. |
+| `off(event, cb)` | Unsubscribe a previously registered callback. |
+| `organizationId` | Brand a string as an `OrganizationId`. |
 
 ### Errors
 
-SDK errors are thrown or reported as `EmbedError`, which carries a stable
-`code` (e.g. `INVALID_ORG`, `INVALID_IDENTITY`) alongside `message`.
+SDK errors are thrown or reported as `EmbedError`, which carries a stable `code` (e.g. `INVALID_ORG`, `INVALID_IDENTITY`) alongside `message`.
 
 ## Local development
 

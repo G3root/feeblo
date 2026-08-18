@@ -1,5 +1,6 @@
 import { createAsync, useParams } from "@solidjs/router";
 import { createMemo, Show } from "solid-js";
+
 import { UpdateDetail } from "../components/updates/update-detail";
 import { fetchUpdates } from "../lib/api";
 
@@ -13,7 +14,7 @@ export default function UpdateDetailRoute() {
   return (
     <Show
       fallback={
-        <p class="p-6 text-muted-foreground text-sm">Update not found.</p>
+        <p class="text-muted-foreground p-6 text-sm">Update not found.</p>
       }
       keyed
       when={update()}

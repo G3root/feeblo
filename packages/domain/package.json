@@ -1,8 +1,8 @@
 {
   "name": "@feeblo/domain",
-  "type": "module",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "exports": {
     "./src/*": {
       "default": "./src/*"
@@ -416,6 +416,11 @@
       "default": "./src/email-outbox/config.ts"
     }
   },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@effect-aws/client-s3": "catalog:",
     "@effect-aws/s3": "catalog:",
@@ -440,11 +445,6 @@
     "leo-profanity": "^1.9.0",
     "react": "catalog:",
     "takumi-js": "^2.4.0"
-  },
-  "scripts": {
-    "check-types": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

@@ -19,6 +19,7 @@ import {
 } from "@feeblo/web-shared/auth-client";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { z } from "zod";
+
 import {
   clearVerificationOtp,
   getResendLabel,
@@ -136,7 +137,7 @@ function RouteComponent() {
   });
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
+    <div className="bg-background flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="w-full max-w-sm">
         <div className="flex flex-col gap-6">
           <form
@@ -157,7 +158,7 @@ function RouteComponent() {
                   </span>
                   <span className="sr-only">Acme Inc.</span>
                 </Link>
-                <h1 className="font-bold text-xl">Enter verification code</h1>
+                <h1 className="text-xl font-bold">Enter verification code</h1>
                 <FieldDescription>
                   We sent a 6-digit code to your email address
                 </FieldDescription>

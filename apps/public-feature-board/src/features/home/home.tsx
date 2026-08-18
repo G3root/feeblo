@@ -8,6 +8,7 @@ import {
 } from "@feeblo/ui/empty";
 import { cn } from "@feeblo/ui/utils";
 import type { ReactNode } from "react";
+
 import {
   FeedbackCard,
   FeedbackCardSkeleton,
@@ -29,7 +30,7 @@ import { HomeProvider } from "./home-provider";
 
 function surfaceClassName(className?: string) {
   return cn(
-    "rounded-3xl border border-border/60 bg-background py-0 shadow-none",
+    "border-border/60 bg-background rounded-3xl border py-0 shadow-none",
     className
   );
 }
@@ -111,7 +112,7 @@ function HomeList() {
             </Empty>
           </div>
         ) : (
-          <div className="divide-y divide-border/40">
+          <div className="divide-border/40 divide-y">
             {filteredPosts.map(({ board, post, status }) => (
               <PostCollectionDataProvider
                 board={board}
@@ -177,14 +178,14 @@ function HomeLoading() {
           <CardPanel className="px-6 py-8 sm:px-8 sm:py-10">
             <div className="grid gap-6 lg:grid-cols-5 lg:items-center">
               <div className="space-y-3 lg:col-span-3">
-                <div className="h-3 w-28 animate-pulse rounded-full bg-muted" />
-                <div className="h-10 w-3/4 animate-pulse rounded-2xl bg-muted" />
-                <div className="h-4 w-2/3 animate-pulse rounded-full bg-muted" />
+                <div className="bg-muted h-3 w-28 animate-pulse rounded-full" />
+                <div className="bg-muted h-10 w-3/4 animate-pulse rounded-2xl" />
+                <div className="bg-muted h-4 w-2/3 animate-pulse rounded-full" />
               </div>
               <div className="grid gap-3 sm:grid-cols-3 lg:col-span-2 lg:grid-cols-1 xl:grid-cols-3">
                 {["a", "b", "c"].map((key) => (
                   <div
-                    className="h-24 animate-pulse rounded-2xl border border-border/60 bg-background"
+                    className="border-border/60 bg-background h-24 animate-pulse rounded-2xl border"
                     key={key}
                   />
                 ))}
@@ -196,7 +197,7 @@ function HomeLoading() {
         <div className="grid gap-6 lg:grid-cols-4">
           <Card className={surfaceClassName()}>
             <CardPanel className="px-4 py-4">
-              <div className="h-40 animate-pulse rounded-2xl bg-muted" />
+              <div className="bg-muted h-40 animate-pulse rounded-2xl" />
             </CardPanel>
           </Card>
           <Card className={surfaceClassName("lg:col-span-3")}>

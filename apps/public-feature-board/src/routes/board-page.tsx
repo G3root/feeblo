@@ -8,6 +8,7 @@ import {
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
 import { BoardListCard } from "../components/feedback/board-list-card";
 import {
   FeedbackCard,
@@ -38,7 +39,7 @@ function MainContent({ children }: { children: ReactNode }) {
 function ListHeader({ count, title }: { count?: number; title: string }) {
   return (
     <div className="flex items-baseline justify-between px-1 pb-3">
-      <h2 className="font-semibold text-base tracking-tight">{title}</h2>
+      <h2 className="text-base font-semibold tracking-tight">{title}</h2>
       {count !== undefined && (
         <span className="text-muted-foreground text-xs tabular-nums">
           {count} {count === 1 ? "post" : "posts"}
@@ -126,7 +127,7 @@ export function BoardPage() {
       <MainContent>
         <div className="min-w-0">
           <ListHeader title="Loading..." />
-          <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
+          <div className="divide-border/40 border-border/60 w-full divide-y overflow-hidden rounded-lg border">
             {["a", "b", "c", "d", "e"].map((key) => (
               <FeedbackCardSkeleton key={key} />
             ))}
@@ -188,7 +189,7 @@ export function BoardPage() {
     <MainContent>
       <div className="min-w-0">
         <ListHeader count={posts.length} title={board.name} />
-        <div className="w-full divide-y divide-border/40 overflow-hidden rounded-lg border border-border/60">
+        <div className="divide-border/40 border-border/60 w-full divide-y overflow-hidden rounded-lg border">
           {posts.map(({ post, postStatus }) => (
             <PostCollectionDataProvider
               board={board}

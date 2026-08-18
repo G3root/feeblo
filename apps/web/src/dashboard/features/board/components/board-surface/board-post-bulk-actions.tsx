@@ -13,6 +13,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
+
 import {
   useBoardStore,
   useSelectedPostIds,
@@ -36,8 +37,8 @@ export function BoardPostBulkActions() {
           : "translate-y-5 opacity-0"
       )}
     >
-      <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-border bg-background/95 px-4 py-3 shadow-lg backdrop-blur-sm">
-        <p className="font-medium text-sm">{selectedCount} selected</p>
+      <div className="border-border bg-background/95 pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm">
+        <p className="text-sm font-medium">{selectedCount} selected</p>
         <Button
           onClick={() => store.send({ type: "clearSelection" })}
           size="sm"

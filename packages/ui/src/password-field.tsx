@@ -2,6 +2,7 @@ import { EyeIcon, EyeOffIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@tanstack/react-store";
 import { useId, useState } from "react";
+
 import { Button } from "./button";
 import { Field, FieldError } from "./field";
 import { useFieldContext } from "./form-context";
@@ -10,8 +11,9 @@ import { Label } from "./label";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./tooltip";
 import { cn } from "./utils";
 
-interface PasswordFieldProps
-  extends React.ComponentProps<typeof InputGroupInput> {
+interface PasswordFieldProps extends React.ComponentProps<
+  typeof InputGroupInput
+> {
   hideLabel?: boolean;
   label: string;
 }

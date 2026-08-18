@@ -16,6 +16,7 @@ import { getBoardStatusIndicatorColor } from "@feeblo/web-shared/board/constants
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, useParams } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
 import { BoardNavLink } from "../components/feedback/board-list-card";
 import { PostPageActions } from "../components/feedback/post-page-actions";
 import { PostVoterDialog } from "../components/feedback/post-voter-dialog";
@@ -34,14 +35,14 @@ function RootLayout({ children }: { children: ReactNode }) {
 
 function StatusPill({ status }: { status: string }) {
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2 py-0.5">
+    <div className="border-border/70 bg-muted/40 inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5">
       <span
         className={cn(
           "size-1.5 shrink-0 rounded-full",
           getBoardStatusIndicatorColor(status)
         )}
       />
-      <span className="font-medium text-muted-foreground text-xs">
+      <span className="text-muted-foreground text-xs font-medium">
         {formatPostStatus(status)}
       </span>
     </div>
@@ -226,7 +227,7 @@ export function PostPage() {
 function PostMetaSidebarRoot({ children }: { children: ReactNode }) {
   return (
     <aside className="lg:col-span-3 lg:pt-16">
-      <div className="space-y-3 rounded-2xl bg-background/80 p-4">
+      <div className="bg-background/80 space-y-3 rounded-2xl p-4">
         {children}
       </div>
     </aside>
@@ -243,9 +244,9 @@ function PostMetaSidebarSection({
   actions?: ReactNode;
 }) {
   return (
-    <section className="space-y-2 border-border/70 border-b pb-3 last:border-b-0 last:pb-0">
+    <section className="border-border/70 space-y-2 border-b pb-3 last:border-b-0 last:pb-0">
       <div className="flex items-center justify-between">
-        <p className="font-medium text-muted-foreground/80 text-xs tracking-wider">
+        <p className="text-muted-foreground/80 text-xs font-medium tracking-wider">
           {title}
         </p>
         {actions}
@@ -305,7 +306,7 @@ function PostMetaSidebarTags({
       <div className="flex flex-wrap gap-1.5">
         {tags.map((tag) => (
           <Badge
-            className="h-6 rounded-full border-border/70 bg-muted/40 px-2.5 text-foreground"
+            className="border-border/70 bg-muted/40 text-foreground h-6 rounded-full px-2.5"
             key={tag.id}
             variant="outline"
           >
@@ -325,7 +326,7 @@ function PostMetaSidebarAuthor() {
     <PostMetaSidebarSection title="Posted by">
       <div className="flex items-center gap-2.5">
         <UserAvatar className="size-8" image={authorImage} name={authorName} />
-        <p className="font-medium text-foreground text-sm">{authorName}</p>
+        <p className="text-foreground text-sm font-medium">{authorName}</p>
       </div>
     </PostMetaSidebarSection>
   );
@@ -336,7 +337,7 @@ function PostMetaSidebarPublishedOn() {
   const publishedDate = formatPublishedDate(post.createdAt);
   return (
     <PostMetaSidebarSection title="Posted on">
-      <p className="font-medium text-foreground text-sm">{publishedDate}</p>
+      <p className="text-foreground text-sm font-medium">{publishedDate}</p>
     </PostMetaSidebarSection>
   );
 }

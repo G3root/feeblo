@@ -26,8 +26,10 @@ import { toCamelCaseAttributeKey } from "@feeblo/utils/scule";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
+
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
+
 import {
   type CustomAttributeEntityType,
   useCustomAttributeCreateDialogContext,

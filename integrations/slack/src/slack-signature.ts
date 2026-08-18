@@ -1,10 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+
 import {
   IntegrationRequestSignatureError,
   verifyRequestSignature,
 } from "@feeblo/integration-core";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
+
 import type { SlackSignatureVerificationError } from "./slack-errors";
 
 /** Maximum age of a Slack request before its signature is rejected (Slack recommends 5 minutes). */

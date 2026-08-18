@@ -10,6 +10,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 import { useId, useRef } from "react";
+
 import { isPaidPlan } from "~/features/billing/lib/plans";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";

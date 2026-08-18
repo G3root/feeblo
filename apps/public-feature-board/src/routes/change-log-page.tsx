@@ -17,6 +17,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, ilike, useLiveQuery } from "@tanstack/react-db";
 import { createLazyRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+
 import { ChangelogCategoryBadges } from "../components/changelog/changelog-category-badge";
 import {
   ChangelogPageLayout,
@@ -100,10 +101,10 @@ export function ChangelogPage() {
     <ChangelogPageLayout>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-base tracking-tight">Changelogs</h2>
+          <h2 className="text-base font-semibold tracking-tight">Changelogs</h2>
           <a
             aria-label="Subscribe to the changelog RSS feed"
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="text-muted-foreground hover:bg-muted hover:text-foreground rounded-md p-1.5 transition-colors"
             href="/changelog/rss.xml"
             title="RSS feed"
           >
@@ -151,7 +152,7 @@ export function ChangelogPage() {
             {changelogs.map((item) => (
               <ChangelogTimelineItem className="pb-14 md:pb-16" key={item.id}>
                 <ChangelogTimelineDate>
-                  <time className="font-medium text-muted-foreground text-sm tracking-tight">
+                  <time className="text-muted-foreground text-sm font-medium tracking-tight">
                     {formatChangelogDate(item.publishedAt ?? item.createdAt)}
                   </time>
                 </ChangelogTimelineDate>
@@ -176,7 +177,7 @@ export function ChangelogPage() {
                       params={{ changelogSlug: item.slug }}
                       to="/changelog/$changelogSlug"
                     >
-                      <h3 className="font-semibold text-2xl tracking-tight sm:text-3xl">
+                      <h3 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                         {item.title}
                       </h3>
                     </Link>

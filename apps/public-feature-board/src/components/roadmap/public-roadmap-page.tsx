@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@feeblo/ui/select";
 import { useNavigate } from "@tanstack/react-router";
+
 import { usePublicCollections } from "../../providers/public-collections-provider";
 import { useSite } from "../../providers/site-provider";
 
@@ -129,9 +130,9 @@ function PublicRoadmapBoard({
       <section className="flex h-full min-h-0 shrink-0 flex-col gap-4">
         <header className="flex items-start justify-between gap-2 px-3">
           <div className="min-w-0 flex-1">
-            <h1 className="font-semibold text-xl">{title}</h1>
+            <h1 className="text-xl font-semibold">{title}</h1>
             {description ? (
-              <p className="mt-1 text-muted-foreground text-sm">
+              <p className="text-muted-foreground mt-1 text-sm">
                 {description}
               </p>
             ) : null}
@@ -172,7 +173,7 @@ function PublicRoadmapBoard({
             )}
           />
         ) : (
-          <div className="flex min-h-64 flex-1 items-center justify-center rounded-lg border border-border/70 border-dashed bg-muted/20 p-6 text-center text-muted-foreground text-sm">
+          <div className="border-border/70 bg-muted/20 text-muted-foreground flex min-h-64 flex-1 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
             This roadmap has no columns configured.
           </div>
         )}
@@ -205,7 +206,7 @@ function PublicRoadmapSkeleton() {
     <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden p-4 md:p-6">
       <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
         {["planned", "in-progress", "completed"].map((key) => (
-          <div className="h-96 w-80 rounded-lg bg-muted/30" key={key} />
+          <div className="bg-muted/30 h-96 w-80 rounded-lg" key={key} />
         ))}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { defineRelations } from "drizzle-orm";
+
 import {
   accountTable,
   assetTable,
