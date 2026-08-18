@@ -32,7 +32,7 @@ test.describe("custom attributes", () => {
 
     await page
       .getByLabel("Contacts")
-      .getByRole("button", { name: "New attribute" })
+      .getByRole("button", { name: "Create attribute" })
       .click();
     const createDialog = page.getByRole("dialog", {
       name: "Create contact attribute",
@@ -96,7 +96,7 @@ test.describe("custom attributes", () => {
 
     await page
       .getByLabel("Companies")
-      .getByRole("button", { name: "New attribute" })
+      .getByRole("button", { name: "Create attribute" })
       .click();
     const createDialog = page.getByRole("dialog", {
       name: "Create company attribute",
@@ -158,7 +158,7 @@ test.describe("custom attributes", () => {
     await page.goto(customAttributesUrl(owner.organizationUrl));
     await page
       .getByLabel("Contacts")
-      .getByRole("button", { name: "New attribute" })
+      .getByRole("button", { name: "Create attribute" })
       .click();
     const attributeDialog = page.getByRole("dialog", {
       name: "Create contact attribute",
@@ -206,7 +206,7 @@ test.describe("custom attributes", () => {
     await page.getByRole("tab", { name: "Companies" }).click();
     await page
       .getByLabel("Companies")
-      .getByRole("button", { name: "New attribute" })
+      .getByRole("button", { name: "Create attribute" })
       .click();
     const attributeDialog = page.getByRole("dialog", {
       name: "Create company attribute",
