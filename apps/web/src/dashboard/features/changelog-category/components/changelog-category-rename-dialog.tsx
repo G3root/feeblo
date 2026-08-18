@@ -45,8 +45,6 @@ export function ChangelogCategoryRenameDialog() {
   );
 }
 
-export const ChangelogCategoryEditDialog = ChangelogCategoryRenameDialog;
-
 function ChangelogCategoryRenameForm() {
   const organizationId = useOrganizationId();
   const { changelogCategoryCollection } = useDashboardCollections();

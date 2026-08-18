@@ -38,8 +38,6 @@ export function TagRenameDialog() {
   );
 }
 
-export const TagEditDialog = TagRenameDialog;
-
 function TagRenameForm() {
   const organizationId = useOrganizationId();
   const { tagCollection } = useDashboardCollections();

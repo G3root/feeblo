@@ -143,51 +143,6 @@ export function formatPlanPrice(
   return `${formatMoney(price.priceAmount, price.priceCurrency)} / month`;
 }
 
-export function formatPlanBillingNote(
-  product: WorkspaceProduct | undefined,
-  interval: BillingInterval
-) {
-  if (!product) {
-    return interval === "month" ? "No monthly charge" : "No yearly charge";
-  }
-
-  const price = getPrice(product);
-  if (!price) {
-    return interval === "month"
-      ? "Custom monthly billing"
-      : "Custom yearly billing";
-  }
-
-  if (interval === "year") {
-    return `${formatMoney(price.priceAmount, price.priceCurrency)} billed yearly`;
-  }
-
-  return "Billed monthly";
-}
-
-export function getPlanDetails(
-  product: WorkspaceProduct | undefined,
-  interval: BillingInterval
-) {
-  if (!product) {
-    return [
-      "Basic access for trialing the workspace.",
-      interval === "month" ? "No monthly charge." : "No yearly charge.",
-      "Upgrade when you need paid plan features.",
-    ];
-  }
-
-  return [
-    product.description || "Paid workspace plan.",
-    `${formatPlanBillingNote(product, interval)}.`,
-    product.trialInterval && product.trialIntervalCount
-      ? `${product.trialIntervalCount} ${product.trialInterval} trial included.`
-      : product.isRecurring
-        ? "Renews automatically until changed."
-        : "One-time purchase.",
-  ];
-}
-
 export const PLAN_FEATURES = {
   free: getPlanFeatureRows("free"),
   starter: getPlanFeatureRows("starter"),

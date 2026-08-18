@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from "@feeblo/ui/card";
 import { Separator } from "@feeblo/ui/separator";
-import { Skeleton } from "@feeblo/ui/skeleton";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useLiveQuery } from "@tanstack/react-db";
@@ -40,6 +39,8 @@ import {
   workspacePlanCollection,
   workspaceProductCollection,
 } from "~/lib/collections";
+
+import { CurrentPlanStat, PlanGridSkeleton } from "./billing-parts";
 
 export const Route = createFileRoute("/$organizationId/settings/billing")({
   validateSearch: (search) =>
@@ -379,41 +380,5 @@ function BillingSettingsContent({
         </div>
       </SettingsLayout.Content>
     </SettingsLayout.Root>
-  );
-}
-
-function CurrentPlanStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="text-muted-foreground text-xs tracking-wide uppercase">
-        {label}
-      </div>
-      <div className="text-sm font-medium">{value}</div>
-    </div>
-  );
-}
-
-function PlanGridSkeleton() {
-  return (
-    <div className="grid gap-4 xl:grid-cols-3">
-      {["free", "starter", "professional"].map((key) => (
-        <Card key={key} size="sm">
-          <CardHeader className="space-y-3">
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-8 w-28" />
-          </CardHeader>
-          <CardPanel className="space-y-4">
-            <Skeleton className="h-px w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-11/12" />
-            <Skeleton className="h-4 w-10/12" />
-          </CardPanel>
-          <CardFooter>
-            <Skeleton className="h-9 w-full" />
-          </CardFooter>
-        </Card>
-      ))}
-    </div>
   );
 }
