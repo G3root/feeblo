@@ -204,7 +204,7 @@ const makeChangelogRepository = Effect.gen(function* () {
             publishedAt,
             organizationId,
             creatorId,
-            ...(creatorMemberId ? { creatorMemberId } : {}),
+            ...(creatorMemberId && { creatorMemberId }),
             createdAt: now,
             updatedAt: now,
           })

@@ -25,7 +25,7 @@ export const S3Layer = Layer.unwrap(
     return S3.layer({
       region: config.region,
       endpoint: config.endpoint,
-      ...(credentials ? { credentials } : {}),
+      ...(credentials && { credentials }),
     });
   }).pipe(Effect.provide(S3Config.layer))
 );

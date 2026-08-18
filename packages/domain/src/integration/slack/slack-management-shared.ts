@@ -23,7 +23,7 @@ export const mapManagementError =
   (operation: string) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
-      Effect.mapError((error: unknown) =>
+      Effect.mapError((error) =>
         Schema.is(SlackIntegrationErrors)(error)
           ? error
           : new InternalServerError({

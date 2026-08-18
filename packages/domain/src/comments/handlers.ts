@@ -48,7 +48,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             ...args,
             content: sanitizedMarkdown,
             userId: session.session.userId,
-            ...(membership ? { memberId: membership.membershipId } : {}),
+            ...(membership && { memberId: membership.membershipId }),
           });
 
           yield* activityRepository.create({
@@ -68,9 +68,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
                 organizationId: args.organizationId,
                 postId: args.postId,
                 commentId: args.id,
-                ...(membership
-                  ? { actorMemberId: membership.membershipId }
-                  : {}),
+                ...(membership && { actorMemberId: membership.membershipId }),
               }),
           });
         })
@@ -135,7 +133,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
             postId: args.postId,
             content: sanitizedMarkdown,
             userId: session.session.userId,
-            ...(membership ? { visibility: args.visibility } : {}),
+            ...(membership && { visibility: args.visibility }),
           });
           if (updated) {
             yield* activityRepository.create({

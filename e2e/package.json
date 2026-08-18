@@ -19,6 +19,7 @@
     "@feeblo/permissions": "workspace:*",
     "@playwright/test": "^1.61.1",
     "@types/node": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "@feeblo/utils": "workspace:*"
   }
 }

@@ -52,12 +52,11 @@ describe("TagRpcHandlers", () => {
           ],
   });
   // A different member of the same organization (not the post/changelog creator).
-  const otherContributor = (
-    f: Fixture
-  ): {
+  type OtherContributor = {
     session: Session;
     membershipId: string;
-  } => {
+  };
+  const otherContributor = (f: Fixture): OtherContributor => {
     const userId = `other_${f.userId}`;
     const membershipId = `other_member_${f.membershipId}`;
     return {

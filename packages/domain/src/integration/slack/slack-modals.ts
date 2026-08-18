@@ -77,6 +77,18 @@ export const decodeModalMetadata = (value: string) =>
     value
   );
 
+/** Slack Block Kit `modal` view document sent to `views.open` / `views.update`. */
+export interface SlackModalViewDocument {
+  readonly callback_id: string;
+  readonly clear_on_close?: boolean;
+  readonly close: { readonly text: string; readonly type: "plain_text" };
+  readonly private_metadata?: string;
+  readonly submit?: { readonly text: string; readonly type: "plain_text" };
+  readonly title: { readonly text: string; readonly type: "plain_text" };
+  readonly type: "modal";
+  readonly blocks: readonly unknown[];
+}
+
 /** Slack Block Kit `modal` view that collects a feedback post. */
 export const buildFeedbackModal = ({
   boards,
@@ -89,7 +101,7 @@ export const buildFeedbackModal = ({
   }[];
   readonly initialTitle: string;
   readonly metadata: string;
-}): unknown => ({
+}): SlackModalViewDocument => ({
   callback_id: SLACK_FEEDBACK_MODAL_CALLBACK_ID,
   close: { text: "Cancel", type: "plain_text" },
   private_metadata: metadata,
@@ -163,7 +175,7 @@ export const buildSuccessModal = ({
   readonly postUrl?: string;
   readonly status: string;
   readonly submitterName: string;
-}): unknown => ({
+}): SlackModalViewDocument => ({
   callback_id: "feeblo_feedback_success",
   clear_on_close: true,
   close: { text: "Close", type: "plain_text" },

@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -53,7 +54,7 @@ const getDatabaseErrorField = (
     onSome: (error) => error[field],
   });
 
-export const isUniqueViolation = (error: unknown): boolean =>
+export const isUniqueViolation = <T,>(error: T): boolean =>
   error instanceof EffectDrizzleQueryError &&
   getDatabaseErrorField(error.cause, "code") === "23505";
 
@@ -63,8 +64,8 @@ export const isUniqueViolation = (error: unknown): boolean =>
  * distinguish which unique index rejected an insert instead of treating every
  * 23505 as the same collision.
  */
-export const getUniqueViolationConstraint = (
-  error: unknown
+export const getUniqueViolationConstraint = <T,>(
+  error: T
 ): string | undefined =>
   error instanceof EffectDrizzleQueryError
     ? getDatabaseErrorField(error.cause, "constraint")
@@ -145,17 +146,15 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
   options?: RemapDbErrorsOptions
 ) {
   let config: RemapDbErrorsConfig<UniqueViolationError>;
-  if (typeof entityOrConfig === "string") {
+  if (isString(entityOrConfig)) {
     if (action === undefined) {
       throw new TypeError("withRemapDbErrors requires a database action");
     }
     config = {
       action,
       entity: entityOrConfig,
-      ...(entityId === undefined ? {} : { entityId }),
-      ...(options?.uniqueViolationMessage === undefined
-        ? {}
-        : { uniqueViolationMessage: options.uniqueViolationMessage }),
+      ...(entityId === undefined ? undefined : { entityId }),
+      ...(options?.uniqueViolationMessage !== undefined && { uniqueViolationMessage: options.uniqueViolationMessage }),
     };
   } else {
     config = entityOrConfig;
@@ -193,6 +192,7 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
             })
           );
 
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     return effect.pipe(
       Effect.catchIf(
         (

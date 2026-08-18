@@ -8,17 +8,17 @@ import type { OgImageData } from "./schema";
 
 const IMAGE_SIZE = { height: 630, width: 1200 } as const;
 
-const statusPresentation: Record<
-  TPostStatus["type"],
-  { color: string; label: string }
-> = {
+const statusPresentation = {
   CLOSED: { color: "#a1a1aa", label: "Closed" },
   COMPLETED: { color: "#34d399", label: "Completed" },
   IN_PROGRESS: { color: "#fbbf24", label: "In Progress" },
   PENDING: { color: "#60a5fa", label: "Pending" },
   PLANNED: { color: "#3b82f6", label: "Planned" },
   REVIEW: { color: "#38bdf8", label: "In Review" },
-};
+} satisfies Record<
+  TPostStatus["type"],
+  { color: string; label: string }
+>;
 
 interface OgFrameProps {
   children: ReactNode;

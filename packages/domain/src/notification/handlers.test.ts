@@ -92,7 +92,7 @@ describe("NotificationRpcHandlers", () => {
         body: "Feedback title",
         href: `/${fixture.organizationId}/post/board/post#comment-comment_1`,
         deduplicationKey: `test:${id}`,
-        ...(options.createdAt ? { createdAt: options.createdAt } : {}),
+        ...(options.createdAt && { createdAt: options.createdAt }),
       });
       return id;
     });

@@ -155,11 +155,9 @@ const makeCommentRepository = Effect.gen(function* () {
           .set({
             content: args.content,
             updatedAt: now,
-            ...(args.visibility
-              ? {
-                  visibility: args.visibility,
-                }
-              : {}),
+            ...(args.visibility && {
+              visibility: args.visibility,
+            }),
           })
           .where(
             and(

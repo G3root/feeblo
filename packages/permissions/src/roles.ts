@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 /**
  * Organization roles — the single source of truth for the role hierarchy.
  *
@@ -25,12 +26,12 @@ export type Role = (typeof ROLES)[number];
  * (`roleAtLeast`) and for member-management rank rules (an actor may only
  * manage targets with a strictly lower rank).
  */
-export const ROLE_RANK: Record<Role, number> = {
+export const ROLE_RANK = {
   contributor: 0,
   manager: 1,
   admin: 2,
   owner: 3,
-};
+} satisfies Record<Role, number>;
 
 /**
  * Roles that can be granted via an invitation. Owners are never invited — the
@@ -44,11 +45,12 @@ export const INVITABLE_ROLES = [
 
 export type InvitableRole = (typeof INVITABLE_ROLES)[number];
 
-export const isRole = (value: unknown): value is Role =>
-  typeof value === "string" && (ROLES as readonly string[]).includes(value);
+export const isRole = <T,>(value: T): value is T & Role =>
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  isString(value) && (ROLES as readonly string[]).includes(value);
 
 /** True when `role` is a role that can be granted through an invitation. */
-export const isInvitableRole = (role: unknown): boolean =>
+export const isInvitableRole = (role: string): boolean =>
   role === "admin" || role === "manager" || role === "contributor";
 
 /**

@@ -285,7 +285,9 @@ function PostEditorComponent({
   const isContentControlled = externalContent !== undefined;
 
   const content = isContentControlled
-    ? (externalContent as string)
+    // SAFETY: The upstream contract guarantees a string here.
+    ? (/* SAFETY: the content is controlled only when the host passes a string. */
+      externalContent as string)
     : internalContent;
 
   // Sync the latest content into the ref after render; the ref is only ever

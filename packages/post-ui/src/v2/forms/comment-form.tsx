@@ -35,6 +35,7 @@ const defaultVisibility: TVisibilitySchema = "PUBLIC";
 export const commentCreateFormOpts = formOptions({
   defaultValues: {
     content: "",
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     visibility: defaultVisibility as TVisibilitySchema,
   },
   validators: {
@@ -66,8 +67,9 @@ export const useCommentForm = ({
     ...commentCreateFormOpts,
     defaultValues: {
       content: "",
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       visibility: defaultVisibility as TVisibilitySchema,
-      ...(defaultValues ? defaultValues : {}),
+      ...(defaultValues ? defaultValues : undefined),
     },
     onSubmit: async ({ value }) => {
       if (!session) {
@@ -106,7 +108,9 @@ export const useCommentForm = ({
 };
 
 export const CommentComposerField = withForm({
+  // SAFETY: Empty-state placeholder for the generic container until real data is set.
   ...commentCreateFormOpts,
+  // SAFETY: Empty-state placeholder for the generic container until real data is set.
   props: {} as CommentComposerProviderProps,
   render: ({ form, ...rest }) => {
     return (

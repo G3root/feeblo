@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { currentDb, type Database, schema } from "@feeblo/db";
 import {
   type DiscordEmbed,
@@ -72,7 +73,7 @@ const slashCommandText = (
   const value = payload.data.options?.find(
     (option) => option.name === "text"
   )?.value;
-  return typeof value === "string" ? value : undefined;
+  return isString(value) ? value : undefined;
 };
 
 /** Reads the target message content from a message context menu invocation. */
@@ -147,7 +148,7 @@ export const makeDiscordInboundServiceLive = (): Layer.Layer<
             );
           }
           const customId = encodeModalMetadata({
-            ...(messageId === undefined ? {} : { messageId }),
+            ...(messageId === undefined ? undefined : { messageId }),
             channelId,
             guildId,
             organizationId,
@@ -176,9 +177,7 @@ export const makeDiscordInboundServiceLive = (): Layer.Layer<
             channelId: payload.channel_id,
             guildId: payload.guild_id,
             initialTitle: (messageText ?? "").trim().slice(0, TITLE_INPUT_MAX),
-            ...(payload.data.type === 3 && payload.data.target_id !== undefined
-              ? { messageId: payload.data.target_id }
-              : {}),
+            ...(payload.data.type === 3 && payload.data.target_id !== undefined && { messageId: payload.data.target_id }),
             organizationId: connection.value.organizationId,
           });
         });

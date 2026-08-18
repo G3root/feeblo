@@ -69,7 +69,9 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
   await page.addScriptTag({ path: sdkBundlePath });
   await page.evaluate(
     ({ host }) => {
-      const browserGlobal = globalThis as unknown as {
+      // SAFETY: the SDK bundle below registers Feeblo on the page global
+      // before this evaluate step runs.
+      const browserGlobal = globalThis as typeof globalThis & {
         Feeblo: {
           init: (
             organizationId: string,
@@ -79,7 +81,7 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
               modules: ["feedback", "updates"];
               placement: "bottom-right";
             }
-          ) => unknown;
+          ) => void;
         };
       };
       browserGlobal.Feeblo.init("org_widget_modes", {

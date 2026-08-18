@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { isIP, type LookupFunction } from "node:net";
 
 import { NodeHttpClient } from "@effect/platform-node";
@@ -63,10 +64,10 @@ export const parseWebhookRetryAfter = (
 };
 
 /** LookupOptions.family legacy string labels, normalized to their numeric forms. */
-const familyLabelToNumber: Record<"IPv4" | "IPv6", 4 | 6> = {
+const familyLabelToNumber = {
   IPv4: 4,
   IPv6: 6,
-};
+} satisfies Record<"IPv4" | "IPv6", 4 | 6>;
 
 /**
  * Builds the DNS pin for a validated endpoint. Node 20+ (where
@@ -83,7 +84,7 @@ export const makeWebhookPinnedLookup =
   (pinnedAddresses: readonly string[]): LookupFunction =>
   (_hostname, options, callback) => {
     const requestedFamily =
-      typeof options.family === "string"
+      isString(options.family)
         ? familyLabelToNumber[options.family]
         : options.family;
     const matchingAddresses = pinnedAddresses.filter(
@@ -199,7 +200,7 @@ export const sendWebhookDelivery = Effect.fn(
           : parseWebhookRetryAfter(retryAfterHeader, now);
       return {
         status: response.status,
-        ...(retryAfter === undefined ? {} : { retryAfter }),
+        ...(retryAfter === undefined ? undefined : { retryAfter }),
       };
     })
   ).pipe(

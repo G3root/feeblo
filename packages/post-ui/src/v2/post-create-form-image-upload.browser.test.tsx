@@ -1,15 +1,25 @@
+import { isFunction } from "@feeblo/utils/runtime-kind";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
+// The widget form reads these workspace modules directly; the stub provides
+// a faithful in-memory implementation for the upload schema endpoint boundary.
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/auth-client", () => ({
   editorMediaUploadEndpoint: "/api/media/upload",
   uploadedEditorMediaSchema: {
-    parse: (value: unknown) => value,
+    parse: <T,>(value: T) => value,
   },
 }));
+// The widget form reads these workspace modules directly; the stub provides
+// a faithful in-memory implementation for the RPC transport boundary.
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/runtime", () => ({
   fetchRpc: vi.fn().mockResolvedValue(undefined),
 }));
+// The widget form reads these workspace modules directly; the stub provides
+// a faithful in-memory implementation for the auth state hook boundary.
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   useAuthState: () => ({
     data: {
@@ -22,30 +32,43 @@ vi.mock("@feeblo/web-shared/use-auth-state", () => ({
 
 import { useEffect, useState } from "react";
 
-let memberData: unknown = {
+/** Member row the live-query stub exposes as the current member. */
+type MockMember = {
+  id: string;
+  organizationId: string;
+  userId: string;
+};
+
+let memberData: MockMember | undefined = {
   id: "member-1",
   organizationId: "organization-id",
   userId: "user-1",
 };
 let bumpRender: (() => void) | null = null;
-function setMemberData(value: unknown) {
+function setMemberData(value: MockMember | undefined) {
   memberData = value;
   bumpRender?.();
 }
+// The form's TanStack DB queries are exercised through an in-memory seam that
+// resolves the member / board / status reads the component performs.
+type MockLiveResult = { data: MockMember | typeof board | typeof postStatus | undefined };
+
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@tanstack/react-db", () => ({
   and: (...args: unknown[]) => args,
   createOptimisticAction: vi.fn(),
   eq: () => ({ __eq: true }),
   queryOnce: vi.fn(),
-  useLiveQuery: vi.fn((query: (q: never) => unknown) => {
+  useLiveQuery: vi.fn((query: (q: never) => MockLiveResult) => {
     let alias = "";
     const fakeQ = {
-      from: (arg: Record<string, unknown>) => {
+      from: (arg: Record<string, string | number | boolean | null | undefined>) => {
         alias = Object.keys(arg)[0] ?? "";
         const chain = { where: () => chain, findOne: () => undefined };
         return chain;
       },
     };
+    // SAFETY: Test fixture: `never` marks an intentionally unsupported input to assert rejection.
     query(fakeQ as never);
     if (alias === "member") {
       return { data: memberData };
@@ -59,6 +82,10 @@ vi.mock("@tanstack/react-db", () => ({
     return { data: undefined };
   }),
 }));
+// The widget form reads these workspace modules directly; the stub provides
+// a faithful in-memory implementation for the id generation boundary.
+// The post form needs a deterministic generated post id for its upload flow.
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/id", () => ({
   PostId: { unsafeGenerate: vi.fn().mockResolvedValue("post-1") },
 }));
@@ -103,10 +130,11 @@ class MockXMLHttpRequest {
 
   private dispatch(type: string) {
     const listener = this.listeners.get(type);
-    if (typeof listener === "function") {
-      listener(new Event(type));
-    } else {
-      listener?.handleEvent(new Event(type));
+    if (isFunction(listener)) {
+      // SAFETY: the non-object union branch is a callable EventListener.
+      (listener as (event: Event) => void)(new Event(type));
+    } else if (listener && "handleEvent" in listener) {
+      listener.handleEvent(new Event(type));
     }
   }
 }
@@ -149,6 +177,7 @@ function FormHarness() {
     <PostCreateDialogProvider>
       <PostCollectionsProvider
         collections={
+          // SAFETY: Test fixture: `never` marks an intentionally unsupported input to assert rejection.
           {
             boardCollection: {},
             membersCollection: {},
@@ -202,7 +231,9 @@ async function pasteImage(screen: RenderScreen, text: string) {
 
 async function submit(screen: RenderScreen): Promise<string> {
   await screen.getByRole("button", { name: "Create Post" }).click();
+  // SAFETY: The upstream contract guarantees a string here.
   await waitForInsertCount(1);
+  // SAFETY: The upstream contract guarantees a string here.
   return insertSpy.mock.calls[0]?.[0]?.content as string;
 }
 

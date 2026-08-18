@@ -50,7 +50,7 @@ const SlackSafeDisplayMetadata = Schema.Struct({
   botUserId: Schema.optionalKey(Schema.String),
 });
 
-const decodeSafeDisplayMetadata = (value: unknown) =>
+const decodeSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(SlackSafeDisplayMetadata)(value ?? {}).pipe(
     Effect.mapError(
       () =>
@@ -64,7 +64,7 @@ const decodeSafeDisplayMetadata = (value: unknown) =>
  * OAuth connection lifecycle: installing a Slack workspace (connect start and
  * completion), listing connections, and disconnecting with credential erasure.
  */
-export interface SlackConnectionServiceShape {
+export interface SlackConnectionServiceContract {
   readonly connectComplete: (input: {
     readonly code: string;
     readonly state: string;
@@ -85,7 +85,7 @@ export interface SlackConnectionServiceShape {
 
 export class SlackConnectionService extends Context.Service<
   SlackConnectionService,
-  SlackConnectionServiceShape
+  SlackConnectionServiceContract
 >()("@feeblo/SlackConnectionService") {}
 
 /** Creates the Slack connection lifecycle service with an injectable API client. */
@@ -227,12 +227,8 @@ export const makeSlackConnectionServiceLive = (
             config.encryptionKey,
             {
               botToken: oauth.access_token,
-              ...(oauth.authed_user?.access_token === undefined
-                ? {}
-                : { userToken: oauth.authed_user.access_token }),
-              ...(oauth.incoming_webhook?.url === undefined
-                ? {}
-                : { incomingWebhookUrl: oauth.incoming_webhook.url }),
+              ...(oauth.authed_user?.access_token !== undefined && { userToken: oauth.authed_user.access_token }),
+              ...(oauth.incoming_webhook?.url !== undefined && { incomingWebhookUrl: oauth.incoming_webhook.url }),
             }
           ).pipe(
             Effect.mapError(

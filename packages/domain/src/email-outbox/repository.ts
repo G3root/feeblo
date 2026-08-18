@@ -47,6 +47,9 @@ type EmailIntentWriteFields = {
 
 type EncodedIntentPayload = Schema.Codec.Encoded<typeof EmailIntentPayload>;
 
+/** Raw value space of rows read back from the outbox/delivery tables. */
+
+
 export type RecordEmailIntentInput = EmailIntentWriteFields & {
   readonly kind: Exclude<EmailIntent["kind"], "post.status_changed">;
   readonly payload: Exclude<
@@ -87,7 +90,7 @@ const dataError = (operation: string, reason: string): EmailOutboxDataError =>
   new EmailOutboxDataError({ operation, reason });
 
 const decodeIntentPayload = (
-  input: unknown,
+  input: Schema.Codec.Encoded<typeof EmailIntentPayload>,
   operation: string
 ): Effect.Effect<IntentPayload, EmailOutboxDataError> =>
   Schema.decodeUnknownEffect(EmailIntentPayload)(input).pipe(
@@ -97,7 +100,7 @@ const decodeIntentPayload = (
   );
 
 const decodeEmailIntent = (
-  input: unknown,
+  input: Schema.Codec.Encoded<typeof EmailOutboxRecord>,
   operation: string
 ): Effect.Effect<EmailIntent, EmailOutboxDataError> =>
   Effect.gen(function* () {
@@ -120,7 +123,7 @@ const decodeEmailIntent = (
   });
 
 const decodeEmailDelivery = (
-  input: unknown,
+  input: Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
   operation: string
 ): Effect.Effect<EmailDelivery, EmailOutboxDataError> =>
   Schema.decodeUnknownEffect(EmailDeliveryRecord)(input).pipe(
@@ -155,7 +158,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   const recordIntent = Effect.fn("EmailOutboxRepository.recordIntent")(
     function* (input: RecordEmailIntentInput) {
       const payload = yield* decodeIntentPayload(
-        input.payload,
+        // SAFETY: the write payload is the encoded intent shape; the decoder
+        // re-validates the tag union before it is used.
+        input.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
         "recordIntent.decodePayload"
       );
       if (payload.kind !== input.kind) {
@@ -196,7 +201,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
 
       return {
         _tag: "Inserted" as const,
-        intent: yield* decodeEmailIntent(inserted, "recordIntent.decodeResult"),
+        intent: yield* decodeEmailIntent(
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          inserted as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
+          "recordIntent.decodeResult"
+        ),
       };
     }
   );
@@ -205,7 +215,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     "EmailOutboxRepository.upsertPendingStatusChange"
   )(function* (input: RecordStatusChangeIntentInput) {
     const payload = yield* decodeIntentPayload(
-      input.payload,
+      // SAFETY: the write payload is the encoded intent shape; the decoder
+      // re-validates the tag union before it is used.
+      input.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
       "upsertPendingStatusChange.decodePayload"
     );
     if (payload.kind !== "post.status_changed") {
@@ -239,7 +251,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       return {
         _tag: "Written" as const,
         intent: yield* decodeEmailIntent(
-          inserted,
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          inserted as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
           "upsertPendingStatusChange.decodeResult"
         ),
       };
@@ -263,7 +277,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       return {
         _tag: "Written" as const,
         intent: yield* decodeEmailIntent(
-          coalesced,
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          coalesced as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
           "upsertPendingStatusChange.decodeResult"
         ),
       };
@@ -284,7 +300,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       return {
         _tag: "Written" as const,
         intent: yield* decodeEmailIntent(
-          retried,
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          retried as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
           "upsertPendingStatusChange.decodeResult"
         ),
       };
@@ -331,7 +349,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         .limit(limit);
 
       return yield* Effect.forEach(rows, (row) =>
-        decodeEmailIntent(row, "findPending.decodeIntent")
+        decodeEmailIntent(
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
+           "findPending.decodeIntent"
+        )
       );
     }
   );
@@ -356,7 +379,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         .orderBy(schema.emailOutboxTable.scheduledAt)
         .limit(limit);
       return yield* Effect.forEach(rows, (row) =>
-        decodeEmailIntent(row, "findPausedByPlan.decodeIntent")
+        decodeEmailIntent(
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
+           "findPausedByPlan.decodeIntent"
+        )
       );
     }
   );
@@ -366,7 +394,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   ) {
     const row = yield* db.query.emailOutboxTable.findFirst({ where: { id } });
     return row
-      ? yield* decodeEmailIntent(row, "findById.decodeIntent")
+      ? yield* decodeEmailIntent(
+          // SAFETY: the stored row is the encoded outbox record; the decoder
+          // re-validates it before it is used.
+          row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
+           "findById.decodeIntent"
+        )
       : undefined;
   });
 
@@ -376,7 +409,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         where: { id },
       });
       return row
-        ? yield* decodeEmailDelivery(row, "findDeliveryById.decodeDelivery")
+        ? yield* decodeEmailDelivery(
+          // SAFETY: the stored row is the encoded delivery record; the decoder
+          // re-validates it before it is used.
+          row as Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
+           "findDeliveryById.decodeDelivery"
+        )
         : undefined;
     }
   );
@@ -581,7 +619,12 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .orderBy(schema.emailDeliveryTable.createdAt)
       .limit(limit);
     return yield* Effect.forEach(rows, (row) =>
-      decodeEmailDelivery(row, "findDueDeliveries.decodeDelivery")
+      decodeEmailDelivery(
+          // SAFETY: the stored row is the encoded delivery record; the decoder
+          // re-validates it before it is used.
+          row as Schema.Codec.Encoded<typeof EmailDeliveryRecord>,
+           "findDueDeliveries.decodeDelivery"
+        )
     );
   });
 
@@ -743,7 +786,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .update(schema.emailDeliveryTable)
       .set({
         state,
-        ...(lastError === undefined ? {} : { lastError }),
+        ...(lastError === undefined ? undefined : { lastError }),
         updatedAt,
       })
       .where(

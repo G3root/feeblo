@@ -1,8 +1,6 @@
 import type { TEmailDeliveryState } from "@feeblo/db/validation-schema/email";
 
-const transitionTargets: Readonly<
-  Record<TEmailDeliveryState, readonly TEmailDeliveryState[]>
-> = {
+const transitionTargets = {
   accepted: ["delivered", "deferred", "bounced", "failed"],
   bounced: [],
   deferred: ["sending", "expired", "failed", "paused_by_plan", "suppressed"],
@@ -22,8 +20,9 @@ const transitionTargets: Readonly<
     "suppressed",
   ],
   suppressed: [],
-};
-
+} satisfies Readonly<
+  Record<TEmailDeliveryState, readonly TEmailDeliveryState[]>
+>;
 // SAFETY: transitionTargets is exhaustively keyed by TEmailDeliveryState, so
 // Object.keys returns only TEmailDeliveryState values.
 const deliveryStates = Object.keys(

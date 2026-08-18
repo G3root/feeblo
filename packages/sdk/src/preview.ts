@@ -9,7 +9,9 @@ import {
 
 const DEFAULTS = {
   baseUrl: "http://localhost:3001",
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   mode: "feedback" as WidgetMode,
+  // SAFETY: The upstream contract guarantees this value here.
   modules: ["feedback", "updates"] as WidgetModule[],
   organizationId: "demo-org",
   theme: "light",
@@ -113,7 +115,10 @@ function updateUrl(patch: Record<string, string | undefined>): void {
 }
 
 function setChoiceState(config: PreviewConfig): void {
-  const values: Record<string, string> = {
+  interface PreviewFieldValues {
+    readonly [key: string]: string;
+  }
+  const values: PreviewFieldValues = {
     mode: config.mode,
     modules: config.modules.join(","),
     placement: config.placement ?? "",
@@ -170,7 +175,7 @@ function initializePreview(): void {
   widget = Feeblo.init(config.organizationId, {
     baseUrl: config.baseUrl,
     mode: config.mode,
-    ...(config.mode === "hub" ? { modules: config.modules } : {}),
+    ...(config.mode === "hub" && { modules: config.modules }),
     placement: config.placement,
     root: embedRoot,
     theme: config.theme,

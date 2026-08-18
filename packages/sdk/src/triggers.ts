@@ -23,9 +23,7 @@ function findTriggers(): HTMLElement[] {
   );
 }
 
-export function extractTriggerMetadata(
-  element: HTMLElement
-): Record<string, string> {
+export function extractTriggerMetadata(element: HTMLElement) {
   const metadata: Record<string, string> = {};
   for (const key of Object.keys(element.dataset)) {
     if (key === FEEDBACK_DATASET_KEY) {

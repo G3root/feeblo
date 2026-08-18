@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { Database, schema, transaction } from "@feeblo/db";
 import {
   Mailer,
@@ -191,7 +192,7 @@ export const SubmissionEmailNotificationWorkflowLayer =
 
           const emails = members
             .map(({ user }) => user?.email)
-            .filter((email): email is string => typeof email === "string");
+            .filter((email): email is string => isString(email));
 
           yield* Effect.forEach(
             emails,

@@ -78,7 +78,7 @@ const main = async () => {
   }
 };
 
-main().catch((error: unknown) => {
+main().catch((error) => {
   console.error("Failed to configure post embeddings:", error);
   process.exitCode = 1;
 });

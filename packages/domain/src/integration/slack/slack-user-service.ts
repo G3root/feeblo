@@ -21,7 +21,7 @@ const SYNTHETIC_SLACK_EMAIL_SUFFIX = "@slack.invalid";
  * no existing account matches. Owns the three-step resolution policy: SSO-style
  * email linking, stable synthetic-email reuse, and anonymous-user creation.
  */
-export interface SlackUserServiceShape {
+export interface SlackUserServiceContract {
   readonly resolveUser: (input: {
     readonly botToken: Redacted.Redacted<string>;
     readonly organizationId: string;
@@ -32,7 +32,7 @@ export interface SlackUserServiceShape {
 
 export class SlackUserService extends Context.Service<
   SlackUserService,
-  SlackUserServiceShape
+  SlackUserServiceContract
 >()("@feeblo/SlackUserService") {}
 
 /** Creates the Slack user resolution service with an injectable API client. */

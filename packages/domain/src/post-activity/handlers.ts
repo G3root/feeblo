@@ -16,7 +16,7 @@ export const PostActivityRpcHandlersEffect = Effect.gen(function* () {
         .findMany({
           organizationId: args.organizationId,
           postId: args.postId,
-          ...(args.since === undefined ? {} : { since: args.since }),
+          ...(args.since === undefined ? undefined : { since: args.since }),
         })
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),

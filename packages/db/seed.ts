@@ -1,3 +1,4 @@
+import { isObject } from "@feeblo/utils/runtime-kind";
 import { faker } from "@faker-js/faker";
 import { initAuthHandler } from "@feeblo/auth/server";
 import {
@@ -175,7 +176,7 @@ const SEED_PRODUCTS = [
  * keyed by the owning user's email. Covers active, trialing, past_due,
  * and canceled — orgs not listed here are free.
  */
-const ORGANIZATION_PLANS: Record<string, SubscriptionScenario> = {
+const ORGANIZATION_PLANS = {
   "test@feeblo.dev": {
     productPlan: "professional",
     productVariant: "yearly",
@@ -205,7 +206,7 @@ const ORGANIZATION_PLANS: Record<string, SubscriptionScenario> = {
     interval: "year",
     cancelAtPeriodEnd: true,
   },
-};
+} satisfies Record<string, SubscriptionScenario>;
 
 const CHANGELOG_TAG_NAMES = [
   "New features",
@@ -438,7 +439,7 @@ const ensureUser = ({
 
       if (
         !result ||
-        typeof result !== "object" ||
+        !isObject(result) ||
         !("user" in result) ||
         !result.user
       ) {
@@ -1339,7 +1340,7 @@ const seed = Effect.gen(function* () {
     boardIds: mainBoards.map((item) => item.id),
     count: MAIN_POST_COUNT,
     creatorId: primaryUser.id,
-    ...(primaryMember ? { creatorMemberId: primaryMember.id } : {}),
+    ...(primaryMember && { creatorMemberId: primaryMember.id }),
   });
 
   const primarySite = yield* ensureSite({
@@ -1439,7 +1440,7 @@ const seed = Effect.gen(function* () {
       boardIds: externalBoards.map((item) => item.id),
       count: EXTERNAL_POST_COUNT,
       creatorId: externalUser.id,
-      ...(externalMember ? { creatorMemberId: externalMember.id } : {}),
+      ...(externalMember && { creatorMemberId: externalMember.id }),
     });
 
     const externalSite = yield* ensureSite({

@@ -1,3 +1,4 @@
+import { isObject } from "@feeblo/utils/runtime-kind";
 import { parseArgs } from "node:util";
 
 import { PGlite } from "@electric-sql/pglite";
@@ -49,7 +50,7 @@ const parseDimensions = (value: string | undefined): number => {
 
 const readCount = (rows: readonly unknown[]): number => {
   const row = rows[0];
-  if (!(typeof row === "object" && row !== null && "count" in row)) {
+  if (!(isObject(row) && "count" in row)) {
     throw new TypeError("Database returned an invalid count.");
   }
   const count = Number(row.count);
@@ -145,7 +146,7 @@ Options:
   }
 };
 
-main().catch((error: unknown) => {
+main().catch((error) => {
   console.error("Failed to configure post embeddings:", error);
   process.exitCode = 1;
 });

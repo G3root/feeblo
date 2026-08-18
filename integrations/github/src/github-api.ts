@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import * as GitHub from "@distilled.cloud/github";
 import {
   IntegrationProviderAuthenticationError,
@@ -147,7 +148,7 @@ export const classifyGitHubApiError = (
     return new IntegrationProviderRateLimitedError({
       message: `GitHub rate limited ${context}`,
       provider: githubProviderKey,
-      ...(status === undefined ? {} : { httpStatus: status }),
+      ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
   if (status !== undefined && status >= 500) {
@@ -167,7 +168,7 @@ export const classifyGitHubApiError = (
   return new IntegrationProviderPermanentRejection({
     message: `GitHub rejected ${context}`,
     provider: githubProviderKey,
-    ...(status === undefined ? {} : { httpStatus: status }),
+    ...(status === undefined ? undefined : { httpStatus: status }),
   });
 };
 
@@ -225,21 +226,21 @@ export interface GitHubApiClient {
 }
 
 /** Extracts the stable `_tag` of a tagged SDK error, if present. */
-const sdkErrorTag = (error: unknown): string | undefined =>
-  Predicate.isObject(error) && "_tag" in error && typeof error._tag === "string"
+const sdkErrorTag = <T,>(error: T): string | undefined =>
+  Predicate.isObject(error) && "_tag" in error && isString(error._tag)
     ? error._tag
     : undefined;
 
 /** Extracts a human-readable message from an SDK error, if present. */
-const sdkErrorMessage = (error: unknown): string | undefined =>
+const sdkErrorMessage = <T,>(error: T): string | undefined =>
   Predicate.isObject(error) &&
   "message" in error &&
-  typeof error.message === "string"
+  isString(error.message)
     ? error.message
     : undefined;
 
 /** Extracts a server-provided retry hint from an SDK error, if present. */
-const sdkRetryAfterMs = (error: unknown): number | undefined =>
+const sdkRetryAfterMs = <T,>(error: T): number | undefined =>
   Predicate.isObject(error) &&
   "retryAfter" in error &&
   Duration.isDuration(error.retryAfter)
@@ -249,7 +250,7 @@ const sdkRetryAfterMs = (error: unknown): number | undefined =>
 /** Maps the Effect-native SDK's typed errors onto the integration kernel failure algebra. */
 const mapSdkError =
   (context: string) =>
-  (error: unknown): GitHubApiFailure => {
+  <T,>(error: T): GitHubApiFailure => {
     if (HttpClientError.isHttpClientError(error)) {
       return new IntegrationProviderTemporaryFailure({
         message: `GitHub request failed during ${context}`,
@@ -276,7 +277,7 @@ const mapSdkError =
           message: detail,
           provider: githubProviderKey,
           httpStatus: 429,
-          ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+          ...(retryAfterMs === undefined ? undefined : { retryAfterMs }),
         });
       }
       case "BadRequest":
@@ -406,7 +407,7 @@ const withSdk = <A, E>(
 const decodeSdkResponse =
   <S extends Schema.Constraint>(schema: S, context: string) =>
   (
-    value: unknown
+    value: Schema.Json
   ): Effect.Effect<S["Type"], GitHubApiFailure, S["DecodingServices"]> =>
     Schema.decodeUnknownEffect(schema)(value).pipe(
       Effect.mapError(

@@ -248,7 +248,7 @@ export const prepareEditorAssetContent = ({
   Effect.gen(function* () {
     const assets = yield* findEditorAssetsByIds({
       organizationId,
-      ...(userId ? { userId } : {}),
+      ...(userId && { userId }),
       assetIds,
     });
     const temporaryAssets = assets.filter(({ key }) =>
@@ -259,6 +259,7 @@ export const prepareEditorAssetContent = ({
       return {
         content,
         coverImage: coverImageUrl ?? null,
+        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         promotions: [] as readonly PromotedEditorAsset[],
       };
     }
@@ -461,13 +462,13 @@ export const syncPostAssetReferences = ({
       .where(eq(schema.postAssetTable.postId, postId));
     const currentAssets = yield* findCurrentEditorAssetsInContent({
       organizationId,
-      ...(userId ? { userId } : {}),
+      ...(userId && { userId }),
       content,
       currentAssetIds: current.map(({ assetId }) => assetId),
     });
     const submittedAssets = yield* findEditorAssetsByIds({
       organizationId,
-      ...(userId ? { userId } : {}),
+      ...(userId && { userId }),
       assetIds,
     });
     const assets = [
@@ -510,13 +511,13 @@ export const syncChangelogAssetReferences = ({
       .where(eq(schema.changelogAssetTable.changelogId, changelogId));
     const currentAssets = yield* findCurrentEditorAssetsInContent({
       organizationId,
-      ...(userId ? { userId } : {}),
+      ...(userId && { userId }),
       content,
       currentAssetIds: current.map(({ assetId }) => assetId),
     });
     const submittedAssets = yield* findEditorAssetsByIds({
       organizationId,
-      ...(userId ? { userId } : {}),
+      ...(userId && { userId }),
       assetIds,
     });
     // The client only knows the cover image URL (not its asset id), so after

@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { currentDb, schema } from "@feeblo/db";
 import type { TNotificationEventType } from "@feeblo/db/validation-schema/notification-kind";
 import { NotificationId } from "@feeblo/id";
@@ -34,7 +35,7 @@ const makeNotificationService = Effect.gen(function* () {
     Effect.gen(function* () {
       const recipients = [...new Set(input.recipientMemberIds)].filter(
         (memberId): memberId is string =>
-          typeof memberId === "string" && memberId !== input.actorMemberId
+          isString(memberId) && memberId !== input.actorMemberId
       );
 
       yield* Effect.forEach(recipients, (recipientMemberId) =>
@@ -107,7 +108,7 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         yield* create({
-          ...(actorMemberId === undefined ? {} : { actorMemberId }),
+          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
           organizationId,
           recipientMemberIds: recipients.map((member) => member.id),
           kind: "feedback.submitted",
@@ -141,7 +142,7 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         yield* create({
-          ...(actorMemberId === undefined ? {} : { actorMemberId }),
+          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
           organizationId,
           recipientMemberIds: [
             context.creatorMemberId,
@@ -179,7 +180,7 @@ const makeNotificationService = Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const statusChangedUuid = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
         yield* create({
-          ...(actorMemberId === undefined ? {} : { actorMemberId }),
+          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
           organizationId,
           recipientMemberIds: [
             context.creatorMemberId,
@@ -217,7 +218,7 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         yield* create({
-          ...(actorMemberId === undefined ? {} : { actorMemberId }),
+          ...(actorMemberId === undefined ? undefined : { actorMemberId }),
           organizationId,
           recipientMemberIds: upvoters.map((upvoter) => upvoter.memberId),
           kind: "feedback.status_changed",

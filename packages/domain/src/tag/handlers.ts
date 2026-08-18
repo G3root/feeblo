@@ -42,7 +42,7 @@ const validateTagIds = ({
     const count = yield* repository.countExistingTags({
       organizationId,
       tagIds,
-      ...(type ? { type } : {}),
+      ...(type && { type }),
     });
 
     if (count !== tagIds.length) {
@@ -174,7 +174,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         yield* repository.create({
           ...args,
           creatorId: session.session.userId,
-          ...(membership ? { creatorMemberId: membership.membershipId } : {}),
+          ...(membership && { creatorMemberId: membership.membershipId }),
         });
       }).pipe(
         Policy.withPolicy(tagPolicy.canCreate(args.organizationId)),

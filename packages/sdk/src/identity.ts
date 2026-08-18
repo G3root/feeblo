@@ -3,6 +3,7 @@ import type {
   NormalizedUserIdentity,
   UserIdentity,
   WidgetCompany,
+  WidgetFieldValue,
 } from "./types";
 
 const COMPANY_KEYS = ["id", "name", "avatar", "customFields"] as const;
@@ -10,12 +11,13 @@ const COMPANY_KEYS = ["id", "name", "avatar", "customFields"] as const;
 function normalizeCompany(
   company: WidgetCompany
 ): Pick<WidgetCompany, "id" | "name" | "avatar" | "customFields"> {
-  const result: Record<string, unknown> = {};
+  const result: Record<string, WidgetFieldValue> = {};
   for (const key of COMPANY_KEYS) {
     if (company[key] !== undefined) {
       result[key] = company[key];
     }
   }
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   return result as Pick<
     WidgetCompany,
     "id" | "name" | "avatar" | "customFields"
@@ -33,7 +35,7 @@ export function normalizeUserIdentity(
     });
   }
 
-  const base: Record<string, unknown> = {};
+  const base: Record<string, WidgetFieldValue> = {};
   for (const key of [
     "email",
     "name",
@@ -47,9 +49,10 @@ export function normalizeUserIdentity(
   }
 
   const companies = rest.companies?.map(normalizeCompany);
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   return {
     id,
     ...base,
-    ...(companies ? { companies } : {}),
+    ...(companies && { companies }),
   } as NormalizedUserIdentity;
 }

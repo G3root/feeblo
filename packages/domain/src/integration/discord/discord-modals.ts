@@ -76,7 +76,7 @@ export const decodeModalMetadata = (
     );
   }
   return Schema.decodeUnknownEffect(DiscordFeedbackModalMetadata)({
-    ...(messageId === undefined ? {} : { messageId }),
+    ...(messageId === undefined ? undefined : { messageId }),
     channelId,
     guildId,
     organizationId,
@@ -115,6 +115,29 @@ export const readModalValue = (
  * feedback post. The modal's `custom_id` carries the metadata the submit
  * interaction returns.
  */
+/**
+ * Discord interaction callback payloads Feeblo emits (types 1, 4, 6, and 9).
+ */
+export type DiscordInteractionCallback =
+  | { readonly type: 1 }
+  | {
+      readonly type: 4;
+      readonly data: {
+        readonly flags: 64;
+        readonly content: string;
+        readonly embeds?: readonly DiscordEmbed[];
+      };
+    }
+  | { readonly type: 6 }
+  | {
+      readonly type: 9;
+      readonly data: {
+        readonly custom_id: string;
+        readonly title: string;
+        readonly components: readonly unknown[];
+      };
+    };
+
 export const buildFeedbackModal = ({
   boards,
   customId,
@@ -126,7 +149,7 @@ export const buildFeedbackModal = ({
   }[];
   readonly customId: string;
   readonly initialTitle: string;
-}): unknown => ({
+}): DiscordInteractionCallback => ({
   type: 9,
   data: {
     custom_id: customId,
@@ -141,9 +164,7 @@ export const buildFeedbackModal = ({
           style: 1,
           required: true,
           max_length: TITLE_MAX_LENGTH,
-          ...(initialTitle.length > 0
-            ? { value: truncate(initialTitle, TITLE_MAX_LENGTH) }
-            : {}),
+          ...(initialTitle.length > 0 && { value: truncate(initialTitle, TITLE_MAX_LENGTH) }),
         },
       },
       {
@@ -181,17 +202,17 @@ export const buildFeedbackModal = ({
 export const buildEphemeralMessage = (
   content: string,
   embeds: readonly DiscordEmbed[] = []
-): unknown => ({
+): DiscordInteractionCallback => ({
   type: 4,
   data: {
     flags: 64,
     content,
-    ...(embeds.length === 0 ? {} : { embeds }),
+    ...(embeds.length === 0 ? undefined : { embeds }),
   },
 });
 
 /** Discord `PONG` response to a `PING` interaction (callback type 1). */
-export const buildPong = (): unknown => ({ type: 1 });
+export const buildPong = (): DiscordInteractionCallback => ({ type: 1 });
 
 /** Discord deferred-update acknowledgment for unhandled interaction types (callback type 6). */
-export const buildDeferredUpdate = (): unknown => ({ type: 6 });
+export const buildDeferredUpdate = (): DiscordInteractionCallback => ({ type: 6 });

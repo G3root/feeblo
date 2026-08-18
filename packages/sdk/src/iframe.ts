@@ -48,7 +48,10 @@ export function createIframe(
   iframe.style.width = "100%";
   iframe.style.height = "100%";
   iframe.style.border = "none";
-  const titles: Record<string, Record<string, string>> = {
+  interface TitleMap {
+    readonly [key: string]: Record<string, string>;
+  }
+  const titles: TitleMap = {
     en: {
       feedback: "Feeblo feedback widget",
       updates: "Feeblo updates widget",

@@ -6,7 +6,7 @@ import type { WebhookManagementError } from "./errors";
 import type * as S from "./schema";
 
 /** Organization-scoped webhook management boundary; read methods never return credentials. */
-export interface WebhookManagementServiceShape {
+export interface WebhookManagementServiceContract {
   readonly createEndpoint: (
     input: S.TWebhookEndpointCreate
   ) => Effect.Effect<
@@ -50,5 +50,5 @@ export interface WebhookManagementServiceShape {
 /** Service key implemented by the server composition root for webhook commands. */
 export class WebhookManagementService extends Context.Service<
   WebhookManagementService,
-  WebhookManagementServiceShape
+  WebhookManagementServiceContract
 >()("@feeblo/WebhookManagementService") {}

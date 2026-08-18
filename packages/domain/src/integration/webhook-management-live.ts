@@ -47,7 +47,7 @@ const subscribableEventTypes = SUBSCRIBABLE_INTEGRATION_EVENT_TYPES;
 
 const WebhookSafeDisplayMetadata = Schema.Struct({ hostname: Schema.String });
 
-const decodeWebhookSafeDisplayMetadata = (value: unknown) =>
+const decodeWebhookSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(WebhookSafeDisplayMetadata)(value).pipe(
     Effect.mapError(
       () =>
@@ -57,7 +57,7 @@ const decodeWebhookSafeDisplayMetadata = (value: unknown) =>
     )
   );
 
-const decodeWebhookRouteEventSelection = (value: unknown) =>
+const decodeWebhookRouteEventSelection = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(IntegrationRouteEventSelection)(value).pipe(
     Effect.mapError(
       () =>
@@ -68,7 +68,7 @@ const decodeWebhookRouteEventSelection = (value: unknown) =>
   );
 
 const mapManagementError = (operation: string) =>
-  Effect.mapError((error: unknown) =>
+  Effect.mapError((error) =>
     Schema.is(WebhookManagementErrors)(error)
       ? error
       : new InternalServerError({
@@ -366,9 +366,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   endpointUrl: input.endpointUrl,
                   signingKeyring: {
                     current: Redacted.value(credentials.signingKeyring.current),
-                    ...(credentials.signingKeyring.previous === undefined
-                      ? {}
-                      : {
+                    ...(credentials.signingKeyring.previous !== undefined && {
                           previous: {
                             expiresAt: DateTime.makeUnsafe(
                               credentials.signingKeyring.previous.expiresAt
@@ -393,7 +391,7 @@ export const WebhookManagementServiceLive = Layer.effect(
             yield* db
               .update(schema.integrationConnectionTable)
               .set({
-                ...(input.name === undefined ? {} : { name: input.name }),
+                ...(input.name === undefined ? undefined : { name: input.name }),
                 credentialsCiphertext,
                 safeDisplayMetadata: { hostname },
               })
@@ -719,9 +717,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   endpointUrl: Redacted.value(credentials.endpointUrl),
                   signingKeyring: {
                     current: Redacted.value(keyring.current),
-                    ...(keyring.previous === undefined
-                      ? {}
-                      : {
+                    ...(keyring.previous !== undefined && {
                           previous: {
                             expiresAt: DateTime.makeUnsafe(
                               keyring.previous.expiresAt

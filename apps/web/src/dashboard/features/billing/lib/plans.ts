@@ -40,10 +40,7 @@ export type PlanCard = {
   year: WorkspaceProduct | undefined;
 };
 
-export const PLAN_COPY: Record<
-  PlanType,
-  { name: string; description: string; recommended?: boolean }
-> = {
+export const PLAN_COPY = {
   free: {
     name: "Free",
     description: "For testing and getting started.",
@@ -57,19 +54,22 @@ export const PLAN_COPY: Record<
     description: "For teams running production workflows.",
     recommended: true,
   },
-};
+} satisfies Record<
+  PlanType,
+  { name: string; description: string; recommended?: boolean }
+>;
 
 export function buildPlanCards(
   products: WorkspaceProduct[],
   currentPlanType: PlanType
 ) {
-  const productsByPlan: Record<
-    Exclude<PlanType, "free">,
-    Record<BillingInterval, WorkspaceProduct | undefined>
-  > = {
+  const productsByPlan = {
     starter: { month: undefined, year: undefined },
     professional: { month: undefined, year: undefined },
-  };
+  } satisfies Record<
+    Exclude<PlanType, "free">,
+    Record<BillingInterval, WorkspaceProduct | undefined>
+  >;
 
   for (const product of products) {
     const plan = product.metadata?.plan;
@@ -188,11 +188,11 @@ export function getPlanDetails(
   ];
 }
 
-export const PLAN_FEATURES: Record<PlanType, readonly PlanFeatureRow[]> = {
+export const PLAN_FEATURES = {
   free: getPlanFeatureRows("free"),
   starter: getPlanFeatureRows("starter"),
   professional: getPlanFeatureRows("professional"),
-};
+} satisfies Record<PlanType, readonly PlanFeatureRow[]>;
 
 export const isPaidPlan = (plan?: PlanType): boolean => {
   if (!plan || plan === "free") {

@@ -135,7 +135,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               content: prepared.content,
               coverImage: prepared.coverImage,
               creatorId: session.session.userId,
-              ...(isMember ? { creatorMemberId: isMember.membershipId } : {}),
+              ...(isMember && { creatorMemberId: isMember.membershipId }),
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
             const createdOutboxId =

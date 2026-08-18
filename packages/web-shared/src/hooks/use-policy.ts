@@ -1,3 +1,4 @@
+import { isFunction } from "@feeblo/utils/runtime-kind";
 import type { AuthClientSession } from "@feeblo/auth/client";
 import type { Permission, Role } from "@feeblo/permissions";
 import { can, isMember, roleIn } from "@feeblo/permissions";
@@ -9,10 +10,12 @@ type SessionData = AuthClientSession;
 
 export type ClientPolicy = (session: SessionData) => boolean;
 
-export function usePolicy(policy: ClientPolicy): {
+export type PolicyEvaluation = {
   allowed: boolean;
   isPending: boolean;
-} {
+};
+
+export function usePolicy(policy: ClientPolicy): PolicyEvaluation {
   const { data: session, isPending } = useAuthState();
 
   const allowed = useMemo(() => {
@@ -102,11 +105,16 @@ export function PolicyGuard({
 }): ReactNode {
   const { allowed, isPending } = usePolicy(policy);
 
-  if (typeof children === "function") {
+  if (isFunction(children)) {
+    // SAFETY: the union branch narrowed by isFunction is the render-function
+    // form of children.
+    const renderChildren = children as (
+      result: { allowed: boolean }
+    ) => ReactNode;
     if (isPending) {
-      return children({ allowed: false });
+      return renderChildren({ allowed: false });
     }
-    return children({ allowed });
+    return renderChildren({ allowed });
   }
 
   if (isPending) {

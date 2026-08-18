@@ -102,8 +102,10 @@ test(
     });
 
     const secret = await page.evaluate(() => {
+      // SAFETY: the browser under test always provides clipboard access; the
+      // intersection only narrows the known global shape.
       const browserNavigator = (
-        globalThis as unknown as {
+        globalThis as typeof globalThis & {
           navigator: { clipboard: { readText: () => Promise<string> } };
         }
       ).navigator;
@@ -145,7 +147,9 @@ test(
               close: () => WidgetHandle;
               open: () => WidgetHandle;
             };
-            const browserGlobal = globalThis as unknown as {
+            // SAFETY: the SDK bundle below registers Feeblo on the page
+            // global before this evaluate step runs.
+            const browserGlobal = globalThis as typeof globalThis & {
               Feeblo: {
                 init: (
                   organizationId: string,
@@ -163,7 +167,7 @@ test(
               e2eWidget?: WidgetHandle;
               addEventListener: (
                 event: string,
-                listener: (event: unknown) => void,
+                listener: (event: { detail: { data: { title: string } } }) => void,
                 options: { once: boolean }
               ) => void;
               document: { body: { dataset: Record<string, string> } };
@@ -171,12 +175,9 @@ test(
 
             browserGlobal.addEventListener(
               "feedbackSubmitted",
-              (event: unknown) => {
-                const submitted = event as {
-                  detail: { data: { title: string } };
-                };
+              (event) => {
                 browserGlobal.document.body.dataset.submittedFeedback =
-                  submitted.detail.data.title;
+                  event.detail.data.title;
               },
               { once: true }
             );
@@ -233,7 +234,8 @@ test(
 
       await test.step("auto-login through a data-feeblo-link", async () => {
         await visitorPage.evaluate(() => {
-          const browserGlobal = globalThis as unknown as {
+          // SAFETY: the widget sets e2eWidget on the page global for tests.
+          const browserGlobal = globalThis as typeof globalThis & {
             e2eWidget?: { close: () => void };
           };
           browserGlobal.e2eWidget?.close();

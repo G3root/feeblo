@@ -49,7 +49,7 @@ const dataError = (
   });
 
 const decodeLifecycleEvent = (
-  input: unknown
+  input: LifecycleEvent | Schema.Json
 ): Effect.Effect<LifecycleEvent, EmailProviderFeedbackInputError> =>
   Schema.decodeUnknownEffect(ProviderLifecycleEvent)(input).pipe(
     Effect.mapError(() =>
@@ -61,7 +61,7 @@ const decodeLifecycleEvent = (
   );
 
 const decodeDelivery = (
-  input: unknown
+  input: Schema.Json
 ): Effect.Effect<DeliveryCorrelationRecord, EmailProviderFeedbackDataError> =>
   Schema.decodeUnknownEffect(DeliveryCorrelationRecord)(input).pipe(
     Effect.mapError(() =>
@@ -76,7 +76,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
   const db = yield* currentDb;
 
   const ingest = Effect.fn("EmailProviderFeedbackService.ingest")(function* (
-    input: unknown
+    input: LifecycleEvent | Schema.Json
   ) {
     const event = yield* decodeLifecycleEvent(input);
 
@@ -125,9 +125,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             .update(schema.emailDeliveryTable)
             .set({
               state: nextState,
-              ...(nextState === "delivered"
-                ? { deliveredAt: event.occurredAt }
-                : {}),
+              ...(nextState === "delivered" && { deliveredAt: event.occurredAt }),
               updatedAt: sql`greatest(${schema.emailDeliveryTable.updatedAt}, ${event.occurredAt})`,
             })
             .where(

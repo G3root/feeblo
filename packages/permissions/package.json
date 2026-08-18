@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@feeblo/utils": "workspace:*"
+  },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "typescript": "catalog:",

@@ -10,9 +10,16 @@ import {
   usePostCollectionData,
 } from "./post-page-context";
 
+// This browser test renders the PostPage in isolation, stubbing its child
+// surfaces (auth, policy, comments, editor, reactions, toggles) with faithful,
+// deterministic DOM stubs so each interaction can be asserted without a full
+// backend. These are the module boundaries the page reads directly, so
+// interception is the only seam available here.
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   useAuthState: () => ({ data: null }),
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-policy", () => ({
   allPolicy: vi.fn(),
   anyPolicy: vi.fn(),
@@ -21,21 +28,27 @@ vi.mock("@feeblo/web-shared/use-policy", () => ({
   isUser: vi.fn(),
   usePolicy: () => ({ allowed: false }),
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./comment-display/list", () => ({
   CommentsList: () => <div>comments list</div>,
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("../post/post-comment-composer", () => ({
   PostCommentComposer: () => <div>comment composer</div>,
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./post-editor", () => ({
   PostContentUpdateInput: () => <div>post content</div>,
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./post-title-input", () => ({
   PostTitleUpdateInput: () => <h1>post title</h1>,
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./reaction-picker", () => ({
   PostReactionPicker: () => <div>reaction picker</div>,
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./upvote-toggle", () => ({
   UpvoteButton: ({ variant }: { variant?: string }) => (
     <button type="button">
@@ -43,6 +56,7 @@ vi.mock("./upvote-toggle", () => ({
     </button>
   ),
 }));
+// eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./subscribe-toggle", () => ({
   SubscribeButton: () => <button type="button">subscribe</button>,
 }));

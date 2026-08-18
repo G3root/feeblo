@@ -91,7 +91,7 @@ export const makeSlackCredentialResolver = ({
     }),
 });
 
-const parseFormBody = (rawBody: string): Record<string, string> => {
+const parseFormBody = (rawBody: string) => {
   const params = new URLSearchParams(rawBody);
   const result: Record<string, string> = {};
   for (const [key, value] of params.entries()) {
@@ -246,9 +246,9 @@ export const makeSlackProviderRegistration = ({
         const blocks = renderChannelUpdateMessageBlocks({
           actionUrl: eventData.post.url.toString(),
           ...(eventData.actor.kind === "member" &&
-          eventData.actor.displayName !== undefined
-            ? { actorName: eventData.actor.displayName }
-            : {}),
+            eventData.actor.displayName !== undefined && {
+              actorName: eventData.actor.displayName,
+            }),
           eventType: input.event.type,
           facts: [
             { label: "Board", value: eventData.board.name },

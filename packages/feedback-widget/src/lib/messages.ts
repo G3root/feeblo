@@ -1,3 +1,4 @@
+import { hasWindow, isObject, isString } from "@feeblo/utils/runtime-kind";
 import type { WidgetModule } from "./config";
 import { isSupportedLocale } from "./config";
 import type { WidgetIdentity } from "./identity";
@@ -41,45 +42,61 @@ const PARENT_EVENT_NAMES = new Set<string>([
   "IDENTIFY",
 ]);
 
-export function isParentMessage(value: unknown): value is ParentMessage {
-  if (typeof value !== "object" || value === null || !("event" in value)) {
+export function isParentMessage<T,>(
+  value: T
+): value is Extract<T, ParentMessage> {
+  // SAFETY: isObject establishes that `value` is a non-null object; the
+  // optional-field view below only exposes the claims the guard inspects.
+  const record = isObject(value) ? (value as { event?: unknown; data?: unknown }) : undefined;
+  if (record === undefined || !("event" in record)) {
     return false;
   }
-  const event = (value as { event: unknown }).event;
-  if (typeof event !== "string" || !PARENT_EVENT_NAMES.has(event)) {
+  const event = record.event;
+  if (!isString(event) || !PARENT_EVENT_NAMES.has(event)) {
     return false;
   }
   if (event === "SHOW" || event === "HIDE") {
     return true;
   }
 
-  const data = (value as { data?: unknown }).data;
-  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+  const data = record.data;
+  if (Array.isArray(data) || !isObject(data)) {
     return false;
   }
+  // SAFETY: isObject + Array.isArray establish that `data` is a plain
+  // non-array object; the optional-field view only exposes the claims the
+  // guard inspects, all of which are strings in the accepted message shapes.
+  const dataRecord = data as {
+    module?: string;
+    board?: string;
+    locale?: string;
+    id?: string;
+  };
 
   switch (event) {
     case "SET_CONTEXT":
-      return Object.values(data).every((item) => typeof item === "string");
+      return Object.values(data).every((item) => isString(item));
     case "SET_MODULE":
       return (
-        "module" in data &&
-        (data.module === "feedback" || data.module === "updates")
+        "module" in dataRecord &&
+        (dataRecord.module === "feedback" || dataRecord.module === "updates")
       );
     case "SET_BOARD":
       return (
-        "board" in data &&
-        typeof data.board === "string" &&
-        data.board.length > 0
+        "board" in dataRecord &&
+        isString(dataRecord.board) &&
+        dataRecord.board.length > 0
       );
     case "SET_LOCALE":
       return (
-        "locale" in data &&
-        typeof data.locale === "string" &&
-        isSupportedLocale(data.locale)
+        "locale" in dataRecord &&
+        isString(dataRecord.locale) &&
+        isSupportedLocale(dataRecord.locale)
       );
     case "IDENTIFY":
-      return "id" in data && typeof data.id === "string" && data.id.length > 0;
+      return (
+        "id" in dataRecord && isString(dataRecord.id) && dataRecord.id.length > 0
+      );
   }
   return false;
 }
@@ -130,7 +147,7 @@ function getParentOrigin(): string | null {
 }
 
 export function sendToParent(message: ChildMessage): void {
-  if (typeof window === "undefined" || window.parent === window) {
+  if (!hasWindow() || window.parent === window) {
     return;
   }
   window.parent.postMessage(message, getParentOrigin() ?? "*");

@@ -3,6 +3,8 @@ import { createServer, type IncomingHttpHeaders } from "node:http";
 
 import { expect, type Locator, test } from "@playwright/test";
 
+import { isObject, isString } from "@feeblo/utils/runtime-kind";
+
 import { createAuthenticatedWorkspace } from "../helpers/auth";
 
 interface ReceivedWebhook {
@@ -17,7 +19,7 @@ const listen = (server: ReturnType<typeof createServer>) =>
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
-      if (address !== null && typeof address === "object") {
+      if (address !== null && isObject(address)) {
         resolve(address.port);
       }
     });
@@ -36,9 +38,9 @@ const verifyStandardWebhookSignature = (
   const timestamp = webhook.headers["webhook-timestamp"];
   const signatureHeader = webhook.headers["webhook-signature"];
   if (
-    typeof deliveryId !== "string" ||
-    typeof timestamp !== "string" ||
-    typeof signatureHeader !== "string" ||
+    !isString(deliveryId) ||
+    !isString(timestamp) ||
+    !isString(signatureHeader) ||
     !secret.startsWith("whsec_")
   ) {
     return false;

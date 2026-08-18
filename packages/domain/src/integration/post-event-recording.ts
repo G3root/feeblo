@@ -117,27 +117,25 @@ export const recordPostIntegrationEvent = Effect.fn(
             board,
             post: {
               id: input.postId,
-              ...(input.description === undefined ||
-              input.description.length === 0
-                ? {}
-                : { description: input.description }),
+              ...(input.description !== undefined &&
+                input.description.length > 0 && {
+                  description: input.description,
+                }),
               ...(input.metadata !== undefined &&
-              Object.keys(input.metadata).length > 0
-                ? { metadata: { ...input.metadata } }
-                : {}),
+                Object.keys(input.metadata).length > 0 && {
+                  metadata: { ...input.metadata },
+                }),
               status: { id: input.statusId, type: statusType },
               title: input.title,
               url,
             },
             ...(input.previousStatusId !== undefined &&
-            previousStatusType !== undefined
-              ? {
-                  previousStatus: {
-                    id: input.previousStatusId,
-                    type: previousStatusType,
-                  },
-                }
-              : {}),
+              previousStatusType !== undefined && {
+                previousStatus: {
+                  id: input.previousStatusId,
+                  type: previousStatusType,
+                },
+              }),
           },
           id,
           occurredAt,

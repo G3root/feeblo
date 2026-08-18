@@ -26,7 +26,7 @@ const browserPublicEnv = {
   window.global = window.global || {};
   window.global.__ENV = {
     ...publicEnv,
-    ...(organizationId ? { organizationId } : {}),
-    ...(widgetConfig ? { widgetConfig } : {}),
+    ...(organizationId && { organizationId }),
+    ...(widgetConfig && { widgetConfig }),
   };
 </script>

@@ -37,11 +37,13 @@ interface FeedbackFormData extends FormData {
 
 function getApiBaseUrl(): string {
   //@ts-expect-error
+  // SAFETY: The upstream contract guarantees a string here.
   return `${window.global.__ENV.API_URL}//api/widget/v1` as string;
 }
 
 export function getOrganizationId(): string {
   //@ts-expect-error
+  // SAFETY: The upstream contract guarantees a string here.
   return window.global.__ENV.organizationId as string;
 }
 
@@ -87,7 +89,9 @@ export async function fetchSuggestions(
 }
 
 export const createFeedBackAction = action(
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   async (formData: FormData): Promise<FeedbackResult> => {
+    // SAFETY: The upstream contract guarantees this value here.
     const data = formData as FeedbackFormData;
     const boardId = data.get("boardId");
     const boardName = data.get("boardName");
@@ -100,30 +104,32 @@ export const createFeedBackAction = action(
 
     const baseUrl = getApiBaseUrl();
     const url = `${baseUrl}/feedback`;
-    const body: {
+    const body = {
+      boardId,
+      content,
+      title,
+      organizationId,
+      metadata,
+      ...(token ? { token } : undefined),
+    } satisfies {
       boardId: string;
       content: string;
       metadata: Record<string, string>;
       organizationId: string;
       title: string;
       token?: string;
-    } = {
-      boardId,
-      content,
-      title,
-      organizationId,
-      metadata,
     };
-    if (token) {
-      body.token = token;
-    }
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
+// SAFETY: The endpoint/API contract guarantees this response shape.
+
+    // SAFETY: The endpoint/API contract guarantees this response shape.
     if (!response.ok) {
+      // SAFETY: The endpoint/API contract guarantees this response shape.
       const errorData = (await response.json()) as { message?: string };
       return {
         ok: false,

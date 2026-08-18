@@ -53,7 +53,7 @@ export function normalizeWidgetConfig(
   return {
     mode,
     modules: [...modules],
-    ...(options.placement ? { placement: options.placement } : {}),
+    ...(options.placement && { placement: options.placement }),
   };
 }
 

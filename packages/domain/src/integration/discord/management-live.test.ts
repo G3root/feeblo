@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { asLegid, IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
@@ -56,12 +57,15 @@ const makeFakeDiscordApiClient = (
       calls.push({ method: "guilds.commands.bulkOverwrite" });
       registeredCommands.length = 0;
       registeredCommands.push(
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         ...(commands as readonly { name: string; type: number }[])
       );
       return Effect.succeed(
         commands.map((command, index) => ({
           id: `command_${index}`,
+          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           name: (command as { name: string }).name,
+          // SAFETY: The endpoint/API contract guarantees this response shape.
           type: (command as { type: number }).type,
         }))
       );
@@ -74,7 +78,7 @@ const makeFakeDiscordApiClient = (
       calls.push({ method: "oauth2.token" });
       exchangeNumber += 1;
       const exchangedGuildId =
-        typeof guildId === "string" ? guildId : guildId(exchangeNumber);
+        isString(guildId) ? guildId : guildId(exchangeNumber);
       return Effect.succeed({
         access_token: "discord-user-token",
         expires_in: 604_800,

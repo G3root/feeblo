@@ -117,7 +117,7 @@ const makePolarService = Effect.gen(function* () {
           catch: (cause) =>
             new FailedToRevokeSubscriptionError({
               message: "Failed to revoke Polar subscription",
-              ...(cause instanceof Error ? { cause } : {}),
+              ...(cause instanceof Error && { cause }),
             }),
         }).pipe(
           Effect.catch((error) =>

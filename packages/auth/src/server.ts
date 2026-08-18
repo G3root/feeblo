@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { NodeCrypto } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
@@ -70,7 +71,9 @@ const loadVerificationOtpEmail = () =>
   import("@feeblo/transactional/templates/verification-otp");
 
 const createTestUtilsPlugin = (): BetterAuthPlugin =>
-  testUtils({ captureOTP: true }) as unknown as BetterAuthPlugin;
+  // SAFETY: better-auth's testUtils plugin implements the BetterAuthPlugin
+  // contract; the cast bridges its generically-typed result.
+  testUtils({ captureOTP: true }) as BetterAuthPlugin;
 
 export const initAuthHandler = (
   makeMailerLayer: () => Layer.Layer<
@@ -201,7 +204,7 @@ export const initAuthHandler = (
       },
     };
 
-    const mapPolicyDeniedToApiError = (error: unknown) => {
+    const mapPolicyDeniedToApiError = <T,>(error: T) => {
       if (error instanceof PolicyDeniedError) {
         return new APIError("FORBIDDEN", {
           message: error.reason ?? "Forbidden",
@@ -298,7 +301,7 @@ export const initAuthHandler = (
               const name = profile.name ?? profile.login;
               return {
                 name: name ?? "",
-                ...(profile.avatar_url ? { image: profile.avatar_url } : {}),
+                ...(profile.avatar_url && { image: profile.avatar_url }),
                 // The emulator always issues emails for verified users.
                 emailVerified: profile.emailVerified ?? Boolean(profile.email),
               };
@@ -377,13 +380,11 @@ export const initAuthHandler = (
                     error.reason._tag === "RateLimitExceeded"
                       ? "Too many verification codes requested. Please try again later."
                       : "Unable to send a verification code. Please try again.",
-                  ...(error.reason._tag === "RateLimitExceeded"
-                    ? {
-                        retryAfterSeconds: Math.ceil(
-                          Duration.toSeconds(error.reason.retryAfter)
-                        ),
-                      }
-                    : {}),
+                  ...(error.reason._tag === "RateLimitExceeded" && {
+                    retryAfterSeconds: Math.ceil(
+                      Duration.toSeconds(error.reason.retryAfter)
+                    ),
+                  }),
                 },
                 error.reason._tag === "RateLimitExceeded"
                   ? {
@@ -401,7 +402,7 @@ export const initAuthHandler = (
 
     const consumeVerificationOtpRateLimit = async (ctx: {
       path: string;
-      body?: Record<string, unknown>;
+      body?: Record<string, string | number | boolean | null | undefined>;
     }) => {
       const flow =
         ctx.path === "/email-otp/request-password-reset" ||
@@ -426,7 +427,7 @@ export const initAuthHandler = (
           ? ctx.body?.newEmail
           : ctx.body?.email;
 
-      if (typeof email !== "string" || !email) {
+      if (!isString(email) || !email) {
         return;
       }
 
@@ -463,33 +464,29 @@ export const initAuthHandler = (
         ? {
             socialProviders: {
               ...(Option.isSome(githubClientId) &&
-              Option.isSome(githubClientSecret) &&
-              Option.isNone(githubEmulatorUrl)
-                ? {
-                    github: {
-                      clientId: githubClientId.value,
-                      clientSecret: githubClientSecret.value,
-                      disableSignUp: !signUpEnabled,
-                      disableImplicitSignUp: !signUpEnabled,
-                    },
-                  }
-                : {}),
+                Option.isSome(githubClientSecret) &&
+                Option.isNone(githubEmulatorUrl) && {
+                  github: {
+                    clientId: githubClientId.value,
+                    clientSecret: githubClientSecret.value,
+                    disableSignUp: !signUpEnabled,
+                    disableImplicitSignUp: !signUpEnabled,
+                  },
+                }),
               ...(Option.isSome(googleClientId) &&
-              Option.isSome(googleClientSecret) &&
-              Option.isNone(googleEmulatorUrl)
-                ? {
-                    google: {
-                      prompt: "select_account",
-                      clientId: googleClientId.value,
-                      clientSecret: googleClientSecret.value,
-                      disableSignUp: !signUpEnabled,
-                      disableImplicitSignUp: !signUpEnabled,
-                    },
-                  }
-                : {}),
+                Option.isSome(googleClientSecret) &&
+                Option.isNone(googleEmulatorUrl) && {
+                  google: {
+                    prompt: "select_account",
+                    clientId: googleClientId.value,
+                    clientSecret: googleClientSecret.value,
+                    disableSignUp: !signUpEnabled,
+                    disableImplicitSignUp: !signUpEnabled,
+                  },
+                }),
             },
           }
-        : {}),
+        : undefined),
       telemetry: {
         enabled: false,
       },
@@ -744,7 +741,7 @@ export const initAuthHandler = (
               ctx.path.startsWith("/sign-up") ||
               ctx.path.startsWith("/email-otp")) &&
             ctx.body?.email &&
-            typeof ctx.body.email === "string"
+            isString(ctx.body.email)
           ) {
             if (
               isEmailBlocked(

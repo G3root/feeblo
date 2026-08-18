@@ -170,7 +170,7 @@ describe("CommentRpcHandlers", () => {
         excerpt: "Another test excerpt",
         createdAt: now,
         updatedAt: now,
-        ...(locked ? { lockedAt: now } : {}),
+        ...(locked && { lockedAt: now }),
       });
 
       return id;

@@ -18,6 +18,7 @@ export const createPermissions = <
 ): readonly `${Resource}.${Actions[number] | "*"}`[] =>
   [...actions, "*"].map(
     (action) =>
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       `${resource}.${action}` as `${Resource}.${Actions[number] | "*"}`
   );
 
@@ -102,15 +103,15 @@ const permissionDefinition = (permission: Permission): PermissionDefinition => {
     description: isWildcard
       ? `All permissions for ${resource}.`
       : `${humanize(action)} ${resource}.`,
-    ...(RESOURCE_SCOPED_PERMISSIONS.has(permission)
-      ? { resourceScoped: true }
-      : {}),
+    ...(RESOURCE_SCOPED_PERMISSIONS.has(permission) && { resourceScoped: true }),
   };
 };
 
-export const PERMISSION_CATALOG = Object.fromEntries(
-  PERMISSIONS.map((permission) => [
-    permission,
-    permissionDefinition(permission),
-  ])
+export const PERMISSION_CATALOG = /* SAFETY: every row carries a Permission key and a matching definition. */
+  (Object.fromEntries(
+    PERMISSIONS.map((permission) => [
+      permission,
+      permissionDefinition(permission),
+    ])
+  )
 ) as Record<Permission, PermissionDefinition>;

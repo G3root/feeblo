@@ -534,9 +534,7 @@ describe("webhook management service", () => {
 
           const pageTwo = yield* service.getDeliveryHistory({
             connectionId: created.endpoint.id,
-            ...(pageOne.nextCursor === null
-              ? {}
-              : { cursor: pageOne.nextCursor }),
+            ...(pageOne.nextCursor !== null && { cursor: pageOne.nextCursor }),
             limit: 1,
             organizationId,
           });

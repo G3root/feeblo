@@ -114,19 +114,18 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         actorMemberId === null
           ? { kind: "end_user" }
           : {
-              ...(actorName === undefined || actorName === null
-                ? {}
-                : { displayName: actorName }),
+              ...(actorName !== undefined &&
+                actorName !== null && { displayName: actorName }),
               kind: "member",
               memberId: actorMemberId,
             },
       boardId,
-      ...(description === undefined ? {} : { description }),
+      ...(description !== undefined && { description }),
       eventType,
       organizationId,
       postId,
       postSlug,
-      ...(previousStatusId === undefined ? {} : { previousStatusId }),
+      ...(previousStatusId !== undefined && { previousStatusId }),
       statusId,
       title,
     }).pipe(
@@ -180,13 +179,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         : Option.none();
       const candidates = yield* repository.findSuggestionCandidates({
         organizationId: args.organizationId,
-        ...(args.boardId ? { boardId: args.boardId } : {}),
-        ...(Option.isSome(queryEmbedding)
-          ? {
-              embedding: queryEmbedding.value.vector,
-              embeddingModel: queryEmbedding.value.model,
-            }
-          : {}),
+        ...(args.boardId && { boardId: args.boardId }),
+        ...(Option.isSome(queryEmbedding) && {
+          embedding: queryEmbedding.value.vector,
+          embeddingModel: queryEmbedding.value.model,
+        }),
         limit: Option.isSome(queryEmbedding)
           ? resultLimit
           : Math.max(25, resultLimit * 5),
@@ -209,7 +206,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const lexicalCandidates = Option.isSome(queryEmbedding)
         ? yield* repository.findSuggestionCandidates({
             organizationId: args.organizationId,
-            ...(args.boardId ? { boardId: args.boardId } : {}),
+            ...(args.boardId && { boardId: args.boardId }),
             limit: Math.max(25, resultLimit * 5),
             publicOnly,
           })
@@ -404,9 +401,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 service.notifyPostStatusChanged({
                   organizationId: args.organizationId,
                   postId: args.id,
-                  ...(membership
-                    ? { actorMemberId: membership.membershipId }
-                    : {}),
+                  ...(membership && {
+                    actorMemberId: membership.membershipId,
+                  }),
                 }),
             });
           }
@@ -619,8 +616,10 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             content: prepared.content,
             excerpt: htmlToExcerpt(sanitizedHtml),
             creatorId: session.session.userId,
-            ...(opts.source ? { source: opts.source } : {}),
-            ...(membership ? { creatorMemberId: membership.membershipId } : {}),
+            ...(opts.source && { source: opts.source }),
+            ...(membership && {
+              creatorMemberId: membership.membershipId,
+            }),
           });
           yield* commitPreparedEditorAssets(prepared.promotions);
           yield* syncPostAssetReferences({
@@ -656,7 +655,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.id,
             userId: session.session.userId,
-            ...(membership ? { memberId: membership.membershipId } : {}),
+            ...(membership && { memberId: membership.membershipId }),
           });
           const subscriptionNow = yield* DateTime.nowAsDate;
           yield* emailSubscriptions
@@ -706,9 +705,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               service.notifySubmission({
                 organizationId: args.organizationId,
                 postId: args.id,
-                ...(membership
-                  ? { actorMemberId: membership.membershipId }
-                  : {}),
+                ...(membership && {
+                  actorMemberId: membership.membershipId,
+                }),
               }),
           });
 

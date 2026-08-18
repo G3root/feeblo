@@ -1,3 +1,4 @@
+import { isObject } from "@feeblo/utils/runtime-kind";
 import {
   IntegrationProviderAuthenticationError,
   IntegrationProviderInvalidConfigurationError,
@@ -163,7 +164,7 @@ export const classifySlackApiError = (
     return new IntegrationProviderAuthenticationError({
       message: `Slack rejected authentication during ${context}`,
       provider: slackProviderKey,
-      ...(status === undefined ? {} : { httpStatus: status }),
+      ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
   if (status === 429) {
@@ -176,8 +177,8 @@ export const classifySlackApiError = (
     return new IntegrationProviderRateLimitedError({
       message: `Slack rate limited ${context}`,
       provider: slackProviderKey,
-      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
-      ...(status === undefined ? {} : { httpStatus: status }),
+      ...(retryAfterMs === undefined ? undefined : { retryAfterMs }),
+      ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
   if (status !== undefined && status >= 500) {
@@ -217,13 +218,13 @@ export const classifySlackApiError = (
     return new IntegrationProviderPermanentRejection({
       message: `Slack rejected ${context}: ${errorName}`,
       provider: slackProviderKey,
-      ...(status === undefined ? {} : { httpStatus: status }),
+      ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
   return new IntegrationProviderPermanentRejection({
     message: `Slack returned an unexpected response during ${context}`,
     provider: slackProviderKey,
-    ...(status === undefined ? {} : { httpStatus: status }),
+    ...(status === undefined ? undefined : { httpStatus: status }),
   });
 };
 
@@ -320,7 +321,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
     // the `ok: false` envelope; classify that envelope (and any non-2xx
     // status) into the typed provider failure algebra.
     if (
-      typeof body === "object" &&
+      isObject(body) &&
       body !== null &&
       "ok" in body &&
       body.ok === true
@@ -329,7 +330,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
     }
     return yield* classifySlackApiError(
       {
-        ...(typeof body === "object" && body !== null ? body : {}),
+        ...(isObject(body) && body),
         status,
       },
       input.context
@@ -342,7 +343,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
       body,
       botToken,
     }: {
-      readonly body: Record<string, unknown>;
+      readonly body: Record<string, string | number | boolean | null | undefined>;
       readonly botToken?: Redacted.Redacted<string>;
     },
     context: string
@@ -468,8 +469,8 @@ export const makeSlackApiClient = (): SlackApiClient => {
               token: Redacted.value(botToken),
               exclude_archived: true,
               types: types ?? "public_channel,private_channel",
-              ...(cursor === undefined ? {} : { cursor }),
-              ...(limit === undefined ? {} : { limit }),
+              ...(cursor === undefined ? undefined : { cursor }),
+              ...(limit === undefined ? undefined : { limit }),
             },
             botToken,
           },

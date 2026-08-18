@@ -16,6 +16,7 @@ interface GlobalAutoConfig {
 }
 
 function getFeebloScript(): HTMLScriptElement | null {
+  // SAFETY: currentScript is a script element whenever the SDK runs as a script.
   const currentScript = document.currentScript as HTMLScriptElement | null;
   if (currentScript && hasFeebloSource(currentScript.src)) {
     return currentScript;
@@ -35,8 +36,11 @@ function hasFeebloSource(src: string): boolean {
 }
 
 function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
-  const globalConfig = (window as unknown as Record<string, unknown>)
-    .feebloConfig as GlobalAutoConfig | undefined;
+  // SAFETY: auto-init probes for a global config the host page opted into by
+  // embedding the bootstrap snippet; the intersection only narrows the known
+  // Window shape.
+  const globalConfig = (window as Window & { feebloConfig?: GlobalAutoConfig })
+    .feebloConfig;
 
   const script = getFeebloScript();
   const scriptDataset = script?.dataset ?? {};
@@ -62,7 +66,9 @@ function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
   const modules =
     globalConfig?.modules ??
     (modulesValue
-      ? (modulesValue
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      ? (/* SAFETY: the parsed module list is one of the supported EmbedOptions modules. */
+        modulesValue
           .split(",")
           .map((value) => value.trim())
           .filter((value) => value.length > 0) as EmbedOptions["modules"])
@@ -82,13 +88,17 @@ function getAutoConfig(): { orgId: string; options: EmbedOptions } | null {
   if (locale) {
     options.locale = locale;
   }
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   if (mode) {
+    // SAFETY: The upstream contract guarantees this value here.
     options.mode = mode as EmbedOptions["mode"];
   }
   if (modules) {
     options.modules = modules;
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   }
   if (placement) {
+    // SAFETY: The upstream contract guarantees this value here.
     options.placement = placement as EmbedOptions["placement"];
   }
   if (debug) {

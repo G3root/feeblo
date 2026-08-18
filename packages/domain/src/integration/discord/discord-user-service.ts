@@ -20,7 +20,7 @@ const SYNTHETIC_DISCORD_EMAIL_SUFFIX = "@discord.invalid";
  * resolution is the stable synthetic-email reuse and anonymous-user creation
  * pair from the Slack policy.
  */
-export interface DiscordUserServiceShape {
+export interface DiscordUserServiceContract {
   readonly resolveUser: (input: {
     readonly displayName: string;
     readonly guildId: string;
@@ -30,7 +30,7 @@ export interface DiscordUserServiceShape {
 
 export class DiscordUserService extends Context.Service<
   DiscordUserService,
-  DiscordUserServiceShape
+  DiscordUserServiceContract
 >()("@feeblo/DiscordUserService") {}
 
 /** Creates the Discord user resolution service. */

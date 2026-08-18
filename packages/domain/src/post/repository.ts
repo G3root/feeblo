@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { currentDb, schema } from "@feeblo/db";
 import { htmlToExcerpt } from "@feeblo/utils/html";
 import { slugify } from "@feeblo/utils/url";
@@ -594,7 +595,7 @@ const makePostRepository = Effect.gen(function* () {
       creatorId,
       onlyIfNew,
     }: TPostDelete) => {
-      const ids = typeof id === "string" ? [id] : id;
+      const ids = isString(id) ? [id] : id;
       const postScope = and(
         inArray(schema.postTable.id, ids),
         eq(schema.postTable.organizationId, organizationId),

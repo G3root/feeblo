@@ -23,7 +23,7 @@ export interface GitHubInstallationLifecycleWebhook {
 }
 
 /** Applies GitHub webhook state once using the durable inbox record before evaluating linked-issue rules. */
-export interface GitHubInboundServiceShape {
+export interface GitHubInboundServiceContract {
   /** Applies GitHub App suspension, restoration, or removal to the linked Feeblo connection. */
   readonly applyInstallationLifecycleWebhook: (
     webhook: GitHubInstallationLifecycleWebhook
@@ -36,5 +36,5 @@ export interface GitHubInboundServiceShape {
 /** Application inbound service implemented against the webhook inbox and post-status workflow. */
 export class GitHubInboundService extends Context.Service<
   GitHubInboundService,
-  GitHubInboundServiceShape
+  GitHubInboundServiceContract
 >()("@feeblo/GitHubInboundService") {}

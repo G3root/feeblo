@@ -248,7 +248,7 @@ export interface IntegrationEventRecordingResult {
  * database transaction; implementations must never make external requests here.
  */
 /** Transaction-bound integration event recording capability. */
-export interface IntegrationEventRecorderShape {
+export interface IntegrationEventRecorderContract {
   readonly recordIntegrationEvent: (input: {
     readonly event: IntegrationEventEnvelopeV1;
   }) => Effect.Effect<
@@ -260,7 +260,7 @@ export interface IntegrationEventRecorderShape {
 /** Service key for atomic integration event and delivery recording. */
 export class IntegrationEventRecorder extends Context.Service<
   IntegrationEventRecorder,
-  IntegrationEventRecorderShape
+  IntegrationEventRecorderContract
 >()("@feeblo/IntegrationEventRecorder") {}
 
 /** Provider-side authentication failure requiring reconnection or remediation. */

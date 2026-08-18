@@ -10,7 +10,7 @@ import { isRole, ROLE_RANK, ROLES, type Role } from "./roles";
  * Keep this table in sync with the backend `*Policy` services; it is the
  * single definition shared by backend enforcement and frontend UI gating.
  */
-export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
+export const ROLE_PERMISSIONS = {
   /**
    * Contributors are otherwise governed by membership- and ownership-scoped
    * content policies. Moving posts is intentionally available across posts.
@@ -49,11 +49,12 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // Owner is retained for legacy workspaces. It intentionally adds no grants:
   // owner and admin have the same effective permissions.
   owner: [],
-};
+} satisfies Record<Role, readonly Permission[]>;
 
 /** Every permission granted to `role`, including inherited ones. */
 export const permissionsForRole = (role: Role): ReadonlySet<Permission> => {
   const permissions = new Set<Permission>();
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   for (const [candidate, rank] of Object.entries(ROLE_RANK) as [
     Role,
     number,
@@ -79,6 +80,7 @@ export const roleGrants = (role: Role, permission: Permission): boolean => {
     return false;
   }
 
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   return grants.has(`${permission.slice(0, separator)}.*` as Permission);
 };
 
@@ -89,10 +91,12 @@ export const roleGrants = (role: Role, permission: Permission): boolean => {
  * always follows its grants. Mirrors `hasOwnerOrAdminRole` on the frontend,
  * which gates on the same permission.
  */
-export const PRIVILEGED_ROLES = ROLES.filter((role) =>
-  roleGrants(role, "workspace.update")
+export const PRIVILEGED_ROLES = /* SAFETY: the filtered items are members of ROLES, hence branded Role values. */
+  (ROLES.filter((role) =>
+    roleGrants(role, "workspace.update")
+  )
 ) as readonly Role[];
 
 /** True when `role` is "owner" or "admin" — i.e. grants `workspace.update`. */
-export const isPrivilegedRole = (role: unknown): boolean =>
+export const isPrivilegedRole = (role: string): boolean =>
   isRole(role) && roleGrants(role, "workspace.update");

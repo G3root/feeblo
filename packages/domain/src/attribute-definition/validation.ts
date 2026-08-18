@@ -1,3 +1,4 @@
+import { isBoolean, isNumber, isString } from "@feeblo/utils/runtime-kind";
 import type { schema } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
@@ -27,13 +28,13 @@ const validateType = (
 
   switch (definition.type) {
     case "TEXT":
-      return typeof value === "string";
+      return isString(value);
     case "INTEGER":
-      return typeof value === "number" && Number.isInteger(value);
+      return isNumber(value) && Number.isInteger(value);
     case "DECIMAL":
-      return typeof value === "number" && !Number.isNaN(value);
+      return isNumber(value) && !Number.isNaN(value);
     case "BOOLEAN":
-      return typeof value === "boolean";
+      return isBoolean(value);
     case "DATE":
       return value instanceof Date && !Number.isNaN(value.getTime());
     default:
@@ -59,7 +60,7 @@ const validateConfig = (
 
   switch (definition.type) {
     case "TEXT": {
-      if (typeof value !== "string") {
+      if (!isString(value)) {
         return {
           valid: false,
           error: `Expected text value for "${definition.name}"`,
@@ -92,7 +93,7 @@ const validateConfig = (
     }
     case "INTEGER":
     case "DECIMAL": {
-      if (typeof value !== "number") {
+      if (!isNumber(value)) {
         return {
           valid: false,
           error: `Expected numeric value for "${definition.name}"`,
@@ -117,10 +118,15 @@ const validateConfig = (
   }
 };
 
+export type AttributeValidationResult = {
+  valid: boolean;
+  error?: string;
+};
+
 export const validateAttributeValue = (
   definition: AttributeDefinition,
   value: AttributeValue
-): { valid: boolean; error?: string } => {
+): AttributeValidationResult => {
   if (!validateType(definition, value)) {
     return {
       valid: false,

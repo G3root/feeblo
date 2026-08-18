@@ -51,7 +51,7 @@ export interface DiscordPostInput {
  * content, records the integration event, subscribes the author, and schedules
  * best-effort embedding.
  */
-export interface DiscordFeedbackServiceShape {
+export interface DiscordFeedbackServiceContract {
   readonly createPost: (
     input: DiscordPostInput
   ) => Effect.Effect<DiscordPost, DiscordInboundFailure>;
@@ -59,7 +59,7 @@ export interface DiscordFeedbackServiceShape {
 
 export class DiscordFeedbackService extends Context.Service<
   DiscordFeedbackService,
-  DiscordFeedbackServiceShape
+  DiscordFeedbackServiceContract
 >()("@feeblo/DiscordFeedbackService") {}
 
 export const makeDiscordFeedbackServiceLive = (): Layer.Layer<
@@ -147,7 +147,7 @@ export const makeDiscordFeedbackServiceLive = (): Layer.Layer<
                 eventType: "feedback.post.created",
                 organizationId: asLegid(WorkspaceId)(organizationId),
                 postId: id,
-                ...(Object.keys(metadata).length === 0 ? {} : { metadata }),
+                ...(Object.keys(metadata).length === 0 ? undefined : { metadata }),
                 postSlug: createdSlug,
                 statusId: asLegid(PostStatusId)(defaultStatus.id),
                 title,
@@ -176,9 +176,7 @@ export const makeDiscordFeedbackServiceLive = (): Layer.Layer<
             postId: id,
             organizationId,
             title,
-            ...(embeddingService._tag === "Some"
-              ? { embeddingService: embeddingService.value }
-              : {}),
+            ...(embeddingService._tag === "Some" && { embeddingService: embeddingService.value }),
           }).pipe(Effect.provideService(Database.Database, db));
           return {
             boardId,

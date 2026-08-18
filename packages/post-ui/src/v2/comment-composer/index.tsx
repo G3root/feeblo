@@ -50,8 +50,11 @@ function CommentComposerComponent({
   const isVisibilityControlled = externalIsPrivate !== undefined;
 
   const content = isContentControlled
-    ? (externalContent as string)
+    // SAFETY: The upstream contract guarantees a string here.
+    ? (/* SAFETY: the content is controlled only when the host passes a string. */
+      externalContent as string)
     : internalContent;
+  // SAFETY: The upstream contract guarantees a boolean here.
   const isPrivate = isVisibilityControlled
     ? (externalIsPrivate as boolean)
     : internalIsPrivate;

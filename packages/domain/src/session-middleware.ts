@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import type { Role } from "@feeblo/permissions";
 import { parseCookie } from "cookie-es";
 import * as Context from "effect/Context";
@@ -124,7 +125,7 @@ export const AuthMiddlewareLive = Layer.effect(
 
     return AuthMiddleware.of((effect, options) => {
       const cookieHeader =
-        typeof options.headers?.cookie === "string"
+        isString(options.headers?.cookie)
           ? options.headers.cookie
           : options.headers?.Cookie;
       const token = getSessionTokenFromCookieHeader(cookieHeader);
@@ -152,7 +153,7 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
 
     return OptionalAuthMiddleware.of((effect, options) => {
       const cookieHeader =
-        typeof options.headers?.cookie === "string"
+        isString(options.headers?.cookie)
           ? options.headers.cookie
           : options.headers?.Cookie;
       const token = getSessionTokenFromCookieHeader(cookieHeader);

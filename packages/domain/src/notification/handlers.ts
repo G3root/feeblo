@@ -27,8 +27,8 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const membership = yield* currentMembership(args.organizationId);
         return yield* notifications.list({
-          ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
-          ...(args.limit === undefined ? {} : { limit: args.limit }),
+          ...(args.cursor === undefined ? undefined : { cursor: args.cursor }),
+          ...(args.limit === undefined ? undefined : { limit: args.limit }),
           organizationId: args.organizationId,
           recipientMemberId: membership.membershipId,
         });

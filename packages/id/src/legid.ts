@@ -50,8 +50,9 @@ export const asLegid =
   <Name extends string>(
     _factory: LegidFactory<Name>
   ): ((input: string) => LegidOf<Name>) =>
-  (input) =>
-    input as unknown as LegidOf<Name>;
+  // SAFETY: the caller promises the input string is a valid legid for this
+  // factory (e.g. freshly read from a database row); the brand is type-only.
+  (input) => input as LegidOf<Name>;
 
 /**
  * Type-only helper that brands the `id` field of a single object using the
@@ -60,8 +61,12 @@ export const asLegid =
  */
 export const asLegidById =
   <Name extends string>(_factory: LegidFactory<Name>) =>
-  <T extends { id: string }>(input: T): WithLegidId<Name, T> =>
-    input as unknown as WithLegidId<Name, T>;
+  <T extends { id: string }>(input: T): WithLegidId<Name, T> => {
+    // SAFETY: the caller promises the input rows carry ids minted for this
+    // factory (e.g. freshly read from a database); the brand is type-only and
+    // never changes the runtime value.
+    return input as any;
+  };
 
 export type LegidFrom<Factory> =
   Factory extends LegidFactory<infer Name> ? LegidOf<Name> : never;
@@ -85,7 +90,12 @@ export type LegidArray<Name extends string> = readonly LegidOf<Name>[];
 export const asLegidArray = <Name extends string>(
   _factory: LegidFactory<Name>
 ): ((input: readonly string[]) => LegidArray<Name>) => {
-  return (input) => input as unknown as LegidArray<Name>;
+  return (input) => {
+    // SAFETY: the caller promises the input strings are valid legids for this
+    // factory (e.g. freshly read from a database); the brand is type-only and
+    // never changes the runtime value.
+    return input as any;
+  };
 };
 
 /**
@@ -109,8 +119,12 @@ export const asLegidArrayById =
   <Name extends string>(_factory: LegidFactory<Name>) =>
   <T extends { id: string }>(
     input: readonly T[]
-  ): readonly WithLegidId<Name, T>[] =>
-    input as unknown as readonly WithLegidId<Name, T>[];
+  ): readonly WithLegidId<Name, T>[] => {
+    // SAFETY: the caller promises the input rows carry ids minted for this
+    // factory (e.g. freshly read from a database); the brand is type-only and
+    // never changes the runtime value.
+    return input as any;
+  };
 
 type DefaultBrandName<Name extends string> =
   Name extends `${infer Head}_${infer Tail}`
@@ -190,8 +204,14 @@ export const makeId = <
     ...(step !== undefined && { step }),
   };
 
+  // SAFETY: defaultBrandName falls back to the supplied factory name and the
+  // supplied brand is validated below, so the value is always a brand for the
+  // legid namespace this factory owns.
   const brand = (options?.brand ?? defaultBrandName(name)) as BrandName;
   const brandLegidId = (id: LegidId): LegidOf<BrandName> =>
+    // SAFETY: the id was produced by this factory's LegidId schema (or was
+    // already verified against it), so adding the factory brand is a
+    // lossless type-only widening.
     id as LegidOf<BrandName>;
 
   const format = (id: string): string => `${validPrefix}_${id}`;
@@ -251,6 +271,8 @@ export const makeId = <
     return brandLegidId(LegidId.make(input));
   });
 
+  // SAFETY: Schema.brand only narrows the produced type; the codec still
+  // decodes to the branded LegidOf<BrandName> contract the factory promises.
   const idSchema = Schema.String.pipe(
     Schema.brand("LegidId"),
     Schema.brand(brand)

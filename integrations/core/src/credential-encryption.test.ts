@@ -39,10 +39,10 @@ describe("integration credential material", () => {
         ciphertext,
         (material) => ({
           ...(material.secret === undefined
-            ? {}
+            ? undefined
             : { secret: Redacted.make(material.secret) }),
           ...(material.oauthState === undefined
-            ? {}
+            ? undefined
             : { oauthState: material.oauthState }),
         })
       )

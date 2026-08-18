@@ -113,8 +113,8 @@ export const publicRpc = ({
     rateLimiter.consume({
       name,
       level,
-      ...(limit === undefined ? {} : { limit }),
-      ...(window === undefined ? {} : { window }),
+      ...(limit === undefined ? undefined : { limit }),
+      ...(window === undefined ? undefined : { window }),
     })
   );
 

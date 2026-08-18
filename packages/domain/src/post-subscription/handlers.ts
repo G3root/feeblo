@@ -32,10 +32,8 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     repository.findSubscribers({
       organizationId: args.organizationId,
       postId: args.postId,
-      ...(options?.publicOnly !== undefined
-        ? { publicOnly: options.publicOnly }
-        : {}),
-      ...(options?.userId !== undefined ? { userId: options.userId } : {}),
+      ...(options?.publicOnly !== undefined && { publicOnly: options.publicOnly }),
+      ...(options?.userId !== undefined && { userId: options.userId }),
     });
 
   const subscribeEffect = (args: TPostSubscriptionCreate) =>
@@ -50,7 +48,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.postId,
             userId: session.session.userId,
-            ...(membership ? { memberId: membership.membershipId } : {}),
+            ...(membership && { memberId: membership.membershipId }),
           });
           yield* emailSubscriptions
             .requestSubscription({

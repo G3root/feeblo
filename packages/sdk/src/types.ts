@@ -14,9 +14,18 @@ export type OrganizationId = string & {
   readonly __feebloOrganizationId: unique symbol;
 };
 
+/** JSON-like value space of widget identity custom fields. */
+export type WidgetFieldValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly WidgetFieldValue[]
+  | { readonly [key: string]: WidgetFieldValue };
+
 export interface WidgetCompany {
   avatar?: string | undefined;
-  customFields?: Record<string, unknown> | undefined;
+  customFields?: Record<string, WidgetFieldValue> | undefined;
   id: string;
   name: string;
 }
@@ -24,7 +33,7 @@ export interface WidgetCompany {
 export interface UserIdentity {
   avatar?: string | undefined;
   companies?: WidgetCompany[] | undefined;
-  customFields?: Record<string, unknown> | undefined;
+  customFields?: Record<string, WidgetFieldValue> | undefined;
   email?: string | undefined;
   id: string;
   name?: string | undefined;
@@ -36,7 +45,7 @@ export type PublicUserIdentity = Omit<UserIdentity, "token">;
 export interface NormalizedUserIdentity {
   avatar?: string | undefined;
   companies?: WidgetCompany[] | undefined;
-  customFields?: Record<string, unknown> | undefined;
+  customFields?: Record<string, WidgetFieldValue> | undefined;
   email?: string | undefined;
   id: string;
   name?: string | undefined;
@@ -168,7 +177,7 @@ export type IncomingMessage =
 export type OutgoingMessage =
   | { event: "SHOW" }
   | { event: "HIDE" }
-  | { event: "IDENTIFY"; data: Record<string, unknown> }
+  | { event: "IDENTIFY"; data: Record<string, WidgetFieldValue> }
   | { event: "SET_CONTEXT"; data: Record<string, string> }
   | { event: "SET_MODULE"; data: { module: WidgetModule } }
   | { event: "SET_BOARD"; data: { board: string } }
@@ -188,5 +197,7 @@ export type ExternalMessageData = {
  * sites. The value is unchanged at runtime.
  */
 export function organizationId(id: string): OrganizationId {
-  return id as unknown as OrganizationId;
+  // SAFETY: the caller promises the id was minted as an organization id; the
+  // brand is type-only and never changes the runtime value.
+  return id as OrganizationId;
 }
