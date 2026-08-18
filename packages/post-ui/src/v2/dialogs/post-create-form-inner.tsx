@@ -285,7 +285,7 @@ export function PostCreateForm() {
         form.reset();
         setContentEditorKey((current) => current + 1);
         store.send({ type: "toggle" });
-      } catch (_error) {
+      } catch {
         trackEvent("post_created", { source, success: false });
 
         const error = parseRpcError(_error);

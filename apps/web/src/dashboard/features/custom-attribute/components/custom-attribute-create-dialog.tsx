@@ -135,7 +135,7 @@ function CustomAttributeCreateForm({
           title: `${capitalize(entityType)} attribute created`,
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         trackEvent("custom_attribute_created", {
           entity_type: entityType,
           success: false,

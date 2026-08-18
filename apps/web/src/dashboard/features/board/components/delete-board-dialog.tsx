@@ -46,7 +46,7 @@ export function DeleteBoardDialog() {
                   type: "success",
                 });
                 store.send({ type: "toggle" });
-              } catch (_error) {
+              } catch {
                 toastManager.add({
                   title: "Failed to delete board",
                   type: "error",

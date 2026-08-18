@@ -79,7 +79,7 @@ export function ToggleRoadmapVisibilityDialog() {
         title: isPrivate ? "Roadmap is now public" : "Roadmap is now private",
         type: "success",
       });
-    } catch (_error) {
+    } catch {
       toastManager.add({
         title: "Failed to update roadmap visibility",
         type: "error",

@@ -191,7 +191,7 @@ function ContactEditFormFields({
         trackEvent("contact_updated", { success: true });
         store.send({ type: "setOpen", open: false });
         toastManager.add({ title: "Contact updated", type: "success" });
-      } catch (_error) {
+      } catch {
         trackEvent("contact_updated", { success: false });
         toastManager.add({ title: "Failed to update contact", type: "error" });
       }

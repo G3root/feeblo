@@ -169,7 +169,7 @@ function EditRoadmapForm() {
           title: "Roadmap updated successfully",
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to update roadmap",
           type: "error",

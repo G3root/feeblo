@@ -78,7 +78,7 @@ export const useChangelogAction = () => {
         to: "/$organizationId/changelog/edit/$changelogSlug",
         params: { organizationId, changelogSlug: slug },
       });
-    } catch (_error) {
+    } catch {
       trackEvent("changelog_created", { success: false });
       toastManager.add({
         title: "Failed to create changelog",

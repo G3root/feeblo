@@ -99,7 +99,7 @@ function TagCreateForm({
           title: "Tag created successfully",
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to create tag",
           type: "error",

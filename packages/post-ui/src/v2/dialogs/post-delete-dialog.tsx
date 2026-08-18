@@ -55,7 +55,7 @@ export function PostDeleteDialog() {
                 if (redirectOptions) {
                   navigate(redirectOptions);
                 }
-              } catch (_error) {
+              } catch {
                 trackEvent("post_deleted", { mode: "single", success: false });
                 toastManager.add({
                   title: "Failed to delete post",

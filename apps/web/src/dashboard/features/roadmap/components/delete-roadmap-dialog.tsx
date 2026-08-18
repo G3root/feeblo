@@ -40,7 +40,7 @@ export function DeleteRoadmapDialog() {
     try {
       const tx = roadmapCollection.delete(id);
       await tx.isPersisted.promise;
-    } catch (_error) {
+    } catch {
       toastManager.add({
         title: "Failed to delete roadmap",
         type: "error",
@@ -64,7 +64,7 @@ export function DeleteRoadmapDialog() {
           );
           await primaryTx.isPersisted.promise;
         }
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to promote a replacement primary roadmap",
           type: "error",

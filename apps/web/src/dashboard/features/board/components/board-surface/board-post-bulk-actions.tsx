@@ -128,7 +128,7 @@ function BulkDeleteAlert() {
                   } deleted successfully`,
                   type: "success",
                 });
-              } catch (_error) {
+              } catch {
                 trackEvent("post_deleted", { mode: "bulk", success: false });
                 console.error(_error);
                 toastManager.add({

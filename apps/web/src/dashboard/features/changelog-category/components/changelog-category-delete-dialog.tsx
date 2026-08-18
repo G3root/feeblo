@@ -46,7 +46,7 @@ export function ChangelogCategoryDeleteDialog() {
                   type: "success",
                 });
                 store.send({ type: "toggle" });
-              } catch (_error) {
+              } catch {
                 toastManager.add({
                   title: "Failed to delete category",
                   type: "error",

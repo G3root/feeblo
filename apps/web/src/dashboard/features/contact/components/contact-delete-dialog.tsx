@@ -29,7 +29,7 @@ export function ContactDeleteDialog() {
       trackEvent("contact_deleted", { success: true });
       store.send({ type: "setOpen", open: false });
       toastManager.add({ title: "Contact deleted", type: "success" });
-    } catch (_error) {
+    } catch {
       trackEvent("contact_deleted", { success: false });
       toastManager.add({ title: "Failed to delete contact", type: "error" });
     }

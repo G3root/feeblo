@@ -104,7 +104,7 @@ function CreateRoadmapForm() {
           title: "Roadmap created successfully",
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to create roadmap",
           type: "error",

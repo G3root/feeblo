@@ -73,7 +73,7 @@ export function ChangelogCompletedPosts({
             getChangelogPostKey({ changelogId: changelog.id, postId })
           );
       await tx.isPersisted.promise;
-    } catch (_error) {
+    } catch {
       toastManager.add({
         title: "Failed to update completed posts",
         type: "error",

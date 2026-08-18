@@ -51,7 +51,7 @@ function ChangelogPrivacySettingsPage() {
           title: "Changelog privacy updated",
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to update changelog privacy",
           type: "error",

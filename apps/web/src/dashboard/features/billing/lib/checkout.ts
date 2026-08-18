@@ -19,7 +19,7 @@ export async function startBillingCheckout({
 
     window.location.href = result.url;
     return true;
-  } catch (_error) {
+  } catch {
     toastManager.add({
       title: "Failed to create checkout session.",
       type: "error",
@@ -43,7 +43,7 @@ export async function startBillingPortal({
 
     window.location.href = result.url;
     return true;
-  } catch (_error) {
+  } catch {
     toastManager.add({
       title: "Failed to open billing portal.",
       type: "error",

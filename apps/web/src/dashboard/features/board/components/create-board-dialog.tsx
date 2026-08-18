@@ -94,7 +94,7 @@ function CreateBoardForm() {
           title: "Board created successfully",
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to create board",
           type: "error",

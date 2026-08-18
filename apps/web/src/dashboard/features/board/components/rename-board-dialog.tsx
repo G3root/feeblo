@@ -93,7 +93,7 @@ function RenameBoardForm() {
             boardSlug,
           },
         });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to rename board",
           type: "error",

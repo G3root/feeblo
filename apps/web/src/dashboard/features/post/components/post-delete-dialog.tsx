@@ -52,7 +52,7 @@ export function PostDeleteDialog() {
                 if (redirectOptions) {
                   navigate(redirectOptions);
                 }
-              } catch (_error) {
+              } catch {
                 toastManager.add({
                   title: "Failed to delete post",
                   type: "error",

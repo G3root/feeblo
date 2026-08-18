@@ -199,7 +199,7 @@ function useChangelogEditorForm({
           title: submitMeta?.successTitle ?? "Changelog saved",
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         trackEvent("changelog_saved", {
           status: changelog.status,
           success: false,
@@ -278,7 +278,7 @@ export function ChangelogEditorProvider({
         to: "/$organizationId/changelog",
         params: { organizationId },
       });
-    } catch (_error) {
+    } catch {
       trackEvent("changelog_deleted", { success: false });
       toastManager.add({
         title: "Failed to delete changelog",
@@ -407,7 +407,7 @@ export function ChangelogEditorCoverImageField() {
         title: "Cover image added",
         type: "success",
       });
-    } catch (_error) {
+    } catch {
       toastManager.add({
         title: "Failed to upload cover image",
         type: "error",
@@ -730,7 +730,7 @@ export function ChangelogEditorCategoryField() {
         title: "Categories updated",
         type: "success",
       });
-    } catch (_error) {
+    } catch {
       toastManager.add({
         title: "Failed to update categories",
         type: "error",
@@ -882,7 +882,7 @@ export function ChangelogEditorSidebarActions() {
                         title: "Changelog link copied to clipboard",
                         type: "success",
                       });
-                    } catch (_error) {
+                    } catch {
                       toastManager.add({
                         title: "Failed to copy changelog link",
                         type: "error",

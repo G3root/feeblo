@@ -58,7 +58,7 @@ export function CommentVisibilityDialog() {
                     : "Comment is now internal",
                   type: "success",
                 });
-              } catch (_error) {
+              } catch {
                 toastManager.add({
                   title: "Failed to update comment visibility",
                   type: "error",

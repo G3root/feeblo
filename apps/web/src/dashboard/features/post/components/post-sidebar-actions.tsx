@@ -109,7 +109,7 @@ function PostAdminActionButtons() {
       });
 
       setDialogAction(null);
-    } catch (_error) {
+    } catch {
       trackEvent("post_lock_changed", {
         locked: action === "lock" ? !isLocked : isLocked,
         success: false,

@@ -45,7 +45,7 @@ export function CompanyDeleteDialog() {
                 trackEvent("company_deleted", { success: true });
                 store.send({ type: "toggle" });
                 toastManager.add({ title: "Company deleted", type: "success" });
-              } catch (_error) {
+              } catch {
                 trackEvent("company_deleted", { success: false });
                 toastManager.add({
                   title: "Failed to delete company",

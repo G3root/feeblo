@@ -49,7 +49,7 @@ function RouteComponent() {
           title: "Roadmap visibility updated",
           type: "success",
         });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to update roadmap visibility",
           type: "error",

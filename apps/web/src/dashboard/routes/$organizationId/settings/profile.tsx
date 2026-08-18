@@ -97,7 +97,7 @@ function FullNameField() {
         type: "success",
       });
       await refetch();
-    } catch (_error) {
+    } catch {
       toastManager.add({
         title: "Failed to update full name",
         type: "error",

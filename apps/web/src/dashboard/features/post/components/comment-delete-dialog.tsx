@@ -45,7 +45,7 @@ export function CommentDeleteDialog() {
                   title: "Comment deleted successfully",
                   type: "success",
                 });
-              } catch (_error) {
+              } catch {
                 toastManager.add({
                   title: "Failed to delete comment",
                   type: "error",

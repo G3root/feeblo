@@ -175,7 +175,7 @@ function CompanyEditForm({
         trackEvent("company_updated", { success: true });
         store.send({ type: "toggle" });
         toastManager.add({ title: "Company updated", type: "success" });
-      } catch (_error) {
+      } catch {
         trackEvent("company_updated", { success: false });
         toastManager.add({ title: "Failed to update company", type: "error" });
       }

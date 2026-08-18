@@ -45,7 +45,7 @@ export function TagDeleteDialog() {
                   type: "success",
                 });
                 store.send({ type: "toggle" });
-              } catch (_error) {
+              } catch {
                 toastManager.add({
                   title: "Failed to delete tag",
                   type: "error",

@@ -748,7 +748,7 @@ export const commentCollection = createCollection(
           { signal: ctx.signal }
         );
         return [...data];
-      } catch (_error) {
+      } catch {
         return [];
       }
     },

@@ -85,7 +85,7 @@ function TagRenameForm() {
           type: "success",
         });
         store.send({ type: "toggle" });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to rename tag",
           type: "error",

@@ -134,7 +134,7 @@ export function SubscribeButton({ variant = "default" }: SubscribeButtonProps) {
             : "Subscribed to the post!",
         });
       }
-    } catch (_error) {
+    } catch {
       toastManager.add({
         title: "Failed to update subscription",
         type: "error",

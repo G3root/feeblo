@@ -501,7 +501,7 @@ function MemberListItem({
                     title: "Member role updated",
                     type: "success",
                   });
-                } catch (_error) {
+                } catch {
                   trackEvent("org_member_role_changed", {
                     role: value,
                     success: false,
@@ -554,7 +554,7 @@ function MemberListItem({
                     title: "Member removed",
                     type: "success",
                   });
-                } catch (_error) {
+                } catch {
                   trackEvent("org_member_removed", { success: false });
                   toastManager.add({
                     title: "Failed to remove member",
@@ -646,7 +646,7 @@ function InvitationListItem({
                   title: "Invitation revoked",
                   type: "success",
                 });
-              } catch (_error) {
+              } catch {
                 trackEvent("org_invitation_revoked", { success: false });
                 toastManager.add({
                   title: "Failed to revoke invitation",

@@ -97,7 +97,7 @@ function ChangelogCategoryRenameForm() {
           type: "success",
         });
         store.send({ type: "toggle" });
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to update category",
           type: "error",

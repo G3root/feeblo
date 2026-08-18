@@ -135,7 +135,7 @@ function CustomAttributeEditForm() {
           type: "success",
         });
         store.send({ type: "toggle" });
-      } catch (_error) {
+      } catch {
         trackEvent("custom_attribute_updated", {
           entity_type: entityType,
           success: false,

@@ -281,7 +281,7 @@ function UpgradePlanButton({
           if (!didStart) {
             setLoading(false);
           }
-        } catch (_error) {
+        } catch {
           setLoading(false);
         }
       }}

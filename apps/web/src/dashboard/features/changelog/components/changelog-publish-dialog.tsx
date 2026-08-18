@@ -41,7 +41,7 @@ export function ChangelogPublishDialog({
         });
         form.reset();
         setOpen(false);
-      } catch (_error) {
+      } catch {
         toastManager.add({
           title: "Failed to publish changelog",
           type: "error",

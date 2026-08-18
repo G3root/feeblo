@@ -55,7 +55,7 @@ function RegisterRoute() {
           });
           return;
         }
-      } catch (_error) {
+      } catch {
         trackEvent("org_created", { success: false });
         toastManager.add({
           title: "Failed to create workspace",

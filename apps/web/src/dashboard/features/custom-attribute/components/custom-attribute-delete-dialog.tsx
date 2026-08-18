@@ -67,7 +67,7 @@ export function CustomAttributeDeleteDialog() {
                   title: "Attribute deleted successfully",
                   type: "success",
                 });
-              } catch (_error) {
+              } catch {
                 trackEvent("custom_attribute_deleted", {
                   entity_type: entityType,
                   success: false,
