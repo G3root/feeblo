@@ -39,6 +39,8 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+      args:
+        APP_RELEASE: ${APP_RELEASE:-dev}
     restart: always
     depends_on:
       pg:
@@ -48,6 +50,7 @@ services:
     environment:
       NODE_ENV: production
       SERVER_PORT: ${SERVER_PORT:-8080}
+      APP_RELEASE: ${APP_RELEASE:-dev}
       APP_URL: ${APP_URL:-http://localhost:3001}
       API_URL: ${API_URL:-http://localhost:3000}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
